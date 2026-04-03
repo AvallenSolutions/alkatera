@@ -10,10 +10,31 @@ import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import { Supplier } from "@/hooks/data/useSuppliers";
 
-interface SupplierLocationTabProps {
+/**
+ * SupplierLocationTab supports two modes:
+ *
+ * 1. **Editable** (supplier portal): pass `supplier` + `onUpdate` props.
+ *    The supplier can edit their own location.
+ *
+ * 2. **Read-only** (brand detail page): pass `supplierCountry` + `readOnly`.
+ *    Displays the location with no edit controls.
+ */
+
+interface EditableProps {
   supplier: Supplier;
   onUpdate: () => void;
+  readOnly?: false;
+  supplierCountry?: never;
 }
+
+interface ReadOnlyProps {
+  readOnly: true;
+  supplierCountry: string | null;
+  supplier?: never;
+  onUpdate?: never;
+}
+
+type SupplierLocationTabProps = EditableProps | ReadOnlyProps;
 
 interface LocationData {
   address: string;
@@ -22,21 +43,24 @@ interface LocationData {
   country_code: string;
 }
 
-export function SupplierLocationTab({ supplier, onUpdate }: SupplierLocationTabProps) {
+export function SupplierLocationTab(props: SupplierLocationTabProps) {
+  const isReadOnly = props.readOnly === true;
+  const country = isReadOnly ? props.supplierCountry : props.supplier?.country;
+
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [locationData, setLocationData] = useState<LocationData | null>(null);
 
   useEffect(() => {
-    if (supplier.country) {
+    if (!isReadOnly && props.supplier?.country) {
       setLocationData({
-        address: supplier.country,
+        address: props.supplier.country,
         lat: 0,
         lng: 0,
-        country_code: supplier.country,
+        country_code: props.supplier.country,
       });
     }
-  }, [supplier]);
+  }, [isReadOnly, isReadOnly ? null : props.supplier]);
 
   const handleLocationSelect = (result: {
     formatted_address: string;
@@ -57,7 +81,7 @@ export function SupplierLocationTab({ supplier, onUpdate }: SupplierLocationTabP
   };
 
   const handleSave = async () => {
-    if (!locationData) return;
+    if (isReadOnly || !locationData || !props.supplier) return;
 
     setLoading(true);
 
@@ -67,13 +91,13 @@ export function SupplierLocationTab({ supplier, onUpdate }: SupplierLocationTabP
         .update({
           country: locationData.country_code || locationData.address,
         })
-        .eq("id", supplier.id);
+        .eq("id", props.supplier.id);
 
       if (error) throw error;
 
       toast.success("Location updated successfully");
       setIsEditing(false);
-      onUpdate();
+      props.onUpdate();
     } catch (error: any) {
       console.error("Error updating location:", error);
       toast.error(error.message || "Failed to update location");
@@ -92,7 +116,7 @@ export function SupplierLocationTab({ supplier, onUpdate }: SupplierLocationTabP
               Geographic location and facility information
             </CardDescription>
           </div>
-          {!isEditing && (
+          {!isReadOnly && !isEditing && (
             <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
               <Edit className="h-4 w-4 mr-2" />
               Edit Location
@@ -100,7 +124,7 @@ export function SupplierLocationTab({ supplier, onUpdate }: SupplierLocationTabP
           )}
         </CardHeader>
         <CardContent className="space-y-6">
-          {isEditing ? (
+          {!isReadOnly && isEditing ? (
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>Search Location</Label>
@@ -142,13 +166,13 @@ export function SupplierLocationTab({ supplier, onUpdate }: SupplierLocationTabP
             </div>
           ) : (
             <div>
-              {supplier.country ? (
+              {country ? (
                 <div className="flex items-start gap-3 p-4 rounded-lg border">
                   <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
                   <div className="flex-1">
                     <p className="font-medium">Location</p>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {supplier.country}
+                      {country}
                     </p>
                   </div>
                 </div>
@@ -158,10 +182,12 @@ export function SupplierLocationTab({ supplier, onUpdate }: SupplierLocationTabP
                   <p className="text-sm text-muted-foreground mb-4">
                     No location information available
                   </p>
-                  <Button onClick={() => setIsEditing(true)}>
-                    <MapPin className="h-4 w-4 mr-2" />
-                    Add Location
-                  </Button>
+                  {!isReadOnly && (
+                    <Button onClick={() => setIsEditing(true)}>
+                      <MapPin className="h-4 w-4 mr-2" />
+                      Add Location
+                    </Button>
+                  )}
                 </div>
               )}
             </div>

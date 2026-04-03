@@ -56,9 +56,12 @@ import {
   Leaf,
   Mail,
   Info,
+  Package,
 } from 'lucide-react';
+import Image from 'next/image';
 import { supabase } from '@/lib/supabaseClient';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
+import type { Session } from '@supabase/supabase-js';
 import { useOrganization } from '@/lib/organizationContext';
 import { useSupplierPermissions } from '@/hooks/useSupplierPermissions';
 import { useSupplierLimit } from '@/hooks/useSubscription';
@@ -75,12 +78,26 @@ interface OrganizationSupplier {
   industry_sector: string | null;
   country: string | null;
   description: string | null;
+  logo_url: string | null;
   is_verified: boolean;
   annual_spend: number | null;
   spend_currency: string | null;
   engagement_status: string;
   notes: string | null;
   added_at: string;
+  // Enriched from suppliers table (supplier-managed data)
+  _enriched?: {
+    name: string | null;
+    logo_url: string | null;
+    description: string | null;
+    country: string | null;
+    industry_sector: string | null;
+    website: string | null;
+    address: string | null;
+    city: string | null;
+    supplier_id: string;
+  };
+  _productCount?: number;
 }
 
 interface PlatformSupplier {
@@ -140,7 +157,62 @@ export default function SuppliersPage() {
         .order('added_at', { ascending: false });
 
       if (error) throw error;
-      setSuppliers(data || []);
+
+      const viewSuppliers = (data || []) as OrganizationSupplier[];
+
+      // Enrich with supplier-managed data via server-side API route.
+      // The suppliers table is RLS-protected to the supplier's own org,
+      // so we use a service-role API to fetch logo, description, address,
+      // product counts, etc.
+      const emails = viewSuppliers
+        .map(s => s.contact_email)
+        .filter((e): e is string => !!e);
+
+      if (emails.length > 0) {
+        try {
+          const browserClient = getSupabaseBrowserClient();
+          const { data: sessionData } = await browserClient.auth.getSession();
+          const token = sessionData?.session?.access_token;
+
+          if (token) {
+            const res = await fetch('/api/suppliers/enrich', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+              },
+              body: JSON.stringify({ emails }),
+            });
+
+            if (res.ok) {
+              const { suppliers: enrichedMap } = await res.json();
+
+              for (const supplier of viewSuppliers) {
+                if (supplier.contact_email && enrichedMap[supplier.contact_email]) {
+                  const enriched = enrichedMap[supplier.contact_email];
+                  supplier._enriched = {
+                    name: enriched.name,
+                    logo_url: enriched.logo_url,
+                    description: enriched.description,
+                    country: enriched.country,
+                    industry_sector: enriched.industry_sector,
+                    website: enriched.website,
+                    address: enriched.address,
+                    city: enriched.city,
+                    supplier_id: enriched.supplier_id,
+                  };
+                  supplier._productCount = enriched.product_count;
+                }
+              }
+            }
+          }
+        } catch (enrichError) {
+          // Non-critical: cards still render with platform_suppliers data
+          console.warn('Could not enrich supplier data:', enrichError);
+        }
+      }
+
+      setSuppliers(viewSuppliers);
     } catch (error) {
       console.error('Error fetching suppliers:', error);
       toast.error('Failed to load suppliers');
@@ -345,10 +417,15 @@ export default function SuppliersPage() {
   const filteredSuppliers = suppliers.filter((supplier) => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
+    const name = supplier._enriched?.name || supplier.supplier_name;
+    const country = supplier._enriched?.country || supplier.country;
+    const city = supplier._enriched?.city;
+    const sector = supplier._enriched?.industry_sector || supplier.industry_sector;
     return (
-      supplier.supplier_name.toLowerCase().includes(query) ||
-      supplier.country?.toLowerCase().includes(query) ||
-      supplier.industry_sector?.toLowerCase().includes(query)
+      name.toLowerCase().includes(query) ||
+      country?.toLowerCase().includes(query) ||
+      city?.toLowerCase().includes(query) ||
+      sector?.toLowerCase().includes(query)
     );
   });
 
@@ -506,12 +583,23 @@ export default function SuppliersPage() {
 
               <Link href={`/suppliers/${supplier.id}`}>
                 <CardHeader>
-                  <div className="mb-4 aspect-video rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-                    <Building2 className="h-12 w-12 text-muted-foreground" />
+                  <div className="mb-4 aspect-video rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center relative overflow-hidden">
+                    {(supplier._enriched?.logo_url || supplier.logo_url) ? (
+                      <Image
+                        src={supplier._enriched?.logo_url || supplier.logo_url!}
+                        alt={`${supplier._enriched?.name || supplier.supplier_name} logo`}
+                        fill
+                        className="object-contain p-4"
+                      />
+                    ) : (
+                      <Building2 className="h-12 w-12 text-muted-foreground" />
+                    )}
                   </div>
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <CardTitle className="line-clamp-1">{supplier.supplier_name}</CardTitle>
+                      <CardTitle className="line-clamp-1">
+                        {supplier._enriched?.name || supplier.supplier_name}
+                      </CardTitle>
                       {supplier.is_verified && (
                         <Badge variant="default" className="bg-emerald-600 text-xs">
                           <CheckCircle className="h-2.5 w-2.5 mr-1" />
@@ -520,36 +608,46 @@ export default function SuppliersPage() {
                       )}
                     </div>
                     <CardDescription className="line-clamp-1">
-                      {supplier.industry_sector || 'No industry specified'}
+                      {supplier._enriched?.industry_sector || supplier.industry_sector || 'No industry specified'}
                     </CardDescription>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {supplier.description && (
+                  {(supplier._enriched?.description || supplier.description) && (
                     <p className="text-sm text-muted-foreground line-clamp-2">
-                      {supplier.description}
+                      {supplier._enriched?.description || supplier.description}
                     </p>
                   )}
 
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground flex items-center gap-1">
                       <MapPin className="h-3.5 w-3.5" />
-                      Country:
+                      Location:
                     </span>
-                    <span className="font-medium">{supplier.country || 'Not specified'}</span>
+                    <span className="font-medium truncate ml-2">
+                      {[
+                        supplier._enriched?.city,
+                        supplier._enriched?.country || supplier.country,
+                      ].filter(Boolean).join(', ') || 'Not specified'}
+                    </span>
                   </div>
 
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Annual Spend:</span>
+                    <span className="text-muted-foreground flex items-center gap-1">
+                      <Package className="h-3.5 w-3.5" />
+                      Products:
+                    </span>
                     <span className="font-medium">
-                      {formatCurrency(supplier.annual_spend, supplier.spend_currency)}
+                      {supplier._productCount != null ? supplier._productCount : '—'}
                     </span>
                   </div>
 
-                  {supplier.website && (
+                  {(supplier._enriched?.website || supplier.website) && (
                     <div className="flex items-center text-sm text-blue-600 hover:text-blue-700">
                       <Globe className="h-3.5 w-3.5 mr-1" />
-                      <span className="truncate">Website</span>
+                      <span className="truncate">
+                        {(supplier._enriched?.website || supplier.website || '').replace(/^https?:\/\//, '')}
+                      </span>
                     </div>
                   )}
 

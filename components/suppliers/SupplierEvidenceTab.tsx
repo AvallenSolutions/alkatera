@@ -50,9 +50,10 @@ interface Document {
 
 interface SupplierEvidenceTabProps {
   supplierId: string;
+  readOnly?: boolean;
 }
 
-export function SupplierEvidenceTab({ supplierId }: SupplierEvidenceTabProps) {
+export function SupplierEvidenceTab({ supplierId, readOnly = false }: SupplierEvidenceTabProps) {
   const { currentOrganization } = useOrganization();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
@@ -258,10 +259,12 @@ export function SupplierEvidenceTab({ supplierId }: SupplierEvidenceTabProps) {
               Environmental Product Declarations (EPDs), LCA reports, and certificates
             </CardDescription>
           </div>
-          <Button onClick={() => setUploadDialogOpen(true)}>
-            <Upload className="h-4 w-4 mr-2" />
-            Upload Document
-          </Button>
+          {!readOnly && (
+            <Button onClick={() => setUploadDialogOpen(true)}>
+              <Upload className="h-4 w-4 mr-2" />
+              Upload Document
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -274,10 +277,12 @@ export function SupplierEvidenceTab({ supplierId }: SupplierEvidenceTabProps) {
               <p className="text-sm text-muted-foreground mb-4">
                 No documents uploaded yet
               </p>
-              <Button onClick={() => setUploadDialogOpen(true)}>
-                <Upload className="h-4 w-4 mr-2" />
-                Upload First Document
-              </Button>
+              {!readOnly && (
+                <Button onClick={() => setUploadDialogOpen(true)}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload First Document
+                </Button>
+              )}
             </div>
           ) : (
             <div className="space-y-3">
@@ -300,18 +305,20 @@ export function SupplierEvidenceTab({ supplierId }: SupplierEvidenceTabProps) {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setDocumentToDelete(doc);
-                        setDeleteDialogOpen(true);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4 text-red-600" />
-                    </Button>
-                  </div>
+                  {!readOnly && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setDocumentToDelete(doc);
+                          setDeleteDialogOpen(true);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 text-red-600" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
