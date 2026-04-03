@@ -11,8 +11,10 @@ const EMISSION_CATEGORIES = [
   'grid_electricity', 'natural_gas', 'diesel_stationary', 'diesel_mobile',
   'petrol_mobile', 'lpg', 'water',
   'air_travel', 'rail_travel', 'accommodation',
+  'employee_commuting',
   'road_freight', 'sea_freight', 'air_freight', 'courier',
-  'packaging', 'raw_materials',
+  'packaging', 'raw_materials', 'marketing_materials',
+  'capital_goods',
   'professional_services', 'it_services', 'telecoms',
   'waste', 'other',
 ]
@@ -23,22 +25,27 @@ Given a list of financial transactions from Xero (supplier name + description + 
 
 ${EMISSION_CATEGORIES.map(c => `- ${c}`).join('\n')}
 
+If a transaction is NOT emissions-relevant (wages, rent, insurance, bank fees, depreciation, subscriptions, donations), use "exclude".
 If a transaction does not fit any category, use null.
 
-Common patterns in drinks industry:
+Category guidance:
 - Utility companies → grid_electricity, natural_gas, water
 - Airlines, Trainline, travel agents → air_travel, rail_travel
 - Hotels, Airbnb → accommodation
-- Logistics, DHL, couriers, hauliers → road_freight, sea_freight, air_freight
+- Cycle-to-work schemes, season tickets, staff bus passes → employee_commuting
+- Logistics, DHL, couriers, hauliers → road_freight, sea_freight, air_freight, courier
 - Packaging suppliers (glass, cans, bottles, labels) → packaging
 - Grain, malt, hops, sugar, fruit suppliers → raw_materials
+- T-shirts, merchandise, POS materials, printed promo → marketing_materials
+- Machinery, brewing equipment, vehicles, fixtures, IT hardware → capital_goods
 - Accountants, lawyers, consultants → professional_services
 - IT, software, hosting → it_services
 - Waste collection → waste
+- Wages, rent, insurance, bank fees, depreciation → exclude
 
 Respond with a JSON array. Each item must have:
 - transactionId: string (the id provided)
-- suggestedCategory: string | null (from the list above)
+- suggestedCategory: string | "exclude" | null (from the list above)
 - confidence: number (0.0-1.0)
 - reasoning: string (brief, one sentence)
 

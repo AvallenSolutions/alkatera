@@ -3,29 +3,48 @@
  * Single source of truth to prevent drift between panels.
  */
 export const CATEGORY_LABELS: Record<string, string> = {
-  grid_electricity: 'Electricity',
+  // Scope 1: Direct emissions
   natural_gas: 'Natural Gas',
   diesel_stationary: 'Diesel (stationary)',
   diesel_mobile: 'Diesel (mobile)',
   petrol_mobile: 'Petrol (mobile)',
   lpg: 'LPG',
-  water: 'Water',
+
+  // Scope 2: Purchased energy
+  grid_electricity: 'Electricity',
+
+  // Scope 3: Business travel (Cat 6)
   air_travel: 'Air Travel',
   rail_travel: 'Rail Travel',
   accommodation: 'Accommodation',
+
+  // Scope 3: Employee commuting (Cat 7)
+  employee_commuting: 'Team & Commuting',
+
+  // Scope 3: Logistics & freight (Cat 4/9)
   road_freight: 'Road Freight',
   sea_freight: 'Sea Freight',
   air_freight: 'Air Freight',
   courier: 'Courier',
+
+  // Scope 3: Purchased goods (Cat 1)
   packaging: 'Packaging',
   raw_materials: 'Raw Materials',
+  marketing_materials: 'Marketing Materials',
+
+  // Scope 3: Capital goods (Cat 2)
+  capital_goods: 'Capital Goods',
+
+  // Scope 3: Purchased services (Cat 8)
   professional_services: 'Professional Services',
   it_services: 'IT Services',
   telecoms: 'Telecoms',
-  waste_management: 'Waste Management',
+
+  // Scope 3: Waste & water (Cat 5)
+  water: 'Water',
   waste: 'Waste',
-  cleaning: 'Cleaning',
-  maintenance: 'Maintenance',
+
+  // Catch-all
   other: 'Other',
 }
 

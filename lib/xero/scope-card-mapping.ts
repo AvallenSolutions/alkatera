@@ -32,31 +32,37 @@ export const XERO_TO_SCOPE_CARD_MAP: Record<string, ScopeCardMapping> = {
   // Scope 2: Purchased energy
   grid_electricity:  { scope: 2, overheadCategory: null, cardLabel: 'Electricity' },
 
-  // Scope 3: Value chain - Business Travel
+  // Scope 3: Business Travel (Cat 6)
   air_travel:        { scope: 3, overheadCategory: 'business_travel', cardLabel: 'Air Travel' },
   rail_travel:       { scope: 3, overheadCategory: 'business_travel', cardLabel: 'Rail Travel' },
   accommodation:     { scope: 3, overheadCategory: 'business_travel', cardLabel: 'Accommodation' },
 
-  // Scope 3: Value chain - Logistics & Freight
+  // Scope 3: Employee Commuting (Cat 7)
+  employee_commuting: { scope: 3, overheadCategory: 'employee_commuting', cardLabel: 'Team & Commuting' },
+
+  // Scope 3: Logistics & Freight (Cat 4/9)
   road_freight:      { scope: 3, overheadCategory: 'downstream_logistics', cardLabel: 'Road Freight' },
   sea_freight:       { scope: 3, overheadCategory: 'downstream_logistics', cardLabel: 'Sea Freight' },
   air_freight:       { scope: 3, overheadCategory: 'downstream_logistics', cardLabel: 'Air Freight' },
   courier:           { scope: 3, overheadCategory: 'downstream_logistics', cardLabel: 'Courier' },
 
-  // Scope 3: Value chain - Purchased Services
+  // Scope 3: Purchased Goods (Cat 1)
   packaging:              { scope: 3, overheadCategory: 'purchased_services_materials', cardLabel: 'Packaging' },
   raw_materials:          { scope: 3, overheadCategory: 'purchased_services', cardLabel: 'Raw Materials' },
+  marketing_materials:    { scope: 3, overheadCategory: 'purchased_services', cardLabel: 'Marketing Materials' },
+
+  // Scope 3: Capital Goods (Cat 2)
+  capital_goods:          { scope: 3, overheadCategory: 'capital_goods', cardLabel: 'Capital Goods' },
+
+  // Scope 3: Purchased Services (Cat 8)
   professional_services:  { scope: 3, overheadCategory: 'purchased_services', cardLabel: 'Professional Services' },
   it_services:            { scope: 3, overheadCategory: 'purchased_services', cardLabel: 'IT Services' },
   telecoms:               { scope: 3, overheadCategory: 'purchased_services', cardLabel: 'Telecoms' },
-  cleaning:               { scope: 3, overheadCategory: 'purchased_services', cardLabel: 'Cleaning' },
-  maintenance:            { scope: 3, overheadCategory: 'purchased_services', cardLabel: 'Maintenance' },
   other:                  { scope: 3, overheadCategory: 'purchased_services', cardLabel: 'Other' },
 
-  // Scope 3: Value chain - Waste & Water
+  // Scope 3: Waste & Water (Cat 5)
   water:            { scope: 3, overheadCategory: 'operational_waste', cardLabel: 'Water' },
   waste:            { scope: 3, overheadCategory: 'operational_waste', cardLabel: 'Waste' },
-  waste_management: { scope: 3, overheadCategory: 'operational_waste', cardLabel: 'Waste Management' },
 }
 
 /**

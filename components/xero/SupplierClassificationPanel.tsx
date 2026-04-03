@@ -63,27 +63,45 @@ const CATEGORY_GROUPS = [
     ],
   },
   {
-    label: 'Scope 2 — Energy',
+    label: 'Scope 2 — Purchased energy',
     options: [
       { value: 'grid_electricity', label: 'Electricity' },
     ],
   },
   {
-    label: 'Scope 3 — Supply chain',
+    label: 'Scope 3 — Travel & commuting',
     options: [
-      { value: 'water', label: 'Water' },
       { value: 'air_travel', label: 'Air Travel' },
       { value: 'rail_travel', label: 'Rail Travel' },
       { value: 'accommodation', label: 'Accommodation' },
+      { value: 'employee_commuting', label: 'Team & Commuting' },
+    ],
+  },
+  {
+    label: 'Scope 3 — Goods & materials',
+    options: [
+      { value: 'raw_materials', label: 'Raw Materials' },
+      { value: 'packaging', label: 'Packaging' },
+      { value: 'marketing_materials', label: 'Marketing Materials' },
+      { value: 'capital_goods', label: 'Capital Goods' },
+    ],
+  },
+  {
+    label: 'Scope 3 — Logistics & freight',
+    options: [
       { value: 'road_freight', label: 'Road Freight' },
       { value: 'sea_freight', label: 'Sea Freight' },
       { value: 'air_freight', label: 'Air Freight' },
       { value: 'courier', label: 'Courier' },
-      { value: 'packaging', label: 'Packaging' },
-      { value: 'raw_materials', label: 'Raw Materials' },
+    ],
+  },
+  {
+    label: 'Scope 3 — Services & utilities',
+    options: [
       { value: 'professional_services', label: 'Professional Services' },
       { value: 'it_services', label: 'IT Services' },
       { value: 'telecoms', label: 'Telecoms' },
+      { value: 'water', label: 'Water' },
       { value: 'waste', label: 'Waste' },
       { value: 'other', label: 'Other' },
     ],

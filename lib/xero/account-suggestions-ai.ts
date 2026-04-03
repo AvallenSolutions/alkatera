@@ -19,8 +19,10 @@ const VALID_CATEGORIES = [
   'grid_electricity', 'natural_gas', 'diesel_stationary', 'diesel_mobile',
   'petrol_mobile', 'lpg', 'water',
   'air_travel', 'rail_travel', 'accommodation',
+  'employee_commuting',
   'road_freight', 'sea_freight', 'air_freight', 'courier',
-  'packaging', 'raw_materials',
+  'packaging', 'raw_materials', 'marketing_materials',
+  'capital_goods',
   'professional_services', 'it_services', 'telecoms',
   'waste', 'other',
 ]
@@ -40,18 +42,21 @@ Valid categories:
 - air_travel: Flights
 - rail_travel: Train travel
 - accommodation: Hotels and lodging
+- employee_commuting: Staff commuting, cycle-to-work, season tickets, bus passes
 - road_freight: Road haulage and delivery
 - sea_freight: Shipping by sea
 - air_freight: Air cargo
 - courier: Parcel and courier services
 - packaging: Bottles, cans, labels, boxes, closures
 - raw_materials: Ingredients (malt, hops, grain, sugar, fruit, yeast, grapes)
+- marketing_materials: POS materials, T-shirts, merchandise, printed promo, branded goods
+- capital_goods: Machinery, brewing equipment, vehicles, fixtures, IT hardware
 - professional_services: Accountants, lawyers, consultants
 - it_services: Software, hosting, IT support
 - telecoms: Phone and internet
 - waste: Waste collection and disposal
 - other: Emissions-relevant but doesn't fit above
-- exclude: NOT emissions-relevant (e.g. wages, rent, insurance, bank fees, depreciation, subscriptions, donations, legal fees for non-consulting)
+- exclude: NOT emissions-relevant (e.g. wages, rent, insurance, bank fees, depreciation, subscriptions, donations)
 
 Common drinks industry account patterns:
 - "Cost of Goods Sold", "COGS", "Purchases" → raw_materials (if a drinks producer)
@@ -59,10 +64,13 @@ Common drinks industry account patterns:
 - "Delivery", "Distribution", "Freight", "Carriage" → road_freight
 - "Motor Expenses", "Fuel", "Mileage" → diesel_mobile
 - "Travel" (general) → air_travel
+- "Staff Travel", "Commuting", "Season Tickets" → employee_commuting
+- "Marketing", "Merchandise", "POS", "Promotional" → marketing_materials
+- "Capital Equipment", "Machinery", "Fixed Assets" → capital_goods
 - "Entertainment", "Staff Costs", "Wages", "Salaries" → exclude
 - "Rent", "Rates", "Insurance" → exclude
 - "Bank Fees", "Interest", "Depreciation" → exclude
-- "Advertising", "Marketing" → exclude (unless print/physical)
+- "Advertising" → exclude (unless print/physical → marketing_materials)
 - "Subscriptions" → exclude
 - "Repairs & Maintenance" → other (may include refrigerant top-ups)
 - "Cleaning" → other

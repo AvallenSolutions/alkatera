@@ -25,23 +25,35 @@ import { suggestCategory } from '@/lib/xero/account-suggestions'
 // ── Constants ───────────────────────────────────────────────────────
 
 const EMISSION_CATEGORIES = [
-  { value: 'grid_electricity', label: 'Grid Electricity', scope: 'Scope 2' },
+  // Scope 1
   { value: 'natural_gas', label: 'Natural Gas', scope: 'Scope 1' },
   { value: 'diesel_stationary', label: 'Diesel (Stationary)', scope: 'Scope 1' },
   { value: 'diesel_mobile', label: 'Diesel (Fleet)', scope: 'Scope 1' },
   { value: 'petrol_mobile', label: 'Petrol (Fleet)', scope: 'Scope 1' },
   { value: 'lpg', label: 'LPG', scope: 'Scope 1' },
-  { value: 'water', label: 'Water Supply', scope: 'Scope 3' },
+  // Scope 2
+  { value: 'grid_electricity', label: 'Grid Electricity', scope: 'Scope 2' },
+  // Scope 3: Travel & commuting
   { value: 'air_travel', label: 'Air Travel', scope: 'Scope 3' },
   { value: 'rail_travel', label: 'Rail Travel', scope: 'Scope 3' },
+  { value: 'accommodation', label: 'Hotel / Accommodation', scope: 'Scope 3' },
+  { value: 'employee_commuting', label: 'Team & Commuting', scope: 'Scope 3' },
+  // Scope 3: Goods & materials
+  { value: 'raw_materials', label: 'Raw Materials / Ingredients', scope: 'Scope 3' },
+  { value: 'packaging', label: 'Packaging Materials', scope: 'Scope 3' },
+  { value: 'marketing_materials', label: 'Marketing Materials', scope: 'Scope 3' },
+  { value: 'capital_goods', label: 'Capital Goods', scope: 'Scope 3' },
+  // Scope 3: Logistics
   { value: 'road_freight', label: 'Road Freight', scope: 'Scope 3' },
   { value: 'sea_freight', label: 'Sea Freight', scope: 'Scope 3' },
   { value: 'air_freight', label: 'Air Freight', scope: 'Scope 3' },
   { value: 'courier', label: 'Courier / Parcel', scope: 'Scope 3' },
-  { value: 'packaging', label: 'Packaging Materials', scope: 'Scope 3' },
-  { value: 'raw_materials', label: 'Raw Materials / Ingredients', scope: 'Scope 3' },
+  // Scope 3: Services & utilities
+  { value: 'professional_services', label: 'Professional Services', scope: 'Scope 3' },
+  { value: 'it_services', label: 'IT Services', scope: 'Scope 3' },
+  { value: 'telecoms', label: 'Telecoms', scope: 'Scope 3' },
+  { value: 'water', label: 'Water Supply', scope: 'Scope 3' },
   { value: 'waste', label: 'Waste Disposal', scope: 'Scope 3' },
-  { value: 'accommodation', label: 'Hotel / Accommodation', scope: 'Scope 3' },
   { value: 'other', label: 'Other', scope: '' },
 ] as const
 

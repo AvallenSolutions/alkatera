@@ -29,8 +29,20 @@ export const SPEND_EMISSION_FACTORS: Record<string, { factor: number; source: st
   courier:          { factor: 0.62, source: 'DEFRA 2024 Table 13c: Postal & courier', uncertainty: 0.7 },
 
   // Supply chain
-  packaging:        { factor: 0.72, source: 'DEFRA 2024 Table 13c: Paper/packaging', uncertainty: 0.8 },
-  raw_materials:    { factor: 0.58, source: 'DEFRA 2024 Table 13c: Food products', uncertainty: 0.7 },
+  packaging:           { factor: 0.72, source: 'DEFRA 2024 Table 13c: Paper/packaging', uncertainty: 0.8 },
+  raw_materials:       { factor: 0.58, source: 'DEFRA 2024 Table 13c: Food products', uncertainty: 0.7 },
+  marketing_materials: { factor: 0.60, source: 'DEFRA 2024 Table 13c: Textiles/printing', uncertainty: 0.8 },
+
+  // Capital goods
+  capital_goods:    { factor: 0.54, source: 'DEFRA 2024 Table 13c: Machinery/equipment', uncertainty: 0.9 },
+
+  // Employee commuting
+  employee_commuting: { factor: 0.27, source: 'DEFRA 2024 Table 13c: Average commuting', uncertainty: 0.7 },
+
+  // Services
+  professional_services: { factor: 0.22, source: 'DEFRA 2024 Table 13c: Professional services', uncertainty: 0.5 },
+  it_services:           { factor: 0.22, source: 'DEFRA 2024 Table 13c: IT services', uncertainty: 0.5 },
+  telecoms:              { factor: 0.22, source: 'DEFRA 2024 Table 13c: Telecoms', uncertainty: 0.4 },
 
   // Utilities & waste
   water:            { factor: 0.32, source: 'DEFRA 2024 Table 13c: Water supply', uncertainty: 0.3 },

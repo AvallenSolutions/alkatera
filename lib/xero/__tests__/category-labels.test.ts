@@ -13,6 +13,7 @@ describe('CATEGORY_LABELS', () => {
       'grid_electricity', 'natural_gas', 'air_travel', 'rail_travel',
       'accommodation', 'road_freight', 'packaging', 'raw_materials',
       'water', 'waste', 'other',
+      'employee_commuting', 'marketing_materials', 'capital_goods',
     ]
     for (const key of expectedKeys) {
       expect(CATEGORY_LABELS[key]).toBeDefined()

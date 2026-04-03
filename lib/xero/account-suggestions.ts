@@ -33,10 +33,20 @@ const SUGGESTION_RULES: Array<{ keywords: string[]; category: string }> = [
   // Waste
   { keywords: ['waste', 'skip hire', 'refuse', 'recycling', 'disposal'], category: 'waste' },
 
+  // Employee commuting
+  { keywords: ['commuting', 'cycle to work', 'season ticket', 'bus pass', 'staff travel'], category: 'employee_commuting' },
+
+  // Marketing materials
+  { keywords: ['merchandise', 'merch', 't-shirt', 'tshirt', 'point of sale', 'pos material', 'promotional', 'branded goods'], category: 'marketing_materials' },
+
+  // Capital goods
+  { keywords: ['machinery', 'equipment', 'capital', 'fixed asset', 'brewing equipment', 'still', 'ferment'], category: 'capital_goods' },
+
   // Broader matches (lower priority, checked last)
   { keywords: ['fuel'], category: 'diesel_mobile' },
   { keywords: ['travel'], category: 'air_travel' },
   { keywords: ['water'], category: 'water' },
+  { keywords: ['marketing'], category: 'marketing_materials' },
 ]
 
 /**
