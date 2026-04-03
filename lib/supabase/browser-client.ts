@@ -41,7 +41,8 @@ export function getSupabaseBrowserClient() {
     cookies: {
       get(name) {
         if (inIframe && typeof window !== 'undefined') {
-          return localStorage.getItem(name) || undefined
+          // Use sessionStorage in iframe context (cleared on tab close, not accessible cross-site)
+          return sessionStorage.getItem(name) || undefined
         }
         if (typeof document === 'undefined') return undefined
         const value = `; ${document.cookie}`
@@ -51,7 +52,7 @@ export function getSupabaseBrowserClient() {
       },
       set(name, value, options) {
         if (inIframe && typeof window !== 'undefined') {
-          localStorage.setItem(name, value)
+          sessionStorage.setItem(name, value)
           return
         }
         if (typeof document === 'undefined') return
@@ -65,7 +66,7 @@ export function getSupabaseBrowserClient() {
       },
       remove(name, options) {
         if (inIframe && typeof window !== 'undefined') {
-          localStorage.removeItem(name)
+          sessionStorage.removeItem(name)
           return
         }
         if (typeof document === 'undefined') return

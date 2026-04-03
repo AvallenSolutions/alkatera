@@ -16,8 +16,8 @@ export function UpdatePasswordForm() {
   const [loading, setLoading] = useState(false)
 
   const validatePassword = (password: string) => {
-    if (password.length < 8) {
-      return "Password must be at least 8 characters long"
+    if (password.length < 10) {
+      return "Password must be at least 10 characters long"
     }
     if (!/[A-Z]/.test(password)) {
       return "Password must contain at least one uppercase letter"

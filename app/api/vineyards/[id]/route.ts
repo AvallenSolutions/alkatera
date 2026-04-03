@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+import { resolveUserOrganization } from '@/lib/supabase/resolve-organization';
 
 /**
  * GET /api/vineyards/[id]
@@ -16,6 +17,11 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
     }
 
+    const { organizationId, error: orgError } = await resolveUserOrganization(supabase, user);
+    if (orgError || !organizationId) {
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    }
+
     const { data, error } = await supabase
       .from('vineyards')
       .select('*, facilities(id, name)')
@@ -24,6 +30,10 @@ export async function GET(
 
     if (error || !data) {
       return NextResponse.json({ error: 'Vineyard not found' }, { status: 404 });
+    }
+
+    if (data.organization_id !== organizationId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     return NextResponse.json({ data });
@@ -46,6 +56,22 @@ export async function PATCH(
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
+    }
+
+    const { organizationId, error: orgError } = await resolveUserOrganization(supabase, user);
+    if (orgError || !organizationId) {
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    }
+
+    // Verify ownership before update
+    const { data: existing } = await supabase
+      .from('vineyards')
+      .select('organization_id')
+      .eq('id', params.id)
+      .single();
+
+    if (!existing || existing.organization_id !== organizationId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -85,6 +111,22 @@ export async function DELETE(
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
+    }
+
+    const { organizationId, error: orgError } = await resolveUserOrganization(supabase, user);
+    if (orgError || !organizationId) {
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    }
+
+    // Verify ownership before delete
+    const { data: existing } = await supabase
+      .from('vineyards')
+      .select('organization_id')
+      .eq('id', params.id)
+      .single();
+
+    if (!existing || existing.organization_id !== organizationId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const { error } = await supabase

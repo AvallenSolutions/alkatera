@@ -341,10 +341,13 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
                   iframe: ['src', 'width', 'height', 'allow', 'allowfullscreen', 'frameborder', 'title', 'class'],
                   video: ['src', 'controls', 'poster', 'class', 'width', 'height'],
                   source: ['src', 'type'],
-                  a: ['href', 'target', 'rel', 'class'],
-                  '*': ['class', 'id', 'style'],
+                  a: ['href', 'rel', 'class'],
+                  '*': ['class', 'id'],
                 },
                 allowedIframeHostnames: ['www.youtube.com', 'youtube.com', 'player.vimeo.com'],
+                transformTags: {
+                  'a': sanitizeHtml.simpleTransform('a', { rel: 'noopener noreferrer' }),
+                },
               }) }}
             />
           )}

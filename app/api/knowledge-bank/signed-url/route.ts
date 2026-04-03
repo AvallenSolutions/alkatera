@@ -62,6 +62,11 @@ export async function POST(request: NextRequest) {
       storagePath = storagePath.split(bucketPrefix).pop() || storagePath
     }
 
+    // Prevent path traversal attacks
+    if (!storagePath || storagePath.includes('..') || storagePath.includes('//')) {
+      return NextResponse.json({ error: 'Invalid file path' }, { status: 400 })
+    }
+
     const { data, error } = await serviceClient.storage
       .from('knowledge-bank-files')
       .createSignedUrl(storagePath, 3600, {

@@ -7,11 +7,13 @@ const TAG_LENGTH = 16
 
 /**
  * Get the encryption key for Xero OAuth cookies.
- * Falls back to null if not configured (cookie stored in plaintext).
+ * Throws if not configured in production to prevent plaintext cookie storage.
  */
-function getKey(): Buffer | null {
+function getKey(): Buffer {
   const secret = process.env.XERO_COOKIE_SECRET
-  if (!secret) return null
+  if (!secret) {
+    throw new Error('XERO_COOKIE_SECRET is required for Xero OAuth cookie encryption')
+  }
   // Use first 32 bytes of the secret (SHA-256 would also work)
   return Buffer.from(secret.padEnd(32, '0').slice(0, 32), 'utf-8')
 }
@@ -22,7 +24,6 @@ function getKey(): Buffer | null {
  */
 export function encryptCookiePayload(plaintext: string): string {
   const key = getKey()
-  if (!key) return plaintext
 
   const iv = randomBytes(IV_LENGTH)
   const cipher = createCipheriv(ALGORITHM, key, iv)
@@ -39,7 +40,6 @@ export function encryptCookiePayload(plaintext: string): string {
  */
 export function decryptCookiePayload(encoded: string): string {
   const key = getKey()
-  if (!key) return encoded
 
   try {
     const data = Buffer.from(encoded, 'base64')

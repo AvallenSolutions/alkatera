@@ -130,6 +130,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       localStorage.removeItem('currentOrganizationId')
+      // Clear any cached auth-related data
+      try {
+        const keysToRemove = Object.keys(localStorage).filter(
+          k => k.startsWith('sb-') || k.startsWith('supabase')
+        )
+        keysToRemove.forEach(k => localStorage.removeItem(k))
+        sessionStorage.clear()
+      } catch {
+        // Storage access may be restricted in some contexts
+      }
       console.log('✅ AuthProvider: Sign out successful')
     } catch (error) {
       console.error('❌ AuthProvider: Fatal sign out error:', error)

@@ -95,6 +95,18 @@ export async function POST(
       );
     }
 
+    // Verify user belongs to the organisation that owns this PCF
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', pcf.organization_id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (!membership) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     // Fetch materials
     const { data: materials } = await supabase
       .from('product_carbon_footprint_materials')
@@ -135,11 +147,7 @@ export async function POST(
     } catch (transformError) {
       console.error('[generate-pdf] Transform failed:', transformError);
       return NextResponse.json(
-        {
-          error: 'Failed to transform LCA data',
-          details: transformError instanceof Error ? transformError.message : 'Unknown transform error',
-          step: 'transform',
-        },
+        { error: 'Failed to generate report' },
         { status: 500 }
       );
     }
@@ -200,11 +208,7 @@ export async function POST(
     } catch (renderError) {
       console.error('[generate-pdf] HTML render failed:', renderError);
       return NextResponse.json(
-        {
-          error: 'Failed to render report HTML',
-          details: renderError instanceof Error ? renderError.message : 'Unknown render error',
-          step: 'render',
-        },
+        { error: 'Failed to generate report' },
         { status: 500 }
       );
     }
@@ -225,11 +229,7 @@ export async function POST(
     } catch (pdfError) {
       console.error('[generate-pdf] PDFShift conversion failed:', pdfError);
       return NextResponse.json(
-        {
-          error: 'PDF conversion failed',
-          details: pdfError instanceof Error ? pdfError.message : 'Unknown PDFShift error',
-          step: 'pdfshift',
-        },
+        { error: 'Failed to generate report' },
         { status: 500 }
       );
     }
@@ -277,10 +277,7 @@ export async function POST(
   } catch (error) {
     console.error('PDF generation error:', error);
     return NextResponse.json(
-      {
-        error: 'Failed to generate PDF',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      },
+      { error: 'Failed to generate report' },
       { status: 500 }
     );
   }

@@ -16,10 +16,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
+    // Enforce file size limit (10MB)
+    const MAX_FILE_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: 'File too large (max 10MB)' },
+        { status: 400 }
+      );
+    }
+
     const fileName = file.name.toLowerCase();
     if (!fileName.endsWith('.xlsx') && !fileName.endsWith('.xls')) {
       return NextResponse.json(
         { error: 'Please upload an Excel file (.xlsx)' },
+        { status: 400 }
+      );
+    }
+
+    // Validate MIME type
+    const allowedMimes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+    ];
+    if (file.type && !allowedMimes.includes(file.type)) {
+      return NextResponse.json(
+        { error: 'Invalid file type' },
         { status: 400 }
       );
     }
