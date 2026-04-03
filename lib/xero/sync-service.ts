@@ -155,9 +155,10 @@ async function stageAccounts(
     }))
 
   if (accountRows.length > 0) {
-    await db
+    const { error } = await db
       .from('xero_account_mappings')
       .upsert(accountRows, { onConflict: 'organization_id,xero_account_id', ignoreDuplicates: false })
+    if (error) throw new Error(`Failed to upsert account mappings: ${error.message}`)
   }
 
   // Clear any stale sync state (best effort)
@@ -211,7 +212,7 @@ async function stageInvoices(
   let inserted = 0
 
   // Store raw transactions in a staging pattern (directly into xero_transactions with pending classification)
-  const batchId = `sync_${Date.now()}`
+  const batchId = crypto.randomUUID()
   // Split multi-line invoices into separate rows per line item so each
   // gets the correct account code for classification. Single-line invoices
   // use the invoice ID directly; multi-line ones get a suffix per line.
@@ -259,9 +260,10 @@ async function stageInvoices(
     })
 
   if (rows.length > 0) {
-    await db
+    const { error } = await db
       .from('xero_transactions')
       .upsert(rows, { onConflict: 'organization_id,xero_transaction_id' })
+    if (error) throw new Error(`Failed to upsert invoices: ${error.message}`)
     inserted = rows.length
   }
 
@@ -312,7 +314,7 @@ async function stageBankTransactions(
 
   // Filter to spend-related types only (exclude RECEIVE types)
   const spendTypes = ['SPEND', 'SPEND-OVERPAYMENT', 'SPEND-PREPAYMENT', 'SPEND-TRANSFER']
-  const batchId = `sync_${Date.now()}`
+  const batchId = crypto.randomUUID()
   const rows = bankTxs
     .filter(tx => {
       if (!tx.bankTransactionID) return false
@@ -363,9 +365,10 @@ async function stageBankTransactions(
     })
 
   if (rows.length > 0) {
-    await db
+    const { error } = await db
       .from('xero_transactions')
       .upsert(rows, { onConflict: 'organization_id,xero_transaction_id' })
+    if (error) throw new Error(`Failed to upsert bank transactions: ${error.message}`)
     inserted = rows.length
   }
 
@@ -452,11 +455,15 @@ async function stageClassify(
     })
 
     // Batch update in parallel (each row has different values)
-    await Promise.all(
+    const results = await Promise.all(
       updates.map(({ id, ...fields }) =>
         db.from('xero_transactions').update(fields).eq('id', id)
       )
     )
+    const updateErrors = results.filter(r => r.error)
+    if (updateErrors.length > 0) {
+      console.error(`[Xero Sync] ${updateErrors.length} classification updates failed:`, updateErrors[0].error?.message)
+    }
   }
 
   return {
@@ -527,10 +534,11 @@ async function stageAIClassify(
       autoClassified++
     } else if (result.suggestedCategory && result.confidence >= 0.3) {
       // Low confidence: store suggestion for manual review without applying
+      // Keep upgrade_status as 'not_applicable' (valid CHECK value) - the AI
+      // suggestion columns signal that review is needed
       await db
         .from('xero_transactions')
         .update({
-          upgrade_status: 'needs_review',
           ai_suggested_category: result.suggestedCategory,
           ai_suggested_confidence: result.confidence,
           ai_suggested_reasoning: result.reasoning || null,
