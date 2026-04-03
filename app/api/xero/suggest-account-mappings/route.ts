@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getSupabaseServerClient } from '@/lib/supabase/server-client'
 import { getMemberRole } from '@/app/api/stripe/_helpers/get-member-role'
-import { suggestCategoryWithAI } from '@/lib/xero/account-suggestions'
+import { suggestCategoryWithAI } from '@/lib/xero/account-suggestions-ai'
 
 export const dynamic = 'force-dynamic'
 
