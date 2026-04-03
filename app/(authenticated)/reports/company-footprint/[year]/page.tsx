@@ -613,8 +613,7 @@ export default function FootprintBuilderPage() {
                   reportId={report.id}
                   organizationId={currentOrganization.id}
                   year={year}
-                  entries={usePhaseEntries}
-                  onUpdate={fetchReportData}
+                  totalCO2eTonnes={0}
                 />
               )}
             </div>

@@ -186,6 +186,7 @@ export default function CompanyEmissionsPage() {
   const [fleetScope2CO2e, setFleetScope2CO2e] = useState(0);
   const [fleetScope3CO2e, setFleetScope3CO2e] = useState(0);
   const [scope3Cat1CO2e, setScope3Cat1CO2e] = useState(0);
+  const [scope3Cat11CO2e, setScope3Cat11CO2e] = useState(0);
   const [scope3Cat1Breakdown, setScope3Cat1Breakdown] = useState<Array<{
     product_name: string;
     total_tco2e: number;
@@ -486,6 +487,7 @@ export default function CompanyEmissionsPage() {
         setScope3Cat1PendingProducts(pendingProducts);
 
         let totalEmissions = 0;
+        let totalUsePhaseEmissions = 0;
         const breakdown: Array<{
           product_name: string;
           total_tco2e: number;
@@ -506,6 +508,9 @@ export default function CompanyEmissionsPage() {
 
           // Use scope3 from aggregated_impacts to avoid double-counting facility S1/S2
           const scope3PerUnit = lca.aggregated_impacts?.breakdown?.by_scope?.scope3 || 0;
+          // Separate use-phase (Cat 11) from purchased goods (Cat 1)
+          const usePhasePerUnit = lca.aggregated_impacts?.breakdown?.by_lifecycle_stage?.use_phase || 0;
+          const cat1PerUnit = scope3PerUnit - usePhasePerUnit;
 
           if (scope3PerUnit === 0) continue;
 
@@ -559,9 +564,13 @@ export default function CompanyEmissionsPage() {
             unitsProduced = 1;
           }
 
-          const totalImpactKg = scope3PerUnit * unitsProduced;
-          const totalImpactTonnes = totalImpactKg / 1000;
-          totalEmissions += totalImpactTonnes;
+          const cat1ImpactKg = cat1PerUnit * unitsProduced;
+          const cat1ImpactTonnes = cat1ImpactKg / 1000;
+          totalEmissions += cat1ImpactTonnes;
+
+          // Accumulate use-phase (Cat 11) separately
+          const usePhaseKg = usePhasePerUnit * unitsProduced;
+          totalUsePhaseEmissions += usePhaseKg / 1000;
 
           // Get materials breakdown for display
           const { data: materials } = await browserSupabase
@@ -583,22 +592,24 @@ export default function CompanyEmissionsPage() {
 
           breakdown.push({
             product_name: (productData as any).name,
-            total_tco2e: totalImpactTonnes,
+            total_tco2e: cat1ImpactTonnes,
             materials_tco2e: (materialsPerUnit * unitsProduced) / 1000,
             packaging_tco2e: (packagingPerUnit * unitsProduced) / 1000,
             production_volume: unitsProduced,
           });
 
-          console.log(`✅ [SCOPE 3 CAT 1] Fallback: ${(productData as any).name}: scope3/unit=${scope3PerUnit.toFixed(4)} × ${unitsProduced} units = ${totalImpactTonnes.toFixed(4)} tCO2e`);
+          console.log(`✅ [SCOPE 3 CAT 1] Fallback: ${(productData as any).name}: cat1/unit=${cat1PerUnit.toFixed(4)} × ${unitsProduced} units = ${cat1ImpactTonnes.toFixed(4)} tCO2e (use_phase: ${(usePhaseKg / 1000).toFixed(4)} t)`);
         }
 
         setScope3Cat1CO2e(totalEmissions);
+        setScope3Cat11CO2e(totalUsePhaseEmissions);
         setScope3Cat1Breakdown(breakdown);
         setScope3Cat1DataQuality(totalEmissions > 0 ? 'Tier 1: Primary LCA data (from completed product reports)' : 'No completed product PEIs found for selected year');
         return;
       }
 
       let totalEmissions = 0;
+      let totalUsePhaseEmissions = 0;
       const breakdown: Array<{
         product_name: string;
         total_tco2e: number;
@@ -636,6 +647,9 @@ export default function CompanyEmissionsPage() {
         const lca = lcaData as any;
         // Use scope3 from aggregated_impacts to avoid double-counting facility S1/S2
         const scope3PerUnit = lca?.aggregated_impacts?.breakdown?.by_scope?.scope3 || 0;
+        // Separate use-phase (Cat 11) from purchased goods (Cat 1)
+        const usePhasePerUnit = lca?.aggregated_impacts?.breakdown?.by_lifecycle_stage?.use_phase || 0;
+        const cat1PerUnit = scope3PerUnit - usePhasePerUnit;
         // Single source of truth: climate_change_gwp100 from aggregated_impacts
         const totalGhgPerUnit = lca?.aggregated_impacts?.climate_change_gwp100 || 0;
         console.log('🔍 [SCOPE 3 CAT 1] LCA data', {
@@ -670,12 +684,16 @@ export default function CompanyEmissionsPage() {
           continue;
         }
 
-        // Use scope3 only (excludes facility S1/S2 already counted in company Scope 1 & 2)
-        const emissionsPerUnit = scope3PerUnit;
+        // Use Cat 1 only (excludes use-phase Cat 11 and facility S1/S2)
+        const emissionsPerUnit = cat1PerUnit;
         const totalImpactKg = emissionsPerUnit * unitsProduced;
         const totalImpactTonnes = totalImpactKg / 1000;
 
         totalEmissions += totalImpactTonnes;
+
+        // Accumulate use-phase (Cat 11) separately
+        const usePhaseKg = usePhasePerUnit * unitsProduced;
+        totalUsePhaseEmissions += usePhaseKg / 1000;
 
         // Fetch materials breakdown for UI display purposes only
         const { data: materials } = await browserSupabase
@@ -761,6 +779,7 @@ export default function CompanyEmissionsPage() {
       setScope3Cat1PendingProducts(pendingProducts);
 
       setScope3Cat1CO2e(totalEmissions);
+      setScope3Cat11CO2e(totalUsePhaseEmissions);
       setScope3Cat1Breakdown(breakdown);
       setScope3Cat1DataQuality('Tier 1: Primary LCA data from ecoinvent 3.10');
 
@@ -772,6 +791,7 @@ export default function CompanyEmissionsPage() {
     } catch (error: any) {
       console.error('Error fetching Scope 3 Cat 1 from LCAs:', error);
       setScope3Cat1CO2e(0);
+      setScope3Cat11CO2e(0);
       setScope3Cat1Breakdown([]);
       setScope3Cat1DataQuality('Error loading data');
     }
@@ -1043,7 +1063,7 @@ export default function CompanyEmissionsPage() {
     // New GHG Protocol categories
     'upstream_transport',
     'downstream_transport',
-    'use_phase',
+    // use_phase excluded: Cat 11 is sourced from product LCA data, not manual overheads
   ];
   const calculatedScope3OverheadsCO2e = overheads
     .filter((o) => scope3OverheadCategories.includes(o.category))
@@ -1058,7 +1078,7 @@ export default function CompanyEmissionsPage() {
       // Fleet values are in tCO2e, utility values are in kgCO2e
       const totalScope1Tonnes = (scope1CO2e / 1000) + fleetScope1CO2e + (xeroScope1Kg / 1000);
       const totalScope2Tonnes = (scope2CO2e / 1000) + fleetScope2CO2e + (xeroScope2Kg / 1000);
-      const totalScope3Tonnes = scope3Cat1CO2e + (calculatedScope3OverheadsCO2e / 1000) + fleetScope3CO2e + (xeroScope3Kg / 1000);
+      const totalScope3Tonnes = scope3Cat1CO2e + scope3Cat11CO2e + (calculatedScope3OverheadsCO2e / 1000) + fleetScope3CO2e + (xeroScope3Kg / 1000);
       const totalEmissionsTonnes = totalScope1Tonnes + totalScope2Tonnes + totalScope3Tonnes;
 
       // Only persist if we have actual data
@@ -1073,7 +1093,8 @@ export default function CompanyEmissionsPage() {
           scope3: fleetScope3CO2e,
         },
         scope3: {
-          products: scope3Cat1CO2e,          // in tonnes
+          products: scope3Cat1CO2e,          // in tonnes (Cat 1: purchased goods)
+          use_phase: scope3Cat11CO2e,        // in tonnes (Cat 11: use of sold products)
           products_breakdown: scope3Cat1Breakdown,
           overheads: calculatedScope3OverheadsCO2e / 1000, // in tonnes
           xero_baseline: xeroScope3Kg / 1000,           // in tonnes (spend-based)
@@ -1102,7 +1123,7 @@ export default function CompanyEmissionsPage() {
     // Debounce to avoid too many updates
     const timeoutId = setTimeout(persistEmissions, 1000);
     return () => clearTimeout(timeoutId);
-  }, [report?.id, currentOrganization?.id, scope1CO2e, scope2CO2e, fleetScope1CO2e, fleetScope2CO2e, fleetScope3CO2e, scope3Cat1CO2e, calculatedScope3OverheadsCO2e, xeroScope1Kg, xeroScope2Kg, xeroScope3Kg, scope3Cat1Breakdown]);
+  }, [report?.id, currentOrganization?.id, scope1CO2e, scope2CO2e, fleetScope1CO2e, fleetScope2CO2e, fleetScope3CO2e, scope3Cat1CO2e, scope3Cat11CO2e, calculatedScope3OverheadsCO2e, xeroScope1Kg, xeroScope2Kg, xeroScope3Kg, scope3Cat1Breakdown]);
 
   return (
     <div className="space-y-6">
@@ -1205,10 +1226,11 @@ export default function CompanyEmissionsPage() {
                 const totalScope2 = s2Utilities + s2Fleet + s2Xero;
 
                 const s3Products = scope3Cat1CO2e;
+                const s3UsePhase = scope3Cat11CO2e;
                 const s3Activities = calculatedScope3OverheadsCO2e / 1000;
                 const s3Xero = xeroScope3Kg / 1000;
                 const s3Fleet = fleetScope3CO2e;
-                const totalScope3 = s3Products + s3Activities + s3Xero + s3Fleet;
+                const totalScope3 = s3Products + s3UsePhase + s3Activities + s3Xero + s3Fleet;
 
                 const totalEmissions = totalScope1 + totalScope2 + totalScope3;
                 const hasData = totalEmissions > 0;
@@ -1237,13 +1259,14 @@ export default function CompanyEmissionsPage() {
                   { name: 'Fleet (electric)', value: s2Fleet, color: SCOPE_COLORS.scope2, scope: 'Scope 2' },
                   { name: 'Spend data (S2)', value: s2Xero, color: SCOPE_COLORS.scope2, scope: 'Scope 2' },
                   { name: 'Products (LCA)', value: s3Products, color: SCOPE_COLORS.scope3, scope: 'Scope 3' },
+                  { name: 'Use phase (Cat 11)', value: s3UsePhase, color: SCOPE_COLORS.scope3, scope: 'Scope 3' },
                   { name: 'Activities', value: s3Activities, color: SCOPE_COLORS.scope3, scope: 'Scope 3' },
                   { name: 'Spend data (S3)', value: s3Xero, color: SCOPE_COLORS.scope3, scope: 'Scope 3' },
                   { name: 'Fleet (grey)', value: s3Fleet, color: SCOPE_COLORS.scope3, scope: 'Scope 3' },
                 ].filter(d => d.value > 0.001).sort((a, b) => b.value - a.value);
 
                 // Data quality tiers (in tonnes)
-                const tier1 = s3Products; // LCA supplier data
+                const tier1 = s3Products + s3UsePhase; // LCA supplier data
                 const tier2 = s1Utilities + s2Utilities + s3Activities; // Activity data
                 const tier4 = s1Xero + s2Xero + s3Xero; // Spend-based
                 const tierTotal = tier1 + tier2 + tier4;
@@ -1466,6 +1489,12 @@ export default function CompanyEmissionsPage() {
                                 <div className="flex justify-between">
                                   <span className="flex items-center gap-1">Products (LCA) <CheckCircle2 className="h-3 w-3 text-green-500" /></span>
                                   <span className="font-mono">{s3Products.toFixed(3)} t</span>
+                                </div>
+                              )}
+                              {s3UsePhase > 0 && (
+                                <div className="flex justify-between">
+                                  <span className="flex items-center gap-1">Use phase (Cat 11) <CheckCircle2 className="h-3 w-3 text-green-500" /></span>
+                                  <span className="font-mono">{s3UsePhase.toFixed(3)} t</span>
                                 </div>
                               )}
                               {s3Activities > 0 && (
@@ -1967,7 +1996,7 @@ export default function CompanyEmissionsPage() {
                 <div className="text-xs text-muted-foreground mb-1">Total Scope 3</div>
                 <div className="text-2xl font-bold font-mono">
                   {(() => {
-                    const total = scope3Cat1CO2e + (calculatedScope3OverheadsCO2e / 1000) + (xeroScope3Kg / 1000) + fleetScope3CO2e;
+                    const total = scope3Cat1CO2e + scope3Cat11CO2e + (calculatedScope3OverheadsCO2e / 1000) + (xeroScope3Kg / 1000) + fleetScope3CO2e;
                     return total > 0 ? `${total.toFixed(2)} t` : '—';
                   })()}
                 </div>
@@ -2177,8 +2206,7 @@ export default function CompanyEmissionsPage() {
                           reportId={report.id}
                           organizationId={currentOrganization.id}
                           year={selectedYear}
-                          entries={usePhaseEntries}
-                          onUpdate={fetchReportData}
+                          totalCO2eTonnes={scope3Cat11CO2e}
                         />
                       )}
                     </div>
