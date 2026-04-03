@@ -64,6 +64,8 @@ import { DownstreamTransportCard } from '@/components/reports/DownstreamTranspor
 import { UsePhaseCard } from '@/components/reports/UsePhaseCard';
 import Link from 'next/link';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip } from 'recharts';
+import { EmissionsGuide } from '@/components/emissions/EmissionsGuide';
+import { ScopeTipBanner } from '@/components/emissions/ScopeTipBanner';
 
 // Emission factors for auto-calculation from facility utility data
 const EMISSION_FACTORS: Record<string, { factor: number; unit: string; scope: 'Scope 1' | 'Scope 2' }> = {
@@ -1173,6 +1175,17 @@ export default function CompanyEmissionsPage() {
         </TabsList>
 
         <TabsContent value="footprint">
+          <EmissionsGuide
+            facilitiesCount={facilities.length}
+            scope1CO2e={scope1CO2e}
+            scope2CO2e={scope2CO2e}
+            scope3Cat1CO2e={scope3Cat1CO2e}
+            calculatedScope3OverheadsCO2e={calculatedScope3OverheadsCO2e}
+            xeroScope3Kg={xeroScope3Kg}
+            hasReport={!!report}
+            onSwitchTab={setActiveTab}
+            onCalculate={handleGenerateReport}
+          />
           {isLoadingReport ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -1579,6 +1592,7 @@ export default function CompanyEmissionsPage() {
 
         <TabsContent value="scope1">
           <div className="space-y-6">
+            <ScopeTipBanner scope={1} hasData={scope1CO2e > 0} />
             {/* Total Scope 1 Summary */}
             <Card className="border-orange-200 dark:border-orange-900 bg-orange-50/30 dark:bg-orange-950/20">
               <CardHeader>
@@ -1763,6 +1777,7 @@ export default function CompanyEmissionsPage() {
 
         <TabsContent value="scope2">
           <div className="space-y-6">
+            <ScopeTipBanner scope={2} hasData={scope2CO2e > 0} />
             {/* Total Scope 2 Summary */}
             <Card className="border-blue-200 dark:border-blue-900 bg-blue-50/30 dark:bg-blue-950/20">
               <CardHeader>
@@ -1945,6 +1960,7 @@ export default function CompanyEmissionsPage() {
 
         <TabsContent value="scope3">
           <div className="space-y-6">
+            <ScopeTipBanner scope={3} hasData={calculatedScope3OverheadsCO2e > 0 || scope3Cat1CO2e > 0 || xeroScope3Kg > 0} />
             {/* ── Summary Bar ──────────────────────────────────────── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Card className="p-4">

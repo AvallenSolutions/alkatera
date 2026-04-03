@@ -52,6 +52,10 @@ interface OnboardingContextType {
   markSearchGuideCompleted: () => void
   /** Re-enable the search guide */
   resetSearchGuide: () => void
+  /** Dismiss the emissions guide */
+  dismissEmissionsGuide: () => void
+  /** Re-open the emissions guide after dismissal */
+  reopenEmissionsGuide: () => void
   /** Reset onboarding (for testing) */
   resetOnboarding: () => void
 }
@@ -303,6 +307,20 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     }))
   }, [updateState])
 
+  const dismissEmissionsGuide = useCallback(() => {
+    updateState(prev => ({
+      ...prev,
+      emissionsGuideDismissed: true,
+    }))
+  }, [updateState])
+
+  const reopenEmissionsGuide = useCallback(() => {
+    updateState(prev => ({
+      ...prev,
+      emissionsGuideDismissed: false,
+    }))
+  }, [updateState])
+
   const resetOnboarding = useCallback(() => {
     sessionDismissedRef.current = false
     const fresh = { ...getInitialStateForFlow(flowRef.current), startedAt: new Date().toISOString() }
@@ -347,6 +365,8 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         markProductGuideCompleted,
         markSearchGuideCompleted,
         resetSearchGuide,
+        dismissEmissionsGuide,
+        reopenEmissionsGuide,
         resetOnboarding,
       }}
     >

@@ -163,6 +163,10 @@ export interface OnboardingState {
   searchGuideCompleted?: boolean
   /** Whether the product page guide has been completed */
   productGuideCompleted?: boolean
+  /** Whether the emissions guide has been completed (all steps) */
+  emissionsGuideCompleted?: boolean
+  /** Whether the emissions guide has been dismissed by the user */
+  emissionsGuideDismissed?: boolean
 }
 
 export const INITIAL_ONBOARDING_STATE: OnboardingState = {
@@ -174,6 +178,8 @@ export const INITIAL_ONBOARDING_STATE: OnboardingState = {
   dashboardGuideCompleted: false,
   searchGuideCompleted: false,
   productGuideCompleted: false,
+  emissionsGuideCompleted: false,
+  emissionsGuideDismissed: false,
 }
 
 export const INITIAL_MEMBER_ONBOARDING_STATE: OnboardingState = {
@@ -185,6 +191,8 @@ export const INITIAL_MEMBER_ONBOARDING_STATE: OnboardingState = {
   dashboardGuideCompleted: false,
   searchGuideCompleted: false,
   productGuideCompleted: false,
+  emissionsGuideCompleted: false,
+  emissionsGuideDismissed: false,
 }
 
 // ---------------------------------------------------------------------------
