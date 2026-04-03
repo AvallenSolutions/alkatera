@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,14 +17,6 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { PageLoader } from '@/components/ui/page-loader';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -35,12 +27,20 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Plus,
   Search,
@@ -53,15 +53,15 @@ import {
   CheckCircle,
   AlertCircle,
   RefreshCw,
-  Leaf,
   Mail,
-  Info,
   Package,
+  ArrowLeft,
+  ChevronRight,
+  X,
 } from 'lucide-react';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabaseClient';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
-import type { Session } from '@supabase/supabase-js';
 import { useOrganization } from '@/lib/organizationContext';
 import { useSupplierPermissions } from '@/hooks/useSupplierPermissions';
 import { useSupplierLimit } from '@/hooks/useSubscription';
@@ -85,7 +85,6 @@ interface OrganizationSupplier {
   engagement_status: string;
   notes: string | null;
   added_at: string;
-  // Enriched from suppliers table (supplier-managed data)
   _enriched?: {
     name: string | null;
     logo_url: string | null;
@@ -108,6 +107,8 @@ interface PlatformSupplier {
   country: string | null;
   description: string | null;
   is_verified: boolean;
+  contact_email: string | null;
+  created_at: string | null;
 }
 
 export default function SuppliersPage() {
@@ -116,19 +117,19 @@ export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<OrganizationSupplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
+
+  // Directory sheet state
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [platformSuppliers, setPlatformSuppliers] = useState<PlatformSupplier[]>([]);
   const [loadingPlatform, setLoadingPlatform] = useState(false);
-  const [selectedSupplier, setSelectedSupplier] = useState<string>('');
-  const [annualSpend, setAnnualSpend] = useState('');
-  const [supplierNotes, setSupplierNotes] = useState('');
-  const [adding, setAdding] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [supplierToDelete, setSupplierToDelete] = useState<OrganizationSupplier | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  const [platformSearchQuery, setPlatformSearchQuery] = useState('');
+  const [previewSupplier, setPreviewSupplier] = useState<PlatformSupplier | null>(null);
+  const [addingId, setAddingId] = useState<string | null>(null);
+  const [industryFilter, setIndustryFilter] = useState<string | null>(null);
+  const [countryFilter, setCountryFilter] = useState<string | null>(null);
 
-  // Invite supplier flow state
-  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  // Invite flow (inside sheet)
+  const [showInviteForm, setShowInviteForm] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteContactName, setInviteContactName] = useState('');
   const [inviteCompanyName, setInviteCompanyName] = useState('');
@@ -136,6 +137,12 @@ export default function SuppliersPage() {
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
   const [inviteSuccess, setInviteSuccess] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
+
+  // Delete state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [supplierToDelete, setSupplierToDelete] = useState<OrganizationSupplier | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
   const { currentCount, maxCount, isUnlimited, checkLimit } = useSupplierLimit();
   const atLimit = !isUnlimited && maxCount != null && currentCount >= maxCount;
 
@@ -146,6 +153,13 @@ export default function SuppliersPage() {
       setLoading(false);
     }
   }, [currentOrganization?.id]);
+
+  // Fetch platform suppliers on mount (for inline directory when empty)
+  useEffect(() => {
+    if (currentOrganization?.id) {
+      fetchPlatformSuppliers();
+    }
+  }, [currentOrganization?.id, suppliers.length]);
 
   const fetchSuppliers = async () => {
     try {
@@ -160,10 +174,6 @@ export default function SuppliersPage() {
 
       const viewSuppliers = (data || []) as OrganizationSupplier[];
 
-      // Enrich with supplier-managed data via server-side API route.
-      // The suppliers table is RLS-protected to the supplier's own org,
-      // so we use a service-role API to fetch logo, description, address,
-      // product counts, etc.
       const emails = viewSuppliers
         .map(s => s.contact_email)
         .filter((e): e is string => !!e);
@@ -207,7 +217,6 @@ export default function SuppliersPage() {
             }
           }
         } catch (enrichError) {
-          // Non-critical: cards still render with platform_suppliers data
           console.warn('Could not enrich supplier data:', enrichError);
         }
       }
@@ -226,12 +235,12 @@ export default function SuppliersPage() {
       setLoadingPlatform(true);
       const { data, error } = await supabase
         .from('platform_suppliers')
-        .select('id, name, website, industry_sector, country, description, is_verified')
-        .order('name');
+        .select('id, name, website, industry_sector, country, description, is_verified, contact_email, created_at')
+        .eq('is_verified', true)
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Filter out suppliers already added to this organization
       const existingSupplierIds = suppliers.map(s => s.platform_supplier_id);
       const availableSuppliers = (data || []).filter(
         s => !existingSupplierIds.includes(s.id)
@@ -240,53 +249,59 @@ export default function SuppliersPage() {
       setPlatformSuppliers(availableSuppliers);
     } catch (error) {
       console.error('Error fetching platform suppliers:', error);
-      toast.error('Failed to load available suppliers');
     } finally {
       setLoadingPlatform(false);
     }
   };
 
-  const handleOpenAddDialog = () => {
-    setSelectedSupplier('');
-    setAnnualSpend('');
-    setSupplierNotes('');
+  const handleOpenSheet = () => {
+    setPlatformSearchQuery('');
+    setPreviewSupplier(null);
+    setShowInviteForm(false);
+    setInviteSuccess(false);
+    setInviteError(null);
+    setIndustryFilter(null);
+    setCountryFilter(null);
     fetchPlatformSuppliers();
-    setAddDialogOpen(true);
+    setSheetOpen(true);
   };
 
-  const handleAddSupplier = async () => {
-    if (!selectedSupplier) {
-      toast.error('Please select a supplier');
+  const handleQuickAdd = async (supplier: PlatformSupplier) => {
+    if (atLimit) {
+      toast.error('Supplier limit reached. Please upgrade your plan.');
       return;
     }
 
     try {
-      setAdding(true);
+      setAddingId(supplier.id);
       const { error } = await supabase.from('organization_suppliers').insert([
         {
           organization_id: currentOrganization!.id,
-          platform_supplier_id: selectedSupplier,
-          annual_spend: annualSpend ? parseFloat(annualSpend) : null,
+          platform_supplier_id: supplier.id,
           spend_currency: 'GBP',
           engagement_status: 'active',
-          notes: supplierNotes || null,
         },
       ]);
 
       if (error) throw error;
 
-      toast.success('Supplier added successfully');
-      setAddDialogOpen(false);
+      toast.success(`${supplier.name} added to your suppliers`);
+      // Remove from available list
+      setPlatformSuppliers(prev => prev.filter(s => s.id !== supplier.id));
+      // Clear preview if this was the previewed supplier
+      if (previewSupplier?.id === supplier.id) {
+        setPreviewSupplier(null);
+      }
       await fetchSuppliers();
     } catch (error: any) {
       console.error('Error adding supplier:', error);
       if (error.code === '23505') {
-        toast.error('This supplier is already added to your organization');
+        toast.error('This supplier is already in your organisation');
       } else {
         toast.error('Failed to add supplier');
       }
     } finally {
-      setAdding(false);
+      setAddingId(null);
     }
   };
 
@@ -302,7 +317,7 @@ export default function SuppliersPage() {
 
       if (error) throw error;
 
-      toast.success('Supplier removed from your organization');
+      toast.success('Supplier removed from your organisation');
       setDeleteDialogOpen(false);
       setSupplierToDelete(null);
       await fetchSuppliers();
@@ -312,23 +327,6 @@ export default function SuppliersPage() {
     } finally {
       setDeleting(false);
     }
-  };
-
-  // Invite supplier flow
-  const handleOpenInviteDialog = () => {
-    setInviteEmail('');
-    setInviteContactName('');
-    setInviteCompanyName('');
-    setInviteMessage('');
-    setInviteSuccess(false);
-    setInviteError(null);
-    setInviteDialogOpen(true);
-  };
-
-  const handleCloseInviteDialog = () => {
-    setInviteDialogOpen(false);
-    setInviteSuccess(false);
-    setInviteError(null);
   };
 
   const validateEmail = (email: string): boolean => {
@@ -352,7 +350,6 @@ export default function SuppliersPage() {
     setInviteSubmitting(true);
 
     try {
-      // Server-side limit check
       const limitResult = await checkLimit();
       if (!limitResult.allowed) {
         setInviteError(limitResult.reason || 'Supplier limit reached. Please upgrade your plan.');
@@ -389,21 +386,12 @@ export default function SuppliersPage() {
 
       setInviteSuccess(true);
       toast.success('Invitation sent successfully');
-      setTimeout(() => {
-        handleCloseInviteDialog();
-      }, 2000);
     } catch (err: any) {
       console.error('Error sending invitation:', err);
       setInviteError(err.message || 'Failed to send invitation. Please try again.');
     } finally {
       setInviteSubmitting(false);
     }
-  };
-
-  const formatCurrency = (amount: number | null, currency: string | null) => {
-    if (!amount) return 'Not specified';
-    const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€';
-    return `${currencySymbol}${amount.toLocaleString()}`;
   };
 
   const formatDate = (dateString: string) => {
@@ -429,19 +417,397 @@ export default function SuppliersPage() {
     );
   });
 
-  const filteredPlatformSuppliers = platformSuppliers.filter((supplier) => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      supplier.name.toLowerCase().includes(query) ||
-      supplier.country?.toLowerCase().includes(query) ||
-      supplier.industry_sector?.toLowerCase().includes(query)
-    );
-  });
+  // Extract unique filter values from platform suppliers
+  const availableIndustries = useMemo(() => {
+    const industries = platformSuppliers
+      .map(s => s.industry_sector)
+      .filter((v): v is string => !!v);
+    return Array.from(new Set(industries)).sort();
+  }, [platformSuppliers]);
+
+  const availableCountries = useMemo(() => {
+    const countries = platformSuppliers
+      .map(s => s.country)
+      .filter((v): v is string => !!v);
+    return Array.from(new Set(countries)).sort();
+  }, [platformSuppliers]);
+
+  const filteredPlatformSuppliers = useMemo(() => {
+    return platformSuppliers.filter((supplier) => {
+      // Text search
+      if (platformSearchQuery) {
+        const query = platformSearchQuery.toLowerCase();
+        const matchesText =
+          supplier.name.toLowerCase().includes(query) ||
+          supplier.country?.toLowerCase().includes(query) ||
+          supplier.industry_sector?.toLowerCase().includes(query);
+        if (!matchesText) return false;
+      }
+      // Industry filter
+      if (industryFilter && supplier.industry_sector !== industryFilter) return false;
+      // Country filter
+      if (countryFilter && supplier.country !== countryFilter) return false;
+      return true;
+    });
+  }, [platformSuppliers, platformSearchQuery, industryFilter, countryFilter]);
 
   if (loading) {
     return <PageLoader message="Loading suppliers..." />;
   }
+
+  const hasSuppliers = suppliers.length > 0;
+
+  // ── Supplier Directory List Item ──
+  const DirectoryListItem = ({ supplier, compact = false }: { supplier: PlatformSupplier; compact?: boolean }) => (
+    <div
+      className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+        previewSupplier?.id === supplier.id
+          ? 'border-emerald-500 bg-emerald-500/5'
+          : 'border-transparent hover:bg-muted/50'
+      }`}
+      onClick={() => {
+        setPreviewSupplier(supplier);
+        setShowInviteForm(false);
+      }}
+    >
+      <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+        <Building2 className="h-5 w-5 text-muted-foreground" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="font-medium text-sm truncate">{supplier.name}</p>
+          <Badge variant="default" className="bg-emerald-600 text-[10px] px-1.5 py-0 shrink-0">
+            <CheckCircle className="h-2.5 w-2.5 mr-0.5" />
+            Verified
+          </Badge>
+        </div>
+        {!compact && (
+          <div className="text-xs text-muted-foreground mt-0.5 flex flex-wrap gap-x-2">
+            {supplier.industry_sector && <span>{supplier.industry_sector}</span>}
+            {supplier.country && (
+              <span className="flex items-center gap-0.5">
+                <MapPin className="h-2.5 w-2.5" />
+                {supplier.country}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+      {compact ? (
+        <Button
+          size="sm"
+          variant="outline"
+          className="shrink-0 h-8 text-xs"
+          disabled={addingId === supplier.id || atLimit}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleQuickAdd(supplier);
+          }}
+        >
+          {addingId === supplier.id ? (
+            <RefreshCw className="h-3 w-3 animate-spin" />
+          ) : (
+            <>
+              <Plus className="h-3 w-3 mr-1" />
+              Add
+            </>
+          )}
+        </Button>
+      ) : (
+        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+      )}
+    </div>
+  );
+
+  // ── Supplier Preview Panel ──
+  const SupplierPreview = ({ supplier }: { supplier: PlatformSupplier }) => (
+    <div className="flex flex-col h-full">
+      <div className="flex-1 space-y-5 overflow-y-auto">
+        <div className="flex items-start gap-3">
+          <div className="h-14 w-14 rounded-xl bg-muted flex items-center justify-center shrink-0">
+            <Building2 className="h-7 w-7 text-muted-foreground" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-lg font-semibold leading-tight">{supplier.name}</h3>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge variant="default" className="bg-emerald-600 text-xs">
+                <CheckCircle className="h-2.5 w-2.5 mr-1" />
+                Verified
+              </Badge>
+            </div>
+          </div>
+        </div>
+
+        {supplier.description && (
+          <p className="text-sm text-muted-foreground leading-relaxed">{supplier.description}</p>
+        )}
+
+        <div className="space-y-3">
+          {supplier.industry_sector && (
+            <div className="flex items-center gap-2 text-sm">
+              <Package className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-muted-foreground">Industry:</span>
+              <span className="font-medium">{supplier.industry_sector}</span>
+            </div>
+          )}
+          {supplier.country && (
+            <div className="flex items-center gap-2 text-sm">
+              <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-muted-foreground">Location:</span>
+              <span className="font-medium">{supplier.country}</span>
+            </div>
+          )}
+          {supplier.website && (
+            <div className="flex items-center gap-2 text-sm">
+              <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-muted-foreground">Website:</span>
+              <span className="font-medium text-blue-500 truncate">
+                {supplier.website.replace(/^https?:\/\//, '')}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="pt-4 border-t mt-4">
+        {canCreateSuppliers ? (
+          <Button
+            className="w-full bg-neon-lime text-black hover:bg-neon-lime/90"
+            size="lg"
+            disabled={addingId === supplier.id || atLimit}
+            onClick={() => handleQuickAdd(supplier)}
+          >
+            {addingId === supplier.id ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                Adding...
+              </>
+            ) : (
+              <>
+                <Plus className="h-4 w-4 mr-2" />
+                Add to My Suppliers
+              </>
+            )}
+          </Button>
+        ) : (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button className="w-full" size="lg" disabled>
+                  <Lock className="h-4 w-4 mr-2" />
+                  Add to My Suppliers
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Only administrators can add suppliers</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+        {atLimit && (
+          <p className="text-xs text-destructive text-center mt-2">
+            Supplier limit reached ({currentCount}/{maxCount}).{' '}
+            <a href="/dashboard/settings" className="underline">Upgrade</a> to add more.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+
+  // ── Inline Invite Form ──
+  const InviteForm = () => (
+    <div className="flex flex-col h-full">
+      <button
+        onClick={() => {
+          setShowInviteForm(false);
+          setInviteSuccess(false);
+          setInviteError(null);
+        }}
+        className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to directory
+      </button>
+
+      <div className="flex items-center gap-3 mb-4">
+        <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+          <Mail className="h-5 w-5 text-blue-500" />
+        </div>
+        <div>
+          <h3 className="font-semibold">Invite a Supplier</h3>
+          <p className="text-xs text-muted-foreground">
+            Send them an invitation to join the platform
+          </p>
+        </div>
+      </div>
+
+      {inviteSuccess ? (
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 py-8">
+          <CheckCircle className="h-12 w-12 text-green-500" />
+          <div className="text-center">
+            <h3 className="font-semibold text-lg">Invitation Sent!</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              Your supplier will receive an email with instructions to join.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setShowInviteForm(false);
+              setInviteSuccess(false);
+              setInviteError(null);
+              setInviteEmail('');
+              setInviteContactName('');
+              setInviteCompanyName('');
+              setInviteMessage('');
+            }}
+          >
+            Back to directory
+          </Button>
+        </div>
+      ) : (
+        <form onSubmit={handleSendInvitation} className="flex-1 flex flex-col">
+          <div className="flex-1 space-y-3 overflow-y-auto">
+            {inviteError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{inviteError}</AlertDescription>
+              </Alert>
+            )}
+
+            <div className="space-y-1.5">
+              <Label htmlFor="invite-email" className="text-xs">
+                Supplier Contact Email <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="invite-email"
+                type="email"
+                placeholder="supplier@example.com"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                disabled={inviteSubmitting}
+                required
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="invite-contact-name" className="text-xs">Contact Person Name</Label>
+              <Input
+                id="invite-contact-name"
+                type="text"
+                placeholder="e.g., Sarah Johnson"
+                value={inviteContactName}
+                onChange={(e) => setInviteContactName(e.target.value)}
+                disabled={inviteSubmitting}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="invite-company-name" className="text-xs">Supplier Company Name</Label>
+              <Input
+                id="invite-company-name"
+                type="text"
+                placeholder="e.g., Acme Materials Ltd"
+                value={inviteCompanyName}
+                onChange={(e) => setInviteCompanyName(e.target.value)}
+                disabled={inviteSubmitting}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="invite-message" className="text-xs">Personal Message</Label>
+              <Textarea
+                id="invite-message"
+                placeholder="Add a personal note to your invitation..."
+                value={inviteMessage}
+                onChange={(e) => setInviteMessage(e.target.value)}
+                disabled={inviteSubmitting}
+                rows={3}
+              />
+            </div>
+
+            <div className="text-xs text-muted-foreground bg-muted p-3 rounded-lg">
+              <p className="font-medium mb-1">What happens next:</p>
+              <ul className="list-disc list-inside space-y-0.5">
+                <li>Your supplier will receive an email invitation</li>
+                <li>A copy will be sent to you and hello@alkatera.com</li>
+                <li>They can create a free account and complete their profile</li>
+                <li>You&apos;ll be notified when they accept</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t mt-4">
+            <Button type="submit" className="w-full" disabled={inviteSubmitting || atLimit}>
+              {inviteSubmitting ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Mail className="mr-2 h-4 w-4" />
+                  Send Invitation
+                </>
+              )}
+            </Button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+
+  // ── Filter chips bar ──
+  const FilterChips = () => {
+    const hasFilters = industryFilter || countryFilter;
+    return (
+      <div className="flex flex-wrap gap-1.5">
+        {hasFilters && (
+          <Badge
+            variant="outline"
+            className="cursor-pointer hover:bg-destructive/10 text-xs h-6"
+            onClick={() => {
+              setIndustryFilter(null);
+              setCountryFilter(null);
+            }}
+          >
+            <X className="h-2.5 w-2.5 mr-1" />
+            Clear
+          </Badge>
+        )}
+        {availableIndustries.map(industry => (
+          <Badge
+            key={industry}
+            variant={industryFilter === industry ? 'default' : 'outline'}
+            className={`cursor-pointer text-xs h-6 ${
+              industryFilter === industry
+                ? 'bg-emerald-600 hover:bg-emerald-700'
+                : 'hover:bg-muted'
+            }`}
+            onClick={() => setIndustryFilter(industryFilter === industry ? null : industry)}
+          >
+            {industry}
+          </Badge>
+        ))}
+        {availableCountries.map(country => (
+          <Badge
+            key={country}
+            variant={countryFilter === country ? 'default' : 'outline'}
+            className={`cursor-pointer text-xs h-6 ${
+              countryFilter === country
+                ? 'bg-blue-600 hover:bg-blue-700'
+                : 'hover:bg-muted'
+            }`}
+            onClick={() => setCountryFilter(countryFilter === country ? null : country)}
+          >
+            <MapPin className="h-2.5 w-2.5 mr-0.5" />
+            {country}
+          </Badge>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6 animate-fade-in-up">
@@ -450,263 +816,286 @@ export default function SuppliersPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Your Suppliers</h1>
           <p className="text-muted-foreground mt-2">
-            Manage your supply chain and track supplier relationships
+            {hasSuppliers
+              ? 'Manage your supply chain and track supplier relationships'
+              : 'Find and add suppliers from our verified directory'}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          {canInviteSuppliers && (
-            <Button variant="outline" size="lg" onClick={handleOpenInviteDialog}>
-              <Mail className="h-5 w-5 mr-2" />
-              Invite Supplier
-            </Button>
-          )}
-          {canCreateSuppliers ? (
-            <Button size="lg" onClick={handleOpenAddDialog}>
-              <Plus className="h-5 w-5 mr-2" />
-              Add Supplier
-            </Button>
-          ) : (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button size="lg" disabled>
-                    <Lock className="h-5 w-5 mr-2" />
-                    Add Supplier
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Only administrators can add suppliers</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
-        </div>
-      </div>
-
-      {/* Supplier Invitation Explainer */}
-      {suppliers.length > 0 && (
-        <div className="flex items-start gap-3 rounded-lg border border-blue-500/20 bg-blue-500/5 p-4">
-          <Info className="h-5 w-5 text-blue-400 shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-blue-300">Invite suppliers to share verified data</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Send email invitations to your suppliers asking them to join alkatera and provide verified sustainability data
-              for specific ingredients or packaging materials. Supplier accounts are completely free, and you&apos;ll be notified when they accept.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Search */}
-      {suppliers.length > 0 && (
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder="Search suppliers by name, country, or industry..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-      )}
-
-      {/* Suppliers Grid */}
-      {suppliers.length === 0 ? (
-        <Card className="border-2 border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <div className="h-14 w-14 rounded-full bg-emerald-500/20 flex items-center justify-center mb-4">
-              <Leaf className="h-7 w-7 text-emerald-400" />
-            </div>
-            <h3 className="text-xl font-semibold mb-2">Map Your Supply Chain</h3>
-            <p className="text-muted-foreground text-center max-w-md mb-6">
-              Your suppliers contribute to your Scope 3 emissions. Adding them here lets you track supply chain impact and even invite them to share their own data.
-            </p>
-            {canCreateSuppliers ? (
-              <Button onClick={handleOpenAddDialog} size="lg" className="gap-2 bg-neon-lime text-black hover:bg-neon-lime/90">
-                <Plus className="h-5 w-5" />
-                Add Your First Supplier
+        {hasSuppliers && (
+          <div className="flex items-center gap-3">
+            {(canCreateSuppliers || canInviteSuppliers) ? (
+              <Button size="lg" onClick={handleOpenSheet}>
+                <Search className="h-5 w-5 mr-2" />
+                Find or Invite Supplier
               </Button>
             ) : (
-              <Button onClick={handleOpenInviteDialog} size="lg" className="gap-2 bg-neon-lime text-black hover:bg-neon-lime/90">
-                <Mail className="h-5 w-5" />
-                Invite Your First Supplier
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button size="lg" disabled>
+                      <Lock className="h-5 w-5 mr-2" />
+                      Find Supplier
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Only administrators can add suppliers</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
-          </CardContent>
-        </Card>
-      ) : filteredSuppliers.length === 0 ? (
-        <Card>
-          <CardContent className="pt-6">
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                No suppliers match your search. Try adjusting your search terms.
-              </AlertDescription>
-            </Alert>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredSuppliers.map((supplier) => (
-            <Card
-              key={supplier.id}
-              className="h-full hover:shadow-lg transition-shadow relative group"
-            >
-              {canDeleteSuppliers && (
-                <div className="absolute top-4 right-4 z-10">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-slate-800 shadow-sm"
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        className="text-red-600 focus:text-red-600"
-                        onClick={() => {
-                          setSupplierToDelete(supplier);
-                          setDeleteDialogOpen(true);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Remove Supplier
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              )}
+          </div>
+        )}
+      </div>
 
-              <Link href={`/suppliers/${supplier.id}`}>
-                <CardHeader>
-                  <div className="mb-4 aspect-video rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center relative overflow-hidden">
-                    {(supplier._enriched?.logo_url || supplier.logo_url) ? (
-                      <Image
-                        src={supplier._enriched?.logo_url || supplier.logo_url!}
-                        alt={`${supplier._enriched?.name || supplier.supplier_name} logo`}
-                        fill
-                        className="object-contain p-4"
-                      />
-                    ) : (
-                      <Building2 className="h-12 w-12 text-muted-foreground" />
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <CardTitle className="line-clamp-1">
-                        {supplier._enriched?.name || supplier.supplier_name}
-                      </CardTitle>
-                      {supplier.is_verified && (
-                        <Badge variant="default" className="bg-emerald-600 text-xs">
-                          <CheckCircle className="h-2.5 w-2.5 mr-1" />
+      {/* ── Empty State: Inline Directory ── */}
+      {!hasSuppliers && (
+        <div className="space-y-6">
+          {/* Welcome + Search */}
+          <Card className="border-2 border-dashed border-emerald-500/30 bg-emerald-500/5">
+            <CardContent className="p-6">
+              <div className="flex flex-col items-center text-center mb-6">
+                <div className="h-14 w-14 rounded-full bg-emerald-500/20 flex items-center justify-center mb-4">
+                  <Building2 className="h-7 w-7 text-emerald-400" />
+                </div>
+                <h3 className="text-xl font-semibold mb-1">Find Your Suppliers</h3>
+                <p className="text-muted-foreground text-sm max-w-lg">
+                  Your suppliers contribute to your Scope 3 emissions. Search our verified directory
+                  to find and add your suppliers, or invite them to join the platform.
+                </p>
+              </div>
+
+              <div className="max-w-md mx-auto relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search suppliers by name, country, or industry..."
+                  value={platformSearchQuery}
+                  onChange={(e) => setPlatformSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Inline Directory Grid */}
+          {loadingPlatform ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-36 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : filteredPlatformSuppliers.length === 0 ? (
+            <Card>
+              <CardContent className="py-10 text-center">
+                <Search className="h-10 w-10 mx-auto mb-3 text-muted-foreground opacity-50" />
+                {platformSearchQuery ? (
+                  <>
+                    <p className="text-sm font-medium">No suppliers match &ldquo;{platformSearchQuery}&rdquo;</p>
+                    <p className="text-xs text-muted-foreground mt-1 mb-4">
+                      Try a different search term, or invite your supplier to join
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground mb-4">No suppliers available in the directory yet</p>
+                )}
+                {canInviteSuppliers && (
+                  <Button variant="outline" size="sm" onClick={handleOpenSheet}>
+                    <Mail className="h-4 w-4 mr-2" />
+                    Invite a Supplier
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  {platformSearchQuery
+                    ? `${filteredPlatformSuppliers.length} verified supplier${filteredPlatformSuppliers.length !== 1 ? 's' : ''} found`
+                    : 'Recently verified suppliers on the platform'}
+                </p>
+                <Button variant="ghost" size="sm" onClick={handleOpenSheet}>
+                  View full directory
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredPlatformSuppliers.slice(0, 6).map((supplier) => (
+                  <Card
+                    key={supplier.id}
+                    className="hover:border-emerald-500/40 transition-colors"
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                            <Building2 className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                          <div className="min-w-0">
+                            <CardTitle className="text-sm truncate">{supplier.name}</CardTitle>
+                            <CardDescription className="text-xs truncate">
+                              {supplier.industry_sector || 'Supplier'}
+                            </CardDescription>
+                          </div>
+                        </div>
+                        <Badge variant="default" className="bg-emerald-600 text-[10px] px-1.5 py-0 shrink-0">
+                          <CheckCircle className="h-2.5 w-2.5 mr-0.5" />
                           Verified
                         </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-0 space-y-3">
+                      {supplier.description && (
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          {supplier.description}
+                        </p>
                       )}
-                    </div>
-                    <CardDescription className="line-clamp-1">
-                      {supplier._enriched?.industry_sector || supplier.industry_sector || 'No industry specified'}
-                    </CardDescription>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {(supplier._enriched?.description || supplier.description) && (
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {supplier._enriched?.description || supplier.description}
-                    </p>
-                  )}
+                      {supplier.country && (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {supplier.country}
+                        </p>
+                      )}
+                      <Button
+                        size="sm"
+                        className="w-full bg-neon-lime text-black hover:bg-neon-lime/90"
+                        disabled={addingId === supplier.id || atLimit || !canCreateSuppliers}
+                        onClick={() => handleQuickAdd(supplier)}
+                      >
+                        {addingId === supplier.id ? (
+                          <>
+                            <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                            Adding...
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="h-3 w-3 mr-1" />
+                            Add to My Suppliers
+                          </>
+                        )}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
 
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground flex items-center gap-1">
-                      <MapPin className="h-3.5 w-3.5" />
-                      Location:
-                    </span>
-                    <span className="font-medium truncate ml-2">
-                      {[
-                        supplier._enriched?.city,
-                        supplier._enriched?.country || supplier.country,
-                      ].filter(Boolean).join(', ') || 'Not specified'}
-                    </span>
-                  </div>
+              {filteredPlatformSuppliers.length > 6 && (
+                <div className="text-center">
+                  <Button variant="outline" onClick={handleOpenSheet}>
+                    <Search className="h-4 w-4 mr-2" />
+                    Browse All {platformSuppliers.length} Suppliers
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
 
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground flex items-center gap-1">
-                      <Package className="h-3.5 w-3.5" />
-                      Products:
-                    </span>
-                    <span className="font-medium">
-                      {supplier._productCount != null ? supplier._productCount : '—'}
-                    </span>
-                  </div>
-
-                  {(supplier._enriched?.website || supplier.website) && (
-                    <div className="flex items-center text-sm text-blue-600 hover:text-blue-700">
-                      <Globe className="h-3.5 w-3.5 mr-1" />
-                      <span className="truncate">
-                        {(supplier._enriched?.website || supplier.website || '').replace(/^https?:\/\//, '')}
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="text-xs text-muted-foreground pt-2 border-t">
-                    Added {formatDate(supplier.added_at)}
-                  </div>
-                </CardContent>
-              </Link>
+          {/* Invite CTA */}
+          {canInviteSuppliers && filteredPlatformSuppliers.length > 0 && (
+            <Card className="bg-muted/30">
+              <CardContent className="py-4 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Can&apos;t find your supplier?</p>
+                  <p className="text-xs text-muted-foreground">
+                    Invite them to join the platform. Supplier accounts are completely free.
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => {
+                  handleOpenSheet();
+                  // Small delay to let sheet open, then switch to invite
+                  setTimeout(() => setShowInviteForm(true), 100);
+                }}>
+                  <Mail className="h-4 w-4 mr-2" />
+                  Invite Supplier
+                </Button>
+              </CardContent>
             </Card>
-          ))}
+          )}
         </div>
       )}
 
-      {/* Add Supplier Dialog */}
-      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Add Supplier from Directory</DialogTitle>
-            <DialogDescription>
-              Select a supplier from our verified directory to add to your organization
-            </DialogDescription>
-          </DialogHeader>
+      {/* ── Existing Suppliers: Search + Grid ── */}
+      {hasSuppliers && (
+        <>
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search your suppliers by name, country, or industry..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
 
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Select Supplier</Label>
-              {loadingPlatform ? (
-                <div className="space-y-2">
-                  {[...Array(3)].map((_, i) => (
-                    <Skeleton key={i} className="h-20 w-full" />
-                  ))}
-                </div>
-              ) : platformSuppliers.length === 0 ? (
+          {/* Suppliers Grid */}
+          {filteredSuppliers.length === 0 ? (
+            <Card>
+              <CardContent className="pt-6">
                 <Alert>
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
-                    All available suppliers have already been added to your organization.
+                    No suppliers match your search. Try adjusting your search terms.
                   </AlertDescription>
                 </Alert>
-              ) : (
-                <div className="border rounded-lg divide-y max-h-[300px] overflow-y-auto">
-                  {filteredPlatformSuppliers.map((supplier) => (
-                    <label
-                      key={supplier.id}
-                      className={`flex items-start gap-3 p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors ${
-                        selectedSupplier === supplier.id ? 'bg-slate-50 dark:bg-slate-900' : ''
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="supplier"
-                        value={supplier.id}
-                        checked={selectedSupplier === supplier.id}
-                        onChange={(e) => setSelectedSupplier(e.target.value)}
-                        className="mt-1"
-                      />
-                      <div className="flex-1 min-w-0">
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredSuppliers.map((supplier) => (
+                <Card
+                  key={supplier.id}
+                  className="h-full hover:shadow-lg transition-shadow relative group"
+                >
+                  {canDeleteSuppliers && (
+                    <div className="absolute top-4 right-4 z-10">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-slate-800 shadow-sm"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            className="text-red-600 focus:text-red-600"
+                            onClick={() => {
+                              setSupplierToDelete(supplier);
+                              setDeleteDialogOpen(true);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Remove Supplier
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  )}
+
+                  <Link href={`/suppliers/${supplier.id}`}>
+                    <CardHeader>
+                      <div className="mb-4 aspect-video rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center relative overflow-hidden">
+                        {(supplier._enriched?.logo_url || supplier.logo_url) ? (
+                          <Image
+                            src={supplier._enriched?.logo_url || supplier.logo_url!}
+                            alt={`${supplier._enriched?.name || supplier.supplier_name} logo`}
+                            fill
+                            className="object-contain p-4"
+                          />
+                        ) : (
+                          <Building2 className="h-12 w-12 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <p className="font-medium">{supplier.name}</p>
+                          <CardTitle className="line-clamp-1">
+                            {supplier._enriched?.name || supplier.supplier_name}
+                          </CardTitle>
                           {supplier.is_verified && (
                             <Badge variant="default" className="bg-emerald-600 text-xs">
                               <CheckCircle className="h-2.5 w-2.5 mr-1" />
@@ -714,80 +1103,244 @@ export default function SuppliersPage() {
                             </Badge>
                           )}
                         </div>
-                        <div className="text-sm text-muted-foreground mt-1 space-y-1">
-                          {supplier.industry_sector && (
-                            <p>{supplier.industry_sector}</p>
-                          )}
-                          {supplier.country && (
-                            <p className="flex items-center gap-1">
-                              <MapPin className="h-3 w-3" />
-                              {supplier.country}
-                            </p>
-                          )}
-                          {supplier.description && (
-                            <p className="line-clamp-2">{supplier.description}</p>
-                          )}
-                        </div>
+                        <CardDescription className="line-clamp-1">
+                          {supplier._enriched?.industry_sector || supplier.industry_sector || 'No industry specified'}
+                        </CardDescription>
                       </div>
-                    </label>
-                  ))}
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {(supplier._enriched?.description || supplier.description) && (
+                        <p className="text-sm text-muted-foreground line-clamp-2">
+                          {supplier._enriched?.description || supplier.description}
+                        </p>
+                      )}
+
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground flex items-center gap-1">
+                          <MapPin className="h-3.5 w-3.5" />
+                          Location:
+                        </span>
+                        <span className="font-medium truncate ml-2">
+                          {[
+                            supplier._enriched?.city,
+                            supplier._enriched?.country || supplier.country,
+                          ].filter(Boolean).join(', ') || 'Not specified'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground flex items-center gap-1">
+                          <Package className="h-3.5 w-3.5" />
+                          Products:
+                        </span>
+                        <span className="font-medium">
+                          {supplier._productCount != null ? supplier._productCount : '—'}
+                        </span>
+                      </div>
+
+                      {(supplier._enriched?.website || supplier.website) && (
+                        <div className="flex items-center text-sm text-blue-600 hover:text-blue-700">
+                          <Globe className="h-3.5 w-3.5 mr-1" />
+                          <span className="truncate">
+                            {(supplier._enriched?.website || supplier.website || '').replace(/^https?:\/\//, '')}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="text-xs text-muted-foreground pt-2 border-t">
+                        Added {formatDate(supplier.added_at)}
+                      </div>
+                    </CardContent>
+                  </Link>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* Browse More CTA */}
+          {(canCreateSuppliers || canInviteSuppliers) && platformSuppliers.length > 0 && (
+            <Card className="bg-muted/30">
+              <CardContent className="py-4 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Add more suppliers to your supply chain</p>
+                  <p className="text-xs text-muted-foreground">
+                    Browse {platformSuppliers.length} verified supplier{platformSuppliers.length !== 1 ? 's' : ''} in our directory, or invite a new supplier to join
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleOpenSheet}>
+                  <Search className="h-4 w-4 mr-2" />
+                  Browse Directory
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+
+      {/* ── Supplier Directory Sheet ── */}
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent
+          side="right"
+          className="sm:max-w-4xl w-full p-0 flex flex-col"
+        >
+          <SheetHeader className="px-6 pt-6 pb-4 border-b shrink-0">
+            <SheetTitle>Supplier Directory</SheetTitle>
+            <SheetDescription>
+              Search verified suppliers and add them to your supply chain
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="flex-1 flex min-h-0">
+            {/* Left Panel: Search + List */}
+            <div className="flex-1 flex flex-col min-h-0 border-r">
+              {/* Search */}
+              <div className="px-4 pt-4 pb-3 space-y-3 shrink-0">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Search by name, country, or industry..."
+                    value={platformSearchQuery}
+                    onChange={(e) => setPlatformSearchQuery(e.target.value)}
+                    className="pl-10"
+                    autoFocus
+                  />
+                </div>
+
+                {/* Filter chips */}
+                {(availableIndustries.length > 0 || availableCountries.length > 0) && (
+                  <FilterChips />
+                )}
+              </div>
+
+              {/* Results header */}
+              <div className="px-4 pb-2 shrink-0">
+                <p className="text-xs text-muted-foreground">
+                  {loadingPlatform
+                    ? 'Loading...'
+                    : platformSearchQuery || industryFilter || countryFilter
+                      ? `${filteredPlatformSuppliers.length} supplier${filteredPlatformSuppliers.length !== 1 ? 's' : ''} found`
+                      : `${filteredPlatformSuppliers.length} verified supplier${filteredPlatformSuppliers.length !== 1 ? 's' : ''}`}
+                </p>
+              </div>
+
+              {/* Supplier list */}
+              <ScrollArea className="flex-1 min-h-0">
+                <div className="px-4 pb-4 space-y-1">
+                  {loadingPlatform ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <Skeleton key={i} className="h-16 w-full rounded-lg" />
+                    ))
+                  ) : filteredPlatformSuppliers.length === 0 ? (
+                    <div className="text-center py-10 text-muted-foreground">
+                      <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      {platformSearchQuery || industryFilter || countryFilter ? (
+                        <>
+                          <p className="text-sm">No suppliers match your search</p>
+                          <p className="text-xs mt-1">Try different terms or clear your filters</p>
+                        </>
+                      ) : (
+                        <p className="text-sm">All available suppliers have been added</p>
+                      )}
+                    </div>
+                  ) : (
+                    filteredPlatformSuppliers.map((supplier) => (
+                      <DirectoryListItem key={supplier.id} supplier={supplier} />
+                    ))
+                  )}
+                </div>
+
+                {/* Invite CTA at bottom of list */}
+                {!loadingPlatform && (canInviteSuppliers || canCreateSuppliers) && (
+                  <div className="px-4 pb-4 pt-2 border-t mx-4">
+                    <button
+                      onClick={() => {
+                        setShowInviteForm(true);
+                        setPreviewSupplier(null);
+                        setInviteEmail('');
+                        setInviteContactName('');
+                        setInviteCompanyName('');
+                        setInviteMessage('');
+                        setInviteSuccess(false);
+                        setInviteError(null);
+                      }}
+                      className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors text-left"
+                    >
+                      <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
+                        <Mail className="h-5 w-5 text-blue-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Can&apos;t find your supplier?</p>
+                        <p className="text-xs text-muted-foreground">
+                          Invite them to join the platform for free
+                        </p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto shrink-0" />
+                    </button>
+                  </div>
+                )}
+              </ScrollArea>
+            </div>
+
+            {/* Right Panel: Preview / Invite */}
+            <div className="w-[380px] hidden lg:flex flex-col p-6 min-h-0">
+              {showInviteForm ? (
+                <InviteForm />
+              ) : previewSupplier ? (
+                <SupplierPreview supplier={previewSupplier} />
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground">
+                  <Building2 className="h-12 w-12 mb-3 opacity-30" />
+                  <p className="text-sm font-medium">Select a supplier</p>
+                  <p className="text-xs mt-1">
+                    Click on a supplier to preview their details and add them to your supply chain
+                  </p>
                 </div>
               )}
             </div>
-
-            {selectedSupplier && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="annual_spend">Annual Spend (Optional)</Label>
-                  <Input
-                    id="annual_spend"
-                    type="number"
-                    placeholder="e.g., 50000"
-                    value={annualSpend}
-                    onChange={(e) => setAnnualSpend(e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="notes">Notes (Optional)</Label>
-                  <Textarea
-                    id="notes"
-                    placeholder="Add any notes about this supplier relationship..."
-                    value={supplierNotes}
-                    onChange={(e) => setSupplierNotes(e.target.value)}
-                    rows={3}
-                  />
-                </div>
-              </>
-            )}
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAddDialogOpen(false)} disabled={adding}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddSupplier} disabled={adding || !selectedSupplier}>
-              {adding ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Adding...
-                </>
-              ) : (
-                'Add Supplier'
+          {/* Mobile: Quick add button when supplier selected (visible on small screens) */}
+          {previewSupplier && !showInviteForm && (
+            <div className="lg:hidden px-6 py-4 border-t shrink-0">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium truncate">{previewSupplier.name}</p>
+                <button onClick={() => setPreviewSupplier(null)} className="text-muted-foreground">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              {canCreateSuppliers && (
+                <Button
+                  className="w-full bg-neon-lime text-black hover:bg-neon-lime/90"
+                  disabled={addingId === previewSupplier.id || atLimit}
+                  onClick={() => handleQuickAdd(previewSupplier)}
+                >
+                  {addingId === previewSupplier.id ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Adding...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add to My Suppliers
+                    </>
+                  )}
+                </Button>
               )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
 
-      {/* Delete Confirmation Dialog */}
+      {/* ── Delete Confirmation Dialog ── */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove Supplier</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to remove <strong>{supplierToDelete?.supplier_name}</strong>{' '}
-              from your organization? This will not delete the supplier from the platform
+              from your organisation? This will not delete the supplier from the platform
               directory.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -803,143 +1356,6 @@ export default function SuppliersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Invite Supplier Dialog */}
-      <Dialog open={inviteDialogOpen} onOpenChange={handleCloseInviteDialog}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Mail className="h-5 w-5" />
-              Invite a Supplier
-            </DialogTitle>
-            <DialogDescription>
-              Send an email invitation to your supplier to join alkatera and share their sustainability data.
-            </DialogDescription>
-          </DialogHeader>
-
-          {atLimit && (
-            <div className="flex items-center gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-              <Lock className="h-5 w-5 text-destructive shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-destructive">Supplier limit reached</p>
-                <p className="text-xs text-muted-foreground">
-                  You&apos;ve used {currentCount} of {maxCount} suppliers on your current plan.{' '}
-                  <a href="/dashboard/settings" className="underline text-primary">Upgrade</a> to add more.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {inviteSuccess ? (
-            <div className="py-8 flex flex-col items-center justify-center gap-4">
-              <CheckCircle className="h-12 w-12 text-green-500" />
-              <div className="text-center">
-                <h3 className="font-semibold text-lg">Invitation Sent!</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Your supplier will receive an email with instructions to join the platform.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <form onSubmit={handleSendInvitation} className="space-y-4 py-4">
-              {inviteError && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{inviteError}</AlertDescription>
-                </Alert>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="invite-email">
-                  Supplier Contact Email <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="invite-email"
-                  type="email"
-                  placeholder="supplier@example.com"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  disabled={inviteSubmitting}
-                  required
-                />
-                <p className="text-xs text-muted-foreground">
-                  The invitation will be sent to this email address
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="invite-contact-name">Contact Person Name (Optional)</Label>
-                <Input
-                  id="invite-contact-name"
-                  type="text"
-                  placeholder="e.g., Sarah Johnson"
-                  value={inviteContactName}
-                  onChange={(e) => setInviteContactName(e.target.value)}
-                  disabled={inviteSubmitting}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="invite-company-name">Supplier Company Name (Optional)</Label>
-                <Input
-                  id="invite-company-name"
-                  type="text"
-                  placeholder="e.g., Acme Materials Ltd"
-                  value={inviteCompanyName}
-                  onChange={(e) => setInviteCompanyName(e.target.value)}
-                  disabled={inviteSubmitting}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="invite-message">Personal Message (Optional)</Label>
-                <Textarea
-                  id="invite-message"
-                  placeholder="Add a personal note to your invitation..."
-                  value={inviteMessage}
-                  onChange={(e) => setInviteMessage(e.target.value)}
-                  disabled={inviteSubmitting}
-                  rows={3}
-                />
-              </div>
-
-              <div className="text-xs text-muted-foreground bg-muted p-3 rounded-lg">
-                <p className="font-medium mb-1">What happens next:</p>
-                <ul className="list-disc list-inside space-y-1">
-                  <li>Your supplier will receive an email invitation</li>
-                  <li>A copy will be sent to you and hello@alkatera.com</li>
-                  <li>They can create a free account and complete their profile</li>
-                  <li>You&apos;ll be notified when they accept</li>
-                </ul>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleCloseInviteDialog}
-                  disabled={inviteSubmitting}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={inviteSubmitting || atLimit}>
-                  {inviteSubmitting ? (
-                    <>
-                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                      Sending...
-                    </>
-                  ) : (
-                    <>
-                      <Mail className="mr-2 h-4 w-4" />
-                      Send Invitation
-                    </>
-                  )}
-                </Button>
-              </div>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
