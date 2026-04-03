@@ -1740,14 +1740,14 @@ export default function CompanyEmissionsPage() {
               /* ── Main Content: Categories + Sidebar ────────────── */
               <div className="flex flex-col xl:flex-row gap-6">
                 {/* Left: Category Cards */}
-                <div className="flex-1 min-w-0 space-y-8">
+                <div className="flex-1 min-w-0 space-y-6">
 
                   {/* ── Purchased Goods (Cat 1-2) ───────────────── */}
                   <section>
                     <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                       Purchased Goods (Cat 1-2)
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                       {/* Category 1: Products (compact version) */}
                       <Card className={scope3Cat1CO2e > 0 ? 'border-green-200 dark:border-green-900' : ''}>
                         <CardHeader className="pb-2">
@@ -1817,7 +1817,7 @@ export default function CompanyEmissionsPage() {
                     <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                       Travel & Commuting (Cat 6-7)
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                       <BusinessTravelCard
                         reportId={report.id}
                         entries={travelEntries}
@@ -1838,7 +1838,7 @@ export default function CompanyEmissionsPage() {
                     <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                       Purchased Services (Cat 8)
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                       <ServicesOverheadCard
                         reportId={report.id}
                         entries={serviceEntries}
@@ -1853,7 +1853,7 @@ export default function CompanyEmissionsPage() {
                     <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                       Logistics & Transport (Cat 4, 9)
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                       {currentOrganization && (
                         <LogisticsDistributionCard
                           reportId={report.id}
@@ -1892,7 +1892,7 @@ export default function CompanyEmissionsPage() {
                     <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                       Waste & Water (Cat 5)
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                       <OperationalWasteCard
                         reportId={report.id}
                         entries={wasteEntries}
@@ -1907,7 +1907,7 @@ export default function CompanyEmissionsPage() {
                     <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                       Product Use Phase (Cat 11)
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                       {currentOrganization && (
                         <UsePhaseCard
                           reportId={report.id}
