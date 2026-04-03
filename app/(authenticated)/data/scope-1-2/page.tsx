@@ -1697,249 +1697,271 @@ export default function CompanyEmissionsPage() {
 
         <TabsContent value="scope3">
           <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Scope 3: Value Chain Emissions</CardTitle>
-                <CardDescription>
-                  Track indirect emissions from your organisation&apos;s value chain for {selectedYear}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Alert className="mb-4">
-                  <Globe className="h-4 w-4" />
-                  <AlertDescription>
-                    Scope 3 emissions typically represent the largest portion of a company&apos;s carbon footprint.
-                    Add data for business travel, purchased services, employee commuting, and more.
-                  </AlertDescription>
-                </Alert>
-              </CardContent>
-            </Card>
-
-            {/* AI Accounts Import - Full Width */}
-            {currentOrganization && report && (
-              <SpendImportCard
-                reportId={report.id}
-                organizationId={currentOrganization.id}
-                year={selectedYear}
-                onUpdate={fetchReportData}
-              />
-            )}
-
-            <Card className="border-green-200 dark:border-green-900 bg-green-50/30 dark:bg-green-950/20">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      Category 1: Purchased Goods & Services
-                      <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
-                        <CheckCircle2 className="h-3 w-3 mr-1" />
-                        Auto-calculated from Product Environmental Impacts
-                      </Badge>
-                    </CardTitle>
-                    <CardDescription className="mt-2">
-                      Emissions from raw materials and packaging calculated from your product PEIs using ecoinvent database
-                    </CardDescription>
-                  </div>
+            {/* ── Summary Bar ──────────────────────────────────────── */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card className="p-4">
+                <div className="text-xs text-muted-foreground mb-1">Total Scope 3</div>
+                <div className="text-2xl font-bold font-mono">
+                  {(() => {
+                    const total = scope3Cat1CO2e + (calculatedScope3OverheadsCO2e / 1000) + (xeroScope3Kg / 1000) + fleetScope3CO2e;
+                    return total > 0 ? `${total.toFixed(2)} t` : '—';
+                  })()}
                 </div>
-              </CardHeader>
-              <CardContent>
-                {isLoadingReport ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  </div>
-                ) : scope3Cat1CO2e > 0 ? (
-                  <div className="space-y-6">
-                    <div className="text-center py-6 bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 rounded-lg border border-green-200 dark:border-green-800">
-                      <div className="text-sm text-muted-foreground mb-2">Total Category 1 Emissions</div>
-                      <div className="text-4xl font-bold text-green-900 dark:text-green-100 mb-2">
-                        {scope3Cat1CO2e.toFixed(3)} tCO2e
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {scope3Cat1DataQuality}
-                      </div>
-                    </div>
-
-                    <Alert className="bg-green-50 dark:bg-green-950/50 border-green-200 dark:border-green-800">
-                      <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-                      <AlertDescription className="text-sm">
-                        <div className="font-semibold text-green-900 dark:text-green-100 mb-1">
-                          Tier 1 Primary Data Quality
-                        </div>
-                        <div className="text-green-800 dark:text-green-200">
-                          This data is calculated from your product LCAs using ecoinvent factors -
-                          <strong> far more accurate than spend-based estimates</strong> (plus/minus 12% vs plus/minus 50% uncertainty).
-                        </div>
-                      </AlertDescription>
-                    </Alert>
-
-                    {scope3Cat1Breakdown.length > 0 && (
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <h4 className="font-semibold text-sm">Breakdown by Product:</h4>
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                        <div className="space-y-2">
-                          {scope3Cat1Breakdown.map((product, idx) => (
-                            <div
-                              key={idx}
-                              className="flex items-center justify-between p-3 bg-white dark:bg-slate-900 rounded-lg border border-green-100 dark:border-green-900/50"
-                            >
-                              <div className="flex-1">
-                                <div className="font-medium text-sm">{product.product_name}</div>
-                                <div className="text-xs text-muted-foreground mt-1">
-                                  Production: {product.production_volume.toLocaleString()} units
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <div className="font-mono font-semibold text-sm">
-                                  {product.total_tco2e.toFixed(3)} tCO2e
-                                </div>
-                                <div className="text-xs text-muted-foreground mt-1">
-                                  Materials: {product.materials_tco2e.toFixed(2)} | Packaging: {product.packaging_tco2e.toFixed(2)}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {scope3Cat1PendingProducts.length > 0 && (
-                      <div className="space-y-3 mt-4">
-                        <h4 className="font-semibold text-sm text-muted-foreground">Products Excluded from Calculations:</h4>
-                        <div className="space-y-2">
-                          {scope3Cat1PendingProducts.map((product, idx) => (
-                            <div
-                              key={idx}
-                              className="flex items-center justify-between p-3 bg-amber-50/50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-900/50"
-                            >
-                              <div className="flex items-center gap-2 flex-1">
-                                <AlertCircle className="h-4 w-4 text-amber-500 shrink-0" />
-                                <div>
-                                  <div className="font-medium text-sm">{product.product_name}</div>
-                                  <div className="text-xs text-muted-foreground mt-1">{product.status}</div>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <div className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-                                  Not included
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <div className="text-muted-foreground mb-4">
-                      <Globe className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                      <p className="font-medium">No Category 1 data available</p>
-                      <p className="text-sm mt-2">
-                        Complete product LCAs and record production volumes to automatically calculate
-                        Category 1 emissions from your raw materials and packaging.
-                      </p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      className="mt-4"
-                      onClick={() => window.location.href = '/products'}
-                    >
-                      Go to Product Environmental Impacts
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                <div className="text-[10px] text-muted-foreground">CO2e for {selectedYear}</div>
+              </Card>
+              <Card className="p-4">
+                <div className="text-xs text-muted-foreground mb-1">From Products</div>
+                <div className="text-2xl font-bold font-mono text-green-600 dark:text-green-400">
+                  {scope3Cat1CO2e > 0 ? `${scope3Cat1CO2e.toFixed(2)} t` : '—'}
+                </div>
+                <div className="text-[10px] text-muted-foreground">Cat 1: LCA-based (Tier 1)</div>
+              </Card>
+              <Card className="p-4">
+                <div className="text-xs text-muted-foreground mb-1">From Activities</div>
+                <div className="text-2xl font-bold font-mono">
+                  {calculatedScope3OverheadsCO2e > 0 ? `${(calculatedScope3OverheadsCO2e / 1000).toFixed(2)} t` : '—'}
+                </div>
+                <div className="text-[10px] text-muted-foreground">Manual data entry</div>
+              </Card>
+              <Card className="p-4">
+                <div className="text-xs text-muted-foreground mb-1">From Spend Data</div>
+                <div className="text-2xl font-bold font-mono text-amber-600 dark:text-amber-400">
+                  {xeroScope3Kg > 0 ? `${(xeroScope3Kg / 1000).toFixed(2)} t` : '—'}
+                </div>
+                <div className="text-[10px] text-muted-foreground">Xero estimates (Tier 4)</div>
+              </Card>
+            </div>
 
             {isLoadingReport ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
             ) : report ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                <BusinessTravelCard
-                  reportId={report.id}
-                  entries={travelEntries}
-                  onUpdate={fetchReportData}
-                  xeroEntries={xeroByCategory.get('business_travel')}
-                />
+              /* ── Main Content: Categories + Sidebar ────────────── */
+              <div className="flex flex-col xl:flex-row gap-6">
+                {/* Left: Category Cards */}
+                <div className="flex-1 min-w-0 space-y-8">
 
-                <MarketingMaterialsCard
-                  reportId={report.id}
-                  entries={marketingEntries}
-                  onUpdate={fetchReportData}
-                  xeroEntries={xeroByCategory.get('purchased_services_materials')}
-                />
+                  {/* ── Purchased Goods (Cat 1-2) ───────────────── */}
+                  <section>
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                      Purchased Goods (Cat 1-2)
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Category 1: Products (compact version) */}
+                      <Card className={scope3Cat1CO2e > 0 ? 'border-green-200 dark:border-green-900' : ''}>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            Cat 1: Products
+                            {scope3Cat1CO2e > 0 && (
+                              <Badge variant="outline" className="text-[10px] bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
+                                <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
+                                Auto
+                              </Badge>
+                            )}
+                          </CardTitle>
+                          <CardDescription className="text-xs">Raw materials and packaging from product LCAs</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          {scope3Cat1CO2e > 0 ? (
+                            <div>
+                              <div className="text-2xl font-bold font-mono text-green-900 dark:text-green-100">
+                                {scope3Cat1CO2e.toFixed(3)} <span className="text-sm font-normal text-muted-foreground">tCO2e</span>
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-1">{scope3Cat1DataQuality}</div>
+                              {scope3Cat1Breakdown.length > 0 && (
+                                <div className="mt-3 space-y-1.5">
+                                  {scope3Cat1Breakdown.map((product, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs">
+                                      <span className="truncate mr-2">{product.product_name}</span>
+                                      <span className="font-mono shrink-0">{product.total_tco2e.toFixed(3)} t</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {scope3Cat1PendingProducts.length > 0 && (
+                                <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                                  <AlertCircle className="h-3 w-3 inline mr-1" />
+                                  {scope3Cat1PendingProducts.length} product{scope3Cat1PendingProducts.length !== 1 ? 's' : ''} excluded (incomplete LCA)
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-center py-4">
+                              <p className="text-xs text-muted-foreground mb-2">No product LCA data yet</p>
+                              <Button variant="outline" size="sm" onClick={() => window.location.href = '/products'}>
+                                Go to Products
+                              </Button>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
 
-                <ServicesOverheadCard
-                  reportId={report.id}
-                  entries={serviceEntries}
-                  onUpdate={fetchReportData}
-                  xeroEntries={xeroByCategory.get('purchased_services')}
-                />
+                      <CapitalGoodsCard
+                        reportId={report.id}
+                        entries={capitalGoodsEntries}
+                        onUpdate={fetchReportData}
+                      />
 
-                <TeamCommutingCard
-                  reportId={report.id}
-                  initialFteCount={fteCount}
-                  onUpdate={fetchReportData}
-                />
+                      <MarketingMaterialsCard
+                        reportId={report.id}
+                        entries={marketingEntries}
+                        onUpdate={fetchReportData}
+                        xeroEntries={xeroByCategory.get('purchased_services_materials')}
+                      />
+                    </div>
+                  </section>
 
-                <CapitalGoodsCard
-                  reportId={report.id}
-                  entries={capitalGoodsEntries}
-                  onUpdate={fetchReportData}
-                />
+                  {/* ── Travel & Commuting (Cat 6-7) ────────────── */}
+                  <section>
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                      Travel & Commuting (Cat 6-7)
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <BusinessTravelCard
+                        reportId={report.id}
+                        entries={travelEntries}
+                        onUpdate={fetchReportData}
+                        xeroEntries={xeroByCategory.get('business_travel')}
+                      />
 
-                {currentOrganization && (
-                  <LogisticsDistributionCard
-                    reportId={report.id}
-                    organizationId={currentOrganization.id}
-                    year={selectedYear}
-                    entries={logisticsEntries}
-                    onUpdate={fetchReportData}
-                    xeroEntries={xeroByCategory.get('downstream_logistics')}
-                  />
-                )}
+                      <TeamCommutingCard
+                        reportId={report.id}
+                        initialFteCount={fteCount}
+                        onUpdate={fetchReportData}
+                      />
+                    </div>
+                  </section>
 
-                <OperationalWasteCard
-                  reportId={report.id}
-                  entries={wasteEntries}
-                  onUpdate={fetchReportData}
-                  xeroEntries={xeroByCategory.get('operational_waste')}
-                />
+                  {/* ── Purchased Services (Cat 8) ──────────────── */}
+                  <section>
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                      Purchased Services (Cat 8)
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <ServicesOverheadCard
+                        reportId={report.id}
+                        entries={serviceEntries}
+                        onUpdate={fetchReportData}
+                        xeroEntries={xeroByCategory.get('purchased_services')}
+                      />
+                    </div>
+                  </section>
 
-                {/* New GHG Protocol Scope 3 category cards */}
-                {currentOrganization && (
-                  <UpstreamTransportCard
-                    reportId={report.id}
-                    organizationId={currentOrganization.id}
-                    year={selectedYear}
-                    entries={upstreamTransportEntries}
-                    onUpdate={fetchReportData}
-                  />
-                )}
+                  {/* ── Logistics & Transport (Cat 4, 9) ────────── */}
+                  <section>
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                      Logistics & Transport (Cat 4, 9)
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {currentOrganization && (
+                        <LogisticsDistributionCard
+                          reportId={report.id}
+                          organizationId={currentOrganization.id}
+                          year={selectedYear}
+                          entries={logisticsEntries}
+                          onUpdate={fetchReportData}
+                          xeroEntries={xeroByCategory.get('downstream_logistics')}
+                        />
+                      )}
 
-                {currentOrganization && (
-                  <DownstreamTransportCard
-                    reportId={report.id}
-                    organizationId={currentOrganization.id}
-                    year={selectedYear}
-                    entries={downstreamTransportEntries}
-                    onUpdate={fetchReportData}
-                  />
-                )}
+                      {currentOrganization && (
+                        <UpstreamTransportCard
+                          reportId={report.id}
+                          organizationId={currentOrganization.id}
+                          year={selectedYear}
+                          entries={upstreamTransportEntries}
+                          onUpdate={fetchReportData}
+                        />
+                      )}
 
-                {currentOrganization && (
-                  <UsePhaseCard
-                    reportId={report.id}
-                    organizationId={currentOrganization.id}
-                    year={selectedYear}
-                    entries={usePhaseEntries}
-                    onUpdate={fetchReportData}
-                  />
-                )}
+                      {currentOrganization && (
+                        <DownstreamTransportCard
+                          reportId={report.id}
+                          organizationId={currentOrganization.id}
+                          year={selectedYear}
+                          entries={downstreamTransportEntries}
+                          onUpdate={fetchReportData}
+                        />
+                      )}
+                    </div>
+                  </section>
+
+                  {/* ── Waste & Water (Cat 5) ───────────────────── */}
+                  <section>
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                      Waste & Water (Cat 5)
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <OperationalWasteCard
+                        reportId={report.id}
+                        entries={wasteEntries}
+                        onUpdate={fetchReportData}
+                        xeroEntries={xeroByCategory.get('operational_waste')}
+                      />
+                    </div>
+                  </section>
+
+                  {/* ── Product Use (Cat 11) ─────────────────────── */}
+                  <section>
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                      Product Use Phase (Cat 11)
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {currentOrganization && (
+                        <UsePhaseCard
+                          reportId={report.id}
+                          organizationId={currentOrganization.id}
+                          year={selectedYear}
+                          entries={usePhaseEntries}
+                          onUpdate={fetchReportData}
+                        />
+                      )}
+                    </div>
+                  </section>
+                </div>
+
+                {/* Right: Import Sidebar */}
+                <div className="xl:w-72 shrink-0 space-y-4">
+                  <div className="xl:sticky xl:top-4 space-y-4">
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                      Import Data
+                    </h3>
+
+                    {/* Xero link */}
+                    <Card className="border-neon-lime/30 bg-neon-lime/5">
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="h-9 w-9 rounded-lg bg-neon-lime/20 flex items-center justify-center shrink-0">
+                            <svg viewBox="0 0 24 24" className="h-5 w-5 text-neon-lime" fill="currentColor">
+                              <path d="M4.205 12.02L8.087 7.98l.078-.082c.263-.27.563-.395.878-.395.482 0 .853.336.853.79 0 .232-.093.44-.263.62L6.74 12.02l2.893 3.106c.17.18.263.39.263.62 0 .453-.37.79-.853.79-.315 0-.615-.124-.878-.395l-.078-.082-3.882-4.04zm15.59 0L15.913 7.98l-.078-.082c-.263-.27-.563-.395-.878-.395-.482 0-.853.336-.853.79 0 .232.093.44.263.62l2.893 3.106-2.893 3.106c-.17.18-.263.39-.263.62 0 .453.37.79.853.79.315 0 .615-.124.878-.395l.078-.082 3.882-4.04z"/>
+                            </svg>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium">Xero Integration</div>
+                            <div className="text-xs text-muted-foreground">Classify suppliers by category</div>
+                          </div>
+                        </div>
+                        <Link href="/data/xero-upgrades/">
+                          <Button variant="outline" size="sm" className="w-full mt-3 text-xs">
+                            <ExternalLink className="h-3 w-3 mr-1.5" />
+                            Open Supplier Classification
+                          </Button>
+                        </Link>
+                      </CardContent>
+                    </Card>
+
+                    {/* Spend Import (CSV upload) */}
+                    {currentOrganization && report && (
+                      <SpendImportCard
+                        reportId={report.id}
+                        organizationId={currentOrganization.id}
+                        year={selectedYear}
+                        onUpdate={fetchReportData}
+                      />
+                    )}
+                  </div>
+                </div>
               </div>
             ) : (
               <Alert>
