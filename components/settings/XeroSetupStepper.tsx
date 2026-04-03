@@ -5,7 +5,7 @@
  *
  * Appears after a fresh Xero connection and guides the user through:
  * 1. Syncing data (auto-triggered)
- * 2. Mapping accounts to emission categories
+ * 2. Classifying suppliers into emission categories
  * 3. Viewing emissions data
  *
  * Dismissible and won't reappear once dismissed for this org.
@@ -15,7 +15,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Check, RefreshCw, Settings, BarChart3, X } from 'lucide-react'
+import { Check, RefreshCw, Users, BarChart3, X, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
@@ -29,14 +29,17 @@ interface Step {
   status: StepStatus
 }
 
+const STALE_SYNC_THRESHOLD_MS = 5 * 60 * 1000 // 5 minutes
+
 export function XeroSetupStepper() {
   const { currentOrganization } = useOrganization()
   const [isDismissed, setIsDismissed] = useState(false)
-  const [mappedCount, setMappedCount] = useState(0)
-  const [totalAccounts, setTotalAccounts] = useState(0)
+  const [supplierStats, setSupplierStats] = useState({ total: 0, classified: 0 })
   const [hasConnection, setHasConnection] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
+  const [isStaleSyncing, setIsStaleSyncing] = useState(false)
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null)
+  const [isResettingSync, setIsResettingSync] = useState(false)
 
   const storageKey = `xero-setup-dismissed-${currentOrganization?.id}`
 
@@ -47,34 +50,55 @@ export function XeroSetupStepper() {
     if (dismissed === 'true') setIsDismissed(true)
   }, [currentOrganization?.id, storageKey])
 
-  // Fetch connection and mapping data
+  // Fetch connection and supplier classification data
   const fetchData = useCallback(async () => {
     if (!currentOrganization?.id) return
 
     // Check connection + sync status
     const { data: conn } = await supabase
       .from('xero_connections')
-      .select('id, sync_status, last_sync_at')
+      .select('id, sync_status, last_sync_at, updated_at')
       .eq('organization_id', currentOrganization.id)
       .maybeSingle()
 
     setHasConnection(!!conn)
     if (conn) {
-      setIsSyncing(conn.sync_status === 'syncing')
+      const syncing = conn.sync_status === 'syncing'
+      setIsSyncing(syncing)
       setLastSyncAt(conn.last_sync_at)
+
+      // Detect stale sync (stuck for >5 minutes)
+      if (syncing && conn.updated_at) {
+        const elapsed = Date.now() - new Date(conn.updated_at).getTime()
+        setIsStaleSyncing(elapsed > STALE_SYNC_THRESHOLD_MS)
+      } else {
+        setIsStaleSyncing(false)
+      }
     }
 
-    // Fetch account mapping stats
-    const { data: mappings } = await supabase
-      .from('xero_account_mappings')
-      .select('id, emission_category, is_excluded')
+    // Fetch supplier classification stats (distinct contact names)
+    const { data: txData } = await supabase
+      .from('xero_transactions')
+      .select('xero_contact_name, emission_category')
       .eq('organization_id', currentOrganization.id)
 
-    if (mappings) {
-      setTotalAccounts(mappings.length)
-      setMappedCount(
-        mappings.filter(m => m.emission_category !== null || m.is_excluded).length
-      )
+    if (txData && txData.length > 0) {
+      const bySupplier = new Map<string, { total: number; classified: number }>()
+      for (const tx of txData) {
+        const name = tx.xero_contact_name || '(unknown)'
+        const existing = bySupplier.get(name) || { total: 0, classified: 0 }
+        existing.total++
+        if (tx.emission_category) existing.classified++
+        bySupplier.set(name, existing)
+      }
+      // A supplier is "classified" if ALL its transactions have a category
+      let totalSuppliers = 0
+      let classifiedSuppliers = 0
+      Array.from(bySupplier.values()).forEach(s => {
+        totalSuppliers++
+        if (s.classified === s.total) classifiedSuppliers++
+      })
+      setSupplierStats({ total: totalSuppliers, classified: classifiedSuppliers })
     }
   }, [currentOrganization?.id])
 
@@ -89,13 +113,37 @@ export function XeroSetupStepper() {
     return () => clearInterval(interval)
   }, [isSyncing, fetchData])
 
+  async function handleResetSync() {
+    if (!currentOrganization?.id) return
+    setIsResettingSync(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      await fetch('/api/xero/sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({
+          organizationId: currentOrganization.id,
+          stage: 'complete',
+        }),
+      })
+      await fetchData()
+    } catch {
+      // Ignore — fetchData will pick up the new status
+    } finally {
+      setIsResettingSync(false)
+    }
+  }
+
   // Don't show if dismissed, not connected, or no org
   if (isDismissed || !hasConnection || !currentOrganization) return null
 
   // Determine step statuses
   const hasSynced = !!lastSyncAt
-  const allMapped = totalAccounts > 0 && mappedCount >= totalAccounts
-  const setupComplete = hasSynced && allMapped
+  const allClassified = supplierStats.total > 0 && supplierStats.classified >= supplierStats.total
+  const setupComplete = hasSynced && allClassified
 
   // Don't show if setup is fully complete
   if (setupComplete) return null
@@ -104,22 +152,28 @@ export function XeroSetupStepper() {
     {
       number: 1,
       label: 'Sync your data',
-      description: isSyncing ? 'Importing transactions...' : hasSynced ? 'Data synced' : 'Waiting to sync',
-      status: hasSynced ? 'complete' : isSyncing ? 'active' : 'active',
+      description: isStaleSyncing
+        ? 'Sync may have stalled'
+        : isSyncing
+          ? 'Importing transactions...'
+          : hasSynced
+            ? 'Data synced'
+            : 'Waiting to sync',
+      status: hasSynced ? 'complete' : 'active',
     },
     {
       number: 2,
-      label: 'Map your accounts',
-      description: totalAccounts > 0
-        ? `${mappedCount} of ${totalAccounts} mapped`
-        : 'Map Xero accounts to emission categories',
-      status: allMapped ? 'complete' : hasSynced ? 'active' : 'pending',
+      label: 'Classify your suppliers',
+      description: supplierStats.total > 0
+        ? `${supplierStats.classified} of ${supplierStats.total} suppliers classified`
+        : 'Assign emission categories to suppliers',
+      status: allClassified ? 'complete' : hasSynced ? 'active' : 'pending',
     },
     {
       number: 3,
       label: 'View your emissions',
       description: 'See your data in the Action Centre',
-      status: allMapped ? 'active' : 'pending',
+      status: allClassified ? 'active' : 'pending',
     },
   ]
 
@@ -157,14 +211,22 @@ export function XeroSetupStepper() {
                   ${step.status === 'complete'
                     ? 'bg-emerald-500 text-white'
                     : step.status === 'active'
-                      ? 'bg-neon-lime text-black'
+                      ? isStaleSyncing && step.number === 1
+                        ? 'bg-amber-500 text-white'
+                        : 'bg-neon-lime text-black'
                       : 'bg-slate-200 dark:bg-slate-700 text-muted-foreground'
                   }
                 `}>
                   {step.status === 'complete' ? (
                     <Check className="h-3.5 w-3.5" />
                   ) : step.status === 'active' && step.number === 1 && isSyncing ? (
-                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    isStaleSyncing ? (
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                    ) : (
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    )
+                  ) : step.number === 2 ? (
+                    <Users className="h-3.5 w-3.5" />
                   ) : (
                     step.number
                   )}
@@ -192,17 +254,39 @@ export function XeroSetupStepper() {
           ))}
         </div>
 
-        {/* Action button for current step */}
-        {hasSynced && !allMapped && totalAccounts > 0 && (
-          <div className="mt-3 pt-3 border-t border-neon-lime/20">
-            <p className="text-xs text-muted-foreground mb-2">
-              Map your Xero accounts to emission categories so transactions are classified correctly.
-              Scroll down to see your accounts.
-            </p>
+        {/* Stale sync warning */}
+        {isStaleSyncing && (
+          <div className="mt-3 pt-3 border-t border-amber-500/30">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-amber-400">
+                Sync appears to have stalled. You can reset it and try again.
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs border-amber-500/50 text-amber-400 hover:bg-amber-500/10"
+                onClick={handleResetSync}
+                disabled={isResettingSync}
+              >
+                {isResettingSync ? 'Resetting...' : 'Reset sync'}
+              </Button>
+            </div>
           </div>
         )}
 
-        {allMapped && (
+        {/* Action button for current step */}
+        {hasSynced && !allClassified && supplierStats.total > 0 && (
+          <div className="mt-3 pt-3 border-t border-neon-lime/20">
+            <Button size="sm" variant="outline" className="w-full" asChild>
+              <Link href="/data/xero-upgrades/">
+                <Users className="h-3.5 w-3.5 mr-1.5" />
+                Classify your suppliers ({supplierStats.total - supplierStats.classified} remaining)
+              </Link>
+            </Button>
+          </div>
+        )}
+
+        {allClassified && (
           <div className="mt-3 pt-3 border-t border-neon-lime/20">
             <Button size="sm" variant="outline" className="w-full" asChild>
               <Link href="/data/xero-upgrades/">

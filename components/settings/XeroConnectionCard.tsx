@@ -265,6 +265,23 @@ export function XeroConnectionCard() {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Sync failed'
       toast.error(message)
+      // Reset server-side sync status so it doesn't get stuck on 'syncing'
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        await fetch('/api/xero/sync', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({
+            organizationId: currentOrganization?.id,
+            stage: 'complete',
+          }),
+        })
+      } catch {
+        // Best effort — if this also fails, stepper stale detection handles it
+      }
     } finally {
       setIsSyncing(false)
       setSyncProgress('')

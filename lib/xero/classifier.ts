@@ -2,9 +2,12 @@
  * Transaction classification engine.
  *
  * Classifies Xero transactions into emission categories using:
- * 1. Account code mappings (user-configured, highest priority)
- * 2. Supplier name pattern matching (system + org-specific rules)
- * 3. Falls back to 'other' if no match found
+ * 1. Supplier name pattern matching (org-specific > system defaults)
+ * 2. Account code mappings (fallback)
+ * 3. Falls back to null (unclassified)
+ *
+ * Supplier rules are checked first because they're more granular —
+ * e.g. "Trainline" → rail_travel is more accurate than "Travel" account → air_travel.
  */
 
 export interface ClassificationResult {
@@ -36,8 +39,8 @@ interface TransactionInput {
  * Classify a single transaction into an emission category.
  *
  * Priority order:
- * 1. Account mapping (user-configured, most reliable)
- * 2. Supplier rule match (pattern-based)
+ * 1. Supplier rule match (most granular — who the money went to)
+ * 2. Account mapping (fallback — which ledger account it's in)
  * 3. Fallback to null (unclassified)
  */
 export function classifyTransaction(
@@ -45,30 +48,12 @@ export function classifyTransaction(
   accountMappings: AccountMapping[],
   supplierRules: SupplierRule[]
 ): ClassificationResult | null {
-  // 1. Try account mapping first (highest confidence)
-  if (tx.xeroAccountId) {
-    const mapping = accountMappings.find(m => m.xero_account_id === tx.xeroAccountId)
-    if (mapping) {
-      if (mapping.is_excluded) {
-        return null // User explicitly excluded this account
-      }
-      if (mapping.emission_category) {
-        return {
-          category: mapping.emission_category,
-          source: 'account_mapping',
-          confidence: 0.95,
-        }
-      }
-    }
-  }
-
-  // 2. Try supplier name pattern matching
+  // 1. Try supplier name pattern matching first (most granular)
   if (tx.contactName) {
     const contactLower = tx.contactName.toLowerCase()
 
     // Sort rules: org-specific first (higher priority), then by priority descending
     const sortedRules = [...supplierRules].sort((a, b) => {
-      // Org-specific rules take precedence over system defaults
       if (a.organization_id && !b.organization_id) return -1
       if (!a.organization_id && b.organization_id) return 1
       return b.priority - a.priority
@@ -85,7 +70,24 @@ export function classifyTransaction(
         return {
           category: rule.emission_category,
           source: 'supplier_rule',
-          confidence: 0.80,
+          confidence: rule.organization_id ? 0.90 : 0.80,
+        }
+      }
+    }
+  }
+
+  // 2. Fall back to account mapping
+  if (tx.xeroAccountId) {
+    const mapping = accountMappings.find(m => m.xero_account_id === tx.xeroAccountId)
+    if (mapping) {
+      if (mapping.is_excluded) {
+        return null // User explicitly excluded this account
+      }
+      if (mapping.emission_category) {
+        return {
+          category: mapping.emission_category,
+          source: 'account_mapping',
+          confidence: 0.75,
         }
       }
     }
