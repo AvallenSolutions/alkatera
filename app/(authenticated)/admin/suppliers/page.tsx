@@ -14,7 +14,6 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Dialog,
   DialogContent,
@@ -23,31 +22,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Building2, Globe, Mail, MapPin, MoveVertical as MoreVertical, CreditCard as Edit, Trash2, CircleCheck as CheckCircle, Circle as XCircle, RefreshCw, Package, ChevronDown, ChevronUp, Shield } from 'lucide-react';
+import { Plus, Search, Building2, Mail, MapPin, RefreshCw, ChevronRight } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { COUNTRIES } from '@/lib/countries';
 import { toast } from 'sonner';
-import { AddPlatformSupplierProductModal } from '@/components/suppliers/AddPlatformSupplierProductModal';
-import { usePlatformSupplierProducts, PlatformSupplierProduct } from '@/hooks/data/usePlatformSupplierProducts';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { SupplierProductsList } from '@/components/suppliers/SupplierProductsList';
+import Link from 'next/link';
 
 interface PlatformSupplier {
   id: string;
@@ -105,16 +85,9 @@ export default function AdminSuppliersPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<PlatformSupplier | null>(null);
-  const [supplierToDelete, setSupplierToDelete] = useState<PlatformSupplier | null>(null);
   const [formData, setFormData] = useState<SupplierFormData>(emptyForm);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [expandedSuppliers, setExpandedSuppliers] = useState<Set<string>>(new Set());
-  const [productModalOpen, setProductModalOpen] = useState(false);
-  const [selectedSupplierForProducts, setSelectedSupplierForProducts] = useState<string | null>(null);
-  const [editingProduct, setEditingProduct] = useState<PlatformSupplierProduct | null>(null);
 
   useEffect(() => {
     fetchSuppliers();
@@ -204,86 +177,6 @@ export default function AdminSuppliersPage() {
     } finally {
       setSaving(false);
     }
-  };
-
-  const handleDelete = async () => {
-    if (!supplierToDelete) return;
-
-    try {
-      setDeleting(true);
-      const { error } = await supabase
-        .from('platform_suppliers')
-        .delete()
-        .eq('id', supplierToDelete.id);
-
-      if (error) throw error;
-
-      toast.success('Supplier deleted successfully');
-      await fetchSuppliers();
-      setDeleteDialogOpen(false);
-      setSupplierToDelete(null);
-    } catch (error: any) {
-      console.error('Error deleting supplier:', error);
-      if (error.code === '23503') {
-        toast.error('Cannot delete supplier that is used by organizations');
-      } else {
-        toast.error('Failed to delete supplier');
-      }
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  const toggleVerification = async (supplier: PlatformSupplier) => {
-    try {
-      const { error } = await (supabase
-        .from('platform_suppliers') as any)
-        .update({
-          is_verified: !supplier.is_verified,
-          verification_date: !supplier.is_verified ? new Date().toISOString() : null,
-        })
-        .eq('id', supplier.id);
-
-      if (error) throw error;
-
-      toast.success(
-        supplier.is_verified ? 'Supplier unverified' : 'Supplier verified'
-      );
-      await fetchSuppliers();
-    } catch (error) {
-      console.error('Error toggling verification:', error);
-      toast.error('Failed to update verification status');
-    }
-  };
-
-  const toggleSupplierExpansion = (supplierId: string) => {
-    setExpandedSuppliers((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(supplierId)) {
-        newSet.delete(supplierId);
-      } else {
-        newSet.add(supplierId);
-      }
-      return newSet;
-    });
-  };
-
-  const handleAddProduct = (supplierId: string) => {
-    setSelectedSupplierForProducts(supplierId);
-    setEditingProduct(null);
-    setProductModalOpen(true);
-  };
-
-  const handleEditProduct = (supplierId: string, product: PlatformSupplierProduct) => {
-    setSelectedSupplierForProducts(supplierId);
-    setEditingProduct(product);
-    setProductModalOpen(true);
-  };
-
-  const handleCloseProductModal = () => {
-    setProductModalOpen(false);
-    setSelectedSupplierForProducts(null);
-    setEditingProduct(null);
   };
 
   const filteredSuppliers = suppliers.filter((supplier) =>
@@ -380,12 +273,8 @@ export default function AdminSuppliersPage() {
       ) : (
         <div className="grid gap-4">
           {filteredSuppliers.map((supplier) => (
-            <Collapsible
-              key={supplier.id}
-              open={expandedSuppliers.has(supplier.id)}
-              onOpenChange={() => toggleSupplierExpansion(supplier.id)}
-            >
-              <Card>
+            <Link key={supplier.id} href={`/admin/suppliers/${supplier.id}`}>
+              <Card className="hover:border-primary/40 transition-colors cursor-pointer">
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -393,12 +282,17 @@ export default function AdminSuppliersPage() {
                         <CardTitle className="text-lg">{supplier.name}</CardTitle>
                         {supplier.is_verified && (
                           <Badge variant="default" className="bg-emerald-600">
-                            <CheckCircle className="h-3 w-3 mr-1" />
                             Verified
                           </Badge>
                         )}
                       </div>
                       <CardDescription className="mt-1">
+                        {supplier.contact_email && (
+                          <span className="inline-flex items-center mr-3">
+                            <Mail className="h-3 w-3 mr-1" />
+                            {supplier.contact_email}
+                          </span>
+                        )}
                         {supplier.industry_sector && (
                           <span className="inline-flex items-center mr-3">
                             {supplier.industry_sector}
@@ -412,95 +306,11 @@ export default function AdminSuppliersPage() {
                         )}
                       </CardDescription>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <Package className="h-4 w-4 mr-2" />
-                          Products
-                          {expandedSuppliers.has(supplier.id) ? (
-                            <ChevronUp className="h-4 w-4 ml-2" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4 ml-2" />
-                          )}
-                        </Button>
-                      </CollapsibleTrigger>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleOpenDialog(supplier)}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => toggleVerification(supplier)}>
-                            {supplier.is_verified ? (
-                              <>
-                                <XCircle className="h-4 w-4 mr-2" />
-                                Unverify
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle className="h-4 w-4 mr-2" />
-                                Verify
-                              </>
-                            )}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setSupplierToDelete(supplier);
-                              setDeleteDialogOpen(true);
-                            }}
-                            className="text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground mt-1" />
                   </div>
                 </CardHeader>
-                {(supplier.description || supplier.website || supplier.contact_name) && (
-                  <CardContent className="pt-0">
-                    <div className="space-y-2 text-sm">
-                      {supplier.description && (
-                        <p className="text-muted-foreground">{supplier.description}</p>
-                      )}
-                      <div className="flex flex-wrap gap-4 text-muted-foreground">
-                        {supplier.website && (
-                          <a
-                            href={supplier.website}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center hover:text-foreground"
-                          >
-                            <Globe className="h-3 w-3 mr-1" />
-                            Website
-                          </a>
-                        )}
-                        {supplier.contact_name && (
-                          <span className="inline-flex items-center">
-                            <Mail className="h-3 w-3 mr-1" />
-                            {supplier.contact_name}
-                            {supplier.contact_email && ` (${supplier.contact_email})`}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                )}
-                <CollapsibleContent>
-                  <SupplierProductsList
-                    supplierId={supplier.id}
-                    onAddProduct={() => handleAddProduct(supplier.id)}
-                    onEditProduct={(product) => handleEditProduct(supplier.id, product)}
-                  />
-                </CollapsibleContent>
               </Card>
-            </Collapsible>
+            </Link>
           ))}
         </div>
       )}
@@ -642,38 +452,6 @@ export default function AdminSuppliersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will delete <strong>{supplierToDelete?.name}</strong> from the platform
-              directory. Organizations using this supplier will lose the connection.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={deleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deleting ? 'Deleting...' : 'Delete Supplier'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Product Modal */}
-      {selectedSupplierForProducts && (
-        <AddPlatformSupplierProductModal
-          platformSupplierId={selectedSupplierForProducts}
-          open={productModalOpen}
-          onOpenChange={handleCloseProductModal}
-          product={editingProduct || undefined}
-        />
-      )}
     </div>
   );
 }

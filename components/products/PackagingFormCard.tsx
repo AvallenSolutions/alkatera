@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Trash2, Building2, Database, Sprout, Info, Package, Tag, Grip, Box, MapPin, Calculator, Truck, Layers, FileText, ChevronDown, ChevronRight, Plus, Loader2 } from "lucide-react";
+import { Trash2, Building2, Database, Sprout, Info, Package, Tag, Grip, Box, MapPin, Calculator, Truck, Layers, FileText, ChevronDown, ChevronRight, Plus, Loader2, Shield, CheckCircle2 } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -109,6 +109,7 @@ interface PackagingFormCardProps {
   totalLinkedFacilities?: number;
   organizationLat?: number | null;
   organizationLng?: number | null;
+  linkedSupplierProducts?: any[];
   onUpdate: (tempId: string, updates: Partial<PackagingFormData>) => void;
   onRemove: (tempId: string) => void;
   onAddNewWithType?: (category: PackagingCategory) => void;
@@ -353,6 +354,7 @@ export function PackagingFormCard({
   totalLinkedFacilities = 0,
   organizationLat,
   organizationLng,
+  linkedSupplierProducts,
   onUpdate,
   onRemove,
   onAddNewWithType,
@@ -640,6 +642,75 @@ export function PackagingFormCard({
     onUpdate(packaging.tempId, updates);
   };
 
+  // Filter linked supplier products for packaging context
+  const packagingSupplierProducts = (linkedSupplierProducts || []).filter((p: any) => {
+    if (p.product_type !== 'packaging') return false;
+    // Further filter by packaging category if set
+    if (packaging.packaging_category && p.packaging_category) {
+      return p.packaging_category === packaging.packaging_category;
+    }
+    return true;
+  });
+
+  const handleSupplierProductSelect = (product: any) => {
+    // Use the same logic as handleSearchSelect but directly from the supplier product
+    let detectedCategory: PackagingCategory = packaging.packaging_category || 'container';
+    if (product.packaging_category) {
+      detectedCategory = product.packaging_category as PackagingCategory;
+    }
+
+    // Resolve origin: prefer product-level origin, fall back to supplier-level location
+    const originAddress = product.origin_address || product.supplier_address
+      || [product.supplier_city, product.supplier_country].filter(Boolean).join(', ')
+      || undefined;
+    const originLat = product.origin_lat ?? product.supplier_lat ?? undefined;
+    const originLng = product.origin_lng ?? product.supplier_lng ?? undefined;
+    const originCountryCode = product.origin_country_code ?? product.supplier_country_code ?? undefined;
+
+    const updates: Partial<PackagingFormData> = {
+      name: product.name,
+      matched_source_name: product.name,
+      data_source: 'supplier',
+      data_source_id: product.id,
+      supplier_product_id: product.id,
+      supplier_name: product.supplier_name,
+      carbon_intensity: product.impact_climate ?? product.carbon_intensity ?? undefined,
+      ef_source: 'Primary Verified',
+      ef_source_type: 'primary',
+      ...(!packaging.packaging_category ? { packaging_category: detectedCategory } : {}),
+      ...(!packaging.amount ? { unit: product.unit || 'kg' } : {}),
+      // Origin/location data from supplier product or supplier profile
+      ...(originAddress ? { origin_address: originAddress } : {}),
+      ...(originLat != null ? { origin_lat: originLat } : {}),
+      ...(originLng != null ? { origin_lng: originLng } : {}),
+      ...(originCountryCode ? { origin_country_code: originCountryCode, origin_country: originCountryCode } : {}),
+    };
+
+    // Auto-populate recycled content if provided
+    if (product.recycled_content_pct != null) {
+      updates.recycled_content_percentage = product.recycled_content_pct;
+    }
+
+    // Auto-populate weight if provided
+    if (product.weight_g != null && product.weight_g > 0) {
+      updates.net_weight_g = product.weight_g;
+      if (!packaging.amount || packaging.amount === '' || Number(packaging.amount) === 0) {
+        if (packaging.unit === 'kg') {
+          updates.amount = (product.weight_g / 1000).toString();
+        } else {
+          updates.amount = product.weight_g.toString();
+        }
+      }
+    }
+
+    // Auto-populate EPR drinks container flag
+    if (product.epr_is_drinks_container != null) {
+      updates.epr_is_drinks_container = product.epr_is_drinks_container;
+    }
+
+    onUpdate(packaging.tempId, updates);
+  };
+
   return (
     <Card className="border-l-4 border-l-orange-500 bg-amber-50/50 dark:bg-amber-950/20">
       <div className="p-6 space-y-4">
@@ -756,6 +827,79 @@ export function PackagingFormCard({
 
           {packaging.packaging_category && (
             <>
+              {/* Supplier product suggestions - shown above name when available */}
+              {packagingSupplierProducts.length > 0 && !packaging.supplier_product_id && (
+                <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20 p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Building2 className="h-3.5 w-3.5 text-emerald-600" />
+                    <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                      From your suppliers
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {packagingSupplierProducts.slice(0, 6).map((product: any) => {
+                      const climateVal = product.impact_climate ?? product.carbon_intensity;
+                      return (
+                        <button
+                          key={product.id}
+                          type="button"
+                          onClick={() => handleSupplierProductSelect(product)}
+                          className="flex items-center gap-2 px-3 py-2 rounded-md border border-emerald-200 dark:border-emerald-700 bg-white dark:bg-slate-900 hover:border-emerald-400 dark:hover:border-emerald-500 hover:shadow-sm transition-all text-left"
+                        >
+                          <Shield className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium truncate">{product.name}</div>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[10px] text-muted-foreground">{product.supplier_name}</span>
+                              {climateVal != null && (
+                                <span className="text-[10px] text-muted-foreground">
+                                  {climateVal.toFixed(3)} kg CO₂e
+                                </span>
+                              )}
+                              {product.weight_g != null && product.weight_g > 0 && (
+                                <span className="text-[10px] text-muted-foreground">
+                                  {product.weight_g}g
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Show primary data indicator when supplier product is selected */}
+              {packaging.supplier_product_id && packaging.data_source === 'supplier' && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span className="text-xs text-emerald-700 dark:text-emerald-400">
+                    Using primary data from <span className="font-medium">{packaging.supplier_name || 'supplier'}</span>
+                  </span>
+                  <button
+                    type="button"
+                    className="ml-auto text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => onUpdate(packaging.tempId, {
+                      name: '',
+                      matched_source_name: undefined,
+                      data_source: null,
+                      data_source_id: undefined,
+                      supplier_product_id: undefined,
+                      supplier_name: undefined,
+                      carbon_intensity: undefined,
+                      ef_source: undefined,
+                      ef_source_type: undefined,
+                      recycled_content_percentage: '',
+                      net_weight_g: '',
+                      amount: '',
+                    })}
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
+
               <div>
                 <Label htmlFor={`name-${packaging.tempId}`}>
                   Material Name <span className="text-destructive">*</span>
@@ -787,7 +931,7 @@ export function PackagingFormCard({
                 <p className="text-xs text-muted-foreground mt-1">
                   Search for the closest matching emission factor from supplier data or global databases
                 </p>
-                {packaging.matched_source_name && packaging.matched_source_name !== packaging.name && (
+                {packaging.matched_source_name && packaging.matched_source_name !== packaging.name && packaging.data_source !== 'supplier' && (
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>

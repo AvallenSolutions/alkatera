@@ -344,89 +344,132 @@ export async function GET(request: NextRequest) {
       agribalyseResults,
       boostResults,
     ] = await Promise.all([
-      // SOURCE 1: Verified Supplier Products (Primary Data)
+      // SOURCE 1: Linked Supplier Products (Primary Data)
+      // Uses service-role client to bypass RLS - supplier_products are
+      // RLS-protected to the supplier's own org, so brand users can't
+      // read them directly. We resolve brand org → linked suppliers → products.
       organizationId ? (async () => {
-        let supplierQuery = supabase
-          .from('supplier_products')
-          .select(`
-            id, name, category, unit, carbon_intensity, product_code,
-            verified_at, recycled_content_pct, impact_climate, impact_water, impact_land, impact_waste,
-            product_type, weight_g, packaging_category, primary_material,
-            epr_material_code, epr_is_drinks_container,
-            suppliers!inner(name)
-          `)
-          .eq('organization_id', organizationId)
-          .eq('is_active', true)
-          .eq('is_verified', true)
-          .ilike('name', `%${normalizedQuery}%`)
-          .order('name')
-          .limit(10);
+        try {
+          const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+          if (!supabaseServiceKey) return [];
 
-        // Filter by product_type when materialType is specified
-        if (materialType === 'ingredient' || materialType === 'packaging') {
-          supplierQuery = supplierQuery.eq('product_type', materialType);
-        }
+          const adminClient = createClient(supabaseUrl!, supabaseServiceKey, {
+            auth: { persistSession: false },
+          });
 
-        const { data: supplierProducts, error } = await supplierQuery;
+          // Resolve linked supplier IDs: org_suppliers → platform_suppliers → suppliers
+          const { data: orgSuppliers } = await adminClient
+            .from('organization_suppliers')
+            .select('platform_supplier_id')
+            .eq('organization_id', organizationId);
 
-        if (error || !supplierProducts) return [];
+          if (!orgSuppliers || orgSuppliers.length === 0) return [];
 
-        // Load component breakdowns for packaging supplier products
-        const packagingProductIds = supplierProducts
-          .filter((p: any) => p.product_type === 'packaging')
-          .map((p: any) => p.id);
+          const platformIds = orgSuppliers.map(s => s.platform_supplier_id).filter(Boolean);
+          if (platformIds.length === 0) return [];
 
-        let componentsByProduct: Record<string, any[]> = {};
-        if (packagingProductIds.length > 0) {
-          const { data: components } = await supabase
-            .from('supplier_product_components')
-            .select('*')
-            .in('supplier_product_id', packagingProductIds);
+          const { data: platformSuppliers } = await adminClient
+            .from('platform_suppliers')
+            .select('contact_email')
+            .in('id', platformIds);
 
-          for (const comp of (components || [])) {
-            if (!componentsByProduct[comp.supplier_product_id]) {
-              componentsByProduct[comp.supplier_product_id] = [];
-            }
-            componentsByProduct[comp.supplier_product_id].push({
-              epr_material_type: comp.epr_material_type,
-              component_name: comp.component_name,
-              weight_grams: comp.weight_grams,
-              recycled_content_percentage: comp.recycled_content_pct || 0,
-              is_recyclable: comp.is_recyclable,
-            });
+          const emails = (platformSuppliers || []).map(s => s.contact_email).filter(Boolean) as string[];
+          if (emails.length === 0) return [];
+
+          const { data: suppliers } = await adminClient
+            .from('suppliers')
+            .select('id, name')
+            .in('contact_email', emails);
+
+          if (!suppliers || suppliers.length === 0) return [];
+
+          const supplierIds = suppliers.map(s => s.id);
+          const supplierNameMap = new Map(suppliers.map(s => [s.id, s.name]));
+
+          // Query supplier products using the resolved supplier IDs
+          let supplierQuery = adminClient
+            .from('supplier_products')
+            .select(`
+              id, name, category, unit, carbon_intensity, product_code, supplier_id,
+              verified_at, recycled_content_pct, impact_climate, impact_water, impact_land, impact_waste,
+              product_type, weight_g, packaging_category, primary_material,
+              epr_material_code, epr_is_drinks_container
+            `)
+            .in('supplier_id', supplierIds)
+            .eq('is_active', true)
+            .ilike('name', `%${normalizedQuery}%`)
+            .order('name')
+            .limit(10);
+
+          // Filter by product_type when materialType is specified
+          if (materialType === 'ingredient' || materialType === 'packaging') {
+            supplierQuery = supplierQuery.eq('product_type', materialType);
           }
-        }
 
-        return supplierProducts.map((product: any): SearchResult => ({
-          id: product.id,
-          name: product.name,
-          category: product.category || 'Supplier Product',
-          unit: product.unit,
-          processType: 'SUPPLIER_PRODUCT',
-          location: product.suppliers?.name || 'Verified Supplier',
-          co2_factor: product.carbon_intensity ?? product.impact_climate,
-          water_factor: product.impact_water,
-          land_factor: product.impact_land,
-          waste_factor: product.impact_waste,
-          source: 'Primary Verified',
-          source_type: 'primary',
-          data_quality: 'verified',
-          // Supplier product packaging data (passed through to form cards)
-          supplier_product_type: product.product_type || 'ingredient',
-          supplier_weight_g: product.weight_g,
-          supplier_packaging_category: product.packaging_category,
-          supplier_primary_material: product.primary_material,
-          supplier_epr_material_code: product.epr_material_code,
-          supplier_epr_is_drinks_container: product.epr_is_drinks_container,
-          recycled_content_pct: product.recycled_content_pct,
-          packaging_components: componentsByProduct[product.id] || undefined,
-          metadata: {
-            supplier_name: product.suppliers?.name,
-            product_code: product.product_code,
-            verified_at: product.verified_at,
+          const { data: supplierProducts, error } = await supplierQuery;
+
+          if (error || !supplierProducts) return [];
+
+          // Load component breakdowns for packaging supplier products
+          const packagingProductIds = supplierProducts
+            .filter((p: any) => p.product_type === 'packaging')
+            .map((p: any) => p.id);
+
+          let componentsByProduct: Record<string, any[]> = {};
+          if (packagingProductIds.length > 0) {
+            const { data: components } = await adminClient
+              .from('supplier_product_components')
+              .select('*')
+              .in('supplier_product_id', packagingProductIds);
+
+            for (const comp of (components || [])) {
+              if (!componentsByProduct[comp.supplier_product_id]) {
+                componentsByProduct[comp.supplier_product_id] = [];
+              }
+              componentsByProduct[comp.supplier_product_id].push({
+                epr_material_type: comp.epr_material_type,
+                component_name: comp.component_name,
+                weight_grams: comp.weight_grams,
+                recycled_content_percentage: comp.recycled_content_pct || 0,
+                is_recyclable: comp.is_recyclable,
+              });
+            }
+          }
+
+          return supplierProducts.map((product: any): SearchResult => ({
+            id: product.id,
+            name: product.name,
+            category: product.category || 'Supplier Product',
+            unit: product.unit,
+            processType: 'SUPPLIER_PRODUCT',
+            location: supplierNameMap.get(product.supplier_id) || 'Verified Supplier',
+            co2_factor: product.impact_climate ?? product.carbon_intensity,
+            water_factor: product.impact_water,
+            land_factor: product.impact_land,
+            waste_factor: product.impact_waste,
+            source: 'Primary Verified',
+            source_type: 'primary',
+            data_quality: 'verified',
+            // Supplier product packaging data (passed through to form cards)
+            supplier_product_type: product.product_type || 'ingredient',
+            supplier_weight_g: product.weight_g,
+            supplier_packaging_category: product.packaging_category,
+            supplier_primary_material: product.primary_material,
+            supplier_epr_material_code: product.epr_material_code,
+            supplier_epr_is_drinks_container: product.epr_is_drinks_container,
             recycled_content_pct: product.recycled_content_pct,
-          },
-        }));
+            packaging_components: componentsByProduct[product.id] || undefined,
+            metadata: {
+              supplier_name: supplierNameMap.get(product.supplier_id),
+              product_code: product.product_code,
+              verified_at: product.verified_at,
+              recycled_content_pct: product.recycled_content_pct,
+            },
+          }));
+        } catch (err) {
+          console.error('[Search] Source 1 (supplier products) error:', err);
+          return [];
+        }
       })() : Promise.resolve([]),
 
       // SOURCE 2: Staging Emission Factors (includes Global Drinks Factor Library)

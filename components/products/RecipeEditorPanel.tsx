@@ -27,6 +27,7 @@ import { SearchGuidePanel } from "@/components/products/SearchGuidePanel";
 import { RecipeChecklist } from "@/components/products/RecipeChecklist";
 import { PackagingTemplateDialog } from "@/components/products/PackagingTemplateDialog";
 import { useRecipeEditor } from "@/hooks/useRecipeEditor";
+import { useLinkedSupplierProducts } from "@/hooks/data/useLinkedSupplierProducts";
 import type { IngredientFormData } from "@/components/products/IngredientFormCard";
 import type { PackagingFormData } from "@/components/products/PackagingFormCard";
 import type { MaturationFormData } from "@/components/products/MaturationProfileCard";
@@ -51,6 +52,7 @@ export function RecipeEditorPanel({
   initialTab = "ingredients",
 }: RecipeEditorPanelProps) {
   const { currentOrganization } = useOrganization();
+  const { products: linkedSupplierProducts } = useLinkedSupplierProducts(organizationId);
   const [activeTab, setActiveTab] = useState(initialTab);
   const [showBOMImport, setShowBOMImport] = useState(false);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
@@ -314,6 +316,7 @@ export function RecipeEditorPanel({
                     productionFacilities={productionFacilities}
                     organizationLat={currentOrganization?.address_lat}
                     organizationLng={currentOrganization?.address_lng}
+                    linkedSupplierProducts={linkedSupplierProducts}
                     onUpdate={updateIngredient}
                     onRemove={removeIngredient}
                     canRemove={ingredientForms.length > 1}
@@ -430,6 +433,7 @@ export function RecipeEditorPanel({
                     productionFacilities={productionFacilities}
                     organizationLat={currentOrganization?.address_lat}
                     organizationLng={currentOrganization?.address_lng}
+                    linkedSupplierProducts={linkedSupplierProducts}
                     onUpdate={updatePackaging}
                     onRemove={removePackaging}
                     onAddNewWithType={addPackagingWithType}

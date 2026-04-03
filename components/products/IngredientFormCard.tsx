@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Trash2, Building2, Database, Sprout, Info, MapPin, Calculator, Award, Layers, Package, ChevronDown, ChevronUp, Plus, Loader2, Leaf } from "lucide-react";
+import { Trash2, Building2, Database, Sprout, Info, MapPin, Calculator, Award, Layers, Package, ChevronDown, ChevronUp, Plus, Loader2, Leaf, Shield, CheckCircle2, Droplets, TreePine } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { InlineIngredientSearch } from "@/components/lca/InlineIngredientSearch";
 import { VineyardSelector, type VineyardOption } from "@/components/vineyards/VineyardSelector";
@@ -192,6 +192,7 @@ interface IngredientFormCardProps {
   totalLinkedFacilities?: number;
   organizationLat?: number | null;
   organizationLng?: number | null;
+  linkedSupplierProducts?: any[];
   onUpdate: (tempId: string, updates: Partial<IngredientFormData>) => void;
   onRemove: (tempId: string) => void;
   canRemove: boolean;
@@ -256,6 +257,7 @@ export function IngredientFormCard({
   totalLinkedFacilities = 0,
   organizationLat,
   organizationLng,
+  linkedSupplierProducts,
   onUpdate,
   onRemove,
   canRemove,
@@ -635,6 +637,39 @@ export function IngredientFormCard({
     onUpdate(ingredient.tempId, updates);
   };
 
+  // Filter linked supplier products for ingredient context
+  const ingredientSupplierProducts = (linkedSupplierProducts || []).filter(
+    (p: any) => p.product_type === 'ingredient' || !p.product_type
+  );
+
+  const handleSupplierProductSelect = (product: any) => {
+    // Resolve origin: prefer product-level origin, fall back to supplier-level location
+    const originAddress = product.origin_address || product.supplier_address
+      || [product.supplier_city, product.supplier_country].filter(Boolean).join(', ')
+      || undefined;
+    const originLat = product.origin_lat ?? product.supplier_lat ?? undefined;
+    const originLng = product.origin_lng ?? product.supplier_lng ?? undefined;
+    const originCountryCode = product.origin_country_code ?? product.supplier_country_code ?? undefined;
+
+    onUpdate(ingredient.tempId, {
+      name: product.name,
+      matched_source_name: product.name,
+      data_source: 'supplier',
+      data_source_id: product.id,
+      supplier_product_id: product.id,
+      supplier_name: product.supplier_name,
+      carbon_intensity: product.impact_climate ?? product.carbon_intensity ?? undefined,
+      ef_source: 'Primary Verified',
+      ef_source_type: 'primary',
+      ...(!ingredient.amount ? { unit: product.unit || 'kg' } : {}),
+      // Origin/location data from supplier product or supplier profile
+      ...(originAddress ? { origin_address: originAddress } : {}),
+      ...(originLat != null ? { origin_lat: originLat } : {}),
+      ...(originLng != null ? { origin_lng: originLng } : {}),
+      ...(originCountryCode ? { origin_country_code: originCountryCode, origin_country: originCountryCode } : {}),
+    });
+  };
+
   return (
     <Card className="border-l-4 border-l-orange-500 bg-amber-50/50 dark:bg-amber-950/20">
       <div className="p-6 space-y-4">
@@ -665,6 +700,71 @@ export function IngredientFormCard({
         </div>
 
         <div className="space-y-4">
+          {/* Supplier product suggestions - shown above name when available */}
+          {ingredientSupplierProducts.length > 0 && !ingredient.supplier_product_id && (
+            <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20 p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Building2 className="h-3.5 w-3.5 text-emerald-600" />
+                <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                  From your suppliers
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {ingredientSupplierProducts.slice(0, 6).map((product: any) => {
+                  const climateVal = product.impact_climate ?? product.carbon_intensity;
+                  return (
+                    <button
+                      key={product.id}
+                      type="button"
+                      onClick={() => handleSupplierProductSelect(product)}
+                      className="flex items-center gap-2 px-3 py-2 rounded-md border border-emerald-200 dark:border-emerald-700 bg-white dark:bg-slate-900 hover:border-emerald-400 dark:hover:border-emerald-500 hover:shadow-sm transition-all text-left"
+                    >
+                      <Shield className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium truncate">{product.name}</div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[10px] text-muted-foreground">{product.supplier_name}</span>
+                          {climateVal != null && (
+                            <span className="text-[10px] text-muted-foreground">
+                              {climateVal.toFixed(3)} kg CO₂e
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Show primary data indicator when supplier product is selected */}
+          {ingredient.supplier_product_id && ingredient.data_source === 'supplier' && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+              <span className="text-xs text-emerald-700 dark:text-emerald-400">
+                Using primary data from <span className="font-medium">{ingredient.supplier_name || 'supplier'}</span>
+              </span>
+              <button
+                type="button"
+                className="ml-auto text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => onUpdate(ingredient.tempId, {
+                  name: '',
+                  matched_source_name: undefined,
+                  data_source: null,
+                  data_source_id: undefined,
+                  supplier_product_id: undefined,
+                  supplier_name: undefined,
+                  carbon_intensity: undefined,
+                  ef_source: undefined,
+                  ef_source_type: undefined,
+                })}
+              >
+                Clear
+              </button>
+            </div>
+          )}
+
           <div>
             <Label htmlFor={`name-${ingredient.tempId}`}>
               Ingredient Name <span className="text-destructive">*</span>
@@ -695,7 +795,7 @@ export function IngredientFormCard({
             <p className="text-xs text-muted-foreground mt-1">
               Search for the closest matching emission factor from supplier data or global databases
             </p>
-            {ingredient.matched_source_name && ingredient.matched_source_name !== ingredient.name && (
+            {ingredient.matched_source_name && ingredient.matched_source_name !== ingredient.name && ingredient.data_source !== 'supplier' && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>

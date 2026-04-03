@@ -141,6 +141,29 @@ function mockTable(table: string, data: any, error: any = null) {
   fromMocks[table] = createQueryMock({ data, error });
 }
 
+/**
+ * Configures mockFetch to handle the /api/supplier-products/resolve endpoint.
+ * When the URL matches, returns the given product data. For any other URL,
+ * delegates to the optional `otherHandler` or returns a default error.
+ */
+function mockSupplierProductResolve(product: any, otherHandler?: (url: string, init?: any) => any) {
+  // Ensure auth session is available (some prior tests set it to null)
+  mockGetSession.mockResolvedValue({
+    data: { session: { access_token: 'test-token' } },
+    error: null,
+  });
+  mockFetch.mockImplementation((url: string, init?: any) => {
+    if (url === '/api/supplier-products/resolve') {
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ product }),
+      });
+    }
+    if (otherHandler) return otherHandler(url, init);
+    return Promise.resolve({ ok: false, statusText: 'Not Found' });
+  });
+}
+
 // ============================================================================
 // TESTS
 // ============================================================================
@@ -295,8 +318,8 @@ describe('validateMaterialsBeforeCalculation', () => {
   it('places materials with assigned supplier factors into validMaterials', async () => {
     const material = createSupplierMaterial({ material_name: 'Eco Glass' });
 
-    // Mock supplier_products to return impact data
-    mockTable('supplier_products', {
+    // Priority 1a now uses fetch('/api/supplier-products/resolve')
+    mockSupplierProductResolve({
       id: 'sp-001',
       product_name: 'Eco Glass',
       impact_climate: 1.5,
@@ -363,8 +386,8 @@ describe('validateMaterialsBeforeCalculation', () => {
       material_name: 'Mystery Material',
     });
 
-    // supplier_products returns data for the first material
-    mockTable('supplier_products', {
+    // Priority 1a now uses fetch('/api/supplier-products/resolve')
+    mockSupplierProductResolve({
       id: 'sp-001',
       product_name: 'Good Glass',
       impact_climate: 1.0,
@@ -436,7 +459,8 @@ describe('resolveImpactFactors', () => {
     it('resolves from supplier_products (Priority 1a)', async () => {
       const material = createSupplierMaterial({ material_name: 'Organic Cork' });
 
-      mockTable('supplier_products', {
+      // Priority 1a now uses fetch('/api/supplier-products/resolve')
+      mockSupplierProductResolve({
         id: 'sp-001',
         product_name: 'Organic Cork',
         impact_climate: 0.8,
@@ -458,8 +482,8 @@ describe('resolveImpactFactors', () => {
     it('falls through to platform_supplier_products (Priority 1b) when 1a has no data', async () => {
       const material = createSupplierMaterial({ material_name: 'Platform Cork' });
 
-      // supplier_products returns no impact data
-      mockTable('supplier_products', {
+      // supplier_products via API returns no impact data
+      mockSupplierProductResolve({
         id: 'sp-001',
         product_name: 'Platform Cork',
         impact_climate: null,
@@ -487,8 +511,8 @@ describe('resolveImpactFactors', () => {
     it('falls through to product LCA (Priority 1c) when 1a and 1b fail', async () => {
       const material = createSupplierMaterial({ material_name: 'LCA Cork' });
 
-      // supplier_products: no data
-      mockTable('supplier_products', null);
+      // supplier_products via API: no data
+      mockSupplierProductResolve(null);
       // platform_supplier_products: no data
       mockTable('platform_supplier_products', null);
       // products table returns the linked product
@@ -520,7 +544,7 @@ describe('resolveImpactFactors', () => {
       });
 
       // All supplier tables return nothing
-      mockTable('supplier_products', null);
+      mockSupplierProductResolve(null);
       mockTable('platform_supplier_products', null);
       mockTable('products', null);
       mockTable('staging_emission_factors', null);
@@ -925,7 +949,8 @@ describe('resolveImpactFactors', () => {
     it('handles zero quantity correctly', async () => {
       const material = createSupplierMaterial({ material_name: 'Zero Glass' });
 
-      mockTable('supplier_products', {
+      // Priority 1a now uses fetch('/api/supplier-products/resolve')
+      mockSupplierProductResolve({
         id: 'sp-001',
         product_name: 'Zero Glass',
         impact_climate: 1.5,
@@ -1032,7 +1057,7 @@ describe('resolveImpactFactors', () => {
       });
 
       // All supplier tables fail
-      mockTable('supplier_products', null);
+      mockSupplierProductResolve(null);
       mockTable('platform_supplier_products', null);
       mockTable('products', null);
       mockTable('staging_emission_factors', null);

@@ -504,12 +504,30 @@ export async function resolveImpactFactors(
     console.log(`[Waterfall] Checking Priority 1 (Supplier) for: ${material.material_name}`);
 
     try {
-      // Priority 1a: Check supplier_products table (organization-specific suppliers)
-      const { data: supplierProduct } = await supabase
-        .from('supplier_products')
-        .select('*')
-        .eq('id', material.supplier_product_id)
-        .maybeSingle();
+      // Priority 1a: Check supplier_products table via service-role API
+      // (supplier_products are RLS-protected to the supplier's own org,
+      // so brand users can't read them with the client-side Supabase client)
+      let supplierProduct: any = null;
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const authToken = sessionData?.session?.access_token;
+        if (authToken) {
+          const res = await fetch('/api/supplier-products/resolve', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${authToken}`,
+            },
+            body: JSON.stringify({ supplier_product_id: material.supplier_product_id }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            supplierProduct = data.product;
+          }
+        }
+      } catch (resolveErr) {
+        console.warn('[Waterfall] Could not resolve supplier product via API:', resolveErr);
+      }
 
       if (supplierProduct && hasSupplierProductImpactData(supplierProduct)) {
         console.log(`[Waterfall] ✓ Priority 1a SUCCESS: Using supplier product ${supplierProduct.id}`);
