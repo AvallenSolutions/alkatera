@@ -233,8 +233,9 @@ export function XeroConnectionCard() {
         } catch {
           // Function crashed (502 HTML response) - skip this stage gracefully
           console.error(`Sync stage '${stage}' returned non-JSON response (status ${res.status})`)
-          if (stage === 'ai_classify') {
-            // AI classification is optional - skip to complete
+          if (stage === 'ai_classify' || stage === 'classify') {
+            // Classification is optional - skip to complete
+            console.warn(`Skipping '${stage}' stage due to server error`)
             stage = 'complete'
             cursor = undefined
             continue
@@ -295,6 +296,8 @@ export function XeroConnectionCard() {
       } catch {
         // Best effort — if this also fails, stepper stale detection handles it
       }
+      // Always refresh displayed status — earlier stages may have succeeded
+      fetchStatus()
     } finally {
       setIsSyncing(false)
       setSyncProgress('')
