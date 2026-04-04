@@ -26,11 +26,13 @@ export const dynamic = 'force-dynamic'
  */
 export async function POST(request: NextRequest) {
   try {
+    console.error('[xero-sync] Handler started')
     const supabase = getSupabaseServerClient()
 
     // 1. Authenticate
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
+      console.error('[xero-sync] Auth failed:', authError?.message)
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
     }
 
@@ -39,6 +41,8 @@ export async function POST(request: NextRequest) {
     if (!organizationId) {
       return NextResponse.json({ error: 'organizationId is required' }, { status: 400 })
     }
+
+    console.error(`[xero-sync] Stage: ${stage || 'accounts'}, Org: ${organizationId}`)
 
     // 3. Check admin role
     const role = await getMemberRole(supabase, organizationId, user.id)
@@ -49,9 +53,10 @@ export async function POST(request: NextRequest) {
     // 4. Run the requested stage
     const result = await syncStage(organizationId, user.id, stage || 'accounts', cursor)
 
+    console.error(`[xero-sync] Stage complete: done=${result.done}, next=${result.nextStage || 'none'}`)
     return NextResponse.json(result)
   } catch (error: unknown) {
-    console.error('Error in Xero sync stage:', error)
+    console.error('[xero-sync] Unhandled error:', error)
     const message = error instanceof Error ? error.message : 'Sync failed'
     return NextResponse.json({ error: message }, { status: 500 })
   }

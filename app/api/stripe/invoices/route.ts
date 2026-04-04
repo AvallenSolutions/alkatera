@@ -57,10 +57,19 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch invoices from Stripe
-    const stripeInvoices = await stripe.invoices.list({
-      customer: org.stripe_customer_id,
-      limit: Math.min(limit, 100),
-    });
+    let stripeInvoices;
+    try {
+      stripeInvoices = await stripe.invoices.list({
+        customer: org.stripe_customer_id,
+        limit: Math.min(limit, 100),
+      });
+    } catch (stripeError: any) {
+      if (stripeError?.code === 'resource_missing') {
+        // Customer doesn't exist in Stripe (e.g. test ID in live mode)
+        return NextResponse.json({ invoices: [] });
+      }
+      throw stripeError;
+    }
 
     const invoices = stripeInvoices.data.map((invoice) => ({
       id: invoice.id,

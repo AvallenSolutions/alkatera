@@ -227,8 +227,13 @@ export async function updateSyncStatus(
     update.sync_error = error
   }
 
-  await db
+  const { error: updateError } = await db
     .from('xero_connections')
     .update(update)
     .eq('organization_id', organizationId)
+
+  if (updateError) {
+    console.error(`Failed to update sync status for org ${organizationId}:`, updateError)
+    throw new Error(`Failed to update sync status: ${updateError.message}`)
+  }
 }

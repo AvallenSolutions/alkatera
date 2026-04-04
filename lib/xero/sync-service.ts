@@ -87,7 +87,12 @@ export async function syncStage(
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Sync stage failed'
-    await updateSyncStatus(organizationId, 'error', message)
+    console.error(`Xero sync stage '${stage}' failed for org ${organizationId}:`, message)
+    try {
+      await updateSyncStatus(organizationId, 'error', message)
+    } catch (statusErr) {
+      console.error('Additionally failed to update sync status:', statusErr)
+    }
     return { done: true, progress: 'Failed', error: message }
   }
 }
@@ -616,7 +621,7 @@ async function stageComplete(
     .not('emission_category', 'is', null)
 
   // Update sync log
-  await db
+  const { error: logError } = await db
     .from('xero_sync_logs')
     .update({
       status: 'completed',
@@ -628,6 +633,10 @@ async function stageComplete(
     .eq('status', 'started')
     .order('created_at', { ascending: false })
     .limit(1)
+
+  if (logError) {
+    console.error(`Failed to update sync log for org ${organizationId}:`, logError)
+  }
 
   return {
     done: true,

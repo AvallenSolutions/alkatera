@@ -56,9 +56,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Get the customer from Stripe
-    const customer = await stripe.customers.retrieve(org.stripe_customer_id, {
-      expand: ['invoice_settings.default_payment_method'],
-    });
+    let customer;
+    try {
+      customer = await stripe.customers.retrieve(org.stripe_customer_id, {
+        expand: ['invoice_settings.default_payment_method'],
+      });
+    } catch (stripeError: any) {
+      if (stripeError?.code === 'resource_missing') {
+        // Customer doesn't exist in Stripe (e.g. test ID in live mode)
+        return NextResponse.json({ paymentMethod: null });
+      }
+      throw stripeError;
+    }
 
     if (customer.deleted) {
       return NextResponse.json({ paymentMethod: null });

@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get subscription history
+    // Note: subscription_history table may not exist yet - handle gracefully
     const { data: history, error: historyError, count } = await supabase
       .from('subscription_history')
       .select('*', { count: 'exact' })
@@ -50,6 +51,10 @@ export async function GET(request: NextRequest) {
       .range(offset, offset + limit - 1);
 
     if (historyError) {
+      // Table may not exist yet (PGRST205) - return empty result
+      if (historyError.code === 'PGRST205' || historyError.code === '42P01') {
+        return NextResponse.json({ history: [], total: 0, limit, offset });
+      }
       console.error('Error fetching subscription history:', historyError);
       return NextResponse.json(
         { error: 'Failed to fetch subscription history' },
@@ -58,7 +63,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Format the history entries
-    const formattedHistory = history.map((entry) => ({
+    const formattedHistory = (history || []).map((entry) => ({
       id: entry.id,
       eventType: entry.event_type,
       previousTier: entry.previous_tier,
@@ -76,7 +81,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       history: formattedHistory,
-      total: count,
+      total: count || 0,
       limit,
       offset,
     });

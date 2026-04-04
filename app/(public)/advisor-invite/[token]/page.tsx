@@ -45,30 +45,26 @@ export default function AdvisorInvitePage() {
         // Check if user is authenticated
         const { data: { user } } = await supabase.auth.getUser();
 
-        // Load invitation details first (before deciding on auth state)
-        // so we can compare emails
-        const { data, error: invError } = await supabase
-          .from('advisor_invitations')
-          .select(`
-            id,
-            advisor_email,
-            access_notes,
-            invited_at,
-            expires_at,
-            status,
-            organizations:organization_id (name)
-          `)
-          .eq('invitation_token', token)
-          .single();
+        // Load invitation via secure RPC function (bypasses RLS so
+        // unauthenticated users can view their invitation by token)
+        const { data: rpcResult, error: invError } = await supabase
+          .rpc('get_advisor_invitation_by_token', { p_token: token });
 
         if (invError) {
-          if (invError.code === 'PGRST116') {
-            setError('Invalid invitation link. The invitation may have been cancelled.');
-          } else {
-            throw invError;
-          }
+          console.error('Failed to load invitation:', invError);
+          setError('Invalid invitation link. The invitation may have been cancelled.');
           return;
         }
+
+        const data = rpcResult as {
+          id: string;
+          advisor_email: string;
+          access_notes: string | null;
+          invited_at: string;
+          expires_at: string;
+          status: string;
+          organization_name: string;
+        } | null;
 
         if (!data) {
           setError('Invitation not found.');
@@ -111,7 +107,7 @@ export default function AdvisorInvitePage() {
 
         setInvitation({
           id: data.id,
-          organization_name: (data.organizations as any)?.name || 'Unknown Organization',
+          organization_name: data.organization_name || 'Unknown Organization',
           advisor_email: data.advisor_email,
           access_notes: data.access_notes,
           invited_at: data.invited_at,
