@@ -52,8 +52,11 @@ Respond with a JSON array. Each item must have:
 Return ONLY the JSON array, no markdown fences.`
 
 /**
- * Classify transactions using AI (Claude). Returns empty array if
- * the Anthropic SDK is not installed or ANTHROPIC_API_KEY is not set.
+ * Classify transactions using AI (Claude via direct API call).
+ * Returns empty array if ANTHROPIC_API_KEY is not set.
+ *
+ * Uses fetch() directly instead of @anthropic-ai/sdk to avoid
+ * bundling issues that crash Netlify serverless functions.
  */
 export async function classifyWithAI(
   transactions: Array<{ id: string; contactName: string | null; description: string | null; amount: number }>
@@ -65,36 +68,40 @@ export async function classifyWithAI(
       return []
     }
 
-    // Dynamic import - SDK is an optional dependency
-    let Anthropic: any
-    try {
-      const mod = await import('@anthropic-ai/sdk')
-      Anthropic = mod.default
-    } catch {
-      console.warn('[AIClassifier] @anthropic-ai/sdk not installed, skipping AI classification')
-      return []
-    }
-
-    const client = new Anthropic({ apiKey })
-
     const txList = transactions.map(tx =>
       `ID: ${tx.id} | Supplier: ${tx.contactName || 'Unknown'} | Description: ${tx.description || 'N/A'} | Amount: £${Math.abs(tx.amount).toFixed(2)}`
     ).join('\n')
 
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4000,
-      system: SYSTEM_PROMPT,
-      messages: [
-        {
-          role: 'user',
-          content: `Classify these ${transactions.length} transactions:\n\n${txList}`,
-        },
-      ],
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 4000,
+        system: SYSTEM_PROMPT,
+        messages: [
+          {
+            role: 'user',
+            content: `Classify these ${transactions.length} transactions:\n\n${txList}`,
+          },
+        ],
+      }),
     })
 
-    // Parse response
-    const responseText = response.content
+    if (!response.ok) {
+      const errorBody = await response.text()
+      console.error(`[AIClassifier] Anthropic API error (${response.status}):`, errorBody)
+      return []
+    }
+
+    const body = await response.json()
+
+    // Extract text from the response content blocks
+    const responseText = (body.content || [])
       .filter((block: { type: string }) => block.type === 'text')
       .map((block: { text: string }) => block.text)
       .join('')
