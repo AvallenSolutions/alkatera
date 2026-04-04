@@ -278,7 +278,7 @@ export function XeroSetupStepper() {
         {hasSynced && !allClassified && supplierStats.total > 0 && (
           <div className="mt-3 pt-3 border-t border-neon-lime/20">
             <Button size="sm" variant="outline" className="w-full" asChild>
-              <Link href="/data/xero-upgrades/">
+              <Link href="/data/spend-data/">
                 <Users className="h-3.5 w-3.5 mr-1.5" />
                 Classify your suppliers ({supplierStats.total - supplierStats.classified} remaining)
               </Link>
@@ -289,7 +289,7 @@ export function XeroSetupStepper() {
         {allClassified && (
           <div className="mt-3 pt-3 border-t border-neon-lime/20">
             <Button size="sm" variant="outline" className="w-full" asChild>
-              <Link href="/data/xero-upgrades/">
+              <Link href="/data/spend-data/">
                 <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
                 View your emissions in the Action Centre
               </Link>

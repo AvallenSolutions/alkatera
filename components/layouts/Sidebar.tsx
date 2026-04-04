@@ -116,7 +116,7 @@ const navigationStructure: NavItem[] = [
     minTier: 1,
     children: [
       { name: 'Company Emissions', href: '/data/scope-1-2/', icon: Flame,     minTier: 1 },
-      { name: 'Xero Upgrades',    href: '/data/xero-upgrades/', icon: ArrowUpCircle, minTier: 1, featureCode: 'xero_integration_beta' },
+      { name: 'Spend Data',        href: '/data/spend-data/', icon: ArrowUpCircle, minTier: 1, featureCode: 'xero_integration_beta' },
       { name: 'Data Quality',      href: '/data/quality/',   icon: BarChart3, minTier: 1 },
       { name: 'Data Sources',      href: '/data/sources/',   icon: BookOpen,  minTier: 1 },
     ],

@@ -2234,7 +2234,7 @@ export default function CompanyEmissionsPage() {
                             <div className="text-xs text-muted-foreground">Classify suppliers by category</div>
                           </div>
                         </div>
-                        <Link href="/data/xero-upgrades/">
+                        <Link href="/data/spend-data/">
                           <Button variant="outline" size="sm" className="w-full mt-3 text-xs">
                             <ExternalLink className="h-3 w-3 mr-1.5" />
                             Open Supplier Classification

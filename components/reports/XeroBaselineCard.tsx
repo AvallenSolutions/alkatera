@@ -179,7 +179,7 @@ export function XeroBaselineCard({
 
             <div className="pt-2 border-t">
               <Button variant="outline" size="sm" asChild className="w-full">
-                <Link href="/data/xero-upgrades/">
+                <Link href="/data/spend-data/">
                   <ArrowUpCircle className="h-4 w-4 mr-2" />
                   Upgrade data quality in the Action Centre
                   <ExternalLink className="h-3 w-3 ml-2" />

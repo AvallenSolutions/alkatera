@@ -12,13 +12,13 @@ import { TransactionBrowser } from '@/components/xero/TransactionBrowser'
 import { SupplierRulesManager } from '@/components/xero/SupplierRulesManager'
 import { DataQualityProgress } from '@/components/xero/DataQualityProgress'
 
-export default function XeroUpgradesPage() {
+export default function SpendDataPage() {
   return (
     <FeatureGate feature="xero_integration_beta">
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-            Xero Data &amp; Classification
+            Spend Data
           </h1>
           <p className="text-sm text-muted-foreground mt-2">
             Classify your suppliers into emission categories. Once mapped, all transactions are categorised automatically.

@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -42,6 +43,7 @@ interface XeroTenant {
 }
 
 export function XeroConnectionCard() {
+  const router = useRouter()
   const { currentOrganization, userRole } = useOrganization()
   const isAdmin = userRole === 'owner' || userRole === 'admin'
 
@@ -266,16 +268,21 @@ export function XeroConnectionCard() {
         toast.success(
           `Sync complete: ${totalFetched} transactions imported, ${totalClassified} classified`,
           {
-            description: `${unclassifiedCount} transaction${unclassifiedCount !== 1 ? 's' : ''} still need classification.`,
+            description: `${unclassifiedCount} transaction${unclassifiedCount !== 1 ? 's' : ''} still need classification. Redirecting...`,
             duration: 8000,
           }
         )
       } else {
         toast.success(
-          `Sync complete: ${totalFetched} transactions imported, ${totalClassified} classified. All transactions categorised.`
+          `Sync complete: ${totalFetched} transactions imported, ${totalClassified} classified. All transactions categorised. Redirecting...`
         )
       }
       fetchStatus()
+
+      // Redirect to Spend Data page after a short delay so the toast is visible
+      setTimeout(() => {
+        router.push('/data/spend-data/')
+      }, 1500)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Sync failed'
       toast.error(message)

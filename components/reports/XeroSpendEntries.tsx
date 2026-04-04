@@ -25,7 +25,7 @@ interface XeroSpendEntriesProps {
   upgradeHref?: string
 }
 
-export function XeroSpendEntries({ entries, upgradeHref = '/data/xero-upgrades/' }: XeroSpendEntriesProps) {
+export function XeroSpendEntries({ entries, upgradeHref = '/data/spend-data/' }: XeroSpendEntriesProps) {
   const [isOpen, setIsOpen] = useState(false)
 
   if (!entries || entries.length === 0) return null
