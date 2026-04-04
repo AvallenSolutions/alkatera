@@ -23,7 +23,6 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   poweredByHeader: false,
-  serverExternalPackages: ['@anthropic-ai/sdk'],
   experimental: {
     optimizePackageImports: [
       'lucide-react',

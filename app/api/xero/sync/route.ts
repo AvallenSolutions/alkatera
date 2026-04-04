@@ -4,7 +4,6 @@ import { getMemberRole } from '@/app/api/stripe/_helpers/get-member-role'
 import { syncStage } from '@/lib/xero/sync-service'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 25 // Netlify Pro allows up to 26s
 
 /**
  * POST /api/xero/sync
