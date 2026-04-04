@@ -494,9 +494,11 @@ async function stageClassify(
     }
   }
 
+  // Skip AI classification if ANTHROPIC_API_KEY is not configured
+  const hasAIKey = !!process.env.ANTHROPIC_API_KEY
   return {
     done: false,
-    nextStage: 'ai_classify',
+    nextStage: hasAIKey ? 'ai_classify' : 'complete',
     progress: `Classified ${classified} of ${unclassified?.length || 0} transactions`,
     stats: { transactionsClassified: classified },
   }

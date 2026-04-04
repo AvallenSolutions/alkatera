@@ -227,8 +227,21 @@ export function XeroConnectionCard() {
           }),
         })
 
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error)
+        let data
+        try {
+          data = await res.json()
+        } catch {
+          // Function crashed (502 HTML response) - skip this stage gracefully
+          console.error(`Sync stage '${stage}' returned non-JSON response (status ${res.status})`)
+          if (stage === 'ai_classify') {
+            // AI classification is optional - skip to complete
+            stage = 'complete'
+            cursor = undefined
+            continue
+          }
+          throw new Error(`Sync failed at stage '${stage}' (server error)`)
+        }
+        if (!res.ok) throw new Error(data.error || `Sync failed at stage '${stage}'`)
 
         setSyncProgress(data.progress || stage)
 
