@@ -207,81 +207,29 @@ export default function NatureAssessmentPage() {
     return () => { cancelled = true }
   }, [orgId, supabase])
 
-  /* ---- load locate summary ---- */
+  /* ---- load locate summary via API route (server-side query) ---- */
   useEffect(() => {
     if (!orgId) return
     let cancelled = false
 
     async function loadLocate() {
-      // Fetch vineyards (which have the site name) and their latest growing profiles (which have TNFD fields)
-      const { data: vineyards } = await supabase
-        .from('vineyards')
-        .select('id, name')
-        .eq('organization_id', orgId!)
-        .eq('is_active', true)
-
-      if (cancelled || !vineyards) return
-
-      const siteData: Array<{ name: string; ecosystem_type: string | null; in_biodiversity_sensitive_area: boolean; water_stress_index: string | null }> = []
-
-      for (const v of vineyards) {
-        const { data: profile } = await supabase
-          .from('vineyard_growing_profiles')
-          .select('ecosystem_type, in_biodiversity_sensitive_area, water_stress_index')
-          .eq('vineyard_id', v.id)
-          .order('vintage_year', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-
-        siteData.push({
-          name: v.name,
-          ecosystem_type: profile?.ecosystem_type ?? null,
-          in_biodiversity_sensitive_area: profile?.in_biodiversity_sensitive_area ?? false,
-          water_stress_index: profile?.water_stress_index ?? null,
-        })
-      }
-
-      // Also include orchards
-      const { data: orchards } = await supabase
-        .from('orchards')
-        .select('id, name')
-        .eq('organization_id', orgId!)
-        .eq('is_active', true)
-
-      if (!cancelled && orchards) {
-        for (const o of orchards) {
-          const { data: profile } = await supabase
-            .from('orchard_growing_profiles')
-            .select('ecosystem_type, in_biodiversity_sensitive_area, water_stress_index')
-            .eq('orchard_id', o.id)
-            .order('harvest_year', { ascending: false })
-            .limit(1)
-            .maybeSingle()
-
-          siteData.push({
-            name: o.name,
-            ecosystem_type: profile?.ecosystem_type ?? null,
-            in_biodiversity_sensitive_area: profile?.in_biodiversity_sensitive_area ?? false,
-            water_stress_index: profile?.water_stress_index ?? null,
-          })
+      try {
+        const res = await fetch('/api/nature-assessment/locate')
+        if (!res.ok) {
+          console.error('[NatureAssessment] Locate fetch failed:', res.status)
+          return
         }
+        const { summary } = await res.json()
+        if (cancelled) return
+        setLocateSummary(summary)
+      } catch (err) {
+        console.error('[NatureAssessment] Locate fetch error:', err)
       }
-
-      const totalSites = siteData.length
-      const withEcosystem = siteData.filter(s => s.ecosystem_type).length
-      const sensitiveSites = siteData.filter(s => s.in_biodiversity_sensitive_area).map(s => s.name || 'Unnamed site')
-      const waterStress: Record<string, number> = {}
-      for (const s of siteData) {
-        const level = s.water_stress_index || 'Not set'
-        waterStress[level] = (waterStress[level] || 0) + 1
-      }
-
-      setLocateSummary({ totalSites, withEcosystem, sensitiveSites, waterStress })
     }
 
     loadLocate()
     return () => { cancelled = true }
-  }, [orgId, supabase])
+  }, [orgId])
 
   /* ---- save handler ---- */
   const save = useCallback(async (status: 'draft' | 'complete' = 'draft') => {
