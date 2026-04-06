@@ -613,6 +613,168 @@ async function aggregateReportData(
           }
         }
 
+        // Extract FLAG removals data (for flag-removals section)
+        if (sections.includes('flag-removals')) {
+          let totalRemovals = 0;
+          let profileCount = 0;
+          let allVerified = true;
+          let allMeetLsr = true;
+          for (const p of Array.from(seenProducts.values())) {
+            const ai = (p as any).aggregated_impacts;
+            if (ai?.flag_removals) {
+              const removals = ai.flag_removals.soil_carbon_co2e || 0;
+              if (removals > 0) {
+                totalRemovals += removals;
+                profileCount++;
+                if (ai.flag_removals.removal_verification_status !== 'verified') {
+                  allVerified = false;
+                }
+                if (!ai.flag_removals.removals_meet_lsr_standard) {
+                  allMeetLsr = false;
+                }
+              }
+            }
+          }
+          (data as any).flagRemovals = {
+            totalRemovals,
+            profileCount,
+            allVerified,
+            allMeetLsr,
+          };
+        }
+
+        // Extract TNFD nature data (for tnfd-nature section)
+        if (sections.includes('tnfd-nature')) {
+          // LCA impact aggregation
+          let totalLandUse = 0, totalTerrestrialEcotox = 0, totalFwEutrophication = 0;
+          let totalTerrestrialAcid = 0, totalWaterConsumption = 0, totalWaterScarcity = 0;
+          for (const p of Array.from(seenProducts.values())) {
+            const ai = (p as any).aggregated_impacts;
+            if (ai) {
+              totalLandUse += ai.land_use || 0;
+              totalTerrestrialEcotox += ai.terrestrial_ecotoxicity || 0;
+              totalFwEutrophication += ai.freshwater_eutrophication || 0;
+              totalTerrestrialAcid += ai.terrestrial_acidification || 0;
+              totalWaterConsumption += ai.water_consumption || 0;
+              totalWaterScarcity += ai.water_scarcity_aware || 0;
+            }
+          }
+
+          // Site data from vineyards and orchards
+          const sites: any[] = [];
+          let sitesWithGaps = 0;
+
+          // Fetch vineyard data
+          const { data: vineyards } = await supabase
+            .from('vineyards')
+            .select('name, address_country, location_country_code')
+            .eq('organization_id', orgId)
+            .eq('is_active', true);
+
+          if (vineyards) {
+            for (const v of vineyards) {
+              // Get latest growing profile for TNFD fields
+              const { data: profile } = await supabase
+                .from('vineyard_growing_profiles')
+                .select('ecosystem_type, in_biodiversity_sensitive_area, sensitive_area_details, water_stress_index')
+                .eq('organization_id', orgId)
+                .order('vintage_year', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+              const hasGap = !profile?.ecosystem_type && !profile?.water_stress_index;
+              if (hasGap) sitesWithGaps++;
+
+              sites.push({
+                name: v.name,
+                country: v.address_country || v.location_country_code || 'N/A',
+                ecosystemType: profile?.ecosystem_type?.replace(/_/g, ' ') || null,
+                inSensitiveArea: profile?.in_biodiversity_sensitive_area || false,
+                sensitiveAreaDetails: profile?.sensitive_area_details || null,
+                waterStress: profile?.water_stress_index?.replace(/_/g, ' ') || null,
+              });
+            }
+          }
+
+          // Fetch orchard data
+          const { data: orchards } = await supabase
+            .from('orchards')
+            .select('name, address_country, location_country_code')
+            .eq('organization_id', orgId)
+            .eq('is_active', true);
+
+          if (orchards) {
+            for (const o of orchards) {
+              const { data: profile } = await supabase
+                .from('orchard_growing_profiles')
+                .select('ecosystem_type, in_biodiversity_sensitive_area, sensitive_area_details, water_stress_index')
+                .eq('organization_id', orgId)
+                .order('harvest_year', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+              const hasGap = !profile?.ecosystem_type && !profile?.water_stress_index;
+              if (hasGap) sitesWithGaps++;
+
+              sites.push({
+                name: o.name,
+                country: o.address_country || o.location_country_code || 'N/A',
+                ecosystemType: profile?.ecosystem_type?.replace(/_/g, ' ') || null,
+                inSensitiveArea: profile?.in_biodiversity_sensitive_area || false,
+                sensitiveAreaDetails: profile?.sensitive_area_details || null,
+                waterStress: profile?.water_stress_index?.replace(/_/g, ' ') || null,
+              });
+            }
+          }
+
+          // Fetch nature impact assessment
+          const { data: assessment } = await supabase
+            .from('nature_impact_assessments')
+            .select('*')
+            .eq('organization_id', orgId)
+            .eq('assessment_year', config.reportYear)
+            .maybeSingle();
+
+          (data as any).tnfdNature = {
+            sites,
+            sitesWithGaps,
+            lcaImpacts: {
+              landUse: totalLandUse,
+              terrestrialEcotoxicity: totalTerrestrialEcotox,
+              freshwaterEutrophication: totalFwEutrophication,
+              terrestrialAcidification: totalTerrestrialAcid,
+              waterConsumption: totalWaterConsumption,
+              waterScarcity: totalWaterScarcity,
+            },
+            assessment: assessment ? {
+              waterDependency: assessment.water_dependency_level,
+              waterDependencyNotes: assessment.water_dependency_notes,
+              pollinationDependency: assessment.pollination_dependency_level,
+              pollinationDependencyNotes: assessment.pollination_dependency_notes,
+              soilHealthDependency: assessment.soil_health_dependency_level,
+              soilHealthDependencyNotes: assessment.soil_health_dependency_notes,
+              landUseHa: assessment.land_use_ha,
+              pollutionN: assessment.pollution_outputs_kg_n,
+              pollutionP: assessment.pollution_outputs_kg_p,
+              pesticideKg: assessment.pesticide_kg_active,
+              materiality: assessment.nature_risk_materiality,
+              materialityRationale: assessment.materiality_rationale,
+              physicalRiskNotes: assessment.physical_risk_notes,
+              transitionRiskNotes: assessment.transition_risk_notes,
+              hasNaturePositiveTarget: assessment.has_nature_positive_target,
+              targetYear: assessment.nature_positive_target_year,
+              baselineYear: assessment.nature_positive_baseline_year,
+              targetDescription: assessment.nature_positive_target_description,
+            } : null,
+            leapStatus: [
+              { phase: 'Locate', status: sites.length > 0 ? 'Implemented' : 'Not started', implemented: 'Site ecosystem type, biodiversity sensitivity, water stress', gaps: sitesWithGaps > 0 ? `${sitesWithGaps} site(s) missing data` : 'None' },
+              { phase: 'Evaluate', status: assessment ? 'Implemented' : 'Not started', implemented: 'ReCiPe 2016 impact metrics, dependency assessment', gaps: !assessment ? 'Complete nature assessment questionnaire' : 'None' },
+              { phase: 'Assess', status: assessment?.nature_risk_materiality ? 'Implemented' : 'Not started', implemented: assessment?.nature_risk_materiality ? 'Materiality determination' : '-', gaps: !assessment?.nature_risk_materiality ? 'Materiality assessment required' : 'None' },
+              { phase: 'Prepare', status: assessment?.has_nature_positive_target ? 'Implemented' : 'Partial', implemented: 'Metrics reporting', gaps: !assessment?.has_nature_positive_target ? 'Nature-positive target not set' : 'None' },
+            ],
+          };
+        }
+
         // Extract multi-capital impact data (for multi-capital section)
         if (sections.includes('multi-capital')) {
           let totalWater = 0, totalLand = 0, totalEutrophication = 0, totalAcidification = 0, totalWaterScarcity = 0;
@@ -1045,6 +1207,30 @@ async function aggregateReportData(
 
     if (hasFacilities) {
       data.standards.push({ code: 'iso-14064', name: 'ISO 14064-1 GHG Inventories', status: hasScope123 ? 'Aligned' : 'Partial', detail: `${data.facilities.length} facilities reporting` });
+    }
+
+    // FLAG threshold status from product LCA aggregated impacts
+    if (hasProducts && data.products?.length > 0) {
+      let anyFlagExceeded = false;
+      let maxFlagPct = 0;
+      for (const p of data.products) {
+        const ai = (p as any).aggregated_impacts;
+        const ft = ai?.breakdown?.flag_threshold;
+        if (ft) {
+          if (ft.flag_threshold_exceeded) anyFlagExceeded = true;
+          if (ft.flag_emissions_pct > maxFlagPct) maxFlagPct = ft.flag_emissions_pct;
+        }
+      }
+      if (maxFlagPct > 0) {
+        data.standards.push({
+          code: 'sbti-flag',
+          name: 'SBTi FLAG Guidance v1.2',
+          status: anyFlagExceeded ? 'Action Required' : 'Compliant',
+          detail: anyFlagExceeded
+            ? `FLAG emissions at ${maxFlagPct.toFixed(1)}% of total (threshold: 20%). FLAG reduction targets required.`
+            : `FLAG emissions at ${maxFlagPct.toFixed(1)}% of total (below 20% threshold)`,
+        });
+      }
     }
   }
   return data;

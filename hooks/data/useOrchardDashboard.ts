@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { calculateOrchardImpacts } from '@/lib/orchard-calculator';
+import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import type {
   Orchard,
   OrchardGrowingProfile,
@@ -55,12 +56,25 @@ export function useOrchardDashboard(orchardId: string): UseOrchardDashboardResul
       }
       setProfiles(profileList);
 
+      // Resolve AWARE water scarcity factor for orchard country
+      let awareFactor = 1.0;
+      if (found.location_country_code) {
+        const supabase = getSupabaseBrowserClient();
+        const { data: awareData } = await supabase
+          .from('aware_factors')
+          .select('aware_factor')
+          .eq('country_code', found.location_country_code.toUpperCase())
+          .maybeSingle();
+        if (awareData?.aware_factor) awareFactor = Number(awareData.aware_factor);
+      }
+
       const impacts: HarvestImpactSummary[] = profileList.map((profile) => {
         const input: OrchardCalculatorInput = {
           orchard_type: found.orchard_type,
           climate_zone: found.climate_zone as 'wet' | 'dry' | 'temperate',
           certification: found.certification as any,
           location_country_code: found.location_country_code,
+          aware_factor: awareFactor,
           area_ha: profile.area_ha,
           soil_management: profile.soil_management,
           pruning_residue_returned: profile.pruning_residue_returned,

@@ -45,6 +45,7 @@ import {
   VINEYARD_CARBON_STOCK,
   C_TO_CO2E,
   LUC_AMORTISATION_YEARS,
+  VINE_SO2_EQ_PER_HA_DEFAULT,
 } from './ghg-constants';
 
 import { getGridFactor } from './grid-emission-factors';
@@ -212,12 +213,23 @@ export function calculateViticultureImpacts(
 
   let n2oCropResidueCo2e = 0;
 
-  if (input.pruning_residue_returned !== false) {
-    // Default: true (most vineyards return prunings to inter-row)
-    const aboveGroundNKg =
-      CROP_RESIDUE_FACTORS.VINE_PRUNING_DM_PER_HA *
-      CROP_RESIDUE_FACTORS.VINE_PRUNING_N_FRACTION *
-      input.area_ha;
+  // Derive pruning_residue_returned from management type for backward compatibility
+  const residueManagementType = input.pruning_residue_management_type ?? (
+    input.pruning_residue_returned === false ? 'removed_for_biomass' : 'in_field'
+  );
+
+  if (residueManagementType !== 'removed_for_biomass') {
+    // Use measured dry matter if provided (primary data), otherwise default constant
+    const pruningDmPerHa = input.pruning_residue_measured_kg_per_ha != null
+      ? input.pruning_residue_measured_kg_per_ha / 1000 // convert kg to tonnes
+      : CROP_RESIDUE_FACTORS.VINE_PRUNING_DM_PER_HA;
+
+    // For chipped_and_spread, apply 0.7 decomposition factor to N fraction
+    const effectiveNFraction = residueManagementType === 'chipped_and_spread'
+      ? CROP_RESIDUE_FACTORS.VINE_PRUNING_N_FRACTION * 0.7
+      : CROP_RESIDUE_FACTORS.VINE_PRUNING_N_FRACTION;
+
+    const aboveGroundNKg = pruningDmPerHa * effectiveNFraction * input.area_ha;
     const belowGroundNKg = aboveGroundNKg * CROP_RESIDUE_FACTORS.ROOT_TURNOVER_RATIO;
     const totalResidueNKg = aboveGroundNKg + belowGroundNKg;
 
@@ -227,6 +239,7 @@ export function calculateViticultureImpacts(
     n2oCropResidueCo2e = residueDirect.co2e + residueIndirect.co2e;
     n2oKg += residueDirect.n2o_kg + residueIndirect.n2o_kg;
   }
+  // removed_for_biomass: N leaves the system, n2oCropResidueCo2e remains 0
 
   // ========================================================================
   // 2. MACHINERY FUEL (non-FLAG: energy emissions)
@@ -248,6 +261,7 @@ export function calculateViticultureImpacts(
   let terrestrialEcotoxicity = 0;
   let humanToxicityNc = 0;
   let freshwaterEutrophication = 0;
+  const terrestrialAcidification = VINE_SO2_EQ_PER_HA_DEFAULT * input.area_ha;
 
   if (input.uses_pesticides && input.pesticide_applications_per_year > 0) {
     const totalAiKg = input.pesticide_applications_per_year *
@@ -339,13 +353,17 @@ export function calculateViticultureImpacts(
 
   let soilCarbonCo2e: number;
   let soilCarbonMethodology: 'practice_based_default' | 'measured';
-  let soilCarbonVerified = false;
+
+  // Derive verification from removal_verification_status (replaces simple override check)
+  const removalVerificationStatus = input.removal_verification_status ?? 'unverified';
+  const verificationExpired = input.removal_verification_expiry
+    ? new Date(input.removal_verification_expiry) <= new Date()
+    : false;
+  const soilCarbonVerified = removalVerificationStatus === 'verified' && !verificationExpired;
 
   if (input.soil_carbon_override_kg_co2e_per_ha != null) {
-    // Phase 2: verified measurement override
     soilCarbonCo2e = input.soil_carbon_override_kg_co2e_per_ha * input.area_ha;
     soilCarbonMethodology = 'measured';
-    soilCarbonVerified = true;
   } else {
     // Practice-based default from WineGB/OIV
     const removalFactor = SOIL_CARBON_REMOVAL_DEFAULTS[input.soil_management] ?? 0;
@@ -378,10 +396,37 @@ export function calculateViticultureImpacts(
   // Methodology notes
   const methodologyNotes = buildMethodologyNotes(input, climateZone);
 
-  // LSR alignment: practice-based defaults do not meet verification requirements
-  const removalsMeetLsrStandard = soilCarbonMethodology === 'measured';
-  const removalsWarning = (!removalsMeetLsrStandard && soilCarbonCo2e > 0)
-    ? 'Practice-based removal estimates have not been independently verified per GHG Protocol Land Sector and Removals Standard V1.0, Section 3.1.4. Values may not be used for FLAG target removal claims without third-party verification.'
+  // LSR alignment: requires measured methodology AND third-party verification
+  let removalsMeetLsrStandard = soilCarbonMethodology === 'measured' && soilCarbonVerified;
+  let removalsWarning: string | undefined;
+
+  if (soilCarbonCo2e > 0) {
+    if (verificationExpired) {
+      removalsWarning = `Removal verification expired on ${input.removal_verification_expiry}. Removals will not meet LSR standard until re-verification.`;
+    } else if (removalVerificationStatus !== 'verified') {
+      removalsWarning = 'Soil carbon removals have not been independently verified. Third-party verification to ISO 14064-3 or equivalent is required for SBTi FLAG submission.';
+    }
+  }
+
+  // Land tenure check: leases expiring within 5 years undermine permanence claims
+  if (
+    (input.land_ownership_type === 'leased' || input.land_ownership_type === 'rental') &&
+    input.lease_expiry_date
+  ) {
+    const yearsRemaining = new Date(input.lease_expiry_date).getFullYear() - new Date().getFullYear();
+    if (yearsRemaining < 5) {
+      removalsMeetLsrStandard = false;
+      removalsWarning = 'Lease expires within 5 years. Soil carbon removal claims require land tenure that exceeds the accounting period. Third-party verification is unlikely to be granted.';
+    }
+  }
+
+  // FLAG 20% threshold check (SBTi FLAG Guidance v1.2)
+  const flagEmissionsPct = totalEmissions > 0
+    ? (totalFlagEmissions / totalEmissions) * 100
+    : 0;
+  const flagThresholdExceeded = flagEmissionsPct >= 20;
+  const flagThresholdMessage = flagThresholdExceeded
+    ? `FLAG emissions represent ${flagEmissionsPct.toFixed(1)}% of total. SBTi requires FLAG reduction targets to be set alongside your near-term and long-term targets.`
     : undefined;
 
   return {
@@ -402,6 +447,7 @@ export function calculateViticultureImpacts(
       soil_carbon_co2e: soilCarbonCo2e,
       methodology: soilCarbonMethodology,
       is_verified: soilCarbonVerified,
+      removal_verification_status: removalVerificationStatus,
       removals_meet_lsr_standard: removalsMeetLsrStandard,
       removals_warning: removalsWarning,
     },
@@ -418,6 +464,15 @@ export function calculateViticultureImpacts(
     terrestrial_ecotoxicity: terrestrialEcotoxicity,
     human_toxicity_non_carcinogenic: humanToxicityNc,
     freshwater_eutrophication: freshwaterEutrophication,
+    terrestrial_acidification: terrestrialAcidification,
+    tnfd_location: input.ecosystem_type || input.in_biodiversity_sensitive_area || input.water_stress_index
+      ? {
+          ecosystem_type: input.ecosystem_type,
+          in_biodiversity_sensitive_area: input.in_biodiversity_sensitive_area ?? false,
+          sensitive_area_details: input.sensitive_area_details,
+          water_stress_index: input.water_stress_index,
+        }
+      : undefined,
     n2o_kg: n2oKg,
     co2_fossil_kg: co2FossilKg,
     total_emissions_per_kg: totalEmissionsPerKg,
@@ -426,6 +481,9 @@ export function calculateViticultureImpacts(
     total_removals: totalRemovals,
     data_quality_grade: dataQualityGrade,
     methodology_notes: methodologyNotes,
+    flag_emissions_pct: flagEmissionsPct,
+    flag_threshold_exceeded: flagThresholdExceeded,
+    flag_threshold_message: flagThresholdMessage,
   };
 }
 
@@ -559,8 +617,18 @@ function buildMethodologyNotes(
 
   parts.push(`Soil: ${input.soil_management}`);
 
-  if (input.pruning_residue_returned !== false) {
-    parts.push('Crop residue N2O: vine prunings (IPCC Ch 11)');
+  const noteResidueType = input.pruning_residue_management_type ?? (
+    input.pruning_residue_returned === false ? 'removed_for_biomass' : 'in_field'
+  );
+  if (noteResidueType === 'removed_for_biomass') {
+    parts.push('Crop residue N2O: prunings removed for biomass (zero N2O)');
+  } else if (noteResidueType === 'chipped_and_spread') {
+    parts.push('Crop residue N2O: vine prunings chipped and spread (0.7x N fraction, IPCC Ch 11)');
+  } else {
+    parts.push('Crop residue N2O: vine prunings in field (IPCC Ch 11)');
+  }
+  if (input.pruning_residue_measured_kg_per_ha != null) {
+    parts.push(`Pruning DM: ${input.pruning_residue_measured_kg_per_ha} kg/ha/yr (measured, primary data)`);
   }
 
   if (input.previous_land_use_type && input.previous_land_use_type !== 'permanent_vineyard') {

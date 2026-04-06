@@ -165,17 +165,32 @@ describe('calculateOrchardImpacts', () => {
     expect(result.flag_removals.methodology).toBe('practice_based_default');
     expect(result.flag_removals.removals_meet_lsr_standard).toBe(false);
     expect(result.flag_removals.removals_warning).toBeDefined();
-    expect(result.flag_removals.removals_warning).toContain('GHG Protocol');
+    expect(result.flag_removals.removals_warning).toContain('verification');
   });
 
-  it('measured soil carbon is marked as verified', () => {
+  it('measured soil carbon without verification is not verified', () => {
     const input = {
       ...normandyApple,
       soil_carbon_override_kg_co2e_per_ha: 600,
     };
     const result = calculateOrchardImpacts(input);
     expect(result.flag_removals.methodology).toBe('measured');
+    expect(result.flag_removals.is_verified).toBe(false);
+    expect(result.flag_removals.removals_meet_lsr_standard).toBe(false);
+    expect(result.flag_removals.removals_warning).toBeDefined();
+  });
+
+  it('measured soil carbon with verified status is verified', () => {
+    const input = {
+      ...normandyApple,
+      soil_carbon_override_kg_co2e_per_ha: 600,
+      removal_verification_status: 'verified' as const,
+      removal_verification_expiry: '2030-01-01',
+    };
+    const result = calculateOrchardImpacts(input);
+    expect(result.flag_removals.methodology).toBe('measured');
     expect(result.flag_removals.is_verified).toBe(true);
+    expect(result.flag_removals.removal_verification_status).toBe('verified');
     expect(result.flag_removals.removals_meet_lsr_standard).toBe(true);
     expect(result.flag_removals.removals_warning).toBeUndefined();
   });
@@ -359,5 +374,106 @@ describe('calculateOrchardImpacts', () => {
     // Sulfur has much lower ecotoxicity than mancozeb
     const organicResult = calculateOrchardImpacts(normandyApple);
     expect(result.freshwater_ecotoxicity).toBeGreaterThan(organicResult.freshwater_ecotoxicity);
+  });
+
+  // --------------------------------------------------------------------------
+  // Phase 2 & 3: AWARE, Acidification, TNFD, Verification Status
+  // --------------------------------------------------------------------------
+
+  describe('AWARE water scarcity factor', () => {
+    it('should apply AWARE factor to water scarcity calculation', () => {
+      const input: OrchardCalculatorInput = {
+        ...irrigatedCitrus,
+        aware_factor: 8.0,
+      };
+      const result = calculateOrchardImpacts(input);
+
+      const expectedWater = irrigatedCitrus.water_m3_per_ha * irrigatedCitrus.area_ha;
+      expect(result.water_m3).toBe(expectedWater);
+      expect(result.water_scarcity_m3_eq).toBe(expectedWater * 8.0);
+    });
+
+    it('should default AWARE factor to 1.0 when not provided', () => {
+      const result = calculateOrchardImpacts(irrigatedCitrus);
+
+      const expectedWater = irrigatedCitrus.water_m3_per_ha * irrigatedCitrus.area_ha;
+      expect(result.water_m3).toBe(expectedWater);
+      expect(result.water_scarcity_m3_eq).toBe(expectedWater * 1.0);
+    });
+  });
+
+  describe('terrestrial acidification', () => {
+    it('should include terrestrial_acidification field in result', () => {
+      const result = calculateOrchardImpacts(normandyApple);
+
+      expect(result).toHaveProperty('terrestrial_acidification');
+      expect(typeof result.terrestrial_acidification).toBe('number');
+    });
+
+    it('should default to zero (placeholder constant)', () => {
+      const result = calculateOrchardImpacts(normandyApple);
+
+      expect(result.terrestrial_acidification).toBe(0);
+    });
+  });
+
+  describe('TNFD location metadata pass-through', () => {
+    it('should include tnfd_location when ecosystem data is provided', () => {
+      const input: OrchardCalculatorInput = {
+        ...normandyApple,
+        ecosystem_type: 'temperate_forest',
+        in_biodiversity_sensitive_area: true,
+        sensitive_area_details: 'Parc naturel du Perche',
+        water_stress_index: 'low',
+      };
+      const result = calculateOrchardImpacts(input);
+
+      expect(result.tnfd_location).toBeDefined();
+      expect(result.tnfd_location!.ecosystem_type).toBe('temperate_forest');
+      expect(result.tnfd_location!.in_biodiversity_sensitive_area).toBe(true);
+      expect(result.tnfd_location!.sensitive_area_details).toBe('Parc naturel du Perche');
+      expect(result.tnfd_location!.water_stress_index).toBe('low');
+    });
+
+    it('should not include tnfd_location when no ecosystem data provided', () => {
+      const result = calculateOrchardImpacts(normandyApple);
+
+      expect(result.tnfd_location).toBeUndefined();
+    });
+
+    it('should not affect emissions calculations', () => {
+      const baseline = calculateOrchardImpacts(normandyApple);
+      const withTnfd = calculateOrchardImpacts({
+        ...normandyApple,
+        ecosystem_type: 'mediterranean',
+        in_biodiversity_sensitive_area: true,
+        water_stress_index: 'very_high',
+      });
+
+      expect(withTnfd.total_emissions).toBe(baseline.total_emissions);
+    });
+  });
+
+  describe('removal verification status', () => {
+    it('should include removal_verification_status in flag_removals', () => {
+      const result = calculateOrchardImpacts(normandyApple);
+
+      expect(result.flag_removals).toHaveProperty('removal_verification_status');
+      expect(result.flag_removals.removal_verification_status).toBe('unverified');
+    });
+
+    it('should mark expired verification as not meeting LSR', () => {
+      const input: OrchardCalculatorInput = {
+        ...normandyApple,
+        soil_carbon_override_kg_co2e_per_ha: 600,
+        removal_verification_status: 'verified',
+        removal_verification_expiry: '2020-01-01', // expired
+      };
+      const result = calculateOrchardImpacts(input);
+
+      expect(result.flag_removals.is_verified).toBe(false);
+      expect(result.flag_removals.removals_meet_lsr_standard).toBe(false);
+      expect(result.flag_removals.removals_warning).toContain('expired');
+    });
   });
 });

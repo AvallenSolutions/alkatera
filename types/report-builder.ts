@@ -130,6 +130,20 @@ export const AVAILABLE_SECTIONS: SectionDefinition[] = [
     category: 'Operations',
   },
   {
+    id: 'flag-removals',
+    label: 'FLAG Land-Based Removals',
+    description: 'Soil carbon sequestration reported separately per SBTi FLAG Guidance v1.2',
+    required: false,
+    category: 'Emissions',
+  },
+  {
+    id: 'tnfd-nature',
+    label: 'TNFD Nature & Biodiversity',
+    description: 'Nature dependencies, impacts, and risks per the TNFD LEAP Framework (Locate, Evaluate, Assess, Prepare) and CSRD ESRS E4.',
+    required: false,
+    category: 'Environmental Impacts',
+  },
+  {
     id: 'key-findings',
     label: 'Key Findings & Change Drivers',
     description: 'AI-generated narrative explaining the most significant drivers of year-on-year emission changes',
@@ -205,7 +219,7 @@ export const REPORTING_STANDARDS = [
   { id: 'cdp', label: 'CDP', fullName: 'Carbon Disclosure Project', scope: 'Environmental Disclosure', recommended: false, platformSupport: 'partial' as const },
   { id: 'iso-14064', label: 'ISO 14064', fullName: 'GHG Accounting & Verification', scope: 'International Standard', recommended: false, platformSupport: 'full' as const },
   { id: 'sasb', label: 'SASB', fullName: 'Sustainability Accounting Standards Board', scope: 'Industry-Specific Standards', recommended: false, platformSupport: 'partial' as const },
-  { id: 'tnfd', label: 'TNFD', fullName: 'Taskforce on Nature-related Financial Disclosures', scope: 'Nature & Biodiversity', recommended: false, platformSupport: 'emerging' as const },
+  { id: 'tnfd', label: 'TNFD', fullName: 'Taskforce on Nature-related Financial Disclosures', scope: 'Nature & Biodiversity', recommended: false, platformSupport: 'beta' as const },
 ];
 
 export const SECTION_LABELS: Record<string, string> = {
@@ -222,6 +236,7 @@ export const SECTION_LABELS: Record<string, string> = {
   'community-impact': 'Community Impact',
   'supply-chain': 'Supply Chain Analysis',
   facilities: 'Facility Emissions Breakdown',
+  'tnfd-nature': 'TNFD Nature & Biodiversity',
   'key-findings': 'Key Findings & Change Drivers',
   trends: 'Year-over-Year Trends',
   targets: 'Targets & Action Plans',

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { calculateViticultureImpacts } from '@/lib/viticulture-calculator';
+import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import type {
   Vineyard,
   VineyardGrowingProfile,
@@ -57,12 +58,25 @@ export function useVineyardDashboard(vineyardId: string): UseVineyardDashboardRe
       }
       setProfiles(profileList);
 
+      // Resolve AWARE water scarcity factor for vineyard country
+      let awareFactor = 1.0;
+      if (found.location_country_code) {
+        const supabase = getSupabaseBrowserClient();
+        const { data: awareData } = await supabase
+          .from('aware_factors')
+          .select('aware_factor')
+          .eq('country_code', found.location_country_code.toUpperCase())
+          .maybeSingle();
+        if (awareData?.aware_factor) awareFactor = Number(awareData.aware_factor);
+      }
+
       // Calculate impacts for each profile
       const impacts: VintageImpactSummary[] = profileList.map((profile) => {
         const result = calculateViticultureImpacts({
           climate_zone: found.climate_zone,
           certification: found.certification,
           location_country_code: found.location_country_code,
+          aware_factor: awareFactor,
           area_ha: profile.area_ha,
           soil_management: profile.soil_management,
           pruning_residue_returned: profile.pruning_residue_returned,

@@ -16,6 +16,7 @@ import { calculateOrchardImpacts } from './orchard-calculator';
 import { calculateMultiHarvestAverage } from './orchard-multi-harvest';
 import type { Orchard } from './types/orchard';
 import { getGridFactor } from './grid-emission-factors';
+import { getAwareFactor } from './calculations/water-risk';
 
 export interface FacilityAllocationInput {
   facilityId: string;
@@ -1190,10 +1191,13 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           origin_lng: material.origin_lng || null,
           origin_country_code: material.origin_country_code || null,
 
+          // ISO 14067 §7 biogenic carbon classification
+          is_biogenic_carbon: (material as any).is_biogenic_carbon || false,
+
           // Impact values
           impact_climate: adjustedClimate,
-          impact_climate_fossil: resolved.impact_climate_fossil,
-          impact_climate_biogenic: resolved.impact_climate_biogenic,
+          impact_climate_fossil: (material as any).is_biogenic_carbon ? 0 : resolved.impact_climate_fossil,
+          impact_climate_biogenic: (material as any).is_biogenic_carbon ? adjustedClimate : resolved.impact_climate_biogenic,
           impact_climate_dluc: resolved.impact_climate_dluc,
           // GHG gas breakdown (ISO 14067)
           ch4_kg: resolved.ch4_kg || 0,
@@ -1503,6 +1507,14 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       const profileCount = viticultureProfiles!.length;
       console.log(`[calculateProductCarbonFootprint] Processing viticulture for vineyard "${vineyard?.name || 'unknown'}" (${profileCount} vintage${profileCount > 1 ? 's' : ''})...`);
 
+      // Resolve AWARE water scarcity factor for vineyard country
+      const vineyardCountryCode = vineyard?.location_country_code;
+      let vineyardAwareFactor = 1.0;
+      if (vineyardCountryCode) {
+        const awareData = await getAwareFactor(supabase, vineyardCountryCode);
+        if (awareData) vineyardAwareFactor = Number(awareData.aware_factor);
+      }
+
       // Build inputs for all available vintages
       const vintageInputs = viticultureProfiles!.map((p: any) => ({
         vintage_year: p.vintage_year,
@@ -1510,6 +1522,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           climate_zone: vineyard?.climate_zone || 'temperate',
           certification: vineyard?.certification || 'conventional',
           location_country_code: vineyard?.location_country_code || null,
+          aware_factor: vineyardAwareFactor,
           area_ha: p.area_ha,
           soil_management: p.soil_management,
           pruning_residue_returned: p.pruning_residue_returned ?? true,
@@ -1532,6 +1545,15 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           previous_land_use_type: vineyard?.previous_land_use_type,
           land_conversion_year: vineyard?.land_conversion_year,
           vintage_year: p.vintage_year,
+          removal_verification_status: (p as any).removal_verification_status ?? 'unverified',
+          removal_verifier_body: (p as any).removal_verifier_body,
+          removal_verifier_standard: (p as any).removal_verifier_standard,
+          removal_verification_date: (p as any).removal_verification_date,
+          removal_verification_expiry: (p as any).removal_verification_expiry,
+          ecosystem_type: (p as any).ecosystem_type ?? undefined,
+          in_biodiversity_sensitive_area: (p as any).in_biodiversity_sensitive_area ?? false,
+          sensitive_area_details: (p as any).sensitive_area_details ?? undefined,
+          water_stress_index: (p as any).water_stress_index ?? undefined,
         },
       }));
 
@@ -1570,6 +1592,9 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       const waterPerBottle = totalBottles > 0
         ? vitResult.water_m3 / totalBottles
         : 0;
+      const waterScarcityPerBottle = totalBottles > 0
+        ? vitResult.water_scarcity_m3_eq / totalBottles
+        : 0;
       const landPerBottle = totalBottles > 0
         ? vitResult.flag_emissions.land_use_m2 / totalBottles
         : 0;
@@ -1581,6 +1606,9 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         : 0;
       const n2oKgPerBottle = totalBottles > 0
         ? vitResult.n2o_kg / totalBottles
+        : 0;
+      const lucPerBottle = totalBottles > 0
+        ? vitResult.flag_emissions.luc_co2e / totalBottles
         : 0;
 
       console.log(`[calculateProductCarbonFootprint] Viticulture per-bottle: ${totalBottles.toFixed(0)} bottles, fert+N2O=${fertFieldPerBottle.toFixed(4)}, fuel=${fuelPerBottle.toFixed(4)}, irrigation=${irrigationPerBottle.toFixed(4)}, removals=${removalsPerBottle.toFixed(4)}`);
@@ -1672,7 +1700,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           impact_climate_biogenic: 0, impact_climate_dluc: 0,
           ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
           impact_water: waterPerBottle,
-          impact_water_scarcity: waterPerBottle, // Simplified; AWARE weighting could be added
+          impact_water_scarcity: waterScarcityPerBottle, // AWARE-weighted
           impact_land: 0, impact_waste: 0,
           impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
           impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
@@ -1701,6 +1729,25 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         source_reference: `Vineyard: ${viticultureProfile.area_ha} ha (${vitResult.flag_emissions.land_use_m2.toFixed(0)} m2) / ${totalBottles.toFixed(0)} bottles`,
         data_quality_grade: 'HIGH',
       });
+
+      // Row 4b: Land Use Change (dLUC) — IPCC 2019, amortised over 20 years
+      if (lucPerBottle > 0) {
+        lcaMaterialsWithImpacts.push({
+          ...vitBaseRow,
+          name: '[Viticulture] Land Use Change (dLUC)',
+          material_name: '[Viticulture] Land Use Change (dLUC)',
+          impact_climate: lucPerBottle,
+          impact_climate_fossil: 0, impact_climate_biogenic: 0, impact_climate_dluc: lucPerBottle,
+          ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
+          impact_water: 0, impact_water_scarcity: 0, impact_land: 0, impact_waste: 0,
+          impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
+          impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+          confidence_score: 50,
+          methodology: 'IPCC 2019 direct land use change, amortised 20 years',
+          source_reference: `dLUC: ${vitResult.flag_emissions.luc_co2e.toFixed(1)} kg CO2e from ${vineyard?.previous_land_use_type || 'unknown'} conversion`,
+          data_quality_grade: 'MEDIUM',
+        });
+      }
 
       // Row 5: Soil Carbon Removals (FLAG: separate from emissions)
       if (removalsPerBottle > 0) {
@@ -1771,6 +1818,14 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       const orchardProfileCount = orchardProfiles!.length;
       console.log(`[calculateProductCarbonFootprint] Processing orchard for "${orchard?.name || 'unknown'}" (${orchardProfileCount} harvest${orchardProfileCount > 1 ? 's' : ''})...`);
 
+      // Resolve AWARE water scarcity factor for orchard country
+      const orchardCountryCode = orchard?.location_country_code;
+      let orchardAwareFactor = 1.0;
+      if (orchardCountryCode) {
+        const orchAwareData = await getAwareFactor(supabase, orchardCountryCode);
+        if (orchAwareData) orchardAwareFactor = Number(orchAwareData.aware_factor);
+      }
+
       // Build inputs for all available harvests
       const harvestInputs = orchardProfiles!.map((p: any) => ({
         harvest_year: p.harvest_year,
@@ -1779,6 +1834,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           climate_zone: orchard?.climate_zone || 'temperate',
           certification: orchard?.certification || 'conventional',
           location_country_code: orchard?.location_country_code || null,
+          aware_factor: orchardAwareFactor,
           area_ha: p.area_ha,
           soil_management: p.soil_management,
           pruning_residue_returned: p.pruning_residue_returned ?? true,
@@ -1803,6 +1859,15 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           previous_land_use_type: orchard?.previous_land_use_type,
           land_conversion_year: orchard?.land_conversion_year,
           harvest_year: p.harvest_year,
+          removal_verification_status: (p as any).removal_verification_status ?? 'unverified',
+          removal_verifier_body: (p as any).removal_verifier_body,
+          removal_verifier_standard: (p as any).removal_verifier_standard,
+          removal_verification_date: (p as any).removal_verification_date,
+          removal_verification_expiry: (p as any).removal_verification_expiry,
+          ecosystem_type: (p as any).ecosystem_type ?? undefined,
+          in_biodiversity_sensitive_area: (p as any).in_biodiversity_sensitive_area ?? false,
+          sensitive_area_details: (p as any).sensitive_area_details ?? undefined,
+          water_stress_index: (p as any).water_stress_index ?? undefined,
         },
       }));
 
@@ -1866,6 +1931,9 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       const orchWaterPerUnit = totalUnits > 0
         ? orchResult.water_m3 / totalUnits
         : 0;
+      const orchWaterScarcityPerUnit = totalUnits > 0
+        ? orchResult.water_scarcity_m3_eq / totalUnits
+        : 0;
       const orchLandPerUnit = totalUnits > 0
         ? orchResult.flag_emissions.land_use_m2 / totalUnits
         : 0;
@@ -1877,6 +1945,9 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         : 0;
       const orchN2oKgPerUnit = totalUnits > 0
         ? orchResult.n2o_kg / totalUnits
+        : 0;
+      const orchLucPerUnit = totalUnits > 0
+        ? orchResult.flag_emissions.luc_co2e / totalUnits
         : 0;
 
       console.log(`[calculateProductCarbonFootprint] Orchard per-unit: ${totalUnits.toFixed(0)} units (${fruitKgPerLitre} kg fruit/L), fert+N2O=${orchFertFieldPerUnit.toFixed(4)}, fuel=${orchFuelPerUnit.toFixed(4)}, transport=${orchTransportPerUnit.toFixed(4)}, removals=${orchRemovalsPerUnit.toFixed(4)}`);
@@ -1968,7 +2039,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           impact_climate_biogenic: 0, impact_climate_dluc: 0,
           ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
           impact_water: orchWaterPerUnit,
-          impact_water_scarcity: orchWaterPerUnit,
+          impact_water_scarcity: orchWaterScarcityPerUnit, // AWARE-weighted
           impact_land: 0, impact_waste: 0,
           impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
           impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
@@ -2017,6 +2088,25 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         source_reference: `Orchard: ${orchardProfile.area_ha} ha (${orchResult.flag_emissions.land_use_m2.toFixed(0)} m2) / ${totalUnits.toFixed(0)} units`,
         data_quality_grade: 'HIGH',
       });
+
+      // Row 5b: Land Use Change (dLUC) — IPCC 2019, amortised over 20 years
+      if (orchLucPerUnit > 0) {
+        lcaMaterialsWithImpacts.push({
+          ...orchBaseRow,
+          name: '[Orchard] Land Use Change (dLUC)',
+          material_name: '[Orchard] Land Use Change (dLUC)',
+          impact_climate: orchLucPerUnit,
+          impact_climate_fossil: 0, impact_climate_biogenic: 0, impact_climate_dluc: orchLucPerUnit,
+          ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
+          impact_water: 0, impact_water_scarcity: 0, impact_land: 0, impact_waste: 0,
+          impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
+          impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+          confidence_score: 50,
+          methodology: 'IPCC 2019 direct land use change, amortised 20 years',
+          source_reference: `dLUC: ${orchResult.flag_emissions.luc_co2e.toFixed(1)} kg CO2e from ${orchard?.previous_land_use_type || 'unknown'} conversion`,
+          data_quality_grade: 'MEDIUM',
+        });
+      }
 
       // Row 6: Soil Carbon Removals (FLAG: separate from emissions)
       if (orchRemovalsPerUnit > 0) {

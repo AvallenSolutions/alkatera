@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useAwareFactor } from '@/hooks/data/useAwareFactor';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -143,6 +144,7 @@ export function VineyardGrowingQuestionnaire({
   onComplete,
   onCancel,
 }: QuestionnaireProps) {
+  const { awareFactor: vineyardAwareFactor } = useAwareFactor(vineyardCountryCode);
   const currentYear = new Date().getFullYear();
   const [selectedVintageYear, setSelectedVintageYear] = useState<number>(
     existingProfile?.vintage_year ?? vintageYear ?? currentYear
@@ -158,6 +160,8 @@ export function VineyardGrowingQuestionnaire({
     area_ha: initSource?.area_ha ?? vineyardHectares,
     soil_management: (initSource?.soil_management ?? 'conventional_tillage') as SoilManagement,
     pruning_residue_returned: initSource?.pruning_residue_returned ?? true,
+    pruning_residue_management_type: (initSource as any)?.pruning_residue_management_type ?? 'in_field' as 'in_field' | 'removed_for_biomass' | 'chipped_and_spread',
+    pruning_residue_measured_kg_per_ha: (initSource as any)?.pruning_residue_measured_kg_per_ha ?? null as number | null,
     fertiliser_type: (initSource?.fertiliser_type ?? 'none') as FertiliserType,
     fertiliser_quantity_kg: initSource?.fertiliser_quantity_kg ?? 0,
     fertiliser_n_content_percent: initSource?.fertiliser_n_content_percent ?? 0,
@@ -183,6 +187,21 @@ export function VineyardGrowingQuestionnaire({
     soil_carbon_methodology: (initSource?.soil_carbon_methodology ?? '') as string,
     soil_carbon_lab_name: initSource?.soil_carbon_lab_name ?? '',
     soil_carbon_sampling_points: initSource?.soil_carbon_sampling_points ?? null as number | null,
+    // Removal verification (SBTi FLAG / GHG Protocol LSR v1.0)
+    removal_verification_status: (initSource as any)?.removal_verification_status ?? 'unverified' as string,
+    removal_verifier_body: (initSource as any)?.removal_verifier_body ?? '' as string,
+    removal_verifier_standard: (initSource as any)?.removal_verifier_standard ?? '' as string,
+    removal_verification_date: (initSource as any)?.removal_verification_date ?? '' as string,
+    removal_verification_expiry: (initSource as any)?.removal_verification_expiry ?? '' as string,
+    // TNFD location sensitivity
+    ecosystem_type: (initSource as any)?.ecosystem_type ?? '' as string,
+    in_biodiversity_sensitive_area: (initSource as any)?.in_biodiversity_sensitive_area ?? false,
+    sensitive_area_details: (initSource as any)?.sensitive_area_details ?? '' as string,
+    water_stress_index: (initSource as any)?.water_stress_index ?? '' as string,
+    // Land ownership boundary (GHG Protocol LSR v1.0)
+    land_ownership_type: (initSource as any)?.land_ownership_type ?? '' as string,
+    lease_expiry_date: (initSource as any)?.lease_expiry_date ?? '' as string,
+    is_boundary_controlled: (initSource as any)?.is_boundary_controlled ?? true,
   });
 
   // Soil carbon evidence state
@@ -242,7 +261,9 @@ export function VineyardGrowingQuestionnaire({
         vintage_year: selectedVintageYear,
         area_ha: form.area_ha,
         soil_management: form.soil_management,
-        pruning_residue_returned: form.pruning_residue_returned,
+        pruning_residue_returned: form.pruning_residue_management_type !== 'removed_for_biomass',
+        pruning_residue_management_type: form.pruning_residue_management_type,
+        pruning_residue_measured_kg_per_ha: form.pruning_residue_measured_kg_per_ha,
         fertiliser_type: form.fertiliser_type,
         fertiliser_quantity_kg: form.fertiliser_quantity_kg,
         fertiliser_n_content_percent: form.fertiliser_n_content_percent,
@@ -274,6 +295,35 @@ export function VineyardGrowingQuestionnaire({
         soil_carbon_sampling_points: form.has_measured_soil_carbon
           ? form.soil_carbon_sampling_points
           : null,
+        // Removal verification
+        removal_verification_status: form.has_measured_soil_carbon
+          ? form.removal_verification_status || 'unverified'
+          : 'unverified',
+        removal_verifier_body: form.has_measured_soil_carbon
+          ? form.removal_verifier_body || null
+          : null,
+        removal_verifier_standard: form.has_measured_soil_carbon
+          ? form.removal_verifier_standard || null
+          : null,
+        removal_verification_date: form.has_measured_soil_carbon
+          ? form.removal_verification_date || null
+          : null,
+        removal_verification_expiry: form.has_measured_soil_carbon
+          ? form.removal_verification_expiry || null
+          : null,
+        // TNFD location sensitivity
+        ecosystem_type: form.ecosystem_type || null,
+        in_biodiversity_sensitive_area: form.in_biodiversity_sensitive_area,
+        sensitive_area_details: form.in_biodiversity_sensitive_area
+          ? form.sensitive_area_details || null
+          : null,
+        water_stress_index: form.water_stress_index || null,
+        // Land ownership boundary
+        land_ownership_type: form.land_ownership_type || null,
+        lease_expiry_date: (form.land_ownership_type === 'leased' || form.land_ownership_type === 'rental')
+          ? form.lease_expiry_date || null
+          : null,
+        is_boundary_controlled: form.is_boundary_controlled,
         is_draft: asDraft,
       };
 
@@ -345,9 +395,12 @@ export function VineyardGrowingQuestionnaire({
     climate_zone: vineyardClimateZone,
     certification: vineyardCertification,
     location_country_code: vineyardCountryCode,
+    aware_factor: vineyardAwareFactor,
     area_ha: form.area_ha,
     soil_management: form.soil_management,
-    pruning_residue_returned: form.pruning_residue_returned,
+    pruning_residue_returned: form.pruning_residue_management_type !== 'removed_for_biomass',
+    pruning_residue_management_type: form.pruning_residue_management_type,
+    pruning_residue_measured_kg_per_ha: form.pruning_residue_measured_kg_per_ha ?? undefined,
     fertiliser_type: form.fertiliser_type,
     fertiliser_quantity_kg: form.fertiliser_quantity_kg,
     fertiliser_n_content_percent: form.fertiliser_n_content_percent,
@@ -369,6 +422,18 @@ export function VineyardGrowingQuestionnaire({
     previous_land_use_type: form.previous_land_use_type,
     land_conversion_year: form.land_conversion_year,
     vintage_year: selectedVintageYear,
+    land_ownership_type: (form.land_ownership_type || undefined) as 'owned' | 'leased' | 'rental' | 'contract_growing' | undefined,
+    lease_expiry_date: form.lease_expiry_date || null,
+    is_boundary_controlled: form.is_boundary_controlled,
+    removal_verification_status: (form.removal_verification_status || 'unverified') as 'unverified' | 'pending' | 'verified' | 'rejected' | 'expired',
+    removal_verifier_body: form.removal_verifier_body || undefined,
+    removal_verifier_standard: form.removal_verifier_standard || undefined,
+    removal_verification_date: form.removal_verification_date || undefined,
+    removal_verification_expiry: form.removal_verification_expiry || undefined,
+    ecosystem_type: (form.ecosystem_type || undefined) as any,
+    in_biodiversity_sensitive_area: form.in_biodiversity_sensitive_area,
+    sensitive_area_details: form.sensitive_area_details || undefined,
+    water_stress_index: (form.water_stress_index || undefined) as any,
   });
 
   return (
@@ -531,17 +596,193 @@ export function VineyardGrowingQuestionnaire({
 
                 <Separator />
 
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Vine prunings returned to soil</Label>
+                {/* Land & Tenure (GHG Protocol LSR v1.0) */}
+                <div className="grid gap-4">
+                  <div className="grid gap-2">
+                    <Label>Land ownership type</Label>
                     <p className="text-xs text-muted-foreground">
-                      Pruning residues left on or incorporated into the soil between rows
+                      GHG Protocol Land Sector and Removals Standard requires the operational boundary for land to be defined.
+                    </p>
+                    <Select
+                      value={form.land_ownership_type}
+                      onValueChange={(v) => updateForm({ land_ownership_type: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select ownership type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="owned">Owned</SelectItem>
+                        <SelectItem value="leased">Leased</SelectItem>
+                        <SelectItem value="rental">Rental</SelectItem>
+                        <SelectItem value="contract_growing">Contract growing</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {(form.land_ownership_type === 'leased' || form.land_ownership_type === 'rental') && (
+                    <div className="grid gap-2 max-w-[200px]">
+                      <Label htmlFor="lease-expiry">Lease expiry date</Label>
+                      <Input
+                        id="lease-expiry"
+                        type="date"
+                        value={form.lease_expiry_date}
+                        onChange={(e) => updateForm({ lease_expiry_date: e.target.value })}
+                      />
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Organisation controls land management</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Whether your organisation makes land management decisions (e.g. soil practices, inputs)
+                      </p>
+                    </div>
+                    <Switch
+                      checked={form.is_boundary_controlled}
+                      onCheckedChange={(v) => updateForm({ is_boundary_controlled: v })}
+                    />
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="grid gap-2">
+                  <Label>Pruning residue management</Label>
+                  <p className="text-xs text-muted-foreground">
+                    How vine prunings are managed after pruning. This affects the N2O calculation.
+                  </p>
+                  <Select
+                    value={form.pruning_residue_management_type}
+                    onValueChange={(v) => updateForm({
+                      pruning_residue_management_type: v as 'in_field' | 'removed_for_biomass' | 'chipped_and_spread',
+                      pruning_residue_returned: v !== 'removed_for_biomass',
+                    })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="in_field">Left in field to decompose (default)</SelectItem>
+                      <SelectItem value="removed_for_biomass">Removed for biomass / off-site use</SelectItem>
+                      <SelectItem value="chipped_and_spread">Chipped and spread back onto soil</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {form.pruning_residue_management_type !== 'removed_for_biomass' && (
+                  <div className="grid gap-2 max-w-[300px]">
+                    <Label htmlFor="pruning-dm">Measured pruning dry matter (kg/ha/yr)</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Optional. If you have measured data, enter it here. This improves data quality from secondary to primary.
+                    </p>
+                    <Input
+                      id="pruning-dm"
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={form.pruning_residue_measured_kg_per_ha ?? ''}
+                      onChange={(e) =>
+                        updateForm({
+                          pruning_residue_measured_kg_per_ha: e.target.value ? parseFloat(e.target.value) : null,
+                        })
+                      }
+                      placeholder="e.g. 2500"
+                    />
+                  </div>
+                )}
+
+                {/* TNFD Location & Nature */}
+                <Separator className="my-4" />
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-sm font-medium">Location & Nature (TNFD)</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Ecosystem and biodiversity data for nature-related disclosure.
                     </p>
                   </div>
-                  <Switch
-                    checked={form.pruning_residue_returned}
-                    onCheckedChange={(v) => updateForm({ pruning_residue_returned: v })}
-                  />
+
+                  <div className="grid gap-3">
+                    <div className="grid gap-1.5">
+                      <Label className="text-xs">Ecosystem type</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Select the dominant ecosystem type at your vineyard's location. This is used for TNFD nature impact disclosure.
+                      </p>
+                      <Select
+                        value={form.ecosystem_type}
+                        onValueChange={(v) => updateForm({ ecosystem_type: v })}
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Select ecosystem type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="temperate_forest">Temperate Forest</SelectItem>
+                          <SelectItem value="mediterranean">Mediterranean</SelectItem>
+                          <SelectItem value="grassland">Grassland</SelectItem>
+                          <SelectItem value="wetland">Wetland</SelectItem>
+                          <SelectItem value="shrubland">Shrubland</SelectItem>
+                          <SelectItem value="tropical_forest">Tropical Forest</SelectItem>
+                          <SelectItem value="boreal_forest">Boreal Forest</SelectItem>
+                          <SelectItem value="semi_arid">Semi-Arid</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label className="text-sm">Within or adjacent to a biodiversity-sensitive area?</Label>
+                        <p className="text-xs text-muted-foreground">
+                          This includes Key Biodiversity Areas, UNESCO World Heritage Sites, Ramsar wetlands, national parks, and other protected designations.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={form.in_biodiversity_sensitive_area}
+                        onCheckedChange={(v) => updateForm({ in_biodiversity_sensitive_area: v })}
+                      />
+                    </div>
+
+                    {form.in_biodiversity_sensitive_area && (
+                      <>
+                        <div className="grid gap-1.5">
+                          <Label className="text-xs">Sensitive area name and designation</Label>
+                          <Input
+                            value={form.sensitive_area_details}
+                            onChange={(e) => updateForm({ sensitive_area_details: e.target.value })}
+                            placeholder="e.g. South Downs National Park"
+                            className="h-9"
+                          />
+                        </div>
+
+                        <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                          <p className="text-xs text-amber-400">
+                            Operations within or adjacent to sensitive areas require enhanced disclosure under TNFD and CSRD ESRS E4. Consider commissioning a biodiversity impact assessment.
+                          </p>
+                        </div>
+                      </>
+                    )}
+
+                    <div className="grid gap-1.5">
+                      <Label className="text-xs">Water stress index</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Based on WRI Aqueduct or equivalent water risk atlas. If unsure, check aqueduct.wri.org for your postcode.
+                      </p>
+                      <Select
+                        value={form.water_stress_index}
+                        onValueChange={(v) => updateForm({ water_stress_index: v })}
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Select water stress level" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                          <SelectItem value="very_high">Very High</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 </div>
 
                 <Separator />
@@ -865,6 +1106,107 @@ export function VineyardGrowingQuestionnaire({
                             />
                           </label>
                         )}
+                      </div>
+
+                      {/* Removal verification */}
+                      <div className="space-y-3 pt-3 border-t border-border">
+                        <div>
+                          <Label className="text-sm font-medium">Removal verification</Label>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Third-party verification is required for SBTi FLAG submission and GHG Protocol LSR v1.0 compliance.
+                          </p>
+                        </div>
+
+                        <div className="grid gap-3">
+                          <div className="grid gap-1.5">
+                            <Label className="text-xs">Verification status</Label>
+                            <Select
+                              value={form.removal_verification_status}
+                              onValueChange={(v) => updateForm({ removal_verification_status: v })}
+                            >
+                              <SelectTrigger className="h-9">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="unverified">Unverified</SelectItem>
+                                <SelectItem value="pending">Pending verification</SelectItem>
+                                <SelectItem value="verified">Verified</SelectItem>
+                                <SelectItem value="rejected">Rejected</SelectItem>
+                                <SelectItem value="expired">Expired</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {form.removal_verification_status !== 'unverified' && (
+                            <>
+                              <div className="grid gap-1.5">
+                                <Label className="text-xs">Verification body</Label>
+                                <Input
+                                  value={form.removal_verifier_body}
+                                  onChange={(e) => updateForm({ removal_verifier_body: e.target.value })}
+                                  placeholder="e.g. SCS Global Services, Verra"
+                                  className="h-9"
+                                />
+                              </div>
+
+                              <div className="grid gap-1.5">
+                                <Label className="text-xs">Verification standard</Label>
+                                <Select
+                                  value={form.removal_verifier_standard}
+                                  onValueChange={(v) => updateForm({ removal_verifier_standard: v })}
+                                >
+                                  <SelectTrigger className="h-9">
+                                    <SelectValue placeholder="Select standard" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="ISO 14064-3">ISO 14064-3</SelectItem>
+                                    <SelectItem value="Verra VCS">Verra VCS</SelectItem>
+                                    <SelectItem value="Gold Standard">Gold Standard</SelectItem>
+                                    <SelectItem value="Plan Vivo">Plan Vivo</SelectItem>
+                                    <SelectItem value="Other">Other</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="grid gap-1.5">
+                                  <Label className="text-xs">Verification date</Label>
+                                  <Input
+                                    type="date"
+                                    value={form.removal_verification_date}
+                                    onChange={(e) => updateForm({ removal_verification_date: e.target.value })}
+                                    className="h-9"
+                                  />
+                                </div>
+                                <div className="grid gap-1.5">
+                                  <Label className="text-xs">Expiry date</Label>
+                                  <Input
+                                    type="date"
+                                    value={form.removal_verification_expiry}
+                                    onChange={(e) => updateForm({ removal_verification_expiry: e.target.value })}
+                                    className="h-9"
+                                  />
+                                </div>
+                              </div>
+                            </>
+                          )}
+
+                          {form.removal_verification_status === 'unverified' && (
+                            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                              <p className="text-xs text-amber-400">
+                                Third-party verification to ISO 14064-3 or equivalent is required for SBTi FLAG submission. Unverified removals will be flagged in reports.
+                              </p>
+                            </div>
+                          )}
+
+                          {form.removal_verification_status === 'expired' && (
+                            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                              <p className="text-xs text-amber-400">
+                                Removal verification has expired. Removals will not meet LSR standard until re-verification is completed.
+                              </p>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )}

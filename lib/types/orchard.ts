@@ -196,6 +196,10 @@ export interface OrchardCalculatorInput {
   area_ha: number;
   soil_management: string; // SoilManagement
   pruning_residue_returned?: boolean;
+  /** How tree prunings are managed. Determines N2O calculation pathway. */
+  pruning_residue_management_type?: 'in_field' | 'removed_for_biomass' | 'chipped_and_spread';
+  /** Measured dry matter from prunings (kg/ha/yr). Overrides per-crop-type default. */
+  pruning_residue_measured_kg_per_ha?: number;
   fertiliser_type: string; // FertiliserType
   fertiliser_quantity_kg: number;
   fertiliser_n_content_percent: number;
@@ -226,6 +230,36 @@ export interface OrchardCalculatorInput {
   land_conversion_year?: number | null;
   /** Current harvest year (for LUC amortisation calculation) */
   harvest_year?: number;
+
+  // Land ownership boundary (GHG Protocol LSR v1.0)
+  /** Operational boundary: owned, leased, rental, or contract growing */
+  land_ownership_type?: 'owned' | 'leased' | 'rental' | 'contract_growing';
+  /** Lease expiry date (required when leased or rental) */
+  lease_expiry_date?: string | null;
+  /** Whether the organisation controls land management decisions */
+  is_boundary_controlled?: boolean;
+
+  // Removal verification (SBTi FLAG / GHG Protocol LSR v1.0)
+  /** Third-party verification status for soil carbon removal claims */
+  removal_verification_status?: 'unverified' | 'pending' | 'verified' | 'rejected' | 'expired';
+  /** Name of the verification body */
+  removal_verifier_body?: string;
+  /** Verification standard used */
+  removal_verifier_standard?: string;
+  /** Date verification was completed */
+  removal_verification_date?: string;
+  /** Date verification expires */
+  removal_verification_expiry?: string;
+
+  // TNFD LEAP Locate phase
+  /** Ecosystem type at the orchard location (IPBES classification) */
+  ecosystem_type?: 'temperate_forest' | 'mediterranean' | 'grassland' | 'wetland' | 'shrubland' | 'tropical_forest' | 'boreal_forest' | 'semi_arid' | 'other';
+  /** Whether the site is within or adjacent to a Key Biodiversity Area or protected area */
+  in_biodiversity_sensitive_area?: boolean;
+  /** Name/designation of the sensitive area if applicable */
+  sensitive_area_details?: string;
+  /** WRI Aqueduct water stress classification for the location */
+  water_stress_index?: 'low' | 'medium' | 'high' | 'very_high';
 }
 
 // ---------------------------------------------------------------------------
@@ -268,8 +302,10 @@ export interface OrchardImpactResult {
     soil_carbon_co2e: number;
     /** Source methodology for the removal estimate */
     methodology: 'practice_based_default' | 'measured';
-    /** Whether the value has been independently verified */
+    /** Whether the value has been independently verified (backward compat) */
     is_verified: boolean;
+    /** Third-party verification status */
+    removal_verification_status: 'unverified' | 'pending' | 'verified' | 'rejected' | 'expired';
     /** Whether removals meet GHG Protocol Land Sector and Removals Standard */
     removals_meet_lsr_standard: boolean;
     /** Warning when removals use practice-based defaults without third-party verification */
@@ -307,6 +343,16 @@ export interface OrchardImpactResult {
   human_toxicity_non_carcinogenic: number;
   /** Freshwater eutrophication (kg P eq) - from nutrient runoff */
   freshwater_eutrophication: number;
+  /** Terrestrial acidification (kg SO₂ eq) - from diesel combustion and ammonia volatilisation */
+  terrestrial_acidification: number;
+
+  // TNFD LEAP Locate phase metadata (pass-through from input)
+  tnfd_location?: {
+    ecosystem_type?: string;
+    in_biodiversity_sensitive_area: boolean;
+    sensitive_area_details?: string;
+    water_stress_index?: string;
+  };
 
   // GHG gas breakdown (ISO 14067)
   /** Actual N2O mass emitted (kg) - not CO2e */
@@ -328,6 +374,14 @@ export interface OrchardImpactResult {
   data_quality_grade: 'HIGH' | 'MEDIUM' | 'LOW';
   /** Human-readable methodology notes */
   methodology_notes: string;
+
+  // FLAG threshold (SBTi FLAG Guidance v1.2)
+  /** Percentage of total emissions that are FLAG-classified */
+  flag_emissions_pct: number;
+  /** True if FLAG emissions >= 20% of total, triggering mandatory FLAG target-setting */
+  flag_threshold_exceeded: boolean;
+  /** Warning message when threshold is exceeded */
+  flag_threshold_message?: string;
 }
 
 // ---------------------------------------------------------------------------

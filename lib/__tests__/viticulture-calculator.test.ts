@@ -151,7 +151,7 @@ describe('calculateViticultureImpacts', () => {
       expect(result.flag_removals.is_verified).toBe(false);
     });
 
-    it('should use measured override when provided and mark as verified', () => {
+    it('should use measured override when provided', () => {
       const input: ViticultureCalculatorInput = {
         ...UK_VINEYARD_BASELINE,
         soil_carbon_override_kg_co2e_per_ha: 800,
@@ -160,7 +160,35 @@ describe('calculateViticultureImpacts', () => {
 
       expect(result.flag_removals.soil_carbon_co2e).toEqual(800 * 5);
       expect(result.flag_removals.methodology).toBe('measured');
+      // is_verified requires removal_verification_status: 'verified'
+      expect(result.flag_removals.is_verified).toBe(false);
+    });
+
+    it('should mark as verified when removal_verification_status is verified', () => {
+      const input: ViticultureCalculatorInput = {
+        ...UK_VINEYARD_BASELINE,
+        soil_carbon_override_kg_co2e_per_ha: 800,
+        removal_verification_status: 'verified',
+        removal_verification_expiry: '2030-01-01',
+      };
+      const result = calculateViticultureImpacts(input);
+
       expect(result.flag_removals.is_verified).toBe(true);
+      expect(result.flag_removals.removal_verification_status).toBe('verified');
+      expect(result.flag_removals.removals_meet_lsr_standard).toBe(true);
+    });
+
+    it('should not mark as verified when verification has expired', () => {
+      const input: ViticultureCalculatorInput = {
+        ...UK_VINEYARD_BASELINE,
+        soil_carbon_override_kg_co2e_per_ha: 800,
+        removal_verification_status: 'verified',
+        removal_verification_expiry: '2020-01-01', // expired
+      };
+      const result = calculateViticultureImpacts(input);
+
+      expect(result.flag_removals.is_verified).toBe(false);
+      expect(result.flag_removals.removals_meet_lsr_standard).toBe(false);
     });
 
     it('should return zero removals for conventional tillage', () => {
@@ -804,21 +832,29 @@ describe('calculateViticultureImpacts', () => {
       expect(result.flag_removals.removals_meet_lsr_standard).toBe(false);
     });
 
-    it('should set removals_meet_lsr_standard to true for measured values', () => {
-      const result = calculateViticultureImpacts({
+    it('should set removals_meet_lsr_standard to true only for measured + verified values', () => {
+      // Measured but unverified: does NOT meet LSR
+      const unverified = calculateViticultureImpacts({
         ...UK_VINEYARD_BASELINE,
         soil_carbon_override_kg_co2e_per_ha: 800,
       });
+      expect(unverified.flag_removals.removals_meet_lsr_standard).toBe(false);
 
-      expect(result.flag_removals.removals_meet_lsr_standard).toBe(true);
+      // Measured + verified: meets LSR
+      const verified = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        soil_carbon_override_kg_co2e_per_ha: 800,
+        removal_verification_status: 'verified',
+        removal_verification_expiry: '2030-01-01',
+      });
+      expect(verified.flag_removals.removals_meet_lsr_standard).toBe(true);
     });
 
-    it('should include warning for practice-based removals with positive values', () => {
+    it('should include warning for unverified removals with positive values', () => {
       const result = calculateViticultureImpacts(ORGANIC_VINEYARD);
 
       expect(result.flag_removals.removals_warning).toBeDefined();
-      expect(result.flag_removals.removals_warning).toContain('Land Sector and Removals Standard');
-      expect(result.flag_removals.removals_warning).toContain('third-party verification');
+      expect(result.flag_removals.removals_warning).toContain('verification');
     });
 
     it('should not include warning when removals are zero', () => {
@@ -829,19 +865,133 @@ describe('calculateViticultureImpacts', () => {
       expect(result.flag_removals.removals_warning).toBeUndefined();
     });
 
-    it('should not include warning for measured removals', () => {
+    it('should not include warning for verified measured removals', () => {
       const result = calculateViticultureImpacts({
         ...UK_VINEYARD_BASELINE,
         soil_carbon_override_kg_co2e_per_ha: 500,
+        removal_verification_status: 'verified',
+        removal_verification_expiry: '2030-01-01',
       });
 
       expect(result.flag_removals.removals_warning).toBeUndefined();
+    });
+
+    it('should include expired warning when verification has expired', () => {
+      const result = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        soil_management: 'cover_cropping',
+        soil_carbon_override_kg_co2e_per_ha: 500,
+        removal_verification_status: 'verified',
+        removal_verification_expiry: '2020-01-01', // expired
+      });
+
+      expect(result.flag_removals.removals_warning).toBeDefined();
+      expect(result.flag_removals.removals_warning).toContain('expired');
     });
 
     it('should reference GHG Protocol LSR V1.0 in methodology notes', () => {
       const result = calculateViticultureImpacts(UK_VINEYARD_BASELINE);
 
       expect(result.methodology_notes).toContain('GHG Protocol LSR V1.0');
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // Phase 2 & 3: AWARE, Acidification, TNFD, Verification Status
+  // --------------------------------------------------------------------------
+
+  describe('AWARE water scarcity factor', () => {
+    it('should apply AWARE factor to water scarcity calculation', () => {
+      const input: ViticultureCalculatorInput = {
+        ...IRRIGATED_VINEYARD,
+        aware_factor: 5.0,
+      };
+      const result = calculateViticultureImpacts(input);
+
+      expect(result.water_m3).toBe(200 * 5); // water_m3_per_ha * area_ha
+      expect(result.water_scarcity_m3_eq).toBe(200 * 5 * 5.0); // water * AWARE factor
+    });
+
+    it('should default AWARE factor to 1.0', () => {
+      const result = calculateViticultureImpacts(IRRIGATED_VINEYARD);
+
+      expect(result.water_m3).toBe(200 * 5);
+      expect(result.water_scarcity_m3_eq).toBe(200 * 5 * 1.0);
+    });
+  });
+
+  describe('terrestrial acidification', () => {
+    it('should include terrestrial_acidification field in result', () => {
+      const result = calculateViticultureImpacts(UK_VINEYARD_BASELINE);
+
+      expect(result).toHaveProperty('terrestrial_acidification');
+      expect(typeof result.terrestrial_acidification).toBe('number');
+    });
+
+    it('should default to zero (placeholder constant)', () => {
+      const result = calculateViticultureImpacts(UK_VINEYARD_BASELINE);
+
+      // VINE_SO2_EQ_PER_HA_DEFAULT is 0 until real factor is sourced
+      expect(result.terrestrial_acidification).toBe(0);
+    });
+  });
+
+  describe('TNFD location metadata pass-through', () => {
+    it('should include tnfd_location when ecosystem data is provided', () => {
+      const input: ViticultureCalculatorInput = {
+        ...UK_VINEYARD_BASELINE,
+        ecosystem_type: 'mediterranean',
+        in_biodiversity_sensitive_area: true,
+        sensitive_area_details: 'South Downs National Park',
+        water_stress_index: 'high',
+      };
+      const result = calculateViticultureImpacts(input);
+
+      expect(result.tnfd_location).toBeDefined();
+      expect(result.tnfd_location!.ecosystem_type).toBe('mediterranean');
+      expect(result.tnfd_location!.in_biodiversity_sensitive_area).toBe(true);
+      expect(result.tnfd_location!.sensitive_area_details).toBe('South Downs National Park');
+      expect(result.tnfd_location!.water_stress_index).toBe('high');
+    });
+
+    it('should not include tnfd_location when no ecosystem data provided', () => {
+      const result = calculateViticultureImpacts(UK_VINEYARD_BASELINE);
+
+      expect(result.tnfd_location).toBeUndefined();
+    });
+
+    it('should not affect emissions or removals calculations', () => {
+      const baseline = calculateViticultureImpacts(UK_VINEYARD_BASELINE);
+      const withTnfd = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        ecosystem_type: 'temperate_forest',
+        in_biodiversity_sensitive_area: true,
+        water_stress_index: 'very_high',
+      });
+
+      expect(withTnfd.flag_emissions.total_flag_co2e).toBe(baseline.flag_emissions.total_flag_co2e);
+      expect(withTnfd.non_flag_emissions.total_non_flag_co2e).toBe(baseline.non_flag_emissions.total_non_flag_co2e);
+      expect(withTnfd.total_emissions).toBe(baseline.total_emissions);
+    });
+  });
+
+  describe('removal verification status in output', () => {
+    it('should include removal_verification_status in flag_removals', () => {
+      const result = calculateViticultureImpacts(UK_VINEYARD_BASELINE);
+
+      expect(result.flag_removals).toHaveProperty('removal_verification_status');
+      expect(result.flag_removals.removal_verification_status).toBe('unverified');
+    });
+
+    it('should pass through the provided verification status', () => {
+      const input: ViticultureCalculatorInput = {
+        ...UK_VINEYARD_BASELINE,
+        soil_carbon_override_kg_co2e_per_ha: 500,
+        removal_verification_status: 'pending',
+      };
+      const result = calculateViticultureImpacts(input);
+
+      expect(result.flag_removals.removal_verification_status).toBe('pending');
     });
   });
 });

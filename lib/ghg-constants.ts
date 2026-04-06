@@ -384,3 +384,21 @@ export const ORCHARD_TRANSPORT_EF: Record<string, number> = {
   road: 0.10516,
   rail: 0.02768,
 };
+
+/**
+ * Terrestrial acidification placeholder defaults (kg SO₂ eq per ha per year).
+ *
+ * Terrestrial acidification arises from SO₂ and NOx emissions depositing
+ * as acid rain. For vineyards and orchards, the primary sources are diesel
+ * combustion and ammonia volatilisation from fertiliser application.
+ *
+ * These default to zero until a validated characterisation factor is sourced
+ * from ecoinvent or peer-reviewed LCA study. When a factor is confirmed,
+ * replace these values and remove the zero default.
+ *
+ * @see ReCiPe 2016 Midpoint (Hierarchist) — Terrestrial Acidification
+ */
+export const VINE_SO2_EQ_PER_HA_DEFAULT = 0;
+
+/** @see VINE_SO2_EQ_PER_HA_DEFAULT for documentation */
+export const ORCHARD_SO2_EQ_PER_HA_DEFAULT = 0;

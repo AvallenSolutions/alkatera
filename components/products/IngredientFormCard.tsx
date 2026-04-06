@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Trash2, Building2, Database, Sprout, Info, MapPin, Calculator, Award, Layers, Package, ChevronDown, ChevronUp, Plus, Loader2, Leaf, Shield, CheckCircle2, Droplets, TreePine } from "lucide-react";
+import { Trash2, Building2, Database, Sprout, Info, MapPin, Calculator, Award, Layers, Package, ChevronDown, ChevronUp, Plus, Loader2, Leaf, Shield, CheckCircle2, Droplets, TreePine, HelpCircle } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { InlineIngredientSearch } from "@/components/lca/InlineIngredientSearch";
 import { VineyardSelector, type VineyardOption } from "@/components/vineyards/VineyardSelector";
@@ -75,6 +75,8 @@ export interface IngredientFormData {
   // Self-grown ingredient (e.g. vineyard grapes)
   is_self_grown?: boolean;
   vineyard_id?: string | null;
+  // ISO 14067 §7: biogenic carbon classification
+  is_biogenic_carbon?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -920,6 +922,34 @@ export function IngredientFormCard({
                 Organic certified
               </Label>
             </div>
+
+            {!ingredient.data_source && (
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id={`biogenic-${ingredient.tempId}`}
+                checked={ingredient.is_biogenic_carbon || false}
+                onCheckedChange={(checked) =>
+                  onUpdate(ingredient.tempId, { is_biogenic_carbon: checked as boolean })
+                }
+              />
+              <Label
+                htmlFor={`biogenic-${ingredient.tempId}`}
+                className="text-sm font-normal cursor-pointer"
+              >
+                Biogenic carbon source
+              </Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-xs">
+                    Tick if the carbon emissions from this material arise from biological processes (e.g. fermentation CO₂). Do not tick for fossil fuels, chemicals, or packaging.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            )}
 
             {showViticultureToggle && (
             <div className="flex items-center space-x-2">

@@ -507,9 +507,238 @@ function buildCarbonOriginSlides(config: ReportConfig, data: ReportData): SlideC
 **Biogenic carbon** is absorbed and released by biological systems (crops, biomass). Net biogenic CO2 can be negative (carbon sequestration).
 **Land use change** emissions arise from conversion of land (e.g. deforestation) for raw material production.
 
-*Based on ${data.products.length} product LCA${data.products.length > 1 ? 's' : ''} | ISO 14067 classification*
+*Based on ${data.products.length} product LCA${data.products.length > 1 ? 's' : ''} | Classification per ISO 14067:2018 Section 7*
+
+*Biogenic carbon refers to CO₂ absorbed and released through natural biological cycles (e.g. fermentation, plant growth). Land use change emissions arise from conversion of land to agricultural or other use, amortised over 20 years per IPCC and GHG Protocol methodology.*
 `.trim(),
   }];
+}
+
+/**
+ * Generates FLAG land-based removals slides
+ * Reports soil carbon sequestration separately per SBTi FLAG Guidance v1.2
+ */
+function buildFlagRemovalsSlides(config: ReportConfig, data: ReportData): SlideContent[] {
+  const flagRemovals = (data as any).flagRemovals;
+
+  if (!flagRemovals || flagRemovals.totalRemovals === 0) {
+    return [{
+      slideNumber: 0,
+      title: 'FLAG Land-Based Removals',
+      content: `
+# FLAG Land-Based Removals
+
+## No Removal Data Available
+
+No soil carbon sequestration data has been recorded for the reporting period.
+
+Soil carbon removals are calculated from vineyard and orchard growing profiles where soil management practices (e.g. cover cropping, composting, no-till) promote carbon sequestration.
+`.trim(),
+    }];
+  }
+
+  const verifiedLabel = flagRemovals.allVerified ? 'Verified' : 'Partially Verified / Unverified';
+  const verifiedIndicator = flagRemovals.allVerified ? 'All profiles verified' : 'One or more profiles require third-party verification';
+
+  let content = `
+# FLAG Land-Based Removals
+
+## Soil Carbon Sequestration
+
+| Metric | Value |
+|--------|-------|
+| **Total removals** | ${formatNumber(flagRemovals.totalRemovals)} kg CO2e |
+| **Verification status** | ${verifiedLabel} |
+| **Profiles with removals** | ${flagRemovals.profileCount} |
+
+---
+
+## Verification Status: ${verifiedIndicator}
+`;
+
+  if (!flagRemovals.allMeetLsr) {
+    content += `
+> **Note:** One or more removal claims do not currently meet the requirements of the GHG Protocol Land Sector and Removals Standard v1.0. Third-party verification to ISO 14064-3 or equivalent is required for SBTi FLAG submission.
+`;
+  }
+
+  content += `
+---
+
+Per GHG Protocol Land Sector and Removals Standard v1.0, carbon removals are reported separately from emissions and are not netted against the carbon footprint. Removals represent CO2 sequestered in soils through management practices such as cover cropping, composting, and reduced tillage.
+
+*Methodology: practice-based defaults per SBTi FLAG Guidance v1.2, or measured soil organic carbon where third-party verified.*
+`;
+
+  return [{
+    slideNumber: 0,
+    title: 'FLAG Land-Based Removals',
+    content: content.trim(),
+  }];
+}
+
+/**
+ * Generates TNFD Nature & Biodiversity slides
+ * Structured per the TNFD LEAP Framework (Locate, Evaluate, Assess, Prepare)
+ */
+function buildTnfdNatureSlides(config: ReportConfig, data: ReportData): SlideContent[] {
+  const tnfd = (data as any).tnfdNature;
+  const slides: SlideContent[] = [];
+
+  // --- Locate ---
+  let locateContent = `
+# TNFD Nature & Biodiversity
+
+## Locate: Production Sites and Ecosystem Context
+`;
+
+  if (tnfd?.sites && tnfd.sites.length > 0) {
+    locateContent += `
+| Site | Country | Ecosystem Type | Sensitive Area | Details | Water Stress |
+|------|---------|---------------|----------------|---------|-------------|
+`;
+    for (const site of tnfd.sites) {
+      locateContent += `| ${site.name} | ${site.country || 'N/A'} | ${site.ecosystemType || 'Not set'} | ${site.inSensitiveArea ? 'Yes' : 'No'} | ${site.sensitiveAreaDetails || '-'} | ${site.waterStress || 'Not set'} |\n`;
+    }
+  } else {
+    locateContent += `\nNo vineyard or orchard site data available. Complete growing profile questionnaires to populate this section.\n`;
+  }
+
+  if (tnfd?.sitesWithGaps > 0) {
+    locateContent += `\n> **Data gap:** Location sensitivity data incomplete for ${tnfd.sitesWithGaps} site(s). Complete vineyard/orchard profile questionnaires to improve disclosure.\n`;
+  }
+
+  slides.push({ slideNumber: 0, title: 'TNFD Locate', content: locateContent.trim() });
+
+  // --- Evaluate: Dependencies and Impacts ---
+  let evaluateContent = `
+## Evaluate: Nature Dependencies and Impacts
+
+### Dependencies
+`;
+
+  const assessment = tnfd?.assessment;
+  if (assessment) {
+    evaluateContent += `
+| Ecosystem Service | Dependency Level | Notes |
+|-------------------|-----------------|-------|
+| Water availability | ${assessment.waterDependency || 'Not assessed'} | ${assessment.waterDependencyNotes || '-'} |
+| Pollination services | ${assessment.pollinationDependency || 'Not assessed'} | ${assessment.pollinationDependencyNotes || '-'} |
+| Soil health | ${assessment.soilHealthDependency || 'Not assessed'} | ${assessment.soilHealthDependencyNotes || '-'} |
+
+### Impact Metrics
+
+| Impact Metric | Value | Unit | Source |
+|--------------|-------|------|--------|
+| Total land under management | ${assessment.landUseHa != null ? formatNumber(assessment.landUseHa) : 'N/A'} | ha | Nature assessment |
+`;
+
+    if (tnfd?.lcaImpacts) {
+      const lca = tnfd.lcaImpacts;
+      evaluateContent += `| Land use (ReCiPe 2016) | ${formatNumber(lca.landUse)} | m\\u00b2a crop eq | LCA calculation |
+| Terrestrial ecotoxicity | ${formatNumber(lca.terrestrialEcotoxicity)} | kg 1,4-DCB eq | LCA calculation |
+| Freshwater eutrophication | ${formatNumber(lca.freshwaterEutrophication)} | kg P eq | LCA calculation |
+| Terrestrial acidification | ${formatNumber(lca.terrestrialAcidification)} | kg SO\\u00b2 eq | LCA calculation |
+| Freshwater consumption | ${formatNumber(lca.waterConsumption)} | m\\u00b3 | LCA calculation |
+| Water scarcity impact | ${formatNumber(lca.waterScarcity)} | m\\u00b3 eq | LCA (AWARE-weighted) |
+`;
+    }
+
+    if (assessment.pollutionN != null) {
+      evaluateContent += `| Nitrogen to freshwater | ${formatNumber(assessment.pollutionN)} | kg N | Nature assessment |\n`;
+    }
+    if (assessment.pollutionP != null) {
+      evaluateContent += `| Phosphorus to freshwater | ${formatNumber(assessment.pollutionP)} | kg P | Nature assessment |\n`;
+    }
+    if (assessment.pesticideKg != null) {
+      evaluateContent += `| Pesticides applied | ${formatNumber(assessment.pesticideKg)} | kg active ingredient | Nature assessment |\n`;
+    }
+  } else {
+    evaluateContent += `\nNature dependency and impact assessment not yet completed. Complete the TNFD questionnaire to populate this section.\n`;
+  }
+
+  if (tnfd?.singleScore != null) {
+    evaluateContent += `
+---
+
+### EF 3.1 Nature Single Score
+
+**Normalised score: ${formatNumber(tnfd.singleScore)} person-equivalents**
+
+This score aggregates the four ReCiPe 2016 Midpoint nature impact categories using EF 3.1 normalisation and weighting factors (Sala et al., 2021).
+`;
+  }
+
+  slides.push({ slideNumber: 0, title: 'TNFD Evaluate', content: evaluateContent.trim() });
+
+  // --- Assess ---
+  let assessContent = `
+## Assess: Nature Risk Materiality
+`;
+
+  if (assessment?.materiality) {
+    const materialityLabels: Record<string, string> = {
+      not_material: 'Not Material',
+      potentially_material: 'Potentially Material',
+      material: 'Material',
+      highly_material: 'Highly Material',
+    };
+    assessContent += `
+**Materiality determination:** ${materialityLabels[assessment.materiality] || assessment.materiality}
+
+${assessment.materialityRationale ? `**Rationale:** ${assessment.materialityRationale}` : ''}
+
+${assessment.physicalRiskNotes ? `**Physical risks:** ${assessment.physicalRiskNotes}` : ''}
+
+${assessment.transitionRiskNotes ? `**Transition risks:** ${assessment.transitionRiskNotes}` : ''}
+`;
+  } else {
+    assessContent += `\nNot yet assessed. TNFD recommends all organisations assess the materiality of nature-related risks and opportunities.\n`;
+  }
+
+  // LEAP status table
+  if (tnfd?.leapStatus) {
+    assessContent += `
+---
+
+### TNFD LEAP Framework Coverage
+
+| Phase | Status | Implemented | Gaps |
+|-------|--------|-------------|------|
+`;
+    for (const phase of tnfd.leapStatus) {
+      assessContent += `| ${phase.phase} | ${phase.status} | ${phase.implemented} | ${phase.gaps} |\n`;
+    }
+  }
+
+  slides.push({ slideNumber: 0, title: 'TNFD Assess', content: assessContent.trim() });
+
+  // --- Prepare ---
+  let prepareContent = `
+## Prepare: Nature-Positive Targets
+`;
+
+  if (assessment?.hasNaturePositiveTarget) {
+    prepareContent += `
+**Target year:** ${assessment.targetYear || 'Not specified'}
+**Baseline year:** ${assessment.baselineYear || 'Not specified'}
+**Description:** ${assessment.targetDescription || 'Not specified'}
+`;
+  } else {
+    prepareContent += `
+No nature-positive target set. ESRS E4-4 requires disclosure of any time-bound targets related to biodiversity and ecosystems.
+`;
+  }
+
+  prepareContent += `
+---
+
+*Nature impact calculations use ReCiPe 2016 Midpoint (Hierarchist) characterisation factors. EF 3.1 normalisation factors from Sala et al. (2021), JRC Technical Report EUR 30735 EN. Performance benchmarks are internal estimates derived from beverage sector LCA studies and are not regulatory thresholds. TNFD and SBTN do not prescribe specific impact targets.*
+`;
+
+  slides.push({ slideNumber: 0, title: 'TNFD Prepare', content: prepareContent.trim() });
+
+  return slides;
 }
 
 /**
@@ -554,6 +783,8 @@ ${impacts.waterScarcity !== undefined ? `| **Water Scarcity** | ${formatNumber(i
 ---
 
 *Aggregated across ${data.products.length} product LCA${data.products.length > 1 ? 's' : ''} | ReCiPe 2016 Midpoint (H)*
+
+*Water scarcity assessed using AWARE v1.3 characterisation factors (Boulay et al., 2018). A factor of 1.0 indicates global average scarcity; higher values indicate greater water stress at the production location.*
 `.trim(),
   }];
 }
@@ -1444,6 +1675,8 @@ export function buildReportContent(config: ReportConfig, data: ReportData, chart
     'scope-1-2-3': () => buildEmissionsSlides(config, data),
     'ghg-inventory': () => buildGHGInventorySlides(config, data),
     'carbon-origin': () => buildCarbonOriginSlides(config, data),
+    'flag-removals': () => buildFlagRemovalsSlides(config, data),
+    'tnfd-nature': () => buildTnfdNatureSlides(config, data),
     'trends': () => buildTrendSlides(config, data),
     'product-footprints': () => buildProductSlides(config, data),
     'multi-capital': () => buildMultiCapitalSlides(config, data),
@@ -1544,43 +1777,43 @@ export function buildReportContent(config: ReportConfig, data: ReportData, chart
 function getAudienceOrderedSections(audience: string, selectedSections: string[]): string[] {
   const AUDIENCE_SECTION_ORDER: Record<string, string[]> = {
     'investors': [
-      'executive-summary', 'scope-1-2-3', 'carbon-origin', 'trends', 'targets',
-      'impact-valuation', 'governance', 'product-footprints', 'multi-capital',
+      'executive-summary', 'scope-1-2-3', 'carbon-origin', 'flag-removals', 'trends', 'targets',
+      'impact-valuation', 'governance', 'product-footprints', 'multi-capital', 'tnfd-nature',
       'people-culture', 'community-impact', 'supply-chain',
       'facilities', 'company-overview', 'methodology', 'regulatory',
       'ghg-inventory', 'appendix',
     ],
     'customers': [
       'executive-summary', 'company-overview', 'community-impact',
-      'people-culture', 'product-footprints', 'multi-capital', 'impact-valuation',
-      'scope-1-2-3', 'carbon-origin', 'governance', 'supply-chain', 'targets',
+      'people-culture', 'product-footprints', 'multi-capital', 'tnfd-nature', 'impact-valuation',
+      'scope-1-2-3', 'carbon-origin', 'flag-removals', 'governance', 'supply-chain', 'targets',
       'facilities', 'trends', 'methodology', 'ghg-inventory',
       'regulatory', 'appendix',
     ],
     'regulators': [
       'executive-summary', 'methodology', 'scope-1-2-3', 'carbon-origin',
-      'ghg-inventory', 'product-footprints', 'multi-capital', 'facilities',
+      'flag-removals', 'ghg-inventory', 'product-footprints', 'multi-capital', 'tnfd-nature', 'facilities',
       'governance', 'people-culture', 'community-impact',
       'supply-chain', 'regulatory', 'targets', 'trends',
       'impact-valuation', 'company-overview', 'appendix',
     ],
     'internal': [
       'executive-summary', 'scope-1-2-3', 'facilities',
-      'people-culture', 'targets', 'product-footprints', 'multi-capital',
+      'people-culture', 'targets', 'product-footprints', 'multi-capital', 'tnfd-nature',
       'community-impact', 'governance', 'supply-chain',
-      'trends', 'carbon-origin', 'impact-valuation', 'company-overview',
+      'trends', 'carbon-origin', 'flag-removals', 'impact-valuation', 'company-overview',
       'methodology', 'ghg-inventory', 'regulatory', 'appendix',
     ],
     'supply-chain': [
-      'executive-summary', 'supply-chain', 'product-footprints', 'multi-capital',
-      'scope-1-2-3', 'carbon-origin', 'facilities', 'people-culture',
+      'executive-summary', 'supply-chain', 'product-footprints', 'multi-capital', 'tnfd-nature',
+      'scope-1-2-3', 'carbon-origin', 'flag-removals', 'facilities', 'people-culture',
       'community-impact', 'governance', 'targets',
       'trends', 'impact-valuation', 'company-overview',
       'methodology', 'ghg-inventory', 'regulatory', 'appendix',
     ],
     'technical': [
       'executive-summary', 'methodology', 'scope-1-2-3', 'carbon-origin',
-      'ghg-inventory', 'product-footprints', 'multi-capital', 'facilities',
+      'flag-removals', 'ghg-inventory', 'product-footprints', 'multi-capital', 'tnfd-nature', 'facilities',
       'people-culture', 'governance', 'community-impact',
       'supply-chain', 'targets', 'trends', 'impact-valuation',
       'company-overview', 'regulatory', 'appendix',
