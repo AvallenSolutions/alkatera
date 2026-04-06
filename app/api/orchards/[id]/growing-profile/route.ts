@@ -164,6 +164,28 @@ export async function POST(
         soil_carbon_lab_name: merged.soil_carbon_lab_name || null,
         soil_carbon_sampling_points: merged.soil_carbon_sampling_points || null,
 
+        // Removal verification (FLAG compliance)
+        removal_verification_status: merged.removal_verification_status || 'unverified',
+        removal_verifier_body: merged.removal_verifier_body || null,
+        removal_verifier_standard: merged.removal_verifier_standard || null,
+        removal_verification_date: merged.removal_verification_date || null,
+        removal_verification_expiry: merged.removal_verification_expiry || null,
+
+        // TNFD location sensitivity
+        ecosystem_type: merged.ecosystem_type || null,
+        in_biodiversity_sensitive_area: merged.in_biodiversity_sensitive_area ?? false,
+        sensitive_area_details: merged.sensitive_area_details || null,
+        water_stress_index: merged.water_stress_index || null,
+
+        // Land ownership boundary
+        land_ownership_type: merged.land_ownership_type || null,
+        lease_expiry_date: merged.lease_expiry_date || null,
+        is_boundary_controlled: merged.is_boundary_controlled ?? true,
+
+        // Pruning residue detail
+        pruning_residue_management_type: merged.pruning_residue_management_type || null,
+        pruning_residue_measured_kg_per_ha: merged.pruning_residue_measured_kg_per_ha || null,
+
         is_draft: isDraft,
       })
       .select()
