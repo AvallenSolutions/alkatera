@@ -667,7 +667,7 @@ async function aggregateReportData(
           // Fetch vineyard data
           const { data: vineyards } = await supabase
             .from('vineyards')
-            .select('name, address_country, location_country_code')
+            .select('id, name, address_country, location_country_code')
             .eq('organization_id', orgId)
             .eq('is_active', true);
 
@@ -677,7 +677,7 @@ async function aggregateReportData(
               const { data: profile } = await supabase
                 .from('vineyard_growing_profiles')
                 .select('ecosystem_type, in_biodiversity_sensitive_area, sensitive_area_details, water_stress_index')
-                .eq('organization_id', orgId)
+                .eq('vineyard_id', v.id)
                 .order('vintage_year', { ascending: false })
                 .limit(1)
                 .maybeSingle();
@@ -699,7 +699,7 @@ async function aggregateReportData(
           // Fetch orchard data
           const { data: orchards } = await supabase
             .from('orchards')
-            .select('name, address_country, location_country_code')
+            .select('id, name, address_country, location_country_code')
             .eq('organization_id', orgId)
             .eq('is_active', true);
 
@@ -708,7 +708,7 @@ async function aggregateReportData(
               const { data: profile } = await supabase
                 .from('orchard_growing_profiles')
                 .select('ecosystem_type, in_biodiversity_sensitive_area, sensitive_area_details, water_stress_index')
-                .eq('organization_id', orgId)
+                .eq('orchard_id', o.id)
                 .order('harvest_year', { ascending: false })
                 .limit(1)
                 .maybeSingle();

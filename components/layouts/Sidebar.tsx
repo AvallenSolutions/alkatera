@@ -130,9 +130,10 @@ const navigationStructure: NavItem[] = [
     icon: Leaf,
     minTier: 1,
     children: [
-      { name: 'Company Vitality', href: '/performance/',  icon: Sparkles, minTier: 2 },
-      { name: 'Products',         href: '/products/',     icon: Package,  minTier: 1 },
-      { name: 'LCA Reports',      href: '/reports/lcas/', icon: Award,    minTier: 2 },
+      { name: 'Company Vitality',    href: '/performance/',      icon: Sparkles, minTier: 2 },
+      { name: 'Products',            href: '/products/',         icon: Package,  minTier: 1 },
+      { name: 'Nature Assessment',   href: '/nature-assessment/',icon: TreePine, minTier: 2 },
+      { name: 'LCA Reports',         href: '/reports/lcas/',     icon: Award,    minTier: 2 },
     ],
   },
   {

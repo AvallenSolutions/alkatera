@@ -28,7 +28,7 @@ import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client'
 
 type DependencyLevel = 'low' | 'medium' | 'high' | 'critical' | ''
 type InvasiveRisk = 'none' | 'low' | 'medium' | 'high' | ''
-type MaterialityLevel = 'not_material' | 'low' | 'medium' | 'high' | ''
+type MaterialityLevel = 'not_material' | 'potentially_material' | 'material' | 'highly_material' | ''
 
 interface NatureForm {
   // Evaluate - Dependencies
@@ -178,26 +178,26 @@ export default function NatureAssessmentPage() {
       if (data) {
         setAssessmentId(data.id)
         setForm({
-          water_dependency: data.water_dependency ?? '',
+          water_dependency: data.water_dependency_level ?? '',
           water_dependency_notes: data.water_dependency_notes ?? '',
-          pollination_dependency: data.pollination_dependency ?? '',
+          pollination_dependency: data.pollination_dependency_level ?? '',
           pollination_dependency_notes: data.pollination_dependency_notes ?? '',
-          soil_health_dependency: data.soil_health_dependency ?? '',
+          soil_health_dependency: data.soil_health_dependency_level ?? '',
           soil_health_dependency_notes: data.soil_health_dependency_notes ?? '',
-          total_land_ha: data.total_land_ha?.toString() ?? '',
+          total_land_ha: data.land_use_ha?.toString() ?? '',
           land_converted_ha: data.land_converted_ha?.toString() ?? '',
-          nitrogen_kg: data.nitrogen_kg?.toString() ?? '',
-          phosphorus_kg: data.phosphorus_kg?.toString() ?? '',
-          pesticide_kg: data.pesticide_kg?.toString() ?? '',
+          nitrogen_kg: data.pollution_outputs_kg_n?.toString() ?? '',
+          phosphorus_kg: data.pollution_outputs_kg_p?.toString() ?? '',
+          pesticide_kg: data.pesticide_kg_active?.toString() ?? '',
           invasive_species_risk: data.invasive_species_risk ?? '',
-          invasive_species_notes: data.invasive_species_notes ?? '',
+          invasive_species_notes: data.invasive_species_details ?? '',
           nature_risk_materiality: data.nature_risk_materiality ?? '',
           physical_risk_notes: data.physical_risk_notes ?? '',
           transition_risk_notes: data.transition_risk_notes ?? '',
-          nature_positive_target: data.nature_positive_target ?? false,
-          target_year: data.target_year?.toString() ?? '',
-          baseline_year: data.baseline_year?.toString() ?? '',
-          target_description: data.target_description ?? '',
+          nature_positive_target: data.has_nature_positive_target ?? false,
+          target_year: data.nature_positive_target_year?.toString() ?? '',
+          baseline_year: data.nature_positive_baseline_year?.toString() ?? '',
+          target_description: data.nature_positive_target_description ?? '',
         })
       }
       setLoading(false)
@@ -213,19 +213,66 @@ export default function NatureAssessmentPage() {
     let cancelled = false
 
     async function loadLocate() {
-      const { data: sites } = await supabase
-        .from('vineyard_profiles')
-        .select('name, ecosystem_type, in_biodiversity_sensitive_area, water_stress_level')
+      // Fetch vineyards (which have the site name) and their latest growing profiles (which have TNFD fields)
+      const { data: vineyards } = await supabase
+        .from('vineyards')
+        .select('id, name')
         .eq('organization_id', orgId!)
+        .eq('is_active', true)
 
-      if (cancelled || !sites) return
+      if (cancelled || !vineyards) return
 
-      const totalSites = sites.length
-      const withEcosystem = sites.filter(s => s.ecosystem_type).length
-      const sensitiveSites = sites.filter(s => s.in_biodiversity_sensitive_area).map(s => s.name || 'Unnamed site')
+      const siteData: Array<{ name: string; ecosystem_type: string | null; in_biodiversity_sensitive_area: boolean; water_stress_index: string | null }> = []
+
+      for (const v of vineyards) {
+        const { data: profile } = await supabase
+          .from('vineyard_growing_profiles')
+          .select('ecosystem_type, in_biodiversity_sensitive_area, water_stress_index')
+          .eq('vineyard_id', v.id)
+          .order('vintage_year', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        siteData.push({
+          name: v.name,
+          ecosystem_type: profile?.ecosystem_type ?? null,
+          in_biodiversity_sensitive_area: profile?.in_biodiversity_sensitive_area ?? false,
+          water_stress_index: profile?.water_stress_index ?? null,
+        })
+      }
+
+      // Also include orchards
+      const { data: orchards } = await supabase
+        .from('orchards')
+        .select('id, name')
+        .eq('organization_id', orgId!)
+        .eq('is_active', true)
+
+      if (!cancelled && orchards) {
+        for (const o of orchards) {
+          const { data: profile } = await supabase
+            .from('orchard_growing_profiles')
+            .select('ecosystem_type, in_biodiversity_sensitive_area, water_stress_index')
+            .eq('orchard_id', o.id)
+            .order('harvest_year', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+          siteData.push({
+            name: o.name,
+            ecosystem_type: profile?.ecosystem_type ?? null,
+            in_biodiversity_sensitive_area: profile?.in_biodiversity_sensitive_area ?? false,
+            water_stress_index: profile?.water_stress_index ?? null,
+          })
+        }
+      }
+
+      const totalSites = siteData.length
+      const withEcosystem = siteData.filter(s => s.ecosystem_type).length
+      const sensitiveSites = siteData.filter(s => s.in_biodiversity_sensitive_area).map(s => s.name || 'Unnamed site')
       const waterStress: Record<string, number> = {}
-      for (const s of sites) {
-        const level = s.water_stress_level || 'Not set'
+      for (const s of siteData) {
+        const level = s.water_stress_index || 'Not set'
         waterStress[level] = (waterStress[level] || 0) + 1
       }
 
@@ -245,26 +292,26 @@ export default function NatureAssessmentPage() {
       organization_id: orgId,
       assessment_year: CURRENT_YEAR,
       assessment_status: status,
-      water_dependency: form.water_dependency || null,
+      water_dependency_level: form.water_dependency || null,
       water_dependency_notes: form.water_dependency_notes || null,
-      pollination_dependency: form.pollination_dependency || null,
+      pollination_dependency_level: form.pollination_dependency || null,
       pollination_dependency_notes: form.pollination_dependency_notes || null,
-      soil_health_dependency: form.soil_health_dependency || null,
+      soil_health_dependency_level: form.soil_health_dependency || null,
       soil_health_dependency_notes: form.soil_health_dependency_notes || null,
-      total_land_ha: form.total_land_ha ? parseFloat(form.total_land_ha) : null,
+      land_use_ha: form.total_land_ha ? parseFloat(form.total_land_ha) : null,
       land_converted_ha: form.land_converted_ha ? parseFloat(form.land_converted_ha) : null,
-      nitrogen_kg: form.nitrogen_kg ? parseFloat(form.nitrogen_kg) : null,
-      phosphorus_kg: form.phosphorus_kg ? parseFloat(form.phosphorus_kg) : null,
-      pesticide_kg: form.pesticide_kg ? parseFloat(form.pesticide_kg) : null,
+      pollution_outputs_kg_n: form.nitrogen_kg ? parseFloat(form.nitrogen_kg) : null,
+      pollution_outputs_kg_p: form.phosphorus_kg ? parseFloat(form.phosphorus_kg) : null,
+      pesticide_kg_active: form.pesticide_kg ? parseFloat(form.pesticide_kg) : null,
       invasive_species_risk: form.invasive_species_risk || null,
-      invasive_species_notes: form.invasive_species_notes || null,
+      invasive_species_details: form.invasive_species_notes || null,
       nature_risk_materiality: form.nature_risk_materiality || null,
       physical_risk_notes: form.physical_risk_notes || null,
       transition_risk_notes: form.transition_risk_notes || null,
-      nature_positive_target: form.nature_positive_target,
-      target_year: form.target_year ? parseInt(form.target_year) : null,
-      baseline_year: form.baseline_year ? parseInt(form.baseline_year) : null,
-      target_description: form.target_description || null,
+      has_nature_positive_target: form.nature_positive_target,
+      nature_positive_target_year: form.target_year ? parseInt(form.target_year) : null,
+      nature_positive_baseline_year: form.baseline_year ? parseInt(form.baseline_year) : null,
+      nature_positive_target_description: form.target_description || null,
     }
 
     const { data, error } = await supabase
@@ -618,9 +665,9 @@ export default function NatureAssessmentPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="not_material">Not material</SelectItem>
-                    <SelectItem value="low">Low materiality</SelectItem>
-                    <SelectItem value="medium">Medium materiality</SelectItem>
-                    <SelectItem value="high">High materiality</SelectItem>
+                    <SelectItem value="potentially_material">Potentially material</SelectItem>
+                    <SelectItem value="material">Material</SelectItem>
+                    <SelectItem value="highly_material">Highly material</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
