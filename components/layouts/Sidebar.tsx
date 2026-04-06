@@ -77,6 +77,7 @@ interface NavItem {
   badge?: number
   minTier?: number // Minimum tier level required (1=Seed, 2=Blossom, 3=Canopy)
   featureCode?: string // Optional feature code requirement
+  requireAnyFeature?: string[] // Show if user has ANY of these features
   locked?: boolean // Set dynamically when user's tier is insufficient
   requiredTierName?: string // Display name of the required tier
   viticultureOnly?: boolean // Only shown for Wine orgs + platform admin
@@ -132,7 +133,7 @@ const navigationStructure: NavItem[] = [
     children: [
       { name: 'Company Vitality',    href: '/performance/',      icon: Sparkles, minTier: 2 },
       { name: 'Products',            href: '/products/',         icon: Package,  minTier: 1 },
-      { name: 'Nature Assessment',   href: '/nature-assessment/',icon: TreePine, minTier: 2 },
+      { name: 'Nature Assessment',   href: '/nature-assessment/',icon: TreePine, minTier: 2, requireAnyFeature: ['viticulture_beta', 'orchard_beta'] },
       { name: 'LCA Reports',         href: '/reports/lcas/',     icon: Award,    minTier: 2 },
     ],
   },
@@ -349,6 +350,8 @@ export function Sidebar({ className }: SidebarProps) {
       .filter((item) => {
         // Completely hide viticulture-only items for non-wine orgs
         if (item.viticultureOnly && !viticultureVisible) return false
+        // Hide items that require any of a set of features (none enabled = hidden)
+        if (item.requireAnyFeature && !item.requireAnyFeature.some(f => hasFeature(f as any))) return false
         // Hide items restricted to specific orgs
         if (item.allowedOrgs && currentOrganization?.id && !item.allowedOrgs.includes(currentOrganization.id)) return false
         return true
