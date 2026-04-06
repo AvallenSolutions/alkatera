@@ -342,6 +342,40 @@ export function OrchardImpactOverview({ impacts, profile }: OrchardImpactOvervie
           </CardContent>
         </Card>
 
+        {/* TNFD Location & Nature */}
+        {(profile.ecosystem_type || profile.in_biodiversity_sensitive_area || profile.water_stress_index) && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <TreePine className="h-4 w-4 text-emerald-600" />
+                Location & Nature (TNFD)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {profile.ecosystem_type && (
+                <DetailRow label="Ecosystem type" value={profile.ecosystem_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} />
+              )}
+              <DetailRow
+                label="Biodiversity-sensitive area"
+                value={profile.in_biodiversity_sensitive_area ? 'Yes' : 'No'}
+              />
+              {profile.in_biodiversity_sensitive_area && profile.sensitive_area_details && (
+                <DetailRow label="Designation" value={profile.sensitive_area_details} muted />
+              )}
+              {profile.in_biodiversity_sensitive_area && (
+                <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2 mt-1">
+                  <p className="text-xs text-amber-400">
+                    Enhanced TNFD and CSRD ESRS E4 disclosure required for operations in or adjacent to sensitive areas.
+                  </p>
+                </div>
+              )}
+              {profile.water_stress_index && (
+                <DetailRow label="Water stress" value={profile.water_stress_index.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} />
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Growing Profile Summary */}
         <Card>
           <CardHeader className="pb-2">

@@ -188,20 +188,20 @@ export function VineyardGrowingQuestionnaire({
     soil_carbon_lab_name: initSource?.soil_carbon_lab_name ?? '',
     soil_carbon_sampling_points: initSource?.soil_carbon_sampling_points ?? null as number | null,
     // Removal verification (SBTi FLAG / GHG Protocol LSR v1.0)
-    removal_verification_status: (initSource as any)?.removal_verification_status ?? 'unverified' as string,
-    removal_verifier_body: (initSource as any)?.removal_verifier_body ?? '' as string,
-    removal_verifier_standard: (initSource as any)?.removal_verifier_standard ?? '' as string,
-    removal_verification_date: (initSource as any)?.removal_verification_date ?? '' as string,
-    removal_verification_expiry: (initSource as any)?.removal_verification_expiry ?? '' as string,
+    removal_verification_status: initSource?.removal_verification_status ?? 'unverified' as string,
+    removal_verifier_body: initSource?.removal_verifier_body ?? '' as string,
+    removal_verifier_standard: initSource?.removal_verifier_standard ?? '' as string,
+    removal_verification_date: initSource?.removal_verification_date ?? '' as string,
+    removal_verification_expiry: initSource?.removal_verification_expiry ?? '' as string,
     // TNFD location sensitivity
-    ecosystem_type: (initSource as any)?.ecosystem_type ?? '' as string,
-    in_biodiversity_sensitive_area: (initSource as any)?.in_biodiversity_sensitive_area ?? false,
-    sensitive_area_details: (initSource as any)?.sensitive_area_details ?? '' as string,
-    water_stress_index: (initSource as any)?.water_stress_index ?? '' as string,
+    ecosystem_type: initSource?.ecosystem_type ?? '' as string,
+    in_biodiversity_sensitive_area: initSource?.in_biodiversity_sensitive_area ?? false,
+    sensitive_area_details: initSource?.sensitive_area_details ?? '' as string,
+    water_stress_index: initSource?.water_stress_index ?? '' as string,
     // Land ownership boundary (GHG Protocol LSR v1.0)
-    land_ownership_type: (initSource as any)?.land_ownership_type ?? '' as string,
-    lease_expiry_date: (initSource as any)?.lease_expiry_date ?? '' as string,
-    is_boundary_controlled: (initSource as any)?.is_boundary_controlled ?? true,
+    land_ownership_type: initSource?.land_ownership_type ?? '' as string,
+    lease_expiry_date: initSource?.lease_expiry_date ?? '' as string,
+    is_boundary_controlled: initSource?.is_boundary_controlled ?? true,
   });
 
   // Soil carbon evidence state

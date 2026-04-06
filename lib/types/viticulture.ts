@@ -160,6 +160,28 @@ export interface VineyardGrowingProfile {
   soil_carbon_lab_name: string | null;
   soil_carbon_sampling_points: number | null;
 
+  // Removal verification (FLAG compliance)
+  removal_verification_status?: string | null;
+  removal_verifier_body?: string | null;
+  removal_verifier_standard?: string | null;
+  removal_verification_date?: string | null;
+  removal_verification_expiry?: string | null;
+
+  // TNFD location sensitivity
+  ecosystem_type?: string | null;
+  in_biodiversity_sensitive_area?: boolean;
+  sensitive_area_details?: string | null;
+  water_stress_index?: string | null;
+
+  // Land ownership boundary
+  land_ownership_type?: string | null;
+  lease_expiry_date?: string | null;
+  is_boundary_controlled?: boolean;
+
+  // Pruning residue detail
+  pruning_residue_management_type?: string | null;
+  pruning_residue_measured_kg_per_ha?: number | null;
+
   // Draft support
   is_draft: boolean;
 
