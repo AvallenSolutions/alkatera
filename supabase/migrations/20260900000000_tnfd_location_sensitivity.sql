@@ -202,3 +202,6 @@ COMMENT ON COLUMN public.facilities.sensitive_area_details IS
   'Name and designation of the biodiversity-sensitive area (if applicable).';
 COMMENT ON COLUMN public.facilities.water_stress_index IS
   'WRI Aqueduct or equivalent water stress classification for the facility location.';
+
+-- Reload PostgREST schema cache so new columns are immediately available
+NOTIFY pgrst, 'reload schema';

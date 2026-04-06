@@ -196,3 +196,6 @@ DO $$ BEGIN
 END $$;
 
 COMMENT ON TABLE public.removal_claims IS 'Registry of soil carbon removal claims for SBTi FLAG and GHG Protocol LSR v1.0 compliance';
+
+-- Reload PostgREST schema cache so new columns/tables are immediately available
+NOTIFY pgrst, 'reload schema';

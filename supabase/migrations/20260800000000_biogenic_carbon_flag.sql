@@ -34,3 +34,6 @@ END $$;
 
 COMMENT ON COLUMN public.product_materials.is_biogenic_carbon IS
   'User-declared: carbon from this material is biogenic (fermentation, plant growth)';
+
+-- Reload PostgREST schema cache so new columns are immediately available
+NOTIFY pgrst, 'reload schema';

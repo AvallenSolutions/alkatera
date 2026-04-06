@@ -110,3 +110,6 @@ CREATE TABLE IF NOT EXISTS public.nature_performance_benchmarks (
 INSERT INTO public.nature_performance_benchmarks (is_active)
 SELECT true
 WHERE NOT EXISTS (SELECT 1 FROM public.nature_performance_benchmarks WHERE is_active = true);
+
+-- Reload PostgREST schema cache so new tables/columns are immediately available
+NOTIFY pgrst, 'reload schema';
