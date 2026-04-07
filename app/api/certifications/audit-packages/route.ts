@@ -122,6 +122,48 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // SBTi FLAG enforcement: if this is an SBTi framework and FLAG threshold is exceeded,
+    // require FLAG targets to exist before allowing audit package creation
+    const { data: framework } = await supabase
+      .from('certification_frameworks')
+      .select('code')
+      .eq('id', body.framework_id)
+      .single();
+
+    if (framework?.code === 'sbti') {
+      // Check FLAG threshold from completed PCFs
+      const { data: pcfs } = await supabase
+        .from('product_carbon_footprints')
+        .select('aggregated_impacts')
+        .eq('organization_id', organizationId)
+        .eq('status', 'completed')
+        .limit(50);
+
+      let anyExceeded = false;
+      for (const p of pcfs || []) {
+        const ft = (p.aggregated_impacts as any)?.breakdown?.flag_threshold;
+        if (ft?.flag_threshold_exceeded) {
+          anyExceeded = true;
+          break;
+        }
+      }
+
+      if (anyExceeded) {
+        const { data: targets } = await supabase
+          .from('flag_targets')
+          .select('id')
+          .eq('organization_id', organizationId)
+          .limit(1);
+
+        if (!targets || targets.length === 0) {
+          return NextResponse.json(
+            { error: 'FLAG emissions exceed the 20% SBTi threshold. Please set FLAG science-based targets before creating an SBTi audit package.' },
+            { status: 422 }
+          );
+        }
+      }
+    }
+
     // Create audit package
     const { data, error } = await supabase
       .from('certification_audit_packages')

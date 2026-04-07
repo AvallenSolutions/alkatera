@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Package,
   ChevronRight,
@@ -16,7 +17,9 @@ import {
   FileText,
   Send,
   Loader2,
+  AlertTriangle,
 } from 'lucide-react';
+import { useFlagThreshold } from '@/hooks/data/useFlagThreshold';
 
 interface Requirement {
   id: string;
@@ -75,6 +78,11 @@ export function AuditPackageBuilder({
   const [methodology, setMethodology] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // FLAG enforcement: block SBTi audit packages when FLAG threshold exceeded without targets
+  const isSbti = frameworkName.toLowerCase().includes('sbti') || frameworkName.toLowerCase().includes('science based');
+  const { flagExceeded, flagTargetsSet, loading: flagLoading } = useFlagThreshold();
+  const flagBlocked = isSbti && flagExceeded && !flagTargetsSet;
 
   const steps: { key: Step; label: string; icon: React.ReactNode }[] = [
     { key: 'requirements', label: 'Requirements', icon: <CheckCircle2 className="h-4 w-4" /> },
@@ -347,6 +355,15 @@ export function AuditPackageBuilder({
         {/* Step 4: Review */}
         {currentStep === 'review' && (
           <div className="space-y-4">
+            {flagBlocked && (
+              <Alert variant="destructive" className="border-amber-500/50 bg-amber-500/10">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                <AlertDescription className="text-amber-200">
+                  <strong>FLAG targets required.</strong> Your FLAG emissions exceed the 20% SBTi threshold but no FLAG targets have been set.
+                  SBTi requires separate FLAG science-based targets before submission. Please set targets in the FLAG Targets tab first.
+                </AlertDescription>
+              </Alert>
+            )}
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="p-4 bg-muted/50 rounded-lg">
                 <p className="text-sm font-medium">Package Name</p>
@@ -397,7 +414,7 @@ export function AuditPackageBuilder({
           </Button>
 
           {currentStep === 'review' ? (
-            <Button onClick={handleSubmit} disabled={submitting}>
+            <Button onClick={handleSubmit} disabled={submitting || flagBlocked}>
               {submitting ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (

@@ -24,9 +24,11 @@ import {
   Plus,
   Trash2,
   XCircle,
+  Leaf,
 } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { GapAnalysisDashboard } from '@/components/certifications/GapAnalysisDashboard';
+import { FlagTargetSetting } from '@/components/certifications/FlagTargetSetting';
 import { EvidenceLinker } from '@/components/certifications/EvidenceLinker';
 import { YearProgressionStepper } from '@/components/certifications/YearProgressionStepper';
 import { useCertificationEvidence } from '@/hooks/data/useCertificationEvidence';
@@ -213,6 +215,25 @@ function CertificationDetailsContent() {
   } = useCertificationAuditPackages(frameworkId);
 
   const [selectedYear, setSelectedYear] = useState<number>(0);
+
+  // FLAG auto-resolution state (SBTi only)
+  const [flagData, setFlagData] = useState<{
+    requirements: any[];
+    resolved: Record<string, { status: string; source: string; detail: string }>;
+  } | null>(null);
+  const [flagLoading, setFlagLoading] = useState(false);
+
+  useEffect(() => {
+    if (code?.toLowerCase() !== 'sbti' || !currentOrganization?.id) return;
+    setFlagLoading(true);
+    fetch(`/api/certifications/flag-resolve?organization_id=${currentOrganization.id}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.requirements) setFlagData(data);
+      })
+      .catch(() => {})
+      .finally(() => setFlagLoading(false));
+  }, [code, currentOrganization?.id]);
 
   // Build requirement counts by year for the stepper (must be before early returns)
   const requirementCountsByYear = useMemo(() => {
@@ -646,8 +667,20 @@ function CertificationDetailsContent() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="gap-analysis" className="space-y-6">
+      <Tabs defaultValue={code?.toLowerCase() === 'sbti' ? 'flag' : 'gap-analysis'} className="space-y-6">
         <TabsList>
+          {code?.toLowerCase() === 'sbti' && (
+            <TabsTrigger value="flag" className="flex items-center gap-2">
+              <Leaf className="h-4 w-4" />
+              FLAG Requirements
+            </TabsTrigger>
+          )}
+          {code?.toLowerCase() === 'sbti' && (
+            <TabsTrigger value="flag-targets" className="flex items-center gap-2">
+              <Target className="h-4 w-4" />
+              FLAG Targets
+            </TabsTrigger>
+          )}
           <TabsTrigger value="gap-analysis" className="flex items-center gap-2">
             <Target className="h-4 w-4" />
             Gap Analysis
@@ -675,6 +708,89 @@ function CertificationDetailsContent() {
             All Requirements
           </TabsTrigger>
         </TabsList>
+
+        {/* FLAG Requirements Tab (SBTi only) */}
+        {code?.toLowerCase() === 'sbti' && (
+          <TabsContent value="flag">
+            <Card>
+              <CardHeader>
+                <CardTitle>FLAG Requirements (SBTi FLAG Guidance v1.2)</CardTitle>
+                <CardDescription>
+                  Forest, Land and Agriculture requirements for SBTi compliance. Requirements marked &quot;Resolved from platform data&quot; are automatically assessed from your product LCA and supplier ESG data.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-6">
+                  For suppliers not yet on alka<strong>tera</strong>, you can manually record their deforestation commitment here. Manual entries are marked as self-reported and do not carry the same evidential weight as platform-verified supplier data.
+                </p>
+                {flagLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : flagData?.requirements?.length ? (
+                  <div className="space-y-4">
+                    {flagData.requirements.map((req: any) => {
+                      const resolution = flagData.resolved[req.id];
+                      const statusColors: Record<string, string> = {
+                        compliant: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                        partial: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+                        non_compliant: 'bg-red-500/20 text-red-400 border-red-500/30',
+                        not_assessed: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
+                      };
+                      const statusLabels: Record<string, string> = {
+                        compliant: 'Compliant',
+                        partial: 'Partial',
+                        non_compliant: 'Non-compliant',
+                        not_assessed: 'Not assessed',
+                      };
+                      return (
+                        <div key={req.id} className="border rounded-lg p-4 space-y-2">
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-mono font-medium text-muted-foreground">{req.requirement_code}</span>
+                                {req.is_mandatory && (
+                                  <Badge variant="destructive" className="text-xs">Mandatory</Badge>
+                                )}
+                              </div>
+                              <h4 className="text-sm font-semibold mt-1">{req.requirement_name}</h4>
+                            </div>
+                            <Badge className={`text-xs border ${statusColors[resolution?.status || 'not_assessed']}`}>
+                              {statusLabels[resolution?.status || 'not_assessed']}
+                            </Badge>
+                          </div>
+                          {resolution && (
+                            <div className="text-xs text-muted-foreground space-y-1">
+                              <p>{resolution.detail}</p>
+                              <p className="text-[10px]">
+                                {resolution.source === 'platform_data' ? (
+                                  <span className="text-emerald-500">Resolved from platform data</span>
+                                ) : (
+                                  <span className="text-amber-500">Requires manual input or document upload</span>
+                                )}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No FLAG requirements found. Run the seeding migration to populate SBTi FLAG requirements.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
+        {/* FLAG Targets Tab (SBTi only) */}
+        {code?.toLowerCase() === 'sbti' && (
+          <TabsContent value="flag-targets">
+            <FlagTargetSetting />
+          </TabsContent>
+        )}
 
         {/* Gap Analysis Tab */}
         <TabsContent value="gap-analysis">

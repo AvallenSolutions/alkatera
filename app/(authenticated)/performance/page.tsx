@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { FlagThresholdBanner } from '@/components/flag/FlagThresholdBanner';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -714,6 +715,8 @@ export default function PerformancePage() {
           </AlertDescription>
         </Alert>
       )}
+
+      <FlagThresholdBanner />
 
       {/* Four Pillars - Expandable Cards */}
       <PillarGrid>
