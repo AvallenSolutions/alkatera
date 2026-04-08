@@ -767,10 +767,10 @@ async function aggregateReportData(
         // Scope 3 from product LCAs via production logs
         const { data: prodLogs } = await supabaseClient
           .from('production_logs')
-          .select('product_id, quantity_produced')
+          .select('product_id, units_produced')
           .eq('organization_id', organizationId)
-          .gte('production_date', yearStart)
-          .lte('production_date', yearEnd);
+          .gte('date', yearStart)
+          .lte('date', yearEnd);
 
         if (prodLogs && prodLogs.length > 0) {
           const productIds = [...new Set(prodLogs.map((p: any) => p.product_id))];
@@ -788,7 +788,7 @@ async function aggregateReportData(
               const l = log as any;
               const pcf = pcfMap.get(l.product_id);
               if (pcf?.aggregated_impacts?.breakdown?.by_scope?.scope3) {
-                scope3 += pcf.aggregated_impacts.breakdown.by_scope.scope3 * (l.quantity_produced || 0);
+                scope3 += pcf.aggregated_impacts.breakdown.by_scope.scope3 * (l.units_produced || 0);
               }
             }
           }
