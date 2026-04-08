@@ -21,15 +21,15 @@ interface RisksOpportunitiesEditorProps {
 }
 
 const LIKELIHOOD_COLOURS: Record<RiskOpportunity['likelihood'], string> = {
-  low: 'bg-green-100 text-green-700',
-  medium: 'bg-amber-100 text-amber-700',
-  high: 'bg-red-100 text-red-700',
+  low: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400',
+  medium: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
+  high: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
 }
 
 const IMPACT_COLOURS: Record<RiskOpportunity['impact'], string> = {
-  low: 'bg-green-100 text-green-700',
-  medium: 'bg-amber-100 text-amber-700',
-  high: 'bg-red-100 text-red-700',
+  low: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400',
+  medium: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
+  high: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
 }
 
 export function RisksOpportunitiesEditor({
@@ -56,8 +56,8 @@ export function RisksOpportunitiesEditor({
           <Sparkles className="w-6 h-6 text-[#84cc16]" />
         </div>
         <div>
-          <p className="text-sm font-medium text-stone-700">Claude is analysing your plan</p>
-          <p className="text-xs text-stone-500 mt-1">Identifying climate risks and opportunities specific to your organisation</p>
+          <p className="text-sm font-medium">Claude is analysing your plan</p>
+          <p className="text-xs text-muted-foreground mt-1">Identifying climate risks and opportunities specific to your organisation</p>
         </div>
       </div>
     )
@@ -65,11 +65,11 @@ export function RisksOpportunitiesEditor({
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-4 text-center border border-dashed border-stone-200 rounded-xl">
-        <Sparkles className="w-8 h-8 text-stone-300" />
+      <div className="flex flex-col items-center justify-center py-16 gap-4 text-center border border-dashed border-border rounded-xl">
+        <Sparkles className="w-8 h-8 text-muted-foreground" />
         <div>
-          <p className="text-sm font-medium text-stone-700">No risks or opportunities yet</p>
-          <p className="text-xs text-stone-500 mt-1">Save your plan to generate an AI analysis</p>
+          <p className="text-sm font-medium">No risks or opportunities yet</p>
+          <p className="text-xs text-muted-foreground mt-1">Save your plan to generate an AI analysis</p>
         </div>
       </div>
     )
@@ -80,7 +80,7 @@ export function RisksOpportunitiesEditor({
       {/* Regenerate button */}
       {onRegenerate && (
         <div className="flex items-center justify-between">
-          <p className="text-xs text-stone-500">
+          <p className="text-xs text-muted-foreground">
             Edit any item below to mark it as manually reviewed. Changes are saved with the plan.
           </p>
           <Button
@@ -101,7 +101,7 @@ export function RisksOpportunitiesEditor({
         <div className="space-y-3">
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle className="w-4 h-4 text-red-400" />
-            <h3 className="text-sm font-semibold text-stone-700">Risks ({risks.length})</h3>
+            <h3 className="text-sm font-semibold">Risks ({risks.length})</h3>
           </div>
           {risks.map(item => (
             <RoCard
@@ -112,7 +112,7 @@ export function RisksOpportunitiesEditor({
             />
           ))}
           {risks.length === 0 && (
-            <p className="text-xs text-stone-400 text-center py-4 border border-dashed rounded-lg">No risks identified</p>
+            <p className="text-xs text-muted-foreground text-center py-4 border border-dashed rounded-lg">No risks identified</p>
           )}
         </div>
 
@@ -120,7 +120,7 @@ export function RisksOpportunitiesEditor({
         <div className="space-y-3">
           <div className="flex items-center gap-2 mb-2">
             <TrendingUp className="w-4 h-4 text-green-500" />
-            <h3 className="text-sm font-semibold text-stone-700">Opportunities ({opportunities.length})</h3>
+            <h3 className="text-sm font-semibold">Opportunities ({opportunities.length})</h3>
           </div>
           {opportunities.map(item => (
             <RoCard
@@ -131,7 +131,7 @@ export function RisksOpportunitiesEditor({
             />
           ))}
           {opportunities.length === 0 && (
-            <p className="text-xs text-stone-400 text-center py-4 border border-dashed rounded-lg">No opportunities identified</p>
+            <p className="text-xs text-muted-foreground text-center py-4 border border-dashed rounded-lg">No opportunities identified</p>
           )}
         </div>
       </div>
@@ -152,7 +152,7 @@ function RoCard({
   const accentColour = isRisk ? 'border-l-red-300' : 'border-l-green-400'
 
   return (
-    <div className={`border border-stone-200 border-l-4 ${accentColour} rounded-xl p-4 bg-white space-y-3`}>
+    <div className={`border border-border border-l-4 ${accentColour} rounded-xl p-4 bg-card space-y-3`}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-wrap gap-1.5 flex-1">
           <Badge variant="outline" className="text-xs">
@@ -165,7 +165,7 @@ function RoCard({
             {IMPACT_LABELS[item.impact]} impact
           </span>
           {item.aiGenerated && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-[#ccff00]/20 text-stone-600">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-[#ccff00]/20 text-foreground">
               <Sparkles className="w-3 h-3" />
               AI
             </span>
@@ -174,7 +174,7 @@ function RoCard({
         <button
           type="button"
           onClick={onRemove}
-          className="text-stone-300 hover:text-red-400 transition-colors flex-shrink-0"
+          className="text-muted-foreground hover:text-red-400 transition-colors flex-shrink-0"
           aria-label="Remove"
         >
           <Trash2 className="w-4 h-4" />
@@ -186,7 +186,7 @@ function RoCard({
         type="text"
         value={item.title}
         onChange={e => onUpdate({ title: e.target.value })}
-        className="w-full text-sm font-semibold text-stone-800 bg-transparent border-0 border-b border-stone-100 pb-1 focus:outline-none focus:border-stone-300"
+        className="w-full text-sm font-semibold bg-transparent border-0 border-b border-border pb-1 focus:outline-none focus:border-muted-foreground"
         placeholder="Title"
       />
 
@@ -194,14 +194,14 @@ function RoCard({
       <Textarea
         value={item.description}
         onChange={e => onUpdate({ description: e.target.value })}
-        className="text-sm text-stone-600 min-h-[72px] resize-none"
+        className="text-sm min-h-[72px] resize-none"
         placeholder="Description"
       />
 
       {/* Selectors row */}
       <div className="grid grid-cols-3 gap-2">
         <div>
-          <label className="text-xs text-stone-400 block mb-1">Likelihood</label>
+          <label className="text-xs text-muted-foreground block mb-1">Likelihood</label>
           <Select
             value={item.likelihood}
             onValueChange={v => onUpdate({ likelihood: v as RiskOpportunity['likelihood'] })}
@@ -217,7 +217,7 @@ function RoCard({
           </Select>
         </div>
         <div>
-          <label className="text-xs text-stone-400 block mb-1">Impact</label>
+          <label className="text-xs text-muted-foreground block mb-1">Impact</label>
           <Select
             value={item.impact}
             onValueChange={v => onUpdate({ impact: v as RiskOpportunity['impact'] })}
@@ -233,7 +233,7 @@ function RoCard({
           </Select>
         </div>
         <div>
-          <label className="text-xs text-stone-400 block mb-1">Time Horizon</label>
+          <label className="text-xs text-muted-foreground block mb-1">Time Horizon</label>
           <Select
             value={item.timeHorizon}
             onValueChange={v => onUpdate({ timeHorizon: v as RiskOpportunity['timeHorizon'] })}
