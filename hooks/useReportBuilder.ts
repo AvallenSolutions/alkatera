@@ -223,14 +223,27 @@ export function useReportBuilder() {
             .eq('id', reportRecord.id);
         });
       } else {
-        // PPTX: invoke edge function async — progress updates via Realtime
-        supabase.functions.invoke('generate-sustainability-report', {
-          body: { report_config_id: reportRecord.id },
-        }).then(async ({ data, error: functionError }) => {
-          if (functionError) {
-            console.error('Edge function error:', functionError);
-            // The edge function stores the real error in error_message before returning 500.
-            // Only set a fallback error_message if the edge function didn't already write one.
+        // PPTX: call edge function directly via fetch (bypasses supabase.functions.invoke
+        // which wraps fetch in getSession() machinery that can cause FunctionsFetchError).
+        // Uses the same explicit-token pattern as PDF and HTML generation above.
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData?.session?.access_token;
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+        fetch(`${supabaseUrl}/functions/v1/generate-sustainability-report`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`,
+            'apikey': anonKey || '',
+          },
+          body: JSON.stringify({ report_config_id: reportRecord.id }),
+        }).then(async (response) => {
+          if (!response.ok) {
+            console.error('Edge function returned error status:', response.status);
+            // The edge function stores the real error in error_message before returning non-2xx.
+            // Only set a fallback if the edge function didn't write one.
             await supabase
               .from('generated_reports')
               .update({
@@ -239,7 +252,6 @@ export function useReportBuilder() {
               })
               .eq('id', reportRecord.id)
               .is('error_message', null);
-            // Also ensure status is failed even if error_message was already set
             await supabase
               .from('generated_reports')
               .update({ status: 'failed' })
@@ -252,7 +264,7 @@ export function useReportBuilder() {
             .from('generated_reports')
             .update({
               status: 'failed',
-              error_message: 'Report generation failed unexpectedly. Please try again.',
+              error_message: `Network error: ${err?.message || 'Could not reach the report generation service.'}`,
             })
             .eq('id', reportRecord.id)
             .is('error_message', null);
