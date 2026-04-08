@@ -57,7 +57,7 @@ export function MilestoneTimeline({ milestones, operationalEvents = [], onChange
   return (
     <div className="space-y-4">
       {sorted.length === 0 && (
-        <p className="text-sm text-stone-500 text-center py-6 border border-dashed border-stone-200 rounded-lg">
+        <p className="text-sm text-muted-foreground text-center py-6 border border-dashed border-border rounded-lg">
           No milestones added. Define the key actions that will drive your decarbonisation.
         </p>
       )}
@@ -66,7 +66,7 @@ export function MilestoneTimeline({ milestones, operationalEvents = [], onChange
       {sorted.length > 0 && (
         <div className="relative">
           {/* Vertical line */}
-          <div className="absolute left-4 top-5 bottom-5 w-px bg-stone-200" />
+          <div className="absolute left-4 top-5 bottom-5 w-px bg-border" />
 
           <div className="space-y-3">
             {sorted.map((milestone, _index) => {
@@ -77,18 +77,18 @@ export function MilestoneTimeline({ milestones, operationalEvents = [], onChange
                 <div key={milestone.id} className="relative pl-11">
                   {/* Status dot */}
                   <div
-                    className="absolute left-2 top-3 w-5 h-5 rounded-full flex items-center justify-center bg-white border-2 z-10"
+                    className="absolute left-2 top-3 w-5 h-5 rounded-full flex items-center justify-center bg-card border-2 z-10"
                     style={{ borderColor: statusColour }}
                   >
                     <StatusIcon className="w-3 h-3" style={{ color: statusColour }} />
                   </div>
 
-                  <div className="border border-stone-200 rounded-xl p-4 bg-white space-y-3">
+                  <div className="border border-border rounded-xl p-4 bg-card space-y-3">
                     <div className="flex items-start gap-3">
                       <div className="flex-1 grid grid-cols-1 gap-3 sm:grid-cols-3">
                         {/* Title */}
                         <div className="sm:col-span-2">
-                          <label className="text-xs font-mono uppercase tracking-wider text-stone-400 mb-1 block">Milestone</label>
+                          <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1 block">Milestone</label>
                           <Input
                             placeholder="e.g. Switch to 100% renewable electricity"
                             value={milestone.title}
@@ -99,7 +99,7 @@ export function MilestoneTimeline({ milestones, operationalEvents = [], onChange
 
                         {/* Target date */}
                         <div>
-                          <label className="text-xs font-mono uppercase tracking-wider text-stone-400 mb-1 block">Target Date</label>
+                          <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1 block">Target Date</label>
                           <Input
                             type="date"
                             value={milestone.targetDate}
@@ -112,7 +112,7 @@ export function MilestoneTimeline({ milestones, operationalEvents = [], onChange
                       <button
                         type="button"
                         onClick={() => remove(milestone.id)}
-                        className="text-stone-300 hover:text-red-400 transition-colors mt-1 flex-shrink-0"
+                        className="text-muted-foreground hover:text-red-400 transition-colors mt-1 flex-shrink-0"
                         aria-label="Remove milestone"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -122,7 +122,7 @@ export function MilestoneTimeline({ milestones, operationalEvents = [], onChange
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                       {/* Status */}
                       <div>
-                        <label className="text-xs font-mono uppercase tracking-wider text-stone-400 mb-1 block">Status</label>
+                        <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1 block">Status</label>
                         <Select
                           value={milestone.status}
                           onValueChange={v => update(milestone.id, { status: v as TransitionMilestone['status'] })}
@@ -140,7 +140,7 @@ export function MilestoneTimeline({ milestones, operationalEvents = [], onChange
 
                       {/* Expected emissions impact */}
                       <div>
-                        <label className="text-xs font-mono uppercase tracking-wider text-stone-400 mb-1 block">
+                        <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1 block">
                           Impact (tCO2e)
                         </label>
                         <Input
@@ -158,7 +158,7 @@ export function MilestoneTimeline({ milestones, operationalEvents = [], onChange
                       {/* Link to operational event */}
                       {operationalEvents.length > 0 && (
                         <div className="col-span-2">
-                          <label className="text-xs font-mono uppercase tracking-wider text-stone-400 mb-1 block">
+                          <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1 block">
                             Link to logged action
                           </label>
                           <Select
@@ -186,7 +186,7 @@ export function MilestoneTimeline({ milestones, operationalEvents = [], onChange
                       placeholder="Notes (optional)"
                       value={milestone.notes ?? ''}
                       onChange={e => update(milestone.id, { notes: e.target.value || undefined })}
-                      className="h-8 text-xs text-stone-500"
+                      className="h-8 text-xs"
                     />
                   </div>
                 </div>
@@ -203,7 +203,7 @@ export function MilestoneTimeline({ milestones, operationalEvents = [], onChange
 
       {/* Summary bar */}
       {sorted.length > 0 && (
-        <div className="flex gap-4 text-xs text-stone-500 pt-1">
+        <div className="flex gap-4 text-xs text-muted-foreground pt-1">
           {(['not_started', 'in_progress', 'complete'] as TransitionMilestone['status'][]).map(s => {
             const count = sorted.filter(m => m.status === s).length
             if (count === 0) return null

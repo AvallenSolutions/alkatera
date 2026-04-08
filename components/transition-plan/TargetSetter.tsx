@@ -41,7 +41,7 @@ export function TargetSetter({ targets, baselineEmissionsTco2e, onChange }: Targ
   return (
     <div className="space-y-4">
       {targets.length === 0 && (
-        <p className="text-sm text-stone-500 text-center py-6 border border-dashed border-stone-200 rounded-lg">
+        <p className="text-sm text-muted-foreground text-center py-6 border border-dashed border-border rounded-lg">
           No targets set. Add a reduction target to get started.
         </p>
       )}
@@ -53,7 +53,7 @@ export function TargetSetter({ targets, baselineEmissionsTco2e, onChange }: Targ
           : null
 
         return (
-          <div key={target.id} className="border border-stone-200 rounded-xl p-4 space-y-3 bg-white">
+          <div key={target.id} className="border border-border rounded-xl p-4 space-y-3 bg-card">
             <div className="flex items-start gap-3">
               {/* Colour dot */}
               <div
@@ -64,7 +64,7 @@ export function TargetSetter({ targets, baselineEmissionsTco2e, onChange }: Targ
               <div className="flex-1 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {/* Scope */}
                 <div className="col-span-2 sm:col-span-1">
-                  <label className="text-xs font-mono uppercase tracking-wider text-stone-400 mb-1 block">Scope</label>
+                  <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1 block">Scope</label>
                   <Select
                     value={target.scope}
                     onValueChange={v => update(target.id, { scope: v as ReductionTarget['scope'] })}
@@ -82,7 +82,7 @@ export function TargetSetter({ targets, baselineEmissionsTco2e, onChange }: Targ
 
                 {/* Target year */}
                 <div>
-                  <label className="text-xs font-mono uppercase tracking-wider text-stone-400 mb-1 block">Target Year</label>
+                  <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1 block">Target Year</label>
                   <Input
                     type="number"
                     min={new Date().getFullYear()}
@@ -95,7 +95,7 @@ export function TargetSetter({ targets, baselineEmissionsTco2e, onChange }: Targ
 
                 {/* Reduction % */}
                 <div>
-                  <label className="text-xs font-mono uppercase tracking-wider text-stone-400 mb-1 block">
+                  <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1 block">
                     Reduction %
                   </label>
                   <div className="flex items-center gap-2">
@@ -107,13 +107,13 @@ export function TargetSetter({ targets, baselineEmissionsTco2e, onChange }: Targ
                       onChange={e => update(target.id, { reductionPct: Math.min(100, Math.max(1, parseInt(e.target.value) || 1)) })}
                       className="h-9 text-sm"
                     />
-                    <span className="text-stone-400 text-sm flex-shrink-0">%</span>
+                    <span className="text-muted-foreground text-sm flex-shrink-0">%</span>
                   </div>
                 </div>
 
                 {/* Absolute target (derived or manual) */}
                 <div>
-                  <label className="text-xs font-mono uppercase tracking-wider text-stone-400 mb-1 block">
+                  <label className="text-xs font-mono uppercase tracking-wider text-muted-foreground mb-1 block">
                     Absolute (tCO2e)
                   </label>
                   <Input
@@ -132,7 +132,7 @@ export function TargetSetter({ targets, baselineEmissionsTco2e, onChange }: Targ
               <button
                 type="button"
                 onClick={() => remove(target.id)}
-                className="text-stone-300 hover:text-red-400 transition-colors mt-1 flex-shrink-0"
+                className="text-muted-foreground hover:text-red-400 transition-colors mt-1 flex-shrink-0"
                 aria-label="Remove target"
               >
                 <Trash2 className="w-4 h-4" />
@@ -142,11 +142,11 @@ export function TargetSetter({ targets, baselineEmissionsTco2e, onChange }: Targ
             {/* Progress bar visualisation */}
             {baselineEmissionsTco2e && baselineEmissionsTco2e > 0 && (
               <div className="ml-6">
-                <div className="flex justify-between text-xs text-stone-400 mb-1">
+                <div className="flex justify-between text-xs text-muted-foreground mb-1">
                   <span>Baseline: {baselineEmissionsTco2e.toLocaleString('en-GB', { maximumFractionDigits: 0 })} tCO2e</span>
                   <span>Target: {((baselineEmissionsTco2e * (1 - target.reductionPct / 100))).toLocaleString('en-GB', { maximumFractionDigits: 0 })} tCO2e by {target.targetYear}</span>
                 </div>
-                <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all duration-300"
                     style={{
@@ -155,7 +155,7 @@ export function TargetSetter({ targets, baselineEmissionsTco2e, onChange }: Targ
                     }}
                   />
                 </div>
-                <div className="text-xs text-stone-400 mt-1">
+                <div className="text-xs text-muted-foreground mt-1">
                   {target.reductionPct}% reduction — {target.reductionPct >= 50 ? 'SBTi-compatible trajectory' : 'Below SBTi 1.5°C minimum (50%)'}
                 </div>
               </div>
@@ -167,7 +167,7 @@ export function TargetSetter({ targets, baselineEmissionsTco2e, onChange }: Targ
                 placeholder="Notes (optional)"
                 value={target.notes ?? ''}
                 onChange={e => update(target.id, { notes: e.target.value || undefined })}
-                className="h-8 text-xs text-stone-500"
+                className="h-8 text-xs"
               />
             </div>
           </div>
