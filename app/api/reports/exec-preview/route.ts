@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
         .from('corporate_reports')
         .select('total_emissions, breakdown_json')
         .eq('organization_id', organizationId)
-        .eq('report_year', reportYear)
+        .eq('year', reportYear)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle(),

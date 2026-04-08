@@ -108,7 +108,7 @@ export async function POST(
       .from('corporate_reports')
       .select('total_emissions, breakdown_json')
       .eq('organization_id', orgId)
-      .eq('report_year', year)
+      .eq('year', year)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
