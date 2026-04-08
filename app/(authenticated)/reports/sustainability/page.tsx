@@ -275,8 +275,12 @@ function SustainabilityReportsHub() {
   const tpComplete = tpHasTargets && tpHasMilestones && tpHasRisks
   const tpInProgress = (tpHasTargets || tpHasMilestones) && !tpComplete
 
-  const activeReports = reports.filter(r => r.status !== 'failed')
-  const failedReports = reports.filter(r => r.status === 'failed')
+  // Treat any "generating" report older than 2 hours as stale (generation process died)
+  const TWO_HOURS_MS = 2 * 60 * 60 * 1000
+  const isStaleGenerating = (r: GeneratedReport) =>
+    r.status === 'generating' && Date.now() - new Date(r.created_at).getTime() > TWO_HOURS_MS
+  const activeReports = reports.filter(r => r.status !== 'failed' && !isStaleGenerating(r))
+  const failedReports = reports.filter(r => r.status === 'failed' || isStaleGenerating(r))
 
   return (
     <div className="space-y-6">
@@ -577,9 +581,9 @@ function SustainabilityReportsHub() {
                         <span className="text-muted-foreground ml-2 text-xs">
                           {formatDistanceToNow(new Date(report.created_at), { addSuffix: true })}
                         </span>
-                        {report.error_message && (
-                          <p className="text-xs text-destructive mt-0.5 truncate">{report.error_message}</p>
-                        )}
+                        <p className="text-xs text-destructive mt-0.5 truncate">
+                          {isStaleGenerating(report) ? 'Generation timed out' : report.error_message}
+                        </p>
                       </div>
                       <Button
                         variant="ghost"
