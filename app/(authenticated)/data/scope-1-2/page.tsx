@@ -42,8 +42,11 @@ import {
   CheckCircle2,
   Building2,
   ExternalLink,
+  TrendingUp,
+  TrendingDown,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
+import { cn } from '@/lib/utils';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { useOrganization } from '@/lib/organizationContext';
 import { useReportingPeriod } from '@/hooks/useReportingPeriod';
@@ -63,7 +66,8 @@ import { UpstreamTransportCard } from '@/components/reports/UpstreamTransportCar
 import { DownstreamTransportCard } from '@/components/reports/DownstreamTransportCard';
 import { UsePhaseCard } from '@/components/reports/UsePhaseCard';
 import Link from 'next/link';
-import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from 'recharts';
+import { calculateCorporateEmissions } from '@/lib/calculations/corporate-emissions';
 import { EmissionsGuide } from '@/components/emissions/EmissionsGuide';
 import { ScopeTipBanner } from '@/components/emissions/ScopeTipBanner';
 
@@ -165,6 +169,14 @@ interface SourceBreakdown {
   total_co2e: number;
 }
 
+interface TrendYear {
+  year: number;
+  scope1: number;
+  scope2: number;
+  scope3: number;
+  total: number;
+}
+
 export default function CompanyEmissionsPage() {
   const { currentOrganization } = useOrganization();
   const { selectableYears, getYearRange, currentLabelYear } = useReportingPeriod();
@@ -212,6 +224,10 @@ export default function CompanyEmissionsPage() {
     totalScope2Kg: xeroScope2Kg,
     totalScope3Kg: xeroScope3Kg,
   } = useXeroTransactions(currentOrganization?.id, selectedYearStart, selectedYearEnd);
+
+  // Trend analytics state
+  const [trendData, setTrendData] = useState<TrendYear[]>([]);
+  const [isLoadingTrends, setIsLoadingTrends] = useState(false);
 
   // New state for facility-based utility data
   const [utilityData, setUtilityData] = useState<UtilityDataEntry[]>([]);
@@ -855,6 +871,51 @@ export default function CompanyEmissionsPage() {
     }
   };
 
+  const fetchTrendData = async () => {
+    if (!currentOrganization?.id) return;
+    setIsLoadingTrends(true);
+    try {
+      const browserSupabase = getSupabaseBrowserClient();
+      const { data: allReports } = await browserSupabase
+        .from('corporate_reports')
+        .select('year')
+        .eq('organization_id', currentOrganization.id)
+        .order('year', { ascending: true });
+
+      if (!allReports || allReports.length === 0) return;
+
+      const results = await Promise.all(
+        allReports.map(async (r) => {
+          try {
+            const result = await calculateCorporateEmissions(browserSupabase, currentOrganization.id, r.year);
+            const bd = result.breakdown;
+            return {
+              year: r.year,
+              scope1: bd.scope1 / 1000,
+              scope2: bd.scope2 / 1000,
+              scope3: bd.scope3.total / 1000,
+              total: bd.total / 1000,
+            };
+          } catch {
+            return { year: r.year, scope1: 0, scope2: 0, scope3: 0, total: 0 };
+          }
+        })
+      );
+      setTrendData(results.filter(r => r.total > 0));
+    } catch {
+      // silent — non-fatal
+    } finally {
+      setIsLoadingTrends(false);
+    }
+  };
+
+  const handleTabChange = (newTab: string) => {
+    setActiveTab(newTab);
+    if (newTab === 'trends' && trendData.length === 0 && !isLoadingTrends) {
+      fetchTrendData();
+    }
+  };
+
 
   const fetchProductsEmissions = async () => {
     if (!currentOrganization?.id) return;
@@ -1175,8 +1236,8 @@ export default function CompanyEmissionsPage() {
         </Alert>
       )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full max-w-3xl grid-cols-4">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
+        <TabsList className="grid w-full max-w-4xl grid-cols-5">
           <TabsTrigger value="footprint" className="gap-2">
             <BarChart3 className="h-4 w-4" />
             Annual Footprint
@@ -1192,6 +1253,10 @@ export default function CompanyEmissionsPage() {
           <TabsTrigger value="scope3" className="gap-2">
             <Globe className="h-4 w-4" />
             Scope 3
+          </TabsTrigger>
+          <TabsTrigger value="trends" className="gap-2">
+            <TrendingUp className="h-4 w-4" />
+            Trends
           </TabsTrigger>
         </TabsList>
 
@@ -2262,6 +2327,230 @@ export default function CompanyEmissionsPage() {
                   Unable to load Scope 3 data collection cards. Please try refreshing the page.
                 </AlertDescription>
               </Alert>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* ── Trends tab ──────────────────────────────────── */}
+        <TabsContent value="trends">
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-xl font-semibold">Emissions Trends</h2>
+              <p className="text-sm text-muted-foreground">Year-over-year emissions analysis across all reporting periods</p>
+            </div>
+
+            {isLoadingTrends ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : trendData.length === 0 ? (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  No data available yet. Calculate your footprint for at least one year to see trends.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <>
+                {/* Stacked bar chart */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Total Emissions by Year</CardTitle>
+                    <CardDescription>Scope 1, 2 and 3 contributions per reporting year (tCO₂e)</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[320px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={trendData} margin={{ left: 10, right: 20, top: 10, bottom: 5 }}>
+                          <XAxis dataKey="year" tick={{ fontSize: 13 }} />
+                          <YAxis tick={{ fontSize: 12 }} tickFormatter={(v: number) => `${v.toFixed(0)} t`} />
+                          <RechartsTooltip
+                            formatter={(value: number, name: string) => [`${value.toFixed(2)} tCO₂e`, name]}
+                            contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '13px' }}
+                          />
+                          <Legend />
+                          <Bar dataKey="scope1" name="Scope 1" stackId="a" fill="#f97316" />
+                          <Bar dataKey="scope2" name="Scope 2" stackId="a" fill="#3b82f6" />
+                          <Bar dataKey="scope3" name="Scope 3" stackId="a" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Scope mix proportions */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Emissions Mix by Year</CardTitle>
+                    <CardDescription>Proportion of each scope as a share of total emissions</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {trendData.map(yr => {
+                        const t = yr.total || 1;
+                        const s1Pct = (yr.scope1 / t) * 100;
+                        const s2Pct = (yr.scope2 / t) * 100;
+                        const s3Pct = (yr.scope3 / t) * 100;
+                        return (
+                          <div key={yr.year}>
+                            <div className="flex justify-between text-sm mb-1.5">
+                              <span className="font-medium">{yr.year}</span>
+                              <span className="text-muted-foreground font-mono">{yr.total.toFixed(2)} tCO₂e</span>
+                            </div>
+                            <div className="flex h-5 rounded-full overflow-hidden">
+                              {s1Pct > 0 && (
+                                <div
+                                  className="bg-orange-500 flex items-center justify-center text-[10px] text-white"
+                                  style={{ width: `${s1Pct}%` }}
+                                  title={`Scope 1: ${s1Pct.toFixed(1)}%`}
+                                >
+                                  {s1Pct >= 10 && 'S1'}
+                                </div>
+                              )}
+                              {s2Pct > 0 && (
+                                <div
+                                  className="bg-blue-500 flex items-center justify-center text-[10px] text-white"
+                                  style={{ width: `${s2Pct}%` }}
+                                  title={`Scope 2: ${s2Pct.toFixed(1)}%`}
+                                >
+                                  {s2Pct >= 10 && 'S2'}
+                                </div>
+                              )}
+                              {s3Pct > 0 && (
+                                <div
+                                  className="bg-emerald-500 flex items-center justify-center text-[10px] text-white"
+                                  style={{ width: `${s3Pct}%` }}
+                                  title={`Scope 3: ${s3Pct.toFixed(1)}%`}
+                                >
+                                  {s3Pct >= 10 && 'S3'}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="flex gap-5 mt-5">
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <div className="w-3 h-3 rounded-full bg-orange-500" />Scope 1 (direct)
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <div className="w-3 h-3 rounded-full bg-blue-500" />Scope 2 (energy)
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <div className="w-3 h-3 rounded-full bg-emerald-500" />Scope 3 (value chain)
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* YoY comparison table */}
+                {trendData.length >= 2 && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">Year-over-Year Comparison</CardTitle>
+                      <CardDescription>Absolute and percentage change between reporting periods</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Year</TableHead>
+                            <TableHead className="text-right">Scope 1</TableHead>
+                            <TableHead className="text-right">Scope 2</TableHead>
+                            <TableHead className="text-right">Scope 3</TableHead>
+                            <TableHead className="text-right">Total</TableHead>
+                            <TableHead className="text-right">YoY Change</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {trendData.map((yr, i) => {
+                            const prev = i > 0 ? trendData[i - 1] : null;
+                            const change = prev && prev.total > 0
+                              ? ((yr.total - prev.total) / prev.total) * 100
+                              : null;
+                            const absChange = prev ? yr.total - prev.total : null;
+                            return (
+                              <TableRow key={yr.year}>
+                                <TableCell className="font-semibold">{yr.year}</TableCell>
+                                <TableCell className="text-right font-mono text-sm">{yr.scope1.toFixed(2)} t</TableCell>
+                                <TableCell className="text-right font-mono text-sm">{yr.scope2.toFixed(2)} t</TableCell>
+                                <TableCell className="text-right font-mono text-sm">{yr.scope3.toFixed(2)} t</TableCell>
+                                <TableCell className="text-right font-mono font-semibold">{yr.total.toFixed(2)} t</TableCell>
+                                <TableCell className="text-right">
+                                  {change !== null && absChange !== null ? (
+                                    <div className="flex flex-col items-end gap-0.5">
+                                      <span className={cn(
+                                        'inline-flex items-center gap-1 text-sm font-medium',
+                                        change < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
+                                      )}>
+                                        {change < 0
+                                          ? <TrendingDown className="h-3.5 w-3.5" />
+                                          : <TrendingUp className="h-3.5 w-3.5" />
+                                        }
+                                        {Math.abs(change).toFixed(1)}%
+                                      </span>
+                                      <span className="text-xs text-muted-foreground font-mono">
+                                        {absChange > 0 ? '+' : ''}{absChange.toFixed(2)} t
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <Badge variant="secondary" className="text-xs">Baseline</Badge>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Latest vs earliest summary */}
+                {trendData.length >= 2 && (() => {
+                  const first = trendData[0];
+                  const last = trendData[trendData.length - 1];
+                  const overallChange = first.total > 0 ? ((last.total - first.total) / first.total) * 100 : null;
+                  const biggestScope =
+                    last.scope3 >= last.scope1 && last.scope3 >= last.scope2 ? 'Scope 3 (value chain)' :
+                    last.scope1 >= last.scope2 ? 'Scope 1 (direct)' : 'Scope 2 (purchased energy)';
+                  return (
+                    <Card className={cn(
+                      'border',
+                      overallChange !== null && overallChange < 0
+                        ? 'bg-emerald-50/50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800'
+                        : 'bg-slate-50/50 dark:bg-slate-900/20'
+                    )}>
+                      <CardContent className="pt-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                          <div>
+                            <div className="text-muted-foreground mb-1">Overall since {first.year}</div>
+                            {overallChange !== null ? (
+                              <div className={cn(
+                                'text-2xl font-bold',
+                                overallChange < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'
+                              )}>
+                                {overallChange > 0 ? '+' : ''}{overallChange.toFixed(1)}%
+                              </div>
+                            ) : (
+                              <div className="text-2xl font-bold text-muted-foreground">N/A</div>
+                            )}
+                          </div>
+                          <div>
+                            <div className="text-muted-foreground mb-1">Largest scope ({last.year})</div>
+                            <div className="text-base font-semibold">{biggestScope}</div>
+                          </div>
+                          <div>
+                            <div className="text-muted-foreground mb-1">Years tracked</div>
+                            <div className="text-2xl font-bold">{trendData.length}</div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
+              </>
             )}
           </div>
         </TabsContent>

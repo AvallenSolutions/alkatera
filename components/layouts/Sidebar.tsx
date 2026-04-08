@@ -54,8 +54,6 @@ import {
   Database,
   ArrowUpCircle,
   TreePine,
-  Layers,
-  Route,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
@@ -191,10 +189,7 @@ const navigationStructure: NavItem[] = [
     icon: FileText,
     minTier: 1,
     children: [
-      { name: 'Company Footprint',       href: '/reports/company-footprint/', icon: Building2,  minTier: 1 },
       { name: 'Sustainability Reports', href: '/reports/sustainability/',    icon: TrendingUp, minTier: 1 },
-      { name: 'Materiality',            href: '/reports/materiality/',       icon: Layers,     minTier: 1 },
-      { name: 'Transition Plan',        href: '/reports/transition-plan/',   icon: Route,      minTier: 1 },
       { name: 'LCA Reports',            href: '/reports/lcas/',              icon: Award,      minTier: 2 },
       { name: 'Impact Valuation',       href: '/reports/impact-valuation/', icon: TrendingUp, minTier: 3 },
     ],
