@@ -77,7 +77,7 @@ async function callAnthropicApi(
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: maxTokens,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
@@ -522,16 +522,20 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
-    // Get branded template if organization has one
+    // Get branded template if organization has one (non-fatal — column may not exist yet)
     let templateId = 'default';
-    const { data: orgData } = await supabaseClient
-      .from('organizations')
-      .select('slidespeak_template_id')
-      .eq('id', reportConfig.organization_id)
-      .single();
+    try {
+      const { data: orgData } = await supabaseClient
+        .from('organizations')
+        .select('slidespeak_template_id')
+        .eq('id', reportConfig.organization_id)
+        .maybeSingle();
 
-    if (orgData?.slidespeak_template_id) {
-      templateId = orgData.slidespeak_template_id;
+      if (orgData?.slidespeak_template_id) {
+        templateId = orgData.slidespeak_template_id;
+      }
+    } catch {
+      // Column not yet in schema — proceed with default template
     }
 
     const slideSpeakResult = await slideSpeakClient.generateAndWait({

@@ -229,13 +229,22 @@ export function useReportBuilder() {
         }).then(async ({ data, error: functionError }) => {
           if (functionError) {
             console.error('Edge function error:', functionError);
+            // The edge function stores the real error in error_message before returning 500.
+            // Only set a fallback error_message if the edge function didn't already write one.
             await supabase
               .from('generated_reports')
               .update({
                 status: 'failed',
-                error_message: functionError.message || 'Unknown error',
+                error_message: 'Report generation failed unexpectedly. Please try again.',
               })
-              .eq('id', reportRecord.id);
+              .eq('id', reportRecord.id)
+              .is('error_message', null);
+            // Also ensure status is failed even if error_message was already set
+            await supabase
+              .from('generated_reports')
+              .update({ status: 'failed' })
+              .eq('id', reportRecord.id)
+              .neq('status', 'failed');
           }
         }).catch(async (err) => {
           console.error('Edge function call failed:', err);
@@ -243,9 +252,15 @@ export function useReportBuilder() {
             .from('generated_reports')
             .update({
               status: 'failed',
-              error_message: err?.message || 'Edge function invocation failed',
+              error_message: 'Report generation failed unexpectedly. Please try again.',
             })
-            .eq('id', reportRecord.id);
+            .eq('id', reportRecord.id)
+            .is('error_message', null);
+          await supabase
+            .from('generated_reports')
+            .update({ status: 'failed' })
+            .eq('id', reportRecord.id)
+            .neq('status', 'failed');
         });
       }
 
