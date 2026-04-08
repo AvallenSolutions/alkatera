@@ -62,8 +62,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(cached.result);
     }
 
-    // Fetch org name and live emissions
-    const [orgResult, corpResult] = await Promise.all([
+    const yearStart = `${reportYear}-01-01`;
+    const yearEnd = `${reportYear}-12-31`;
+
+    // Fetch org, corporate report (for scope1/scope2 cache), and production logs in parallel.
+    // We always calculate scope3 LIVE from production_logs × PCFs — breakdown_json.scope3 can
+    // be stale if persistEmissions ran before async product data had finished loading.
+    const [orgResult, corpResult, prodLogsResult] = await Promise.all([
       supabase
         .from('organizations')
         .select('name, industry_sector')
@@ -71,24 +76,60 @@ export async function POST(request: NextRequest) {
         .single(),
       supabase
         .from('corporate_reports')
-        .select('total_emissions, breakdown_json')
+        .select('id, total_emissions, breakdown_json')
         .eq('organization_id', organizationId)
         .eq('year', reportYear)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle(),
+      supabase
+        .from('production_logs')
+        .select('product_id, quantity_produced')
+        .eq('organization_id', organizationId)
+        .gte('production_date', yearStart)
+        .lte('production_date', yearEnd),
     ]);
 
     const orgName = orgResult.data?.name || 'the organisation';
     const sector = orgResult.data?.industry_sector || '';
     const bj = (corpResult.data?.breakdown_json as any) || {};
-    // breakdown_json.total is the authoritative value written by the live calculation.
-    // Fall back to the total_emissions column if breakdown_json.total is absent (legacy records).
-    const total = bj.total || corpResult.data?.total_emissions || 0;
-    // scope3 is stored as an object { products, use_phase, total, ... } — extract the total.
-    const scope3Total = typeof bj.scope3 === 'object' && bj.scope3 !== null
-      ? (bj.scope3.total ?? 0)
-      : (bj.scope3 ?? 0);
+
+    // scope1 and scope2 are reliably cached in breakdown_json (utility entries are
+    // logged explicitly and don't change after the fact).
+    const scope1 = typeof bj.scope1 === 'number' ? bj.scope1 : 0;
+    const scope2 = typeof bj.scope2 === 'number' ? bj.scope2 : 0;
+
+    // Scope 3 products: always calculate live from production_logs × completed PCFs.
+    // pcf.aggregated_impacts.breakdown.by_scope.scope3 is in kg/unit; × quantity = kg → /1000 = tonnes.
+    let scope3Products = 0;
+    const prodLogs = prodLogsResult.data || [];
+    if (prodLogs.length > 0) {
+      const productIds = Array.from(new Set(prodLogs.map((p: any) => p.product_id)));
+      const { data: pcfs } = await supabase
+        .from('product_carbon_footprints')
+        .select('product_id, aggregated_impacts')
+        .in('product_id', productIds)
+        .eq('status', 'completed');
+      if (pcfs && pcfs.length > 0) {
+        const pcfMap = new Map(pcfs.map((p: any) => [p.product_id, p]));
+        for (const log of prodLogs) {
+          const l = log as any;
+          const pcf = pcfMap.get(l.product_id) as any;
+          if (pcf?.aggregated_impacts?.breakdown?.by_scope?.scope3) {
+            scope3Products += pcf.aggregated_impacts.breakdown.by_scope.scope3 * (l.quantity_produced || 0);
+          }
+        }
+      }
+    }
+    scope3Products = scope3Products / 1000; // kg → tonnes
+
+    // Secondary scope3 (overheads, fleet, xero baseline): read from cached breakdown_json.
+    // These are small, stable values that don't suffer from the race-condition stale issue.
+    const bj3 = (typeof bj.scope3 === 'object' && bj.scope3 !== null) ? bj.scope3 : {};
+    const scope3Secondary = (bj3.overheads || 0) + (bj3.business_travel_fleet || 0) + (bj3.xero_baseline || 0);
+
+    const scope3Total = scope3Products + scope3Secondary;
+    const total = scope1 + scope2 + scope3Total;
 
     // If no emissions data, return a placeholder immediately (no AI call)
     if (total === 0) {
@@ -117,8 +158,8 @@ export async function POST(request: NextRequest) {
 Audience: ${audience} — they care about ${audienceTone}
 Sector: ${sector}
 Total emissions: ${total.toLocaleString('en-GB', { maximumFractionDigits: 0 })} tCO2e
-Scope 1: ${(bj.scope1 || 0).toLocaleString('en-GB', { maximumFractionDigits: 0 })} tCO2e
-Scope 2: ${(bj.scope2 || 0).toLocaleString('en-GB', { maximumFractionDigits: 0 })} tCO2e
+Scope 1: ${scope1.toLocaleString('en-GB', { maximumFractionDigits: 0 })} tCO2e
+Scope 2: ${scope2.toLocaleString('en-GB', { maximumFractionDigits: 0 })} tCO2e
 Scope 3: ${scope3Total.toLocaleString('en-GB', { maximumFractionDigits: 0 })} tCO2e (${scope3Pct}% of total)`;
 
     if (reportFramingStatement) {

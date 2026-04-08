@@ -672,17 +672,11 @@ async function aggregateReportData(
         .eq('year', reportYear)
         .maybeSingle();
 
-      if (corporateReport && corporateReport.total_emissions > 0) {
-        data.emissions = {
-          scope1: corporateReport.breakdown_json?.scope1 || 0,
-          scope2: corporateReport.breakdown_json?.scope2 || 0,
-          scope3: corporateReport.breakdown_json?.scope3 || 0,
-          total: corporateReport.total_emissions || 0,
-          year: reportYear,
-        };
-        data.dataAvailability.hasEmissions = true;
-      } else {
-        // Fallback: Calculate from utility_data_entries + fleet + overheads (same as dashboard)
+      // Always calculate emissions live from raw data tables.
+      // breakdown_json can be stale if persistEmissions ran before async product data loaded
+      // (e.g. scope3.products is 0 because product LCAs hadn't resolved yet).
+      {
+        // Live calculation from utility_data_entries + fleet + overheads + production_logs × PCFs
         // Emission factors matching corporate-emissions.ts
         const UTILITY_FACTORS: Record<string, { factor: number; scope: string }> = {
           diesel_stationary: { factor: 2.68787, scope: 'Scope 1' },
