@@ -19,9 +19,10 @@ import { createClient } from '@supabase/supabase-js';
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 
-// 10-minute in-memory cache keyed on org+year+audience+framing
+// 5-minute in-memory cache keyed on org+year+audience+framing
+// Kept short so that when emissions data is updated the preview refreshes promptly.
 const previewCache = new Map<string, { result: { preview: string; primaryMessage: string }; expiresAt: number }>();
-const CACHE_TTL = 10 * 60 * 1000;
+const CACHE_TTL = 5 * 60 * 1000;
 
 export async function POST(request: NextRequest) {
   try {
@@ -80,8 +81,14 @@ export async function POST(request: NextRequest) {
 
     const orgName = orgResult.data?.name || 'the organisation';
     const sector = orgResult.data?.industry_sector || '';
-    const total = corpResult.data?.total_emissions || 0;
     const bj = (corpResult.data?.breakdown_json as any) || {};
+    // breakdown_json.total is the authoritative value written by the live calculation.
+    // Fall back to the total_emissions column if breakdown_json.total is absent (legacy records).
+    const total = bj.total || corpResult.data?.total_emissions || 0;
+    // scope3 is stored as an object { products, use_phase, total, ... } — extract the total.
+    const scope3Total = typeof bj.scope3 === 'object' && bj.scope3 !== null
+      ? (bj.scope3.total ?? 0)
+      : (bj.scope3 ?? 0);
 
     // If no emissions data, return a placeholder immediately (no AI call)
     if (total === 0) {
@@ -103,7 +110,7 @@ export async function POST(request: NextRequest) {
     };
 
     const audienceTone = AUDIENCE_TONE[audience] || 'sustainability performance';
-    const scope3Pct = total > 0 ? ((bj.scope3 || 0) / total * 100).toFixed(0) : '0';
+    const scope3Pct = total > 0 ? (scope3Total / total * 100).toFixed(0) : '0';
 
     let prompt = `Write a 2-3 sentence executive summary preview for ${orgName}'s ${reportYear} sustainability report.
 
@@ -112,7 +119,7 @@ Sector: ${sector}
 Total emissions: ${total.toLocaleString('en-GB', { maximumFractionDigits: 0 })} tCO2e
 Scope 1: ${(bj.scope1 || 0).toLocaleString('en-GB', { maximumFractionDigits: 0 })} tCO2e
 Scope 2: ${(bj.scope2 || 0).toLocaleString('en-GB', { maximumFractionDigits: 0 })} tCO2e
-Scope 3: ${(bj.scope3 || 0).toLocaleString('en-GB', { maximumFractionDigits: 0 })} tCO2e (${scope3Pct}% of total)`;
+Scope 3: ${scope3Total.toLocaleString('en-GB', { maximumFractionDigits: 0 })} tCO2e (${scope3Pct}% of total)`;
 
     if (reportFramingStatement) {
       prompt += `\n\nEditorial framing: "${reportFramingStatement}"`;
@@ -152,7 +159,7 @@ Rules: British English, no em dashes, factual, audience-specific tone.`;
     } catch (err) {
       console.error('[exec-preview] AI generation failed, using fallback:', err);
       preview = {
-        preview: `${orgName} recorded total GHG emissions of ${total.toLocaleString('en-GB', { maximumFractionDigits: 0 })} tCO2e in ${reportYear}, with Scope 3 representing ${scope3Pct}% of the total footprint. The full report covers emissions methodology, targets, and strategic initiatives.`,
+        preview: `${orgName} recorded total GHG emissions of ${total.toLocaleString('en-GB', { maximumFractionDigits: 0 })} tCO2e in ${reportYear}, with Scope 3 representing ${scope3Pct}% of the total footprint (${scope3Total.toLocaleString('en-GB', { maximumFractionDigits: 0 })} tCO2e). The full report covers emissions methodology, targets, and strategic initiatives.`,
         primaryMessage: `${orgName} recorded ${total.toLocaleString('en-GB', { maximumFractionDigits: 0 })} tCO2e in ${reportYear}.`,
       };
     }

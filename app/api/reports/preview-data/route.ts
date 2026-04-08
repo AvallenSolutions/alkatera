@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
     ] = await Promise.all([
       supabase
         .from('corporate_reports')
-        .select('id, total_emissions')
+        .select('id, total_emissions, breakdown_json')
         .eq('organization_id', organizationId)
         .eq('year', reportYear)
         .order('created_at', { ascending: false })
@@ -118,7 +118,10 @@ export async function POST(request: NextRequest) {
         .maybeSingle(),
     ]);
 
-    const hasEmissions = !!(corpReport.data && corpReport.data.total_emissions > 0);
+    // Use breakdown_json.total as the authoritative value; fall back to total_emissions column.
+    const bjTotal = (corpReport.data?.breakdown_json as any)?.total;
+    const emissionsTotal = bjTotal || corpReport.data?.total_emissions || 0;
+    const hasEmissions = emissionsTotal > 0;
     const hasProducts = (products.count ?? 0) > 0;
     const hasFacilities = (facilities.count ?? 0) > 0;
     const hasSuppliers = (suppliers.count ?? 0) > 0;

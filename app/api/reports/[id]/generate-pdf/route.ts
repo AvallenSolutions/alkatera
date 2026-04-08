@@ -124,13 +124,16 @@ export async function POST(
       .limit(1)
       .maybeSingle();
 
-    if (corpReport && corpReport.total_emissions > 0) {
-      const bj = corpReport.breakdown_json as any;
+    const bjPdf = corpReport?.breakdown_json as any;
+    const pdfTotal = bjPdf?.total || corpReport?.total_emissions || 0;
+    if (corpReport && pdfTotal > 0) {
+      const scope3Pdf = typeof bjPdf?.scope3 === 'object' && bjPdf.scope3 !== null
+        ? (bjPdf.scope3.total ?? 0) : (bjPdf?.scope3 ?? 0);
       reportData.emissions = {
-        scope1: bj?.scope1 || 0,
-        scope2: bj?.scope2 || 0,
-        scope3: bj?.scope3 || 0,
-        total: corpReport.total_emissions,
+        scope1: bjPdf?.scope1 || 0,
+        scope2: bjPdf?.scope2 || 0,
+        scope3: scope3Pdf,
+        total: pdfTotal,
         year,
       };
       reportData.dataAvailability.hasEmissions = true;

@@ -69,11 +69,14 @@ export async function POST(
       .maybeSingle();
 
     const bj = (corpReport?.breakdown_json as any) || {};
+    const invTotal = bj?.total || corpReport?.total_emissions || 0;
+    const invScope3 = typeof bj?.scope3 === 'object' && bj.scope3 !== null
+      ? (bj.scope3.total ?? 0) : (bj?.scope3 ?? 0);
     const emissions = {
       scope1: bj?.scope1 || 0,
       scope2: bj?.scope2 || 0,
-      scope3: bj?.scope3 || 0,
-      total: corpReport?.total_emissions || 0,
+      scope3: invScope3,
+      total: invTotal,
     };
 
     // Fetch transition plan for targets/milestones/risks
