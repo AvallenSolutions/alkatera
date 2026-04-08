@@ -1972,19 +1972,19 @@ export function calculateSlideCount(sections: string[]): number {
   const sectionSlides: Record<string, number> = {
     'executive-summary': 1,
     'company-overview': 1,
-    'scope-1-2-3': 3,
+    'scope-1-2-3': 2,
     'ghg-inventory': 1,
     'product-footprints': 2,
-    'impact-valuation': 2,
+    'impact-valuation': 1,
     'supply-chain': 1,
     'facilities': 1,
     'trends': 1,
     'targets': 1,
     'carbon-origin': 1,
     'multi-capital': 1,
-    'people-culture': 3,
-    'governance': 2,
-    'community-impact': 2,
+    'people-culture': 2,
+    'governance': 1,
+    'community-impact': 1,
     'methodology': 1,
     'regulatory': 1,
     'appendix': 1,
@@ -1998,6 +1998,6 @@ export function calculateSlideCount(sections: string[]): number {
     count += sectionSlides[section] || 1;
   }
 
-  // Minimum 8 slides, maximum 40
-  return Math.max(8, Math.min(40, count));
+  // Minimum 8 slides, maximum 28 — keeps generation within SlideSpeak's reliable window
+  return Math.max(8, Math.min(28, count));
 }

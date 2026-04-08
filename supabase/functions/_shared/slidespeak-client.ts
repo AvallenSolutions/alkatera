@@ -49,8 +49,10 @@ export interface SlideSpeakResult {
 }
 
 const DEFAULT_BASE_URL = 'https://api.slidespeak.co/api/v1';
-const DEFAULT_POLL_INTERVAL = 2000; // 2 seconds
-const DEFAULT_MAX_POLL_TIME = 120000; // 2 minutes
+const DEFAULT_POLL_INTERVAL = 3000; // 3 seconds
+// 85 s — gives the edge function time to write the error and return before
+// any platform-level HTTP connection timeout (~100 s) drops the connection.
+const DEFAULT_MAX_POLL_TIME = 85000;
 const MAX_RETRIES = 4;
 const RETRY_BACKOFF = [2000, 4000, 8000, 16000];
 
