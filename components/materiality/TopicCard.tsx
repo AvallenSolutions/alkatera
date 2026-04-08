@@ -15,10 +15,11 @@ const STATUS_OPTIONS: { value: TopicStatus; label: string; description: string }
   { value: 'not_material', label: 'Not Material', description: 'Not relevant to your business' },
 ]
 
-const STATUS_STYLES: Record<TopicStatus, string> = {
-  material: 'bg-lime-100 text-lime-800 border-lime-300 dark:bg-lime-900/40 dark:text-lime-400 dark:border-lime-700',
-  monitoring: 'bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-900/40 dark:text-amber-400 dark:border-amber-700',
-  not_material: 'bg-muted text-muted-foreground border-border',
+// Active state: solid coloured pill
+const STATUS_ACTIVE: Record<TopicStatus, string> = {
+  material:     'bg-lime-500 text-white border-lime-500 dark:bg-lime-500 dark:text-white dark:border-lime-500',
+  monitoring:   'bg-amber-500 text-white border-amber-500 dark:bg-amber-500 dark:text-white dark:border-amber-500',
+  not_material: 'bg-slate-500 text-white border-slate-500 dark:bg-slate-600 dark:text-white dark:border-slate-600',
 }
 
 export function TopicCard({ topic, onStatusChange }: TopicCardProps) {
@@ -27,19 +28,16 @@ export function TopicCard({ topic, onStatusChange }: TopicCardProps) {
 
   return (
     <div
-      className={cn(
-        'rounded-xl border bg-card p-4 transition-all',
-        currentStatus === 'material' ? 'border-lime-300 dark:border-lime-700 shadow-sm' : 'border-border',
-      )}
+      className="rounded-xl border-l-4 border border-border bg-card p-4 transition-all hover:shadow-sm"
+      style={{ borderLeftColor: categoryColour }}
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-2">
           <span
-            className="inline-block w-2 h-2 rounded-full flex-shrink-0 mt-1"
-            style={{ background: categoryColour }}
-          />
-          <span className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
+            className="text-xs font-semibold uppercase tracking-widest"
+            style={{ color: categoryColour }}
+          >
             {topic.category}
           </span>
         </div>
@@ -55,16 +53,16 @@ export function TopicCard({ topic, onStatusChange }: TopicCardProps) {
       <p className="text-xs text-muted-foreground leading-relaxed mb-3">{topic.description}</p>
 
       {/* Status toggle */}
-      <div className="flex gap-1">
+      <div className="flex gap-1.5">
         {STATUS_OPTIONS.map(opt => (
           <button
             key={opt.value}
             title={opt.description}
             onClick={() => onStatusChange(topic.id, opt.value)}
             className={cn(
-              'flex-1 text-xs font-medium py-1 px-2 rounded-md border transition-colors',
+              'flex-1 text-xs font-semibold py-1.5 px-2 rounded-lg border transition-all',
               currentStatus === opt.value
-                ? STATUS_STYLES[opt.value]
+                ? STATUS_ACTIVE[opt.value]
                 : 'bg-transparent text-muted-foreground border-border hover:border-muted-foreground hover:text-foreground',
             )}
           >
