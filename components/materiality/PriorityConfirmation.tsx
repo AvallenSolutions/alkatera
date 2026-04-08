@@ -57,13 +57,13 @@ export function PriorityConfirmation({ materialTopics, priorityOrder, onChange }
 
   return (
     <div>
-      <p className="text-sm text-stone-600 mb-4">
+      <p className="text-sm text-muted-foreground mb-4">
         The topics below are ranked by combined materiality score. Drag or use the arrows to reflect your organisation's
         strategic priorities. The order here determines how your sustainability report is structured.
       </p>
 
       {orderedTopics.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-stone-300 p-8 text-center text-sm text-stone-400">
+        <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
           No material topics scored yet. Go back to Step 2 and score your material topics.
         </div>
       ) : (
@@ -77,15 +77,15 @@ export function PriorityConfirmation({ materialTopics, priorityOrder, onChange }
               <div
                 key={topic.id}
                 className={cn(
-                  'rounded-xl border bg-white transition-all',
-                  index < 5 ? 'border-lime-200' : 'border-stone-200',
+                  'rounded-xl border bg-card transition-all',
+                  index < 5 ? 'border-lime-300 dark:border-lime-700' : 'border-border',
                 )}
               >
                 <div className="flex items-center gap-3 p-3">
                   {/* Rank badge */}
                   <div className={cn(
                     'w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0',
-                    index < 3 ? 'bg-[#ccff00] text-stone-900' : 'bg-stone-100 text-stone-500',
+                    index < 3 ? 'bg-[#ccff00] text-stone-900' : 'bg-muted text-muted-foreground',
                   )}>
                     {index + 1}
                   </div>
@@ -94,9 +94,9 @@ export function PriorityConfirmation({ materialTopics, priorityOrder, onChange }
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: colour }} />
-                      <span className="text-sm font-medium text-stone-900 truncate">{topic.name}</span>
+                      <span className="text-sm font-medium truncate">{topic.name}</span>
                     </div>
-                    <div className="text-xs text-stone-400 mt-0.5">
+                    <div className="text-xs text-muted-foreground mt-0.5">
                       Impact: {topic.impactScore}/5 · Financial: {topic.financialScore}/5 · Combined: {score}
                     </div>
                   </div>
@@ -105,29 +105,29 @@ export function PriorityConfirmation({ materialTopics, priorityOrder, onChange }
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <button
                       onClick={() => setExpanded(isExpanded ? null : topic.id)}
-                      className="text-xs text-stone-400 hover:text-stone-700 px-2 py-1 rounded"
+                      className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded"
                     >
                       {isExpanded ? 'Less' : 'Rationale'}
                     </button>
                     <button
                       onClick={() => moveUp(index)}
                       disabled={index === 0}
-                      className="p-1 rounded hover:bg-stone-100 disabled:opacity-30"
+                      className="p-1 rounded hover:bg-muted disabled:opacity-30"
                       title="Move up"
                     >
-                      <ChevronUp className="w-4 h-4 text-stone-500" />
+                      <ChevronUp className="w-4 h-4 text-muted-foreground" />
                     </button>
                     <button
                       onClick={() => moveDown(index)}
                       disabled={index === orderedTopics.length - 1}
-                      className="p-1 rounded hover:bg-stone-100 disabled:opacity-30"
+                      className="p-1 rounded hover:bg-muted disabled:opacity-30"
                       title="Move down"
                     >
-                      <ChevronDown className="w-4 h-4 text-stone-500" />
+                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
                     </button>
                     <button
                       onClick={() => removeFromPriority(topic.id)}
-                      className="p-1 rounded hover:bg-red-50 text-stone-300 hover:text-red-400"
+                      className="p-1 rounded hover:bg-red-950/20 text-muted-foreground hover:text-red-400"
                       title="Remove from priority list"
                     >
                       ×
@@ -138,8 +138,8 @@ export function PriorityConfirmation({ materialTopics, priorityOrder, onChange }
                 {/* Expanded rationale */}
                 {isExpanded && topic.rationale && (
                   <div className="px-3 pb-3 pt-0">
-                    <div className="text-xs text-stone-500 bg-stone-50 rounded-lg p-3 border border-stone-100">
-                      <span className="font-medium text-stone-700">Rationale: </span>
+                    <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3 border border-border">
+                      <span className="font-medium text-foreground">Rationale: </span>
                       {topic.rationale}
                     </div>
                   </div>
@@ -153,17 +153,17 @@ export function PriorityConfirmation({ materialTopics, priorityOrder, onChange }
       {/* Non-priority material topics */}
       {remainingTopics.length > 0 && (
         <div className="mt-6">
-          <h4 className="text-xs font-mono uppercase tracking-widest text-stone-400 mb-2">
+          <h4 className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-2">
             Other Material Topics (not in priority list)
           </h4>
           <div className="space-y-1.5">
             {remainingTopics.map(topic => (
-              <div key={topic.id} className="flex items-center gap-3 p-2.5 rounded-lg border border-stone-100 bg-stone-50">
+              <div key={topic.id} className="flex items-center gap-3 p-2.5 rounded-lg border border-border bg-muted/30">
                 <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: CATEGORY_COLOURS[topic.category] }} />
-                <span className="text-sm text-stone-600 flex-1">{topic.name}</span>
+                <span className="text-sm text-muted-foreground flex-1">{topic.name}</span>
                 <button
                   onClick={() => addToPriority(topic.id)}
-                  className="text-xs text-stone-400 hover:text-lime-700 flex items-center gap-1"
+                  className="text-xs text-muted-foreground hover:text-lime-500 flex items-center gap-1"
                 >
                   <Star className="w-3 h-3" />
                   Add to priority

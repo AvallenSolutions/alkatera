@@ -16,9 +16,9 @@ const STATUS_OPTIONS: { value: TopicStatus; label: string; description: string }
 ]
 
 const STATUS_STYLES: Record<TopicStatus, string> = {
-  material: 'bg-lime-100 text-lime-800 border-lime-300',
-  monitoring: 'bg-amber-50 text-amber-800 border-amber-300',
-  not_material: 'bg-stone-100 text-stone-500 border-stone-200',
+  material: 'bg-lime-100 text-lime-800 border-lime-300 dark:bg-lime-900/40 dark:text-lime-400 dark:border-lime-700',
+  monitoring: 'bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-900/40 dark:text-amber-400 dark:border-amber-700',
+  not_material: 'bg-muted text-muted-foreground border-border',
 }
 
 export function TopicCard({ topic, onStatusChange }: TopicCardProps) {
@@ -28,8 +28,8 @@ export function TopicCard({ topic, onStatusChange }: TopicCardProps) {
   return (
     <div
       className={cn(
-        'rounded-xl border bg-white p-4 transition-all',
-        currentStatus === 'material' ? 'border-lime-300 shadow-sm' : 'border-stone-200',
+        'rounded-xl border bg-card p-4 transition-all',
+        currentStatus === 'material' ? 'border-lime-300 dark:border-lime-700 shadow-sm' : 'border-border',
       )}
     >
       {/* Header */}
@@ -39,20 +39,20 @@ export function TopicCard({ topic, onStatusChange }: TopicCardProps) {
             className="inline-block w-2 h-2 rounded-full flex-shrink-0 mt-1"
             style={{ background: categoryColour }}
           />
-          <span className="text-xs font-mono uppercase tracking-widest text-stone-400">
+          <span className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
             {topic.category}
           </span>
         </div>
         {(topic.esrsReference || topic.griReference) && (
-          <span className="text-xs font-mono text-stone-400 shrink-0">
+          <span className="text-xs font-mono text-muted-foreground shrink-0">
             {topic.esrsReference || topic.griReference}
           </span>
         )}
       </div>
 
       {/* Title + description */}
-      <h3 className="font-semibold text-stone-900 text-sm mb-1">{topic.name}</h3>
-      <p className="text-xs text-stone-500 leading-relaxed mb-3">{topic.description}</p>
+      <h3 className="font-semibold text-sm mb-1">{topic.name}</h3>
+      <p className="text-xs text-muted-foreground leading-relaxed mb-3">{topic.description}</p>
 
       {/* Status toggle */}
       <div className="flex gap-1">
@@ -65,7 +65,7 @@ export function TopicCard({ topic, onStatusChange }: TopicCardProps) {
               'flex-1 text-xs font-medium py-1 px-2 rounded-md border transition-colors',
               currentStatus === opt.value
                 ? STATUS_STYLES[opt.value]
-                : 'bg-transparent text-stone-400 border-stone-200 hover:border-stone-300 hover:text-stone-600',
+                : 'bg-transparent text-muted-foreground border-border hover:border-muted-foreground hover:text-foreground',
             )}
           >
             {opt.label}

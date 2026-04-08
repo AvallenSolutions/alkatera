@@ -42,7 +42,7 @@ function ScoreSlider({
   return (
     <div>
       <div className="flex justify-between items-center mb-1">
-        <span className="text-xs text-stone-600">{label}</span>
+        <span className="text-xs text-muted-foreground">{label}</span>
         <span className="text-sm font-bold" style={{ color: colour }}>{value}/5</span>
       </div>
       <input
@@ -55,7 +55,7 @@ function ScoreSlider({
         className="w-full accent-current h-1.5"
         style={{ accentColor: colour }}
       />
-      <div className="flex justify-between text-xs text-stone-300 mt-0.5">
+      <div className="flex justify-between text-xs text-muted-foreground/50 mt-0.5">
         <span>Low</span>
         <span>High</span>
       </div>
@@ -198,10 +198,10 @@ export default function MaterialitySetupPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <Link href="/reports/materiality/" className="text-sm text-stone-400 hover:text-stone-600 flex items-center gap-1 mb-1">
+          <Link href="/reports/materiality/" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 mb-1">
             <ChevronLeft className="w-3.5 h-3.5" /> Materiality
           </Link>
-          <h1 className="text-xl font-semibold text-stone-900">
+          <h1 className="text-xl font-semibold">
             {year} Materiality Assessment
           </h1>
         </div>
@@ -221,19 +221,19 @@ export default function MaterialitySetupPage() {
               <div className="flex items-center gap-2 flex-1">
                 <div className={[
                   'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0',
-                  isDone ? 'bg-[#ccff00] text-stone-900' : isActive ? 'bg-stone-900 text-white' : 'bg-stone-200 text-stone-500',
+                  isDone ? 'bg-[#ccff00] text-stone-900' : isActive ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground',
                 ].join(' ')}>
                   {isDone ? <Check className="w-4 h-4" /> : num}
                 </div>
                 <div className="hidden sm:block">
-                  <div className={['text-xs font-medium', isActive ? 'text-stone-900' : 'text-stone-400'].join(' ')}>
+                  <div className={['text-xs font-medium', isActive ? 'text-foreground' : 'text-muted-foreground'].join(' ')}>
                     {s.label}
                   </div>
-                  <div className="text-xs text-stone-400">{s.description}</div>
+                  <div className="text-xs text-muted-foreground">{s.description}</div>
                 </div>
               </div>
               {i < STEPS.length - 1 && (
-                <div className={['h-px flex-1 mx-3', isDone ? 'bg-[#ccff00]' : 'bg-stone-200'].join(' ')} />
+                <div className={['h-px flex-1 mx-3', isDone ? 'bg-[#ccff00]' : 'bg-border'].join(' ')} />
               )}
             </div>
           )
@@ -244,8 +244,8 @@ export default function MaterialitySetupPage() {
       {step === 1 && (
         <div className="space-y-4">
           <div>
-            <h2 className="text-base font-semibold text-stone-900">Which topics are material to your business?</h2>
-            <p className="text-sm text-stone-500 mt-1">
+            <h2 className="text-base font-semibold">Which topics are material to your business?</h2>
+            <p className="text-sm text-muted-foreground mt-1">
               Review each topic and mark it as <strong>Material</strong> (relevant and important),
               <strong> Monitoring</strong> (potentially relevant), or <strong>Not Material</strong>.
               You can change these at any time.
@@ -258,7 +258,7 @@ export default function MaterialitySetupPage() {
               onClick={() => setCategoryFilter('all')}
               className={[
                 'text-xs px-3 py-1.5 rounded-full border transition-colors',
-                categoryFilter === 'all' ? 'bg-stone-900 text-white border-stone-900' : 'border-stone-200 text-stone-600 hover:border-stone-400',
+                categoryFilter === 'all' ? 'bg-foreground text-background border-foreground' : 'border-border text-muted-foreground hover:border-muted-foreground',
               ].join(' ')}
             >
               All ({topics.length})
@@ -269,7 +269,7 @@ export default function MaterialitySetupPage() {
                 onClick={() => setCategoryFilter(cat)}
                 className={[
                   'text-xs px-3 py-1.5 rounded-full border transition-colors flex items-center gap-1.5',
-                  categoryFilter === cat ? 'text-white border-transparent' : 'border-stone-200 text-stone-600 hover:border-stone-400',
+                  categoryFilter === cat ? 'text-white border-transparent' : 'border-border text-muted-foreground hover:border-muted-foreground',
                 ].join(' ')}
                 style={categoryFilter === cat ? { background: CATEGORY_COLOURS[cat] } : {}}
               >
@@ -277,14 +277,14 @@ export default function MaterialitySetupPage() {
                 {categoryCounts[cat] > 0 && (
                   <span className={[
                     'text-xs rounded-full px-1.5',
-                    categoryFilter === cat ? 'bg-white/30' : 'bg-stone-100',
+                    categoryFilter === cat ? 'bg-white/30' : 'bg-muted',
                   ].join(' ')}>
                     {categoryCounts[cat]}
                   </span>
                 )}
               </button>
             ))}
-            <span className="text-xs text-stone-400 ml-auto">
+            <span className="text-xs text-muted-foreground ml-auto">
               {materialTopics.length} material
             </span>
           </div>
@@ -306,8 +306,8 @@ export default function MaterialitySetupPage() {
       {step === 2 && (
         <div className="space-y-4">
           <div>
-            <h2 className="text-base font-semibold text-stone-900">Score your material topics</h2>
-            <p className="text-sm text-stone-500 mt-1">
+            <h2 className="text-base font-semibold">Score your material topics</h2>
+            <p className="text-sm text-muted-foreground mt-1">
               For each material topic, rate two dimensions on a scale of 1-5.
               <strong> Impact score:</strong> how significantly does your business affect this topic?
               <strong> Financial score:</strong> how significantly does this topic affect your business finances or reputation?
@@ -315,10 +315,10 @@ export default function MaterialitySetupPage() {
           </div>
 
           {materialTopics.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-stone-200 p-10 text-center">
-              <p className="text-sm text-stone-400">
+            <div className="rounded-xl border border-dashed border-border p-10 text-center">
+              <p className="text-sm text-muted-foreground">
                 No topics marked as Material yet.{' '}
-                <button onClick={() => setStep(1)} className="underline hover:text-stone-600">
+                <button onClick={() => setStep(1)} className="underline hover:text-foreground">
                   Go back to Step 1
                 </button>{' '}
                 to select your material topics.
@@ -333,14 +333,14 @@ export default function MaterialitySetupPage() {
                     key={topic.id}
                     className={[
                       'border transition-all cursor-pointer',
-                      activeTopicId === topic.id ? 'border-stone-400 shadow-sm' : 'border-stone-200',
+                      activeTopicId === topic.id ? 'border-foreground shadow-sm' : 'border-border',
                     ].join(' ')}
                     onClick={() => setActiveTopicId(activeTopicId === topic.id ? null : topic.id)}
                   >
                     <CardContent className="p-3">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="w-2 h-2 rounded-full" style={{ background: CATEGORY_COLOURS[topic.category] }} />
-                        <span className="text-sm font-medium text-stone-900">{topic.name}</span>
+                        <span className="text-sm font-medium">{topic.name}</span>
                       </div>
                       <div className="space-y-2">
                         <ScoreSlider
@@ -356,7 +356,7 @@ export default function MaterialitySetupPage() {
                           colour="#8b5cf6"
                         />
                         <textarea
-                          className="w-full text-xs text-stone-600 border border-stone-200 rounded-md p-2 resize-none h-16 placeholder:text-stone-300 focus:outline-none focus:ring-1 focus:ring-stone-400"
+                          className="w-full text-xs bg-transparent border border-border rounded-md p-2 resize-none h-16 placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-border"
                           placeholder="Optional: note your rationale for these scores..."
                           value={topic.rationale || ''}
                           onChange={e => handleRationaleChange(topic.id, e.target.value)}
@@ -370,8 +370,8 @@ export default function MaterialitySetupPage() {
 
               {/* Live matrix */}
               <div className="sticky top-4 self-start">
-                <p className="text-xs font-mono uppercase tracking-widest text-stone-400 mb-2">Live Matrix</p>
-                <div className="rounded-xl border border-stone-200 bg-white p-4">
+                <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-2">Live Matrix</p>
+                <div className="rounded-xl border border-border bg-card p-4">
                   <MaterialityMatrix
                     topics={topics}
                     activeTopicId={activeTopicId || undefined}
@@ -388,8 +388,8 @@ export default function MaterialitySetupPage() {
       {step === 3 && (
         <div className="space-y-4">
           <div>
-            <h2 className="text-base font-semibold text-stone-900">Confirm your priority topics</h2>
-            <p className="text-sm text-stone-500 mt-1">
+            <h2 className="text-base font-semibold">Confirm your priority topics</h2>
+            <p className="text-sm text-muted-foreground mt-1">
               We have ranked your material topics by combined materiality score. Use the arrows to reorder them to reflect
               your organisation's strategic priorities. The top topics will lead your sustainability reports.
             </p>
@@ -404,7 +404,7 @@ export default function MaterialitySetupPage() {
       )}
 
       {/* Navigation */}
-      <div className="flex justify-between pt-4 border-t border-stone-100">
+      <div className="flex justify-between pt-4 border-t border-border">
         <Button
           variant="outline"
           onClick={() => step > 1 ? setStep(s => s - 1) : router.push('/reports/materiality/')}
