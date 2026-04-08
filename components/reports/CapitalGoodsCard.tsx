@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { HardHat, Plus } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -38,9 +39,11 @@ interface CapitalGoodsCardProps {
   reportId: string;
   entries: CapitalGoodsEntry[];
   onUpdate: () => void;
+  isNotApplicable?: boolean;
+  onToggleNotApplicable?: (value: boolean) => void;
 }
 
-export function CapitalGoodsCard({ reportId, entries, onUpdate }: CapitalGoodsCardProps) {
+export function CapitalGoodsCard({ reportId, entries, onUpdate, isNotApplicable, onToggleNotApplicable }: CapitalGoodsCardProps) {
   const [showModal, setShowModal] = useState(false);
   const [description, setDescription] = useState("");
   const [assetType, setAssetType] = useState("machinery");
@@ -132,15 +135,21 @@ export function CapitalGoodsCard({ reportId, entries, onUpdate }: CapitalGoodsCa
                 <CardDescription>Machinery, vehicles, equipment</CardDescription>
               </div>
             </div>
-            {entries.length > 0 && (
-              <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100">
-                {entries.length} {entries.length === 1 ? "asset" : "assets"}
-              </Badge>
-            )}
+            <div className="flex flex-col items-end gap-1.5">
+              {entries.length > 0 && (
+                <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100">
+                  {entries.length} {entries.length === 1 ? "asset" : "assets"}
+                </Badge>
+              )}
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">Not applicable</span>
+                <Switch checked={isNotApplicable ?? false} onCheckedChange={onToggleNotApplicable} />
+              </div>
+            </div>
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-4">
+        <CardContent className={`space-y-4${isNotApplicable ? ' opacity-40 pointer-events-none' : ''}`}>
           {entries.length > 0 ? (
             <>
               <div className="text-center py-4 border-b">

@@ -54,6 +54,8 @@ import {
   Database,
   ArrowUpCircle,
   TreePine,
+  Layers,
+  Route,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
@@ -106,7 +108,6 @@ const navigationStructure: NavItem[] = [
       { name: 'Vineyards',   href: '/vineyards/',          icon: Leaf,           minTier: 1, featureCode: 'viticulture_beta', viticultureOnly: true },
       { name: 'Orchards',    href: '/orchards/',           icon: TreePine,       minTier: 1, featureCode: 'orchard_beta' },
       { name: 'Fleet',        href: '/company/fleet/',      icon: Truck,          minTier: 2, featureCode: 'vehicle_registry' },
-      { name: 'Log Data',     href: '/company/log-data/',   icon: ClipboardCheck, minTier: 1 },
       { name: 'Suppliers',    href: '/suppliers/',          icon: Users,          minTier: 1 },
     ],
   },
@@ -190,9 +191,12 @@ const navigationStructure: NavItem[] = [
     icon: FileText,
     minTier: 1,
     children: [
-      { name: 'Sustainability Reports', href: '/reports/sustainability/',   icon: TrendingUp, minTier: 1 },
+      { name: 'Company Footprint',       href: '/reports/company-footprint/', icon: Building2,  minTier: 1 },
+      { name: 'Sustainability Reports', href: '/reports/sustainability/',    icon: TrendingUp, minTier: 1 },
+      { name: 'Materiality',            href: '/reports/materiality/',       icon: Layers,     minTier: 1 },
+      { name: 'Transition Plan',        href: '/reports/transition-plan/',   icon: Route,      minTier: 1 },
+      { name: 'LCA Reports',            href: '/reports/lcas/',              icon: Award,      minTier: 2 },
       { name: 'Impact Valuation',       href: '/reports/impact-valuation/', icon: TrendingUp, minTier: 3 },
-      { name: 'LCA Reports',            href: '/reports/lcas/',             icon: Award,      minTier: 2 },
     ],
   },
   {

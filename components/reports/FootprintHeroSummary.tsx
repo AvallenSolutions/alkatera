@@ -34,11 +34,11 @@ export function FootprintHeroSummary({
   status,
   lastUpdated,
 }: FootprintHeroSummaryProps) {
-  const formatEmissions = (value: number): string => {
-    if (value >= 1000) {
-      return `${(value / 1000).toFixed(2)} kt`;
-    }
-    return `${value.toFixed(2)} t`;
+  // All emission values are in kg CO₂e — convert to tonnes for display
+  const formatEmissions = (kgValue: number): string => {
+    const t = kgValue / 1000;
+    if (t >= 1000) return `${(t / 1000).toFixed(2)} kt`;
+    return `${t.toFixed(2)} t`;
   };
 
   const formatPercentage = (value: number, total: number): string => {

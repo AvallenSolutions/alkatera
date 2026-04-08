@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Zap, ArrowLeft, ArrowRight, FileText, Loader2 } from 'lucide-react';
 import { WizardStepIndicator } from '@/components/report-builder/WizardStepIndicator';
+import { FramingStep, getAudienceDefaults } from '@/components/report-builder/FramingStep';
+import { ReportPreviewPanel } from '@/components/report-builder/ReportPreviewPanel';
 import { ConfigureStep } from '@/components/report-builder/ConfigureStep';
 import { ContentSelectionStep } from '@/components/report-builder/ContentSelectionStep';
 import { ReviewStep } from '@/components/report-builder/ReviewStep';
@@ -14,10 +16,12 @@ import { useReportBuilder } from '@/hooks/useReportBuilder';
 import { useReportProgress } from '@/hooks/useReportProgress';
 import { useOrganization } from '@/lib/organizationContext';
 import { useToast } from '@/hooks/use-toast';
+import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import type { ReportConfig } from '@/types/report-builder';
 
 const WIZARD_STEPS = [
-  { label: 'Configure', description: 'Name, year, audience' },
+  { label: 'Framing', description: 'Audience and intent' },
+  { label: 'Configure', description: 'Name, year, format' },
   { label: 'Select Content', description: 'Choose report sections' },
   { label: 'Review & Generate', description: 'Branding and final review' },
 ];
@@ -32,6 +36,8 @@ export default function ReportBuilderPage() {
   const [quickGenerateOpen, setQuickGenerateOpen] = useState(false);
   const [generatingReportId, setGeneratingReportId] = useState<string | null>(null);
   const [defaultsSaved, setDefaultsSaved] = useState(false);
+  const [smartDefaultsApplied, setSmartDefaultsApplied] = useState(false);
+  const [applyingDefaults, setApplyingDefaults] = useState(false);
 
   const [config, setConfig] = useState<ReportConfig>({
     reportName: `Sustainability Report ${currentYear}`,
@@ -66,6 +72,74 @@ export default function ReportBuilderPage() {
 
   const handleUpdateConfig = (updates: Partial<ReportConfig>) => {
     setConfig(prev => ({ ...prev, ...updates }));
+    // If audience changed, reset smart defaults so they can be re-applied on next step
+    if ('audience' in updates) {
+      setSmartDefaultsApplied(false);
+    }
+  };
+
+  // Apply smart defaults when leaving the Framing step
+  const applySmartDefaults = useCallback(async () => {
+    if (!currentOrganization?.id || smartDefaultsApplied) return;
+
+    setApplyingDefaults(true);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const year = config.reportYear;
+      const orgId = currentOrganization.id;
+
+      // Get audience-based section/standard suggestions
+      const audienceDefaults = getAudienceDefaults(config.audience);
+      let sections = [...audienceDefaults.sections];
+      let standards = [...audienceDefaults.standards];
+
+      // Check for completed materiality assessment
+      const { data: matData } = await supabase
+        .from('materiality_assessments')
+        .select('completed_at')
+        .eq('organization_id', orgId)
+        .eq('assessment_year', year)
+        .maybeSingle();
+
+      // If CSRD-relevant audience and materiality is complete, ensure CSRD is included
+      if (matData?.completed_at && !standards.includes('csrd')) {
+        standards = ['csrd', ...standards];
+      }
+
+      // Check for a transition plan
+      const { data: tpData } = await supabase
+        .from('transition_plans')
+        .select('id')
+        .eq('organization_id', orgId)
+        .eq('plan_year', year)
+        .maybeSingle();
+
+      // If transition plan exists, add roadmap and R&O sections
+      if (tpData) {
+        if (!sections.includes('transition-roadmap')) sections.push('transition-roadmap');
+        if (!sections.includes('risks-and-opportunities')) sections.push('risks-and-opportunities');
+      }
+
+      // Always include executive-summary
+      if (!sections.includes('executive-summary')) {
+        sections = ['executive-summary', ...sections];
+      }
+
+      setConfig(prev => ({ ...prev, sections, standards }));
+      setSmartDefaultsApplied(true);
+    } catch {
+      // Non-fatal — proceed without smart defaults
+    } finally {
+      setApplyingDefaults(false);
+    }
+  }, [currentOrganization, config.audience, config.reportYear, smartDefaultsApplied]);
+
+  const handleNext = async () => {
+    if (step === 1) {
+      // Leaving Framing step — apply smart defaults before advancing
+      await applySmartDefaults();
+    }
+    setStep(s => s + 1);
   };
 
   const handleGenerate = async (reportConfig?: ReportConfig) => {
@@ -158,60 +232,91 @@ export default function ReportBuilderPage() {
       {/* Wizard Steps */}
       <WizardStepIndicator currentStep={step} steps={WIZARD_STEPS} />
 
-      {/* Step Content */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{WIZARD_STEPS[step - 1].label}</CardTitle>
-          <CardDescription>{WIZARD_STEPS[step - 1].description}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {step === 1 && (
-            <ConfigureStep config={config} onChange={handleUpdateConfig} />
-          )}
-          {step === 2 && (
-            <ContentSelectionStep config={config} onChange={handleUpdateConfig} organizationId={currentOrganization?.id || null} />
-          )}
-          {step === 3 && (
-            <ReviewStep
-              config={config}
-              onChange={handleUpdateConfig}
-              onSaveDefaults={handleSaveDefaults}
-              defaultsSaved={defaultsSaved}
-            />
-          )}
-        </CardContent>
-        <CardFooter className="flex justify-between">
-          <Button
-            variant="outline"
-            onClick={() => setStep(s => s - 1)}
-            disabled={step === 1}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
+      {/* 2-column layout: wizard left, preview panel right */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6 items-start">
+        {/* Step Content */}
+        <Card>
+          <CardHeader>
+            <CardTitle>{WIZARD_STEPS[step - 1].label}</CardTitle>
+            <CardDescription>{WIZARD_STEPS[step - 1].description}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {step === 1 && (
+              <FramingStep
+                config={config}
+                onChange={handleUpdateConfig}
+                smartDefaultsApplied={smartDefaultsApplied}
+              />
+            )}
+            {step === 2 && (
+              <ConfigureStep config={config} onChange={handleUpdateConfig} />
+            )}
+            {step === 3 && (
+              <ContentSelectionStep
+                config={config}
+                onChange={handleUpdateConfig}
+                organizationId={currentOrganization?.id || null}
+              />
+            )}
+            {step === 4 && (
+              <ReviewStep
+                config={config}
+                onChange={handleUpdateConfig}
+                onSaveDefaults={handleSaveDefaults}
+                defaultsSaved={defaultsSaved}
+              />
+            )}
+          </CardContent>
+          <CardFooter className="flex justify-between">
+            <Button
+              variant="outline"
+              onClick={() => setStep(s => s - 1)}
+              disabled={step === 1}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
 
-          {step < 3 ? (
-            <Button onClick={() => setStep(s => s + 1)}>
-              Next
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          ) : (
-            <Button onClick={() => handleGenerate()} disabled={generating} size="lg">
-              {generating ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Starting...
-                </>
-              ) : (
-                <>
-                  <FileText className="mr-2 h-4 w-4" />
-                  Generate Report
-                </>
-              )}
-            </Button>
-          )}
-        </CardFooter>
-      </Card>
+            {step < 4 ? (
+              <Button onClick={handleNext} disabled={applyingDefaults}>
+                {applyingDefaults ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Applying...
+                  </>
+                ) : (
+                  <>
+                    Next
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            ) : (
+              <Button onClick={() => handleGenerate()} disabled={generating} size="lg">
+                {generating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Starting...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Generate Report
+                  </>
+                )}
+              </Button>
+            )}
+          </CardFooter>
+        </Card>
+
+        {/* Preview panel — sticky on large screens */}
+        <div className="hidden lg:block sticky top-6">
+          <ReportPreviewPanel
+            config={config}
+            organizationId={currentOrganization?.id || null}
+          />
+        </div>
+      </div>
 
       {/* Quick Generate Dialog */}
       <QuickGenerateDialog

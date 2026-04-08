@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { useOrganization } from "@/lib/organizationContext";
+import { calculateCorporateEmissions, type ScopeBreakdown } from "@/lib/calculations/corporate-emissions";
 import { PageLoader } from "@/components/ui/page-loader";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -42,7 +43,10 @@ export default function CompanyFootprintPage() {
   const { currentOrganization } = useOrganization();
 
   const [reports, setReports] = useState<CorporateReport[]>([]);
+  const [liveEmissions, setLiveEmissions] = useState<Record<number, { total: number; breakdown: ScopeBreakdown | null }>>({});
   const [isLoading, setIsLoading] = useState(true);
+
+  const currentYear = new Date().getFullYear();
 
   useEffect(() => {
     if (currentOrganization?.id) {
@@ -65,6 +69,26 @@ export default function CompanyFootprintPage() {
 
       if (error) throw error;
       setReports(data || []);
+
+      // Calculate live emissions for every report year — same calculation as dashboard
+      if (data && data.length > 0) {
+        const liveResults: Record<number, { total: number; breakdown: ScopeBreakdown | null }> = {};
+        await Promise.all(
+          data.map(async (report) => {
+            try {
+              const result = await calculateCorporateEmissions(supabase, currentOrganization.id, report.year);
+              liveResults[report.year] = {
+                total: result.breakdown.total,
+                breakdown: result.breakdown,
+              };
+            } catch {
+              // Fall back to stored value on error
+              liveResults[report.year] = { total: report.total_emissions, breakdown: null };
+            }
+          })
+        );
+        setLiveEmissions(liveResults);
+      }
     } catch (error: any) {
       console.error("Error fetching reports:", error);
       toast.error("Failed to load reports");
@@ -115,13 +139,24 @@ export default function CompanyFootprintPage() {
     }
   };
 
-  const formatEmissions = (value: number) => {
-    if (value >= 1000) return `${(value / 1000).toFixed(2)} kt CO₂e`;
-    return `${value.toFixed(2)} t CO₂e`;
+  /**
+   * Get the live total for a report year.
+   * Uses calculateCorporateEmissions (same as dashboard) for all years.
+   * All values are in kg CO₂e.
+   */
+  const getLiveTotal = (report: CorporateReport): number => {
+    return liveEmissions[report.year]?.total ?? report.total_emissions;
+  };
+
+  // Display: values are in kg CO₂e — convert to tonnes for display
+  // Matches dashboard: (value / 1000).toFixed(1) for tonnes
+  const formatEmissions = (kgValue: number) => {
+    const t = kgValue / 1000;
+    if (t >= 1000) return `${(t / 1000).toFixed(2)} kt CO₂e`;
+    return `${t.toFixed(2)} t CO₂e`;
   };
 
   const getAvailableYears = () => {
-    const currentYear = new Date().getFullYear();
     const years = [];
     for (let i = 0; i < 5; i++) {
       years.push(currentYear - i);
@@ -129,22 +164,36 @@ export default function CompanyFootprintPage() {
     return years;
   };
 
-  // Year-over-year trend calculation
+  // Year-over-year trend calculation (uses live totals)
   const getTrend = () => {
     if (reports.length < 2) return null;
-    const latest = reports[0];
-    const previous = reports[1];
-    if (latest.total_emissions === 0 || previous.total_emissions === 0) return null;
-    const change = ((latest.total_emissions - previous.total_emissions) / previous.total_emissions) * 100;
+    const latestReport = reports[0];
+    const previousReport = reports[1];
+    const latestTotal = getLiveTotal(latestReport);
+    const previousTotal = getLiveTotal(previousReport);
+    if (latestTotal === 0 || previousTotal === 0) return null;
+    const change = ((latestTotal - previousTotal) / previousTotal) * 100;
     return {
       change,
-      latestYear: latest.year,
-      previousYear: previous.year,
+      latestYear: latestReport.year,
+      previousYear: previousReport.year,
     };
   };
 
-  // Get scope breakdown from report's breakdown_json
+  // Get scope breakdown from live calculation
   const getScopeBar = (report: CorporateReport) => {
+    const live = liveEmissions[report.year];
+    if (live?.breakdown) {
+      const bd = live.breakdown;
+      const total = bd.total || 1;
+      return {
+        scope1Pct: ((bd.scope1 || 0) / total) * 100,
+        scope2Pct: ((bd.scope2 || 0) / total) * 100,
+        scope3Pct: ((bd.scope3?.total || 0) / total) * 100,
+      };
+    }
+
+    // Fallback to stored breakdown
     const bj = report.breakdown_json;
     if (!bj || report.total_emissions === 0) return null;
 
@@ -218,6 +267,7 @@ export default function CompanyFootprintPage() {
             <div className="space-y-3">
               {reports.map((report) => {
                 const scopeBar = getScopeBar(report);
+                const liveTotal = getLiveTotal(report);
                 return (
                   <button
                     key={report.id}
@@ -231,8 +281,8 @@ export default function CompanyFootprintPage() {
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-lg">{report.year} Footprint</div>
                         <div className="text-sm text-muted-foreground">
-                          {report.total_emissions > 0
-                            ? formatEmissions(report.total_emissions)
+                          {liveTotal > 0
+                            ? formatEmissions(liveTotal)
                             : "No data yet"}
                           {report.finalized_at && (
                             <span className="ml-2">

@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Trash2, Plus, Recycle } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -47,9 +48,11 @@ interface OperationalWasteCardProps {
   entries: WasteEntry[];
   xeroEntries?: XeroEntry[];
   onUpdate: () => void;
+  isNotApplicable?: boolean;
+  onToggleNotApplicable?: (value: boolean) => void;
 }
 
-export function OperationalWasteCard({ reportId, entries, xeroEntries, onUpdate }: OperationalWasteCardProps) {
+export function OperationalWasteCard({ reportId, entries, xeroEntries, onUpdate, isNotApplicable, onToggleNotApplicable }: OperationalWasteCardProps) {
   const [showModal, setShowModal] = useState(false);
   const [materialType, setMaterialType] = useState("");
   const [disposalMethod, setDisposalMethod] = useState("recycling");
@@ -138,16 +141,22 @@ export function OperationalWasteCard({ reportId, entries, xeroEntries, onUpdate 
                 <CardDescription>Facility waste & disposal</CardDescription>
               </div>
             </div>
-            {(entries.length > 0 || (xeroEntries && xeroEntries.length > 0)) && (
-              <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100">
-                {entries.length} {entries.length === 1 ? "entry" : "entries"}
-                {xeroEntries && xeroEntries.length > 0 && ` + ${xeroEntries.length} from Xero`}
-              </Badge>
-            )}
+            <div className="flex flex-col items-end gap-1.5">
+              {(entries.length > 0 || (xeroEntries && xeroEntries.length > 0)) && (
+                <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100">
+                  {entries.length} {entries.length === 1 ? "entry" : "entries"}
+                  {xeroEntries && xeroEntries.length > 0 && ` + ${xeroEntries.length} from Xero`}
+                </Badge>
+              )}
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">Not applicable</span>
+                <Switch checked={isNotApplicable ?? false} onCheckedChange={onToggleNotApplicable} />
+              </div>
+            </div>
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-4">
+        <CardContent className={`space-y-4${isNotApplicable ? ' opacity-40 pointer-events-none' : ''}`}>
           {(entries.length > 0 || xeroTotal > 0) ? (
             <>
               <div className="text-center py-4 border-b">

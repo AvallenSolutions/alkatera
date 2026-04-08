@@ -138,6 +138,7 @@ export function useReportBuilder() {
           secondary_color: config.branding.secondaryColor,
           is_multi_year: config.isMultiYear || false,
           report_years: config.reportYears || [config.reportYear],
+          report_framing_statement: config.reportFramingStatement || null,
           status: 'pending',
         })
         .select()
@@ -187,6 +188,37 @@ export function useReportBuilder() {
             .update({
               status: 'failed',
               error_message: err?.message || 'PDF generation failed',
+            })
+            .eq('id', reportRecord.id);
+        });
+      } else if (config.outputFormat === 'html') {
+        // HTML: call the generate-html API route, open result in a new tab
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData?.session?.access_token;
+
+        fetch(`/api/reports/${reportRecord.id}/generate-html`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }).then(async (response) => {
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || 'HTML generation failed');
+          }
+          const htmlContent = await response.text();
+          const blob = new Blob([htmlContent], { type: 'text/html' });
+          const url = window.URL.createObjectURL(blob);
+          window.open(url, '_blank');
+          // Revoke after a short delay to allow the new tab to load
+          setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+        }).catch(async (err) => {
+          console.error('HTML generation failed:', err);
+          await supabase
+            .from('generated_reports')
+            .update({
+              status: 'failed',
+              error_message: err?.message || 'HTML generation failed',
             })
             .eq('id', reportRecord.id);
         });

@@ -27,6 +27,7 @@ import { DataProvenanceBadge } from "@/components/ui/data-provenance-badge";
 import { XeroSpendEntries } from "@/components/reports/XeroSpendEntries";
 import type { XeroEntry } from "@/lib/xero/scope-card-mapping";
 import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
+import { Switch } from "@/components/ui/switch";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { toast } from "sonner";
 import {
@@ -57,6 +58,8 @@ interface BusinessTravelCardProps {
   entries: TravelEntry[];
   xeroEntries?: XeroEntry[];
   onUpdate: () => void;
+  isNotApplicable?: boolean;
+  onToggleNotApplicable?: (value: boolean) => void;
 }
 
 interface EmissionFactor {
@@ -75,7 +78,7 @@ const cabinClassOptions = [
   { value: "First", label: "First", icon: "👑", description: "First class" },
 ];
 
-export function BusinessTravelCard({ reportId, entries, xeroEntries, onUpdate }: BusinessTravelCardProps) {
+export function BusinessTravelCard({ reportId, entries, xeroEntries, onUpdate, isNotApplicable, onToggleNotApplicable }: BusinessTravelCardProps) {
   const [showModal, setShowModal] = useState(false);
   const [description, setDescription] = useState("");
   const [transportMode, setTransportMode] = useState("");
@@ -352,16 +355,22 @@ export function BusinessTravelCard({ reportId, entries, xeroEntries, onUpdate }:
                 <CardDescription>Activity-based tracking</CardDescription>
               </div>
             </div>
-            {(entries.length > 0 || (xeroEntries && xeroEntries.length > 0)) && (
-              <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
-                {entries.length} {entries.length === 1 ? "trip" : "trips"}
-                {xeroEntries && xeroEntries.length > 0 && ` + ${xeroEntries.length} from Xero`}
-              </Badge>
-            )}
+            <div className="flex flex-col items-end gap-1.5">
+              {(entries.length > 0 || (xeroEntries && xeroEntries.length > 0)) && (
+                <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
+                  {entries.length} {entries.length === 1 ? "trip" : "trips"}
+                  {xeroEntries && xeroEntries.length > 0 && ` + ${xeroEntries.length} from Xero`}
+                </Badge>
+              )}
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">Not applicable</span>
+                <Switch checked={isNotApplicable ?? false} onCheckedChange={onToggleNotApplicable} />
+              </div>
+            </div>
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-4">
+        <CardContent className={`space-y-4${isNotApplicable ? ' opacity-40 pointer-events-none' : ''}`}>
           {(entries.length > 0 || xeroTotal > 0) ? (
             <>
               <div className="text-center py-4 border-b">

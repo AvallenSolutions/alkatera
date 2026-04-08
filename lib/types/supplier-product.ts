@@ -229,6 +229,10 @@ export interface SupplierProduct {
   // Product type
   product_type: SupplierProductType;
 
+  // FLAG / EU Deforestation Regulation commodity classification
+  commodity_type: 'cattle' | 'cocoa' | 'palm_oil' | 'soy' | 'timber' | 'coffee' | 'rubber' | 'none';
+  deforestation_commitment_verified: boolean;
+
   // Packaging-specific fields
   weight_g: number | null;
   packaging_category: PackagingCategoryType | null;

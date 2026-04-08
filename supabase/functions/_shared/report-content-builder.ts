@@ -211,6 +211,35 @@ export interface ReportConfig {
   };
 }
 
+// ============================================================================
+// Narrative Types (mirrored from lib/claude/section-narrative-assistant.ts)
+// These are defined here so the Edge Function (Deno) can use them without
+// importing from the Next.js lib/ directory.
+// ============================================================================
+
+export interface SectionNarrative {
+  headlineInsight: string;
+  contextParagraph: string;
+  nextStepPrompt: string;
+  dataConfidenceStatement: string | null;
+  methodologyFootnote: string | null;
+  readonly aiGenerated: true;
+}
+
+export interface ExecutiveSummaryNarrative {
+  summaryText: string;
+  primaryMessage: string;
+  readonly aiGenerated: true;
+}
+
+/** Map of sectionId -> SectionNarrative, plus optional executive summary */
+export interface ReportNarratives {
+  executiveSummary?: ExecutiveSummaryNarrative;
+  sections?: Partial<Record<string, SectionNarrative>>;
+}
+
+// ============================================================================
+
 export interface SlideContent {
   slideNumber: number;
   title: string;
@@ -1655,7 +1684,53 @@ ${config.isMultiYear ? `- **Multi-year coverage:** ${(config.reportYears || []).
  * CRITICAL: This function is DETERMINISTIC. The same inputs always produce
  * the same outputs. No LLM interpretation of data values occurs here.
  */
-export function buildReportContent(config: ReportConfig, data: ReportData, chartUrls?: Record<string, string>): string {
+/**
+ * Formats a SectionNarrative as markdown for injection before slide data.
+ * The narrative block uses blockquotes and horizontal rules to visually
+ * separate it from the data tables below.
+ * Tagged with <!-- AI_GENERATED --> for downstream tooling.
+ */
+function formatNarrativeAsMarkdown(narrative: SectionNarrative): string {
+  let md = `<!-- AI_GENERATED -->
+> **${narrative.headlineInsight}**
+>
+> ${narrative.contextParagraph}
+>
+> *${narrative.nextStepPrompt}*`;
+
+  if (narrative.dataConfidenceStatement) {
+    md += `\n>\n> **Data confidence:** ${narrative.dataConfidenceStatement}`;
+  }
+
+  if (narrative.methodologyFootnote) {
+    md += `\n\n*${narrative.methodologyFootnote}*`;
+  }
+
+  return md;
+}
+
+/**
+ * Prepends a narrative block to an existing slide content string.
+ * Places narrative before the first data table (after the section heading).
+ */
+function injectNarrativeIntoSlide(content: string, narrative: SectionNarrative): string {
+  const narrativeMd = formatNarrativeAsMarkdown(narrative);
+  // Insert after the first heading (# or ##) and any immediately following blank line
+  const headingMatch = content.match(/^(#+ .+)(\n\n?)/m);
+  if (headingMatch && headingMatch.index !== undefined) {
+    const insertAt = headingMatch.index + headingMatch[0].length;
+    return content.slice(0, insertAt) + narrativeMd + '\n\n' + content.slice(insertAt);
+  }
+  // Fallback: prepend
+  return narrativeMd + '\n\n' + content;
+}
+
+export function buildReportContent(
+  config: ReportConfig,
+  data: ReportData,
+  chartUrls?: Record<string, string>,
+  narratives?: ReportNarratives,
+): string {
   const slides: SlideContent[] = [];
 
   // Always include title slide
@@ -1663,7 +1738,24 @@ export function buildReportContent(config: ReportConfig, data: ReportData, chart
 
   // Executive summary (always included)
   if (config.sections.includes('executive-summary') || config.sections.length === 0) {
-    slides.push(buildExecutiveSummarySlide(config, data));
+    const execSlide = buildExecutiveSummarySlide(config, data);
+    // Inject executive summary narrative if available
+    if (narratives?.executiveSummary) {
+      const es = narratives.executiveSummary;
+      const execNarrativeMd = `<!-- AI_GENERATED -->
+> **${es.primaryMessage}**
+>
+> ${es.summaryText}`;
+      execSlide.content = injectNarrativeIntoSlide(execSlide.content, {
+        headlineInsight: es.primaryMessage,
+        contextParagraph: es.summaryText,
+        nextStepPrompt: 'Read the full report for section-level detail, targets, and methodology.',
+        dataConfidenceStatement: null,
+        methodologyFootnote: null,
+        aiGenerated: true,
+      });
+    }
+    slides.push(execSlide);
   }
 
   // Audience-specific section ordering
@@ -1716,11 +1808,15 @@ export function buildReportContent(config: ReportConfig, data: ReportData, chart
     if (!builder) continue;
 
     const result = builder();
-    if (Array.isArray(result)) {
-      slides.push(...result);
-    } else {
-      slides.push(result);
+    const sectionSlides = Array.isArray(result) ? result : [result];
+
+    // Inject AI narrative into the first slide of each section (if available)
+    const sectionNarrative = narratives?.sections?.[sectionId];
+    if (sectionNarrative && sectionSlides.length > 0) {
+      sectionSlides[0].content = injectNarrativeIntoSlide(sectionSlides[0].content, sectionNarrative);
     }
+
+    slides.push(...sectionSlides);
 
     // Inject chart images after relevant sections (PPTX only)
     if (chartUrls) {

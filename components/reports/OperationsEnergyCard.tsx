@@ -14,9 +14,10 @@ interface OperationsEnergyCardProps {
 }
 
 export function OperationsEnergyCard({ totalCO2e, year, isLoading }: OperationsEnergyCardProps) {
-  const formatEmissions = (value: number) => {
-    // Always display in tonnes
-    return `${(value / 1000).toFixed(3)} tCO₂e`;
+  const formatEmissions = (kgValue: number) => {
+    const t = kgValue / 1000;
+    if (t >= 1000) return `${(t / 1000).toFixed(2)} ktCO₂e`;
+    return `${t.toFixed(2)} tCO₂e`;
   };
 
   return (
@@ -75,17 +76,20 @@ export function OperationsEnergyCard({ totalCO2e, year, isLoading }: OperationsE
             </div>
           </>
         ) : (
-          <div className="py-8 text-center">
-            <div className="text-sm text-muted-foreground mb-4">
-              No facility data found for {year}
+          <div className="py-6 text-center space-y-3">
+            <div className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              No utility data for {year}
             </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Log electricity, gas, and water usage in your Facilities to populate Scope 1 & 2 emissions automatically.
+            </p>
           </div>
         )}
 
-        <Link href="/operations" passHref>
+        <Link href="/company/facilities/" passHref>
           <Button variant="outline" className="w-full" size="sm">
             <ExternalLink className="h-4 w-4 mr-2" />
-            Manage Facilities
+            {totalCO2e > 0 ? "Manage Facilities" : "Add Facility Data"}
           </Button>
         </Link>
       </CardContent>

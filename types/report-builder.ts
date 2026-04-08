@@ -8,16 +8,27 @@ export interface ReportConfig {
   reportingPeriodStart: string;
   reportingPeriodEnd: string;
   audience: 'investors' | 'regulators' | 'customers' | 'internal' | 'supply-chain' | 'technical';
-  outputFormat: 'pptx' | 'pdf';
+  outputFormat: 'pptx' | 'pdf' | 'html';
   standards: string[];
   sections: string[];
   branding: {
     logo: string | null;
     primaryColor: string;
     secondaryColor: string;
+    /** Photos uploaded by the user. First image is used as the cover hero. */
+    heroImages?: string[];
+    /** Leadership message to appear as a full page in storytelling reports. */
+    leadership?: {
+      name?: string;
+      title?: string;
+      message?: string;
+      photo?: string;
+    };
   };
   isMultiYear?: boolean;
   reportYears?: number[];
+  /** Step 0 framing: what the report author wants the audience to take away */
+  reportFramingStatement?: string;
 }
 
 export interface ReportDefaults {
@@ -161,6 +172,20 @@ export const AVAILABLE_SECTIONS: SectionDefinition[] = [
     id: 'targets',
     label: 'Targets & Action Plans',
     description: 'Emission reduction goals, timelines, and strategic initiatives',
+    required: false,
+    category: 'Strategy',
+  },
+  {
+    id: 'transition-roadmap',
+    label: 'Transition Roadmap',
+    description: 'Visual timeline of decarbonisation milestones and reduction targets from your Transition Plan',
+    required: false,
+    category: 'Strategy',
+  },
+  {
+    id: 'risks-and-opportunities',
+    label: 'Climate Risks & Opportunities',
+    description: 'AI-generated and reviewed assessment of physical and transition climate risks and strategic opportunities',
     required: false,
     category: 'Strategy',
   },

@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Briefcase, Plus } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -34,9 +35,11 @@ interface ServicesOverheadCardProps {
   entries: ServiceEntry[];
   xeroEntries?: XeroEntry[];
   onUpdate: () => void;
+  isNotApplicable?: boolean;
+  onToggleNotApplicable?: (value: boolean) => void;
 }
 
-export function ServicesOverheadCard({ reportId, entries, xeroEntries, onUpdate }: ServicesOverheadCardProps) {
+export function ServicesOverheadCard({ reportId, entries, xeroEntries, onUpdate, isNotApplicable, onToggleNotApplicable }: ServicesOverheadCardProps) {
   const [showModal, setShowModal] = useState(false);
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
@@ -112,16 +115,22 @@ export function ServicesOverheadCard({ reportId, entries, xeroEntries, onUpdate 
                 <CardDescription>Marketing, legal, IT, consulting</CardDescription>
               </div>
             </div>
-            {(entries.length > 0 || (xeroEntries && xeroEntries.length > 0)) && (
-              <Badge className="bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-100">
-                {entries.length} {entries.length === 1 ? "entry" : "entries"}
-                {xeroEntries && xeroEntries.length > 0 && ` + ${xeroEntries.length} from Xero`}
-              </Badge>
-            )}
+            <div className="flex flex-col items-end gap-1.5">
+              {(entries.length > 0 || (xeroEntries && xeroEntries.length > 0)) && (
+                <Badge className="bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-100">
+                  {entries.length} {entries.length === 1 ? "entry" : "entries"}
+                  {xeroEntries && xeroEntries.length > 0 && ` + ${xeroEntries.length} from Xero`}
+                </Badge>
+              )}
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">Not applicable</span>
+                <Switch checked={isNotApplicable ?? false} onCheckedChange={onToggleNotApplicable} />
+              </div>
+            </div>
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-4">
+        <CardContent className={`space-y-4${isNotApplicable ? ' opacity-40 pointer-events-none' : ''}`}>
           {(entries.length > 0 || xeroTotal > 0) ? (
             <>
               <div className="text-center py-4 border-b">

@@ -7,13 +7,16 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Car, Plus, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { Switch } from "@/components/ui/switch";
 
 interface CompanyFleetCardProps {
   totalCO2e?: number;
   year: number;
+  isNotApplicable?: boolean;
+  onToggleNotApplicable?: (value: boolean) => void;
 }
 
-export function CompanyFleetCard({ totalCO2e = 0, year }: CompanyFleetCardProps) {
+export function CompanyFleetCard({ totalCO2e = 0, year, isNotApplicable, onToggleNotApplicable }: CompanyFleetCardProps) {
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
 
@@ -41,9 +44,17 @@ export function CompanyFleetCard({ totalCO2e = 0, year }: CompanyFleetCardProps)
                 </div>
               </div>
             </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">Not applicable</span>
+              <Switch
+                checked={isNotApplicable ?? false}
+                onCheckedChange={onToggleNotApplicable}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className={isNotApplicable ? 'opacity-40 pointer-events-none' : undefined}>
           <div className="space-y-2">
             <div>
               <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">

@@ -152,6 +152,7 @@ interface CommunityImpactData {
     title: string;
     category: string;
     summary: string;
+    photo?: string;
   }[];
   localEmploymentRate: number | null;
   localSourcingRate: number | null;
@@ -178,6 +179,32 @@ interface KeyFinding {
   confidence: string;
 }
 
+// ============================================================================
+// NARRATIVE TYPES (mirrored from lib/claude/section-narrative-assistant.ts)
+// ============================================================================
+
+interface SectionNarrative {
+  headlineInsight: string;
+  contextParagraph: string;
+  nextStepPrompt: string;
+  dataConfidenceStatement: string | null;
+  methodologyFootnote: string | null;
+  readonly aiGenerated: true;
+}
+
+interface ExecutiveSummaryNarrative {
+  summaryText: string;
+  primaryMessage: string;
+  readonly aiGenerated: true;
+}
+
+interface ReportNarratives {
+  executiveSummary?: ExecutiveSummaryNarrative;
+  sections?: Partial<Record<string, SectionNarrative>>;
+}
+
+// ============================================================================
+
 interface ReportData {
   organization: OrganizationInfo;
   emissions: EmissionsData;
@@ -192,6 +219,62 @@ interface ReportData {
   governance?: GovernanceData;
   communityImpact?: CommunityImpactData;
   keyFindings?: KeyFinding[];
+  /** Pre-generated AI narrative blocks, keyed by section ID */
+  narratives?: ReportNarratives;
+  /** Materiality assessment data for callouts and ESRS index */
+  materiality?: {
+    priority_topics: string[];
+    topics: Array<{
+      id: string;
+      name: string;
+      category: string;
+      status: string;
+      impactScore?: number;
+      financialScore?: number;
+      rationale?: string;
+      esrsReference?: string;
+      griReference?: string;
+    }>;
+    completed_at: string | null;
+  };
+  materialityComplete?: boolean;
+  /** Set to true when CSRD is selected but materiality assessment is incomplete */
+  csrdGatingWarning?: boolean;
+  /** Transition plan data for Roadmap and R&O sections */
+  transitionPlan?: {
+    plan_year: number;
+    baseline_year: number;
+    baseline_emissions_tco2e: number | null;
+    targets: Array<{
+      id: string;
+      scope: 'scope1' | 'scope2' | 'scope3' | 'total';
+      targetYear: number;
+      reductionPct: number;
+      absoluteTargetTco2e?: number;
+      notes?: string;
+    }>;
+    milestones: Array<{
+      id: string;
+      title: string;
+      targetDate: string;
+      status: 'not_started' | 'in_progress' | 'complete';
+      emissionsImpactTco2e?: number;
+      notes?: string;
+    }>;
+    risks_and_opportunities: Array<{
+      id: string;
+      type: 'risk' | 'opportunity';
+      category: string;
+      title: string;
+      description: string;
+      likelihood: 'low' | 'medium' | 'high';
+      impact: 'low' | 'medium' | 'high';
+      timeHorizon: 'short' | 'medium' | 'long';
+      aiGenerated: boolean;
+    }> | null;
+    sbti_aligned: boolean;
+    sbti_target_year: number | null;
+  };
   dataAvailability: {
     hasOrganization: boolean;
     hasEmissions: boolean;
@@ -219,7 +302,15 @@ interface ReportConfig {
     logo: string | null;
     primaryColor: string;
     secondaryColor: string;
+    heroImages?: string[];
+    leadership?: {
+      name?: string;
+      title?: string;
+      message?: string;
+      photo?: string;
+    };
   };
+  reportFramingStatement?: string;
 }
 
 // ============================================================================
@@ -287,6 +378,26 @@ function formatGBP(value: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value);
+}
+
+// ============================================================================
+// BRAND ELEMENTS
+// ============================================================================
+
+// ============================================================================
+// STORYTELLING TIER
+// ============================================================================
+
+/**
+ * Determines the storytelling richness for a given audience.
+ * - 'full'       → leadership page, section dividers, rich story cards (investors, customers, supply-chain)
+ * - 'balanced'   → section dividers + story cards, no leadership page (internal)
+ * - 'data-first' → no storytelling additions (regulators, technical)
+ */
+function getStorytellingTier(audience: string): 'full' | 'balanced' | 'data-first' {
+  if (['customers', 'investors', 'supply-chain'].includes(audience)) return 'full';
+  if (audience === 'internal') return 'balanced';
+  return 'data-first';
 }
 
 // ============================================================================
@@ -365,7 +476,7 @@ function renderPageFooter(pageNumber?: number, dark = false, standardsLabel?: st
   const rightText = standardsLabel || dateStr;
 
   return `
-    <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: ${bgColor}; padding: 0 48px 48px 48px;">
+    <div class="page-footer" style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: ${bgColor}; padding: 0 48px 48px 48px;">
       <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'Fira Code', monospace; color: ${color}; text-transform: uppercase; letter-spacing: 3px; border-top: 1px solid ${color}; padding-top: 16px;">
         <div style="display: flex; align-items: center; gap: 8px;">
           <span>Generated by</span>
@@ -374,6 +485,173 @@ function renderPageFooter(pageNumber?: number, dark = false, standardsLabel?: st
         ${pageNumber !== undefined ? `<div style="font-weight: 700; font-size: 12px;">__PAGE_NUM__</div>` : ''}
         <div>${escapeHtml(rightText)}</div>
       </div>
+    </div>`;
+}
+
+/**
+ * Renders an AI-generated narrative block as styled HTML.
+ * Visually distinct from data tables — light background, left accent bar.
+ * The dataConfidenceStatement renders in a smaller, muted style below.
+ */
+function renderNarrativeBlock(narrative: SectionNarrative): string {
+  return `
+    <!-- AI_GENERATED -->
+    <div class="narrative-block">
+      <div class="narrative-headline">${escapeHtml(narrative.headlineInsight)}</div>
+      <div class="narrative-context">${escapeHtml(narrative.contextParagraph)}</div>
+      <div class="narrative-next-step">${escapeHtml(narrative.nextStepPrompt)}</div>
+      ${narrative.dataConfidenceStatement ? `
+      <div class="narrative-confidence">${escapeHtml(narrative.dataConfidenceStatement)}</div>` : ''}
+    </div>
+    ${narrative.methodologyFootnote ? `
+    <div class="narrative-footnote">${escapeHtml(narrative.methodologyFootnote)}</div>` : ''}`;
+}
+
+/**
+ * Renders the executive summary narrative block (slightly larger, no footnote).
+ */
+function renderExecutiveSummaryNarrativeBlock(narrative: ExecutiveSummaryNarrative): string {
+  return `
+    <!-- AI_GENERATED -->
+    <div class="narrative-block" style="border-left-width: 4px; margin-bottom: 24px;">
+      <div class="narrative-headline" style="font-size: 16px;">${escapeHtml(narrative.primaryMessage)}</div>
+      <div class="narrative-context" style="font-size: 14px; line-height: 1.7;">${escapeHtml(narrative.summaryText)}</div>
+    </div>`;
+}
+
+// Maps section IDs to materiality topic IDs (mirrors section-narrative-assistant.ts)
+const SECTION_TO_TOPIC: Record<string, string> = {
+  'scope-1-2-3': 'climate-mitigation',
+  'emissions-breakdown': 'climate-mitigation',
+  'key-findings': 'climate-mitigation',
+  'trends': 'climate-mitigation',
+  'products': 'product-footprints',
+  'people': 'employee-wellbeing',
+  'governance': 'governance-accountability',
+  'community': 'community-engagement',
+  'supply-chain': 'supply-chain-standards',
+};
+
+/**
+ * Renders a small materiality context callout for a given section.
+ * Shows "This is a priority topic" if the topic is in priority_topics,
+ * or "This is a material topic" if status === 'material'.
+ * Returns empty string if the topic is not material.
+ */
+function renderMaterialityCallout(sectionId: string, data: ReportData): string {
+  if (!data.materiality?.completed_at) return '';
+  const topicId = SECTION_TO_TOPIC[sectionId];
+  if (!topicId) return '';
+  const topic = data.materiality.topics.find(t => t.id === topicId);
+  if (!topic || topic.status !== 'material') return '';
+
+  const isPriority = data.materiality.priority_topics.includes(topicId);
+  const accentColor = isPriority ? '#ccff00' : '#d1fae5';
+  const textColor = isPriority ? '#1c1917' : '#065f46';
+  const label = isPriority ? 'Priority Material Topic' : 'Material Topic';
+  const rationale = topic.rationale ? ` — ${topic.rationale}` : '';
+
+  return `
+    <div style="display: flex; align-items: flex-start; gap: 10px; background: ${accentColor}20; border: 1px solid ${accentColor}80; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px;">
+      <div style="width: 6px; height: 6px; border-radius: 50%; background: ${accentColor === '#ccff00' ? '#84cc16' : '#059669'}; flex-shrink: 0; margin-top: 4px;"></div>
+      <div>
+        <span style="font-size: 10px; font-family: 'Fira Code', monospace; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: ${textColor};">${escapeHtml(label)}</span>
+        <span style="font-size: 10px; color: ${textColor}; opacity: 0.8;">${escapeHtml(rationale)}</span>
+        ${topic.esrsReference ? `<span style="display: inline-block; margin-left: 8px; font-size: 9px; font-family: 'Fira Code', monospace; color: ${textColor}; opacity: 0.6;">ESRS ${escapeHtml(topic.esrsReference)}</span>` : ''}
+      </div>
+    </div>`;
+}
+
+// ============================================================================
+// STORYTELLING PAGE RENDERERS
+// ============================================================================
+
+/**
+ * Full-page leadership message. Only rendered when config.branding.leadership.message is set
+ * and the audience tier is 'full'. Placed immediately after the cover page.
+ */
+function renderLeadershipPage(config: ReportConfig): string {
+  const leadership = config.branding?.leadership;
+  if (!leadership?.message) return '';
+
+  const primaryColor = config.branding.primaryColor || '#ccff00';
+  const hasPhoto = !!leadership.photo;
+
+  return `
+    <div class="page dark-page" style="position: relative; overflow: hidden; justify-content: center;">
+      <div style="position: absolute; inset: 0; background: linear-gradient(135deg, #1c1917 0%, #292524 100%);"></div>
+      <div style="position: absolute; top: 0; right: 0; width: 55%; height: 100%; background: linear-gradient(to left, ${primaryColor}05, transparent);"></div>
+      <div style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: linear-gradient(to bottom, ${primaryColor}, ${primaryColor}40 60%, transparent);"></div>
+
+      <div style="position: relative; z-index: 10; display: flex; gap: 56px; align-items: center; padding-left: 24px;">
+        <div style="flex: 1;">
+          <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: ${primaryColor}; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 40px;">A Message From Our Leadership</div>
+
+          <div style="font-size: 80px; font-family: 'Playfair Display', serif; color: ${primaryColor}; opacity: 0.18; line-height: 0.7; margin-bottom: 20px; pointer-events: none;">&ldquo;</div>
+
+          <p style="font-size: 17px; font-family: 'Playfair Display', serif; font-weight: 300; line-height: 1.8; color: white; margin-bottom: 40px; max-width: 500px;">
+            ${escapeHtml(leadership.message)}
+          </p>
+
+          <div style="display: flex; align-items: center; gap: 20px;">
+            <div style="flex: none; width: 3px; height: 44px; background: ${primaryColor};"></div>
+            <div>
+              <div style="font-size: 15px; font-weight: 600; color: white; margin-bottom: 5px;">${escapeHtml(leadership.name || '')}</div>
+              <div style="font-size: 11px; color: #a8a29e; font-family: 'Fira Code', monospace; text-transform: uppercase; letter-spacing: 1.5px;">${escapeHtml(leadership.title || '')}</div>
+            </div>
+          </div>
+        </div>
+
+        ${hasPhoto ? `
+        <div style="flex-shrink: 0; width: 240px;">
+          <div style="width: 240px; height: 300px; border-radius: 20px; overflow: hidden; border: 1px solid rgba(255,255,255,0.07); box-shadow: 0 24px 64px rgba(0,0,0,0.5);">
+            <img src="${escapeHtml(leadership.photo!)}" alt="${escapeHtml(leadership.name || 'Leadership')}" style="width: 100%; height: 100%; object-fit: cover;" />
+          </div>
+        </div>` : `
+        <div style="flex-shrink: 0; width: 160px; display: flex; flex-direction: column; align-items: center; gap: 20px;">
+          <div style="width: 96px; height: 96px; border-radius: 50%; background: linear-gradient(135deg, ${primaryColor}20, ${primaryColor}06); border: 2px solid ${primaryColor}20; display: flex; align-items: center; justify-content: center;">
+            <span style="font-size: 34px; font-family: 'Playfair Display', serif; color: ${primaryColor}; opacity: 0.45;">${escapeHtml((leadership.name || 'L')[0].toUpperCase())}</span>
+          </div>
+          ${config.branding.logo ? `<img src="${escapeHtml(config.branding.logo)}" alt="" style="max-height: 22px; width: auto; object-fit: contain; opacity: 0.35;" />` : ''}
+        </div>`}
+      </div>
+
+      ${renderPageFooter(undefined, true)}
+    </div>`;
+}
+
+/**
+ * Visual chapter-divider page — a full dark page with a single large stat and supporting text.
+ * Used before major section groups for storytelling audiences.
+ */
+function renderSectionDividerPage(
+  config: ReportConfig,
+  stat: string,
+  statLabel: string,
+  subtitle: string,
+  chapterLabel: string,
+): string {
+  const primaryColor = config.branding.primaryColor || '#ccff00';
+  const dividerHero = config.branding?.heroImages?.[1];
+
+  return `
+    <div class="page dark-page" style="position: relative; overflow: hidden; justify-content: flex-end; padding-bottom: 80px;">
+      <div style="position: absolute; inset: 0; background: linear-gradient(145deg, #1c1917 0%, #292524 100%);"></div>
+      ${dividerHero ? `<img src="${escapeHtml(dividerHero)}" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.12;" />` : ''}
+      <div style="position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.9) 50%, rgba(0,0,0,0.3) 100%);"></div>
+
+      <div style="position: absolute; right: -90px; top: -90px; width: 420px; height: 420px; border-radius: 50%; border: 1px solid ${primaryColor}12; pointer-events: none;"></div>
+      <div style="position: absolute; right: -44px; top: -44px; width: 280px; height: 280px; border-radius: 50%; border: 1px solid ${primaryColor}08; pointer-events: none;"></div>
+
+      <div style="position: relative; z-index: 10;">
+        <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: ${primaryColor}; text-transform: uppercase; letter-spacing: 4px; margin-bottom: 32px;">${escapeHtml(chapterLabel)}</div>
+        <div style="font-size: 76px; font-family: 'Playfair Display', serif; font-weight: 700; color: ${primaryColor}; line-height: 0.9; margin-bottom: 16px;">${escapeHtml(stat)}</div>
+        <div style="font-size: 22px; font-family: 'Playfair Display', serif; color: white; font-weight: 300; margin-bottom: 20px;">${escapeHtml(statLabel)}</div>
+        <div style="width: 56px; height: 3px; background: ${primaryColor}; margin-bottom: 20px;"></div>
+        <div style="font-size: 13px; color: #a8a29e; max-width: 420px; line-height: 1.65;">${escapeHtml(subtitle)}</div>
+      </div>
+
+      ${renderPageFooter(undefined, true)}
     </div>`;
 }
 
@@ -390,10 +668,13 @@ function renderCoverPage(config: ReportConfig, data: ReportData): string {
     ? `<img src="${escapeHtml(config.branding.logo)}" alt="${escapeHtml(data.organization.name)}" style="height: 48px; width: auto; object-fit: contain; margin-bottom: 24px;" />`
     : '';
 
+  const coverHero = config.branding?.heroImages?.[0];
+
   return `
     <div class="page dark-page" style="justify-content: space-between; overflow: hidden; position: relative;">
-      <div style="position: absolute; inset: 0; background: linear-gradient(135deg, #292524, #1c1917); opacity: 0.6;"></div>
-      <div style="position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,0.4), transparent, rgba(0,0,0,0.8));"></div>
+      ${coverHero ? `<img src="${escapeHtml(coverHero)}" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;" />` : ''}
+      <div style="position: absolute; inset: 0; background: linear-gradient(135deg, #292524, #1c1917); opacity: ${coverHero ? '0.75' : '0.6'};"></div>
+      <div style="position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,0.4), transparent, rgba(0,0,0,0.85));"></div>
 
       <div style="position: relative; z-index: 10; padding-top: 48px;">
         ${alkateraLogo(44)}
@@ -458,9 +739,13 @@ function renderExecSummaryPage(config: ReportConfig, data: ReportData): string {
     }
   }
 
+  const execNarrative = data.narratives?.executiveSummary;
+
   return `
     <div class="page light-page">
       ${renderSectionHeader('01', 'Executive Summary')}
+
+      ${execNarrative ? renderExecutiveSummaryNarrativeBlock(execNarrative) : ''}
 
       <div style="display: flex; gap: 24px; margin-bottom: 28px;">
         <div style="flex: 1; background: #1c1917; border-radius: 16px; padding: 32px; color: white;">
@@ -515,6 +800,14 @@ function renderExecSummaryPage(config: ReportConfig, data: ReportData): string {
         </div>
       </div>
 
+      ${data.transitionPlan?.sbti_aligned ? `
+      <div style="display: flex; align-items: center; gap: 12px; background: #ccff0015; border: 1px solid #ccff0050; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px;">
+        <div style="width: 8px; height: 8px; border-radius: 50%; background: #84cc16; flex-shrink: 0;"></div>
+        <div style="font-size: 12px; font-weight: 600; color: #1c1917;">SBTi Aligned</div>
+        <div style="font-size: 11px; color: #78716c;">Science Based Targets initiative — targets consistent with 1.5&deg;C pathway</div>
+        ${data.transitionPlan.sbti_target_year ? `<div style="font-size: 11px; font-family: 'Fira Code', monospace; color: #a8a29e; margin-left: auto;">Target year: ${data.transitionPlan.sbti_target_year}</div>` : ''}
+      </div>` : ''}
+
       ${socialHighlights.length > 0 ? `
       <div style="background: white; border: 1px solid #e7e5e4; border-radius: 12px; padding: 20px;">
         <div style="font-size: 11px; font-family: 'Fira Code', monospace; text-transform: uppercase; letter-spacing: 2px; color: #78716c; margin-bottom: 12px;">Social Highlights</div>
@@ -544,9 +837,14 @@ function renderEmissionsPage(config: ReportConfig, data: ReportData): string {
     { label: 'Scope 3 (Value Chain)', value: emissions.scope3, color: SCOPE_COLOURS.scope3, desc: 'Supply chain, distribution, product use, end-of-life' },
   ];
 
+  const emissionsNarrative = data.narratives?.sections?.['scope-1-2-3'];
+
   return `
     <div class="page light-page">
       ${renderSectionHeader('02', 'Emissions Breakdown')}
+
+      ${renderMaterialityCallout('scope-1-2-3', data)}
+      ${emissionsNarrative ? renderNarrativeBlock(emissionsNarrative) : ''}
 
       <div style="display: flex; gap: 32px; margin-bottom: 28px; align-items: center;">
         <div style="width: 180px; height: 180px; border-radius: 50%; ${donutStyle} position: relative; flex-shrink: 0;">
@@ -635,9 +933,13 @@ function renderKeyFindingsPage(config: ReportConfig, data: ReportData): string {
       </div>`;
   }).join('');
 
+  const keyFindingsNarrative = data.narratives?.sections?.['key-findings'];
+
   return `
     <div class="page light-page">
       ${renderSectionHeader('02', 'Key Findings')}
+
+      ${keyFindingsNarrative ? renderNarrativeBlock(keyFindingsNarrative) : ''}
 
       <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #78716c; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">CHANGE DRIVERS &amp; ANALYSIS</div>
 
@@ -670,9 +972,13 @@ function renderTrendsPage(config: ReportConfig, data: ReportData): string {
     </tr>`;
   }).join('');
 
+  const trendsNarrative = data.narratives?.sections?.['trends'];
+
   return `
     <div class="page light-page">
       ${renderSectionHeader('03', 'Emissions Trends')}
+
+      ${trendsNarrative ? renderNarrativeBlock(trendsNarrative) : ''}
 
       <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #78716c; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">MULTI-YEAR COMPARISON</div>
 
@@ -743,9 +1049,13 @@ function renderProductsPage(config: ReportConfig, data: ReportData): string {
     </tr>
   `).join('');
 
+  const productsNarrative = data.narratives?.sections?.['product-footprints'];
+
   return `
     <div class="page light-page">
       ${renderSectionHeader('04', 'Product Impact')}
+
+      ${productsNarrative ? renderNarrativeBlock(productsNarrative) : ''}
 
       <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;">
         <div class="metric-card" style="text-align: center;">
@@ -804,7 +1114,7 @@ function renderVineyardsPage(config: ReportConfig, data: ReportData): string {
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('05', 'Viticulture &amp; Land Stewardship')}
+      ${renderSectionHeader('05', 'Viticulture & Land Stewardship')}
 
       <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;">
         <div class="metric-card" style="text-align: center;">
@@ -867,9 +1177,14 @@ function renderPeopleCulturePage(config: ReportConfig, data: ReportData): string
 
   const maxScore = 100;
 
+  const peopleCultureNarrative = data.narratives?.sections?.['people-culture'];
+
   return `
     <div class="page light-page">
-      ${renderSectionHeader('05', 'People &amp; Culture')}
+      ${renderSectionHeader('05', 'People & Culture')}
+
+      ${renderMaterialityCallout('people', data)}
+      ${peopleCultureNarrative ? renderNarrativeBlock(peopleCultureNarrative) : ''}
 
       <div style="display: flex; gap: 24px; margin-bottom: 28px;">
         <div style="flex: 1; background: #1c1917; border-radius: 16px; padding: 28px; color: white;">
@@ -963,9 +1278,14 @@ function renderGovernancePage(config: ReportConfig, data: ReportData): string {
     </tr>`;
   }).join('');
 
+  const governanceNarrative = data.narratives?.sections?.['governance'];
+
   return `
     <div class="page light-page">
       ${renderSectionHeader('06', 'Governance')}
+
+      ${renderMaterialityCallout('governance', data)}
+      ${governanceNarrative ? renderNarrativeBlock(governanceNarrative) : ''}
 
       <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px;">
         <div class="metric-card" style="text-align: center;">
@@ -1027,9 +1347,14 @@ function renderCommunityImpactPage(config: ReportConfig, data: ReportData): stri
     { label: 'Engagement', score: ci.engagementScore, color: '#f97316' },
   ];
 
+  const communityNarrative = data.narratives?.sections?.['community-impact'];
+
   return `
     <div class="page light-page">
       ${renderSectionHeader('07', 'Community Impact')}
+
+      ${renderMaterialityCallout('community', data)}
+      ${communityNarrative ? renderNarrativeBlock(communityNarrative) : ''}
 
       <div style="display: flex; gap: 24px; margin-bottom: 24px;">
         <div style="flex: 1; background: #1c1917; border-radius: 16px; padding: 28px; color: white;">
@@ -1073,19 +1398,30 @@ function renderCommunityImpactPage(config: ReportConfig, data: ReportData): stri
         </div>
       </div>
 
-      ${ci.impactStories.length > 0 ? `
-      <div style="font-size: 12px; font-weight: 600; margin-bottom: 12px;">Impact Stories</div>
-      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
-        ${ci.impactStories.slice(0, 4).map(s => `
-          <div style="background: white; border: 1px solid #e7e5e4; border-radius: 12px; padding: 16px;">
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-              <span style="display: inline-block; padding: 2px 8px; border-radius: 8px; font-size: 10px; background: #f0fdf4; color: #166534;">${escapeHtml(s.category)}</span>
+      ${ci.impactStories.length > 0 ? (() => {
+        const primaryColor = config.branding.primaryColor || '#ccff00';
+        const storyAccents = [primaryColor, '#22c55e', '#3b82f6', '#8b5cf6'];
+        return `
+      <div style="font-size: 11px; font-family: 'Fira Code', monospace; text-transform: uppercase; letter-spacing: 2px; color: #78716c; margin-bottom: 12px;">Impact Stories</div>
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;">
+        ${ci.impactStories.slice(0, 4).map((s, i) => {
+          const accent = storyAccents[i % storyAccents.length];
+          return `
+          <div style="background: white; border: 1px solid #e7e5e4; border-radius: 14px; overflow: hidden; display: flex; flex-direction: column;">
+            ${s.photo ? `
+            <div style="height: 110px; overflow: hidden;">
+              <img src="${escapeHtml(s.photo)}" alt="${escapeHtml(s.title)}" style="width: 100%; height: 100%; object-fit: cover;" />
+            </div>` : `
+            <div style="height: 6px; background: ${accent};"></div>`}
+            <div style="padding: 14px 16px; flex: 1;">
+              <span style="display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 9px; font-family: 'Fira Code', monospace; text-transform: uppercase; letter-spacing: 1px; background: ${accent}18; color: ${accent === '#ccff00' ? '#3f6212' : accent}; font-weight: 600; margin-bottom: 8px;">${escapeHtml(s.category)}</span>
+              <div style="font-size: 13px; font-weight: 700; color: #1c1917; margin-bottom: 6px; line-height: 1.3;">${escapeHtml(s.title)}</div>
+              <p style="font-size: 11px; color: #78716c; line-height: 1.55;">${escapeHtml(s.summary)}</p>
             </div>
-            <div style="font-size: 13px; font-weight: 600; margin-bottom: 4px;">${escapeHtml(s.title)}</div>
-            <p style="font-size: 11px; color: #78716c; line-height: 1.5;">${escapeHtml(s.summary)}</p>
-          </div>
-        `).join('')}
-      </div>` : ''}
+          </div>`;
+        }).join('')}
+      </div>`;
+      })() : ''}
 
       ${renderPageFooter(7)}
     </div>`;
@@ -1114,9 +1450,14 @@ function renderSupplyChainPage(config: ReportConfig, data: ReportData): string {
       </tr>
     `).join('');
 
+  const supplyChainNarrative = data.narratives?.sections?.['supply-chain'];
+
   return `
     <div class="page light-page">
       ${renderSectionHeader('08', 'Supply Chain')}
+
+      ${renderMaterialityCallout('supply-chain', data)}
+      ${supplyChainNarrative ? renderNarrativeBlock(supplyChainNarrative) : ''}
 
       <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;">
         <div class="metric-card" style="text-align: center;">
@@ -1151,9 +1492,13 @@ function renderSupplyChainPage(config: ReportConfig, data: ReportData): string {
 function renderTargetsPage(config: ReportConfig, data: ReportData): string {
   const commitments = data.governance?.climateCommitments || [];
 
+  const targetsNarrative = data.narratives?.sections?.['targets'];
+
   return `
     <div class="page light-page">
-      ${renderSectionHeader('09', 'Targets &amp; Commitments')}
+      ${renderSectionHeader('09', 'Targets & Commitments')}
+
+      ${targetsNarrative ? renderNarrativeBlock(targetsNarrative) : ''}
 
       <div style="background: #1c1917; border-radius: 16px; padding: 28px; color: white; margin-bottom: 24px;">
         <div style="font-size: 12px; font-family: 'Fira Code', monospace; color: #ccff00; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">Climate Commitments</div>
@@ -1214,7 +1559,7 @@ function renderTargetsPage(config: ReportConfig, data: ReportData): string {
 
 function renderMethodologyPage(config: ReportConfig, data: ReportData): string {
   const standardsRows = data.standards.map(s => {
-    const statusColor = s.status === 'Compliant' || s.status === 'compliant' ? '#22c55e' : s.status === 'Partial' || s.status === 'partial' ? '#eab308' : '#78716c';
+    const statusColor = s.status === 'Compliant' || s.status === 'compliant' || s.status === 'Aligned' ? '#22c55e' : s.status === 'Partial' || s.status === 'partial' || s.status === 'Action Required' || s.status === 'In Progress' ? '#eab308' : '#78716c';
     return `
     <tr>
       <td style="font-weight: 500;">${escapeHtml(s.code)}</td>
@@ -1233,7 +1578,7 @@ function renderMethodologyPage(config: ReportConfig, data: ReportData): string {
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('10', 'Methodology &amp; Standards')}
+      ${renderSectionHeader('10', 'Methodology & Standards')}
 
       <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #78716c; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">REPORTING FRAMEWORK COMPLIANCE</div>
 
@@ -1321,6 +1666,372 @@ function formatDateRange(start: string, end: string): string {
 }
 
 // ============================================================================
+// CSRD GATING WARNING PAGE
+// ============================================================================
+
+/**
+ * Rendered when CSRD is selected as a standard but the materiality assessment
+ * has not been completed. Guides the user to complete it before generating
+ * a fully compliant report.
+ */
+function renderCsrdGatingWarningPage(config: ReportConfig): string {
+  return `
+    <div class="page light-page">
+      ${renderSectionHeader('!', 'CSRD Compliance Action Required')}
+
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; gap: 24px; text-align: center; padding: 0 48px;">
+        <div style="width: 72px; height: 72px; background: #fef3c7; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+          <div style="font-size: 36px;">&#9888;&#65039;</div>
+        </div>
+
+        <div>
+          <h3 style="font-size: 22px; font-family: 'Playfair Display', serif; font-weight: 700; color: #92400e; margin-bottom: 12px;">
+            Double-Materiality Assessment Incomplete
+          </h3>
+          <p style="font-size: 14px; color: #78716c; line-height: 1.7; max-width: 480px;">
+            You have selected the <strong>Corporate Sustainability Reporting Directive (CSRD)</strong> standard,
+            which requires a completed double-materiality assessment as a prerequisite.
+          </p>
+        </div>
+
+        <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 24px 32px; max-width: 520px; width: 100%; text-align: left;">
+          <div style="font-size: 12px; font-family: 'Fira Code', monospace; font-weight: 700; color: #92400e; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">
+            Steps to achieve CSRD compliance:
+          </div>
+          ${[
+            'Complete the double-materiality assessment in Reports &rarr; Materiality',
+            'Score each topic for impact on people &amp; planet (1&ndash;5) and financial risk (1&ndash;5)',
+            'Confirm your priority topics in Step 3 of the assessment wizard',
+            'Regenerate this report once the assessment is marked complete',
+          ].map((step, i) => `
+            <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px;">
+              <div style="width: 22px; height: 22px; background: #f59e0b; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: white; flex-shrink: 0;">${i + 1}</div>
+              <p style="font-size: 13px; color: #92400e; line-height: 1.5;">${step}</p>
+            </div>
+          `).join('')}
+        </div>
+
+        <p style="font-size: 11px; color: #a8a29e; font-family: 'Fira Code', monospace;">
+          ESRS 1 &sect;17 &mdash; Double materiality is the foundation of all CSRD disclosures.
+          Without it, topic-specific disclosures cannot be scoped or reported.
+        </p>
+      </div>
+
+      ${renderPageFooter(undefined, false, 'CSRD Compliance Notice')}
+    </div>`;
+}
+
+// ============================================================================
+// ESRS DISCLOSURE INDEX PAGE
+// ============================================================================
+
+/**
+ * Auto-generated ESRS disclosure index based on the completed materiality assessment.
+ * Lists each material topic, its ESRS reference, and disclosure status.
+ * Only rendered when CSRD is selected and materiality assessment is complete.
+ */
+function renderEsrsDisclosureIndexPage(config: ReportConfig, data: ReportData): string {
+  if (!data.materiality?.completed_at || !config.standards.includes('csrd')) return '';
+
+  const materialTopics = data.materiality.topics.filter(t => t.status === 'material');
+  const priorityIds = new Set(data.materiality.priority_topics);
+
+  const categoryLabels: Record<string, string> = {
+    environmental: 'Environmental',
+    social: 'Social',
+    governance: 'Governance',
+  };
+
+  const byCategory: Record<string, typeof materialTopics> = {};
+  for (const t of materialTopics) {
+    if (!byCategory[t.category]) byCategory[t.category] = [];
+    byCategory[t.category].push(t);
+  }
+
+  const sectionRows = Object.entries(byCategory).map(([cat, topics]) => {
+    const header = `
+      <tr style="background: #1c1917; color: white;">
+        <td colspan="4" style="padding: 8px 12px; font-size: 11px; font-family: 'Fira Code', monospace; text-transform: uppercase; letter-spacing: 2px;">${escapeHtml(categoryLabels[cat] || cat)}</td>
+      </tr>`;
+    const rows = topics.map(t => {
+      const isPriority = priorityIds.has(t.id);
+      return `
+      <tr>
+        <td style="width: 40%;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            ${isPriority ? '<span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #ccff00; flex-shrink: 0;"></span>' : '<span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #d1d5db; flex-shrink: 0;"></span>'}
+            <span style="font-size: 12px; font-weight: ${isPriority ? '600' : '400'};">${escapeHtml(t.name)}</span>
+          </div>
+        </td>
+        <td style="font-size: 11px; font-family: 'Fira Code', monospace; color: #78716c;">${t.esrsReference ? escapeHtml(t.esrsReference) : '&mdash;'}</td>
+        <td style="font-size: 11px;">
+          <span style="display: inline-block; padding: 2px 8px; border-radius: 10px; background: #dcfce7; color: #166534; font-size: 10px; font-weight: 500;">Material</span>
+          ${isPriority ? '<span style="display: inline-block; padding: 2px 8px; border-radius: 10px; background: #ccff0020; color: #365314; font-size: 10px; font-weight: 500; margin-left: 4px;">Priority</span>' : ''}
+        </td>
+        <td style="font-size: 11px; color: #78716c; max-width: 160px;">${t.rationale ? escapeHtml(t.rationale.substring(0, 80) + (t.rationale.length > 80 ? '...' : '')) : '&mdash;'}</td>
+      </tr>`;
+    }).join('');
+    return header + rows;
+  }).join('');
+
+  return `
+    <div class="page light-page">
+      ${renderSectionHeader('A', 'ESRS Disclosure Index')}
+
+      <p style="font-size: 12px; color: #78716c; margin-bottom: 20px; line-height: 1.5;">
+        This index lists all topics determined to be material through the double-materiality assessment
+        conducted for the ${config.reportYear} reporting period, along with their applicable ESRS disclosures.
+        Priority topics (&#9679;) appear first in all report sections.
+      </p>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Topic</th>
+            <th>ESRS Reference</th>
+            <th>Status</th>
+            <th>Rationale</th>
+          </tr>
+        </thead>
+        <tbody>${sectionRows}</tbody>
+      </table>
+
+      <div style="margin-top: 20px; padding: 12px 16px; background: #f5f5f4; border-radius: 8px; font-size: 10px; color: #a8a29e; font-family: 'Fira Code', monospace;">
+        Assessment completed: ${new Date(data.materiality.completed_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })} &middot;
+        ${materialTopics.length} material topic${materialTopics.length !== 1 ? 's' : ''} &middot;
+        ${priorityIds.size} priority topic${priorityIds.size !== 1 ? 's' : ''}
+      </div>
+
+      ${renderPageFooter(undefined, false, 'ESRS Disclosure Index')}
+    </div>`;
+}
+
+// ============================================================================
+// TRANSITION ROADMAP PAGE
+// ============================================================================
+
+const SCOPE_LABEL_MAP: Record<string, string> = {
+  scope1: 'Scope 1',
+  scope2: 'Scope 2',
+  scope3: 'Scope 3',
+  total:  'Total',
+};
+
+const SCOPE_COLOUR_MAP: Record<string, string> = {
+  scope1: '#22c55e',
+  scope2: '#3b82f6',
+  scope3: '#f97316',
+  total:  '#8b5cf6',
+};
+
+const MILESTONE_STATUS_COLOUR_MAP: Record<string, string> = {
+  not_started: '#a8a29e',
+  in_progress: '#f59e0b',
+  complete:    '#22c55e',
+};
+
+const MILESTONE_STATUS_LABEL_MAP: Record<string, string> = {
+  not_started: 'Planned',
+  in_progress: 'In Progress',
+  complete:    'Achieved',
+};
+
+/**
+ * Renders the Transition Roadmap page: CSS-based timeline of milestones
+ * plus a table of reduction targets.
+ */
+function renderTransitionRoadmapPage(config: ReportConfig, data: ReportData): string {
+  const tp = data.transitionPlan!;
+  const currentYear = config.reportYear;
+
+  // Sort milestones by date
+  const milestones = [...(tp.milestones || [])].sort((a, b) => a.targetDate.localeCompare(b.targetDate));
+
+  // Build milestone rows (max 10)
+  const milestoneRows = milestones.slice(0, 10).map((m, i) => {
+    const statusColour = MILESTONE_STATUS_COLOUR_MAP[m.status] || '#a8a29e';
+    const statusLabel = MILESTONE_STATUS_LABEL_MAP[m.status] || m.status;
+    const year = m.targetDate.split('-')[0] || '';
+    const isLast = i === Math.min(milestones.length, 10) - 1;
+
+    return `
+      <div style="display: flex; align-items: flex-start; gap: 16px; position: relative; padding-bottom: ${isLast ? '0' : '20px'};">
+        ${!isLast ? `<div style="position: absolute; left: 10px; top: 22px; bottom: 0; width: 2px; background: #e7e5e4;"></div>` : ''}
+        <div style="width: 22px; height: 22px; border-radius: 50%; background: ${statusColour}20; border: 2px solid ${statusColour}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; z-index: 1;">
+          ${m.status === 'complete' ? `<div style="width: 8px; height: 8px; border-radius: 50%; background: ${statusColour};"></div>` : `<div style="width: 6px; height: 6px; border-radius: 50%; background: ${statusColour};"></div>`}
+        </div>
+        <div style="flex: 1;">
+          <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 8px;">
+            <span style="font-size: 13px; font-weight: 500; color: #1c1917;">${escapeHtml(m.title || 'Untitled milestone')}</span>
+            <span style="font-size: 10px; font-family: 'Fira Code', monospace; color: #a8a29e; flex-shrink: 0;">${escapeHtml(year)}</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; margin-top: 2px;">
+            <span style="font-size: 10px; color: ${statusColour}; font-weight: 500;">${escapeHtml(statusLabel)}</span>
+            ${m.emissionsImpactTco2e ? `<span style="font-size: 10px; color: #a8a29e;">${formatNumber(m.emissionsImpactTco2e, 1)} tCO2e expected</span>` : ''}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  // Build targets table rows
+  const targetRows = (tp.targets || []).map(t => {
+    const colour = SCOPE_COLOUR_MAP[t.scope] || '#1c1917';
+    const scopeLabel = SCOPE_LABEL_MAP[t.scope] || t.scope;
+    const reductionPct = tp.baseline_emissions_tco2e
+      ? ((tp.baseline_emissions_tco2e * (1 - t.reductionPct / 100))).toFixed(0)
+      : null;
+    const sbtiFlag = t.reductionPct >= 50;
+
+    return `
+    <tr>
+      <td>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="width: 8px; height: 8px; border-radius: 50%; background: ${colour};"></div>
+          <span>${escapeHtml(scopeLabel)}</span>
+        </div>
+      </td>
+      <td>${tp.baseline_year}</td>
+      <td>${t.targetYear}</td>
+      <td style="font-weight: 600; color: ${colour};">-${t.reductionPct}%</td>
+      <td>${reductionPct ? `${reductionPct} tCO2e` : (t.absoluteTargetTco2e ? `${formatNumber(t.absoluteTargetTco2e, 0)} tCO2e` : '&mdash;')}</td>
+      <td>${sbtiFlag ? '<span style="font-size: 10px; background: #ccff0020; color: #365314; padding: 2px 8px; border-radius: 10px; font-weight: 500;">SBTi</span>' : '&mdash;'}</td>
+    </tr>`;
+  }).join('');
+
+  const baselineText = tp.baseline_emissions_tco2e
+    ? `${formatNumber(tp.baseline_emissions_tco2e, 0)} tCO2e (${tp.baseline_year} baseline)`
+    : `${tp.baseline_year} baseline`;
+
+  return `
+    <div class="page light-page">
+      ${renderSectionHeader('T1', 'Transition Roadmap')}
+
+      <div style="display: flex; gap: 32px;">
+        <!-- Timeline (left) -->
+        <div style="flex: 1;">
+          <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #78716c; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">
+            DECARBONISATION MILESTONES &middot; ${currentYear}&ndash;${Math.max(...(tp.targets || []).map(t => t.targetYear), currentYear + 10)}
+          </div>
+
+          ${milestones.length > 0 ? milestoneRows : `
+          <div style="color: #a8a29e; font-size: 13px; padding: 24px 0;">No milestones defined.</div>
+          `}
+        </div>
+
+        <!-- Targets (right) -->
+        <div style="width: 300px; flex-shrink: 0;">
+          <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #78716c; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">
+            REDUCTION TARGETS
+          </div>
+
+          ${tp.targets && tp.targets.length > 0 ? `
+          <table class="data-table" style="font-size: 11px;">
+            <thead>
+              <tr>
+                <th>Scope</th>
+                <th>Base</th>
+                <th>Year</th>
+                <th>Reduction</th>
+                <th>Target</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>${targetRows}</tbody>
+          </table>
+
+          <div style="margin-top: 12px; font-size: 10px; color: #a8a29e;">
+            Baseline: ${escapeHtml(baselineText)}
+          </div>
+          ` : `<div style="color: #a8a29e; font-size: 12px;">No targets set.</div>`}
+
+          ${tp.sbti_aligned ? `
+          <div style="margin-top: 16px; background: #ccff0015; border: 1px solid #ccff0040; border-radius: 8px; padding: 10px 12px;">
+            <div style="font-size: 10px; font-weight: 600; color: #365314; margin-bottom: 2px;">SBTi Aligned</div>
+            <div style="font-size: 10px; color: #78716c;">Targets meet Science Based Targets initiative Corporate Standard for 1.5&deg;C alignment.</div>
+          </div>` : ''}
+        </div>
+      </div>
+
+      ${renderPageFooter(undefined, false, 'Transition Roadmap')}
+    </div>`;
+}
+
+// ============================================================================
+// CLIMATE RISKS & OPPORTUNITIES PAGE
+// ============================================================================
+
+/**
+ * Renders the Climate Risks & Opportunities page.
+ * Two-column layout: risks (left), opportunities (right).
+ */
+function renderRisksOpportunitiesPage(config: ReportConfig, data: ReportData): string {
+  const ro = data.transitionPlan?.risks_and_opportunities || [];
+  const risks = ro.filter(i => i.type === 'risk');
+  const opportunities = ro.filter(i => i.type === 'opportunity');
+
+  const LIKELIHOOD_COLOUR: Record<string, string> = {
+    low: '#22c55e',
+    medium: '#f59e0b',
+    high: '#ef4444',
+  };
+
+  function renderRoItem(item: NonNullable<typeof ro>[0]): string {
+    const isRisk = item.type === 'risk';
+    const accentColour = isRisk ? '#ef444420' : '#22c55e20';
+    const borderColour = isRisk ? '#ef4444' : '#22c55e';
+    const likelihoodColour = LIKELIHOOD_COLOUR[item.likelihood] || '#78716c';
+    const impactColour = LIKELIHOOD_COLOUR[item.impact] || '#78716c';
+    const timeLabels: Record<string, string> = { short: '1-3yr', medium: '3-10yr', long: '10yr+' };
+
+    return `
+      <div style="background: ${accentColour}; border-left: 3px solid ${borderColour}; border-radius: 0 8px 8px 0; padding: 12px 14px; margin-bottom: 10px;">
+        <div style="font-size: 12px; font-weight: 600; color: #1c1917; margin-bottom: 4px;">${escapeHtml(item.title)}</div>
+        <div style="font-size: 11px; color: #44403c; line-height: 1.5; margin-bottom: 8px;">${escapeHtml(item.description)}</div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <span style="font-size: 9px; font-family: 'Fira Code', monospace; text-transform: uppercase; letter-spacing: 1px; color: ${likelihoodColour};">${escapeHtml(item.likelihood.toUpperCase())} likelihood</span>
+          <span style="font-size: 9px; font-family: 'Fira Code', monospace; color: #a8a29e;">&middot;</span>
+          <span style="font-size: 9px; font-family: 'Fira Code', monospace; text-transform: uppercase; letter-spacing: 1px; color: ${impactColour};">${escapeHtml(item.impact.toUpperCase())} impact</span>
+          <span style="font-size: 9px; font-family: 'Fira Code', monospace; color: #a8a29e;">&middot;</span>
+          <span style="font-size: 9px; font-family: 'Fira Code', monospace; color: #a8a29e;">${escapeHtml(timeLabels[item.timeHorizon] || item.timeHorizon)}</span>
+          ${item.category ? `<span style="font-size: 9px; font-family: 'Fira Code', monospace; color: #a8a29e; margin-left: 4px; text-transform: uppercase;">${escapeHtml(item.category)}</span>` : ''}
+        </div>
+      </div>`;
+  }
+
+  return `
+    <div class="page light-page">
+      ${renderSectionHeader('T2', 'Climate Risks & Opportunities')}
+
+      <p style="font-size: 12px; color: #78716c; margin-bottom: 20px; line-height: 1.5;">
+        The following risks and opportunities were identified through analysis of ${escapeHtml(data.organization?.name || 'the organisation')}'s
+        emissions profile, transition targets, and material topics. Items marked AI-generated have been reviewed and approved by the reporting team.
+      </p>
+
+      <div style="display: flex; gap: 24px;">
+        <div style="flex: 1;">
+          <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #ef4444; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px;">
+            RISKS (${risks.length})
+          </div>
+          ${risks.length > 0
+            ? risks.map(renderRoItem).join('')
+            : '<div style="color: #a8a29e; font-size: 12px;">No risks identified.</div>'}
+        </div>
+
+        <div style="flex: 1;">
+          <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #22c55e; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px;">
+            OPPORTUNITIES (${opportunities.length})
+          </div>
+          ${opportunities.length > 0
+            ? opportunities.map(renderRoItem).join('')
+            : '<div style="color: #a8a29e; font-size: 12px;">No opportunities identified.</div>'}
+        </div>
+      </div>
+
+      ${renderPageFooter(undefined, false, 'Climate Risks & Opportunities')}
+    </div>`;
+}
+
+// ============================================================================
 // MAIN RENDERER
 // ============================================================================
 
@@ -1336,34 +2047,89 @@ function formatDateRange(start: string, end: string): string {
 export function renderSustainabilityReportHtml(
   config: ReportConfig,
   data: ReportData,
+  options: { screenMode?: boolean } = {},
 ): string {
+  const screenMode = options.screenMode === true;
   const sections = new Set(config.sections);
+  const tier = getStorytellingTier(config.audience);
+
+  // Compute values used for section dividers
+  const totalEmissions = data.emissions?.total ?? 0;
+  const yoyChange = data.emissionsTrends?.length >= 2
+    ? data.emissionsTrends[data.emissionsTrends.length - 1]?.yoyChange
+    : null;
+  const reductionTarget = data.transitionPlan?.targets?.[0]?.reductionPct;
+  const emissionsDividerStat = totalEmissions > 0
+    ? `${(totalEmissions / 1000).toFixed(1)}k`
+    : '—';
+  const emissionsDividerYoY = yoyChange
+    ? ` — a ${parseFloat(yoyChange) < 0 ? Math.abs(parseFloat(yoyChange)).toFixed(1) + '% reduction' : parseFloat(yoyChange).toFixed(1) + '% increase'} year-on-year`
+    : '';
 
   const pages = [
-    // Always included
+    // Cover — with optional hero photo
     renderCoverPage(config, data),
+
+    // Leadership message — storytelling full audiences only
+    tier === 'full' ? renderLeadershipPage(config) : '',
+
+    // Executive summary
     renderExecSummaryPage(config, data),
+
+    // Section divider: Emissions — storytelling audiences
+    (tier === 'full' || tier === 'balanced') && totalEmissions > 0
+      ? renderSectionDividerPage(
+          config,
+          emissionsDividerStat,
+          `tCO\u2082e total emissions in ${config.reportYear}`,
+          `Our carbon footprint is measured across all three GHG Protocol scopes${emissionsDividerYoY}. The following section presents the complete picture.`,
+          'Our Carbon Footprint',
+        )
+      : '',
+
+    // Emissions sections
     renderEmissionsPage(config, data),
-    // Conditional sections
     sections.has('key-findings') && data.keyFindings && data.keyFindings.length > 0
       ? renderKeyFindingsPage(config, data) : '',
     sections.has('trends') && data.emissionsTrends && data.emissionsTrends.length >= 2
       ? renderTrendsPage(config, data) : '',
-    sections.has('products') && data.dataAvailability.hasProducts
+    (sections.has('product-footprints') || sections.has('products')) && data.dataAvailability.hasProducts
       ? renderProductsPage(config, data) : '',
     data.dataAvailability.hasVineyards && data.vineyards && data.vineyards.length > 0
       ? renderVineyardsPage(config, data) : '',
-    sections.has('people') && data.dataAvailability.hasPeopleCulture
+
+    // People & governance sections
+    (sections.has('people-culture') || sections.has('people')) && data.dataAvailability.hasPeopleCulture
       ? renderPeopleCulturePage(config, data) : '',
     sections.has('governance') && data.dataAvailability.hasGovernance
       ? renderGovernancePage(config, data) : '',
-    sections.has('community') && data.dataAvailability.hasCommunityImpact
+    (sections.has('community-impact') || sections.has('community')) && data.dataAvailability.hasCommunityImpact
       ? renderCommunityImpactPage(config, data) : '',
     sections.has('supply-chain') && data.dataAvailability.hasSuppliers
       ? renderSupplyChainPage(config, data) : '',
-    // Always included
+
+    // Section divider: Commitments — storytelling audiences
+    (tier === 'full' || tier === 'balanced') && reductionTarget
+      ? renderSectionDividerPage(
+          config,
+          `-${reductionTarget}%`,
+          'absolute emission reduction target',
+          `Our transition plan sets out the milestones, investments, and actions required to reach this goal. Progress is independently verified and reported annually.`,
+          'Our Commitments',
+        )
+      : '',
+
+    // Strategy sections
     renderTargetsPage(config, data),
+    sections.has('transition-roadmap') && data.transitionPlan && data.transitionPlan.milestones.length > 0
+      ? renderTransitionRoadmapPage(config, data) : '',
+    sections.has('risks-and-opportunities') && data.transitionPlan?.risks_and_opportunities?.length
+      ? renderRisksOpportunitiesPage(config, data) : '',
+
+    // Technical sections
     renderMethodologyPage(config, data),
+    data.csrdGatingWarning ? renderCsrdGatingWarningPage(config) : '',
+    renderEsrsDisclosureIndexPage(config, data),
     renderClosingPage(config, data),
   ].filter(Boolean).join('\n');
 
@@ -1398,6 +2164,26 @@ export function renderSustainabilityReportHtml(
 
     @page { size: A4; margin: 0; }
 
+    ${screenMode ? `
+    .page {
+      max-width: 860px;
+      margin: 0 auto 48px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      padding: 48px;
+      overflow: visible;
+      border-radius: 12px;
+      box-shadow: 0 2px 20px rgba(0,0,0,0.08);
+    }
+    /* In screen mode footers render in normal flow — no absolute overlap */
+    .page-footer {
+      position: static !important;
+      padding: 24px 0 0 0 !important;
+      background: transparent !important;
+      margin-top: 32px;
+    }
+    ` : `
     .page {
       width: 794px;
       height: 1123px;
@@ -1412,6 +2198,7 @@ export function renderSustainabilityReportHtml(
     }
 
     .page:last-child { page-break-after: auto; break-after: auto; }
+    `}
 
     .dark-page { background: #1c1917; color: white; }
     .light-page { background: #f5f5f4; color: #1c1917; }
@@ -1482,13 +2269,115 @@ export function renderSustainabilityReportHtml(
     .badge-medium { background: #fef3c7; color: #92400e; }
     .badge-high { background: #fee2e2; color: #991b1b; }
 
+    /* AI-generated narrative block */
+    .narrative-block {
+      background: #fafaf9;
+      border-left: 3px solid #ccff00;
+      border-radius: 0 8px 8px 0;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+    }
+
+    .narrative-headline {
+      font-size: 15px;
+      font-weight: 600;
+      color: #1c1917;
+      line-height: 1.4;
+      margin-bottom: 10px;
+    }
+
+    .narrative-context {
+      font-size: 13px;
+      color: #44403c;
+      line-height: 1.6;
+      margin-bottom: 10px;
+    }
+
+    .narrative-next-step {
+      font-size: 12px;
+      font-style: italic;
+      color: #78716c;
+      margin-bottom: 0;
+    }
+
+    .narrative-confidence {
+      font-size: 11px;
+      color: #a8a29e;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #e7e5e4;
+    }
+
+    .narrative-footnote {
+      font-size: 10px;
+      font-family: 'Fira Code', monospace;
+      color: #a8a29e;
+      margin-top: 8px;
+    }
+
     @media print {
       body { background: white; }
-      .page { box-shadow: none; margin: 0; }
+      .page { box-shadow: none; margin: 0; border-radius: 0; }
     }
+
+    ${screenMode ? `
+    body { background: #f5f5f4; padding: 24px 16px; }
+    .screen-nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: #1c1917;
+      color: white;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 32px;
+      border-radius: 12px;
+      max-width: 860px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .screen-nav-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: white;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 300px;
+    }
+    .screen-nav-links {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .screen-nav-links a {
+      font-size: 11px;
+      color: #a8a29e;
+      text-decoration: none;
+      font-family: 'Fira Code', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .screen-nav-links a:hover { color: #ccff00; }
+    ` : ''}
   </style>
 </head>
 <body>
+  ${screenMode ? `
+  <nav class="screen-nav">
+    <span class="screen-nav-title">${escapeHtml(config.reportName)}</span>
+    <div class="screen-nav-links">
+      <a href="#section-overview">Overview</a>
+      ${config.sections.includes('scope-1-2-3') || config.sections.includes('ghg-inventory') ? '<a href="#section-emissions">Emissions</a>' : ''}
+      ${config.sections.includes('people-culture') ? '<a href="#section-people">People</a>' : ''}
+      ${config.sections.includes('governance') ? '<a href="#section-governance">Governance</a>' : ''}
+      ${config.sections.includes('targets') ? '<a href="#section-targets">Targets</a>' : ''}
+      ${config.sections.includes('transition-roadmap') ? '<a href="#section-transition">Transition</a>' : ''}
+    </div>
+  </nav>
+  ` : ''}
   ${pagesWithNumbers}
 </body>
 </html>`;

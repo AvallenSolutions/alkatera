@@ -15,6 +15,15 @@ import {
 } from '@/components/ui/accordion'
 import { PageLoader } from '@/components/ui/page-loader'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
   Shield,
   ShieldCheck,
   Clock,
@@ -36,9 +45,22 @@ import { isReadyToSubmit, getRatingLabel } from '@/lib/supplier-esg/scoring'
 import { EsgQuestionEvidenceUpload } from '@/components/suppliers/EsgQuestionEvidenceUpload'
 import type { SupplierEsgEvidence } from '@/lib/types/supplier-esg'
 
+const DEFORESTATION_QUESTION_IDS = ['env_09', 'env_10']
+
+const DEFORESTATION_STANDARD_OPTIONS = [
+  { value: 'ndpe', label: 'NDPE (No Deforestation, No Peat, No Exploitation)' },
+  { value: 'fsc', label: 'FSC (Forest Stewardship Council)' },
+  { value: 'pefc', label: 'PEFC (Programme for the Endorsement of Forest Certification)' },
+  { value: 'eu_deforestation_regulation', label: 'EU Deforestation Regulation' },
+  { value: 'soy_moratorium', label: 'Soy Moratorium' },
+  { value: 'rtrs', label: 'RTRS (Round Table on Responsible Soy)' },
+  { value: 'other', label: 'Other' },
+]
+
 export default function SupplierEsgAssessmentPage() {
   const [supplierId, setSupplierId] = useState<string | undefined>()
   const [loadingSupplier, setLoadingSupplier] = useState(true)
+  const [hasCommodityProducts, setHasCommodityProducts] = useState(false)
 
   const {
     assessment,
@@ -72,7 +94,18 @@ export default function SupplierEsgAssessmentPage() {
         .limit(1)
         .maybeSingle()
 
-      if (data) setSupplierId(data.id)
+      if (data) {
+        setSupplierId(data.id)
+
+        // Check if this supplier has any products with deforestation-linked commodities
+        const { data: commodityProducts } = await supabase
+          .from('supplier_products')
+          .select('id')
+          .eq('supplier_id', data.id)
+          .neq('commodity_type', 'none')
+          .limit(1)
+        setHasCommodityProducts(!!(commodityProducts && commodityProducts.length > 0))
+      }
       setLoadingSupplier(false)
     }
     loadSupplier()
@@ -199,7 +232,11 @@ export default function SupplierEsgAssessmentPage() {
       {/* Section Accordions */}
       <Accordion type="multiple" defaultValue={[ESG_SECTIONS[0].key]}>
         {ESG_SECTIONS.map((section) => {
-          const questions = getQuestionsBySection(section.key)
+          // Filter out deforestation questions if supplier has no commodity products
+          const allQuestions = getQuestionsBySection(section.key)
+          const questions = hasCommodityProducts
+            ? allQuestions
+            : allQuestions.filter((q) => !DEFORESTATION_QUESTION_IDS.includes(q.id))
           const sectionAnswered = questions.filter((q) => answers[q.id] != null).length
           const sectionComplete = sectionAnswered === questions.length
 
@@ -220,7 +257,54 @@ export default function SupplierEsgAssessmentPage() {
               </AccordionTrigger>
               <AccordionContent>
                 <div className="space-y-6 pt-2">
-                  {questions.map((question, idx) => (
+                  {questions.map((question, idx) => {
+                    // env_10: show as standard select when env_09 is yes/partial
+                    if (question.id === 'env_10') {
+                      const env09Answer = answers['env_09']
+                      if (env09Answer !== 'yes' && env09Answer !== 'partial') return null
+                      return (
+                        <div key={question.id} className="border rounded-lg p-4">
+                          <div className="flex gap-3">
+                            <span className="text-sm font-medium text-muted-foreground w-6 flex-shrink-0">
+                              {idx + 1}.
+                            </span>
+                            <div className="flex-1 space-y-3">
+                              <p className="text-sm font-medium leading-relaxed">{question.text}</p>
+                              {question.guidanceNote && (
+                                <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/50 rounded-md p-2">
+                                  <Info className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                                  <span>{question.guidanceNote}</span>
+                                </div>
+                              )}
+                              <Select
+                                value={answers['env_10'] || ''}
+                                onValueChange={(val) => handleAnswer('env_10', val as EsgResponse)}
+                                disabled={isSubmitted}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select standard" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {DEFORESTATION_STANDARD_OPTIONS.map((opt) => (
+                                    <SelectItem key={opt.value} value={opt.value}>
+                                      {opt.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              {(answers['env_10'] as string) === 'other' && (
+                                <Input
+                                  placeholder="Please specify the standard"
+                                  disabled={isSubmitted}
+                                  onChange={(e) => handleAnswer('env_10', e.target.value as EsgResponse)}
+                                />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    }
+                    return (
                     <QuestionRow
                       key={question.id}
                       question={question}
@@ -232,7 +316,8 @@ export default function SupplierEsgAssessmentPage() {
                       onUploadEvidence={uploadEvidence}
                       onDeleteEvidence={deleteEvidence}
                     />
-                  ))}
+                  )})}
+
                 </div>
               </AccordionContent>
             </AccordionItem>

@@ -65,6 +65,7 @@ interface CorporateReport {
   breakdown_json: any;
   created_at: string;
   updated_at: string;
+  not_applicable_categories: string[];
 }
 
 interface OverheadEntry {
@@ -101,6 +102,7 @@ export default function FootprintBuilderPage() {
   const [fleetCO2e, setFleetCO2e] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [openSections, setOpenSections] = useState<string[]>(["scope12", "scope3"]);
 
   // Use the shared Scope 3 hook
   const { scope3Emissions, isLoading: isLoadingScope3, refetch: refetchScope3 } = useScope3Emissions(
@@ -225,6 +227,53 @@ export default function FootprintBuilderPage() {
     }
   };
 
+  const handleScrollToCategory = (key: string) => {
+    const categorySection: Record<string, string> = {
+      operations: 'scope12',
+      fleet: 'scope12',
+      products: 'scope3',
+      upstream_transport: 'scope3',
+      business_travel: 'scope3',
+      employee_commuting: 'scope3',
+      capital_goods: 'scope3',
+      purchased_services: 'scope3',
+      marketing_materials: 'scope3',
+      downstream_logistics: 'scope3',
+      operational_waste: 'scope3',
+    };
+    const section = categorySection[key];
+    if (section) {
+      setOpenSections(prev => prev.includes(section) ? prev : [...prev, section]);
+    }
+    setTimeout(() => {
+      const el = document.getElementById(`footprint-card-${key}`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 300);
+  };
+
+  const handleToggleNotApplicable = async (category: string, value: boolean) => {
+    if (!report) return;
+    const supabase = getSupabaseBrowserClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    try {
+      const res = await fetch(`/api/reports/${report.id}/not-applicable`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ category, isNotApplicable: value }),
+      });
+      if (!res.ok) throw new Error('Failed to update');
+      const data = await res.json();
+      setReport(prev => prev ? { ...prev, not_applicable_categories: data.not_applicable_categories } : prev);
+    } catch (error: any) {
+      toast.error('Failed to update category');
+    }
+  };
+
   const handleGenerateReport = async () => {
     if (!report || !currentOrganization?.id) return;
 
@@ -311,21 +360,26 @@ export default function FootprintBuilderPage() {
     use_phase: scope3Emissions.use_phase,
   };
 
+  const notApplicableCategories = report.not_applicable_categories || [];
+
   // Data completeness
   const completeness = calculateDataCompleteness({
     operationsEmissions: operationsCO2e,
     fleetEmissions: fleetCO2e,
     scope3Breakdown,
+    notApplicableCategories,
   });
 
-  // Scope 3 completeness for the accordion trigger
-  const scope3Categories = completeness.categories.filter(c => c.scope === 3 && !c.isComingSoon);
+  // Scope 3 completeness for the accordion trigger (exclude N/A categories)
+  const scope3Categories = completeness.categories.filter(c => c.scope === 3 && !c.isComingSoon && !c.isNotApplicable);
   const scope3CompletedCount = scope3Categories.filter(c => c.hasData).length;
 
   // Format emissions helper
-  const formatEmissions = (value: number): string => {
-    if (value >= 1000) return `${(value / 1000).toFixed(2)} kt`;
-    return `${value.toFixed(2)} t`;
+  // All scope 1/2/3 values are in kg CO₂e — convert to tonnes for display
+  const formatEmissions = (kgValue: number): string => {
+    const t = kgValue / 1000;
+    if (t >= 1000) return `${(t / 1000).toFixed(2)} kt`;
+    return `${t.toFixed(2)} t`;
   };
 
   const isFinalized = report.status === "Finalized";
@@ -432,6 +486,8 @@ export default function FootprintBuilderPage() {
         totalCount={completeness.totalCount}
         score={completeness.score}
         firstIncompleteCategory={completeness.firstIncompleteCategory}
+        onScrollToCategory={handleScrollToCategory}
+        year={year}
       />
 
       {/* ================================================================= */}
@@ -448,7 +504,7 @@ export default function FootprintBuilderPage() {
       {/* ================================================================= */}
       {/* Scope-Grouped Activity Cards (Accordion)                          */}
       {/* ================================================================= */}
-      <Accordion type="multiple" defaultValue={["scope12", "scope3"]} className="space-y-3">
+      <Accordion type="multiple" value={openSections} onValueChange={setOpenSections} className="space-y-3">
 
         {/* ─────────────────────────────────────────────────────────────── */}
         {/* Scope 1 & 2: Direct & Energy Emissions                        */}
@@ -475,8 +531,17 @@ export default function FootprintBuilderPage() {
           </AccordionTrigger>
           <AccordionContent className="px-5 pb-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <OperationsEnergyCard totalCO2e={operationsCO2e} year={year} />
-              <CompanyFleetCard totalCO2e={fleetCO2e} year={year} />
+              <div id="footprint-card-operations">
+                <OperationsEnergyCard totalCO2e={operationsCO2e} year={year} />
+              </div>
+              <div id="footprint-card-fleet">
+                <CompanyFleetCard
+                  totalCO2e={fleetCO2e}
+                  year={year}
+                  isNotApplicable={notApplicableCategories.includes('fleet')}
+                  onToggleNotApplicable={(v) => handleToggleNotApplicable('fleet', v)}
+                />
+              </div>
             </div>
           </AccordionContent>
         </AccordionItem>
@@ -513,31 +578,83 @@ export default function FootprintBuilderPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {report && (
-                  <BusinessTravelCard reportId={report.id} entries={travelEntries} onUpdate={fetchReportData} />
+                  <div id="footprint-card-business_travel">
+                    <BusinessTravelCard
+                      reportId={report.id}
+                      entries={travelEntries}
+                      onUpdate={fetchReportData}
+                      isNotApplicable={notApplicableCategories.includes('business_travel')}
+                      onToggleNotApplicable={(v) => handleToggleNotApplicable('business_travel', v)}
+                    />
+                  </div>
                 )}
                 {report && (
-                  <ServicesOverheadCard reportId={report.id} entries={serviceEntries} onUpdate={fetchReportData} />
+                  <div id="footprint-card-purchased_services">
+                    <ServicesOverheadCard
+                      reportId={report.id}
+                      entries={serviceEntries}
+                      onUpdate={fetchReportData}
+                      isNotApplicable={notApplicableCategories.includes('purchased_services')}
+                      onToggleNotApplicable={(v) => handleToggleNotApplicable('purchased_services', v)}
+                    />
+                  </div>
                 )}
                 {report && (
-                  <MarketingMaterialsCard reportId={report.id} entries={marketingEntries} onUpdate={fetchReportData} />
+                  <div id="footprint-card-marketing_materials">
+                    <MarketingMaterialsCard
+                      reportId={report.id}
+                      entries={marketingEntries}
+                      onUpdate={fetchReportData}
+                      isNotApplicable={notApplicableCategories.includes('marketing_materials')}
+                      onToggleNotApplicable={(v) => handleToggleNotApplicable('marketing_materials', v)}
+                    />
+                  </div>
                 )}
                 {report && (
-                  <TeamCommutingCard reportId={report.id} initialFteCount={fteCount} onUpdate={fetchReportData} />
+                  <div id="footprint-card-employee_commuting">
+                    <TeamCommutingCard
+                      reportId={report.id}
+                      initialFteCount={fteCount}
+                      onUpdate={fetchReportData}
+                      isNotApplicable={notApplicableCategories.includes('employee_commuting')}
+                      onToggleNotApplicable={(v) => handleToggleNotApplicable('employee_commuting', v)}
+                    />
+                  </div>
                 )}
                 {report && (
-                  <CapitalGoodsCard reportId={report.id} entries={capitalGoodsEntries} onUpdate={fetchReportData} />
+                  <div id="footprint-card-capital_goods">
+                    <CapitalGoodsCard
+                      reportId={report.id}
+                      entries={capitalGoodsEntries}
+                      onUpdate={fetchReportData}
+                      isNotApplicable={notApplicableCategories.includes('capital_goods')}
+                      onToggleNotApplicable={(v) => handleToggleNotApplicable('capital_goods', v)}
+                    />
+                  </div>
                 )}
                 {report && currentOrganization && (
-                  <LogisticsDistributionCard
-                    reportId={report.id}
-                    organizationId={currentOrganization.id}
-                    year={year}
-                    entries={logisticsEntries}
-                    onUpdate={fetchReportData}
-                  />
+                  <div id="footprint-card-downstream_logistics">
+                    <LogisticsDistributionCard
+                      reportId={report.id}
+                      organizationId={currentOrganization.id}
+                      year={year}
+                      entries={logisticsEntries}
+                      onUpdate={fetchReportData}
+                      isNotApplicable={notApplicableCategories.includes('downstream_logistics')}
+                      onToggleNotApplicable={(v) => handleToggleNotApplicable('downstream_logistics', v)}
+                    />
+                  </div>
                 )}
                 {report && (
-                  <OperationalWasteCard reportId={report.id} entries={wasteEntries} onUpdate={fetchReportData} />
+                  <div id="footprint-card-operational_waste">
+                    <OperationalWasteCard
+                      reportId={report.id}
+                      entries={wasteEntries}
+                      onUpdate={fetchReportData}
+                      isNotApplicable={notApplicableCategories.includes('operational_waste')}
+                      onToggleNotApplicable={(v) => handleToggleNotApplicable('operational_waste', v)}
+                    />
+                  </div>
                 )}
               </div>
             </div>
@@ -552,7 +669,7 @@ export default function FootprintBuilderPage() {
                 <div className="flex-1 border-t border-slate-200 dark:border-slate-700" />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="border-l-4 border-emerald-500/20 pl-0 rounded-lg">
+                <div id="footprint-card-products" className="border-l-4 border-emerald-500/20 pl-0 rounded-lg">
                   <ProductsSupplyChainCard
                     totalCO2e={scope3TotalCO2e}
                     productsCO2e={scope3Emissions.products}
@@ -562,7 +679,7 @@ export default function FootprintBuilderPage() {
                   />
                 </div>
                 {report && currentOrganization && (
-                  <div className="border-l-4 border-emerald-500/20 pl-0 rounded-lg">
+                  <div id="footprint-card-upstream_transport" className="border-l-4 border-emerald-500/20 pl-0 rounded-lg">
                     <UpstreamTransportCard
                       reportId={report.id}
                       organizationId={currentOrganization.id}

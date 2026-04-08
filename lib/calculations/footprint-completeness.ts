@@ -13,6 +13,7 @@ export interface CategoryStatus {
   emissions: number;
   isAutoCalculated: boolean;
   isComingSoon: boolean;
+  isNotApplicable: boolean;
   scope: 1 | 2 | 3;
 }
 
@@ -42,8 +43,11 @@ export function calculateDataCompleteness(params: {
   operationsEmissions: number;
   fleetEmissions: number;
   scope3Breakdown?: Scope3BreakdownInput;
+  notApplicableCategories?: string[];
 }): DataCompletenessResult {
-  const { operationsEmissions, fleetEmissions, scope3Breakdown } = params;
+  const { operationsEmissions, fleetEmissions, scope3Breakdown, notApplicableCategories = [] } = params;
+
+  const na = new Set(notApplicableCategories);
 
   const categories: CategoryStatus[] = [
     {
@@ -54,6 +58,7 @@ export function calculateDataCompleteness(params: {
       emissions: operationsEmissions,
       isAutoCalculated: true,
       isComingSoon: false,
+      isNotApplicable: na.has('operations'),
       scope: 1,
     },
     {
@@ -64,6 +69,7 @@ export function calculateDataCompleteness(params: {
       emissions: fleetEmissions,
       isAutoCalculated: false,
       isComingSoon: false,
+      isNotApplicable: na.has('fleet'),
       scope: 1,
     },
     {
@@ -74,6 +80,7 @@ export function calculateDataCompleteness(params: {
       emissions: scope3Breakdown?.products || 0,
       isAutoCalculated: true,
       isComingSoon: false,
+      isNotApplicable: na.has('products'),
       scope: 3,
     },
     {
@@ -84,6 +91,7 @@ export function calculateDataCompleteness(params: {
       emissions: scope3Breakdown?.business_travel || 0,
       isAutoCalculated: false,
       isComingSoon: false,
+      isNotApplicable: na.has('business_travel'),
       scope: 3,
     },
     {
@@ -94,6 +102,7 @@ export function calculateDataCompleteness(params: {
       emissions: scope3Breakdown?.employee_commuting || 0,
       isAutoCalculated: false,
       isComingSoon: false,
+      isNotApplicable: na.has('employee_commuting'),
       scope: 3,
     },
     {
@@ -104,6 +113,7 @@ export function calculateDataCompleteness(params: {
       emissions: scope3Breakdown?.capital_goods || 0,
       isAutoCalculated: false,
       isComingSoon: false,
+      isNotApplicable: na.has('capital_goods'),
       scope: 3,
     },
     {
@@ -114,6 +124,7 @@ export function calculateDataCompleteness(params: {
       emissions: scope3Breakdown?.purchased_services || 0,
       isAutoCalculated: false,
       isComingSoon: false,
+      isNotApplicable: na.has('purchased_services'),
       scope: 3,
     },
     {
@@ -124,6 +135,7 @@ export function calculateDataCompleteness(params: {
       emissions: scope3Breakdown?.marketing_materials || 0,
       isAutoCalculated: false,
       isComingSoon: false,
+      isNotApplicable: na.has('marketing_materials'),
       scope: 3,
     },
     {
@@ -134,6 +146,7 @@ export function calculateDataCompleteness(params: {
       emissions: scope3Breakdown?.downstream_logistics || 0,
       isAutoCalculated: false,
       isComingSoon: false,
+      isNotApplicable: na.has('downstream_logistics'),
       scope: 3,
     },
     {
@@ -144,6 +157,7 @@ export function calculateDataCompleteness(params: {
       emissions: scope3Breakdown?.operational_waste || 0,
       isAutoCalculated: false,
       isComingSoon: false,
+      isNotApplicable: na.has('operational_waste'),
       scope: 3,
     },
     {
@@ -154,6 +168,7 @@ export function calculateDataCompleteness(params: {
       emissions: scope3Breakdown?.upstream_transport || 0,
       isAutoCalculated: true,
       isComingSoon: false,
+      isNotApplicable: na.has('upstream_transport'),
       scope: 3,
     },
     {
@@ -164,6 +179,7 @@ export function calculateDataCompleteness(params: {
       emissions: scope3Breakdown?.downstream_transport || 0,
       isAutoCalculated: false,
       isComingSoon: true,
+      isNotApplicable: na.has('downstream_transport'),
       scope: 3,
     },
     {
@@ -176,12 +192,13 @@ export function calculateDataCompleteness(params: {
       emissions: scope3Breakdown?.use_phase || 0,
       isAutoCalculated: true,
       isComingSoon: false,
+      isNotApplicable: na.has('use_phase'),
       scope: 3,
     },
   ];
 
-  // Only count non-coming-soon categories for completeness
-  const trackableCategories = categories.filter(c => !c.isComingSoon);
+  // Only count non-coming-soon, non-N/A categories for completeness
+  const trackableCategories = categories.filter(c => !c.isComingSoon && !c.isNotApplicable);
   const completedCount = trackableCategories.filter(c => c.hasData).length;
   const totalCount = trackableCategories.length;
   const score = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;

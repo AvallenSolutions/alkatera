@@ -9,7 +9,310 @@ import {
   calculateSlideCount,
   type ReportData,
   type ReportConfig,
+  type SectionNarrative,
+  type ExecutiveSummaryNarrative,
+  type ReportNarratives,
 } from '../_shared/report-content-builder.ts';
+
+// ============================================================================
+// Narrative generation via Anthropic API (native fetch, Deno-compatible)
+// ============================================================================
+
+const SECTION_NARRATIVE_SYSTEM = `You are a senior sustainability analyst writing interpretive narrative for a corporate sustainability report.
+
+Rules:
+- Write in clear, factual British English
+- Never use em dashes
+- Never invent data — use only the figures and context provided
+- Produce insight, not description. Do not repeat numbers already in the data tables.
+- Be specific to this organisation and this data
+- Write for the specified audience
+- If data is absent, say so clearly and explain what data would be needed
+- The headline insight is one sentence only
+- The context paragraph is 2-3 sentences
+- The next step prompt is one sentence
+
+Return valid JSON only. No markdown, no explanation. Return an object with exactly:
+{"headlineInsight":"<one sentence>","contextParagraph":"<2-3 sentences>","nextStepPrompt":"<one sentence>"}`;
+
+const EXEC_SUMMARY_SYSTEM = `You are a senior sustainability communicator writing the Executive Summary for a corporate sustainability report.
+
+This summary must work as a standalone page: a reader who only reads it should understand the company's full sustainability position.
+
+Rules:
+- Write in plain English, accessible to a non-specialist
+- Never use em dashes
+- Never invent data — use only the figures and context provided
+- Lead with the most material finding
+- Include one sentence on direction of travel (improving/worsening and by how much)
+- Include one sentence on the most significant action taken in the reporting year
+- Include one sentence on the primary challenge or data gap
+- Do not use bullet points in the summary text
+
+Return valid JSON only. No markdown, no explanation. Return an object with exactly:
+{"primaryMessage":"<one sentence>","summaryText":"<4-6 sentences>"}`;
+
+const AUDIENCE_FOCUS: Record<string, string> = {
+  investors: 'financial materiality, ESG risk management, long-term value creation, and progress against targets',
+  regulators: 'regulatory compliance, disclosure completeness, data quality, and verifiability',
+  customers: 'product impact, brand values, tangible sustainability actions, and community commitment',
+  internal: 'operational efficiency, cost implications, team performance, and actionable next steps',
+  'supply-chain': 'supply chain transparency, upstream impacts, shared commitments, and procurement criteria',
+  technical: 'methodology robustness, data quality, uncertainty ranges, and scientific rigour',
+};
+
+async function callAnthropicApi(
+  systemPrompt: string,
+  userPrompt: string,
+  maxTokens = 512,
+): Promise<string> {
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: maxTokens,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Anthropic API error: ${response.status} ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return data.content?.[0]?.type === 'text' ? data.content[0].text : '{}';
+}
+
+function buildFallbackSectionNarrative(sectionLabel: string, reportingYear: number): SectionNarrative {
+  return {
+    headlineInsight: `${sectionLabel} data is available for the ${reportingYear} reporting period.`,
+    contextParagraph: `The ${sectionLabel} section presents performance data for ${reportingYear}. Review the figures below for individual metrics and their contribution to the overall sustainability position.`,
+    nextStepPrompt: `Consider how these findings connect to stated targets and commitments.`,
+    dataConfidenceStatement: null,
+    methodologyFootnote: null,
+    aiGenerated: true,
+  };
+}
+
+async function generateSingleSectionNarrative(params: {
+  sectionId: string;
+  sectionLabel: string;
+  organisationName: string;
+  sector?: string;
+  reportingYear: number;
+  standards: string[];
+  audience: string;
+  sectionData: Record<string, unknown>;
+  materialityHint?: string;
+}): Promise<SectionNarrative> {
+  const { sectionId, sectionLabel, organisationName, sector, reportingYear, standards, audience, sectionData, materialityHint } = params;
+  const audienceFocus = AUDIENCE_FOCUS[audience] || 'strategic context and actionable insight';
+
+  const userPrompt = `Write a section narrative for the "${sectionLabel}" section of the ${reportingYear} sustainability report for ${organisationName}.
+
+Organisation: ${organisationName}
+Sector: ${sector || 'Not specified'}
+Reporting year: ${reportingYear}
+Applicable standards: ${standards.length > 0 ? standards.join(', ') : 'None specified'}
+Primary audience: ${audience} — they care about: ${audienceFocus}${materialityHint || ''}
+
+Section data:
+${JSON.stringify(sectionData, null, 2)}
+
+IMPORTANT: Do not describe the data. Interpret it. Answer: what does this mean for ${organisationName}, why does it matter to the specified audience, and what should they take away from it?
+
+Return JSON only.`;
+
+  try {
+    const rawText = await callAnthropicApi(SECTION_NARRATIVE_SYSTEM, userPrompt, 512);
+    const cleaned = rawText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    const parsed = JSON.parse(cleaned);
+
+    return {
+      headlineInsight: parsed.headlineInsight || `${sectionLabel} analysis for ${reportingYear}.`,
+      contextParagraph: parsed.contextParagraph || '',
+      nextStepPrompt: parsed.nextStepPrompt || '',
+      dataConfidenceStatement: null,
+      methodologyFootnote: null,
+      aiGenerated: true,
+    };
+  } catch {
+    return buildFallbackSectionNarrative(sectionLabel, reportingYear);
+  }
+}
+
+interface MaterialityAssessmentCtx {
+  priorityTopics: string[];
+  topicDetails: Record<string, { name: string; rationale?: string }>;
+}
+
+// Maps section IDs to materiality topic IDs
+const SECTION_TO_TOPIC: Record<string, string> = {
+  'scope-1-2-3': 'climate-mitigation',
+  'ghg-inventory': 'climate-mitigation',
+  'carbon-origin': 'climate-mitigation',
+  'flag-removals': 'land-use',
+  'tnfd-nature': 'biodiversity',
+  'product-footprints': 'product-footprints',
+  'people-culture': 'employee-wellbeing',
+  'governance': 'governance-accountability',
+  'community-impact': 'community-engagement',
+  'supply-chain': 'supply-chain-standards',
+  'targets': 'climate-mitigation',
+};
+
+async function generateNarrativesForReport(
+  config: ReportConfig,
+  data: ReportData,
+  materiality?: MaterialityAssessmentCtx,
+): Promise<ReportNarratives> {
+  const SECTION_LABELS: Record<string, string> = {
+    'scope-1-2-3': 'Scope 1, 2 & 3 Emissions Breakdown',
+    'ghg-inventory': 'GHG Gas Inventory',
+    'carbon-origin': 'Carbon Origin Breakdown',
+    'flag-removals': 'FLAG Land-Based Removals',
+    'tnfd-nature': 'TNFD Nature & Biodiversity',
+    'product-footprints': 'Product Environmental Impacts',
+    'multi-capital': 'Multi-capital Impacts',
+    'impact-valuation': 'Impact Valuation',
+    'people-culture': 'People & Culture',
+    'governance': 'Governance',
+    'community-impact': 'Community Impact',
+    'supply-chain': 'Supply Chain Analysis',
+    'facilities': 'Facility Emissions Breakdown',
+    'key-findings': 'Key Findings & Change Drivers',
+    'trends': 'Year-over-Year Trends',
+    'targets': 'Targets & Action Plans',
+  };
+
+  const SKIP = new Set(['executive-summary', 'methodology', 'regulatory', 'appendix']);
+
+  const DATA_EXTRACTORS: Record<string, (d: ReportData) => Record<string, unknown>> = {
+    'scope-1-2-3': d => ({ emissions: d.emissions }),
+    'ghg-inventory': d => ({ emissions: d.emissions }),
+    'carbon-origin': d => ({ emissions: d.emissions }),
+    'flag-removals': d => ({ flagRemovals: (d as any).flagRemovals }),
+    'tnfd-nature': d => ({ tnfd: (d as any).tnfd }),
+    'product-footprints': d => ({ products: d.products }),
+    'multi-capital': d => ({ products: d.products }),
+    'impact-valuation': d => ({ impactValuation: d.impactValuation }),
+    'people-culture': d => ({ peopleCulture: d.peopleCulture }),
+    'governance': d => ({ governance: d.governance }),
+    'community-impact': d => ({ communityImpact: d.communityImpact }),
+    'supply-chain': d => ({ suppliers: d.suppliers }),
+    'facilities': d => ({ facilities: d.facilities }),
+    'key-findings': d => ({ emissions: d.emissions, emissionsTrends: d.emissionsTrends }),
+    'trends': d => ({ emissionsTrends: d.emissionsTrends }),
+    'targets': d => ({ governance: d.governance, emissions: d.emissions }),
+  };
+
+  const sectionsToProcess = config.sections.filter(id => !SKIP.has(id) && SECTION_LABELS[id]);
+
+  // Build per-section materiality context
+  function buildMaterialityHint(sectionId: string): string {
+    if (!materiality) return '';
+    const topicId = SECTION_TO_TOPIC[sectionId];
+    if (!topicId) return '';
+    const topicDetail = materiality.topicDetails[topicId];
+    if (!topicDetail) return '';
+    const isPriority = materiality.priorityTopics.includes(topicId);
+    const status = isPriority ? 'a priority material topic' : 'a material topic';
+    const rationale = topicDetail.rationale ? ` Stakeholder rationale: "${topicDetail.rationale}".` : '';
+    return `\n\nMateriality context: "${topicDetail.name}" is ${status} for this organisation.${rationale} Ensure the narrative reflects this materiality significance.`;
+  }
+
+  // Generate all section narratives in parallel
+  const sectionResults = await Promise.allSettled(
+    sectionsToProcess.map(sectionId => {
+      const extractor = DATA_EXTRACTORS[sectionId];
+      return generateSingleSectionNarrative({
+        sectionId,
+        sectionLabel: SECTION_LABELS[sectionId],
+        organisationName: data.organization.name,
+        sector: data.organization.industry_sector,
+        reportingYear: config.reportYear,
+        standards: config.standards,
+        audience: config.audience,
+        sectionData: extractor ? extractor(data) : {},
+        materialityHint: buildMaterialityHint(sectionId),
+      });
+    })
+  );
+
+  const sectionNarratives: Partial<Record<string, SectionNarrative>> = {};
+  sectionsToProcess.forEach((sectionId, i) => {
+    const result = sectionResults[i];
+    if (result.status === 'fulfilled') {
+      sectionNarratives[sectionId] = result.value;
+    }
+  });
+
+  // Generate executive summary last, after all section narratives
+  const totalEmissions = data.emissions.total;
+  const scope3Pct = totalEmissions > 0 ? ((data.emissions.scope3 / totalEmissions) * 100).toFixed(1) : '0';
+  let yoyChangePct = '';
+  if (data.emissionsTrends && data.emissionsTrends.length >= 2) {
+    const latest = data.emissionsTrends[data.emissionsTrends.length - 1];
+    if (latest.yoyChange) yoyChangePct = `${latest.yoyChange}%`;
+  }
+
+  const sectionInsights = Object.entries(sectionNarratives)
+    .filter(([, n]) => n)
+    .map(([id, n]) => `${id}: ${n!.headlineInsight}`)
+    .join('\n');
+
+  const execUserPrompt = `Write the Executive Summary for ${data.organization.name}'s ${config.reportYear} sustainability report.
+
+Organisation: ${data.organization.name}
+Sector: ${data.organization.industry_sector || 'Not specified'}
+Reporting year: ${config.reportYear}
+Primary audience: ${config.audience}
+Applicable standards: ${config.standards.length > 0 ? config.standards.join(', ') : 'None specified'}
+
+Emissions summary:
+- Total GHG emissions: ${totalEmissions.toLocaleString('en-GB', { maximumFractionDigits: 1 })} tCO2e
+- Scope 1: ${data.emissions.scope1.toLocaleString('en-GB', { maximumFractionDigits: 1 })} tCO2e
+- Scope 2: ${data.emissions.scope2.toLocaleString('en-GB', { maximumFractionDigits: 1 })} tCO2e
+- Scope 3: ${data.emissions.scope3.toLocaleString('en-GB', { maximumFractionDigits: 1 })} tCO2e (${scope3Pct}% of total)
+${yoyChangePct ? `- Year-on-year change: ${yoyChangePct}` : ''}
+
+Key section insights (synthesise the 3-5 most important):
+${sectionInsights}
+
+Return JSON only.`;
+
+  let execNarrative: ExecutiveSummaryNarrative;
+  try {
+    const rawExec = await callAnthropicApi(EXEC_SUMMARY_SYSTEM, execUserPrompt, 768);
+    const cleanedExec = rawExec.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    const parsedExec = JSON.parse(cleanedExec);
+    execNarrative = {
+      primaryMessage: parsedExec.primaryMessage || `${data.organization.name} recorded ${totalEmissions.toLocaleString('en-GB', { maximumFractionDigits: 1 })} tCO2e in ${config.reportYear}.`,
+      summaryText: parsedExec.summaryText || '',
+      aiGenerated: true,
+    };
+  } catch {
+    execNarrative = {
+      primaryMessage: `${data.organization.name} recorded total GHG emissions of ${totalEmissions.toLocaleString('en-GB', { maximumFractionDigits: 1 })} tCO2e in ${config.reportYear}.`,
+      summaryText: `This sustainability report covers emissions across Scopes 1, 2, and 3 for the ${config.reportYear} reporting period. Review the full report for section-level detail, targets, and methodology.`,
+      aiGenerated: true,
+    };
+  }
+
+  return {
+    executiveSummary: execNarrative,
+    sections: sectionNarratives,
+  };
+}
 
 // CORS headers for cross-origin requests
 const corsHeaders = {
@@ -130,7 +433,6 @@ Deno.serve(async (req: Request) => {
       .update({ status: 'building_content' })
       .eq('id', report_config_id);
 
-    // 6. Build structured content (DETERMINISTIC - no LLM interpretation)
     const config: ReportConfig = {
       reportName: reportConfig.report_name,
       reportYear: reportConfig.report_year,
@@ -148,7 +450,40 @@ Deno.serve(async (req: Request) => {
       },
     };
 
-    const structuredContent = buildReportContent(config, aggregatedData);
+    // Fetch materiality assessment for narrative context (non-fatal)
+    let materialityCtx: MaterialityAssessmentCtx | undefined;
+    try {
+      const { data: matData } = await supabaseClient
+        .from('materiality_assessments')
+        .select('topics, priority_topics, completed_at')
+        .eq('organization_id', reportConfig.organization_id)
+        .eq('assessment_year', reportConfig.report_year)
+        .maybeSingle();
+      if (matData?.completed_at && matData.priority_topics && matData.topics) {
+        materialityCtx = {
+          priorityTopics: matData.priority_topics,
+          topicDetails: Object.fromEntries(
+            (matData.topics as Array<{ id: string; name: string; rationale?: string }>).map(t => [
+              t.id,
+              { name: t.name, rationale: t.rationale },
+            ])
+          ),
+        };
+      }
+    } catch {
+      // Non-fatal — narratives still generated without materiality context
+    }
+
+    // Generate AI narrative blocks for all sections (non-fatal if it fails)
+    let reportNarratives: ReportNarratives | undefined;
+    try {
+      reportNarratives = await generateNarrativesForReport(config, aggregatedData, materialityCtx);
+    } catch (narrativeErr) {
+      console.warn('[Narratives] Generation failed (non-fatal), continuing without narratives:', narrativeErr);
+    }
+
+    // Build structured content — data is DETERMINISTIC, narratives are additive
+    const structuredContent = buildReportContent(config, aggregatedData, undefined, reportNarratives);
     const customInstructions = buildCustomInstructions(config);
     const slideCount = calculateSlideCount(config.sections);
     // 7. Update status to 'generating_document'

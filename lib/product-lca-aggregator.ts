@@ -214,6 +214,9 @@ export async function aggregateProductImpacts(
   let viticultureEmissions = 0; // sub-total of rawMaterialsEmissions: on-site vineyard growing
   let viticultureRemovalsCo2e = 0; // FLAG: soil carbon removals (tracked separately, never netted)
   let viticultureMethodology: string | null = null; // Captured from first viticulture row
+  let orchardEmissions = 0; // sub-total of rawMaterialsEmissions: on-site orchard growing
+  let orchardRemovalsCo2e = 0; // FLAG: orchard soil carbon removals (tracked separately)
+  let orchardMethodology: string | null = null; // Captured from first orchard row
   let packagingEmissions = 0;
   let processingEmissions = 0;
   let distributionEmissions = 0;
@@ -287,6 +290,16 @@ export async function aggregateProductImpacts(
       viticultureEmissions += climateImpact;
       if (!viticultureMethodology && (material as any).methodology) {
         viticultureMethodology = (material as any).methodology;
+      }
+    } else if (material.material_name?.startsWith('[Orchard Removals]')) {
+      // FLAG: Orchard soil carbon removals tracked separately, never netted.
+      orchardRemovalsCo2e += Math.abs(Number((material as any).impact_removals_co2e || 0));
+    } else if (material.material_name?.startsWith('[Orchard]')) {
+      // On-site orchard growing emissions (fertiliser, fuel, irrigation, land, transport)
+      rawMaterialsEmissions += climateImpact;
+      orchardEmissions += climateImpact;
+      if (!orchardMethodology && (material as any).methodology) {
+        orchardMethodology = (material as any).methodology;
       }
     } else {
       rawMaterialsEmissions += climateImpact;
@@ -912,6 +925,7 @@ export async function aggregateProductImpacts(
         raw_materials: rawMaterialsEmissions,
         inbound_containers: containerEmissions, // sub-item of raw_materials (already included in that total)
         viticulture: viticultureEmissions, // sub-item of raw_materials: on-site vineyard growing (already included)
+        orchard: orchardEmissions, // sub-item of raw_materials: on-site orchard growing (already included)
         processing: processingEmissions,
         packaging: packagingEmissions,
         distribution: distributionEmissions,
@@ -922,10 +936,25 @@ export async function aggregateProductImpacts(
       // reported SEPARATELY from emissions per FLAG Guidance v1.2.
       // These are NEVER subtracted from total_carbon_footprint.
       flag_removals: {
-        soil_carbon_co2e: viticultureRemovalsCo2e,
-        methodology: viticultureRemovalsCo2e > 0 ? 'practice_based_default' : null,
+        soil_carbon_co2e: viticultureRemovalsCo2e + orchardRemovalsCo2e,
+        methodology: (viticultureRemovalsCo2e + orchardRemovalsCo2e) > 0 ? 'practice_based_default' : null,
         viticulture_notes: viticultureMethodology,
+        orchard_notes: orchardMethodology,
       },
+      // FLAG threshold assessment (SBTi FLAG Guidance v1.2)
+      flag_threshold: (() => {
+        const flagEmissionsCo2e = viticultureEmissions + orchardEmissions;
+        const nonFlagEmissionsCo2e = totalCarbonFootprint - flagEmissionsCo2e;
+        const flagEmissionsPct = totalCarbonFootprint > 0
+          ? (flagEmissionsCo2e / totalCarbonFootprint) * 100
+          : 0;
+        return {
+          flag_emissions_co2e: flagEmissionsCo2e,
+          non_flag_emissions_co2e: nonFlagEmissionsCo2e,
+          flag_emissions_pct: flagEmissionsPct,
+          flag_threshold_exceeded: flagEmissionsPct >= 20,
+        };
+      })(),
       by_ghg: {
         co2_fossil: totalCO2Fossil,
         co2_biogenic: totalCO2Biogenic,

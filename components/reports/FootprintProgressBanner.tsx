@@ -21,6 +21,7 @@ interface FootprintProgressBannerProps {
   score: number;
   firstIncompleteCategory: CategoryStatus | null;
   onScrollToCategory?: (key: string) => void;
+  year?: number;
 }
 
 export function FootprintProgressBanner({
@@ -30,23 +31,27 @@ export function FootprintProgressBanner({
   score,
   firstIncompleteCategory,
   onScrollToCategory,
+  year,
 }: FootprintProgressBannerProps) {
   const [dismissed, setDismissed] = useState(false);
+  const storageKey = year
+    ? `footprint-progress-banner-dismissed-${year}`
+    : 'footprint-progress-banner-dismissed';
 
   useEffect(() => {
-    const stored = localStorage.getItem('footprint-progress-banner-dismissed');
+    const stored = localStorage.getItem(storageKey);
     if (stored === 'true') setDismissed(true);
-  }, []);
+  }, [storageKey]);
 
   const handleDismiss = () => {
     setDismissed(true);
-    localStorage.setItem('footprint-progress-banner-dismissed', 'true');
+    localStorage.setItem(storageKey, 'true');
   };
 
   // Don't show if dismissed or all categories are complete
   if (dismissed || completedCount >= totalCount) return null;
 
-  // Only show trackable (non-coming-soon) categories
+  // Show trackable (non-coming-soon) categories; N/A categories show with a distinct style
   const trackableCategories = categories.filter(c => !c.isComingSoon);
 
   return (
@@ -76,15 +81,18 @@ export function FootprintProgressBanner({
                   variant="outline"
                   className={cn(
                     'text-[11px] font-normal cursor-default transition-colors',
-                    cat.hasData
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800'
-                      : cat.isAutoCalculated
-                        ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800'
-                        : 'bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700',
+                    cat.isNotApplicable
+                      ? 'bg-slate-50 text-slate-400 border-slate-200 line-through dark:bg-slate-800/50 dark:text-slate-500 dark:border-slate-700'
+                      : cat.hasData
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800'
+                        : cat.isAutoCalculated
+                          ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800'
+                          : 'bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700',
                   )}
                 >
-                  {cat.hasData && <CheckCircle2 className="h-3 w-3 mr-0.5" />}
+                  {cat.hasData && !cat.isNotApplicable && <CheckCircle2 className="h-3 w-3 mr-0.5" />}
                   {cat.shortLabel}
+                  {cat.isNotApplicable && <span className="ml-0.5 not-italic text-[10px]">N/A</span>}
                 </Badge>
               ))}
             </div>

@@ -142,6 +142,22 @@ export const ESG_QUESTIONS: EsgQuestion[] = [
     sectionLabel: 'Environment',
     text: 'Do you comply with all applicable environmental regulations in your operating regions?',
   },
+  {
+    id: 'env_09',
+    section: 'environment',
+    sectionLabel: 'Environment',
+    text: 'Do you have a no-deforestation commitment covering the commodities you supply?',
+    guidanceNote: 'A no-deforestation commitment means a policy commitment not to source from or contribute to the conversion of natural forests. This applies to any of the following commodities you supply: cattle, cocoa, palm oil, soy, timber, coffee, rubber.',
+    allowNA: true,
+  },
+  {
+    id: 'env_10',
+    section: 'environment',
+    sectionLabel: 'Environment',
+    text: 'Which standard does your no-deforestation commitment align with?',
+    guidanceNote: 'Select the primary certification or standard your commitment aligns with. If multiple apply, select the most stringent.',
+    allowNA: true,
+  },
 
   // Ethics (6 questions)
   {

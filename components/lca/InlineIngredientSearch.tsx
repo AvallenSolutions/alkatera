@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Building2, Database, Layers, CheckCircle2, AlertCircle, Shield, Leaf, Sprout, BookOpen, FlaskConical, Info, Sparkles, Search, Lightbulb, Droplets, TreePine, Star, TrendingUp } from "lucide-react";
+import { Loader2, Building2, Database, Layers, CheckCircle2, AlertCircle, AlertTriangle, Shield, Leaf, Sprout, BookOpen, FlaskConical, Info, Sparkles, Search, Lightbulb, Droplets, TreePine, Star, TrendingUp } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { findBrandNameMatch } from "@/lib/openlca/drinks-aliases";
 import type { DataSource } from "@/lib/types/lca";
@@ -49,6 +49,9 @@ export interface SearchResult {
   supplier_primary_material?: string | null;
   supplier_epr_material_code?: string | null;
   supplier_epr_is_drinks_container?: boolean | null;
+  // FLAG commodity and deforestation status
+  commodity_type?: string;
+  deforestation_commitment_verified?: boolean;
   // Favourites / popularity boost data
   is_user_favourite?: boolean;
   global_selection_count?: number;
@@ -697,6 +700,12 @@ export function InlineIngredientSearch({
                         </Badge>
                       )}
                     </div>
+                    {result.commodity_type && result.commodity_type !== 'none' && !result.deforestation_commitment_verified && (
+                      <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3 shrink-0" />
+                        No deforestation commitment on record for this {result.commodity_type.replace('_', ' ')} ingredient
+                      </p>
+                    )}
                     {result.co2_factor && (
                       <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
                         <span className={`inline-block h-2 w-2 rounded-full ${getIntensityDot(result.co2_factor)}`} />

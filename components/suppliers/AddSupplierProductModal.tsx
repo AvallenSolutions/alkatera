@@ -71,6 +71,7 @@ export function AddSupplierProductModal({
     unit_measurement_type: product?.unit_measurement_type || "weight",
     product_code: product?.product_code || "",
     is_active: product?.is_active !== undefined ? product.is_active : true,
+    commodity_type: product?.commodity_type || "none",
   });
 
   // Impact data - initialize from existing product
@@ -309,6 +310,7 @@ export function AddSupplierProductModal({
         unit_measurement_type: basicData.unit_measurement_type || null,
         product_code: basicData.product_code || null,
         is_active: basicData.is_active,
+        commodity_type: basicData.commodity_type,
         // Legacy field for backward compatibility
         carbon_intensity: impactData.impact_climate ?? null,
         // Multi-category impacts
@@ -417,6 +419,7 @@ export function AddSupplierProductModal({
       unit_measurement_type: "weight",
       product_code: "",
       is_active: true,
+      commodity_type: "none",
     });
     setImpactData({
       name: "",
@@ -610,6 +613,31 @@ export function AddSupplierProductModal({
                     placeholder="Additional details about this product..."
                     rows={3}
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Deforestation-linked commodity</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Select the FLAG commodity category if this product contains cattle, cocoa, palm oil, soy, timber, coffee, or rubber. Leave as &apos;None&apos; for all other products.
+                  </p>
+                  <Select
+                    value={basicData.commodity_type}
+                    onValueChange={(value) => setBasicData({ ...basicData, commodity_type: value as SupplierProduct['commodity_type'] })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="timber">Timber (cork, cardboard, wood, paper)</SelectItem>
+                      <SelectItem value="soy">Soy</SelectItem>
+                      <SelectItem value="cocoa">Cocoa</SelectItem>
+                      <SelectItem value="cattle">Cattle</SelectItem>
+                      <SelectItem value="palm_oil">Palm oil</SelectItem>
+                      <SelectItem value="coffee">Coffee</SelectItem>
+                      <SelectItem value="rubber">Rubber</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">

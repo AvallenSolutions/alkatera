@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Truck, Settings, CheckCircle2, Info } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -44,6 +45,8 @@ interface LogisticsDistributionCardProps {
   entries: LogisticsEntry[];
   xeroEntries?: XeroEntry[];
   onUpdate: () => void;
+  isNotApplicable?: boolean;
+  onToggleNotApplicable?: (value: boolean) => void;
 }
 
 export function LogisticsDistributionCard({
@@ -53,6 +56,8 @@ export function LogisticsDistributionCard({
   entries,
   xeroEntries,
   onUpdate,
+  isNotApplicable,
+  onToggleNotApplicable,
 }: LogisticsDistributionCardProps) {
   const [showModal, setShowModal] = useState(false);
   const [transportMode, setTransportMode] = useState("road");
@@ -214,19 +219,25 @@ export function LogisticsDistributionCard({
                 <CardDescription>Downstream transport emissions</CardDescription>
               </div>
             </div>
-            {(isConfigured || (xeroEntries && xeroEntries.length > 0)) ? (
-              <Badge className="bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-100">
-                <CheckCircle2 className="h-3 w-3 mr-1" />
-                Configured
-                {xeroEntries && xeroEntries.length > 0 && ` + ${xeroEntries.length} from Xero`}
-              </Badge>
-            ) : (
-              <Badge variant="secondary">Not configured</Badge>
-            )}
+            <div className="flex flex-col items-end gap-1.5">
+              {(isConfigured || (xeroEntries && xeroEntries.length > 0)) ? (
+                <Badge className="bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-100">
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  Configured
+                  {xeroEntries && xeroEntries.length > 0 && ` + ${xeroEntries.length} from Xero`}
+                </Badge>
+              ) : (
+                <Badge variant="secondary">Not configured</Badge>
+              )}
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">Not applicable</span>
+                <Switch checked={isNotApplicable ?? false} onCheckedChange={onToggleNotApplicable} />
+              </div>
+            </div>
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-4">
+        <CardContent className={`space-y-4${isNotApplicable ? ' opacity-40 pointer-events-none' : ''}`}>
           {(isConfigured || xeroTotal > 0) ? (
             <>
               <div className="text-center py-4 border-b">

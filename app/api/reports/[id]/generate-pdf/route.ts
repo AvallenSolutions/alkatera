@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { renderSustainabilityReportHtml } from '@/lib/pdf/render-sustainability-report-html';
 import { convertHtmlToPdf } from '@/lib/pdf/pdfshift-client';
+import { generateAllSectionNarratives } from '@/lib/claude/section-narrative-assistant';
+import { generateExecutiveSummaryNarrative } from '@/lib/claude/executive-summary-assistant';
 
 /**
  * Generate Sustainability Report PDF
@@ -15,7 +17,7 @@ import { convertHtmlToPdf } from '@/lib/pdf/pdfshift-client';
  */
 
 export const runtime = 'nodejs';
-export const maxDuration = 60; // PDFShift can take 30+ seconds
+export const maxDuration = 120; // PDFShift (~30s) + AI narrative generation (~10s parallel)
 
 export async function POST(
   request: NextRequest,
@@ -72,6 +74,7 @@ export async function POST(
       sections: report.sections || [],
       isMultiYear: report.is_multi_year || false,
       reportYears: report.report_years || [],
+      reportFramingStatement: report.report_framing_statement || undefined,
       branding: {
         logo: report.logo_url || null,
         primaryColor: report.primary_color || '#ccff00',
@@ -151,6 +154,48 @@ export async function POST(
       }
     }
 
+    // Materiality assessment (used for narrative context and CSRD gating)
+    let materialityAssessment: { priority_topics: string[]; topics: any[]; completed_at: string | null } | null = null;
+    try {
+      const { data: matData } = await supabase
+        .from('materiality_assessments')
+        .select('topics, priority_topics, completed_at')
+        .eq('organization_id', orgId)
+        .eq('assessment_year', year)
+        .maybeSingle();
+      if (matData) materialityAssessment = matData as { priority_topics: string[]; topics: any[]; completed_at: string | null };
+    } catch {
+      // Non-fatal
+    }
+
+    // CSRD gating: if CSRD selected but no completed materiality assessment, warn in report
+    const hasCsrd = config.standards.includes('csrd');
+    const hasMaterialityComplete = !!materialityAssessment?.completed_at;
+    if (hasCsrd && !hasMaterialityComplete) {
+      reportData.csrdGatingWarning = true;
+    }
+    if (materialityAssessment) {
+      reportData.materiality = materialityAssessment;
+      reportData.materialityComplete = hasMaterialityComplete;
+    }
+
+    // Transition plan (for Roadmap + R&O sections)
+    if (config.sections.includes('transition-roadmap') || config.sections.includes('risks-and-opportunities')) {
+      try {
+        const { data: tpData } = await supabase
+          .from('transition_plans')
+          .select('plan_year, baseline_year, baseline_emissions_tco2e, targets, milestones, risks_and_opportunities, sbti_aligned, sbti_target_year')
+          .eq('organization_id', orgId)
+          .eq('plan_year', year)
+          .maybeSingle();
+        if (tpData) {
+          reportData.transitionPlan = tpData as any;
+        }
+      } catch {
+        // Non-fatal
+      }
+    }
+
     // Key Findings (AI-generated, if section selected)
     if (config.sections.includes('key-findings')) {
       try {
@@ -210,6 +255,84 @@ export async function POST(
         console.error('[generate-pdf] Key findings generation failed (non-fatal):', err);
         // Non-fatal - report generates without key findings
       }
+    }
+
+    // Generate AI narrative blocks for all included sections
+    // These are generated in parallel and fail gracefully — report always renders
+    try {
+      const dataQuality = reportData.dataQuality
+        ? {
+            qualityTier: reportData.dataQuality.qualityTier as 'tier_1' | 'tier_2' | 'tier_3' | 'mixed',
+            completeness: reportData.dataQuality.completeness,
+            confidenceScore: reportData.dataQuality.confidenceScore,
+          }
+        : undefined;
+
+      // Determine YoY change percentage for exec summary context
+      let yoyChangePct: string | undefined;
+      if (reportData.emissionsTrends && reportData.emissionsTrends.length >= 2) {
+        const latest = reportData.emissionsTrends[reportData.emissionsTrends.length - 1];
+        if (latest.yoyChange) yoyChangePct = `${latest.yoyChange}%`;
+      }
+
+      // Build materiality context for narrative generation
+      let materialityCtx: import('@/lib/claude/section-narrative-assistant').MaterialityAssessmentSummary | undefined;
+      if (materialityAssessment?.topics && materialityAssessment.priority_topics) {
+        materialityCtx = {
+          priorityTopics: materialityAssessment.priority_topics,
+          topicDetails: Object.fromEntries(
+            (materialityAssessment.topics as any[]).map((t: any) => [
+              t.id,
+              { name: t.name, rationale: t.rationale },
+            ])
+          ),
+        };
+      }
+
+      // Step 1: Generate all section narratives in parallel
+      const sectionNarratives = await generateAllSectionNarratives({
+        organisationName: org?.name || 'Organisation',
+        sector: org?.industry_sector,
+        reportingYear: year,
+        previousYear: year - 1,
+        standards: config.standards,
+        audience: config.audience,
+        sections: config.sections,
+        reportData,
+        dataQuality,
+        materiality: materialityCtx,
+        reportFramingStatement: config.reportFramingStatement,
+      });
+
+      // Step 2: Generate executive summary narrative last, using section narratives
+      const execNarrative = await generateExecutiveSummaryNarrative({
+        organisationName: org?.name || 'Organisation',
+        sector: org?.industry_sector,
+        reportingYear: year,
+        previousYear: year - 1,
+        standards: config.standards,
+        audience: config.audience,
+        sectionNarratives,
+        emissions: {
+          scope1: reportData.emissions?.scope1 || 0,
+          scope2: reportData.emissions?.scope2 || 0,
+          scope3: reportData.emissions?.scope3 || 0,
+          total: reportData.emissions?.total || 0,
+        },
+        yoyChangePct,
+        hasPeopleCulture: !!reportData.dataAvailability?.hasPeopleCulture,
+        hasGovernance: !!reportData.dataAvailability?.hasGovernance,
+        hasImpactValuation: !!reportData.dataAvailability?.hasImpactValuation,
+        reportFramingStatement: config.reportFramingStatement,
+      });
+
+      reportData.narratives = {
+        executiveSummary: execNarrative,
+        sections: sectionNarratives,
+      };
+    } catch (narrativeErr) {
+      console.error('[generate-pdf] Narrative generation failed (non-fatal):', narrativeErr);
+      // Non-fatal — report generates without AI narratives
     }
 
     // Render HTML

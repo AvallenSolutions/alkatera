@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Users, Save, CheckCircle2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DataProvenanceBadge } from "@/components/ui/data-provenance-badge";
@@ -15,9 +16,11 @@ interface TeamCommutingCardProps {
   reportId: string;
   initialFteCount: number;
   onUpdate: () => void;
+  isNotApplicable?: boolean;
+  onToggleNotApplicable?: (value: boolean) => void;
 }
 
-export function TeamCommutingCard({ reportId, initialFteCount, onUpdate }: TeamCommutingCardProps) {
+export function TeamCommutingCard({ reportId, initialFteCount, onUpdate, isNotApplicable, onToggleNotApplicable }: TeamCommutingCardProps) {
   const [fteCount, setFteCount] = useState(initialFteCount.toString());
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
@@ -95,15 +98,21 @@ export function TeamCommutingCard({ reportId, initialFteCount, onUpdate }: TeamC
               <CardDescription>Employee commuting emissions</CardDescription>
             </div>
           </div>
-          {initialFteCount > 0 && (
-            <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
-              {initialFteCount} FTEs
-            </Badge>
-          )}
+          <div className="flex flex-col items-end gap-1.5">
+            {initialFteCount > 0 && (
+              <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
+                {initialFteCount} FTEs
+              </Badge>
+            )}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">Not applicable</span>
+              <Switch checked={isNotApplicable ?? false} onCheckedChange={onToggleNotApplicable} />
+            </div>
+          </div>
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-4">
+      <CardContent className={`space-y-4${isNotApplicable ? ' opacity-40 pointer-events-none' : ''}`}>
         <div className="space-y-3">
           <div className="space-y-2">
             <Label htmlFor="fte-count">Number of Full-Time Employees</Label>
