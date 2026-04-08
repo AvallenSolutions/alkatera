@@ -91,7 +91,7 @@ function TransitionPlanSetupInner() {
       .from('corporate_reports')
       .select('total_emissions')
       .eq('organization_id', currentOrganization.id)
-      .eq('report_year', planYear - 1)
+      .eq('year', planYear - 1)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
