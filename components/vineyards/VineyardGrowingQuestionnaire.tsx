@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAwareFactor } from '@/hooks/data/useAwareFactor';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -55,7 +55,27 @@ import type {
   VineyardClimateZone,
   VineyardCertification,
   PreviousLandUseType,
+  ChemicalType,
+  SprayChemicalDraft,
 } from '@/lib/types/viticulture';
+
+const CHEMICAL_TYPE_OPTIONS: { value: ChemicalType; label: string }[] = [
+  { value: 'fertiliser', label: 'Fertiliser' },
+  { value: 'fungicide', label: 'Fungicide' },
+  { value: 'herbicide', label: 'Herbicide' },
+  { value: 'insecticide', label: 'Insecticide' },
+  { value: 'other', label: 'Other' },
+];
+
+function chemicalTypeBadgeClass(type: ChemicalType): string {
+  switch (type) {
+    case 'fertiliser': return 'bg-green-500/10 text-green-400 border-green-500/20';
+    case 'fungicide': return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+    case 'herbicide': return 'bg-orange-500/10 text-orange-400 border-orange-500/20';
+    case 'insecticide': return 'bg-red-500/10 text-red-400 border-red-500/20';
+    default: return 'bg-muted/50 text-muted-foreground border-border';
+  }
+}
 
 interface QuestionnaireProps {
   vineyardId: string;
@@ -218,6 +238,141 @@ export function VineyardGrowingQuestionnaire({
       .catch(() => { /* silently fail - evidence is optional */ });
   }, [existingProfile?.id, vineyardId]);
 
+  // Spray chemicals state
+  const [sprayChemicals, setSprayChemicals] = useState<SprayChemicalDraft[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
+  const sprayFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load existing chemicals when editing a profile
+  useEffect(() => {
+    if (!existingProfile?.id) return;
+    fetch(`/api/vineyards/${vineyardId}/spray-chemicals?growing_profile_id=${existingProfile.id}`)
+      .then((res) => res.json())
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setSprayChemicals(
+            data.map((c: any) => ({
+              chemical_name: c.chemical_name,
+              chemical_type: c.chemical_type,
+              unit: c.unit,
+              rate_per_ha: c.rate_per_ha,
+              water_rate_l_per_ha: c.water_rate_l_per_ha,
+              total_ha_sprayed: c.total_ha_sprayed,
+              total_amount_used: c.total_amount_used,
+              applications_count: c.applications_count,
+              n_content_percent: (c as any).n_content_percent ?? 0,
+              fertiliser_subtype: (c as any).fertiliser_subtype ?? null,
+              library_matched: (c as any).library_matched ?? false,
+            }))
+          );
+        }
+      })
+      .catch(() => { /* silently fail */ });
+  }, [existingProfile?.id, vineyardId]);
+
+  function deriveSimplifiedFields(chemicals: SprayChemicalDraft[]) {
+    const fertilisers = chemicals.filter((c) => c.chemical_type === 'fertiliser');
+    const pesticides = chemicals.filter((c) => c.chemical_type === 'fungicide' || c.chemical_type === 'insecticide');
+    const herbicides = chemicals.filter((c) => c.chemical_type === 'herbicide');
+
+    // Total product quantity for all fertilisers
+    const fertiliser_quantity_kg = fertilisers.reduce((sum, c) => sum + (c.total_amount_used || 0), 0);
+
+    // Weighted-average N content: sum(qty × n%) / total_qty
+    const fertiliser_n_content_percent =
+      fertiliser_quantity_kg > 0
+        ? fertilisers.reduce((sum, c) => sum + (c.total_amount_used || 0) * (c.n_content_percent || 0), 0) /
+          fertiliser_quantity_kg
+        : 0;
+
+    // Derive fertiliser type from subtypes
+    let fertiliser_type: FertiliserType = 'none';
+    if (fertilisers.length > 0) {
+      const subtypes = new Set(
+        fertilisers.map((c) => c.fertiliser_subtype).filter((s): s is NonNullable<typeof s> => s !== null && s !== undefined)
+      );
+      const hasSyntheticN = subtypes.has('synthetic_n');
+      const hasOrganic = subtypes.has('organic_compost') || subtypes.has('organic_manure');
+      const hasManure = subtypes.has('organic_manure');
+      if (hasSyntheticN && hasOrganic) {
+        fertiliser_type = 'mixed';
+      } else if (hasSyntheticN) {
+        fertiliser_type = 'synthetic_n';
+      } else if (hasManure) {
+        fertiliser_type = 'organic_manure';
+      } else if (hasOrganic) {
+        fertiliser_type = 'organic_compost';
+      } else {
+        // Fertilisers present but all zero-N or unmatched (e.g. calcium, iron products)
+        fertiliser_type = 'mixed';
+      }
+    }
+
+    return {
+      fertiliser_type,
+      fertiliser_quantity_kg,
+      fertiliser_n_content_percent,
+      uses_pesticides: pesticides.length > 0,
+      pesticide_applications_per_year: pesticides.reduce((s, c) => s + (c.applications_count || 0), 0),
+      pesticide_type: 'generic' as PesticideType,
+      uses_herbicides: herbicides.length > 0,
+      herbicide_applications_per_year: herbicides.reduce((s, c) => s + (c.applications_count || 0), 0),
+      herbicide_type: 'generic' as PesticideType,
+    };
+  }
+
+  function addEmptyChemical() {
+    setSprayChemicals((prev) => [
+      ...prev,
+      {
+        chemical_name: '',
+        chemical_type: 'fungicide',
+        unit: 'L',
+        rate_per_ha: 0,
+        water_rate_l_per_ha: null,
+        total_ha_sprayed: 0,
+        total_amount_used: 0,
+        applications_count: 1,
+        n_content_percent: 0,
+        fertiliser_subtype: null,
+        library_matched: false,
+      },
+    ]);
+  }
+
+  function updateChemical(index: number, updates: Partial<SprayChemicalDraft>) {
+    setSprayChemicals((prev) => prev.map((c, i) => (i === index ? { ...c, ...updates } : c)));
+  }
+
+  function removeChemical(index: number) {
+    setSprayChemicals((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function handleSprayImport(file: File) {
+    setIsImporting(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch(`/api/vineyards/${vineyardId}/spray-import`, {
+        method: 'POST',
+        body: fd,
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Import failed');
+      }
+      const { chemicals } = await res.json();
+      setSprayChemicals(chemicals);
+      // Derive simplified fields immediately so calculator stays live
+      updateForm(deriveSimplifiedFields(chemicals));
+      toast.success(`${chemicals.length} chemical${chemicals.length !== 1 ? 's' : ''} imported`);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to import spray diary');
+    } finally {
+      setIsImporting(false);
+    }
+  }
+
   // Build vintage year options (current year down to current-10)
   const vintageYearOptions = Array.from({ length: 11 }, (_, i) => currentYear - i);
 
@@ -358,6 +513,19 @@ export function VineyardGrowingQuestionnaire({
       }
 
       const { data } = await res.json();
+
+      // Save spray chemicals if any
+      if (sprayChemicals.length > 0 && data?.id) {
+        try {
+          await fetch(`/api/vineyards/${vineyardId}/spray-chemicals`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ growing_profile_id: data.id, chemicals: sprayChemicals }),
+          });
+        } catch {
+          toast.error('Profile saved but chemical data could not be saved. You can re-import later.');
+        }
+      }
 
       // Upload evidence file if pending
       if (evidenceFile && data?.id) {
@@ -1219,195 +1387,212 @@ export function VineyardGrowingQuestionnaire({
           {currentStep === 1 && (
             <div className="space-y-4">
               <div>
-                <h3 className="font-semibold text-lg">Fertiliser & Crop Protection</h3>
+                <h3 className="font-semibold text-lg">Chemical Inputs</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Synthetic nitrogen fertiliser is typically the largest single emission source in viticulture.
+                  Import your spray diary or add chemicals manually to record all inputs for this vintage.
                 </p>
               </div>
 
-              <div className="grid gap-4">
-                <div className="grid gap-2">
-                  <Label>Fertiliser type</Label>
-                  <Select
-                    value={form.fertiliser_type}
-                    onValueChange={(v) => updateForm({ fertiliser_type: v as FertiliserType })}
+              {/* Import panel */}
+              <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Import spray diary</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Accepts any Excel format — spray schedule, application diary, field records.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => sprayFileInputRef.current?.click()}
+                    disabled={isImporting}
                   >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {FERTILISER_TYPES.map((ft) => (
-                        <SelectItem key={ft.value} value={ft.value}>
-                          {ft.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {form.fertiliser_type !== 'none' && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="fert-qty">
-                        Total quantity applied (kg/year)
-                      </Label>
-                      <Input
-                        id="fert-qty"
-                        type="number"
-                        min="0"
-                        value={form.fertiliser_quantity_kg || ''}
-                        onChange={(e) =>
-                          updateForm({ fertiliser_quantity_kg: parseFloat(e.target.value) || 0 })
-                        }
-                        placeholder="e.g. 200"
-                      />
-                      {form.fertiliser_quantity_kg > 0 && form.area_ha > 0 && (
-                        <p className="text-xs text-muted-foreground">
-                          {(form.fertiliser_quantity_kg / form.area_ha).toFixed(0)} kg/ha
-                          {form.fertiliser_type === 'synthetic_n' && form.fertiliser_quantity_kg / form.area_ha > 200 && (
-                            <span className="text-amber-600 dark:text-amber-400 ml-1">
-                              ⚠ High for vineyards (typical: 30-80 kg N/ha)
-                            </span>
-                          )}
-                        </p>
-                      )}
-                    </div>
-                    <div className="grid gap-2">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Label htmlFor="n-content" className="flex items-center gap-1">
-                              Nitrogen content (%)
-                              <Info className="h-3 w-3 text-muted-foreground" />
-                            </Label>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="max-w-xs text-xs">
-                              Ammonium nitrate: 34.5%. Urea: 46%. Manure: 0.5-1%. Compost: 1-2%.
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                      <Input
-                        id="n-content"
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        value={form.fertiliser_n_content_percent || ''}
-                        onChange={(e) =>
-                          updateForm({ fertiliser_n_content_percent: parseFloat(e.target.value) || 0 })
-                        }
-                        placeholder="e.g. 34.5"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <Separator />
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label>Pesticides (fungicides, insecticides)</Label>
-                      <p className="text-xs text-muted-foreground">
-                        Includes copper and sulphur treatments for organic vineyards
-                      </p>
-                    </div>
-                    <Switch
-                      checked={form.uses_pesticides}
-                      onCheckedChange={(v) => updateForm({ uses_pesticides: v })}
-                    />
-                  </div>
-                  {form.uses_pesticides && (
-                    <div className="grid gap-3 pl-4">
-                      <div className="grid gap-2">
-                        <Label htmlFor="pest-apps">Applications per year</Label>
-                        <Input
-                          id="pest-apps"
-                          type="number"
-                          min="0"
-                          max="30"
-                          value={form.pesticide_applications_per_year || ''}
-                          onChange={(e) =>
-                            updateForm({ pesticide_applications_per_year: parseInt(e.target.value) || 0 })
-                          }
-                          placeholder="e.g. 6"
-                          className="w-32"
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label>Pesticide type</Label>
-                        <Select
-                          value={form.pesticide_type}
-                          onValueChange={(v) => updateForm({ pesticide_type: v as PesticideType })}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {PESTICIDE_TYPES.map((pt) => (
-                              <SelectItem key={pt.value} value={pt.value}>
-                                {pt.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label>Herbicides</Label>
-                      <p className="text-xs text-muted-foreground">
-                        Chemical weed control (not applicable for organic)
-                      </p>
-                    </div>
-                    <Switch
-                      checked={form.uses_herbicides}
-                      onCheckedChange={(v) => updateForm({ uses_herbicides: v })}
-                    />
-                  </div>
-                  {form.uses_herbicides && (
-                    <div className="grid gap-3 pl-4">
-                      <div className="grid gap-2">
-                        <Label htmlFor="herb-apps">Applications per year</Label>
-                        <Input
-                          id="herb-apps"
-                          type="number"
-                          min="0"
-                          max="10"
-                          value={form.herbicide_applications_per_year || ''}
-                          onChange={(e) =>
-                            updateForm({ herbicide_applications_per_year: parseInt(e.target.value) || 0 })
-                          }
-                          placeholder="e.g. 2"
-                          className="w-32"
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label>Herbicide type</Label>
-                        <Select
-                          value={form.herbicide_type}
-                          onValueChange={(v) => updateForm({ herbicide_type: v as PesticideType })}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {HERBICIDE_TYPES.map((ht) => (
-                              <SelectItem key={ht.value} value={ht.value}>
-                                {ht.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  )}
+                    {isImporting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Analysing...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="mr-2 h-4 w-4" />
+                        Import xlsx
+                      </>
+                    )}
+                  </Button>
+                  <input
+                    ref={sprayFileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleSprayImport(file);
+                      e.target.value = '';
+                    }}
+                  />
                 </div>
               </div>
+
+              {/* Chemicals table */}
+              {sprayChemicals.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">{sprayChemicals.length} chemical{sprayChemicals.length !== 1 ? 's' : ''} recorded</p>
+                  </div>
+
+                  {/* Table header */}
+                  <div className="rounded-lg border border-border overflow-hidden">
+                    <div className="grid grid-cols-[2fr_1fr_0.7fr_1fr_1fr_1fr_auto] gap-x-2 px-3 py-2 bg-muted/30 text-xs text-muted-foreground font-medium">
+                      <span>Chemical</span>
+                      <span>Type</span>
+                      <span>N %</span>
+                      <span>Rate / ha</span>
+                      <span>Total ha</span>
+                      <span>Total used</span>
+                      <span></span>
+                    </div>
+
+                    {sprayChemicals.map((chem, idx) => (
+                      <div
+                        key={idx}
+                        className="grid grid-cols-[2fr_1fr_0.7fr_1fr_1fr_1fr_auto] gap-x-2 px-3 py-2 border-t border-border items-center text-sm"
+                      >
+                        {/* Chemical name */}
+                        <Input
+                          value={chem.chemical_name}
+                          onChange={(e) => updateChemical(idx, { chemical_name: e.target.value })}
+                          className="h-7 text-xs px-2"
+                          placeholder="Product name"
+                        />
+
+                        {/* Type */}
+                        <Select
+                          value={chem.chemical_type}
+                          onValueChange={(v) => updateChemical(idx, { chemical_type: v as ChemicalType })}
+                        >
+                          <SelectTrigger className="h-7 text-xs px-2">
+                            <SelectValue>
+                              <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-xs font-medium ${chemicalTypeBadgeClass(chem.chemical_type)}`}>
+                                {CHEMICAL_TYPE_OPTIONS.find((o) => o.value === chem.chemical_type)?.label ?? chem.chemical_type}
+                              </span>
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CHEMICAL_TYPE_OPTIONS.map((o) => (
+                              <SelectItem key={o.value} value={o.value}>
+                                <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-xs font-medium ${chemicalTypeBadgeClass(o.value)}`}>
+                                  {o.label}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+
+                        {/* N content % — editable for fertilisers, locked for others */}
+                        <div className="flex items-center gap-0.5">
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value={chem.chemical_type === 'fertiliser' ? (chem.n_content_percent ?? '') : ''}
+                            onChange={(e) =>
+                              updateChemical(idx, { n_content_percent: parseFloat(e.target.value) || 0 })
+                            }
+                            disabled={chem.chemical_type !== 'fertiliser'}
+                            className="h-7 text-xs px-2 w-14"
+                            placeholder={chem.chemical_type === 'fertiliser' ? '0' : '—'}
+                          />
+                          {chem.chemical_type === 'fertiliser' && chem.library_matched && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  <span className="text-green-400 text-xs leading-none">✓</span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="text-xs">Matched from chemical library</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                        </div>
+
+                        {/* Rate/ha + unit */}
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={chem.rate_per_ha || ''}
+                            onChange={(e) => updateChemical(idx, { rate_per_ha: parseFloat(e.target.value) || 0 })}
+                            className="h-7 text-xs px-2 w-16"
+                            placeholder="0"
+                          />
+                          <Input
+                            value={chem.unit}
+                            onChange={(e) => updateChemical(idx, { unit: e.target.value })}
+                            className="h-7 text-xs px-2 w-12"
+                            placeholder="L"
+                          />
+                        </div>
+
+                        {/* Total ha */}
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={chem.total_ha_sprayed || ''}
+                          onChange={(e) => {
+                            const ha = parseFloat(e.target.value) || 0;
+                            updateChemical(idx, {
+                              total_ha_sprayed: ha,
+                              total_amount_used: parseFloat((chem.rate_per_ha * ha).toFixed(4)),
+                            });
+                          }}
+                          className="h-7 text-xs px-2"
+                          placeholder="ha"
+                        />
+
+                        {/* Total used */}
+                        <div className="text-xs text-muted-foreground">
+                          {chem.total_amount_used > 0
+                            ? `${chem.total_amount_used.toFixed(1)} ${chem.unit}`
+                            : '-'}
+                        </div>
+
+                        {/* Delete */}
+                        <button
+                          onClick={() => removeChemical(idx)}
+                          className="text-muted-foreground hover:text-destructive transition-colors p-1 rounded"
+                          title="Remove"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Summary row */}
+                  <div className="flex flex-wrap gap-4 text-xs text-muted-foreground px-1">
+                    {(['fertiliser', 'fungicide', 'herbicide', 'insecticide'] as ChemicalType[]).map((type) => {
+                      const count = sprayChemicals.filter((c) => c.chemical_type === type).length;
+                      if (count === 0) return null;
+                      return (
+                        <span key={type} className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 font-medium ${chemicalTypeBadgeClass(type)}`}>
+                          {count} {type}{count !== 1 ? 's' : ''}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Add manually */}
+              <Button variant="outline" size="sm" onClick={addEmptyChemical} className="w-full">
+                + Add chemical manually
+              </Button>
+
             </div>
           )}
 
@@ -1624,7 +1809,15 @@ export function VineyardGrowingQuestionnaire({
         </Button>
 
         {currentStep < STEPS.length - 1 ? (
-          <Button onClick={() => setCurrentStep(currentStep + 1)}>
+          <Button
+            onClick={() => {
+              if (currentStep === 1 && sprayChemicals.length > 0) {
+                // Derive simplified fields from spray chemicals before advancing
+                updateForm(deriveSimplifiedFields(sprayChemicals));
+              }
+              setCurrentStep(currentStep + 1);
+            }}
+          >
             Next
             <ChevronRight className="ml-1 h-4 w-4" />
           </Button>

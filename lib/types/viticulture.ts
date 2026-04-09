@@ -428,3 +428,50 @@ export interface VineyardSoilCarbonEvidence {
   /** Signed URL for downloading (populated client-side, not stored in DB) */
   signed_url?: string;
 }
+
+// ---------------------------------------------------------------------------
+// Spray chemicals (detailed inputs)
+// ---------------------------------------------------------------------------
+
+export type ChemicalType = 'fertiliser' | 'fungicide' | 'herbicide' | 'insecticide' | 'other';
+
+export interface VineyardSprayChemical {
+  id: string;
+  growing_profile_id: string;
+  vineyard_id: string;
+  organization_id: string;
+  chemical_name: string;
+  chemical_type: ChemicalType;
+  unit: string;
+  rate_per_ha: number;
+  water_rate_l_per_ha: number | null;
+  total_ha_sprayed: number;
+  total_amount_used: number;
+  applications_count: number;
+  /** Nitrogen content of this product as sold (% by weight/volume). 0 for non-fertilisers. */
+  n_content_percent: number;
+  /** Maps to FertiliserType for the viticulture calculator emission factors. Null for non-fertilisers. */
+  fertiliser_subtype: 'synthetic_n' | 'organic_manure' | 'organic_compost' | 'mixed' | null;
+  /** True when this chemical was enriched from vineyard_chemical_library. */
+  library_matched: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Draft type for form state — no DB identity fields */
+export type SprayChemicalDraft = Omit<
+  VineyardSprayChemical,
+  'id' | 'growing_profile_id' | 'vineyard_id' | 'organization_id' | 'created_at' | 'updated_at'
+>;
+
+/** Row from vineyard_chemical_library */
+export interface VineyardChemicalLibraryRow {
+  id: string;
+  chemical_name: string;
+  name_variants: string[];
+  chemical_type: ChemicalType;
+  n_content_percent: number;
+  fertiliser_subtype: 'synthetic_n' | 'organic_manure' | 'organic_compost' | 'mixed' | null;
+  active_ingredient: string | null;
+  is_verified: boolean;
+}
