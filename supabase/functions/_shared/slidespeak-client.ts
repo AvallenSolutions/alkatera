@@ -48,6 +48,23 @@ export interface SlideSpeakResult {
   error?: string;
 }
 
+export interface WebhookSubscription {
+  /** The callback URL registered with SlideSpeak */
+  url: string;
+}
+
+export interface WebhookPayload {
+  /** SlideSpeak task ID — matches slidespeak_task_id stored in generated_reports */
+  task_id: string;
+  /** Generation outcome */
+  task_status: 'SUCCESS' | 'FAILED';
+  task_result?: {
+    /** PPTX download URL on success */
+    url?: string;
+  } | null;
+  error?: string;
+}
+
 const DEFAULT_BASE_URL = 'https://api.slidespeak.co/api/v1';
 const DEFAULT_POLL_INTERVAL = 3000; // 3 seconds
 // 85 s — gives the edge function time to write the error and return before
@@ -252,8 +269,52 @@ export class SlideSpeakClient {
   }
 
   /**
+   * Generates a presentation and returns the task ID immediately — no polling.
+   * Use this with webhook delivery: SlideSpeak will POST to your callback URL when done.
+   */
+  async generateAndReturn(
+    options: GeneratePresentationOptions
+  ): Promise<SlideSpeakResult> {
+    return this.generatePresentation(options);
+  }
+
+  /**
+   * Subscribes a callback URL to receive webhook notifications when presentations complete.
+   * Only needs to be called once — the subscription persists.
+   */
+  async subscribeWebhook(callbackUrl: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      await this.request<unknown>('/webhook/subscribe', {
+        method: 'POST',
+        body: JSON.stringify({ url: callbackUrl }),
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('[SlideSpeak] Webhook subscribe failed:', error);
+      return { success: false, error: (error as Error).message };
+    }
+  }
+
+  /**
+   * Unsubscribes a callback URL from webhook notifications.
+   */
+  async unsubscribeWebhook(callbackUrl: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      await this.request<unknown>('/webhook/unsubscribe', {
+        method: 'POST',
+        body: JSON.stringify({ url: callbackUrl }),
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('[SlideSpeak] Webhook unsubscribe failed:', error);
+      return { success: false, error: (error as Error).message };
+    }
+  }
+
+  /**
    * Generates a presentation and waits for completion
    * Combines generatePresentation and pollUntilComplete
+   * @deprecated Prefer generateAndReturn() with webhook delivery to avoid timeouts
    */
   async generateAndWait(
     options: GeneratePresentationOptions,

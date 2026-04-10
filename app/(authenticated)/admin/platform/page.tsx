@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Shield, RefreshCw } from "lucide-react";
+import { Shield, RefreshCw, Webhook, CheckCircle, XCircle } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useIsAlkateraAdmin } from "@/hooks/usePermissions";
 
@@ -37,6 +37,8 @@ export default function PlatformDashboardPage() {
   const [alerts, setAlerts] = useState<PlatformAlerts | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [webhookStatus, setWebhookStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [webhookMessage, setWebhookMessage] = useState('');
 
   const fetchData = async () => {
     try {
@@ -98,6 +100,29 @@ export default function PlatformDashboardPage() {
   const handleRefresh = () => {
     setRefreshing(true);
     fetchData();
+  };
+
+  const handleRegisterWebhook = async () => {
+    setWebhookStatus('loading');
+    setWebhookMessage('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error('Not authenticated');
+
+      const res = await fetch('/api/admin/slidespeak-webhook', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+
+      if (!res.ok) throw new Error(json.error || 'Registration failed');
+      setWebhookStatus('success');
+      setWebhookMessage(`Registered: ${json.callbackUrl}`);
+    } catch (err) {
+      setWebhookStatus('error');
+      setWebhookMessage((err as Error).message);
+    }
   };
 
   if (authLoading || loading) {
@@ -183,6 +208,36 @@ export default function PlatformDashboardPage() {
 
       {/* Organisations Table (Improvement 3) */}
       <OrganizationsTable organizations={organizations} loading={false} />
+
+      {/* Integrations */}
+      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-5 space-y-3">
+        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Integrations</h2>
+        <div className="flex items-start gap-4">
+          <div className="flex-1">
+            <p className="text-sm font-medium text-gray-900 dark:text-white">SlideSpeak Webhook</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              Register alkatera as a callback recipient so SlideSpeak notifies us when PPTX reports finish generating. Run this once after each deployment.
+            </p>
+            {webhookMessage && (
+              <p className={`text-xs mt-2 flex items-center gap-1 ${webhookStatus === 'success' ? 'text-green-600' : 'text-red-500'}`}>
+                {webhookStatus === 'success'
+                  ? <CheckCircle className="h-3 w-3 shrink-0" />
+                  : <XCircle className="h-3 w-3 shrink-0" />}
+                {webhookMessage}
+              </p>
+            )}
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleRegisterWebhook}
+            disabled={webhookStatus === 'loading'}
+          >
+            <Webhook className={`h-4 w-4 mr-2 ${webhookStatus === 'loading' ? 'animate-pulse' : ''}`} />
+            {webhookStatus === 'loading' ? 'Registering...' : 'Register Webhook'}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

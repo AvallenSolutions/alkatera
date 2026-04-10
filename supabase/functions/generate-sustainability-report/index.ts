@@ -1,7 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import {
   createSlideSpeakClient,
-  type SlideSpeakResult,
 } from '../_shared/slidespeak-client.ts';
 import {
   buildReportContent,
@@ -538,42 +537,38 @@ Deno.serve(async (req: Request) => {
       // Column not yet in schema — proceed with default template
     }
 
-    const slideSpeakResult = await slideSpeakClient.generateAndWait({
+    // 8. Start generation — returns task_id immediately, no polling
+    const slideSpeakResult = await slideSpeakClient.generateAndReturn({
       content: structuredContent,
       slideCount,
       template: templateId,
       customInstructions,
     });
 
-    if (!slideSpeakResult.success) {
-      console.error('[SlideSpeak] Generation failed:', slideSpeakResult.error);
+    if (!slideSpeakResult.success || !slideSpeakResult.taskId) {
+      console.error('[SlideSpeak] Failed to start generation:', slideSpeakResult.error);
       throw new Error(`SlideSpeak API error: ${slideSpeakResult.error}`);
     }
 
-    const documentUrl = slideSpeakResult.downloadUrl;
-    if (!documentUrl) {
-      console.error('[SlideSpeak] No download URL received');
-      throw new Error('No download URL received from SlideSpeak');
-    }
-    // 8. Update report with success (using service role to bypass RLS)
-    const { error: updateError } = await serviceClient
+    // 9. Store task_id so the webhook callback can look up this report
+    const { error: taskIdError } = await serviceClient
       .from('generated_reports')
-      .update({
-        status: 'completed',
-        document_url: documentUrl,
-        generated_at: new Date().toISOString(),
-      })
+      .update({ slidespeak_task_id: slideSpeakResult.taskId })
       .eq('id', report_config_id);
 
-    if (updateError) {
-      console.error('[DB] Failed to update report status to completed:', updateError);
+    if (taskIdError) {
+      console.error('[DB] Failed to store slidespeak_task_id:', taskIdError);
     }
 
+    console.log(`[SlideSpeak] Generation started. task_id=${slideSpeakResult.taskId}, report_id=${report_config_id}`);
+
+    // Return immediately — completion handled by webhook at /api/webhooks/slidespeak
     return new Response(
       JSON.stringify({
         success: true,
         report_id: report_config_id,
-        document_url: documentUrl,
+        task_id: slideSpeakResult.taskId,
+        note: 'Generation started. Report will be available once SlideSpeak completes and posts the webhook callback.',
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
