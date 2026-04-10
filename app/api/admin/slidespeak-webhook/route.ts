@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 export const dynamic = 'force-dynamic';
 
 function buildCallbackUrl(): string {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL;
+  const appUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL;
   if (!appUrl) throw new Error('NEXT_PUBLIC_APP_URL is not configured');
   const secret = process.env.SLIDESPEAK_WEBHOOK_SECRET;
   if (!secret) throw new Error('SLIDESPEAK_WEBHOOK_SECRET is not configured');
