@@ -354,34 +354,62 @@ export async function POST(
     const safeName = config.reportName.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 50);
     const filename = `Sustainability_Report_${safeName}_${dateStr}.pdf`;
 
-    // Parse body for inline preference
-    let inline = false;
-    try {
-      const body = await request.json();
-      inline = body?.inline === true;
-    } catch {
-      // No body or invalid JSON - default to attachment
+    // Upload to Supabase Storage (service-role client bypasses RLS)
+    // Path: reports/{orgId}/{reportId}.pdf — overwrites if report is regenerated
+    const storagePath = `reports/${report.organization_id}/${reportId}.pdf`;
+    const serviceClient = createClient(
+      supabaseUrl,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { error: uploadError } = await serviceClient.storage
+      .from('report-assets')
+      .upload(storagePath, pdfResult.buffer, {
+        contentType: 'application/pdf',
+        cacheControl: '3600',
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error('[generate-pdf] Storage upload failed:', uploadError);
+      // Mark report failed so the frontend sees the error
+      await supabase
+        .from('generated_reports')
+        .update({
+          status: 'failed',
+          error_message: `PDF upload to storage failed: ${uploadError.message}`,
+        })
+        .eq('id', reportId);
+
+      return NextResponse.json(
+        { error: `Failed to upload PDF: ${uploadError.message}` },
+        { status: 500 }
+      );
     }
 
-    const disposition = inline ? 'inline' : `attachment; filename="${filename}"`;
+    const { data: urlData } = serviceClient.storage
+      .from('report-assets')
+      .getPublicUrl(storagePath);
 
-    // Update report record with completion
+    const documentUrl = urlData.publicUrl;
+
+    // Update report record with completion + URL
     await supabase
       .from('generated_reports')
       .update({
         status: 'completed',
+        document_url: documentUrl,
         generated_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq('id', reportId);
 
-    return new NextResponse(pdfResult.buffer, {
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': disposition,
-        'Content-Length': pdfResult.buffer.length.toString(),
-        'X-PDF-Pages': pdfResult.pages?.toString() || '0',
-      },
+    return NextResponse.json({
+      success: true,
+      reportId,
+      documentUrl,
+      filename,
+      pages: pdfResult.pages ?? null,
     });
   } catch (error: any) {
     console.error('Error generating sustainability report PDF:', error);

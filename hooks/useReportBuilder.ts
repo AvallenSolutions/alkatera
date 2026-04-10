@@ -154,8 +154,10 @@ export function useReportBuilder() {
       }
 
       if (config.outputFormat === 'pdf') {
-        // PDF: call the API route directly (synchronous generation)
-        // The PDF is generated server-side and the report record is updated on completion.
+        // PDF: call the API route directly. The route uploads the PDF to Supabase
+        // Storage and updates generated_reports.document_url — the frontend progress
+        // hook will pick up the completion + URL via polling, so we don't need to
+        // download here.
         const { data: sessionData } = await supabase.auth.getSession();
         const accessToken = sessionData?.session?.access_token;
 
@@ -165,22 +167,14 @@ export function useReportBuilder() {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${accessToken}`,
           },
-          body: JSON.stringify({ inline: false }),
+          body: JSON.stringify({}),
         }).then(async (response) => {
           if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.error || 'PDF generation failed');
           }
-          // PDF returned successfully - trigger download
-          const blob = await response.blob();
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `Sustainability_Report_${config.reportName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
-          document.body.appendChild(a);
-          a.click();
-          window.URL.revokeObjectURL(url);
-          a.remove();
+          // Success — document_url is already set by the API route, the progress
+          // hook will pick it up on its next poll and flip the UI to the download state.
         }).catch(async (err) => {
           console.error('PDF generation failed:', err);
           await supabase
