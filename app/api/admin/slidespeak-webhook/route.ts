@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       'X-API-Key': apiKey,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ url: callbackUrl }),
+    body: JSON.stringify({ endpoint: callbackUrl }),
   });
 
   if (!response.ok) {
@@ -105,7 +105,7 @@ export async function DELETE(request: NextRequest) {
       'X-API-Key': apiKey,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ url: callbackUrl }),
+    body: JSON.stringify({ endpoint: callbackUrl }),
   });
 
   if (!response.ok) {

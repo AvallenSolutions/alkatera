@@ -286,7 +286,7 @@ export class SlideSpeakClient {
     try {
       await this.request<unknown>('/webhook/subscribe', {
         method: 'POST',
-        body: JSON.stringify({ url: callbackUrl }),
+        body: JSON.stringify({ endpoint: callbackUrl }),
       });
       return { success: true };
     } catch (error) {
@@ -302,7 +302,7 @@ export class SlideSpeakClient {
     try {
       await this.request<unknown>('/webhook/unsubscribe', {
         method: 'POST',
-        body: JSON.stringify({ url: callbackUrl }),
+        body: JSON.stringify({ endpoint: callbackUrl }),
       });
       return { success: true };
     } catch (error) {
