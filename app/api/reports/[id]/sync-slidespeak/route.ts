@@ -97,61 +97,40 @@ export async function POST(
     JSON.stringify(statusData)
   );
 
-  // Extract URL from any of the many shapes SlideSpeak may use
-  function extractUrl(data: any): string | undefined {
-    if (!data) return undefined;
-    if (typeof data === 'string' && data.startsWith('http')) return data;
-    if (typeof data !== 'object') return undefined;
-    // Direct top-level fields
-    const directCandidates = [
-      data.url,
-      data.download_url,
-      data.presentation_url,
-      data.file_url,
-      data.pptx_url,
-    ];
-    for (const c of directCandidates) {
-      if (typeof c === 'string' && c.startsWith('http')) return c;
-    }
-    // Nested under task_result
-    if (data.task_result) {
-      if (typeof data.task_result === 'string' && data.task_result.startsWith('http')) {
-        return data.task_result;
-      }
-      if (typeof data.task_result === 'object') {
-        const nestedCandidates = [
-          data.task_result.url,
-          data.task_result.download_url,
-          data.task_result.presentation_url,
-          data.task_result.file_url,
-          data.task_result.pptx_url,
-        ];
-        for (const c of nestedCandidates) {
-          if (typeof c === 'string' && c.startsWith('http')) return c;
-        }
-      }
-    }
-    // Nested under result
-    if (data.result && typeof data.result === 'object') {
-      const resultCandidates = [
-        data.result.url,
-        data.result.download_url,
-        data.result.presentation_url,
-        data.result.file_url,
-        data.result.pptx_url,
-      ];
-      for (const c of resultCandidates) {
-        if (typeof c === 'string' && c.startsWith('http')) return c;
-      }
-    }
-    return undefined;
-  }
-
   const slidespeakStatus: string | undefined = statusData.task_status || statusData.status;
 
   // Map SlideSpeak status and update DB if terminal
   if (slidespeakStatus === 'SUCCESS' || slidespeakStatus === 'success') {
-    const downloadUrl = extractUrl(statusData);
+    // SlideSpeak's task_status response returns { task_result: { presentation_id, request_id } }
+    // To get the actual download URL, call /presentation/download/{request_id}
+    const requestId: string | undefined =
+      statusData.task_result?.request_id || statusData.task_info?.request_id;
+
+    let downloadUrl: string | undefined;
+
+    if (requestId) {
+      try {
+        const downloadResponse = await fetch(
+          `https://api.slidespeak.co/api/v1/presentation/download/${requestId}`,
+          { headers: { 'X-API-Key': apiKey } }
+        );
+        if (downloadResponse.ok) {
+          const downloadData = await downloadResponse.json() as Record<string, any>;
+          console.log(
+            `[SlideSpeak Sync] download response for request_id=${requestId}:`,
+            JSON.stringify(downloadData)
+          );
+          downloadUrl = downloadData.url || downloadData.download_url || downloadData.presentation_url;
+        } else {
+          const errorText = await downloadResponse.text();
+          console.error(
+            `[SlideSpeak Sync] download endpoint failed: ${downloadResponse.status} ${errorText}`
+          );
+        }
+      } catch (err) {
+        console.error('[SlideSpeak Sync] download endpoint threw:', err);
+      }
+    }
 
     if (!downloadUrl) {
       // Store the raw response in error_message so we can see the actual schema

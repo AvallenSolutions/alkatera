@@ -3,8 +3,15 @@ import { createClient } from '@supabase/supabase-js';
 
 interface WebhookPayload {
   task_id: string;
-  task_status: 'SUCCESS' | 'FAILED';
-  task_result?: { url?: string } | null;
+  task_status: 'SUCCESS' | 'FAILED' | 'success' | 'failed';
+  task_result?: {
+    url?: string;
+    presentation_id?: string;
+    request_id?: string;
+  } | null;
+  task_info?: {
+    request_id?: string;
+  } | null;
   error?: string;
 }
 
@@ -38,6 +45,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
+  console.log('[SlideSpeak Webhook] Received payload:', JSON.stringify(payload));
+
   const { task_id, task_status, task_result, error } = payload;
 
   if (!task_id) {
@@ -62,21 +71,44 @@ export async function POST(request: NextRequest) {
   }
 
   if (!report) {
-    // Unknown task — could be a duplicate delivery or stale webhook; ignore safely
     console.warn(`[SlideSpeak Webhook] No report found for task_id=${task_id}`);
     return NextResponse.json({ received: true });
   }
 
-  if (task_status === 'SUCCESS') {
-    const downloadUrl = task_result?.url;
+  const statusUpper = task_status?.toUpperCase();
+
+  if (statusUpper === 'SUCCESS') {
+    // Get the request_id and fetch the actual download URL from SlideSpeak
+    const requestId = task_result?.request_id || payload.task_info?.request_id;
+    let downloadUrl: string | undefined = task_result?.url;
+
+    if (!downloadUrl && requestId) {
+      const apiKey = process.env.SLIDESPEAK_API_KEY;
+      if (apiKey) {
+        try {
+          const downloadResponse = await fetch(
+            `https://api.slidespeak.co/api/v1/presentation/download/${requestId}`,
+            { headers: { 'X-API-Key': apiKey } }
+          );
+          if (downloadResponse.ok) {
+            const downloadData = await downloadResponse.json() as Record<string, any>;
+            downloadUrl = downloadData.url || downloadData.download_url || downloadData.presentation_url;
+          } else {
+            const text = await downloadResponse.text();
+            console.error(`[SlideSpeak Webhook] download endpoint failed: ${downloadResponse.status} ${text}`);
+          }
+        } catch (err) {
+          console.error('[SlideSpeak Webhook] download endpoint threw:', err);
+        }
+      }
+    }
 
     if (!downloadUrl) {
-      console.error(`[SlideSpeak Webhook] SUCCESS but no download URL for task_id=${task_id}`);
       await supabase
         .from('generated_reports')
         .update({
           status: 'failed',
-          error_message: 'SlideSpeak reported success but provided no download URL',
+          error_message: `SlideSpeak SUCCESS but no URL found. Raw payload: ${JSON.stringify(payload).slice(0, 2000)}`,
         })
         .eq('id', report.id);
 
@@ -118,6 +150,5 @@ export async function POST(request: NextRequest) {
     console.error(`[SlideSpeak Webhook] Report ${report.id} failed. task_id=${task_id}, error=${errorMessage}`);
   }
 
-  // Always return 200 quickly — SlideSpeak expects fast acknowledgement
   return NextResponse.json({ received: true });
 }
