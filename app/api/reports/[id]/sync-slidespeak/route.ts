@@ -89,31 +89,83 @@ export async function POST(
     );
   }
 
-  const statusData = await statusResponse.json() as {
-    task_id: string;
-    task_status: string;
-    task_result?: { url?: string } | null;
-    task_info?: unknown;
-  };
+  const statusData = await statusResponse.json() as Record<string, any>;
 
-  console.log(`[SlideSpeak Sync] task_id=${report.slidespeak_task_id}, slidespeak_status=${statusData.task_status}`);
+  // Log the full response so we can see SlideSpeak's actual schema
+  console.log(
+    `[SlideSpeak Sync] task_id=${report.slidespeak_task_id} full response:`,
+    JSON.stringify(statusData)
+  );
+
+  // Extract URL from any of the many shapes SlideSpeak may use
+  function extractUrl(data: any): string | undefined {
+    if (!data) return undefined;
+    if (typeof data === 'string' && data.startsWith('http')) return data;
+    if (typeof data !== 'object') return undefined;
+    // Direct top-level fields
+    const directCandidates = [
+      data.url,
+      data.download_url,
+      data.presentation_url,
+      data.file_url,
+      data.pptx_url,
+    ];
+    for (const c of directCandidates) {
+      if (typeof c === 'string' && c.startsWith('http')) return c;
+    }
+    // Nested under task_result
+    if (data.task_result) {
+      if (typeof data.task_result === 'string' && data.task_result.startsWith('http')) {
+        return data.task_result;
+      }
+      if (typeof data.task_result === 'object') {
+        const nestedCandidates = [
+          data.task_result.url,
+          data.task_result.download_url,
+          data.task_result.presentation_url,
+          data.task_result.file_url,
+          data.task_result.pptx_url,
+        ];
+        for (const c of nestedCandidates) {
+          if (typeof c === 'string' && c.startsWith('http')) return c;
+        }
+      }
+    }
+    // Nested under result
+    if (data.result && typeof data.result === 'object') {
+      const resultCandidates = [
+        data.result.url,
+        data.result.download_url,
+        data.result.presentation_url,
+        data.result.file_url,
+        data.result.pptx_url,
+      ];
+      for (const c of resultCandidates) {
+        if (typeof c === 'string' && c.startsWith('http')) return c;
+      }
+    }
+    return undefined;
+  }
+
+  const slidespeakStatus: string | undefined = statusData.task_status || statusData.status;
 
   // Map SlideSpeak status and update DB if terminal
-  if (statusData.task_status === 'SUCCESS') {
-    const downloadUrl = statusData.task_result?.url;
+  if (slidespeakStatus === 'SUCCESS' || slidespeakStatus === 'success') {
+    const downloadUrl = extractUrl(statusData);
 
     if (!downloadUrl) {
+      // Store the raw response in error_message so we can see the actual schema
       await serviceClient
         .from('generated_reports')
         .update({
           status: 'failed',
-          error_message: 'SlideSpeak reported success but provided no download URL',
+          error_message: `SlideSpeak SUCCESS but no URL found. Raw response: ${JSON.stringify(statusData).slice(0, 2000)}`,
         })
         .eq('id', report.id);
 
       return NextResponse.json({
         status: 'failed',
-        error: 'SlideSpeak reported success but provided no download URL',
+        error: 'SlideSpeak SUCCESS but no URL found in response',
         slidespeakResponse: statusData,
       });
     }
@@ -134,7 +186,7 @@ export async function POST(
     });
   }
 
-  if (statusData.task_status === 'FAILED') {
+  if (slidespeakStatus === 'FAILED' || slidespeakStatus === 'failed') {
     await serviceClient
       .from('generated_reports')
       .update({
@@ -153,7 +205,7 @@ export async function POST(
   // Still pending/processing
   return NextResponse.json({
     status: report.status,
-    slidespeakStatus: statusData.task_status,
+    slidespeakStatus,
     message: 'SlideSpeak is still processing this task',
     slidespeakResponse: statusData,
   });
