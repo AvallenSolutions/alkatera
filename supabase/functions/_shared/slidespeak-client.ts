@@ -137,11 +137,18 @@ export class SlideSpeakClient {
   async generatePresentation(options: GeneratePresentationOptions): Promise<SlideSpeakResult> {
     try {
       // Build request body - SlideSpeak uses 'plain_text' and 'length'
+      // Content-fidelity flags prevent AI hallucination and stock-image nonsense:
+      // - use_wording_from_document: stick to our wording
+      // - use_general_knowledge: false stops AI from inventing facts
+      // - fetch_images: false stops random stock photos (BMW garages, etc.)
       const requestBody: Record<string, unknown> = {
         plain_text: options.content,
         length: options.slideCount || 15,
         template: (options.template || 'DEFAULT').toUpperCase(),
         language: options.language || 'ORIGINAL',
+        use_wording_from_document: true,
+        use_general_knowledge: false,
+        fetch_images: false,
       };
 
       // Add custom instructions if provided
