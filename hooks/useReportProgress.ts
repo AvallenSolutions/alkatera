@@ -7,7 +7,8 @@ interface ReportProgressState {
   error: string | null;
 }
 
-const STALE_TIMEOUT_MS = 180_000; // If stuck on same status for 3 minutes, mark as failed
+const STALE_TIMEOUT_MS = 300_000; // If stuck on same status for 5 minutes, mark as failed
+const SYNC_AFTER_MS = 30_000; // After 30 seconds on generating_document, start polling SlideSpeak directly as a webhook fallback
 
 export function useReportProgress(reportId: string | null) {
   const [state, setState] = useState<ReportProgressState>({
@@ -20,6 +21,8 @@ export function useReportProgress(reportId: string | null) {
   const lastChangeRef = useRef<number>(Date.now());
   const lastStatusRef = useRef<string>('pending');
   const requestIdRef = useRef(0);
+  const lastSyncRef = useRef<number>(0);
+  const syncInFlightRef = useRef(false);
 
   useEffect(() => {
     if (!reportId) return;
@@ -58,6 +61,32 @@ export function useReportProgress(reportId: string | null) {
             pollRef.current = null;
           }
           return;
+        }
+
+        // Webhook fallback: if stuck in generating_document, poll SlideSpeak directly every 10s
+        if (
+          data.status === 'generating_document' &&
+          Date.now() - lastChangeRef.current > SYNC_AFTER_MS &&
+          Date.now() - lastSyncRef.current > 10_000 &&
+          !syncInFlightRef.current
+        ) {
+          syncInFlightRef.current = true;
+          lastSyncRef.current = Date.now();
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const authToken = session?.access_token;
+            if (authToken) {
+              await fetch(`/api/reports/${reportId}/sync-slidespeak`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${authToken}` },
+              });
+              // Next poll tick will pick up any DB changes from the sync
+            }
+          } catch (err) {
+            console.warn('[useReportProgress] SlideSpeak sync failed:', err);
+          } finally {
+            syncInFlightRef.current = false;
+          }
         }
 
         // Timeout: if stuck on same non-terminal status for too long
