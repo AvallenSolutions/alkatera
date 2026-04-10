@@ -42,5 +42,6 @@ jobs:
           supabase functions deploy invoke-waste-circularity-calculations --no-verify-jwt
           supabase functions deploy invoke-water-calculations --no-verify-jwt
           supabase functions deploy manage-facility --no-verify-jwt
+          supabase functions deploy generate-sustainability-report --no-verify-jwt
 
           echo "All edge functions deployed successfully!"
