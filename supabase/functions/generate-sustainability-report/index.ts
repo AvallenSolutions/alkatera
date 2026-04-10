@@ -1,3 +1,4 @@
+// deploy: webhook-based generation (no polling)
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import {
   createSlideSpeakClient,
