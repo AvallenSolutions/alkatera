@@ -170,17 +170,14 @@ export function ConfigureStep({ config, onChange }: ConfigureStepProps) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="pptx">PowerPoint (PPTX)</SelectItem>
             <SelectItem value="pdf">PDF Report</SelectItem>
             <SelectItem value="html">Interactive HTML</SelectItem>
           </SelectContent>
         </Select>
         <p className="text-sm text-muted-foreground">
-          {config.outputFormat === 'pdf'
-            ? 'A branded PDF document with charts and tables, ideal for sharing and publishing.'
-            : config.outputFormat === 'html'
-            ? 'A responsive web page that opens in your browser — easy to share via link or embed.'
-            : 'A slide presentation generated via SlideSpeak, ideal for board meetings and stakeholder presentations.'}
+          {config.outputFormat === 'html'
+            ? 'A responsive web page that opens in your browser, easy to share via link or embed.'
+            : 'A branded PDF document with charts and tables, ideal for sharing and publishing.'}
         </p>
       </div>
 

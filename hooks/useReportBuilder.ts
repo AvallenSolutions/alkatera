@@ -222,58 +222,6 @@ export function useReportBuilder() {
             })
             .eq('id', reportRecord.id);
         });
-      } else {
-        // PPTX: call edge function directly via fetch (bypasses supabase.functions.invoke
-        // which wraps fetch in getSession() machinery that can cause FunctionsFetchError).
-        // Uses the same explicit-token pattern as PDF and HTML generation above.
-        const { data: sessionData } = await supabase.auth.getSession();
-        const accessToken = sessionData?.session?.access_token;
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-        fetch(`${supabaseUrl}/functions/v1/generate-sustainability-report`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${accessToken}`,
-            'apikey': anonKey || '',
-          },
-          body: JSON.stringify({ report_config_id: reportRecord.id }),
-        }).then(async (response) => {
-          if (!response.ok) {
-            console.error('Edge function returned error status:', response.status);
-            // The edge function stores the real error in error_message before returning non-2xx.
-            // Only set a fallback if the edge function didn't write one.
-            await supabase
-              .from('generated_reports')
-              .update({
-                status: 'failed',
-                error_message: 'Report generation failed unexpectedly. Please try again.',
-              })
-              .eq('id', reportRecord.id)
-              .is('error_message', null);
-            await supabase
-              .from('generated_reports')
-              .update({ status: 'failed' })
-              .eq('id', reportRecord.id)
-              .neq('status', 'failed');
-          }
-        }).catch(async (err) => {
-          console.error('Edge function call failed:', err);
-          await supabase
-            .from('generated_reports')
-            .update({
-              status: 'failed',
-              error_message: `Network error: ${err?.message || 'Could not reach the report generation service.'}`,
-            })
-            .eq('id', reportRecord.id)
-            .is('error_message', null);
-          await supabase
-            .from('generated_reports')
-            .update({ status: 'failed' })
-            .eq('id', reportRecord.id)
-            .neq('status', 'failed');
-        });
       }
 
       // Auto-save defaults after generation

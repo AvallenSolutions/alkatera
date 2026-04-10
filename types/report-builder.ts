@@ -8,7 +8,7 @@ export interface ReportConfig {
   reportingPeriodStart: string;
   reportingPeriodEnd: string;
   audience: 'investors' | 'regulators' | 'customers' | 'internal' | 'supply-chain' | 'technical';
-  outputFormat: 'pptx' | 'pdf' | 'html';
+  outputFormat: 'pdf' | 'html';
   standards: string[];
   sections: string[];
   branding: {

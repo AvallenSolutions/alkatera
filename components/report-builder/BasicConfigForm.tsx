@@ -167,17 +167,18 @@ export function BasicConfigForm({ config, onChange }: BasicConfigFormProps) {
           <Label htmlFor="output-format">Output Format</Label>
           <Select
             value={config.outputFormat}
-            onValueChange={(value: 'pptx') => onChange({ outputFormat: value })}
+            onValueChange={(value: 'pdf' | 'html') => onChange({ outputFormat: value })}
           >
             <SelectTrigger id="output-format">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="pptx">PowerPoint (.pptx)</SelectItem>
+              <SelectItem value="pdf">PDF Report</SelectItem>
+              <SelectItem value="html">Interactive HTML</SelectItem>
             </SelectContent>
           </Select>
           <p className="text-sm text-muted-foreground">
-            AI-generated presentations optimized for stakeholder communication
+            Pixel-perfect reports with all your data rendered exactly as calculated
           </p>
         </div>
       </div>

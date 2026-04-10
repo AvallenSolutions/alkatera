@@ -45,7 +45,7 @@ export default function ReportBuilderPage() {
     reportingPeriodStart: `${currentYear}-01-01`,
     reportingPeriodEnd: `${currentYear}-12-31`,
     audience: 'investors',
-    outputFormat: 'pptx',
+    outputFormat: 'pdf',
     standards: ['csrd', 'iso-14067'],
     sections: ['executive-summary'],
     branding: {

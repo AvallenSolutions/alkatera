@@ -21,9 +21,8 @@ const AUDIENCE_LABELS: Record<string, string> = {
 };
 
 const FORMAT_LABELS: Record<string, string> = {
-  pptx: 'PowerPoint Presentation',
-  docx: 'Word Document',
-  xlsx: 'Excel Workbook',
+  pdf: 'PDF Report',
+  html: 'Interactive HTML',
 };
 
 const STANDARDS_LABELS: Record<string, string> = {

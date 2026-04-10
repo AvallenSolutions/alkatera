@@ -87,7 +87,7 @@ function SustainabilityReportsHub() {
     reportingPeriodStart: `${currentYear}-01-01`,
     reportingPeriodEnd: `${currentYear}-12-31`,
     audience: 'investors',
-    outputFormat: 'pptx',
+    outputFormat: 'pdf',
     standards: ['csrd', 'iso-14067'],
     sections: ['executive-summary'],
     branding: { logo: null, primaryColor: '#2563eb', secondaryColor: '#10b981' },
