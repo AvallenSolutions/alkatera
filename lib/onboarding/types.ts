@@ -6,9 +6,10 @@
  *
  * Owner flow: Full 14-step onboarding (create org, add data, etc.)
  * Member flow: Streamlined 6-step onboarding (welcome, learn platform)
+ * Fast track flow: 5-step "see your footprint in 10 min" path
  */
 
-export type OnboardingFlow = 'owner' | 'member'
+export type OnboardingFlow = 'owner' | 'member' | 'fast_track'
 
 export type OnboardingPhase =
   | 'welcome'           // Phase 1: Welcome & Orientation
@@ -42,6 +43,12 @@ export type OnboardingStep =
   | 'member-org-overview'
   | 'member-platform-tour'
   | 'member-completion'
+  // Fast Track flow steps
+  | 'fast-track-setup'
+  | 'fast-track-products'
+  | 'fast-track-facility'
+  | 'fast-track-estimate'
+  | 'fast-track-completion'
 
 export interface OnboardingStepConfig {
   id: OnboardingStep
@@ -89,6 +96,21 @@ export const MEMBER_ONBOARDING_STEPS: OnboardingStepConfig[] = [
 export const TOTAL_STEPS = ONBOARDING_STEPS.length
 export const TOTAL_MEMBER_STEPS = MEMBER_ONBOARDING_STEPS.length
 
+/** Fast Track onboarding: 6-step path that populates real account data */
+export const FAST_TRACK_STEPS: OnboardingStepConfig[] = [
+  { id: 'welcome-screen',        phase: 'welcome',        title: 'Welcome',         description: 'Welcome to alkatera',          skippable: false, index: 0 },
+  { id: 'fast-track-setup',      phase: 'welcome',        title: 'Your Company',    description: 'Tell us about your business',  skippable: false, index: 1 },
+  { id: 'fast-track-products',   phase: 'quick-wins',     title: 'Your Products',   description: 'Import or add products',       skippable: true,  index: 2 },
+  { id: 'fast-track-facility',   phase: 'quick-wins',     title: 'Your Facility',   description: 'Where you produce',            skippable: true,  index: 3 },
+  { id: 'fast-track-estimate',   phase: 'first-insights', title: 'Your Footprint',  description: 'Your instant estimate',        skippable: false, index: 4 },
+  { id: 'fast-track-completion', phase: 'power-features', title: 'All Set',         description: 'Next steps to improve',        skippable: false, index: 5 },
+]
+
+export const TOTAL_FAST_TRACK_STEPS = FAST_TRACK_STEPS.length
+
+/** Phases shown in the fast track top bar */
+export const FAST_TRACK_PHASES: OnboardingPhase[] = ['welcome', 'quick-wins', 'first-insights', 'power-features']
+
 export const PHASE_CONFIG: Record<OnboardingPhase, { label: string; duration: string; color: string }> = {
   'welcome': { label: 'Welcome & Orientation', duration: '~3 min', color: 'lime' },
   'quick-wins': { label: 'Quick Wins', duration: '~5 min', color: 'cyan' },
@@ -133,6 +155,8 @@ export type PrimaryGoal =
   | 'understand_footprint'
   | 'learning'
 
+export type AnnualProductionBucket = '<10k' | '10k-100k' | '100k-1M' | '1M+'
+
 export interface PersonalizationData {
   role?: UserRole
   roleOther?: string
@@ -140,6 +164,15 @@ export interface PersonalizationData {
   beverageTypeOther?: string
   companySize?: CompanySize
   primaryGoals?: PrimaryGoal[]
+  // Fast Track fields — all stored in personalization for estimate calculation
+  /** Annual production volume bucket (used for footprint estimate) */
+  annualProductionBucket?: AnnualProductionBucket
+  /** Company website URL */
+  websiteUrl?: string
+  /** Country of operation */
+  country?: string
+  /** Year company was founded */
+  foundingYear?: number
 }
 
 export interface OnboardingState {
@@ -195,26 +228,45 @@ export const INITIAL_MEMBER_ONBOARDING_STATE: OnboardingState = {
   emissionsGuideDismissed: false,
 }
 
+export const INITIAL_FAST_TRACK_STATE: OnboardingState = {
+  completed: false,
+  dismissed: false,
+  currentStep: 'welcome-screen',
+  completedSteps: [],
+  personalization: {},
+  dashboardGuideCompleted: false,
+  searchGuideCompleted: false,
+  productGuideCompleted: false,
+  emissionsGuideCompleted: false,
+  emissionsGuideDismissed: false,
+}
+
 // ---------------------------------------------------------------------------
 // Helper functions
 // ---------------------------------------------------------------------------
 
 /** Get the steps array for the given flow */
 export function getStepsForFlow(flow: OnboardingFlow): OnboardingStepConfig[] {
-  return flow === 'member' ? MEMBER_ONBOARDING_STEPS : ONBOARDING_STEPS
+  if (flow === 'member') return MEMBER_ONBOARDING_STEPS
+  if (flow === 'fast_track') return FAST_TRACK_STEPS
+  return ONBOARDING_STEPS
 }
 
 /** Get the initial state for the given flow */
 export function getInitialStateForFlow(flow: OnboardingFlow): OnboardingState {
-  return flow === 'member' ? { ...INITIAL_MEMBER_ONBOARDING_STATE } : { ...INITIAL_ONBOARDING_STATE }
+  if (flow === 'member') return { ...INITIAL_MEMBER_ONBOARDING_STATE }
+  if (flow === 'fast_track') return { ...INITIAL_FAST_TRACK_STATE }
+  return { ...INITIAL_ONBOARDING_STATE }
 }
 
-/** Get step config — searches both owner and member step arrays */
+/** Get step config — searches all step arrays */
 export function getStepConfig(step: OnboardingStep): OnboardingStepConfig {
   const ownerStep = ONBOARDING_STEPS.find(s => s.id === step)
   if (ownerStep) return ownerStep
   const memberStep = MEMBER_ONBOARDING_STEPS.find(s => s.id === step)
   if (memberStep) return memberStep
+  const fastTrackStep = FAST_TRACK_STEPS.find(s => s.id === step)
+  if (fastTrackStep) return fastTrackStep
   // Fallback — should never happen
   return ONBOARDING_STEPS[0]
 }

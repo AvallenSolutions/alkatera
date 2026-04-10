@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { useOnboarding, ONBOARDING_STEPS, MEMBER_ONBOARDING_STEPS, PHASE_CONFIG, MEMBER_PHASES, getStepConfig } from '@/lib/onboarding'
+import { useOnboarding, ONBOARDING_STEPS, MEMBER_ONBOARDING_STEPS, FAST_TRACK_STEPS, FAST_TRACK_PHASES, PHASE_CONFIG, MEMBER_PHASES, getStepConfig } from '@/lib/onboarding'
 import type { OnboardingPhase } from '@/lib/onboarding'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
@@ -30,6 +30,13 @@ import { MemberOrgOverview } from './steps/MemberOrgOverview'
 import { MemberPlatformTour } from './steps/MemberPlatformTour'
 import { MemberCompletionStep } from './steps/MemberCompletionStep'
 
+// Step components — fast track flow
+import { FastTrackSetupStep } from './steps/FastTrackSetupStep'
+import { FastTrackProductsStep } from './steps/FastTrackProductsStep'
+import { FastTrackFacilityStep } from './steps/FastTrackFacilityStep'
+import { FastTrackEstimateStep } from './steps/FastTrackEstimateStep'
+import { FastTrackCompletionStep } from './steps/FastTrackCompletionStep'
+
 const STEP_COMPONENTS: Record<string, React.ComponentType> = {
   // Owner steps
   'welcome-screen': WelcomeScreen,
@@ -51,6 +58,12 @@ const STEP_COMPONENTS: Record<string, React.ComponentType> = {
   'member-org-overview': MemberOrgOverview,
   'member-platform-tour': MemberPlatformTour,
   'member-completion': MemberCompletionStep,
+  // Fast Track steps
+  'fast-track-setup': FastTrackSetupStep,
+  'fast-track-products': FastTrackProductsStep,
+  'fast-track-facility': FastTrackFacilityStep,
+  'fast-track-estimate': FastTrackEstimateStep,
+  'fast-track-completion': FastTrackCompletionStep,
 }
 
 const OWNER_PHASES: OnboardingPhase[] = ['welcome', 'quick-wins', 'core-setup', 'first-insights', 'power-features']
@@ -69,11 +82,12 @@ export function OnboardingWizard() {
 
   // Use flow-appropriate phases and steps for the top bar
   const isMemberFlow = onboardingFlow === 'member'
-  const phases = isMemberFlow ? MEMBER_PHASES : OWNER_PHASES
-  const flowSteps = isMemberFlow ? MEMBER_ONBOARDING_STEPS : ONBOARDING_STEPS
+  const isFastTrack = onboardingFlow === 'fast_track'
+  const phases = isMemberFlow ? MEMBER_PHASES : isFastTrack ? FAST_TRACK_PHASES : OWNER_PHASES
+  const flowSteps = isMemberFlow ? MEMBER_ONBOARDING_STEPS : isFastTrack ? FAST_TRACK_STEPS : ONBOARDING_STEPS
 
   const isWelcome = state.currentStep === 'welcome-screen' || state.currentStep === 'member-welcome'
-  const isCompletion = state.currentStep === 'completion' || state.currentStep === 'member-completion'
+  const isCompletion = state.currentStep === 'completion' || state.currentStep === 'member-completion' || state.currentStep === 'fast-track-completion'
 
   return (
     <div className="fixed inset-0 z-[60] overflow-y-auto" role="dialog" aria-label="Onboarding wizard">

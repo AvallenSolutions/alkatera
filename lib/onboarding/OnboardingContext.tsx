@@ -15,6 +15,7 @@ import {
   getStepConfig,
   getProgressPercentage,
   getInitialStateForFlow,
+  FAST_TRACK_STEPS,
 } from './types'
 
 interface OnboardingContextType {
@@ -56,6 +57,8 @@ interface OnboardingContextType {
   dismissEmissionsGuide: () => void
   /** Re-open the emissions guide after dismissal */
   reopenEmissionsGuide: () => void
+  /** Switch to a different onboarding flow and reinitialise steps */
+  setFlow: (flow: OnboardingFlow) => void
   /** Reset onboarding (for testing) */
   resetOnboarding: () => void
 }
@@ -65,7 +68,7 @@ const OnboardingContext = createContext<OnboardingContextType | undefined>(undef
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<OnboardingState>(INITIAL_ONBOARDING_STATE)
   const [isLoading, setIsLoading] = useState(true)
-  const [onboardingFlow, setOnboardingFlow] = useState<OnboardingFlow>('owner')
+  const [onboardingFlow, setOnboardingFlow] = useState<OnboardingFlow>('fast_track')
   const { user } = useAuth()
   const { currentOrganization, userRole } = useOrganization()
   const isOwner = userRole === 'owner'
@@ -74,7 +77,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const loadedOrgIdRef = useRef<string | null>(null)
   // Track the org ID and flow for saves so the callback doesn't need them in deps
   const orgIdRef = useRef<string | null>(null)
-  const flowRef = useRef<OnboardingFlow>('owner')
+  const flowRef = useRef<OnboardingFlow>('fast_track')
   // Guard against saving while a fetch is in flight
   const isFetchingRef = useRef(false)
   // Counter to ignore stale fetch responses
@@ -153,7 +156,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         if (res.ok) {
           const data = await res.json()
           // Set the flow from the API response
-          const serverFlow: OnboardingFlow = data.flow || (isOwner ? 'owner' : 'member')
+          const serverFlow: OnboardingFlow = data.flow || (isOwner ? 'fast_track' : 'member')
           setOnboardingFlow(serverFlow)
 
           if (data.state) {
@@ -256,7 +259,10 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
 
   const completeOnboarding = useCallback(async () => {
     // Use the appropriate completion step for the flow
-    const completionStep = flowRef.current === 'member' ? 'member-completion' : 'completion'
+    const completionStep =
+      flowRef.current === 'member' ? 'member-completion' :
+      flowRef.current === 'fast_track' ? 'fast-track-completion' :
+      'completion'
     const completedState: OnboardingState = {
       ...state,
       completed: true,
@@ -321,6 +327,26 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     }))
   }, [updateState])
 
+  const setFlow = useCallback((flow: OnboardingFlow) => {
+    setOnboardingFlow(flow)
+    flowRef.current = flow
+    // Reinitialise to the first step of the new flow, preserving personalization
+    setState(prev => {
+      const newState: OnboardingState = {
+        ...getInitialStateForFlow(flow),
+        personalization: prev.personalization,
+        startedAt: prev.startedAt,
+        // Advance past welcome-screen since it triggered this switch
+        currentStep: flow === 'fast_track'
+          ? (FAST_TRACK_STEPS[1]?.id ?? 'fast-track-setup')
+          : (flow === 'member' ? 'member-welcome' : 'meet-rosa'),
+        completedSteps: ['welcome-screen'],
+      }
+      saveState(newState)
+      return newState
+    })
+  }, [saveState])
+
   const resetOnboarding = useCallback(() => {
     sessionDismissedRef.current = false
     const fresh = { ...getInitialStateForFlow(flowRef.current), startedAt: new Date().toISOString() }
@@ -367,6 +393,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         resetSearchGuide,
         dismissEmissionsGuide,
         reopenEmissionsGuide,
+        setFlow,
         resetOnboarding,
       }}
     >

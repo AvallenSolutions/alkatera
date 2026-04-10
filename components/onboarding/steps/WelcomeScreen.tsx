@@ -2,7 +2,7 @@
 
 import { useOnboarding } from '@/lib/onboarding'
 import { Button } from '@/components/ui/button'
-import { Leaf } from 'lucide-react'
+import { Leaf, ArrowRight } from 'lucide-react'
 
 export function WelcomeScreen() {
   const { completeStep } = useOnboarding()
@@ -22,21 +22,20 @@ export function WelcomeScreen() {
           Welcome to Your Sustainability Control Centre
         </h1>
         <p className="text-lg text-white/60">
-          Let&apos;s build something meaningful together.
+          Let&apos;s get your account set up. It only takes about 10 minutes to see your estimated carbon footprint.
         </p>
       </div>
 
-      <p className="text-sm text-white/40 max-w-sm">
-        We&apos;ll walk you through setting up your sustainability platform in about 20 minutes. You can pause and come back anytime.
-      </p>
-
       <Button
-        size="lg"
         onClick={completeStep}
-        className="bg-[#ccff00] text-black hover:bg-[#ccff00]/90 font-medium text-base px-8 rounded-xl"
+        size="lg"
+        className="bg-[#ccff00] text-black hover:bg-[#ccff00]/90 font-semibold text-base rounded-2xl px-8 py-4 h-auto"
       >
-        Continue
+        Get Started
+        <ArrowRight className="w-5 h-5 ml-2" />
       </Button>
+
+      <p className="text-xs text-white/30">You can skip steps and come back to complete your setup later.</p>
     </div>
   )
 }

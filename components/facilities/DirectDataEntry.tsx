@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Plus, Trash2, Loader2, Zap, Droplets, Trash } from "lucide-react";
+import { Plus, Trash2, Loader2, Zap, Droplets, Trash, Upload, Copy } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import { useReportingPeriod } from "@/hooks/useReportingPeriod";
@@ -23,6 +23,8 @@ import {
   DATA_QUALITY_OPTIONS,
 } from "@/lib/constants/utility-types";
 import type { Cadence, Period } from "@/lib/log-data/period-utils";
+import { UtilityBillImportDialog } from "./UtilityBillImportDialog";
+import { UtilityRolloverDialog } from "./UtilityRolloverDialog";
 
 // =============================================================================
 // Types
@@ -74,6 +76,8 @@ export function DirectDataEntry({
   const [selectedPeriodIndex, setSelectedPeriodIndex] = useState<string>("0");
   const [activeTab, setActiveTab] = useState("utilities");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showBillImport, setShowBillImport] = useState(false);
+  const [showRollover, setShowRollover] = useState(false);
 
   // Utility rows
   const [utilityRows, setUtilityRows] = useState<UtilityRow[]>([
@@ -415,9 +419,17 @@ export function DirectDataEntry({
           <TabsContent value="utilities" className="space-y-4 mt-4">
             <div className="flex items-center justify-between">
               <Label className="text-sm font-semibold">Utility Entries</Label>
-              <Button variant="outline" size="sm" onClick={addUtilityRow} disabled={isSubmitting}>
-                <Plus className="h-4 w-4 mr-1" /> Add Row
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setShowRollover(true)} disabled={isSubmitting}>
+                  <Copy className="h-4 w-4 mr-1" /> Copy from last year
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setShowBillImport(true)} disabled={isSubmitting}>
+                  <Upload className="h-4 w-4 mr-1" /> Upload Bill
+                </Button>
+                <Button variant="outline" size="sm" onClick={addUtilityRow} disabled={isSubmitting}>
+                  <Plus className="h-4 w-4 mr-1" /> Add Row
+                </Button>
+              </div>
             </div>
 
             {utilityRows.map((row, i) => (
@@ -655,6 +667,28 @@ export function DirectDataEntry({
           </TabsContent>
         </Tabs>
       </CardContent>
+
+      <UtilityRolloverDialog
+        open={showRollover}
+        onClose={() => setShowRollover(false)}
+        facilityId={facilityId}
+        organizationId={organizationId}
+        onDataSaved={() => {
+          setShowRollover(false)
+          onDataSaved?.()
+        }}
+      />
+
+      <UtilityBillImportDialog
+        open={showBillImport}
+        onClose={() => setShowBillImport(false)}
+        facilityId={facilityId}
+        organizationId={organizationId}
+        onDataSaved={() => {
+          setShowBillImport(false)
+          onDataSaved?.()
+        }}
+      />
     </Card>
   );
 }

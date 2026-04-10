@@ -16,6 +16,7 @@ import {
   Image as ImageIcon,
   Trash2,
   AlertTriangle,
+  Factory,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -114,6 +115,12 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
   const [productType, setProductType] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  // Production profile
+  const [annualProductionBucket, setAnnualProductionBucket] = useState("");
+  const [productionModel, setProductionModel] = useState("");
+  const [primaryPackaging, setPrimaryPackaging] = useState("");
+  const [ingredientSourcing, setIngredientSourcing] = useState("");
+  const [renewableEnergyUsage, setRenewableEnergyUsage] = useState("");
   const [fyStartMonth, setFyStartMonth] = useState("1");
   const [defaultCadence, setDefaultCadence] = useState("monthly");
 
@@ -151,6 +158,12 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
       setTaxId(orgInfo.tax_id || "");
       setProductType(orgInfo.product_type || "");
       setLogoUrl(orgInfo.logo_url || null);
+      // Production profile
+      setAnnualProductionBucket(orgInfo.annual_production_bucket || "");
+      setProductionModel(orgInfo.production_model || "");
+      setPrimaryPackaging(orgInfo.primary_packaging || "");
+      setIngredientSourcing(orgInfo.ingredient_sourcing || "");
+      setRenewableEnergyUsage(orgInfo.renewable_energy_usage || "");
 
       // Load reporting period settings from report_defaults
       const reportingPeriod = orgInfo.report_defaults?.reporting_period;
@@ -249,6 +262,12 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
         product_type: productType || null,
         logo_url: logoUrl,
         report_defaults: updatedReportDefaults,
+        // Production profile
+        annual_production_bucket: annualProductionBucket || null,
+        production_model: productionModel || null,
+        primary_packaging: primaryPackaging || null,
+        ingredient_sourcing: ingredientSourcing || null,
+        renewable_energy_usage: renewableEnergyUsage || null,
         updated_at: new Date().toISOString(),
       };
 
@@ -681,6 +700,92 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
           </Card>
         </div>
       </div>
+
+      {/* Production Profile */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Factory className="h-5 w-5" />
+            Production Profile
+          </CardTitle>
+          <CardDescription>
+            Your production setup — used to calibrate emissions estimates and benchmark comparisons
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="space-y-2">
+            <Label htmlFor="annual-production">Annual Production Volume</Label>
+            <Select value={annualProductionBucket} onValueChange={setAnnualProductionBucket} disabled={isSaving}>
+              <SelectTrigger id="annual-production">
+                <SelectValue placeholder="Select volume" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="<10k">Under 10,000 L (Micro / Craft)</SelectItem>
+                <SelectItem value="10k-100k">10,000 – 100,000 L (Small-scale)</SelectItem>
+                <SelectItem value="100k-1M">100,000 L – 1M L (Mid-size)</SelectItem>
+                <SelectItem value="1M+">1M+ L (Large scale)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="production-model">Production Model</Label>
+            <Select value={productionModel} onValueChange={setProductionModel} disabled={isSaving}>
+              <SelectTrigger id="production-model">
+                <SelectValue placeholder="Select model" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="owned">Own facility</SelectItem>
+                <SelectItem value="third_party">Contract / 3rd party producer</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="primary-packaging">Primary Packaging</Label>
+            <Select value={primaryPackaging} onValueChange={setPrimaryPackaging} disabled={isSaving}>
+              <SelectTrigger id="primary-packaging">
+                <SelectValue placeholder="Select packaging" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="glass_bottle">Glass bottle</SelectItem>
+                <SelectItem value="aluminium_can">Aluminium can</SelectItem>
+                <SelectItem value="keg_cask">Keg / Cask</SelectItem>
+                <SelectItem value="pet_bag">PET / Bag-in-box</SelectItem>
+                <SelectItem value="mixed">Mixed formats</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="ingredient-sourcing">Ingredient Sourcing</Label>
+            <Select value={ingredientSourcing} onValueChange={setIngredientSourcing} disabled={isSaving}>
+              <SelectTrigger id="ingredient-sourcing">
+                <SelectValue placeholder="Select sourcing" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="local">Mostly local / domestic</SelectItem>
+                <SelectItem value="regional">Mostly regional</SelectItem>
+                <SelectItem value="global">Global imports</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="renewable-energy">Renewable Energy Usage</Label>
+            <Select value={renewableEnergyUsage} onValueChange={setRenewableEnergyUsage} disabled={isSaving}>
+              <SelectTrigger id="renewable-energy">
+                <SelectValue placeholder="Select energy mix" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="yes">100% renewable</SelectItem>
+                <SelectItem value="partial">Partly renewable</SelectItem>
+                <SelectItem value="no">Grid / fossil fuel</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
       <Separator />
 

@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ArrowLeft, ArrowRight, SkipForward, Package, Loader2 } from 'lucide-react'
+import { WebsiteImportFlow } from '@/components/products/WebsiteImportFlow'
+import { ArrowLeft, ArrowRight, SkipForward, Package, Loader2, Globe } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 const CATEGORY_OPTIONS = [
@@ -39,6 +40,8 @@ export function FirstProductStep() {
   const [description, setDescription] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [importedCount, setImportedCount] = useState(0)
+  const [showImportFlow, setShowImportFlow] = useState(false)
   const savingRef = useRef(false)
 
   const handleSave = async () => {
@@ -95,18 +98,22 @@ export function FirstProductStep() {
           <Package className="w-10 h-10 text-[#ccff00]" />
         </div>
         <h3 className="text-2xl font-serif font-bold text-white">
-          Awesome! You added your first product to Alkatera!
+          {importedCount > 0
+            ? `${importedCount} product${importedCount !== 1 ? 's' : ''} imported!`
+            : 'Awesome! You added your first product!'}
         </h3>
-        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-4 max-w-sm w-full">
-          <p className="font-medium text-white">{productName}</p>
-          {category && (
-            <p className="text-sm text-white/50">
-              {category}{subCategory ? ` → ${subCategory}` : ''}
-            </p>
-          )}
-        </div>
+        {importedCount === 0 && (
+          <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-4 max-w-sm w-full">
+            <p className="font-medium text-white">{productName}</p>
+            {category && (
+              <p className="text-sm text-white/50">
+                {category}{subCategory ? ` → ${subCategory}` : ''}
+              </p>
+            )}
+          </div>
+        )}
         <p className="text-sm text-white/30">
-          Next: You&apos;ll complete the full product details (ingredients & packaging) later in the journey.
+          Next: You&apos;ll complete the full product details (ingredients &amp; packaging) later in the journey.
         </p>
       </div>
     )
@@ -114,6 +121,21 @@ export function FirstProductStep() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 animate-in fade-in duration-300">
+      {currentOrganization && (
+        <WebsiteImportFlow
+          open={showImportFlow}
+          onClose={() => setShowImportFlow(false)}
+          organizationId={currentOrganization.id}
+          darkMode
+          onSuccess={(count) => {
+            setImportedCount(count)
+            setShowImportFlow(false)
+            setSaved(true)
+            setTimeout(() => completeStep(), 1500)
+          }}
+        />
+      )}
+
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-2">
           <h3 className="text-xl font-serif font-bold text-white">
@@ -122,6 +144,27 @@ export function FirstProductStep() {
           <p className="text-sm text-white/50">
             This takes ~60 seconds. Let&apos;s start simple. Just one product.
           </p>
+        </div>
+
+        {/* Import from website option */}
+        <button
+          onClick={() => setShowImportFlow(true)}
+          className="w-full flex items-center gap-3 p-4 bg-[#ccff00]/10 border border-[#ccff00]/30 hover:bg-[#ccff00]/20 rounded-2xl text-left transition-colors group"
+        >
+          <div className="h-10 w-10 rounded-xl bg-[#ccff00]/20 flex items-center justify-center shrink-0">
+            <Globe className="w-5 h-5 text-[#ccff00]" />
+          </div>
+          <div>
+            <p className="font-medium text-white text-sm">Import from your website</p>
+            <p className="text-xs text-white/40">We scan your site and create all your products automatically</p>
+          </div>
+          <ArrowRight className="w-4 h-4 text-[#ccff00]/50 group-hover:text-[#ccff00] ml-auto transition-colors" />
+        </button>
+
+        <div className="flex items-center gap-3">
+          <div className="flex-1 h-px bg-white/10" />
+          <span className="text-xs text-white/30">or add one manually</span>
+          <div className="flex-1 h-px bg-white/10" />
         </div>
 
         <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 space-y-4">
