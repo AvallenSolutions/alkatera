@@ -28,6 +28,8 @@ export function useReportBuilder() {
         logo: defaults.branding.logo ?? null,
         primaryColor: defaults.branding.primaryColor ?? '#2563eb',
         secondaryColor: defaults.branding.secondaryColor ?? '#10b981',
+        heroImages: (defaults.branding as any).heroImages ?? undefined,
+        leadership: (defaults.branding as any).leadership ?? undefined,
       };
     }
     if (defaults.audience) {
@@ -35,6 +37,19 @@ export function useReportBuilder() {
     }
     if (defaults.standards && defaults.standards.length > 0) {
       partial.standards = defaults.standards;
+    }
+
+    // Fallback: if no branding logo saved but org has a logo_url, use it
+    if (!partial.branding?.logo && org?.logo_url) {
+      if (!partial.branding) {
+        partial.branding = {
+          logo: org.logo_url,
+          primaryColor: '#2563eb',
+          secondaryColor: '#10b981',
+        };
+      } else {
+        partial.branding.logo = org.logo_url;
+      }
     }
 
     return Object.keys(partial).length > 0 ? partial : null;
