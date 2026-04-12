@@ -22,6 +22,26 @@
  * Design matches the existing LCA template in lib/pdf/render-lca-html.ts
  */
 
+import { resolveTheme, getThemeFontImport, type ReportTheme } from '@/lib/pdf/templates/themes';
+
+// ============================================================================
+// DENSITY HELPERS
+// ============================================================================
+
+/** Returns font sizes and spacing derived from the theme's density setting. */
+function getDensityStyles(theme?: ReportTheme) {
+  const density = theme?.density ?? 'comfortable';
+  switch (density) {
+    case 'dense':
+      return { bodySize: 11, headingSize: 20, padding: 36, gap: 12, sectionGap: 20 };
+    case 'compact':
+      return { bodySize: 12, headingSize: 24, padding: 40, gap: 14, sectionGap: 24 };
+    case 'comfortable':
+    default:
+      return { bodySize: 13, headingSize: 32, padding: 48, gap: 16, sectionGap: 32 };
+  }
+}
+
 // ============================================================================
 // TYPES (duplicated from supabase/functions/_shared/report-content-builder.ts)
 // ============================================================================
@@ -480,24 +500,51 @@ function getStandardName(code: string): string {
 // SHARED ELEMENTS
 // ============================================================================
 
-function renderSectionHeader(number: string, title: string, dark = false, continuation = false, brandColor = '#2563eb'): string {
+function renderSectionHeader(number: string, title: string, dark = false, continuation = false, brandColor = '#2563eb', theme?: ReportTheme): string {
   const borderColor = dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)';
+  const ds = getDensityStyles(theme);
+  const headingFont = theme?.headingFont ?? "'Playfair Display', serif";
+  const headingWeight = theme?.headingWeight ?? '300';
+  const style = theme?.sectionHeaderStyle ?? 'numbered';
+  const mutedColor = theme?.mutedTextColor ?? '#a8a29e';
+
+  if (style === 'bold-block') {
+    return `
+    <div style="margin-bottom: ${continuation ? `${ds.sectionGap - 8}px` : `${ds.sectionGap}px`}; padding: 16px 20px; background: ${brandColor}15; border-radius: 8px;">
+      <span style="color: ${brandColor}; font-family: 'Fira Code', monospace; font-size: 14px; font-weight: 700; letter-spacing: 3px; margin-right: 12px;">${number}</span>
+      <h2 style="display: inline; font-size: ${continuation ? `${ds.headingSize - 8}px` : `${ds.headingSize}px`}; font-family: ${headingFont}; font-weight: ${headingWeight};">${escapeHtml(title)}</h2>
+      ${continuation ? `<span style="font-size: 10px; color: ${mutedColor}; font-family: 'Fira Code', monospace; margin-left: 8px;">(continued)</span>` : ''}
+    </div>`;
+  }
+
+  if (style === 'divider-line') {
+    return `
+    <div style="margin-bottom: ${continuation ? `${ds.sectionGap - 8}px` : `${ds.sectionGap}px`}; border-bottom: 2px solid ${brandColor}; padding-bottom: 12px;">
+      <h2 style="font-size: ${continuation ? `${ds.headingSize - 8}px` : `${ds.headingSize}px`}; font-family: ${headingFont}; font-weight: ${headingWeight};">${escapeHtml(title)}</h2>
+      ${continuation ? `<span style="font-size: 10px; color: ${mutedColor}; font-family: 'Fira Code', monospace;">(continued)</span>` : ''}
+    </div>`;
+  }
+
+  // Default: 'numbered'
   return `
-    <div style="display: flex; align-items: baseline; gap: 16px; margin-bottom: ${continuation ? '24px' : '32px'}; border-bottom: 1px solid ${borderColor}; padding-bottom: 12px;">
+    <div style="display: flex; align-items: baseline; gap: 16px; margin-bottom: ${continuation ? `${ds.sectionGap - 8}px` : `${ds.sectionGap}px`}; border-bottom: 1px solid ${borderColor}; padding-bottom: 12px;">
       <span style="color: ${brandColor}; font-family: 'Fira Code', monospace; font-size: 14px; font-weight: 700; letter-spacing: 3px;">${number}</span>
-      <h2 style="font-size: ${continuation ? '24px' : '32px'}; font-family: 'Playfair Display', serif; font-weight: 300;">${escapeHtml(title)}</h2>
-      ${continuation ? '<span style="font-size: 10px; color: #a8a29e; font-family: \'Fira Code\', monospace;">(continued)</span>' : ''}
+      <h2 style="font-size: ${continuation ? `${ds.headingSize - 8}px` : `${ds.headingSize}px`}; font-family: ${headingFont}; font-weight: ${headingWeight};">${escapeHtml(title)}</h2>
+      ${continuation ? `<span style="font-size: 10px; color: ${mutedColor}; font-family: 'Fira Code', monospace;">(continued)</span>` : ''}
     </div>`;
 }
 
-function renderPageFooter(config: ReportConfig, pageNumber?: number, dark = false, standardsLabel?: string): string {
+function renderPageFooter(config: ReportConfig, pageNumber?: number, dark = false, standardsLabel?: string, theme?: ReportTheme): string {
   const color = dark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)';
-  const bgColor = dark ? '#1c1917' : '#f5f5f4';
+  const bgDark = theme?.pageDarkBackground ?? '#1c1917';
+  const bgLight = theme?.pageBackground ?? '#f5f5f4';
+  const bgColor = dark ? bgDark : bgLight;
+  const pad = theme?.pagePadding ?? 48;
   const dateStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   const rightText = standardsLabel || dateStr;
 
   return `
-    <div class="page-footer" style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: ${bgColor}; padding: 0 48px 48px 48px;">
+    <div class="page-footer" style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: ${bgColor}; padding: 0 ${pad}px ${pad}px ${pad}px;">
       <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'Fira Code', monospace; color: ${color}; text-transform: uppercase; letter-spacing: 3px; border-top: 1px solid ${color}; padding-top: 16px;">
         <div style="display: flex; align-items: center; gap: 8px;">
           <span>Generated by</span>
@@ -593,16 +640,18 @@ function renderMaterialityCallout(config: ReportConfig, sectionId: string, data:
  * Full-page leadership message. Only rendered when config.branding.leadership.message is set
  * and the audience tier is 'full'. Placed immediately after the cover page.
  */
-function renderLeadershipPage(config: ReportConfig): string {
+function renderLeadershipPage(config: ReportConfig, theme?: ReportTheme): string {
   const leadership = config.branding?.leadership;
   if (!leadership?.message) return '';
 
   const brandColor = getBrandColor(config);
   const hasPhoto = !!leadership.photo;
+  const headingFont = theme?.headingFont ?? "'Playfair Display', serif";
+  const darkBg = theme?.pageDarkBackground ?? '#1c1917';
 
   return `
-    <div class="page dark-page" style="position: relative; overflow: hidden; justify-content: center;">
-      <div style="position: absolute; inset: 0; background: linear-gradient(135deg, #1c1917 0%, #292524 100%);"></div>
+    <div class="page dark-page" style="position: relative; overflow: hidden; justify-content: center; background: ${darkBg};">
+      <div style="position: absolute; inset: 0; background: linear-gradient(135deg, ${darkBg} 0%, #292524 100%);"></div>
       <div style="position: absolute; top: 0; right: 0; width: 55%; height: 100%; background: linear-gradient(to left, ${brandColor}05, transparent);"></div>
       <div style="position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: linear-gradient(to bottom, ${brandColor}, ${brandColor}40 60%, transparent);"></div>
 
@@ -610,9 +659,9 @@ function renderLeadershipPage(config: ReportConfig): string {
         <div style="flex: 1;">
           <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: ${brandColor}; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 40px;">A Message From Our Leadership</div>
 
-          <div style="font-size: 80px; font-family: 'Playfair Display', serif; color: ${brandColor}; opacity: 0.18; line-height: 0.7; margin-bottom: 20px; pointer-events: none;">&ldquo;</div>
+          <div style="font-size: 80px; font-family: ${headingFont}; color: ${brandColor}; opacity: 0.18; line-height: 0.7; margin-bottom: 20px; pointer-events: none;">&ldquo;</div>
 
-          <p style="font-size: 17px; font-family: 'Playfair Display', serif; font-weight: 300; line-height: 1.8; color: white; margin-bottom: 40px; max-width: 500px;">
+          <p style="font-size: 17px; font-family: ${headingFont}; font-weight: 300; line-height: 1.8; color: white; margin-bottom: 40px; max-width: 500px;">
             ${escapeHtml(leadership.message)}
           </p>
 
@@ -633,13 +682,13 @@ function renderLeadershipPage(config: ReportConfig): string {
         </div>` : `
         <div style="flex-shrink: 0; width: 160px; display: flex; flex-direction: column; align-items: center; gap: 20px;">
           <div style="width: 96px; height: 96px; border-radius: 50%; background: linear-gradient(135deg, ${brandColor}20, ${brandColor}06); border: 2px solid ${brandColor}20; display: flex; align-items: center; justify-content: center;">
-            <span style="font-size: 34px; font-family: 'Playfair Display', serif; color: ${brandColor}; opacity: 0.45;">${escapeHtml((leadership.name || 'L')[0].toUpperCase())}</span>
+            <span style="font-size: 34px; font-family: ${headingFont}; color: ${brandColor}; opacity: 0.45;">${escapeHtml((leadership.name || 'L')[0].toUpperCase())}</span>
           </div>
           ${config.branding.logo ? `<img src="${escapeHtml(config.branding.logo)}" alt="" style="max-height: 22px; width: auto; object-fit: contain; opacity: 0.35;" />` : ''}
         </div>`}
       </div>
 
-      ${renderPageFooter(config, undefined, true)}
+      ${renderPageFooter(config, undefined, true, undefined, theme)}
     </div>`;
 }
 
@@ -653,13 +702,17 @@ function renderSectionDividerPage(
   statLabel: string,
   subtitle: string,
   chapterLabel: string,
+  theme?: ReportTheme,
 ): string {
   const brandColor = getBrandColor(config);
-  const dividerHero = config.branding?.heroImages?.[1];
+  const dividerHero = (theme?.showHeroImages !== false) ? config.branding?.heroImages?.[1] : undefined;
+  const headingFont = theme?.headingFont ?? "'Playfair Display', serif";
+  const darkBg = theme?.pageDarkBackground ?? '#1c1917';
+  const mutedColor = theme?.mutedTextColor ?? '#a8a29e';
 
   return `
-    <div class="page dark-page" style="position: relative; overflow: hidden; justify-content: flex-end; padding-bottom: 80px;">
-      <div style="position: absolute; inset: 0; background: linear-gradient(145deg, #1c1917 0%, #292524 100%);"></div>
+    <div class="page dark-page" style="position: relative; overflow: hidden; justify-content: flex-end; padding-bottom: 80px; background: ${darkBg};">
+      <div style="position: absolute; inset: 0; background: linear-gradient(145deg, ${darkBg} 0%, #292524 100%);"></div>
       ${dividerHero ? `<img src="${escapeHtml(dividerHero)}" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.12;" />` : ''}
       <div style="position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.9) 50%, rgba(0,0,0,0.3) 100%);"></div>
 
@@ -668,13 +721,13 @@ function renderSectionDividerPage(
 
       <div style="position: relative; z-index: 10;">
         <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: ${brandColor}; text-transform: uppercase; letter-spacing: 4px; margin-bottom: 32px;">${escapeHtml(chapterLabel)}</div>
-        <div style="font-size: 76px; font-family: 'Playfair Display', serif; font-weight: 700; color: ${brandColor}; line-height: 0.9; margin-bottom: 16px;">${escapeHtml(stat)}</div>
-        <div style="font-size: 22px; font-family: 'Playfair Display', serif; color: white; font-weight: 300; margin-bottom: 20px;">${escapeHtml(statLabel)}</div>
+        <div style="font-size: 76px; font-family: ${headingFont}; font-weight: 700; color: ${brandColor}; line-height: 0.9; margin-bottom: 16px;">${escapeHtml(stat)}</div>
+        <div style="font-size: 22px; font-family: ${headingFont}; color: white; font-weight: 300; margin-bottom: 20px;">${escapeHtml(statLabel)}</div>
         <div style="width: 56px; height: 3px; background: ${brandColor}; margin-bottom: 20px;"></div>
-        <div style="font-size: 13px; color: #a8a29e; max-width: 420px; line-height: 1.65;">${escapeHtml(subtitle)}</div>
+        <div style="font-size: 13px; color: ${mutedColor}; max-width: 420px; line-height: 1.65;">${escapeHtml(subtitle)}</div>
       </div>
 
-      ${renderPageFooter(config, undefined, true)}
+      ${renderPageFooter(config, undefined, true, undefined, theme)}
     </div>`;
 }
 
@@ -682,8 +735,15 @@ function renderSectionDividerPage(
 // PAGE RENDERERS
 // ============================================================================
 
-function renderCoverPage(config: ReportConfig, data: ReportData): string {
+function renderCoverPage(config: ReportConfig, data: ReportData, theme?: ReportTheme): string {
   const brandColor = getBrandColor(config);
+  const headingFont = theme?.headingFont ?? "'Playfair Display', serif";
+  const coverStyle = theme?.coverStyle ?? 'hero-photo';
+  const darkBg = theme?.pageDarkBackground ?? '#1c1917';
+  const lightBg = theme?.pageBackground ?? '#f5f5f4';
+  const textColor = theme?.textColor ?? '#1c1917';
+  const mutedColor = theme?.mutedTextColor ?? '#a8a29e';
+
   const standardsBadges = config.standards.map(s =>
     `<div style="display: inline-block; padding: 6px 16px; border: 1px solid ${brandColor}50; border-radius: 8px; font-size: 10px; font-family: 'Fira Code', monospace; color: ${brandColor}; margin-right: 8px; margin-bottom: 8px; background: ${brandColor}0d;">${escapeHtml(getStandardName(s))}</div>`
   ).join('');
@@ -692,12 +752,72 @@ function renderCoverPage(config: ReportConfig, data: ReportData): string {
     ? `<img src="${escapeHtml(config.branding.logo)}" alt="${escapeHtml(data.organization.name)}" style="height: 48px; width: auto; object-fit: contain; margin-bottom: 24px;" />`
     : '';
 
-  const coverHero = config.branding?.heroImages?.[0];
+  const coverHero = (theme?.showHeroImages !== false) ? config.branding?.heroImages?.[0] : undefined;
 
-  return `
-    <div class="page dark-page" style="justify-content: space-between; overflow: hidden; position: relative;">
+  // ---- Cover style: minimal (Modern, Technical) ----
+  if (coverStyle === 'minimal') {
+    return `
+    <div class="page light-page" style="justify-content: center; align-items: center; text-align: center; overflow: hidden; position: relative; background: ${lightBg};">
+      <div style="position: relative; z-index: 10; max-width: 520px;">
+        ${orgLogo(config, 64, false)}
+        <h1 style="font-size: 44px; font-family: ${headingFont}; font-weight: 700; line-height: 1.15; margin-top: 40px; margin-bottom: 16px; color: ${textColor};">
+          ${escapeHtml(config.reportName)}
+        </h1>
+        <p style="font-size: 20px; color: ${mutedColor}; font-weight: 300; margin-bottom: 8px;">${escapeHtml(data.organization.name)}</p>
+        <p style="font-size: 13px; color: ${mutedColor}; margin-bottom: 40px;">${escapeHtml(config.reportYear.toString())} Reporting Period</p>
+        <div style="display: flex; flex-wrap: wrap; justify-content: center;">${standardsBadges}</div>
+      </div>
+      ${renderPageFooter(config, undefined, false, undefined, theme)}
+    </div>`;
+  }
+
+  // ---- Cover style: brand-block (Executive) ----
+  if (coverStyle === 'brand-block') {
+    return `
+    <div class="page" style="justify-content: space-between; overflow: hidden; position: relative; background: ${darkBg}; color: white;">
+      <div style="position: relative; z-index: 10; padding-top: 48px;">
+        ${orgLogo(config, 44)}
+      </div>
+      <div style="position: relative; z-index: 10;">
+        <div style="background: ${brandColor}; color: black; padding: 32px 40px; border-radius: 12px; margin-bottom: 40px;">
+          <h1 style="font-size: 36px; font-family: ${headingFont}; font-weight: 700; line-height: 1.15; margin-bottom: 8px;">
+            ${escapeHtml(config.reportName)}
+          </h1>
+          <p style="font-size: 16px; opacity: 0.8;">${escapeHtml(data.organization.name)} &middot; ${config.reportYear}</p>
+        </div>
+        ${data.organization.description ? `<p style="font-size: 13px; color: ${mutedColor}; max-width: 480px; line-height: 1.6;">${escapeHtml(data.organization.description)}</p>` : ''}
+      </div>
+      <div style="position: relative; z-index: 10; margin-bottom: 80px;">
+        <div style="display: flex; flex-wrap: wrap;">${standardsBadges}</div>
+      </div>
+      ${renderPageFooter(config, undefined, true, undefined, theme)}
+    </div>`;
+  }
+
+  // ---- Cover style: editorial (Narrative) ----
+  if (coverStyle === 'editorial') {
+    return `
+    <div class="page dark-page" style="justify-content: flex-end; overflow: hidden; position: relative; background: ${darkBg};">
       ${coverHero ? `<img src="${escapeHtml(coverHero)}" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;" />` : ''}
-      <div style="position: absolute; inset: 0; background: linear-gradient(135deg, #292524, #1c1917); opacity: ${coverHero ? '0.75' : '0.6'};"></div>
+      <div style="position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.95) 30%, rgba(0,0,0,0.2) 100%);"></div>
+      <div style="position: relative; z-index: 10; margin-bottom: 80px;">
+        ${orgLogo(config, 36)}
+        <h1 style="font-size: 56px; font-family: ${headingFont}; font-weight: 300; line-height: 1.1; margin-top: 24px; margin-bottom: 16px; color: white;">
+          ${escapeHtml(config.reportName)}
+        </h1>
+        <p style="font-size: 22px; color: #d6d3d1; font-weight: 300; margin-bottom: 16px;">${escapeHtml(data.organization.name)}</p>
+        <p style="font-size: 13px; color: ${mutedColor}; margin-bottom: 32px;">${escapeHtml(config.reportYear.toString())} Reporting Period</p>
+        <div style="display: flex; flex-wrap: wrap;">${standardsBadges}</div>
+      </div>
+      ${renderPageFooter(config, undefined, true, undefined, theme)}
+    </div>`;
+  }
+
+  // ---- Cover style: hero-photo (Classic, default) ----
+  return `
+    <div class="page dark-page" style="justify-content: space-between; overflow: hidden; position: relative; background: ${darkBg};">
+      ${coverHero ? `<img src="${escapeHtml(coverHero)}" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;" />` : ''}
+      <div style="position: absolute; inset: 0; background: linear-gradient(135deg, #292524, ${darkBg}); opacity: ${coverHero ? '0.75' : '0.6'};"></div>
       <div style="position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,0.4), transparent, rgba(0,0,0,0.85));"></div>
 
       <div style="position: relative; z-index: 10; padding-top: 48px;">
@@ -709,38 +829,43 @@ function renderCoverPage(config: ReportConfig, data: ReportData): string {
           <h2 style="font-family: 'Fira Code', monospace; font-weight: 700; font-style: italic; font-size: 22px; letter-spacing: -0.5px;">SUSTAINABILITY REPORT</h2>
           <p style="font-size: 11px; margin-top: 4px; opacity: 0.7;">${escapeHtml(config.reportYear.toString())} Reporting Period</p>
         </div>
-        <h1 style="font-size: 56px; font-family: 'Playfair Display', serif; font-weight: 300; line-height: 1.1; margin-bottom: 16px; color: white;">
+        <h1 style="font-size: 56px; font-family: ${headingFont}; font-weight: 300; line-height: 1.1; margin-bottom: 16px; color: white;">
           ${escapeHtml(config.reportName)}
         </h1>
         <p style="font-size: 22px; color: #d6d3d1; font-weight: 300; margin-bottom: 16px;">${escapeHtml(data.organization.name)}</p>
         ${logoHtml}
-        ${data.organization.description ? `<p style="font-size: 13px; color: #a8a29e; max-width: 480px; line-height: 1.6;">${escapeHtml(data.organization.description)}</p>` : ''}
+        ${data.organization.description ? `<p style="font-size: 13px; color: ${mutedColor}; max-width: 480px; line-height: 1.6;">${escapeHtml(data.organization.description)}</p>` : ''}
       </div>
 
       <div style="position: relative; z-index: 10; margin-bottom: 80px;">
         <div style="display: flex; gap: 16px; margin-bottom: 24px;">
           <div style="border: 1px solid rgba(255,255,255,0.15); border-radius: 16px; padding: 20px 24px; background: rgba(0,0,0,0.4); flex: 1;">
             <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: ${brandColor}; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 6px;">Reporting Period</div>
-            <div style="font-size: 14px; font-family: 'Playfair Display', serif; color: white;">${escapeHtml(formatDateRange(config.reportingPeriodStart, config.reportingPeriodEnd))}</div>
+            <div style="font-size: 14px; font-family: ${headingFont}; color: white;">${escapeHtml(formatDateRange(config.reportingPeriodStart, config.reportingPeriodEnd))}</div>
           </div>
           <div style="border: 1px solid rgba(255,255,255,0.15); border-radius: 16px; padding: 20px 24px; background: rgba(0,0,0,0.4);">
             <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: ${brandColor}; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 6px;">Audience</div>
-            <div style="font-size: 14px; font-family: 'Playfair Display', serif; color: white;">${escapeHtml(getAudienceDescription(config.audience))}</div>
+            <div style="font-size: 14px; font-family: ${headingFont}; color: white;">${escapeHtml(getAudienceDescription(config.audience))}</div>
           </div>
           <div style="border: 1px solid rgba(255,255,255,0.15); border-radius: 16px; padding: 20px 24px; background: rgba(0,0,0,0.4);">
             <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: ${brandColor}; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 6px;">Year</div>
-            <div style="font-size: 14px; font-family: 'Playfair Display', serif; color: white;">${config.reportYear}</div>
+            <div style="font-size: 14px; font-family: ${headingFont}; color: white;">${config.reportYear}</div>
           </div>
         </div>
         <div style="display: flex; flex-wrap: wrap;">${standardsBadges}</div>
       </div>
 
-      ${renderPageFooter(config, undefined, true)}
+      ${renderPageFooter(config, undefined, true, undefined, theme)}
     </div>`;
 }
 
-function renderExecSummaryPage(config: ReportConfig, data: ReportData): string {
+function renderExecSummaryPage(config: ReportConfig, data: ReportData, theme?: ReportTheme): string {
   const brandColor = getBrandColor(config);
+  const headingFont = theme?.headingFont ?? "'Playfair Display', serif";
+  const darkBg = theme?.pageDarkBackground ?? '#1c1917';
+  const lightBg = theme?.pageBackground ?? '#f5f5f4';
+  const textColor = theme?.textColor ?? '#1c1917';
+  const mutedColor = theme?.mutedTextColor ?? '#78716c';
   const { emissions, products, peopleCulture } = data;
   const total = emissions.total;
   const scope1Pct = total > 0 ? ((emissions.scope1 / total) * 100).toFixed(1) : '0';
@@ -768,35 +893,35 @@ function renderExecSummaryPage(config: ReportConfig, data: ReportData): string {
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('01', 'Executive Summary', false, false, brandColor)}
+      ${renderSectionHeader('01', 'Executive Summary', false, false, brandColor, theme)}
 
-      ${execNarrative ? renderExecutiveSummaryNarrativeBlock(execNarrative) : ''}
+      ${(theme?.showNarratives !== false) && execNarrative ? renderExecutiveSummaryNarrativeBlock(execNarrative) : ''}
 
       <div style="display: flex; gap: 24px; margin-bottom: 28px;">
-        <div style="flex: 1; background: #1c1917; border-radius: 16px; padding: 32px; color: white;">
+        <div style="flex: 1; background: ${darkBg}; border-radius: 16px; padding: 32px; color: white;">
           <div style="font-size: 12px; font-family: 'Fira Code', monospace; color: ${brandColor}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Total Emissions</div>
-          <div style="font-size: 48px; font-family: 'Playfair Display', serif; font-weight: 700; color: ${brandColor};">${formatNumber(total, 1)}</div>
-          <div style="font-size: 16px; color: #a8a29e; margin-top: 4px;">tonnes CO&#8322;e</div>
-          <div style="font-size: 12px; color: #78716c; margin-top: 4px;">${config.reportYear} reporting year</div>
+          <div style="font-size: 48px; font-family: ${headingFont}; font-weight: 700; color: ${brandColor};">${formatNumber(total, 1)}</div>
+          <div style="font-size: 16px; color: ${mutedColor}; margin-top: 4px;">tonnes CO&#8322;e</div>
+          <div style="font-size: 12px; color: ${mutedColor}; margin-top: 4px;">${config.reportYear} reporting year</div>
         </div>
 
         <div style="width: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-          <div style="font-size: 11px; font-family: 'Fira Code', monospace; text-transform: uppercase; letter-spacing: 2px; color: #78716c; margin-bottom: 16px;">Scope Split</div>
+          <div style="font-size: 11px; font-family: 'Fira Code', monospace; text-transform: uppercase; letter-spacing: 2px; color: ${mutedColor}; margin-bottom: 16px;">Scope Split</div>
           <div style="width: 140px; height: 140px; border-radius: 50%; ${donutStyle} position: relative;">
-            <div style="position: absolute; inset: 35px; background: #f5f5f4; border-radius: 50%;"></div>
+            <div style="position: absolute; inset: 35px; background: ${lightBg}; border-radius: 50%;"></div>
           </div>
           <div style="display: flex; gap: 12px; margin-top: 16px; font-size: 10px;">
             <div style="display: flex; align-items: center; gap: 4px;">
               <div style="width: 8px; height: 8px; border-radius: 50%; background: ${SCOPE_COLOURS.scope1};"></div>
-              <span style="color: #78716c;">S1</span>
+              <span style="color: ${mutedColor};">S1</span>
             </div>
             <div style="display: flex; align-items: center; gap: 4px;">
               <div style="width: 8px; height: 8px; border-radius: 50%; background: ${SCOPE_COLOURS.scope2};"></div>
-              <span style="color: #78716c;">S2</span>
+              <span style="color: ${mutedColor};">S2</span>
             </div>
             <div style="display: flex; align-items: center; gap: 4px;">
               <div style="width: 8px; height: 8px; border-radius: 50%; background: ${SCOPE_COLOURS.scope3};"></div>
-              <span style="color: #78716c;">S3</span>
+              <span style="color: ${mutedColor};">S3</span>
             </div>
           </div>
         </div>
@@ -841,11 +966,11 @@ function renderExecSummaryPage(config: ReportConfig, data: ReportData): string {
         </div>
       </div>` : ''}
 
-      ${renderPageFooter(config, 1)}
+      ${renderPageFooter(config, 1, false, undefined, theme)}
     </div>`;
 }
 
-function renderEmissionsPage(config: ReportConfig, data: ReportData): string {
+function renderEmissionsPage(config: ReportConfig, data: ReportData, theme?: ReportTheme): string {
   const { emissions } = data;
   const total = emissions.total;
   const maxScope = Math.max(emissions.scope1, emissions.scope2, emissions.scope3, 0.001);
@@ -866,16 +991,16 @@ function renderEmissionsPage(config: ReportConfig, data: ReportData): string {
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('02', 'Emissions Breakdown', false, false, getBrandColor(config))}
+      ${renderSectionHeader('02', 'Emissions Breakdown', false, false, getBrandColor(config), theme)}
 
       ${renderMaterialityCallout(config, 'scope-1-2-3', data)}
-      ${emissionsNarrative ? renderNarrativeBlock(emissionsNarrative) : ''}
+      ${(theme?.showNarratives !== false) && emissionsNarrative ? renderNarrativeBlock(emissionsNarrative) : ''}
 
       <div style="display: flex; gap: 32px; margin-bottom: 28px; align-items: center;">
         <div style="width: 180px; height: 180px; border-radius: 50%; ${donutStyle} position: relative; flex-shrink: 0;">
-          <div style="position: absolute; inset: 45px; background: #f5f5f4; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column;">
-            <span style="font-size: 12px; font-weight: 700; font-family: 'Playfair Display', serif; color: #1c1917;">${formatNumber(total, 1)}</span>
-            <span style="font-size: 8px; color: #78716c;">tCO&#8322;e</span>
+          <div style="position: absolute; inset: 45px; background: ${theme?.pageBackground ?? '#f5f5f4'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column;">
+            <span style="font-size: 12px; font-weight: 700; font-family: ${theme?.headingFont ?? "'Playfair Display', serif"}; color: ${theme?.textColor ?? '#1c1917'};">${formatNumber(total, 1)}</span>
+            <span style="font-size: 8px; color: ${theme?.mutedTextColor ?? '#78716c'};">tCO&#8322;e</span>
           </div>
         </div>
 
@@ -921,11 +1046,11 @@ function renderEmissionsPage(config: ReportConfig, data: ReportData): string {
         </tbody>
       </table>
 
-      ${renderPageFooter(config, 2)}
+      ${renderPageFooter(config, 2, false, undefined, theme)}
     </div>`;
 }
 
-function renderKeyFindingsPage(config: ReportConfig, data: ReportData): string {
+function renderKeyFindingsPage(config: ReportConfig, data: ReportData, theme?: ReportTheme): string {
   if (!data.keyFindings || data.keyFindings.length === 0) return '';
 
   const findings = data.keyFindings;
@@ -962,19 +1087,19 @@ function renderKeyFindingsPage(config: ReportConfig, data: ReportData): string {
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('02', 'Key Findings', false, false, getBrandColor(config))}
+      ${renderSectionHeader('02', 'Key Findings', false, false, getBrandColor(config), theme)}
 
-      ${keyFindingsNarrative ? renderNarrativeBlock(keyFindingsNarrative) : ''}
+      ${(theme?.showNarratives !== false) && keyFindingsNarrative ? renderNarrativeBlock(keyFindingsNarrative) : ''}
 
       <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #78716c; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">CHANGE DRIVERS &amp; ANALYSIS</div>
 
       ${findingCards}
 
-      ${renderPageFooter(config, 2)}
+      ${renderPageFooter(config, 2, false, undefined, theme)}
     </div>`;
 }
 
-function renderTrendsPage(config: ReportConfig, data: ReportData): string {
+function renderTrendsPage(config: ReportConfig, data: ReportData, theme?: ReportTheme): string {
   if (!data.emissionsTrends || data.emissionsTrends.length < 2) return '';
 
   const trends = data.emissionsTrends;
@@ -1001,9 +1126,9 @@ function renderTrendsPage(config: ReportConfig, data: ReportData): string {
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('03', 'Emissions Trends', false, false, getBrandColor(config))}
+      ${renderSectionHeader('03', 'Emissions Trends', false, false, getBrandColor(config), theme)}
 
-      ${trendsNarrative ? renderNarrativeBlock(trendsNarrative) : ''}
+      ${(theme?.showNarratives !== false) && trendsNarrative ? renderNarrativeBlock(trendsNarrative) : ''}
 
       <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #78716c; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">MULTI-YEAR COMPARISON</div>
 
@@ -1051,11 +1176,11 @@ function renderTrendsPage(config: ReportConfig, data: ReportData): string {
         </div>
       </div>
 
-      ${renderPageFooter(config, 3)}
+      ${renderPageFooter(config, 3, false, undefined, theme)}
     </div>`;
 }
 
-function renderProductsPage(config: ReportConfig, data: ReportData): string {
+function renderProductsPage(config: ReportConfig, data: ReportData, theme?: ReportTheme): string {
   if (!data.products || data.products.length === 0) return '';
 
   const avgImpact = data.products.reduce((sum, p) => sum + p.climateImpact, 0) / data.products.length;
@@ -1078,9 +1203,9 @@ function renderProductsPage(config: ReportConfig, data: ReportData): string {
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('04', 'Product Impact', false, false, getBrandColor(config))}
+      ${renderSectionHeader('04', 'Product Impact', false, false, getBrandColor(config), theme)}
 
-      ${productsNarrative ? renderNarrativeBlock(productsNarrative) : ''}
+      ${(theme?.showNarratives !== false) && productsNarrative ? renderNarrativeBlock(productsNarrative) : ''}
 
       <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;">
         <div class="metric-card" style="text-align: center;">
@@ -1114,11 +1239,11 @@ function renderProductsPage(config: ReportConfig, data: ReportData): string {
 
       ${data.products.length > 15 ? `<div style="font-size: 11px; color: #a8a29e; margin-top: 8px; font-style: italic;">Showing 15 of ${data.products.length} products</div>` : ''}
 
-      ${renderPageFooter(config, 4)}
+      ${renderPageFooter(config, 4, false, undefined, theme)}
     </div>`;
 }
 
-function renderVineyardsPage(config: ReportConfig, data: ReportData): string {
+function renderVineyardsPage(config: ReportConfig, data: ReportData, theme?: ReportTheme): string {
   if (!data.vineyards || data.vineyards.length === 0) return '';
 
   const totalHa = data.vineyards.reduce((sum, v) => sum + v.hectares, 0);
@@ -1139,7 +1264,7 @@ function renderVineyardsPage(config: ReportConfig, data: ReportData): string {
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('05', 'Viticulture & Land Stewardship', false, false, getBrandColor(config))}
+      ${renderSectionHeader('05', 'Viticulture & Land Stewardship', false, false, getBrandColor(config), theme)}
 
       <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;">
         <div class="metric-card" style="text-align: center;">
@@ -1185,11 +1310,11 @@ function renderVineyardsPage(config: ReportConfig, data: ReportData): string {
         against emissions. N&#8322;O calculations use IPCC 2019 Refinement Tier 1 methodology with climate zone disaggregation.
       </div>
 
-      ${renderPageFooter(config, 5)}
+      ${renderPageFooter(config, 5, false, undefined, theme)}
     </div>`;
 }
 
-function renderPeopleCulturePage(config: ReportConfig, data: ReportData): string {
+function renderPeopleCulturePage(config: ReportConfig, data: ReportData, theme?: ReportTheme): string {
   const brandColor = getBrandColor(config);
   if (!data.peopleCulture) return '';
   const pc = data.peopleCulture;
@@ -1207,16 +1332,16 @@ function renderPeopleCulturePage(config: ReportConfig, data: ReportData): string
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('05', 'People & Culture', false, false, brandColor)}
+      ${renderSectionHeader('05', 'People & Culture', false, false, brandColor, theme)}
 
       ${renderMaterialityCallout(config, 'people', data)}
-      ${peopleCultureNarrative ? renderNarrativeBlock(peopleCultureNarrative) : ''}
+      ${(theme?.showNarratives !== false) && peopleCultureNarrative ? renderNarrativeBlock(peopleCultureNarrative) : ''}
 
       <div style="display: flex; gap: 24px; margin-bottom: 28px;">
-        <div style="flex: 1; background: #1c1917; border-radius: 16px; padding: 28px; color: white;">
+        <div style="flex: 1; background: ${theme?.pageDarkBackground ?? '#1c1917'}; border-radius: 16px; padding: 28px; color: white;">
           <div style="font-size: 12px; font-family: 'Fira Code', monospace; color: ${brandColor}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Overall Score</div>
-          <div style="font-size: 56px; font-family: 'Playfair Display', serif; font-weight: 700; color: ${brandColor};">${pc.overallScore}<span style="font-size: 20px; color: #78716c;">/100</span></div>
-          <div style="font-size: 12px; color: #a8a29e; margin-top: 4px;">${pc.dataCompleteness.toFixed(0)}% data completeness</div>
+          <div style="font-size: 56px; font-family: ${theme?.headingFont ?? "'Playfair Display', serif"}; font-weight: 700; color: ${brandColor};">${pc.overallScore}<span style="font-size: 20px; color: ${theme?.mutedTextColor ?? '#78716c'};">/100</span></div>
+          <div style="font-size: 12px; color: ${theme?.mutedTextColor ?? '#a8a29e'}; margin-top: 4px;">${pc.dataCompleteness.toFixed(0)}% data completeness</div>
         </div>
         <div style="flex: 1;">
           ${pillars.map(p => `
@@ -1275,11 +1400,11 @@ function renderPeopleCulturePage(config: ReportConfig, data: ReportData): string
         </div>` : ''}
       </div>
 
-      ${renderPageFooter(config, 5)}
+      ${renderPageFooter(config, 5, false, undefined, theme)}
     </div>`;
 }
 
-function renderGovernancePage(config: ReportConfig, data: ReportData): string {
+function renderGovernancePage(config: ReportConfig, data: ReportData, theme?: ReportTheme): string {
   if (!data.governance) return '';
   const gov = data.governance;
 
@@ -1308,10 +1433,10 @@ function renderGovernancePage(config: ReportConfig, data: ReportData): string {
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('06', 'Governance', false, false, getBrandColor(config))}
+      ${renderSectionHeader('06', 'Governance', false, false, getBrandColor(config), theme)}
 
       ${renderMaterialityCallout(config, 'governance', data)}
-      ${governanceNarrative ? renderNarrativeBlock(governanceNarrative) : ''}
+      ${(theme?.showNarratives !== false) && governanceNarrative ? renderNarrativeBlock(governanceNarrative) : ''}
 
       <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px;">
         <div class="metric-card" style="text-align: center;">
@@ -1358,11 +1483,11 @@ function renderGovernancePage(config: ReportConfig, data: ReportData): string {
         <p style="font-size: 12px; color: #44403c; line-height: 1.6; font-style: italic;">${escapeHtml(gov.missionStatement)}</p>
       </div>` : ''}
 
-      ${renderPageFooter(config, 6)}
+      ${renderPageFooter(config, 6, false, undefined, theme)}
     </div>`;
 }
 
-function renderCommunityImpactPage(config: ReportConfig, data: ReportData): string {
+function renderCommunityImpactPage(config: ReportConfig, data: ReportData, theme?: ReportTheme): string {
   const brandColor = getBrandColor(config);
   if (!data.communityImpact) return '';
   const ci = data.communityImpact;
@@ -1378,16 +1503,16 @@ function renderCommunityImpactPage(config: ReportConfig, data: ReportData): stri
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('07', 'Community Impact', false, false, brandColor)}
+      ${renderSectionHeader('07', 'Community Impact', false, false, brandColor, theme)}
 
       ${renderMaterialityCallout(config, 'community', data)}
-      ${communityNarrative ? renderNarrativeBlock(communityNarrative) : ''}
+      ${(theme?.showNarratives !== false) && communityNarrative ? renderNarrativeBlock(communityNarrative) : ''}
 
       <div style="display: flex; gap: 24px; margin-bottom: 24px;">
-        <div style="flex: 1; background: #1c1917; border-radius: 16px; padding: 28px; color: white;">
+        <div style="flex: 1; background: ${theme?.pageDarkBackground ?? '#1c1917'}; border-radius: 16px; padding: 28px; color: white;">
           <div style="font-size: 12px; font-family: 'Fira Code', monospace; color: ${brandColor}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Community Score</div>
-          <div style="font-size: 56px; font-family: 'Playfair Display', serif; font-weight: 700; color: ${brandColor};">${ci.overallScore}<span style="font-size: 20px; color: #78716c;">/100</span></div>
-          <div style="font-size: 12px; color: #a8a29e; margin-top: 4px;">${ci.dataCompleteness.toFixed(0)}% data completeness</div>
+          <div style="font-size: 56px; font-family: ${theme?.headingFont ?? "'Playfair Display', serif"}; font-weight: 700; color: ${brandColor};">${ci.overallScore}<span style="font-size: 20px; color: ${theme?.mutedTextColor ?? '#78716c'};">/100</span></div>
+          <div style="font-size: 12px; color: ${theme?.mutedTextColor ?? '#a8a29e'}; margin-top: 4px;">${ci.dataCompleteness.toFixed(0)}% data completeness</div>
         </div>
         <div style="flex: 1;">
           ${pillarScores.map(p => `
@@ -1449,11 +1574,11 @@ function renderCommunityImpactPage(config: ReportConfig, data: ReportData): stri
       </div>`;
       })() : ''}
 
-      ${renderPageFooter(config, 7)}
+      ${renderPageFooter(config, 7, false, undefined, theme)}
     </div>`;
 }
 
-function renderSupplyChainPage(config: ReportConfig, data: ReportData): string {
+function renderSupplyChainPage(config: ReportConfig, data: ReportData, theme?: ReportTheme): string {
   if (!data.suppliers || data.suppliers.length === 0) return '';
 
   // Group suppliers by category
@@ -1480,10 +1605,10 @@ function renderSupplyChainPage(config: ReportConfig, data: ReportData): string {
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('08', 'Supply Chain', false, false, getBrandColor(config))}
+      ${renderSectionHeader('08', 'Supply Chain', false, false, getBrandColor(config), theme)}
 
       ${renderMaterialityCallout(config, 'supply-chain', data)}
-      ${supplyChainNarrative ? renderNarrativeBlock(supplyChainNarrative) : ''}
+      ${(theme?.showNarratives !== false) && supplyChainNarrative ? renderNarrativeBlock(supplyChainNarrative) : ''}
 
       <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;">
         <div class="metric-card" style="text-align: center;">
@@ -1511,11 +1636,11 @@ function renderSupplyChainPage(config: ReportConfig, data: ReportData): string {
         <tbody>${categoryRows}</tbody>
       </table>
 
-      ${renderPageFooter(config, 8)}
+      ${renderPageFooter(config, 8, false, undefined, theme)}
     </div>`;
 }
 
-function renderTargetsPage(config: ReportConfig, data: ReportData): string {
+function renderTargetsPage(config: ReportConfig, data: ReportData, theme?: ReportTheme): string {
   const brandColor = getBrandColor(config);
   const commitments = data.governance?.climateCommitments || [];
 
@@ -1523,11 +1648,11 @@ function renderTargetsPage(config: ReportConfig, data: ReportData): string {
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('09', 'Targets & Commitments', false, false, brandColor)}
+      ${renderSectionHeader('09', 'Targets & Commitments', false, false, brandColor, theme)}
 
-      ${targetsNarrative ? renderNarrativeBlock(targetsNarrative) : ''}
+      ${(theme?.showNarratives !== false) && targetsNarrative ? renderNarrativeBlock(targetsNarrative) : ''}
 
-      <div style="background: #1c1917; border-radius: 16px; padding: 28px; color: white; margin-bottom: 24px;">
+      <div style="background: ${theme?.pageDarkBackground ?? '#1c1917'}; border-radius: 16px; padding: 28px; color: white; margin-bottom: 24px;">
         <div style="font-size: 12px; font-family: 'Fira Code', monospace; color: ${brandColor}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">Climate Commitments</div>
         ${commitments.length > 0 ? commitments.map((c, i) => `
           <div style="display: flex; gap: 16px; align-items: flex-start; margin-bottom: 16px; padding-bottom: 16px; ${i < commitments.length - 1 ? 'border-bottom: 1px solid rgba(255,255,255,0.1);' : ''}">
@@ -1580,11 +1705,11 @@ function renderTargetsPage(config: ReportConfig, data: ReportData): string {
         </div>
       </div>
 
-      ${renderPageFooter(config, 9)}
+      ${renderPageFooter(config, 9, false, undefined, theme)}
     </div>`;
 }
 
-function renderMethodologyPage(config: ReportConfig, data: ReportData): string {
+function renderMethodologyPage(config: ReportConfig, data: ReportData, theme?: ReportTheme): string {
   const standardsRows = data.standards.map(s => {
     const statusColor = s.status === 'Compliant' || s.status === 'compliant' || s.status === 'Aligned' ? '#22c55e' : s.status === 'Partial' || s.status === 'partial' || s.status === 'Action Required' || s.status === 'In Progress' ? '#eab308' : '#78716c';
     return `
@@ -1605,7 +1730,7 @@ function renderMethodologyPage(config: ReportConfig, data: ReportData): string {
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('10', 'Methodology & Standards', false, false, getBrandColor(config))}
+      ${renderSectionHeader('10', 'Methodology & Standards', false, false, getBrandColor(config), theme)}
 
       <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #78716c; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">REPORTING FRAMEWORK COMPLIANCE</div>
 
@@ -1650,19 +1775,21 @@ function renderMethodologyPage(config: ReportConfig, data: ReportData): string {
         </div>
       </div>
 
-      ${renderPageFooter(config, 10)}
+      ${renderPageFooter(config, 10, false, undefined, theme)}
     </div>`;
 }
 
-function renderClosingPage(config: ReportConfig, data: ReportData): string {
+function renderClosingPage(config: ReportConfig, data: ReportData, theme?: ReportTheme): string {
   const brandColor = getBrandColor(config);
+  const headingFont = theme?.headingFont ?? "'Playfair Display', serif";
+  const darkBg = theme?.pageDarkBackground ?? '#1c1917';
   return `
-    <div class="page dark-page" style="justify-content: center; align-items: center; text-align: center;">
+    <div class="page dark-page" style="justify-content: center; align-items: center; text-align: center; background: ${darkBg};">
       <div style="margin-bottom: 48px;">
         ${orgLogo(config, 56)}
       </div>
 
-      <h1 style="font-size: 48px; font-family: 'Playfair Display', serif; font-weight: 300; color: white; margin-bottom: 16px;">Thank You</h1>
+      <h1 style="font-size: 48px; font-family: ${headingFont}; font-weight: 300; color: white; margin-bottom: 16px;">Thank You</h1>
       <p style="font-size: 16px; color: #a8a29e; max-width: 400px; line-height: 1.8; margin-bottom: 48px;">
         This sustainability report was prepared for ${escapeHtml(data.organization.name)} covering the ${config.reportYear} reporting period.
       </p>
@@ -1702,10 +1829,10 @@ function formatDateRange(start: string, end: string): string {
  * has not been completed. Guides the user to complete it before generating
  * a fully compliant report.
  */
-function renderCsrdGatingWarningPage(config: ReportConfig): string {
+function renderCsrdGatingWarningPage(config: ReportConfig, theme?: ReportTheme): string {
   return `
     <div class="page light-page">
-      ${renderSectionHeader('!', 'CSRD Compliance Action Required', false, false, getBrandColor(config))}
+      ${renderSectionHeader('!', 'CSRD Compliance Action Required', false, false, getBrandColor(config), theme)}
 
       <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; gap: 24px; text-align: center; padding: 0 48px;">
         <div style="width: 72px; height: 72px; background: #fef3c7; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
@@ -1713,7 +1840,7 @@ function renderCsrdGatingWarningPage(config: ReportConfig): string {
         </div>
 
         <div>
-          <h3 style="font-size: 22px; font-family: 'Playfair Display', serif; font-weight: 700; color: #92400e; margin-bottom: 12px;">
+          <h3 style="font-size: 22px; font-family: ${theme?.headingFont ?? "'Playfair Display', serif"}; font-weight: 700; color: #92400e; margin-bottom: 12px;">
             Double-Materiality Assessment Incomplete
           </h3>
           <p style="font-size: 14px; color: #78716c; line-height: 1.7; max-width: 480px;">
@@ -1745,7 +1872,7 @@ function renderCsrdGatingWarningPage(config: ReportConfig): string {
         </p>
       </div>
 
-      ${renderPageFooter(config, undefined, false, 'CSRD Compliance Notice')}
+      ${renderPageFooter(config, undefined, false, 'CSRD Compliance Notice', theme)}
     </div>`;
 }
 
@@ -1758,7 +1885,7 @@ function renderCsrdGatingWarningPage(config: ReportConfig): string {
  * Lists each material topic, its ESRS reference, and disclosure status.
  * Only rendered when CSRD is selected and materiality assessment is complete.
  */
-function renderEsrsDisclosureIndexPage(config: ReportConfig, data: ReportData): string {
+function renderEsrsDisclosureIndexPage(config: ReportConfig, data: ReportData, theme?: ReportTheme): string {
   const brandColor = getBrandColor(config);
   if (!data.materiality?.completed_at || !config.standards.includes('csrd')) return '';
 
@@ -1805,7 +1932,7 @@ function renderEsrsDisclosureIndexPage(config: ReportConfig, data: ReportData): 
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('A', 'ESRS Disclosure Index', false, false, brandColor)}
+      ${renderSectionHeader('A', 'ESRS Disclosure Index', false, false, brandColor, theme)}
 
       <p style="font-size: 12px; color: #78716c; margin-bottom: 20px; line-height: 1.5;">
         This index lists all topics determined to be material through the double-materiality assessment
@@ -1831,7 +1958,7 @@ function renderEsrsDisclosureIndexPage(config: ReportConfig, data: ReportData): 
         ${priorityIds.size} priority topic${priorityIds.size !== 1 ? 's' : ''}
       </div>
 
-      ${renderPageFooter(config, undefined, false, 'ESRS Disclosure Index')}
+      ${renderPageFooter(config, undefined, false, 'ESRS Disclosure Index', theme)}
     </div>`;
 }
 
@@ -1869,7 +1996,7 @@ const MILESTONE_STATUS_LABEL_MAP: Record<string, string> = {
  * Renders the Transition Roadmap page: CSS-based timeline of milestones
  * plus a table of reduction targets.
  */
-function renderTransitionRoadmapPage(config: ReportConfig, data: ReportData): string {
+function renderTransitionRoadmapPage(config: ReportConfig, data: ReportData, theme?: ReportTheme): string {
   const brandColor = getBrandColor(config);
   const tp = data.transitionPlan!;
   const currentYear = config.reportYear;
@@ -1934,7 +2061,7 @@ function renderTransitionRoadmapPage(config: ReportConfig, data: ReportData): st
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('T1', 'Transition Roadmap', false, false, brandColor)}
+      ${renderSectionHeader('T1', 'Transition Roadmap', false, false, brandColor, theme)}
 
       <div style="display: flex; gap: 32px;">
         <!-- Timeline (left) -->
@@ -1982,7 +2109,7 @@ function renderTransitionRoadmapPage(config: ReportConfig, data: ReportData): st
         </div>
       </div>
 
-      ${renderPageFooter(config, undefined, false, 'Transition Roadmap')}
+      ${renderPageFooter(config, undefined, false, 'Transition Roadmap', theme)}
     </div>`;
 }
 
@@ -1994,7 +2121,7 @@ function renderTransitionRoadmapPage(config: ReportConfig, data: ReportData): st
  * Renders the Climate Risks & Opportunities page.
  * Two-column layout: risks (left), opportunities (right).
  */
-function renderRisksOpportunitiesPage(config: ReportConfig, data: ReportData): string {
+function renderRisksOpportunitiesPage(config: ReportConfig, data: ReportData, theme?: ReportTheme): string {
   const ro = data.transitionPlan?.risks_and_opportunities || [];
   const risks = ro.filter(i => i.type === 'risk');
   const opportunities = ro.filter(i => i.type === 'opportunity');
@@ -2030,7 +2157,7 @@ function renderRisksOpportunitiesPage(config: ReportConfig, data: ReportData): s
 
   return `
     <div class="page light-page">
-      ${renderSectionHeader('T2', 'Climate Risks & Opportunities', false, false, getBrandColor(config))}
+      ${renderSectionHeader('T2', 'Climate Risks & Opportunities', false, false, getBrandColor(config), theme)}
 
       <p style="font-size: 12px; color: #78716c; margin-bottom: 20px; line-height: 1.5;">
         The following risks and opportunities were identified through analysis of ${escapeHtml(data.organization?.name || 'the organisation')}'s
@@ -2057,7 +2184,7 @@ function renderRisksOpportunitiesPage(config: ReportConfig, data: ReportData): s
         </div>
       </div>
 
-      ${renderPageFooter(config, undefined, false, 'Climate Risks & Opportunities')}
+      ${renderPageFooter(config, undefined, false, 'Climate Risks & Opportunities', theme)}
     </div>`;
 }
 
@@ -2083,6 +2210,10 @@ export function renderSustainabilityReportHtml(
   const sections = new Set(config.sections);
   const tier = getStorytellingTier(config.audience);
 
+  // Resolve the active theme based on config.template and config.orientation
+  const theme = resolveTheme((config as any).template, (config as any).orientation);
+  const ds = getDensityStyles(theme);
+
   // Compute values used for section dividers
   const totalEmissions = data.emissions?.total ?? 0;
   const yoyChange = data.emissionsTrends?.length >= 2
@@ -2098,69 +2229,72 @@ export function renderSustainabilityReportHtml(
 
   const pages = [
     // Cover — with optional hero photo
-    renderCoverPage(config, data),
+    renderCoverPage(config, data, theme),
 
-    // Leadership message — storytelling full audiences only
-    tier === 'full' ? renderLeadershipPage(config) : '',
+    // Leadership message — storytelling full audiences only, gated by theme
+    (theme.showLeadershipPage !== false) && tier === 'full'
+      ? renderLeadershipPage(config, theme) : '',
 
     // Executive summary
-    renderExecSummaryPage(config, data),
+    renderExecSummaryPage(config, data, theme),
 
-    // Section divider: Emissions — storytelling audiences
-    (tier === 'full' || tier === 'balanced') && totalEmissions > 0
+    // Section divider: Emissions — storytelling audiences, gated by theme
+    (theme.showSectionDividers !== false) && (tier === 'full' || tier === 'balanced') && totalEmissions > 0
       ? renderSectionDividerPage(
           config,
           emissionsDividerStat,
           `tCO\u2082e total emissions in ${config.reportYear}`,
           `Our carbon footprint is measured across all three GHG Protocol scopes${emissionsDividerYoY}. The following section presents the complete picture.`,
           'Our Carbon Footprint',
+          theme,
         )
       : '',
 
     // Emissions sections
-    renderEmissionsPage(config, data),
+    renderEmissionsPage(config, data, theme),
     sections.has('key-findings') && data.keyFindings && data.keyFindings.length > 0
-      ? renderKeyFindingsPage(config, data) : '',
+      ? renderKeyFindingsPage(config, data, theme) : '',
     sections.has('trends') && data.emissionsTrends && data.emissionsTrends.length >= 2
-      ? renderTrendsPage(config, data) : '',
+      ? renderTrendsPage(config, data, theme) : '',
     (sections.has('product-footprints') || sections.has('products')) && data.dataAvailability.hasProducts
-      ? renderProductsPage(config, data) : '',
+      ? renderProductsPage(config, data, theme) : '',
     data.dataAvailability.hasVineyards && data.vineyards && data.vineyards.length > 0
-      ? renderVineyardsPage(config, data) : '',
+      ? renderVineyardsPage(config, data, theme) : '',
 
     // People & governance sections
     (sections.has('people-culture') || sections.has('people')) && data.dataAvailability.hasPeopleCulture
-      ? renderPeopleCulturePage(config, data) : '',
+      ? renderPeopleCulturePage(config, data, theme) : '',
     sections.has('governance') && data.dataAvailability.hasGovernance
-      ? renderGovernancePage(config, data) : '',
+      ? renderGovernancePage(config, data, theme) : '',
     (sections.has('community-impact') || sections.has('community')) && data.dataAvailability.hasCommunityImpact
-      ? renderCommunityImpactPage(config, data) : '',
+      ? renderCommunityImpactPage(config, data, theme) : '',
     sections.has('supply-chain') && data.dataAvailability.hasSuppliers
-      ? renderSupplyChainPage(config, data) : '',
+      ? renderSupplyChainPage(config, data, theme) : '',
 
-    // Section divider: Commitments — storytelling audiences
-    (tier === 'full' || tier === 'balanced') && reductionTarget
+    // Section divider: Commitments — storytelling audiences, gated by theme
+    (theme.showSectionDividers !== false) && (tier === 'full' || tier === 'balanced') && reductionTarget
       ? renderSectionDividerPage(
           config,
           `-${reductionTarget}%`,
           'absolute emission reduction target',
           `Our transition plan sets out the milestones, investments, and actions required to reach this goal. Progress is independently verified and reported annually.`,
           'Our Commitments',
+          theme,
         )
       : '',
 
     // Strategy sections
-    renderTargetsPage(config, data),
+    renderTargetsPage(config, data, theme),
     sections.has('transition-roadmap') && data.transitionPlan && data.transitionPlan.milestones.length > 0
-      ? renderTransitionRoadmapPage(config, data) : '',
+      ? renderTransitionRoadmapPage(config, data, theme) : '',
     sections.has('risks-and-opportunities') && data.transitionPlan?.risks_and_opportunities?.length
-      ? renderRisksOpportunitiesPage(config, data) : '',
+      ? renderRisksOpportunitiesPage(config, data, theme) : '',
 
     // Technical sections
-    renderMethodologyPage(config, data),
-    data.csrdGatingWarning ? renderCsrdGatingWarningPage(config) : '',
-    renderEsrsDisclosureIndexPage(config, data),
-    renderClosingPage(config, data),
+    renderMethodologyPage(config, data, theme),
+    data.csrdGatingWarning ? renderCsrdGatingWarningPage(config, theme) : '',
+    renderEsrsDisclosureIndexPage(config, data, theme),
+    renderClosingPage(config, data, theme),
   ].filter(Boolean).join('\n');
 
   // Replace __PAGE_NUM__ placeholders with sequential page numbers.
@@ -2180,7 +2314,7 @@ export function renderSustainabilityReportHtml(
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@300;700&family=Fira+Code:wght@400;700&display=swap" rel="stylesheet" />
+  <link href="${getThemeFontImport(theme)}" rel="stylesheet" />
 
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -2190,13 +2324,14 @@ export function renderSustainabilityReportHtml(
     }
 
     body {
-      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      font-family: ${theme.bodyFont};
       -webkit-font-smoothing: antialiased;
       background: white;
-      color: #1c1917;
+      color: ${theme.textColor};
+      font-size: ${ds.bodySize}px;
     }
 
-    @page { size: A4; margin: 0; }
+    @page { size: ${theme.orientation === 'landscape' ? 'A4 landscape' : 'A4'}; margin: 0; }
 
     ${screenMode ? `
     .page {
@@ -2205,7 +2340,7 @@ export function renderSustainabilityReportHtml(
       position: relative;
       display: flex;
       flex-direction: column;
-      padding: 48px;
+      padding: ${theme.pagePadding}px;
       overflow: visible;
       border-radius: 12px;
       box-shadow: 0 2px 20px rgba(0,0,0,0.08);
@@ -2219,13 +2354,13 @@ export function renderSustainabilityReportHtml(
     }
     ` : `
     .page {
-      width: 794px;
-      height: 1123px;
+      width: ${theme.pageWidth}px;
+      height: ${theme.pageHeight}px;
       position: relative;
       display: flex;
       flex-direction: column;
-      padding: 48px;
-      padding-bottom: 96px;
+      padding: ${theme.pagePadding}px;
+      padding-bottom: ${theme.pagePadding * 2}px;
       overflow: hidden;
       page-break-after: always;
       break-after: page;
@@ -2234,8 +2369,8 @@ export function renderSustainabilityReportHtml(
     .page:last-child { page-break-after: auto; break-after: auto; }
     `}
 
-    .dark-page { background: #1c1917; color: white; }
-    .light-page { background: #f5f5f4; color: #1c1917; }
+    .dark-page { background: ${theme.pageDarkBackground}; color: white; }
+    .light-page { background: ${theme.pageBackground}; color: ${theme.textColor}; }
 
     .metric-card {
       background: white;
@@ -2249,20 +2384,20 @@ export function renderSustainabilityReportHtml(
       font-family: 'Fira Code', monospace;
       text-transform: uppercase;
       letter-spacing: 2px;
-      color: #78716c;
+      color: ${theme.mutedTextColor};
       margin-bottom: 8px;
     }
 
     .metric-value {
-      font-size: 32px;
-      font-family: 'Playfair Display', serif;
+      font-size: ${ds.headingSize}px;
+      font-family: ${theme.headingFont};
       font-weight: 700;
-      color: #1c1917;
+      color: ${theme.textColor};
     }
 
     .metric-unit {
       font-size: 12px;
-      color: #a8a29e;
+      color: ${theme.mutedTextColor};
       margin-top: 4px;
     }
 
@@ -2279,7 +2414,7 @@ export function renderSustainabilityReportHtml(
       font-family: 'Fira Code', monospace;
       text-transform: uppercase;
       letter-spacing: 1px;
-      color: #78716c;
+      color: ${theme.mutedTextColor};
       border-bottom: 2px solid #e7e5e4;
     }
 
