@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { Sparkles, Loader2, AlertCircle, CheckCircle2, Clock, Lock } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Sparkles, Loader2, AlertCircle, CheckCircle2, Clock, Lock, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { SECTION_LABELS } from '@/types/report-builder';
@@ -30,6 +30,91 @@ export function ReportPreviewPanel({ config, organizationId }: ReportPreviewPane
   const [loadingAvailability, setLoadingAvailability] = useState(false);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const previewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Live HTML preview state
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [loadingHtmlPreview, setLoadingHtmlPreview] = useState(false);
+  const htmlPreviewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  // Debounce HTML preview when config changes
+  const fetchHtmlPreview = useCallback(async () => {
+    if (!organizationId || config.sections.length === 0) return;
+    setLoadingHtmlPreview(true);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) return;
+
+      const response = await fetch('/api/reports/preview', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ config, organizationId }),
+      });
+
+      if (response.ok) {
+        const html = await response.text();
+        setPreviewHtml(html);
+      }
+    } catch {
+      // Non-fatal
+    } finally {
+      setLoadingHtmlPreview(false);
+    }
+  }, [organizationId, config]);
+
+  // Re-render preview when key config values change
+  useEffect(() => {
+    if (!organizationId) return;
+    if (htmlPreviewDebounceRef.current) clearTimeout(htmlPreviewDebounceRef.current);
+    htmlPreviewDebounceRef.current = setTimeout(fetchHtmlPreview, 800);
+    return () => {
+      if (htmlPreviewDebounceRef.current) clearTimeout(htmlPreviewDebounceRef.current);
+    };
+  }, [
+    organizationId,
+    config.template,
+    config.orientation,
+    config.audience,
+    config.branding?.primaryColor,
+    config.branding?.secondaryColor,
+    config.branding?.logo,
+    config.sections.join(','),
+    config.reportYear,
+  ]);
+
+  // Write HTML into iframe whenever it changes
+  useEffect(() => {
+    if (iframeRef.current && previewHtml) {
+      const doc = iframeRef.current.contentDocument;
+      if (doc) {
+        doc.open();
+        doc.write(previewHtml);
+        doc.close();
+      }
+    }
+  }, [previewHtml]);
+
+  // Compute scale factor to fit the iframe into its container
+  const previewContainerRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const container = previewContainerRef.current;
+    if (!container) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const containerWidth = entry.contentRect.width;
+        const iframeWidth = config.orientation === 'landscape' ? 1123 : 794;
+        const scale = containerWidth / iframeWidth;
+        container.style.setProperty('--preview-scale', String(Math.min(scale, 1)));
+      }
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [config.orientation]);
 
   // Fetch data availability whenever config changes
   useEffect(() => {
@@ -131,6 +216,58 @@ export function ReportPreviewPanel({ config, organizationId }: ReportPreviewPane
       <div>
         <p className="text-xs font-mono uppercase tracking-wider text-stone-400">Live Preview</p>
         <p className="text-xs text-stone-500 mt-0.5">Updates as you configure</p>
+      </div>
+
+      {/* Live HTML preview iframe */}
+      <div className="rounded-xl border border-stone-200 bg-white overflow-hidden relative">
+        <div
+          ref={previewContainerRef}
+          className="relative"
+          style={{
+            width: '100%',
+            paddingBottom: config.orientation === 'landscape' ? '70.7%' : '141.4%', // A4 ratio
+          }}
+        >
+          {loadingHtmlPreview && !previewHtml && (
+            <div className="absolute inset-0 flex items-center justify-center bg-stone-50">
+              <div className="text-center space-y-2">
+                <Loader2 className="h-5 w-5 animate-spin text-stone-400 mx-auto" />
+                <p className="text-xs text-stone-400">Generating preview...</p>
+              </div>
+            </div>
+          )}
+          {!previewHtml && !loadingHtmlPreview && (
+            <div className="absolute inset-0 flex items-center justify-center bg-stone-50">
+              <div className="text-center space-y-2">
+                <Eye className="h-5 w-5 text-stone-300 mx-auto" />
+                <p className="text-xs text-stone-400">Select sections to see a preview</p>
+              </div>
+            </div>
+          )}
+          <iframe
+            ref={iframeRef}
+            title="Report preview"
+            className={cn(
+              'absolute top-0 left-0 border-0 origin-top-left',
+              !previewHtml && 'hidden'
+            )}
+            style={{
+              width: config.orientation === 'landscape' ? '1123px' : '794px',
+              height: config.orientation === 'landscape' ? '794px' : '1123px',
+              transform: 'scale(var(--preview-scale, 0.3))',
+              transformOrigin: 'top left',
+            }}
+            sandbox="allow-same-origin"
+          />
+          {loadingHtmlPreview && previewHtml && (
+            <div className="absolute top-2 right-2 z-10">
+              <div className="flex items-center gap-1 bg-white/80 backdrop-blur rounded-full px-2 py-1">
+                <Loader2 className="h-3 w-3 animate-spin text-stone-400" />
+                <span className="text-[10px] text-stone-400">Updating</span>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Data coverage summary */}

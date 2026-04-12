@@ -39,6 +39,8 @@ export interface ReportDefaults {
   branding: ReportConfig['branding'];
   audience: ReportConfig['audience'];
   standards: string[];
+  template?: ReportConfig['template'];
+  orientation?: ReportConfig['orientation'];
 }
 
 export interface SectionDefinition {

@@ -38,6 +38,12 @@ export function useReportBuilder() {
     if (defaults.standards && defaults.standards.length > 0) {
       partial.standards = defaults.standards;
     }
+    if (defaults.template) {
+      partial.template = defaults.template;
+    }
+    if (defaults.orientation) {
+      partial.orientation = defaults.orientation;
+    }
 
     // Fallback: if no branding logo saved but org has a logo_url, use it
     if (!partial.branding?.logo && org?.logo_url) {
@@ -64,6 +70,8 @@ export function useReportBuilder() {
         branding: config.branding,
         audience: config.audience,
         standards: config.standards,
+        template: config.template,
+        orientation: config.orientation,
       };
 
       const { error } = await supabase

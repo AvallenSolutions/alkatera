@@ -12,11 +12,20 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
-import { CalendarIcon, TrendingUp, Info, ChevronDown, Settings2, CheckCircle2 } from 'lucide-react';
+import { CalendarIcon, TrendingUp, Info, ChevronDown, Settings2, CheckCircle2, Monitor, FileText, BarChart3, BookOpen, Presentation } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { ReportConfig } from '@/types/report-builder';
 import { AUDIENCE_TYPES, REPORTING_STANDARDS } from '@/types/report-builder';
+import { THEME_LIST } from '@/lib/pdf/templates/themes';
+
+const TEMPLATE_ICONS: Record<string, React.ElementType> = {
+  'classic': FileText,
+  'modern': Monitor,
+  'executive': Presentation,
+  'data-dense': BarChart3,
+  'narrative': BookOpen,
+};
 
 interface ConfigureStepProps {
   config: ReportConfig;
@@ -179,6 +188,64 @@ export function ConfigureStep({ config, onChange }: ConfigureStepProps) {
             ? 'A responsive web page that opens in your browser, easy to share via link or embed.'
             : 'A branded PDF document with charts and tables, ideal for sharing and publishing.'}
         </p>
+      </div>
+
+      {/* Report Template */}
+      <div className="space-y-3">
+        <Label>Report Style</Label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {THEME_LIST.map((theme) => {
+            const Icon = TEMPLATE_ICONS[theme.id] || FileText;
+            const isActive = (config.template || 'classic') === theme.id;
+            return (
+              <button
+                key={theme.id}
+                type="button"
+                onClick={() => onChange({ template: theme.id as ReportConfig['template'], orientation: theme.orientation })}
+                className={cn(
+                  'flex flex-col items-start gap-2 rounded-lg border-2 p-4 text-left transition-all hover:border-primary/50',
+                  isActive
+                    ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
+                    : 'border-border hover:bg-muted/50'
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <div className={cn(
+                    'flex h-8 w-8 items-center justify-center rounded-md',
+                    isActive ? 'bg-primary text-primary-foreground' : 'bg-muted'
+                  )}>
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <div className="font-medium text-sm">{theme.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {theme.orientation === 'landscape' ? 'Landscape' : 'Portrait'}
+                    </div>
+                  </div>
+                  {isActive && <CheckCircle2 className="h-4 w-4 text-primary ml-auto" />}
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">{theme.description}</p>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Orientation toggle */}
+        <div className="flex items-center gap-3 pt-1">
+          <Label htmlFor="orientation" className="text-sm text-muted-foreground">Orientation</Label>
+          <Select
+            value={config.orientation || (THEME_LIST.find(t => t.id === (config.template || 'classic'))?.orientation || 'portrait')}
+            onValueChange={(value: 'portrait' | 'landscape') => onChange({ orientation: value })}
+          >
+            <SelectTrigger id="orientation" className="w-[160px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="portrait">Portrait</SelectItem>
+              <SelectItem value="landscape">Landscape</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Advanced Options */}
