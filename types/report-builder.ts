@@ -9,6 +9,10 @@ export interface ReportConfig {
   reportingPeriodEnd: string;
   audience: 'investors' | 'regulators' | 'customers' | 'internal' | 'supply-chain' | 'technical';
   outputFormat: 'pdf' | 'html';
+  /** Report template/theme ID. See lib/pdf/templates/themes.ts for options. */
+  template?: 'classic' | 'modern' | 'executive' | 'data-dense' | 'narrative';
+  /** Orientation override. If not set, uses the template's default. */
+  orientation?: 'portrait' | 'landscape';
   standards: string[];
   sections: string[];
   branding: {
