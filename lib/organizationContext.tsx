@@ -56,6 +56,24 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   const lastFetchedUserIdRef = useRef<string | null>(null)
   const { user, session, loading: authLoading, onAuthStateChanged } = useAuth()
 
+  // Listen for SIGNED_OUT directly on the Supabase auth listener so we clear
+  // organisation state synchronously — before the next React render. Relying
+  // on the user-id-change effect alone leaves a gap where the old
+  // currentOrganization is still in state while the new session bootstraps.
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        console.log('🧹 OrganizationContext: SIGNED_OUT — clearing state immediately')
+        setOrganizations([])
+        setCurrentOrganization(null)
+        setUserRole(null)
+        setIsLoading(false)
+        lastFetchedUserIdRef.current = null
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
   const fetchOrganizations = useCallback(async () => {
     if (authLoading) {
       console.log('⏳ OrganizationContext: Waiting for auth to complete...')
