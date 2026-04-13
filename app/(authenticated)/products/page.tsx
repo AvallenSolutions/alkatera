@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageLoader } from "@/components/ui/page-loader";
 import { Input } from "@/components/ui/input";
-import { Plus, Package, AlertCircle, Trash2, MoreVertical, Search, Leaf, ArrowRight } from "lucide-react";
+import { WebsiteImportFlow } from "@/components/products/WebsiteImportFlow";
+import { Plus, Package, AlertCircle, Trash2, MoreVertical, Search, Leaf, ArrowRight, Globe } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { boundaryFromDbEnum, getBoundaryLabel, SYSTEM_BOUNDARIES } from "@/lib/system-boundaries";
 import { useOrganization } from "@/lib/organizationContext";
@@ -60,6 +61,7 @@ export default function ProductsPage() {
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   useEffect(() => {
     if (currentOrganization?.id) {
@@ -223,12 +225,23 @@ export default function ProductsPage() {
             Create and manage your products here
           </p>
         </div>
-        <Link href="/products/new">
-          <Button size="lg" className="gap-2">
-            <Plus className="h-5 w-5" />
-            Add New Product
+        <div className="flex items-center gap-2">
+          <Button
+            size="lg"
+            variant="outline"
+            className="gap-2"
+            onClick={() => setImportDialogOpen(true)}
+          >
+            <Globe className="h-4 w-4" />
+            Import from Website
           </Button>
-        </Link>
+          <Link href="/products/new">
+            <Button size="lg" className="gap-2">
+              <Plus className="h-5 w-5" />
+              Add New Product
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {products.length > 0 && (
@@ -254,13 +267,24 @@ export default function ProductsPage() {
             </div>
             <h3 className="text-xl font-semibold mb-2">Build Your Product Portfolio</h3>
             <p className="text-muted-foreground text-center max-w-md mb-6">
-              Products are at the heart of your sustainability story. Create your first one and I&apos;ll walk you through building its lifecycle assessment.
+              Products are at the heart of your sustainability story. Import from your website or create one manually.
             </p>
-            <Button asChild size="lg" className="gap-2 bg-neon-lime text-black hover:bg-neon-lime/90">
-              <Link href="/products/new">
-                Create Your First Product <ArrowRight className="ml-1 h-4 w-4" />
-              </Link>
-            </Button>
+            <div className="flex flex-col sm:flex-row items-center gap-3">
+              <Button
+                size="lg"
+                className="gap-2 bg-neon-lime text-black hover:bg-neon-lime/90"
+                onClick={() => setImportDialogOpen(true)}
+              >
+                <Globe className="h-4 w-4" />
+                Import from Website
+              </Button>
+              <Button asChild size="lg" variant="outline" className="gap-2">
+                <Link href="/products/new">
+                  <Plus className="h-4 w-4" />
+                  Add Manually
+                </Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ) : filteredProducts.length === 0 ? (
@@ -342,6 +366,19 @@ export default function ProductsPage() {
             </Card>
           ))}
         </div>
+      )}
+
+      {currentOrganization && (
+        <WebsiteImportFlow
+          open={importDialogOpen}
+          onClose={() => setImportDialogOpen(false)}
+          organizationId={currentOrganization.id}
+          onSuccess={(count) => {
+            // Refresh products in the background while success state is shown
+            fetchProducts();
+            toast.success(`${count} product${count !== 1 ? 's' : ''} imported successfully`);
+          }}
+        />
       )}
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

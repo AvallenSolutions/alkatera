@@ -38,11 +38,10 @@ next-env.d.ts
 # temporary design exports / imports
 *-marketing-export/
 *-import/
-# Exception: bulk-import and spray-import are part of the codebase
+# Exception: bulk-import is part of the codebase
 !lib/bulk-import/
 !app/api/bulk-import/
 !components/bulk-import/
-!app/api/vineyards/[id]/spray-import/
 Alkatera Marketing/
 STRIPE_PRODUCTION_KEYS.txt
 STRIPE_TEST_KEYS.txt
