@@ -3,7 +3,11 @@
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 
-export const LandingHero = () => {
+interface HeroProps {
+  onOpenGuardian: () => void;
+}
+
+export const LandingHero = ({ onOpenGuardian }: HeroProps) => {
   const { scrollY } = useScroll();
   const y1 = useTransform(scrollY, [0, 500], [0, 200]);
   const opacity = useTransform(scrollY, [0, 300], [1, 0]);
@@ -48,6 +52,13 @@ export const LandingHero = () => {
             >
               See the Platform
             </a>
+            <button
+              onClick={onOpenGuardian}
+              className="inline-flex items-center justify-center text-white/60 font-mono text-sm uppercase tracking-widest hover:text-white transition-colors duration-300 gap-2"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-[#ccff00]" />
+              Free: Scan for greenwashing risk
+            </button>
           </div>
         </motion.div>
       </div>

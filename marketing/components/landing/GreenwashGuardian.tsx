@@ -60,7 +60,13 @@ function getJurisdictionLabel(jurisdiction: string): string {
   }
 }
 
-export const LandingGreenwashGuardian = () => {
+interface GreenwashGuardianProps {
+  isModal?: boolean;
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export const LandingGreenwashGuardian = ({ isModal = false, isOpen = false, onClose }: GreenwashGuardianProps) => {
   const [url, setUrl] = useState('');
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -223,8 +229,8 @@ export const LandingGreenwashGuardian = () => {
     }
   };
 
-  return (
-    <section id="greenwash-guardian" className="relative py-24 md:py-32 px-6 md:px-20 bg-[#050505] text-white border-t border-b border-white/10 overflow-hidden">
+  const innerContent = (
+    <div id="greenwash-guardian" className="relative py-24 md:py-32 px-6 md:px-20 bg-[#050505] text-white overflow-hidden w-full">
       {/* Background glow */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/3 left-1/4 w-[500px] h-[500px] bg-emerald-500/8 rounded-full blur-[120px]" />
@@ -594,8 +600,46 @@ export const LandingGreenwashGuardian = () => {
           )}
         </AnimatePresence>
       </div>
-    </section>
+    </div>
   );
+
+  if (isModal) {
+    return (
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto"
+          >
+            <div
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              onClick={onClose}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 40 }}
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              className="relative w-full max-w-5xl mx-auto my-8 rounded-2xl overflow-hidden border border-white/10 shadow-2xl"
+            >
+              <button
+                onClick={onClose}
+                className="absolute top-6 right-6 z-10 text-gray-400 hover:text-white transition-colors"
+                aria-label="Close"
+              >
+                <X className="h-6 w-6" />
+              </button>
+              {innerContent}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    );
+  }
+
+  return <section className="border-t border-b border-white/10">{innerContent}</section>;
 };
 
 function ClaimCard({
