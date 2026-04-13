@@ -12,6 +12,7 @@ import type {
   PlatformStats,
   FeatureAdoption,
   OrganizationInfo,
+  PlatformSupplier,
   GrowthTrends,
   OnboardingAnalytics,
   PlatformInsights,
@@ -21,7 +22,7 @@ import type {
 import { StatsOverview } from "./components/StatsOverview";
 import { GrowthTrendsSection } from "./components/GrowthTrendsSection";
 import { OnboardingFunnelSection } from "./components/OnboardingFunnelSection";
-import { OrganizationsTable } from "./components/OrganizationsTable";
+import { OrganizationsAndSuppliersCard } from "./components/OrganizationsAndSuppliersCard";
 import { InsightsSection } from "./components/InsightsSection";
 import { AlertsPanel } from "./components/AlertsPanel";
 import { FeatureAdoptionCard } from "./components/FeatureAdoptionCard";
@@ -31,6 +32,7 @@ export default function PlatformDashboardPage() {
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [featureAdoption, setFeatureAdoption] = useState<FeatureAdoption | null>(null);
   const [organizations, setOrganizations] = useState<OrganizationInfo[]>([]);
+  const [platformSuppliers, setPlatformSuppliers] = useState<PlatformSupplier[]>([]);
   const [growthTrends, setGrowthTrends] = useState<GrowthTrends | null>(null);
   const [onboardingAnalytics, setOnboardingAnalytics] = useState<OnboardingAnalytics | null>(null);
   const [insights, setInsights] = useState<PlatformInsights | null>(null);
@@ -50,6 +52,7 @@ export default function PlatformDashboardPage() {
         onboardingResult,
         insightsResult,
         alertsResult,
+        suppliersResult,
       ] = await Promise.all([
         (supabase.rpc as any)("get_platform_statistics"),
         (supabase.rpc as any)("get_feature_adoption"),
@@ -58,6 +61,7 @@ export default function PlatformDashboardPage() {
         (supabase.rpc as any)("get_onboarding_analytics"),
         (supabase.rpc as any)("get_platform_insights"),
         (supabase.rpc as any)("get_platform_alerts"),
+        supabase.from("platform_suppliers").select("*").order("name"),
       ]);
 
       if (statsResult.data && !(statsResult.data as any).error) {
@@ -80,6 +84,9 @@ export default function PlatformDashboardPage() {
       }
       if (alertsResult.data && !(alertsResult.data as any).error) {
         setAlerts(alertsResult.data);
+      }
+      if (suppliersResult.data) {
+        setPlatformSuppliers(suppliersResult.data);
       }
     } catch (err) {
       console.error("Error fetching platform data:", err);
@@ -206,8 +213,12 @@ export default function PlatformDashboardPage() {
       {/* Feature Adoption (existing, extracted) */}
       <FeatureAdoptionCard data={featureAdoption} loading={false} />
 
-      {/* Organisations Table (Improvement 3) */}
-      <OrganizationsTable organizations={organizations} loading={false} />
+      {/* Organisations & Suppliers (Improvement 3) */}
+      <OrganizationsAndSuppliersCard
+        organizations={organizations}
+        suppliers={platformSuppliers}
+        loading={false}
+      />
 
       {/* Integrations */}
       <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-5 space-y-3">

@@ -40,6 +40,7 @@ import type { OrganizationInfo } from "../types";
 interface OrganizationsTableProps {
   organizations: OrganizationInfo[];
   loading: boolean;
+  bare?: boolean;
 }
 
 type SortField = "name" | "created_at" | "member_count" | "product_count" | "facility_count" | "subscription_tier";
@@ -71,7 +72,7 @@ function getStatusVariant(status: string | null): "default" | "secondary" | "out
   }
 }
 
-export function OrganizationsTable({ organizations, loading }: OrganizationsTableProps) {
+export function OrganizationsTable({ organizations, loading, bare }: OrganizationsTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -187,18 +188,16 @@ export function OrganizationsTable({ organizations, loading }: OrganizationsTabl
     </TableHead>
   );
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Organisations</CardTitle>
-        <CardDescription>
-          {filteredAndSorted.length} of {organizations.length} organisations
-          {searchQuery || filterTier !== "all" || filterStatus !== "all" ? " (filtered)" : ""}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Search and filters */}
-        <div className="flex flex-col sm:flex-row gap-3">
+  const tableContent = (
+    <div className="space-y-4">
+      {/* Filter description */}
+      <p className="text-sm text-muted-foreground">
+        {filteredAndSorted.length} of {organizations.length} organisations
+        {searchQuery || filterTier !== "all" || filterStatus !== "all" ? " (filtered)" : ""}
+      </p>
+
+      {/* Search and filters */}
+      <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
@@ -380,6 +379,20 @@ export function OrganizationsTable({ organizations, loading }: OrganizationsTabl
             )}
           </TableBody>
         </Table>
+    </div>
+  );
+
+  if (bare) {
+    return tableContent;
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Organisations</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {tableContent}
       </CardContent>
     </Card>
   );

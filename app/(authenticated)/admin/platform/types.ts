@@ -76,6 +76,22 @@ export interface OrganizationInfo {
   last_activity_at: string | null;
 }
 
+export interface PlatformSupplier {
+  id: string;
+  name: string;
+  website: string | null;
+  contact_email: string | null;
+  contact_name: string | null;
+  industry_sector: string | null;
+  country: string | null;
+  description: string | null;
+  logo_url: string | null;
+  is_verified: boolean;
+  verification_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // Growth Trends (Improvement 1)
 export interface GrowthTrendPoint {
   week: string;
