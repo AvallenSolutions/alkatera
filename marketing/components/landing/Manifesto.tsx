@@ -71,7 +71,7 @@ export const LandingManifesto = () => {
                 </div>
                 <div className="mt-8 flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.2em] text-gray-400">
                   <div className="w-1 h-1 rounded-full bg-[#ccff00]" />
-                  Verified Industry Insight
+                  NYU Stern Center for Sustainable Business, 2023
                 </div>
               </div>
            </motion.div>

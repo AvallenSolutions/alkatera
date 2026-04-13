@@ -13,6 +13,7 @@ import { LandingTrustedBy } from '@/marketing/components/landing/TrustedBy';
 import { LandingPricing } from '@/marketing/components/landing/Pricing';
 import { LandingCTA } from '@/marketing/components/landing/CTA';
 import { LandingGreenwashGuardian } from '@/marketing/components/landing/GreenwashGuardian';
+import { LandingPainPoints } from '@/marketing/components/landing/PainPoints';
 
 export function HomePageClient() {
   const [isContactOpen, setIsContactOpen] = useState(false);
@@ -24,6 +25,7 @@ export function HomePageClient() {
       <LandingGreenwashGuardian />
       <LandingMarquee />
       <LandingManifesto />
+      <LandingPainPoints />
       <LandingFeatures />
       <LandingShowcase />
       <LandingTrustedBy />

@@ -32,9 +32,23 @@ export const LandingHero = () => {
             Sustainability, <br />
             <span className="italic text-[#ccff00]">Distilled.</span>
           </h1>
-          <p className="font-mono text-sm md:text-lg max-w-xl text-gray-300 leading-relaxed border-l border-[#ccff00] pl-6">
-            Make sustainability your competitive edge, not your paperwork. Alkatera is the operating system for the drinks industry, automating the complex science of impact to turn your environmental data into a powerful engine for brand growth.
+          <p className="font-mono text-sm md:text-lg max-w-xl text-gray-300 leading-relaxed border-l border-[#ccff00] pl-6 mb-10">
+            Carbon is just the start. alkatera is the only sustainability platform built from the ground up for the drinks industry — measuring water, waste, land use, biodiversity, and more, so you can prove your impact, pass any audit, and turn your environmental data into a genuine competitive edge.
           </p>
+          <div className="flex flex-col sm:flex-row gap-4 pl-6">
+            <a
+              href="/getaccess"
+              className="inline-flex items-center justify-center bg-[#ccff00] text-black px-8 py-4 rounded-full font-mono text-sm uppercase tracking-widest hover:scale-105 transition-transform duration-300"
+            >
+              Get Access — from £99/mo
+            </a>
+            <a
+              href="/platform"
+              className="inline-flex items-center justify-center border border-white/30 text-white px-8 py-4 rounded-full font-mono text-sm uppercase tracking-widest hover:border-white/70 transition-colors duration-300"
+            >
+              See the Platform
+            </a>
+          </div>
         </motion.div>
       </div>
 

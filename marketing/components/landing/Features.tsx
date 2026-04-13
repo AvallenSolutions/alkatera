@@ -37,15 +37,12 @@ const FeatureCard = ({ title, subtitle, icon: Icon, image, description, index }:
 
         <div className="mt-auto mb-auto w-full">
           <h3 className="font-mono text-xs text-[#ccff00] mb-2 tracking-widest uppercase h-4 flex items-end">{subtitle}</h3>
-          <h2 className="font-serif text-4xl md:text-5xl mb-4 leading-tight group-hover:text-white transition-colors duration-300 min-h-[2.2em] flex items-start">
+          <h2 className="font-serif text-4xl md:text-5xl mb-6 leading-tight group-hover:text-white transition-colors duration-300 min-h-[2.2em] flex items-start">
             {title}
           </h2>
-
-          <div className="h-0 group-hover:h-auto overflow-hidden transition-all duration-500 ease-in-out opacity-0 group-hover:opacity-100">
-             <p className="font-mono text-sm text-gray-300 leading-relaxed border-l border-[#ccff00] pl-4 max-w-sm">
-              {description}
-            </p>
-          </div>
+          <p className="font-mono text-sm text-gray-400 group-hover:text-gray-300 leading-relaxed border-l border-[#ccff00] pl-4 max-w-sm transition-colors duration-300">
+            {description}
+          </p>
         </div>
       </div>
     </motion.div>

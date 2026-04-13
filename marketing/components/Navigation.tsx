@@ -24,6 +24,7 @@ export const Navigation = ({ onOpenContact }: NavigationProps) => {
 
   const navItems = [
     { label: 'Platform', href: '/platform' },
+    { label: 'Pricing', href: '/getaccess' },
     { label: 'Manifesto', href: '/manifesto' },
     { label: 'Impact', href: '/impact' },
     { label: 'Knowledge', href: '/knowledge' },
