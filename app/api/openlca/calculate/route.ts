@@ -4,6 +4,7 @@ import { createOpenLCAClientForDatabase } from '@/lib/openlca/client';
 import type { ImpactResult } from '@/lib/openlca/schema';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 120; // OpenLCA calculations can take 60-90s
 
 // ReCiPe 2016 MIDPOINT impact category mapping (problem-oriented: kg CO2-eq, m³, etc.)
 const MIDPOINT_CATEGORY_MAPPING: Record<string, string> = {

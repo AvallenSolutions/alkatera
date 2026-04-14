@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 120; // Batch cache warming can take a while
 
 interface WarmCacheRequest {
   organizationId: string;

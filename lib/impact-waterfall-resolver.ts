@@ -760,7 +760,7 @@ export async function resolveImpactFactors(
   // Determine which database to use:
   // 1. If the material explicitly specifies a database (from product_materials.openlca_database), use that
   // 2. Otherwise, use the Agribalyse alias logic to determine the preferred database
-  const materialDatabase: OpenLCADatabaseSource =
+  let materialDatabase: OpenLCADatabaseSource =
     material.openlca_database || getPreferredDatabase(material.material_name);
 
   // Before attempting the live OpenLCA API, check if this data_source_id exists
@@ -778,8 +778,8 @@ export async function resolveImpactFactors(
     // ecoinvent process UUID (ecoinvent_process_id). Check both columns.
     const [{ data: localStaging }, { data: localProxyById }, { data: localProxyByProcessId }] = await Promise.all([
       supabase.from('staging_emission_factors').select('id, co2_factor').eq('id', material.data_source_id).maybeSingle(),
-      supabase.from('ecoinvent_material_proxies').select('id, impact_climate').eq('id', material.data_source_id).maybeSingle(),
-      supabase.from('ecoinvent_material_proxies').select('id, impact_climate').eq('ecoinvent_process_id', material.data_source_id).maybeSingle(),
+      supabase.from('ecoinvent_material_proxies').select('id, impact_climate, ecoinvent_process_id, openlca_database').eq('id', material.data_source_id).maybeSingle(),
+      supabase.from('ecoinvent_material_proxies').select('id, impact_climate, ecoinvent_process_id, openlca_database').eq('ecoinvent_process_id', material.data_source_id).maybeSingle(),
     ]);
     const localProxy = localProxyById || localProxyByProcessId;
     const hasLocalData = (localStaging && localStaging.co2_factor) || (localProxy && localProxy.impact_climate);
@@ -788,6 +788,18 @@ export async function resolveImpactFactors(
       resolvedFromLocalTable = true;
     } else if (localStaging || localProxy) {
       console.log(`[Waterfall] data_source_id ${material.data_source_id} found in local table but has no impact data — will try OpenLCA API for ${material.material_name}`);
+      // If data_source_id is a local row UUID (not the actual OpenLCA process UUID),
+      // look up the real ecoinvent_process_id so we can send the correct UUID to OpenLCA.
+      if (localProxy?.ecoinvent_process_id && localProxy.ecoinvent_process_id !== material.data_source_id) {
+        console.log(`[Waterfall] Translating local row UUID ${material.data_source_id} → OpenLCA process UUID ${localProxy.ecoinvent_process_id} for ${material.material_name}`);
+        material = { ...material, data_source_id: localProxy.ecoinvent_process_id };
+        // Also pick up the database if not already set on the material
+        if (!material.openlca_database && localProxy.openlca_database) {
+          material = { ...material, openlca_database: localProxy.openlca_database };
+        }
+        // Refresh materialDatabase since we may have discovered the correct database
+        materialDatabase = material.openlca_database || localProxy.openlca_database || getPreferredDatabase(material.material_name);
+      }
     }
   }
 
