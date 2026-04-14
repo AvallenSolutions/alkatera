@@ -362,11 +362,22 @@ export function WizardProvider({
         return;
       }
 
-      // 3. Validate emission factors
-      const validation = await validateMaterialsBeforeCalculation(
-        materialsData as ProductMaterial[],
-        productData.organization_id
-      );
+      // 3. Validate emission factors AND fetch facility data in parallel.
+      // These are independent operations - running them concurrently cuts
+      // wizard load time significantly (validation involves OpenLCA API calls).
+      const [validation, { data: facilitiesData }] = await Promise.all([
+        validateMaterialsBeforeCalculation(
+          materialsData as ProductMaterial[],
+          productData.organization_id
+        ),
+        sb
+          .from('facility_product_assignments')
+          .select(
+            '*, facilities (id, name, operational_control, address_city, address_country)'
+          )
+          .eq('product_id', productId)
+          .eq('assignment_status', 'active'),
+      ]);
 
       const materialsWithStatus: MaterialWithValidation[] = materialsData.map(
         (mat) => {
@@ -424,15 +435,6 @@ export function WizardProvider({
           };
         }
       );
-
-      // 4. Fetch linked facilities
-      const { data: facilitiesData } = await sb
-        .from('facility_product_assignments')
-        .select(
-          '*, facilities (id, name, operational_control, address_city, address_country)'
-        )
-        .eq('product_id', productId)
-        .eq('assignment_status', 'active');
 
       let facilities: LinkedFacility[] = [];
       let allSessions: Record<string, ReportingSession[]> = {};

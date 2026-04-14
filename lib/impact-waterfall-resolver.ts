@@ -1478,9 +1478,13 @@ export async function validateMaterialsBeforeCalculation(
   const missingData: Array<{ material: ProductMaterial; error: string }> = [];
   const validMaterials: Array<{ material: ProductMaterial; resolved: WaterfallResult }> = [];
 
-  for (let i = 0; i < materials.length; i++) {
-    const material = materials[i];
-    onProgress?.(i + 1, materials.length, material.material_name);
+  // Resolve all materials concurrently (capped at 4) instead of sequentially.
+  // This dramatically reduces wizard load time for products with many materials,
+  // since each material may involve OpenLCA API calls with 60s+ timeouts.
+  const CONCURRENCY = 4;
+  let completedCount = 0;
+
+  const tasks = materials.map(material => async () => {
     try {
       const quantityKg = normalizeToKg(material.quantity, material.unit);
       const resolved = await resolveImpactFactors(material, quantityKg, organizationId);
@@ -1491,7 +1495,24 @@ export async function validateMaterialsBeforeCalculation(
         error: error.message || 'Unknown error'
       });
     }
+    completedCount++;
+    onProgress?.(completedCount, materials.length, material.material_name);
+  });
+
+  // Run with concurrency limit
+  const executing = new Set<Promise<void>>();
+  const results: Promise<void>[] = [];
+  for (const task of tasks) {
+    const p = task();
+    results.push(p);
+    executing.add(p);
+    const cleanup = () => { executing.delete(p); };
+    p.then(cleanup, cleanup);
+    if (executing.size >= CONCURRENCY) {
+      await Promise.race(executing);
+    }
   }
+  await Promise.allSettled(results);
 
   return {
     valid: missingData.length === 0,
