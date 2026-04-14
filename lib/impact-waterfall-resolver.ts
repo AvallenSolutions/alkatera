@@ -778,8 +778,8 @@ export async function resolveImpactFactors(
     // ecoinvent process UUID (ecoinvent_process_id). Check both columns.
     const [{ data: localStaging }, { data: localProxyById }, { data: localProxyByProcessId }] = await Promise.all([
       supabase.from('staging_emission_factors').select('id, co2_factor').eq('id', material.data_source_id).maybeSingle(),
-      supabase.from('ecoinvent_material_proxies').select('id, impact_climate, ecoinvent_process_id, openlca_database').eq('id', material.data_source_id).maybeSingle(),
-      supabase.from('ecoinvent_material_proxies').select('id, impact_climate, ecoinvent_process_id, openlca_database').eq('ecoinvent_process_id', material.data_source_id).maybeSingle(),
+      supabase.from('ecoinvent_material_proxies').select('id, impact_climate, ecoinvent_process_id').eq('id', material.data_source_id).maybeSingle(),
+      supabase.from('ecoinvent_material_proxies').select('id, impact_climate, ecoinvent_process_id').eq('ecoinvent_process_id', material.data_source_id).maybeSingle(),
     ]);
     const localProxy = localProxyById || localProxyByProcessId;
     const hasLocalData = (localStaging && localStaging.co2_factor) || (localProxy && localProxy.impact_climate);
@@ -793,12 +793,8 @@ export async function resolveImpactFactors(
       if (localProxy?.ecoinvent_process_id && localProxy.ecoinvent_process_id !== material.data_source_id) {
         console.log(`[Waterfall] Translating local row UUID ${material.data_source_id} → OpenLCA process UUID ${localProxy.ecoinvent_process_id} for ${material.material_name}`);
         material = { ...material, data_source_id: localProxy.ecoinvent_process_id };
-        // Also pick up the database if not already set on the material
-        if (!material.openlca_database && localProxy.openlca_database) {
-          material = { ...material, openlca_database: localProxy.openlca_database };
-        }
-        // Refresh materialDatabase since we may have discovered the correct database
-        materialDatabase = material.openlca_database || localProxy.openlca_database || getPreferredDatabase(material.material_name);
+        // Refresh materialDatabase — use the material's explicit database or infer from name
+        materialDatabase = material.openlca_database || getPreferredDatabase(material.material_name);
       }
     }
   }
@@ -823,7 +819,7 @@ export async function resolveImpactFactors(
     const tryOpenLCAServer = async (
       db: OpenLCADatabaseSource,
       token: string,
-      timeoutMs: number = 45000,
+      timeoutMs: number = 90000, // Increased: streaming keeps connection alive past Netlify's 30s inactivity timeout
     ): Promise<OpenLCAAttemptResult> => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -845,17 +841,26 @@ export async function resolveImpactFactors(
         });
         clearTimeout(timeoutId);
 
-        if (response.ok) {
-          const result = await response.json();
+        // The response is streamed: keepalive newlines followed by JSON.
+        // Read the full response text, strip whitespace, and parse the JSON.
+        const text = await response.text();
+        const jsonStr = text.trim();
+
+        if (!jsonStr) {
+          return { ok: false, is404: false, isTimeout: false, error: 'Empty response from OpenLCA API' };
+        }
+
+        try {
+          const result = JSON.parse(jsonStr);
           if (result.success && result.impacts) {
             return { ok: true, result };
           }
-          return { ok: false, is404: false, isTimeout: false, error: 'No impact data in response' };
+          const errMsg = result.error || 'No impact data in response';
+          const is404 = errMsg.includes('404') || response.status === 404;
+          return { ok: false, is404, isTimeout: false, error: errMsg };
+        } catch (parseErr) {
+          return { ok: false, is404: false, isTimeout: false, error: `Failed to parse response: ${jsonStr.substring(0, 200)}` };
         }
-        const errorData = await response.json().catch(() => ({}));
-        const errMsg = errorData.error || response.statusText;
-        const is404 = errMsg.includes('404') || response.status === 404;
-        return { ok: false, is404, isTimeout: false, error: errMsg };
       } catch (err: any) {
         clearTimeout(timeoutId);
         if (err.name === 'AbortError') {
