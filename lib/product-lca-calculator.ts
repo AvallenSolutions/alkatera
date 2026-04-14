@@ -862,26 +862,61 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       }
     }
 
+    // Pre-resolve all impact factors in parallel (OpenLCA calls are the slow part).
+    // This turns N sequential API calls into concurrent ones, capped at 4 to avoid
+    // overwhelming the OpenLCA server.
+    const OPENLCA_CONCURRENCY = 4;
+    const resolvedFactors = new Map<string, WaterfallResult>();
+
+    // Build list of materials that need live resolution (not pinned)
+    const materialsToResolve = materials.filter(m => !pinnedMaterials?.has(m.material_name));
+
+    if (materialsToResolve.length > 0) {
+      console.log(`[calculateProductCarbonFootprint] Resolving ${materialsToResolve.length} materials in parallel (concurrency: ${OPENLCA_CONCURRENCY})`);
+
+      // Semaphore-based concurrency limiter
+      const queue = materialsToResolve.map(m => async () => {
+        const quantityKg = normalizeToKg(m.quantity, m.unit);
+        console.log(`[calculateProductCarbonFootprint] Processing material: ${m.material_name} (${quantityKg} kg)`);
+        console.log(`[calculateProductCarbonFootprint] Material OpenLCA data:`, {
+          data_source: m.data_source,
+          data_source_id: m.data_source_id,
+          organization_id: product.organization_id,
+        });
+        const result = await resolveImpactFactors(m as ProductMaterial, quantityKg, product.organization_id, fallbackEvents);
+        resolvedFactors.set(m.material_name, result);
+      });
+
+      // Run with concurrency limit
+      const results: Promise<void>[] = [];
+      const executing = new Set<Promise<void>>();
+      for (const task of queue) {
+        const p = task();
+        results.push(p);
+        executing.add(p);
+        const cleanup = () => { executing.delete(p); };
+        p.then(cleanup, cleanup);
+        if (executing.size >= OPENLCA_CONCURRENCY) {
+          await Promise.race(executing);
+        }
+      }
+      await Promise.allSettled(results);
+    }
+
     for (const material of materials) {
       try {
         // Normalize quantity to kg
         const quantityKg = normalizeToKg(material.quantity, material.unit);
 
-        console.log(`[calculateProductCarbonFootprint] Processing material: ${material.material_name} (${quantityKg} kg)`);
-        console.log(`[calculateProductCarbonFootprint] Material OpenLCA data:`, {
-          data_source: material.data_source,
-          data_source_id: material.data_source_id,
-          organization_id: product.organization_id,
-        });
-
-        // Apply waterfall logic to get impact factors
-        // Pass organization ID to enable OpenLCA lookups (Priority 2.5)
-        // In pinned mode, use stored factors directly for deterministic re-calculation
+        // Use pre-resolved factors (parallel) or pinned factors
         let resolved: WaterfallResult;
         if (pinnedMaterials?.has(material.material_name)) {
           console.log(`[calculateProductCarbonFootprint] Using pinned factors for: ${material.material_name}`);
           resolved = buildResultFromPinnedMaterial(pinnedMaterials.get(material.material_name)!, quantityKg);
+        } else if (resolvedFactors.has(material.material_name)) {
+          resolved = resolvedFactors.get(material.material_name)!;
         } else {
+          // Fallback: resolve individually (should not happen, but safe)
           resolved = await resolveImpactFactors(material as ProductMaterial, quantityKg, product.organization_id, fallbackEvents);
         }
 

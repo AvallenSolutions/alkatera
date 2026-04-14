@@ -281,8 +281,10 @@ export async function POST(request: NextRequest) {
 
     // Try to cache the results (per 1 kg) - gracefully handle missing table
     try {
+      // Ecoinvent/Agribalyse process factors are stable between database versions,
+      // so a 30-day TTL reduces repeated API calls without risking stale data.
       const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7);
+      expiresAt.setDate(expiresAt.getDate() + 30);
 
       const { error: cacheError } = await supabase.from('openlca_impact_cache').upsert({
         organization_id: organizationId,

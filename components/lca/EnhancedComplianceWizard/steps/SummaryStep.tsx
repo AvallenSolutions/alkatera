@@ -268,6 +268,7 @@ export function SummaryStep() {
   const compliancePercent = Math.round((completedCount / requiredCount) * 100);
 
   // Step number lookup for Edit buttons
+  const calculationStep = useStepNumber('calculate');
   const goalStep = useStepNumber('goal');
   const boundaryStep = useStepNumber('boundary');
   const cutoffStep = useStepNumber('cutoff');
@@ -568,6 +569,15 @@ export function SummaryStep() {
                             ))}
                           </ul>
                         </details>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-2 border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/30"
+                          onClick={() => goToStep(calculationStep)}
+                        >
+                          <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                          Retry failed calculations
+                        </Button>
                       </AlertDescription>
                     </Alert>
                   )}

@@ -539,6 +539,36 @@ export function WizardProvider({
         materialDataLoading: false,
       }));
 
+      // Fire-and-forget: pre-warm OpenLCA cache for materials with assigned
+      // OpenLCA process IDs. This runs in the background so that by the time
+      // the user clicks "Calculate", results are already cached.
+      const openLcaMaterials = materialsData
+        .filter((m: any) => m.data_source === 'openlca' && m.data_source_id)
+        .map((m: any) => ({
+          processId: m.data_source_id,
+          database: (m.openlca_database || 'ecoinvent') as 'ecoinvent' | 'agribalyse',
+        }));
+
+      if (openLcaMaterials.length > 0) {
+        const { data: { session } } = await sb.auth.getSession();
+        if (session?.access_token) {
+          fetch('/api/openlca/warm-cache', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              organizationId: productData.organization_id,
+              materials: openLcaMaterials,
+            }),
+          }).catch(() => {
+            // Non-critical: warm-cache failure doesn't block the wizard
+          });
+          console.log(`[WizardContext] Pre-warming OpenLCA cache for ${openLcaMaterials.length} materials`);
+        }
+      }
+
       // 5. If PCF already exists, load it and mark steps 1-3 complete
       if (initialPcfId) {
         await loadPcfData(initialPcfId);
