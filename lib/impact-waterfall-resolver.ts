@@ -290,7 +290,10 @@ function buildSupplierProductResult(
     gwp_reference_id: product.id,
     non_gwp_reference_id: product.id,
     is_hybrid_source: false,
-    supplier_lca_id: product.id,
+    // supplier_lca_id must reference product_carbon_footprints(id) per FK constraint.
+    // Supplier/platform supplier products are NOT PCF records, so leave null here.
+    // Only set supplier_lca_id when resolving from actual PCF data (Priority 1c).
+    supplier_lca_id: undefined,
     resolved_factor_id: product.id,
     category_type: category,
   };
@@ -767,14 +770,19 @@ export async function resolveImpactFactors(
   // more reliable, and avoids 404 errors from the OpenLCA server.
   let resolvedFromLocalTable = false;
   if (material.data_source === 'openlca' && material.data_source_id) {
-    // Quick check: does this ID exist in either local table?
+    // Quick check: does this ID exist in either local table WITH actual impact data?
+    // Only skip the OpenLCA API if the local row can actually resolve the factor.
+    // Rows with null/zero impact_climate or co2_factor are stubs that need live calculation.
     const [{ data: localStaging }, { data: localProxy }] = await Promise.all([
-      supabase.from('staging_emission_factors').select('id').eq('id', material.data_source_id).maybeSingle(),
-      supabase.from('ecoinvent_material_proxies').select('id').eq('id', material.data_source_id).maybeSingle(),
+      supabase.from('staging_emission_factors').select('id, co2_factor').eq('id', material.data_source_id).maybeSingle(),
+      supabase.from('ecoinvent_material_proxies').select('id, impact_climate').eq('id', material.data_source_id).maybeSingle(),
     ]);
-    if (localStaging || localProxy) {
-      console.log(`[Waterfall] data_source_id ${material.data_source_id} found in local table — skipping OpenLCA API for ${material.material_name}`);
+    const hasLocalData = (localStaging && localStaging.co2_factor) || (localProxy && localProxy.impact_climate);
+    if (hasLocalData) {
+      console.log(`[Waterfall] data_source_id ${material.data_source_id} found in local table with impact data — skipping OpenLCA API for ${material.material_name}`);
       resolvedFromLocalTable = true;
+    } else if (localStaging || localProxy) {
+      console.log(`[Waterfall] data_source_id ${material.data_source_id} found in local table but has no impact data — will try OpenLCA API for ${material.material_name}`);
     }
   }
 
