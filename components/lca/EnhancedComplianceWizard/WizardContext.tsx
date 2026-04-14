@@ -333,13 +333,19 @@ export function WizardProvider({
       setLoading(true);
       setError(null);
 
-      // 1. Fetch product
-      const { data: productData, error: productError } = await sb
-        .from('products')
-        .select('*')
-        .eq('id', productId)
-        .maybeSingle();
+      // ── FAST PHASE: fetch product, materials, and facilities in parallel ──
+      // These are simple DB reads that complete in <1s. We show the wizard
+      // immediately after this phase, with materials in 'validating' state.
+      const [productResult, materialsResult, facilitiesResult] = await Promise.all([
+        sb.from('products').select('*').eq('id', productId).maybeSingle(),
+        sb.from('product_materials').select('*').eq('product_id', productId),
+        sb.from('facility_product_assignments')
+          .select('*, facilities (id, name, operational_control, address_city, address_country)')
+          .eq('product_id', productId)
+          .eq('assignment_status', 'active'),
+      ]);
 
+      const { data: productData, error: productError } = productResult;
       if (productError || !productData) {
         setError('Product not found');
         return;
@@ -347,12 +353,7 @@ export function WizardProvider({
 
       setPreCalcState((prev) => ({ ...prev, product: productData }));
 
-      // 2. Fetch materials
-      const { data: materialsData, error: materialsError } = await sb
-        .from('product_materials')
-        .select('*')
-        .eq('product_id', productId);
-
+      const { data: materialsData, error: materialsError } = materialsResult;
       if (materialsError) throw materialsError;
 
       if (!materialsData || materialsData.length === 0) {
@@ -362,80 +363,30 @@ export function WizardProvider({
         return;
       }
 
-      // 3. Validate emission factors AND fetch facility data in parallel.
-      // These are independent operations - running them concurrently cuts
-      // wizard load time significantly (validation involves OpenLCA API calls).
-      const [validation, { data: facilitiesData }] = await Promise.all([
-        validateMaterialsBeforeCalculation(
-          materialsData as ProductMaterial[],
-          productData.organization_id
-        ),
-        sb
-          .from('facility_product_assignments')
-          .select(
-            '*, facilities (id, name, operational_control, address_city, address_country)'
-          )
-          .eq('product_id', productId)
-          .eq('assignment_status', 'active'),
-      ]);
+      const { data: facilitiesData } = facilitiesResult;
 
-      const materialsWithStatus: MaterialWithValidation[] = materialsData.map(
+      // Build initial materials list with 'validating' status.
+      // Materials with a DB-assigned factor show as 'assigned' immediately;
+      // the rest show as 'validating' until background resolution completes.
+      const initialMaterials: MaterialWithValidation[] = materialsData.map(
         (mat) => {
-          const validMaterial = validation.validMaterials.find(
-            (v) => v.material.id === mat.id
-          );
-          const missingMaterial = validation.missingData.find(
-            (m) => m.material.id === mat.id
-          );
-
-          if (validMaterial) {
-            const r = validMaterial.resolved;
-            // Compute decomposition percentages for UI transparency
-            const totalClimate = r.impact_climate || 1; // avoid div by zero
-            const transportPct = r.impact_climate_transport_embedded
-              ? (r.impact_climate_transport_embedded / totalClimate) * 100
-              : undefined;
-            const electricityPct = r.impact_climate_electricity_embedded
-              ? (r.impact_climate_electricity_embedded / totalClimate) * 100
-              : undefined;
-
-            return {
-              ...mat,
-              hasData: true,
-              validationStatus: 'resolved' as const,
-              dataQuality: r.data_quality_tag,
-              confidenceScore: r.confidence_score,
-              factorGeography: r.geographic_scope || undefined,
-              embeddedTransportPercent: transportPct,
-              embeddedElectricityPercent: electricityPct,
-              embeddedElectricityGeography: r.embedded_electricity_geography,
-            };
-          }
-
-          // DB-column guard: if the resolver failed but the DB has an assigned
-          // factor, treat as "assigned" (not "missing"). This prevents transient
-          // resolver failures (OpenLCA timeout, network errors) from hiding
-          // factors that the user has already selected.
           if (materialHasAssignedFactor(mat)) {
             return {
               ...mat,
               hasData: true,
               validationStatus: 'assigned' as const,
               resolvedFactorName: mat.matched_source_name || mat.material_name,
-              error: missingMaterial?.error,
             };
           }
-
-          // Truly missing — no factor in DB
           return {
             ...mat,
             hasData: false,
-            validationStatus: 'missing' as const,
-            error: missingMaterial?.error || 'Unknown validation error',
+            validationStatus: 'validating' as const,
           };
         }
       );
 
+      // Process facility data (fast, no API calls)
       let facilities: LinkedFacility[] = [];
       let allSessions: Record<string, ReportingSession[]> = {};
       let allocations: FacilityAllocation[] = [];
@@ -522,9 +473,89 @@ export function WizardProvider({
         });
       }
 
-      // Derive canCalculate and missingCount from the consumer-level
-      // validationStatus (not the raw resolver result), so transient resolver
-      // failures for assigned materials don't block the calculation.
+      // ── SHOW WIZARD IMMEDIATELY ──
+      // Set initial state with materials in 'validating' status so the wizard
+      // renders instantly. Validation runs in the background below.
+      setPreCalcState((prev) => ({
+        ...prev,
+        materials: initialMaterials,
+        canCalculate: false, // Will be updated after validation
+        missingCount: 0,
+        linkedFacilities: facilities,
+        facilityAllocations: allocations,
+        reportingSessions: allSessions,
+        materialDataLoaded: true,
+        materialDataLoading: true, // Still validating
+      }));
+
+      // Clear the top-level loading gate — wizard UI is now visible
+      setLoading(false);
+
+      // Load PCF data if editing an existing calculation (fast DB read)
+      if (initialPcfId) {
+        await loadPcfData(initialPcfId);
+      }
+
+      // ── BACKGROUND PHASE: validate materials asynchronously ──
+      // This resolves emission factors (including OpenLCA API calls) without
+      // blocking the wizard. Materials update from 'validating' to their final
+      // status as each one completes.
+      const validation = await validateMaterialsBeforeCalculation(
+        materialsData as ProductMaterial[],
+        productData.organization_id
+      );
+
+      const materialsWithStatus: MaterialWithValidation[] = materialsData.map(
+        (mat) => {
+          const validMaterial = validation.validMaterials.find(
+            (v) => v.material.id === mat.id
+          );
+          const missingMaterial = validation.missingData.find(
+            (m) => m.material.id === mat.id
+          );
+
+          if (validMaterial) {
+            const r = validMaterial.resolved;
+            const totalClimate = r.impact_climate || 1;
+            const transportPct = r.impact_climate_transport_embedded
+              ? (r.impact_climate_transport_embedded / totalClimate) * 100
+              : undefined;
+            const electricityPct = r.impact_climate_electricity_embedded
+              ? (r.impact_climate_electricity_embedded / totalClimate) * 100
+              : undefined;
+
+            return {
+              ...mat,
+              hasData: true,
+              validationStatus: 'resolved' as const,
+              dataQuality: r.data_quality_tag,
+              confidenceScore: r.confidence_score,
+              factorGeography: r.geographic_scope || undefined,
+              embeddedTransportPercent: transportPct,
+              embeddedElectricityPercent: electricityPct,
+              embeddedElectricityGeography: r.embedded_electricity_geography,
+            };
+          }
+
+          if (materialHasAssignedFactor(mat)) {
+            return {
+              ...mat,
+              hasData: true,
+              validationStatus: 'assigned' as const,
+              resolvedFactorName: mat.matched_source_name || mat.material_name,
+              error: missingMaterial?.error,
+            };
+          }
+
+          return {
+            ...mat,
+            hasData: false,
+            validationStatus: 'missing' as const,
+            error: missingMaterial?.error || 'Unknown validation error',
+          };
+        }
+      );
+
       const trulyMissing = materialsWithStatus.filter(
         (m) => m.validationStatus === 'missing'
       ).length;
@@ -534,16 +565,10 @@ export function WizardProvider({
         materials: materialsWithStatus,
         canCalculate: trulyMissing === 0,
         missingCount: trulyMissing,
-        linkedFacilities: facilities,
-        facilityAllocations: allocations,
-        reportingSessions: allSessions,
-        materialDataLoaded: true,
         materialDataLoading: false,
       }));
 
-      // Fire-and-forget: pre-warm OpenLCA cache for materials with assigned
-      // OpenLCA process IDs. This runs in the background so that by the time
-      // the user clicks "Calculate", results are already cached.
+      // Fire-and-forget: pre-warm OpenLCA cache for next calculation
       const openLcaMaterials = materialsData
         .filter((m: any) => m.data_source === 'openlca' && m.data_source_id)
         .map((m: any) => ({
@@ -564,21 +589,12 @@ export function WizardProvider({
               organizationId: productData.organization_id,
               materials: openLcaMaterials,
             }),
-          }).catch(() => {
-            // Non-critical: warm-cache failure doesn't block the wizard
-          });
-          console.log(`[WizardContext] Pre-warming OpenLCA cache for ${openLcaMaterials.length} materials`);
+          }).catch(() => {});
         }
-      }
-
-      // 5. If PCF already exists, load it and mark steps 1-3 complete
-      if (initialPcfId) {
-        await loadPcfData(initialPcfId);
       }
     } catch (err: any) {
       console.error('[WizardContext] Load error:', err);
       setError(err.message || 'Failed to load data');
-    } finally {
       setLoading(false);
     }
   }

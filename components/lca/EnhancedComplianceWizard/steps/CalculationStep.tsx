@@ -233,6 +233,16 @@ export function CalculationStep() {
         </p>
       </div>
 
+      {/* Validation in progress */}
+      {preCalcState.materialDataLoading && (
+        <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50/50 dark:bg-blue-950/10 dark:border-blue-800 p-3">
+          <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+          <p className="text-sm text-blue-800 dark:text-blue-400">
+            Material validation is still running in the background. The calculate button will enable once complete.
+          </p>
+        </div>
+      )}
+
       {/* Summary */}
       <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
         <h4 className="text-sm font-medium">Calculation Summary</h4>

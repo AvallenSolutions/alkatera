@@ -203,16 +203,18 @@ export function MaterialValidationStep() {
     }
   }
 
-  if (materialDataLoading) {
+  if (materialDataLoading && materials.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 space-y-4">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="text-sm text-muted-foreground">
-          Loading and validating materials...
+          Loading materials...
         </p>
       </div>
     );
   }
+
+  const validatingCount = materials.filter(m => m.validationStatus === 'validating').length;
 
   return (
     <div className="space-y-6">
@@ -224,8 +226,18 @@ export function MaterialValidationStep() {
         </p>
       </div>
 
+      {/* Validating banner */}
+      {materialDataLoading && validatingCount > 0 && (
+        <Alert className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/10 dark:border-blue-800">
+          <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+          <AlertDescription className="text-sm text-blue-800 dark:text-blue-400">
+            Validating emission factors for {validatingCount} material{validatingCount !== 1 ? 's' : ''}...
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Status */}
-      {!canCalculate && (
+      {!materialDataLoading && !canCalculate && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Missing Emission Data</AlertTitle>
@@ -236,7 +248,7 @@ export function MaterialValidationStep() {
           </AlertDescription>
         </Alert>
       )}
-      {canCalculate && (
+      {!materialDataLoading && canCalculate && (
         <Alert className="border-green-200 bg-green-50 dark:bg-green-950/20">
           <CheckCircle2 className="h-4 w-4 text-green-600" />
           <AlertTitle className="text-green-900 dark:text-green-100">
@@ -305,7 +317,9 @@ export function MaterialValidationStep() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {material.hasData ? (
+                  {material.validationStatus === 'validating' ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  ) : material.hasData ? (
                     <CheckCircle2 className="h-4 w-4 text-green-600" />
                   ) : material.validationStatus === 'assigned' ? (
                     <CheckCircle2 className="h-4 w-4 text-amber-500" />
@@ -348,6 +362,12 @@ export function MaterialValidationStep() {
                 </div>
               )}
 
+              {material.validationStatus === 'validating' && (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">Validating...</span>
+                </div>
+              )}
               {!material.hasData && material.validationStatus === 'assigned' && (
                 <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant="secondary" className="text-xs bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30">
@@ -529,7 +549,12 @@ export function MaterialValidationStep() {
 
                       {/* Column 4: Quality badge */}
                       <TableCell>
-                        {material.hasData && badgeProps ? (
+                        {material.validationStatus === 'validating' ? (
+                          <Badge variant="secondary" className="text-xs">
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            Validating
+                          </Badge>
+                        ) : material.hasData && badgeProps ? (
                           <Badge
                             variant={badgeProps.variant}
                             className={`${badgeProps.className} text-xs`}
@@ -550,7 +575,9 @@ export function MaterialValidationStep() {
 
                       {/* Column 5: Status / Fix button */}
                       <TableCell>
-                        {material.hasData ? (
+                        {material.validationStatus === 'validating' ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        ) : material.hasData ? (
                           <CheckCircle2 className="h-4 w-4 text-green-600" />
                         ) : material.validationStatus === 'assigned' ? (
                           <CheckCircle2 className="h-4 w-4 text-amber-500" />

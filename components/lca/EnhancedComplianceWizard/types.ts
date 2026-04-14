@@ -16,7 +16,7 @@ import type { OperationStep } from '@/components/ui/operation-progress';
  * - 'assigned': Factor assigned in DB but the resolver failed transiently (timeout, network, etc.)
  * - 'missing':  No factor assigned — user needs to pick one
  */
-export type MaterialValidationStatus = 'resolved' | 'assigned' | 'missing';
+export type MaterialValidationStatus = 'resolved' | 'assigned' | 'missing' | 'validating';
 
 /**
  * Check whether a material has a factor assigned in the DB, regardless of
