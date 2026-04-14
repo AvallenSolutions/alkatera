@@ -773,10 +773,15 @@ export async function resolveImpactFactors(
     // Quick check: does this ID exist in either local table WITH actual impact data?
     // Only skip the OpenLCA API if the local row can actually resolve the factor.
     // Rows with null/zero impact_climate or co2_factor are stubs that need live calculation.
-    const [{ data: localStaging }, { data: localProxy }] = await Promise.all([
+    //
+    // Note: data_source_id may be either the local table row ID OR the actual
+    // ecoinvent process UUID (ecoinvent_process_id). Check both columns.
+    const [{ data: localStaging }, { data: localProxyById }, { data: localProxyByProcessId }] = await Promise.all([
       supabase.from('staging_emission_factors').select('id, co2_factor').eq('id', material.data_source_id).maybeSingle(),
       supabase.from('ecoinvent_material_proxies').select('id, impact_climate').eq('id', material.data_source_id).maybeSingle(),
+      supabase.from('ecoinvent_material_proxies').select('id, impact_climate').eq('ecoinvent_process_id', material.data_source_id).maybeSingle(),
     ]);
+    const localProxy = localProxyById || localProxyByProcessId;
     const hasLocalData = (localStaging && localStaging.co2_factor) || (localProxy && localProxy.impact_climate);
     if (hasLocalData) {
       console.log(`[Waterfall] data_source_id ${material.data_source_id} found in local table with impact data — skipping OpenLCA API for ${material.material_name}`);
@@ -1008,12 +1013,27 @@ export async function resolveImpactFactors(
   }
 
   if (material.data_source_id && (material.data_source === 'ecoinvent' || material.data_source === 'openlca')) {
-    // Try ecoinvent_material_proxies by ID first
-    const { data: directProxy } = await supabase
+    // Try ecoinvent_material_proxies by ID first.
+    // data_source_id may be either the local row ID or the actual ecoinvent
+    // process UUID (ecoinvent_process_id), so check both columns.
+    let directProxy: any = null;
+    const { data: proxyById } = await supabase
       .from('ecoinvent_material_proxies')
       .select('*')
       .eq('id', material.data_source_id)
       .maybeSingle();
+    if (proxyById) {
+      directProxy = proxyById;
+    } else {
+      const { data: proxyByProcessId } = await supabase
+        .from('ecoinvent_material_proxies')
+        .select('*')
+        .eq('ecoinvent_process_id', material.data_source_id)
+        .maybeSingle();
+      if (proxyByProcessId) {
+        directProxy = proxyByProcessId;
+      }
+    }
     if (directProxy && directProxy.impact_climate) {
       console.log(`[Waterfall] ✓ Direct ID lookup SUCCESS: Using Ecoinvent proxy ${directProxy.material_name}`);
 

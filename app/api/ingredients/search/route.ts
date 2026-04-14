@@ -570,7 +570,10 @@ export async function GET(request: NextRequest) {
         if (error || !proxies) return [];
 
         return proxies.map((proxy: any): SearchResult => ({
-          id: proxy.id,
+          // Use the actual ecoinvent process UUID (not the local table row ID) so
+          // the OpenLCA server can find the process during live calculations.
+          // Fall back to local ID only if ecoinvent_process_id is missing.
+          id: proxy.ecoinvent_process_id || proxy.id,
           name: proxy.material_name,
           category: proxy.material_category,
           unit: proxy.reference_unit,
@@ -584,9 +587,11 @@ export async function GET(request: NextRequest) {
           source_type: 'ecoinvent_proxy',
           data_quality: 'calculated',
           metadata: {
+            local_proxy_id: proxy.id,
             lcia_method: proxy.lcia_method,
             system_model: proxy.system_model,
             ecoinvent_process_name: proxy.ecoinvent_process_name,
+            ecoinvent_process_id: proxy.ecoinvent_process_id,
             // Impact decomposition (populated when proxy resolved with contribution analysis)
             impact_climate_production: proxy.impact_climate_production,
             impact_climate_transport: proxy.impact_climate_transport,
