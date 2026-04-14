@@ -823,7 +823,7 @@ export async function resolveImpactFactors(
     const tryOpenLCAServer = async (
       db: OpenLCADatabaseSource,
       token: string,
-      timeoutMs: number = 60000,
+      timeoutMs: number = 45000,
     ): Promise<OpenLCAAttemptResult> => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -865,19 +865,8 @@ export async function resolveImpactFactors(
       }
     };
 
-    // Helper: try a server with one retry on timeout (longer timeout on retry)
-    const tryOpenLCAServerWithRetry = async (
-      db: OpenLCADatabaseSource,
-      token: string,
-    ): Promise<OpenLCAAttemptResult> => {
-      const firstResult = await tryOpenLCAServer(db, token, 60000);
-      if (firstResult.ok || !firstResult.isTimeout) {
-        return firstResult;
-      }
-      // Retry once with a longer timeout (90s) for slow calculations
-      console.log(`[Waterfall] Retrying ${db} with extended timeout (90s) for: ${material.material_name}`);
-      return tryOpenLCAServer(db, token, 90000);
-    };
+    // No retry on timeout — Netlify has a hard 60s limit on the server side,
+    // so retrying just wastes time. Fall through to staging/proxy factors instead.
 
     // Helper: build WaterfallResult from API response
     const buildOpenLCAResult = (result: any): WaterfallResult => {
@@ -930,40 +919,38 @@ export async function resolveImpactFactors(
 
       if (session?.access_token) {
         // Try the primary database first (with automatic retry on timeout)
-        const primaryResult = await tryOpenLCAServerWithRetry(materialDatabase, session.access_token);
+        const primaryResult = await tryOpenLCAServer(materialDatabase, session.access_token);
 
         if (primaryResult.ok) {
           return buildOpenLCAResult(primaryResult.result);
         }
 
-        // Primary server failed — always try the OTHER server as fallback.
-        // Covers 404 (wrong server), timeout (server slow), 500/503/504 (server down).
-        const altDatabase: OpenLCADatabaseSource = materialDatabase === 'ecoinvent' ? 'agribalyse' : 'ecoinvent';
-        const reason = primaryResult.is404 ? 'not found (404)' : primaryResult.isTimeout ? 'timed out' : `error (${primaryResult.error})`;
-        console.log(`[Waterfall] Process ${reason} on ${materialDatabase}, trying ${altDatabase} for: ${material.material_name}`);
+        // Only try the alternate server on 404 (process genuinely on wrong server).
+        // For timeouts/500s, fall through to staging factors immediately — waiting
+        // another 45s for the alt server just delays the fallback that will work.
+        if (primaryResult.is404) {
+          const altDatabase: OpenLCADatabaseSource = materialDatabase === 'ecoinvent' ? 'agribalyse' : 'ecoinvent';
+          console.log(`[Waterfall] Process not found (404) on ${materialDatabase}, trying ${altDatabase} for: ${material.material_name}`);
 
-        const altResult = await tryOpenLCAServerWithRetry(altDatabase, session.access_token);
+          const altResult = await tryOpenLCAServer(altDatabase, session.access_token);
 
-        if (altResult.ok) {
-          // Fire-and-forget: auto-correct the database for future calculations
-          if (primaryResult.is404) {
+          if (altResult.ok) {
             void supabase.from('product_materials')
               .update({ openlca_database: altDatabase })
               .eq('id', material.id)
               .then(() => console.log(`[Waterfall] Auto-corrected openlca_database to '${altDatabase}' for ${material.material_name}`));
+            return buildOpenLCAResult(altResult.result);
           }
-          return buildOpenLCAResult(altResult.result);
         }
 
-        // Both servers failed
-        const errMsg = `Failed on ${materialDatabase} (${reason}), also failed on ${altDatabase}: ${altResult.error}`;
-        console.warn(`[Waterfall] OpenLCA API error for ${material.material_name}:`, errMsg);
+        const reason = primaryResult.is404 ? 'not found (404)' : primaryResult.isTimeout ? 'timed out' : `error (${primaryResult.error})`;
+        console.warn(`[Waterfall] OpenLCA API failed for ${material.material_name}: ${reason}. Falling through to staging factors.`);
         fallbackEvents?.push({
           material_name: material.material_name,
           material_id: material.id,
-          attempted_priority: `2.5 (OpenLCA/${materialDatabase}+${altDatabase})`,
+          attempted_priority: `2.5 (OpenLCA/${materialDatabase})`,
           resolved_priority: 0,
-          fallback_reason: `OpenLCA API error: ${errMsg}`,
+          fallback_reason: `OpenLCA API: ${reason}`,
           factor_value_kg_co2e: 0,
           source_reference: '',
         });
@@ -1194,6 +1181,7 @@ export async function resolveImpactFactors(
 
   // Fallback: Try staging_emission_factors by name — first exact match, then partial match
   // Try matched_source_name first (the database match name), then fall back to material_name (user's name)
+  console.log(`[Waterfall] Priority 3 staging lookup for "${material.material_name}" (matched_source_name="${material.matched_source_name || 'none'}", stagingFactor=${!!stagingFactor})`);
   if (!stagingFactor && material.matched_source_name) {
     const { data: nameMatch } = await supabase
       .from('staging_emission_factors')
