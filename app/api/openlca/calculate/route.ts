@@ -188,49 +188,64 @@ export async function POST(request: NextRequest) {
 
     // Netlify has a hard 60-second function timeout. Some complex processes
     // (e.g. Ascorbic Acid on Agribalyse) take 60-70s for the endpoint method.
-    // Strategy: always run midpoint first (has all key impact data, ~20-30s),
-    // then attempt endpoint with a time guard. If endpoint doesn't finish in
-    // time, return midpoint-only results rather than timing out entirely.
-    const ENDPOINT_BUDGET_MS = 25000; // Max time to wait for endpoint after midpoint completes
+    // Strategy: run both midpoint and endpoint simultaneously, but impose a
+    // total time budget of 50s. Return whatever completes within that window.
+    // Midpoint (~20-30s) always finishes; endpoint finishes if it can.
+    // Results are cached, so on retry all time goes to the slower method.
+    const TOTAL_BUDGET_MS = 50000; // 50s total, leaving 10s headroom for overhead
+
+    // Helper: run a calculation and capture its result into a mutable ref
+    const runWithCapture = async (
+      method: string,
+      ref: { impacts: ImpactResult[] },
+    ): Promise<void> => {
+      ref.impacts = await client.calculateProcess(processId, method, 1);
+    };
+
+    const midpointRef = { impacts: [] as ImpactResult[] };
+    const endpointRef = { impacts: [] as ImpactResult[] };
 
     if (database === 'agribalyse') {
       try {
-        // Run midpoint first — this is the critical calculation
-        midpointImpacts = await client.calculateProcess(processId, 'ReCiPe 2016 Midpoint (H)', 1);
-        console.log(`[OpenLCA API] Midpoint complete for ${processId}, attempting endpoint...`);
+        // Launch both simultaneously
+        const midpointPromise = runWithCapture('ReCiPe 2016 Midpoint (H)', midpointRef);
+        const endpointPromise = runWithCapture('ReCiPe 2016 Endpoint (I)', endpointRef);
 
-        // Attempt endpoint with a time budget — if it takes too long, skip it
-        try {
-          endpointImpacts = await Promise.race([
-            client.calculateProcess(processId, 'ReCiPe 2016 Endpoint (I)', 1),
-            new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error('Endpoint budget exceeded')), ENDPOINT_BUDGET_MS)
-            ),
-          ]);
-        } catch (endpointErr: any) {
-          console.warn(`[OpenLCA API] Endpoint skipped for ${processId}: ${endpointErr.message}`);
-          // Continue with midpoint-only results
+        // Wait for both, but bail at the budget limit
+        await Promise.race([
+          Promise.allSettled([midpointPromise, endpointPromise]),
+          new Promise(resolve => setTimeout(resolve, TOTAL_BUDGET_MS)),
+        ]);
+
+        midpointImpacts = midpointRef.impacts;
+        endpointImpacts = endpointRef.impacts;
+
+        if (midpointImpacts.length > 0) {
+          console.log(`[OpenLCA API] Midpoint: ${midpointImpacts.length} categories, Endpoint: ${endpointImpacts.length} categories for ${processId}`);
         }
       } catch {
-        // ReCiPe midpoint failed — fall back to EF 3.1 Method (adapted)
+        // ReCiPe failed entirely — fall back to EF 3.1
         console.warn('[OpenLCA API] ReCiPe not available on Agribalyse, falling back to EF 3.1');
         midpointImpacts = await client.calculateProcess(processId, 'EF 3.1 Method (adapted)', 1);
       }
     } else {
-      // ecoinvent: run midpoint first, then attempt endpoint with budget
-      midpointImpacts = await client.calculateProcess(processId, 'ReCiPe 2016 v1.03, midpoint (H)', 1);
-      console.log(`[OpenLCA API] Midpoint complete for ${processId}, attempting endpoint...`);
+      // ecoinvent: same parallel strategy
+      const midpointPromise = runWithCapture('ReCiPe 2016 v1.03, midpoint (H)', midpointRef);
+      const endpointPromise = runWithCapture('ReCiPe 2016 v1.03, endpoint (I) no LT', endpointRef);
 
-      try {
-        endpointImpacts = await Promise.race([
-          client.calculateProcess(processId, 'ReCiPe 2016 v1.03, endpoint (I) no LT', 1),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('Endpoint budget exceeded')), ENDPOINT_BUDGET_MS)
-          ),
-        ]);
-      } catch (endpointErr: any) {
-        console.warn(`[OpenLCA API] Endpoint skipped for ${processId}: ${endpointErr.message}`);
-      }
+      await Promise.race([
+        Promise.allSettled([midpointPromise, endpointPromise]),
+        new Promise(resolve => setTimeout(resolve, TOTAL_BUDGET_MS)),
+      ]);
+
+      midpointImpacts = midpointRef.impacts;
+      endpointImpacts = endpointRef.impacts;
+      console.log(`[OpenLCA API] Midpoint: ${midpointImpacts.length} categories, Endpoint: ${endpointImpacts.length} categories for ${processId}`);
+    }
+
+    // If midpoint failed but endpoint succeeded, something is very wrong
+    if (midpointImpacts.length === 0 && endpointImpacts.length === 0) {
+      throw new Error(`Both midpoint and endpoint calculations timed out for process ${processId} (${database})`);
     }
 
     // Parse impacts into our format - combining midpoint and endpoint values
