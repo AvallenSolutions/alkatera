@@ -186,27 +186,51 @@ export async function POST(request: NextRequest) {
     let midpointImpacts: ImpactResult[] = [];
     let endpointImpacts: ImpactResult[] = [];
 
+    // Netlify has a hard 60-second function timeout. Some complex processes
+    // (e.g. Ascorbic Acid on Agribalyse) take 60-70s for the endpoint method.
+    // Strategy: always run midpoint first (has all key impact data, ~20-30s),
+    // then attempt endpoint with a time guard. If endpoint doesn't finish in
+    // time, return midpoint-only results rather than timing out entirely.
+    const ENDPOINT_BUDGET_MS = 25000; // Max time to wait for endpoint after midpoint completes
+
     if (database === 'agribalyse') {
-      // Agribalyse server has both EF 3.1 and ReCiPe 2016 methods.
-      // Use ReCiPe 2016 Midpoint (H) for consistency with ecoinvent results,
-      // plus EF 3.1 Method (adapted) for EU-compliant impact categories.
-      // Fall back to EF 3.1 only if ReCiPe is unavailable.
       try {
-        [midpointImpacts, endpointImpacts] = await Promise.all([
-          client.calculateProcess(processId, 'ReCiPe 2016 Midpoint (H)', 1),
-          client.calculateProcess(processId, 'ReCiPe 2016 Endpoint (I)', 1),
-        ]);
+        // Run midpoint first — this is the critical calculation
+        midpointImpacts = await client.calculateProcess(processId, 'ReCiPe 2016 Midpoint (H)', 1);
+        console.log(`[OpenLCA API] Midpoint complete for ${processId}, attempting endpoint...`);
+
+        // Attempt endpoint with a time budget — if it takes too long, skip it
+        try {
+          endpointImpacts = await Promise.race([
+            client.calculateProcess(processId, 'ReCiPe 2016 Endpoint (I)', 1),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('Endpoint budget exceeded')), ENDPOINT_BUDGET_MS)
+            ),
+          ]);
+        } catch (endpointErr: any) {
+          console.warn(`[OpenLCA API] Endpoint skipped for ${processId}: ${endpointErr.message}`);
+          // Continue with midpoint-only results
+        }
       } catch {
-        // ReCiPe failed — fall back to EF 3.1 Method (adapted)
+        // ReCiPe midpoint failed — fall back to EF 3.1 Method (adapted)
         console.warn('[OpenLCA API] ReCiPe not available on Agribalyse, falling back to EF 3.1');
         midpointImpacts = await client.calculateProcess(processId, 'EF 3.1 Method (adapted)', 1);
       }
     } else {
-      // ecoinvent uses ReCiPe 2016 (midpoint + endpoint)
-      [midpointImpacts, endpointImpacts] = await Promise.all([
-        client.calculateProcess(processId, 'ReCiPe 2016 v1.03, midpoint (H)', 1),
-        client.calculateProcess(processId, 'ReCiPe 2016 v1.03, endpoint (I) no LT', 1),
-      ]);
+      // ecoinvent: run midpoint first, then attempt endpoint with budget
+      midpointImpacts = await client.calculateProcess(processId, 'ReCiPe 2016 v1.03, midpoint (H)', 1);
+      console.log(`[OpenLCA API] Midpoint complete for ${processId}, attempting endpoint...`);
+
+      try {
+        endpointImpacts = await Promise.race([
+          client.calculateProcess(processId, 'ReCiPe 2016 v1.03, endpoint (I) no LT', 1),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Endpoint budget exceeded')), ENDPOINT_BUDGET_MS)
+          ),
+        ]);
+      } catch (endpointErr: any) {
+        console.warn(`[OpenLCA API] Endpoint skipped for ${processId}: ${endpointErr.message}`);
+      }
     }
 
     // Parse impacts into our format - combining midpoint and endpoint values
