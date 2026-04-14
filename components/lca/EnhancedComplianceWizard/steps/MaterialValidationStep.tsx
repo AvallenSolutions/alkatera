@@ -93,6 +93,7 @@ export function MaterialValidationStep() {
       supplier_product_id?: string;
       unit: string;
       carbon_intensity?: number;
+      openlca_database?: string;
     }
   ) {
     const supabase = getSupabaseBrowserClient();
@@ -108,6 +109,11 @@ export function MaterialValidationStep() {
           material && selection.name !== material.material_name
             ? selection.name
             : null,
+        // Persist which OpenLCA database this factor comes from (ecoinvent/agribalyse)
+        // so the resolver routes to the correct server on calculation
+        openlca_database: selection.openlca_database || null,
+        // Cache the CO2 factor as a last-resort fallback in case OpenLCA is unreachable
+        cached_co2_factor: selection.carbon_intensity || null,
       };
       if (
         selection.data_source === 'supplier' &&
