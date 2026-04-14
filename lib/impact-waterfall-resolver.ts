@@ -936,57 +936,37 @@ export async function resolveImpactFactors(
           return buildOpenLCAResult(primaryResult.result);
         }
 
-        // If process not found (404) or timed out, try the OTHER server.
-        // For 404: handles materials assigned before openlca_database was saved,
-        // e.g. Agribalyse processes stored without openlca_database='agribalyse'
-        // that default to ecoinvent.
-        // For timeout: the process may exist on the other server and respond faster.
-        if (primaryResult.is404 || primaryResult.isTimeout) {
-          const altDatabase: OpenLCADatabaseSource = materialDatabase === 'ecoinvent' ? 'agribalyse' : 'ecoinvent';
-          const reason = primaryResult.is404 ? 'not found' : 'timed out';
-          console.log(`[Waterfall] Process ${reason} on ${materialDatabase}, trying ${altDatabase} for: ${material.material_name}`);
+        // Primary server failed — always try the OTHER server as fallback.
+        // Covers 404 (wrong server), timeout (server slow), 500/503/504 (server down).
+        const altDatabase: OpenLCADatabaseSource = materialDatabase === 'ecoinvent' ? 'agribalyse' : 'ecoinvent';
+        const reason = primaryResult.is404 ? 'not found (404)' : primaryResult.isTimeout ? 'timed out' : `error (${primaryResult.error})`;
+        console.log(`[Waterfall] Process ${reason} on ${materialDatabase}, trying ${altDatabase} for: ${material.material_name}`);
 
-          const altResult = await tryOpenLCAServerWithRetry(altDatabase, session.access_token);
+        const altResult = await tryOpenLCAServerWithRetry(altDatabase, session.access_token);
 
-          if (altResult.ok) {
-            // Fire-and-forget: auto-correct the database for future calculations
-            // (only for 404s where the process genuinely lives on the other server)
-            if (primaryResult.is404) {
-              void supabase.from('product_materials')
-                .update({ openlca_database: altDatabase })
-                .eq('id', material.id)
-                .then(() => console.log(`[Waterfall] Auto-corrected openlca_database to '${altDatabase}' for ${material.material_name}`));
-            }
-            return buildOpenLCAResult(altResult.result);
+        if (altResult.ok) {
+          // Fire-and-forget: auto-correct the database for future calculations
+          if (primaryResult.is404) {
+            void supabase.from('product_materials')
+              .update({ openlca_database: altDatabase })
+              .eq('id', material.id)
+              .then(() => console.log(`[Waterfall] Auto-corrected openlca_database to '${altDatabase}' for ${material.material_name}`));
           }
-
-          // Both servers failed
-          const errMsg = primaryResult.is404
-            ? `Not found on ${materialDatabase} (404), also failed on ${altDatabase}: ${altResult.error}`
-            : `Timed out on ${materialDatabase}, also failed on ${altDatabase}: ${altResult.error}`;
-          console.warn(`[Waterfall] OpenLCA API error for ${material.material_name}:`, errMsg);
-          fallbackEvents?.push({
-            material_name: material.material_name,
-            material_id: material.id,
-            attempted_priority: `2.5 (OpenLCA/${materialDatabase}+${altDatabase})`,
-            resolved_priority: 0,
-            fallback_reason: `OpenLCA API error: ${errMsg}`,
-            factor_value_kg_co2e: 0,
-            source_reference: '',
-          });
-        } else {
-          // Non-404, non-timeout error (server down, 503, etc.)
-          console.warn(`[Waterfall] OpenLCA API error (${materialDatabase}):`, primaryResult.error);
-          fallbackEvents?.push({
-            material_name: material.material_name,
-            material_id: material.id,
-            attempted_priority: `2.5 (OpenLCA/${materialDatabase})`,
-            resolved_priority: 0,
-            fallback_reason: `OpenLCA API error: ${primaryResult.error}`,
-            factor_value_kg_co2e: 0,
-            source_reference: '',
-          });
+          return buildOpenLCAResult(altResult.result);
         }
+
+        // Both servers failed
+        const errMsg = `Failed on ${materialDatabase} (${reason}), also failed on ${altDatabase}: ${altResult.error}`;
+        console.warn(`[Waterfall] OpenLCA API error for ${material.material_name}:`, errMsg);
+        fallbackEvents?.push({
+          material_name: material.material_name,
+          material_id: material.id,
+          attempted_priority: `2.5 (OpenLCA/${materialDatabase}+${altDatabase})`,
+          resolved_priority: 0,
+          fallback_reason: `OpenLCA API error: ${errMsg}`,
+          factor_value_kg_co2e: 0,
+          source_reference: '',
+        });
       }
     } catch (error: any) {
       console.warn(`[Waterfall] Priority 2.5 unexpected error for ${material.material_name}:`, error.message);
