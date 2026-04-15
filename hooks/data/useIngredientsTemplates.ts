@@ -31,6 +31,8 @@ export interface IngredientTemplateItem {
   inbound_container_ef?: number | null;
   is_self_grown?: boolean;
   vineyard_id?: string | null;
+  arable_field_id?: string | null;
+  orchard_id?: string | null;
   is_biogenic_carbon?: boolean;
 }
 
@@ -79,6 +81,8 @@ export function ingredientToTemplateItem(form: IngredientFormData): IngredientTe
     inbound_container_ef: form.inbound_container_ef ?? null,
     is_self_grown: form.is_self_grown,
     vineyard_id: form.vineyard_id ?? null,
+    arable_field_id: form.arable_field_id ?? null,
+    orchard_id: form.orchard_id ?? null,
     is_biogenic_carbon: form.is_biogenic_carbon,
   };
 }
@@ -134,6 +138,8 @@ export function templateItemToIngredientForm(
     inbound_container_ef: item.inbound_container_ef ?? null,
     is_self_grown: item.is_self_grown,
     vineyard_id: item.vineyard_id ?? null,
+    arable_field_id: item.arable_field_id ?? null,
+    orchard_id: item.orchard_id ?? null,
     is_biogenic_carbon: item.is_biogenic_carbon,
   };
 }

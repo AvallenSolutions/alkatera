@@ -258,12 +258,21 @@ export function TeamSettings({ showHeader = true }: TeamSettingsProps) {
     setIsDeleting(true)
 
     try {
-      const { error } = await supabase
-        .from('organization_members')
-        .delete()
-        .eq('id', memberToDelete.membership_id)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Not authenticated')
 
-      if (error) throw error
+      const response = await fetch(`/api/team-members/${memberToDelete.membership_id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      })
+
+      const result = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to remove team member')
+      }
 
       toast({
         title: 'Success',
@@ -276,7 +285,7 @@ export function TeamSettings({ showHeader = true }: TeamSettingsProps) {
       console.error('Error removing member:', error)
       toast({
         title: 'Error',
-        description: 'Failed to remove team member. Please try again.',
+        description: error instanceof Error ? error.message : 'Failed to remove team member. Please try again.',
         variant: 'destructive',
       })
     } finally {
@@ -436,7 +445,7 @@ export function TeamSettings({ showHeader = true }: TeamSettingsProps) {
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Role</TableHead>
-                    {isAdmin && <TableHead className="text-right">Actions</TableHead>}
+                    {isOwner && <TableHead className="text-right">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -472,7 +481,7 @@ export function TeamSettings({ showHeader = true }: TeamSettingsProps) {
                           </Badge>
                         )}
                       </TableCell>
-                      {isAdmin && (
+                      {isOwner && (
                         <TableCell className="text-right">
                           {member.role !== 'owner' && (
                             <Button

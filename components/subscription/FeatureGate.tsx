@@ -21,6 +21,7 @@ import {
   Link2,
   Loader2,
   TreePine,
+  Wheat,
 } from "lucide-react";
 import { useFeatureGate, FeatureCode, TierName } from "@/hooks/useSubscription";
 import { cn } from "@/lib/utils";
@@ -484,6 +485,22 @@ const featureInfo: Partial<Record<FeatureCode, FeatureInfo>> = {
     icon: TreePine,
     category: "Products & LCA",
   },
+  arable_beta: {
+    name: "Arable Fields (Grain Growing)",
+    description:
+      "Manage your arable fields and calculate the environmental impact of self-grown grain crops (barley, wheat, oats, etc.) using primary data. Currently in private beta with SBTi FLAG v1.2 compliance, lime CO2 emissions, grain drying energy, and field-to-facility transport tracking.",
+    benefits: [
+      "Model field-level climate, water, and land use impacts by crop type",
+      "SBTi FLAG v1.2 compliant with separate emissions and removals reporting",
+      "IPCC Tier 1 N\u2082O calculations with crop-specific straw residue factors",
+      "Lime application CO2 emissions (limestone and dolomite)",
+      "Grain drying energy tracking with fuel-specific emission factors",
+      "Field-to-facility transport emissions (road and rail)",
+      "Multi-harvest averaging for representative environmental footprints",
+    ],
+    icon: Wheat,
+    category: "Products & LCA",
+  },
   knowledge_bank_manage: {
     name: "Knowledge Bank (Upload & Manage)",
     description:
@@ -573,6 +590,7 @@ const featureNames: Record<FeatureCode, string> = {
   xero_integration_beta: "Xero Integration (Beta)",
   viticulture_beta: "Viticulture (Beta)",
   orchard_beta: "Orchards (Beta)",
+  arable_beta: "Arable Fields (Beta)",
 };
 
 const tierDisplayNames: Record<TierName, string> = {

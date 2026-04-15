@@ -433,7 +433,7 @@ export interface VineyardSoilCarbonEvidence {
 // Spray chemicals (detailed inputs)
 // ---------------------------------------------------------------------------
 
-export type ChemicalType = 'fertiliser' | 'fungicide' | 'herbicide' | 'insecticide' | 'other';
+export type ChemicalType = 'fertiliser' | 'fungicide' | 'herbicide' | 'insecticide' | 'growth_regulator' | 'seed_treatment' | 'other';
 
 export interface VineyardSprayChemical {
   id: string;

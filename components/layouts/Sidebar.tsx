@@ -54,6 +54,7 @@ import {
   Database,
   ArrowUpCircle,
   TreePine,
+  Wheat,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
@@ -105,6 +106,7 @@ const navigationStructure: NavItem[] = [
       { name: 'Facilities',   href: '/company/facilities/', icon: Warehouse,      minTier: 1 },
       { name: 'Vineyards',   href: '/vineyards/',          icon: Leaf,           minTier: 1, featureCode: 'viticulture_beta', viticultureOnly: true },
       { name: 'Orchards',    href: '/orchards/',           icon: TreePine,       minTier: 1, featureCode: 'orchard_beta' },
+      { name: 'Arable Fields', href: '/arable-fields/',    icon: Wheat,          minTier: 1, featureCode: 'arable_beta' },
       { name: 'Fleet',        href: '/company/fleet/',      icon: Truck,          minTier: 2, featureCode: 'vehicle_registry' },
       { name: 'Suppliers',    href: '/suppliers/',          icon: Users,          minTier: 1 },
     ],
@@ -132,7 +134,7 @@ const navigationStructure: NavItem[] = [
     children: [
       { name: 'Company Vitality',    href: '/performance/',      icon: Sparkles, minTier: 2 },
       { name: 'Products',            href: '/products/',         icon: Package,  minTier: 1 },
-      { name: 'Nature Assessment',   href: '/nature-assessment/',icon: TreePine, minTier: 2, requireAnyFeature: ['viticulture_beta', 'orchard_beta'] },
+      { name: 'Nature Assessment',   href: '/nature-assessment/',icon: TreePine, minTier: 2, requireAnyFeature: ['viticulture_beta', 'orchard_beta', 'arable_beta'] },
       { name: 'LCA Reports',         href: '/reports/lcas/',     icon: Award,    minTier: 2 },
     ],
   },

@@ -85,7 +85,7 @@ export async function POST(
 
     // Load chemical library once (single query, ~100 rows)
     const { data: libraryData, error: libError } = await supabase
-      .from('vineyard_chemical_library')
+      .from('chemical_library')
       .select('id, chemical_name, name_variants, chemical_type, n_content_percent, fertiliser_subtype, active_ingredient, is_verified');
 
     if (libError) {

@@ -402,3 +402,170 @@ export const VINE_SO2_EQ_PER_HA_DEFAULT = 0;
 
 /** @see VINE_SO2_EQ_PER_HA_DEFAULT for documentation */
 export const ORCHARD_SO2_EQ_PER_HA_DEFAULT = 0;
+
+// ---------------------------------------------------------------------------
+// Arable-Specific Constants (Arable Crop LCA)
+// ---------------------------------------------------------------------------
+// Parameters for arable crop LCA calculations, parameterised by crop type.
+// Used by arable-calculator.ts alongside the shared constants above.
+//
+// Sources:
+//   - IPCC 2019 Refinement, Chapter 11, Table 11.2 (crop residue)
+//   - IPCC 2019 Refinement, Volume 4, Chapter 2, Table 2.3 (carbon stocks)
+//   - IPCC 2019, Volume 4, Chapter 11 (lime CO2 emissions)
+//   - DEFRA 2024 UK Government GHG Conversion Factors
+//   - Conservative end of published ranges
+
+/**
+ * Arable crop residue factors by crop type (IPCC 2019 Ch11 Table 11.2).
+ * straw_n_fraction: kg N per kg straw DM
+ * root_shoot_ratio: below-ground to above-ground residue ratio
+ * default_straw_yield_t_per_ha: default straw DM yield (t/ha)
+ */
+export const ARABLE_CROP_RESIDUE_FACTORS: Record<
+  string,
+  { straw_n_fraction: number; root_shoot_ratio: number; default_straw_yield_t_per_ha: number }
+> = {
+  barley:  { straw_n_fraction: 0.007, root_shoot_ratio: 0.22, default_straw_yield_t_per_ha: 2.8 },
+  wheat:   { straw_n_fraction: 0.006, root_shoot_ratio: 0.24, default_straw_yield_t_per_ha: 3.5 },
+  oats:    { straw_n_fraction: 0.007, root_shoot_ratio: 0.22, default_straw_yield_t_per_ha: 2.5 },
+  rye:     { straw_n_fraction: 0.005, root_shoot_ratio: 0.22, default_straw_yield_t_per_ha: 3.0 },
+  maize:   { straw_n_fraction: 0.006, root_shoot_ratio: 0.22, default_straw_yield_t_per_ha: 4.0 },
+  other:   { straw_n_fraction: 0.006, root_shoot_ratio: 0.22, default_straw_yield_t_per_ha: 3.0 },
+};
+
+/**
+ * Arable carbon stock by crop type and climate zone (tonnes C per hectare).
+ * Annual cropland carbon stocks are lower than perennials due to annual
+ * disturbance and lack of permanent above-ground biomass.
+ */
+export const ARABLE_CARBON_STOCK: Record<string, Record<string, number>> = {
+  barley:  { wet: 55, dry: 30, temperate: 40 },
+  wheat:   { wet: 55, dry: 30, temperate: 40 },
+  oats:    { wet: 55, dry: 30, temperate: 40 },
+  rye:     { wet: 55, dry: 30, temperate: 40 },
+  maize:   { wet: 50, dry: 28, temperate: 38 },
+  other:   { wet: 55, dry: 30, temperate: 40 },
+};
+
+/**
+ * Arable soil carbon removal defaults (kg CO2e removed per hectare per year).
+ * Lower than orchard/vineyard defaults due to annual tillage disturbance and
+ * lack of permanent root systems. No-till and cover cropping make the biggest
+ * difference in arable systems.
+ */
+export const ARABLE_SOIL_CARBON_REMOVAL_DEFAULTS: Record<string, number> = {
+  conventional_tillage: 0,
+  minimum_tillage: 120,
+  no_till: 300,
+  cover_cropping: 400,
+  composting: 250,
+  biochar_compost: 600,
+  regenerative_integrated: 500,
+};
+
+/**
+ * Arable pesticide ecotoxicity profiles (USEtox 2.0).
+ * Arable crops use fewer copper-based products but more broad-spectrum
+ * herbicides and growth regulators than perennial crops.
+ */
+export const ARABLE_PESTICIDE_ECOTOX_PROFILES: Record<string, PesticideEcotoxProfile> = {
+  generic: {
+    freshwater_ecotox: 3500,
+    terrestrial_ecotox: 650,
+    human_toxicity_nc: 1.2e-5,
+    freshwater_eutroph: 0.003,
+  },
+  sulfur: {
+    freshwater_ecotox: 350,
+    terrestrial_ecotox: 180,
+    human_toxicity_nc: 1.0e-6,
+    freshwater_eutroph: 0.0005,
+  },
+  synthetic_fungicide: {
+    freshwater_ecotox: 4200,
+    terrestrial_ecotox: 850,
+    human_toxicity_nc: 1.8e-5,
+    freshwater_eutroph: 0.001,
+  },
+  herbicide_glyphosate: {
+    freshwater_ecotox: 2800,
+    terrestrial_ecotox: 450,
+    human_toxicity_nc: 8.0e-6,
+    freshwater_eutroph: 0.015,
+  },
+  growth_regulator: {
+    freshwater_ecotox: 1200,
+    terrestrial_ecotox: 300,
+    human_toxicity_nc: 5.0e-6,
+    freshwater_eutroph: 0.001,
+  },
+};
+
+/**
+ * Transport emission factors for field-to-facility delivery (DEFRA 2024).
+ * Units: kg CO2e per tonne-km. Same as orchard transport factors.
+ */
+export const ARABLE_TRANSPORT_EF: Record<string, number> = {
+  road: 0.10516,
+  rail: 0.02768,
+};
+
+/**
+ * Lime emission factors (IPCC 2019, Volume 4, Chapter 11).
+ * CO2 released when limestone or dolomite dissolves in soil.
+ * Units: kg CO2 per kg of limestone/dolomite applied.
+ */
+export const LIME_EMISSION_FACTORS: Record<string, number> = {
+  /** Limestone (CaCO3): 0.12 kg CO2 per kg */
+  ite: 0.12,
+  /** Dolomite (CaMg(CO3)2): 0.13 kg CO2 per kg */
+  dolomite: 0.13,
+  none: 0,
+};
+
+/**
+ * Grain drying emission factors by fuel type (DEFRA 2024 + literature).
+ * Units: kg CO2e per kWh of drying energy consumed.
+ */
+export const GRAIN_DRYING_FACTORS: Record<string, number> = {
+  natural_gas: 0.18,
+  lpg: 0.21,
+  diesel: 0.25,
+  biomass: 0.015,
+  grid_electricity: 0.21, // UK grid average; overridden by country-specific factor
+  none: 0,
+};
+
+/**
+ * Default grain drying energy intensity by crop type (kWh per tonne).
+ * Barley for malting typically requires more drying than feed grain.
+ */
+export const GRAIN_DRYING_DEFAULTS: Record<string, number> = {
+  barley: 80,
+  wheat: 50,
+  oats: 60,
+  rye: 50,
+  maize: 100,
+  other: 60,
+};
+
+/**
+ * Seed production emission factor (kg CO2e per kg seed).
+ * Conservative estimate covering seed cleaning, dressing, and transport.
+ * Source: ecoinvent 3.9.1, market for seed.
+ */
+export const SEED_PRODUCTION_EF = 0.5;
+
+/**
+ * Growth regulator production emission factor (kg CO2e per kg a.i.).
+ * Chlormequat and similar PGRs used in cereal production.
+ * Source: ecoinvent 3.9.1, market for plant growth regulator.
+ */
+export const GROWTH_REGULATOR_PRODUCTION_EF = 8.5;
+
+/** Average kg active ingredient per growth regulator application per hectare */
+export const GROWTH_REGULATOR_AI_KG_PER_APPLICATION_PER_HA = 1.0;
+
+/** @see VINE_SO2_EQ_PER_HA_DEFAULT for documentation */
+export const ARABLE_SO2_EQ_PER_HA_DEFAULT = 0;

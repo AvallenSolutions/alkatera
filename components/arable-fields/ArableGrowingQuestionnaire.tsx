@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useAwareFactor } from '@/hooks/data/useAwareFactor';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,7 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import {
-  Leaf,
+  Wheat,
   Droplets,
   Fuel,
   Sprout,
@@ -39,96 +39,89 @@ import {
   Trash2,
   Download,
   Save,
+  Truck,
   Plus,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { calculateViticultureImpacts } from '@/lib/viticulture-calculator';
-import { SOIL_CARBON_REMOVAL_DEFAULTS } from '@/lib/ghg-constants';
+import { calculateArableImpacts } from '@/lib/arable-calculator';
+import {
+  ARABLE_PESTICIDE_TYPE_LABELS,
+  STRAW_MANAGEMENT_LABELS,
+  GRAIN_DRYING_FUEL_LABELS,
+  LIME_TYPE_LABELS,
+} from '@/lib/arable-utils';
 import type {
-  VineyardGrowingProfile,
-  VineyardSoilCarbonEvidence,
+  ArableGrowingProfile,
+  ArableSoilCarbonEvidence,
+  ArablePesticideType,
+  ArableSprayChemicalDraft,
+  ArableChemicalType,
+  CropType,
+  ArableCertification,
+  StrawManagement,
+  GrainDryingFuel,
+  PreviousLandUseType,
+} from '@/lib/types/arable';
+import type {
   SoilManagement,
   SoilCarbonMethodology,
   FertiliserType,
-  PesticideType,
   IrrigationEnergySource,
-  ViticultureCalculatorInput,
-  VineyardClimateZone,
-  VineyardCertification,
-  PreviousLandUseType,
-  ChemicalType,
-  SprayChemicalDraft,
 } from '@/lib/types/viticulture';
-
-const CHEMICAL_TYPE_OPTIONS: { value: ChemicalType; label: string }[] = [
-  { value: 'fertiliser', label: 'Fertiliser' },
-  { value: 'fungicide', label: 'Fungicide' },
-  { value: 'herbicide', label: 'Herbicide' },
-  { value: 'insecticide', label: 'Insecticide' },
-  { value: 'other', label: 'Other' },
-];
-
-function chemicalTypeBadgeClass(type: ChemicalType): string {
-  switch (type) {
-    case 'fertiliser': return 'bg-green-500/10 text-green-400 border-green-500/20';
-    case 'fungicide': return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
-    case 'herbicide': return 'bg-orange-500/10 text-orange-400 border-orange-500/20';
-    case 'insecticide': return 'bg-red-500/10 text-red-400 border-red-500/20';
-    default: return 'bg-muted/50 text-muted-foreground border-border';
-  }
-}
+import type { TransportMode } from '@/lib/types/orchard';
+import { SOIL_CARBON_REMOVAL_DEFAULTS } from '@/lib/ghg-constants';
 
 interface QuestionnaireProps {
-  vineyardId: string;
-  vineyardName: string;
-  vineyardHectares: number;
-  vineyardClimateZone: VineyardClimateZone;
-  vineyardCertification: VineyardCertification;
-  vineyardCountryCode: string | null;
-  vineyardPreviousLandUse?: PreviousLandUseType | null;
-  vineyardLandConversionYear?: number | null;
-  existingProfile?: VineyardGrowingProfile | null;
-  vintageYear?: number;
+  fieldId: string;
+  fieldName: string;
+  fieldHectares: number;
+  cropType: CropType;
+  fieldClimateZone: 'wet' | 'dry' | 'temperate';
+  fieldCertification: ArableCertification;
+  fieldCountryCode: string | null;
+  fieldPreviousLandUse?: PreviousLandUseType | null;
+  fieldLandConversionYear?: number | null;
+  existingProfile?: ArableGrowingProfile | null;
+  harvestYear?: number;
   copyFromData?: Record<string, any>;
-  onComplete: (profile: VineyardGrowingProfile) => void;
+  onComplete: (profile: ArableGrowingProfile) => void;
   onCancel: () => void;
 }
 
 const PREVIOUS_LAND_USE_OPTIONS: { value: PreviousLandUseType; label: string }[] = [
-  { value: 'permanent_vineyard', label: 'Already a vineyard (no land use change)' },
+  { value: 'permanent_arable', label: 'Already arable (no land use change)' },
   { value: 'grassland', label: 'Grassland / pasture' },
-  { value: 'arable', label: 'Arable cropland' },
   { value: 'forest', label: 'Forest / woodland' },
   { value: 'wetland', label: 'Wetland' },
   { value: 'settlement', label: 'Settlement / urban land' },
   { value: 'other_land', label: 'Other land' },
 ];
 
-const PESTICIDE_TYPES: { value: PesticideType; label: string }[] = [
+const PESTICIDE_TYPES: { value: ArablePesticideType; label: string }[] = [
   { value: 'generic', label: 'Generic / mixed products' },
-  { value: 'copper_fungicide', label: 'Copper-based fungicide (e.g. Bordeaux mixture)' },
-  { value: 'sulfur', label: 'Sulphur-based' },
+  { value: 'sulfur', label: 'Sulfur-based' },
   { value: 'synthetic_fungicide', label: 'Synthetic fungicide' },
 ];
 
-const HERBICIDE_TYPES: { value: PesticideType; label: string }[] = [
+const HERBICIDE_TYPES: { value: ArablePesticideType; label: string }[] = [
   { value: 'generic', label: 'Generic herbicide' },
   { value: 'herbicide_glyphosate', label: 'Glyphosate-based' },
 ];
 
 const STEPS = [
   { id: 'soil', label: 'Soil & Land', icon: Sprout },
-  { id: 'inputs', label: 'Inputs', icon: Leaf },
+  { id: 'inputs', label: 'Inputs', icon: Wheat },
   { id: 'machinery', label: 'Machinery & Fuel', icon: Fuel },
   { id: 'irrigation', label: 'Irrigation', icon: Droplets },
+  { id: 'transport', label: 'Transport & Yield', icon: Truck },
 ] as const;
 
 const SOIL_PRACTICES: { value: SoilManagement; label: string; description: string }[] = [
   { value: 'conventional_tillage', label: 'Conventional tillage', description: 'Regular ploughing and mechanical soil disturbance' },
   { value: 'minimum_tillage', label: 'Minimum tillage', description: 'Reduced soil disturbance, shallow cultivation only' },
-  { value: 'no_till', label: 'No-till', description: 'No mechanical soil disturbance, direct seeding' },
-  { value: 'cover_cropping', label: 'Cover cropping (active)', description: 'Living ground cover between vine rows year-round' },
-  { value: 'composting', label: 'Composting (active)', description: 'Regular compost application to vineyard soils' },
+  { value: 'no_till', label: 'No-till / direct drill', description: 'No mechanical soil disturbance, direct seeding' },
+  { value: 'cover_cropping', label: 'Cover cropping (active)', description: 'Living ground cover between cash crops' },
+  { value: 'composting', label: 'Composting (active)', description: 'Regular compost application to arable soils' },
   { value: 'biochar_compost', label: 'Biochar + compost', description: 'Biochar-amended compost for enhanced carbon storage' },
   { value: 'regenerative_integrated', label: 'Regenerative integrated', description: 'Holistic approach combining cover crops, no-till, and organic inputs' },
 ];
@@ -136,7 +129,7 @@ const SOIL_PRACTICES: { value: SoilManagement; label: string; description: strin
 const SOIL_CARBON_METHODOLOGIES: { value: SoilCarbonMethodology; label: string; description: string }[] = [
   { value: 'soc_0_30cm_fixed', label: 'SOC sampling 0-30 cm, fixed depth', description: 'IPCC minimum depth. Single composite sample per point.' },
   { value: 'soc_0_30cm_multi_increment', label: 'SOC sampling 0-30 cm, multi-increment', description: 'IPCC recommended: 0-10, 10-20, 20-30 cm increments.' },
-  { value: 'soc_0_60cm_fixed', label: 'SOC sampling 0-60 cm, fixed depth', description: 'Verra/IWCA best practice depth. Single composite per point.' },
+  { value: 'soc_0_60cm_fixed', label: 'SOC sampling 0-60 cm, fixed depth', description: 'Verra best practice depth. Single composite per point.' },
   { value: 'soc_0_60cm_multi_increment', label: 'SOC sampling 0-60 cm, multi-increment', description: 'Gold standard: 0-15, 15-30, 30-45, 45-60 cm increments with ESM accounting.' },
   { value: 'full_soil_profile', label: 'Full soil profile (> 60 cm)', description: 'Deep profile analysis, typically for research or baseline studies.' },
   { value: 'other', label: 'Other methodology', description: 'Modelling, remote sensing, or other approach.' },
@@ -150,25 +143,26 @@ const FERTILISER_TYPES: { value: FertiliserType; label: string }[] = [
   { value: 'mixed', label: 'Mixed (synthetic + organic)' },
 ];
 
-export function VineyardGrowingQuestionnaire({
-  vineyardId,
-  vineyardName,
-  vineyardHectares,
-  vineyardClimateZone,
-  vineyardCertification,
-  vineyardCountryCode,
-  vineyardPreviousLandUse,
-  vineyardLandConversionYear,
+export function ArableGrowingQuestionnaire({
+  fieldId,
+  fieldName,
+  fieldHectares,
+  cropType,
+  fieldClimateZone,
+  fieldCertification,
+  fieldCountryCode,
+  fieldPreviousLandUse,
+  fieldLandConversionYear,
   existingProfile,
-  vintageYear,
+  harvestYear,
   copyFromData,
   onComplete,
   onCancel,
 }: QuestionnaireProps) {
-  const { awareFactor: vineyardAwareFactor } = useAwareFactor(vineyardCountryCode);
+  const { awareFactor: fieldAwareFactor } = useAwareFactor(fieldCountryCode);
   const currentYear = new Date().getFullYear();
-  const [selectedVintageYear, setSelectedVintageYear] = useState<number>(
-    existingProfile?.vintage_year ?? vintageYear ?? currentYear
+  const [selectedHarvestYear, setSelectedHarvestYear] = useState<number>(
+    existingProfile?.harvest_year ?? harvestYear ?? currentYear
   );
   const [currentStep, setCurrentStep] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -178,29 +172,49 @@ export function VineyardGrowingQuestionnaire({
 
   // Form state
   const [form, setForm] = useState({
-    area_ha: initSource?.area_ha ?? vineyardHectares,
+    // Step 1: Soil & Land
+    area_ha: initSource?.area_ha ?? fieldHectares,
     soil_management: (initSource?.soil_management ?? 'conventional_tillage') as SoilManagement,
-    pruning_residue_returned: initSource?.pruning_residue_returned ?? true,
-    pruning_residue_management_type: (initSource as any)?.pruning_residue_management_type ?? 'in_field' as 'in_field' | 'removed_for_biomass' | 'chipped_and_spread',
-    pruning_residue_measured_kg_per_ha: (initSource as any)?.pruning_residue_measured_kg_per_ha ?? null as number | null,
+    straw_management: (initSource?.straw_management ?? 'incorporated') as StrawManagement,
+    straw_yield_tonnes_per_ha: initSource?.straw_yield_tonnes_per_ha ?? 2.5,
+    lime_applied_kg_per_ha: initSource?.lime_applied_kg_per_ha ?? 0,
+    lime_type: (initSource?.lime_type ?? 'none') as 'ite' | 'dolomite' | 'none',
+
+    // Step 2: Inputs
     fertiliser_type: (initSource?.fertiliser_type ?? 'none') as FertiliserType,
     fertiliser_quantity_kg: initSource?.fertiliser_quantity_kg ?? 0,
     fertiliser_n_content_percent: initSource?.fertiliser_n_content_percent ?? 0,
     uses_pesticides: initSource?.uses_pesticides ?? false,
     pesticide_applications_per_year: initSource?.pesticide_applications_per_year ?? 0,
-    pesticide_type: (initSource?.pesticide_type ?? 'generic') as PesticideType,
+    pesticide_type: (initSource?.pesticide_type ?? 'generic') as ArablePesticideType,
     uses_herbicides: initSource?.uses_herbicides ?? false,
     herbicide_applications_per_year: initSource?.herbicide_applications_per_year ?? 0,
-    herbicide_type: (initSource?.herbicide_type ?? 'generic') as PesticideType,
+    herbicide_type: (initSource?.herbicide_type ?? 'generic') as ArablePesticideType,
+    uses_growth_regulators: initSource?.uses_growth_regulators ?? false,
+    growth_regulator_applications: initSource?.growth_regulator_applications ?? 0,
+    seed_rate_kg_per_ha: initSource?.seed_rate_kg_per_ha ?? 160,
+
+    // Step 3: Machinery & Fuel
     diesel_litres_per_year: initSource?.diesel_litres_per_year ?? 0,
     petrol_litres_per_year: initSource?.petrol_litres_per_year ?? 0,
+    grain_drying_fuel: (initSource?.grain_drying_fuel ?? 'none') as GrainDryingFuel,
+    grain_drying_energy_kwh_per_tonne: initSource?.grain_drying_energy_kwh_per_tonne ?? 0,
+
+    // Step 4: Irrigation
     is_irrigated: initSource?.is_irrigated ?? false,
     water_m3_per_ha: initSource?.water_m3_per_ha ?? 0,
     irrigation_energy_source: (initSource?.irrigation_energy_source ?? 'none') as IrrigationEnergySource,
-    grape_yield_tonnes: initSource?.grape_yield_tonnes ?? 0,
-    // Land use change (FLAG-C3) - stored on vineyard, not growing profile
-    previous_land_use_type: (vineyardPreviousLandUse ?? 'permanent_vineyard') as PreviousLandUseType,
-    land_conversion_year: vineyardLandConversionYear ?? null as number | null,
+
+    // Step 5: Transport & Yield
+    transport_distance_km: initSource?.transport_distance_km ?? null as number | null,
+    transport_mode: (initSource?.transport_mode ?? 'road') as TransportMode,
+    grain_yield_tonnes: initSource?.grain_yield_tonnes ?? 0,
+    grain_moisture_percent: initSource?.grain_moisture_percent ?? 14.5,
+
+    // Land use change (FLAG-C3) - stored on field, not growing profile
+    previous_land_use_type: (fieldPreviousLandUse ?? 'permanent_arable') as PreviousLandUseType,
+    land_conversion_year: fieldLandConversionYear ?? null as number | null,
+
     // Soil carbon measured data
     has_measured_soil_carbon: !!(initSource?.soil_carbon_override_kg_co2e_per_ha),
     soil_carbon_override_kg_co2e_per_ha: initSource?.soil_carbon_override_kg_co2e_per_ha ?? null as number | null,
@@ -208,17 +222,20 @@ export function VineyardGrowingQuestionnaire({
     soil_carbon_methodology: (initSource?.soil_carbon_methodology ?? '') as string,
     soil_carbon_lab_name: initSource?.soil_carbon_lab_name ?? '',
     soil_carbon_sampling_points: initSource?.soil_carbon_sampling_points ?? null as number | null,
+
     // Removal verification (SBTi FLAG / GHG Protocol LSR v1.0)
     removal_verification_status: initSource?.removal_verification_status ?? 'unverified' as string,
     removal_verifier_body: initSource?.removal_verifier_body ?? '' as string,
     removal_verifier_standard: initSource?.removal_verifier_standard ?? '' as string,
     removal_verification_date: initSource?.removal_verification_date ?? '' as string,
     removal_verification_expiry: initSource?.removal_verification_expiry ?? '' as string,
+
     // TNFD location sensitivity
     ecosystem_type: initSource?.ecosystem_type ?? '' as string,
     in_biodiversity_sensitive_area: initSource?.in_biodiversity_sensitive_area ?? false,
     sensitive_area_details: initSource?.sensitive_area_details ?? '' as string,
     water_stress_index: initSource?.water_stress_index ?? '' as string,
+
     // Land ownership boundary (GHG Protocol LSR v1.0)
     land_ownership_type: initSource?.land_ownership_type ?? '' as string,
     lease_expiry_date: initSource?.lease_expiry_date ?? '' as string,
@@ -228,145 +245,121 @@ export function VineyardGrowingQuestionnaire({
   // Soil carbon evidence state
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
   const [evidenceUploading, setEvidenceUploading] = useState(false);
-  const [existingEvidence, setExistingEvidence] = useState<VineyardSoilCarbonEvidence[]>([]);
+  const [existingEvidence, setExistingEvidence] = useState<ArableSoilCarbonEvidence[]>([]);
+
+  // Spray chemicals state
+  const [sprayChemicals, setSprayChemicals] = useState<ArableSprayChemicalDraft[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
+  const sprayFileInputRef = useRef<HTMLInputElement>(null);
 
   // Load existing evidence when editing a profile
   useEffect(() => {
     if (!existingProfile?.id) return;
-    fetch(`/api/vineyards/${vineyardId}/growing-profile/evidence?profile_id=${existingProfile.id}`)
+    fetch(`/api/arable-fields/${fieldId}/growing-profile/evidence?profile_id=${existingProfile.id}`)
       .then((res) => res.json())
       .then(({ data }) => { if (data) setExistingEvidence(data); })
       .catch(() => { /* silently fail - evidence is optional */ });
-  }, [existingProfile?.id, vineyardId]);
+  }, [existingProfile?.id, fieldId]);
 
-  // Spray chemicals state
-  const [sprayChemicals, setSprayChemicals] = useState<SprayChemicalDraft[]>([]);
-  const [isImporting, setIsImporting] = useState(false);
-  const sprayFileInputRef = useRef<HTMLInputElement>(null);
-
-  // Load existing chemicals when editing a profile
+  // Load existing spray chemicals when editing a profile
   useEffect(() => {
     if (!existingProfile?.id) return;
-    fetch(`/api/vineyards/${vineyardId}/spray-chemicals?growing_profile_id=${existingProfile.id}`)
+    fetch(`/api/arable-fields/${fieldId}/spray-chemicals?growing_profile_id=${existingProfile.id}`)
       .then((res) => res.json())
       .then(({ data }) => {
         if (data && data.length > 0) {
-          setSprayChemicals(
-            data.map((c: any) => ({
-              chemical_name: c.chemical_name,
-              chemical_type: c.chemical_type,
-              unit: c.unit,
-              rate_per_ha: c.rate_per_ha,
-              water_rate_l_per_ha: c.water_rate_l_per_ha,
-              total_ha_sprayed: c.total_ha_sprayed,
-              total_amount_used: c.total_amount_used,
-              applications_count: c.applications_count,
-              n_content_percent: (c as any).n_content_percent ?? 0,
-              fertiliser_subtype: (c as any).fertiliser_subtype ?? null,
-              library_matched: (c as any).library_matched ?? false,
-            }))
-          );
+          setSprayChemicals(data.map((row: any) => ({
+            chemical_name: row.chemical_name,
+            chemical_type: row.chemical_type,
+            unit: row.unit,
+            rate_per_ha: row.rate_per_ha,
+            water_rate_l_per_ha: row.water_rate_l_per_ha,
+            total_ha_sprayed: row.total_ha_sprayed,
+            total_amount_used: row.total_amount_used,
+            applications_count: row.applications_count,
+            n_content_percent: row.n_content_percent,
+            fertiliser_subtype: row.fertiliser_subtype,
+            library_matched: row.library_matched,
+          })));
         }
       })
       .catch(() => { /* silently fail */ });
-  }, [existingProfile?.id, vineyardId]);
+  }, [existingProfile?.id, fieldId]);
 
-  function deriveSimplifiedFields(chemicals: SprayChemicalDraft[]) {
+  /**
+   * Derive simplified form fields from detailed spray chemical data.
+   * Aggregates chemical records by type to populate the calculator inputs.
+   */
+  function deriveSimplifiedFields(chemicals: ArableSprayChemicalDraft[]) {
     const fertilisers = chemicals.filter((c) => c.chemical_type === 'fertiliser');
-    const pesticides = chemicals.filter((c) => c.chemical_type === 'fungicide' || c.chemical_type === 'insecticide');
+    const fungicides = chemicals.filter((c) => c.chemical_type === 'fungicide');
+    const insecticides = chemicals.filter((c) => c.chemical_type === 'insecticide');
     const herbicides = chemicals.filter((c) => c.chemical_type === 'herbicide');
+    const growthRegs = chemicals.filter((c) => c.chemical_type === 'growth_regulator');
 
-    // Total product quantity for all fertilisers
-    const fertiliser_quantity_kg = fertilisers.reduce((sum, c) => sum + (c.total_amount_used || 0), 0);
+    // Fertiliser: total quantity + weighted-average N%
+    const totalFertKg = fertilisers.reduce((sum, c) => sum + (c.total_amount_used || 0), 0);
+    const weightedN = totalFertKg > 0
+      ? fertilisers.reduce((sum, c) => sum + (c.total_amount_used || 0) * (c.n_content_percent || 0), 0) / totalFertKg
+      : 0;
 
-    // Weighted-average N content: sum(qty × n%) / total_qty
-    const fertiliser_n_content_percent =
-      fertiliser_quantity_kg > 0
-        ? fertilisers.reduce((sum, c) => sum + (c.total_amount_used || 0) * (c.n_content_percent || 0), 0) /
-          fertiliser_quantity_kg
-        : 0;
-
-    // Derive fertiliser type from subtypes
-    let fertiliser_type: FertiliserType = 'none';
-    if (fertilisers.length > 0) {
-      const subtypes = new Set(
-        fertilisers.map((c) => c.fertiliser_subtype).filter((s): s is NonNullable<typeof s> => s !== null && s !== undefined)
-      );
-      const hasSyntheticN = subtypes.has('synthetic_n');
-      const hasOrganic = subtypes.has('organic_compost') || subtypes.has('organic_manure');
-      const hasManure = subtypes.has('organic_manure');
-      if (hasSyntheticN && hasOrganic) {
-        fertiliser_type = 'mixed';
-      } else if (hasSyntheticN) {
-        fertiliser_type = 'synthetic_n';
-      } else if (hasManure) {
-        fertiliser_type = 'organic_manure';
-      } else if (hasOrganic) {
-        fertiliser_type = 'organic_compost';
-      } else {
-        // Fertilisers present but all zero-N or unmatched (e.g. calcium, iron products)
-        fertiliser_type = 'mixed';
+    // Determine dominant fertiliser subtype
+    let fertType: FertiliserType = 'none';
+    if (totalFertKg > 0) {
+      const syntheticKg = fertilisers.filter((c) => c.fertiliser_subtype === 'synthetic_n').reduce((s, c) => s + (c.total_amount_used || 0), 0);
+      const organicKg = totalFertKg - syntheticKg;
+      if (syntheticKg > 0 && organicKg > 0) fertType = 'mixed';
+      else if (syntheticKg > 0) fertType = 'synthetic_n';
+      else {
+        const manureKg = fertilisers.filter((c) => c.fertiliser_subtype === 'organic_manure').reduce((s, c) => s + (c.total_amount_used || 0), 0);
+        fertType = manureKg > organicKg / 2 ? 'organic_manure' : 'organic_compost';
       }
     }
 
+    // Pesticides = fungicides + insecticides
+    const pesticideApps = fungicides.reduce((s, c) => s + (c.applications_count || 0), 0)
+      + insecticides.reduce((s, c) => s + (c.applications_count || 0), 0);
+    const herbicideApps = herbicides.reduce((s, c) => s + (c.applications_count || 0), 0);
+    const growthRegApps = growthRegs.reduce((s, c) => s + (c.applications_count || 0), 0);
+
+    // Determine herbicide type based on presence of glyphosate
+    const hasGlyphosate = herbicides.some((c) =>
+      c.chemical_name.toLowerCase().includes('glyphosate') ||
+      c.chemical_name.toLowerCase().includes('roundup')
+    );
+
     return {
-      fertiliser_type,
-      fertiliser_quantity_kg,
-      fertiliser_n_content_percent,
-      uses_pesticides: pesticides.length > 0,
-      pesticide_applications_per_year: pesticides.reduce((s, c) => s + (c.applications_count || 0), 0),
-      pesticide_type: 'generic' as PesticideType,
-      uses_herbicides: herbicides.length > 0,
-      herbicide_applications_per_year: herbicides.reduce((s, c) => s + (c.applications_count || 0), 0),
-      herbicide_type: 'generic' as PesticideType,
+      fertiliser_type: fertType,
+      fertiliser_quantity_kg: Math.round(totalFertKg),
+      fertiliser_n_content_percent: Math.round(weightedN * 10) / 10,
+      uses_pesticides: pesticideApps > 0,
+      pesticide_applications_per_year: pesticideApps,
+      pesticide_type: 'generic' as ArablePesticideType,
+      uses_herbicides: herbicideApps > 0,
+      herbicide_applications_per_year: herbicideApps,
+      herbicide_type: (hasGlyphosate ? 'herbicide_glyphosate' : 'generic') as ArablePesticideType,
+      uses_growth_regulators: growthRegApps > 0,
+      growth_regulator_applications: growthRegApps,
     };
-  }
-
-  function addEmptyChemical() {
-    setSprayChemicals((prev) => [
-      ...prev,
-      {
-        chemical_name: '',
-        chemical_type: 'fungicide',
-        unit: 'L',
-        rate_per_ha: 0,
-        water_rate_l_per_ha: null,
-        total_ha_sprayed: 0,
-        total_amount_used: 0,
-        applications_count: 1,
-        n_content_percent: 0,
-        fertiliser_subtype: null,
-        library_matched: false,
-      },
-    ]);
-  }
-
-  function updateChemical(index: number, updates: Partial<SprayChemicalDraft>) {
-    setSprayChemicals((prev) => prev.map((c, i) => (i === index ? { ...c, ...updates } : c)));
-  }
-
-  function removeChemical(index: number) {
-    setSprayChemicals((prev) => prev.filter((_, i) => i !== index));
   }
 
   async function handleSprayImport(file: File) {
     setIsImporting(true);
     try {
-      const fd = new FormData();
-      fd.append('file', file);
-      const res = await fetch(`/api/vineyards/${vineyardId}/spray-import`, {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch(`/api/arable-fields/${fieldId}/spray-import`, {
         method: 'POST',
-        body: fd,
+        body: formData,
       });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'Import failed');
+        throw new Error(err.error || 'Failed to parse spray diary');
       }
       const { chemicals } = await res.json();
       setSprayChemicals(chemicals);
-      // Derive simplified fields immediately so calculator stays live
       updateForm(deriveSimplifiedFields(chemicals));
-      toast.success(`${chemicals.length} chemical${chemicals.length !== 1 ? 's' : ''} imported`);
+      toast.success(`Imported ${chemicals.length} chemical records`);
     } catch (err: any) {
       toast.error(err.message || 'Failed to import spray diary');
     } finally {
@@ -374,8 +367,8 @@ export function VineyardGrowingQuestionnaire({
     }
   }
 
-  // Build vintage year options (current year down to current-10)
-  const vintageYearOptions = Array.from({ length: 11 }, (_, i) => currentYear - i);
+  // Build harvest year options (current year down to current-10)
+  const harvestYearOptions = Array.from({ length: 11 }, (_, i) => currentYear - i);
 
   const progress = ((currentStep + 1) / STEPS.length) * 100;
 
@@ -386,8 +379,8 @@ export function VineyardGrowingQuestionnaire({
   async function handleSave(asDraft: boolean) {
     // Full validation only when finalising
     if (!asDraft) {
-      if (form.grape_yield_tonnes <= 0) {
-        toast.error('Please enter the annual grape yield (tonnes) to finalise');
+      if (form.grain_yield_tonnes <= 0) {
+        toast.error('Please enter the grain yield (tonnes) to finalise');
         return;
       }
 
@@ -409,17 +402,22 @@ export function VineyardGrowingQuestionnaire({
 
     setSaving(true);
     try {
-      const url = `/api/vineyards/${vineyardId}/growing-profile`;
+      const url = `/api/arable-fields/${fieldId}/growing-profile`;
       const method = existingProfile ? 'PATCH' : 'POST';
 
       const body = {
         ...(existingProfile ? { id: existingProfile.id } : {}),
-        vintage_year: selectedVintageYear,
+        harvest_year: selectedHarvestYear,
         area_ha: form.area_ha,
         soil_management: form.soil_management,
-        pruning_residue_returned: form.pruning_residue_management_type !== 'removed_for_biomass',
-        pruning_residue_management_type: form.pruning_residue_management_type,
-        pruning_residue_measured_kg_per_ha: form.pruning_residue_measured_kg_per_ha,
+
+        // Arable-specific: straw & lime
+        straw_management: form.straw_management,
+        straw_yield_tonnes_per_ha: form.straw_yield_tonnes_per_ha,
+        lime_applied_kg_per_ha: form.lime_type !== 'none' ? form.lime_applied_kg_per_ha : 0,
+        lime_type: form.lime_type,
+
+        // Inputs
         fertiliser_type: form.fertiliser_type,
         fertiliser_quantity_kg: form.fertiliser_quantity_kg,
         fertiliser_n_content_percent: form.fertiliser_n_content_percent,
@@ -429,12 +427,29 @@ export function VineyardGrowingQuestionnaire({
         uses_herbicides: form.uses_herbicides,
         herbicide_applications_per_year: form.herbicide_applications_per_year,
         herbicide_type: form.herbicide_type,
+        uses_growth_regulators: form.uses_growth_regulators,
+        growth_regulator_applications: form.growth_regulator_applications,
+        seed_rate_kg_per_ha: form.seed_rate_kg_per_ha,
+
+        // Machinery & Fuel
         diesel_litres_per_year: form.diesel_litres_per_year,
         petrol_litres_per_year: form.petrol_litres_per_year,
+        grain_drying_fuel: form.grain_drying_fuel,
+        grain_drying_energy_kwh_per_tonne: form.grain_drying_fuel !== 'none' ? form.grain_drying_energy_kwh_per_tonne : 0,
+
+        // Irrigation
         is_irrigated: form.is_irrigated,
         water_m3_per_ha: form.water_m3_per_ha,
         irrigation_energy_source: form.irrigation_energy_source,
-        grape_yield_tonnes: form.grape_yield_tonnes,
+
+        // Yield
+        grain_yield_tonnes: form.grain_yield_tonnes,
+        grain_moisture_percent: form.grain_moisture_percent,
+
+        // Transport
+        transport_distance_km: form.transport_distance_km,
+        transport_mode: form.transport_mode,
+
         // Soil carbon measured data
         soil_carbon_override_kg_co2e_per_ha: form.has_measured_soil_carbon
           ? form.soil_carbon_override_kg_co2e_per_ha
@@ -451,6 +466,7 @@ export function VineyardGrowingQuestionnaire({
         soil_carbon_sampling_points: form.has_measured_soil_carbon
           ? form.soil_carbon_sampling_points
           : null,
+
         // Removal verification
         removal_verification_status: form.has_measured_soil_carbon
           ? form.removal_verification_status || 'unverified'
@@ -467,6 +483,7 @@ export function VineyardGrowingQuestionnaire({
         removal_verification_expiry: form.has_measured_soil_carbon
           ? form.removal_verification_expiry || null
           : null,
+
         // TNFD location sensitivity
         ecosystem_type: form.ecosystem_type || null,
         in_biodiversity_sensitive_area: form.in_biodiversity_sensitive_area,
@@ -474,6 +491,7 @@ export function VineyardGrowingQuestionnaire({
           ? form.sensitive_area_details || null
           : null,
         water_stress_index: form.water_stress_index || null,
+
         // Land ownership boundary
         land_ownership_type: form.land_ownership_type || null,
         lease_expiry_date: (form.land_ownership_type === 'leased' || form.land_ownership_type === 'rental')
@@ -483,19 +501,19 @@ export function VineyardGrowingQuestionnaire({
         is_draft: asDraft,
       };
 
-      // Save LUC fields to the vineyard record (not the growing profile)
+      // Save LUC fields to the arable field record (not the growing profile)
       const lucChanged =
-        form.previous_land_use_type !== (vineyardPreviousLandUse ?? 'permanent_vineyard') ||
-        form.land_conversion_year !== vineyardLandConversionYear;
+        form.previous_land_use_type !== (fieldPreviousLandUse ?? 'permanent_arable') ||
+        form.land_conversion_year !== fieldLandConversionYear;
       if (lucChanged) {
-        await fetch(`/api/vineyards/${vineyardId}`, {
+        await fetch(`/api/arable-fields/${fieldId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            previous_land_use_type: form.previous_land_use_type === 'permanent_vineyard'
+            previous_land_use_type: form.previous_land_use_type === 'permanent_arable'
               ? null
               : form.previous_land_use_type,
-            land_conversion_year: form.previous_land_use_type === 'permanent_vineyard'
+            land_conversion_year: form.previous_land_use_type === 'permanent_arable'
               ? null
               : form.land_conversion_year,
           }),
@@ -515,19 +533,6 @@ export function VineyardGrowingQuestionnaire({
 
       const { data } = await res.json();
 
-      // Save spray chemicals if any
-      if (sprayChemicals.length > 0 && data?.id) {
-        try {
-          await fetch(`/api/vineyards/${vineyardId}/spray-chemicals`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ growing_profile_id: data.id, chemicals: sprayChemicals }),
-          });
-        } catch {
-          toast.error('Profile saved but chemical data could not be saved. You can re-import later.');
-        }
-      }
-
       // Upload evidence file if pending
       if (evidenceFile && data?.id) {
         setEvidenceUploading(true);
@@ -537,7 +542,7 @@ export function VineyardGrowingQuestionnaire({
           evidenceFormData.append('profile_id', data.id);
 
           const evidenceRes = await fetch(
-            `/api/vineyards/${vineyardId}/growing-profile/evidence`,
+            `/api/arable-fields/${fieldId}/growing-profile/evidence`,
             { method: 'POST', body: evidenceFormData }
           );
           if (!evidenceRes.ok) {
@@ -550,6 +555,15 @@ export function VineyardGrowingQuestionnaire({
         }
       }
 
+      // Save spray chemicals if any
+      if (sprayChemicals.length > 0 && data?.id) {
+        await fetch(`/api/arable-fields/${fieldId}/spray-chemicals`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ growing_profile_id: data.id, chemicals: sprayChemicals }),
+        });
+      }
+
       toast.success(asDraft ? 'Draft saved' : 'Growing profile saved');
       onComplete(data);
     } catch (err: any) {
@@ -560,16 +574,18 @@ export function VineyardGrowingQuestionnaire({
   }
 
   // Preview calculation
-  const previewResult = calculateViticultureImpacts({
-    climate_zone: vineyardClimateZone,
-    certification: vineyardCertification,
-    location_country_code: vineyardCountryCode,
-    aware_factor: vineyardAwareFactor,
+  const previewResult = calculateArableImpacts({
+    crop_type: cropType,
+    climate_zone: fieldClimateZone,
+    certification: fieldCertification,
+    location_country_code: fieldCountryCode,
+    aware_factor: fieldAwareFactor,
     area_ha: form.area_ha,
     soil_management: form.soil_management,
-    pruning_residue_returned: form.pruning_residue_management_type !== 'removed_for_biomass',
-    pruning_residue_management_type: form.pruning_residue_management_type,
-    pruning_residue_measured_kg_per_ha: form.pruning_residue_measured_kg_per_ha ?? undefined,
+    straw_management: form.straw_management,
+    straw_yield_tonnes_per_ha: form.straw_yield_tonnes_per_ha,
+    lime_applied_kg_per_ha: form.lime_type !== 'none' ? form.lime_applied_kg_per_ha : 0,
+    lime_type: form.lime_type,
     fertiliser_type: form.fertiliser_type,
     fertiliser_quantity_kg: form.fertiliser_quantity_kg,
     fertiliser_n_content_percent: form.fertiliser_n_content_percent,
@@ -579,18 +595,26 @@ export function VineyardGrowingQuestionnaire({
     uses_herbicides: form.uses_herbicides,
     herbicide_applications_per_year: form.herbicide_applications_per_year,
     herbicide_type: form.herbicide_type,
+    uses_growth_regulators: form.uses_growth_regulators,
+    growth_regulator_applications: form.growth_regulator_applications,
+    seed_rate_kg_per_ha: form.seed_rate_kg_per_ha,
     diesel_litres_per_year: form.diesel_litres_per_year,
     petrol_litres_per_year: form.petrol_litres_per_year,
+    grain_drying_fuel: form.grain_drying_fuel,
+    grain_drying_energy_kwh_per_tonne: form.grain_drying_fuel !== 'none' ? form.grain_drying_energy_kwh_per_tonne : 0,
     is_irrigated: form.is_irrigated,
     water_m3_per_ha: form.water_m3_per_ha,
     irrigation_energy_source: form.irrigation_energy_source,
-    grape_yield_tonnes: form.grape_yield_tonnes,
+    grain_yield_tonnes: form.grain_yield_tonnes,
+    grain_moisture_percent: form.grain_moisture_percent,
+    transport_distance_km: form.transport_distance_km,
+    transport_mode: form.transport_mode,
     soil_carbon_override_kg_co2e_per_ha: form.has_measured_soil_carbon
       ? form.soil_carbon_override_kg_co2e_per_ha
       : null,
     previous_land_use_type: form.previous_land_use_type,
     land_conversion_year: form.land_conversion_year,
-    vintage_year: selectedVintageYear,
+    harvest_year: selectedHarvestYear,
     land_ownership_type: (form.land_ownership_type || undefined) as 'owned' | 'leased' | 'rental' | 'contract_growing' | undefined,
     lease_expiry_date: form.lease_expiry_date || null,
     is_boundary_controlled: form.is_boundary_controlled,
@@ -607,18 +631,18 @@ export function VineyardGrowingQuestionnaire({
 
   return (
     <div className="space-y-4">
-      {/* Vintage Year Selector */}
+      {/* Harvest Year Selector */}
       <div className="flex items-center gap-3">
-        <Label htmlFor="vintage-year" className="text-sm font-medium whitespace-nowrap">Vintage Year</Label>
+        <Label htmlFor="harvest-year" className="text-sm font-medium whitespace-nowrap">Harvest Year</Label>
         <Select
-          value={String(selectedVintageYear)}
-          onValueChange={(v) => setSelectedVintageYear(parseInt(v))}
+          value={String(selectedHarvestYear)}
+          onValueChange={(v) => setSelectedHarvestYear(parseInt(v))}
         >
-          <SelectTrigger id="vintage-year" className="w-[120px]">
+          <SelectTrigger id="harvest-year" className="w-[120px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {vintageYearOptions.map((yr) => (
+            {harvestYearOptions.map((yr) => (
               <SelectItem key={yr} value={String(yr)}>
                 {yr}
               </SelectItem>
@@ -631,7 +655,7 @@ export function VineyardGrowingQuestionnaire({
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">
-            Grape growing questionnaire for <span className="text-foreground font-medium">{vineyardName}</span>
+            Arable growing questionnaire for <span className="text-foreground font-medium">{fieldName}</span>
           </span>
           <span className="text-muted-foreground">
             Step {currentStep + 1} of {STEPS.length}
@@ -674,7 +698,7 @@ export function VineyardGrowingQuestionnaire({
               <div>
                 <h3 className="font-semibold text-lg">Soil & Land Management</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  How you manage your vineyard soils affects carbon sequestration and N2O emissions.
+                  How you manage your arable soils affects carbon sequestration and N2O emissions.
                 </p>
               </div>
 
@@ -691,46 +715,86 @@ export function VineyardGrowingQuestionnaire({
                       onChange={(e) => updateForm({ area_ha: parseFloat(e.target.value) || 0 })}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Vineyard total: {vineyardHectares} ha. Enter the area used for this product.
+                      Field total: {fieldHectares} ha. Enter the area used for this product.
                     </p>
-                    {form.area_ha > vineyardHectares && (
+                    {form.area_ha > fieldHectares && (
                       <p className="text-xs text-amber-600 dark:text-amber-400">
-                        ⚠ Area exceeds vineyard total ({vineyardHectares} ha)
+                        Area exceeds field total ({fieldHectares} ha)
                       </p>
                     )}
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="yield">Annual grape yield (tonnes) *</Label>
-                    <Input
-                      id="yield"
-                      type="number"
-                      step="0.1"
-                      min="0.1"
-                      value={form.grape_yield_tonnes || ''}
-                      onChange={(e) => updateForm({ grape_yield_tonnes: parseFloat(e.target.value) || 0 })}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Total harvest from this area. UK average: 5-8 t/ha, warm climate: 8-15 t/ha.
-                    </p>
-                    {form.grape_yield_tonnes > 0 && form.area_ha > 0 && (
-                      <>
-                        <p className="text-xs text-muted-foreground">
-                          Calculated yield: {(form.grape_yield_tonnes / form.area_ha).toFixed(1)} t/ha
-                        </p>
-                        {form.grape_yield_tonnes / form.area_ha > 25 && (
-                          <p className="text-xs text-amber-600 dark:text-amber-400">
-                            ⚠ Yield above 25 t/ha is unusually high. Please check your figures.
-                          </p>
-                        )}
-                        {form.grape_yield_tonnes / form.area_ha < 1 && (
-                          <p className="text-xs text-amber-600 dark:text-amber-400">
-                            ⚠ Yield below 1 t/ha is very low. Is this a newly planted vineyard?
-                          </p>
-                        )}
-                      </>
-                    )}
+                    <Label>Straw management</Label>
+                    <Select
+                      value={form.straw_management}
+                      onValueChange={(v) => updateForm({ straw_management: v as StrawManagement })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(STRAW_MANAGEMENT_LABELS).map(([value, label]) => (
+                          <SelectItem key={value} value={value}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="straw-yield">Straw yield (t/ha)</Label>
+                    <Input
+                      id="straw-yield"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      value={form.straw_yield_tonnes_per_ha || ''}
+                      onChange={(e) => updateForm({ straw_yield_tonnes_per_ha: parseFloat(e.target.value) || 0 })}
+                      placeholder="e.g. 2.5"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Used for crop residue N2O calculation. UK average: 2-3.5 t/ha.
+                    </p>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Lime type</Label>
+                    <Select
+                      value={form.lime_type}
+                      onValueChange={(v) => updateForm({ lime_type: v as 'ite' | 'dolomite' | 'none' })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(LIME_TYPE_LABELS).map(([value, label]) => (
+                          <SelectItem key={value} value={value}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {form.lime_type !== 'none' && (
+                  <div className="grid gap-2 max-w-[300px]">
+                    <Label htmlFor="lime-qty">Lime applied (kg/ha)</Label>
+                    <Input
+                      id="lime-qty"
+                      type="number"
+                      min="0"
+                      value={form.lime_applied_kg_per_ha || ''}
+                      onChange={(e) => updateForm({ lime_applied_kg_per_ha: parseFloat(e.target.value) || 0 })}
+                      placeholder="e.g. 2000"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      IPCC Tier 1: CO2 emissions calculated from lime dissolution in soil.
+                    </p>
+                  </div>
+                )}
 
                 <div className="grid gap-2">
                   <Label>Soil management practice</Label>
@@ -814,53 +878,6 @@ export function VineyardGrowingQuestionnaire({
                   </div>
                 </div>
 
-                <Separator />
-
-                <div className="grid gap-2">
-                  <Label>Pruning residue management</Label>
-                  <p className="text-xs text-muted-foreground">
-                    How vine prunings are managed after pruning. This affects the N2O calculation.
-                  </p>
-                  <Select
-                    value={form.pruning_residue_management_type}
-                    onValueChange={(v) => updateForm({
-                      pruning_residue_management_type: v as 'in_field' | 'removed_for_biomass' | 'chipped_and_spread',
-                      pruning_residue_returned: v !== 'removed_for_biomass',
-                    })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="in_field">Left in field to decompose (default)</SelectItem>
-                      <SelectItem value="removed_for_biomass">Removed for biomass / off-site use</SelectItem>
-                      <SelectItem value="chipped_and_spread">Chipped and spread back onto soil</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {form.pruning_residue_management_type !== 'removed_for_biomass' && (
-                  <div className="grid gap-2 max-w-[300px]">
-                    <Label htmlFor="pruning-dm">Measured pruning dry matter (kg/ha/yr)</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Optional. If you have measured data, enter it here. This improves data quality from secondary to primary.
-                    </p>
-                    <Input
-                      id="pruning-dm"
-                      type="number"
-                      min="0"
-                      step="0.1"
-                      value={form.pruning_residue_measured_kg_per_ha ?? ''}
-                      onChange={(e) =>
-                        updateForm({
-                          pruning_residue_measured_kg_per_ha: e.target.value ? parseFloat(e.target.value) : null,
-                        })
-                      }
-                      placeholder="e.g. 2500"
-                    />
-                  </div>
-                )}
-
                 {/* TNFD Location & Nature */}
                 <Separator className="my-4" />
                 <div className="space-y-3">
@@ -875,7 +892,7 @@ export function VineyardGrowingQuestionnaire({
                     <div className="grid gap-1.5">
                       <Label className="text-xs">Ecosystem type</Label>
                       <p className="text-xs text-muted-foreground">
-                        Select the dominant ecosystem type at your vineyard's location. This is used for TNFD nature impact disclosure.
+                        Select the dominant ecosystem type at your field's location. This is used for TNFD nature impact disclosure.
                       </p>
                       <Select
                         value={form.ecosystem_type}
@@ -918,7 +935,7 @@ export function VineyardGrowingQuestionnaire({
                           <Input
                             value={form.sensitive_area_details}
                             onChange={(e) => updateForm({ sensitive_area_details: e.target.value })}
-                            placeholder="e.g. South Downs National Park"
+                            placeholder="e.g. Breckland SPA"
                             className="h-9"
                           />
                         </div>
@@ -961,7 +978,7 @@ export function VineyardGrowingQuestionnaire({
                   <div>
                     <Label>Previous land use</Label>
                     <p className="text-xs text-muted-foreground">
-                      What was this land used for before it became a vineyard?
+                      What was this land used for before it became arable?
                       Required for FLAG-compliant land use change (dLUC) calculations.
                     </p>
                   </div>
@@ -981,9 +998,9 @@ export function VineyardGrowingQuestionnaire({
                     </SelectContent>
                   </Select>
 
-                  {form.previous_land_use_type !== 'permanent_vineyard' && (
+                  {form.previous_land_use_type !== 'permanent_arable' && (
                     <div className="grid gap-2 max-w-[200px]">
-                      <Label htmlFor="conversion-year">Year of conversion to vineyard</Label>
+                      <Label htmlFor="conversion-year">Year of conversion to arable</Label>
                       <Input
                         id="conversion-year"
                         type="number"
@@ -1035,7 +1052,7 @@ export function VineyardGrowingQuestionnaire({
                         <span className="font-medium text-foreground">
                           {SOIL_CARBON_REMOVAL_DEFAULTS[form.soil_management] ?? 0} kg CO2e/ha/yr
                         </span>{' '}
-                        removal (WineGB/OIV conservative estimate).
+                        removal (conservative estimate).
                       </p>
                     </div>
                   )}
@@ -1067,15 +1084,6 @@ export function VineyardGrowingQuestionnaire({
                             <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
                               <AlertTriangle className="h-3 w-3" />
                               Unusually high. Please verify your measurement.
-                            </p>
-                          )}
-                          {form.soil_carbon_override_kg_co2e_per_ha != null &&
-                            form.soil_carbon_override_kg_co2e_per_ha > 0 &&
-                            (SOIL_CARBON_REMOVAL_DEFAULTS[form.soil_management] ?? 0) > 0 &&
-                            form.soil_carbon_override_kg_co2e_per_ha > (SOIL_CARBON_REMOVAL_DEFAULTS[form.soil_management] ?? 0) * 3 && (
-                            <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                              <AlertTriangle className="h-3 w-3" />
-                              Significantly above the practice-based estimate.
                             </p>
                           )}
                         </div>
@@ -1126,7 +1134,7 @@ export function VineyardGrowingQuestionnaire({
                         </div>
                       </div>
 
-                      {/* Row 3: Sampling points (optional) */}
+                      {/* Row 3: Sampling points */}
                       <div className="grid gap-2 max-w-[200px]">
                         <Label htmlFor="sampling-points">Sampling points (optional)</Label>
                         <Input
@@ -1182,7 +1190,6 @@ export function VineyardGrowingQuestionnaire({
                           Upload the laboratory report as supporting evidence. Optional but recommended for credibility.
                         </p>
 
-                        {/* Existing evidence files */}
                         {existingEvidence.map((doc) => (
                           <div
                             key={doc.id}
@@ -1212,7 +1219,7 @@ export function VineyardGrowingQuestionnaire({
                                 type="button"
                                 onClick={async () => {
                                   const res = await fetch(
-                                    `/api/vineyards/${vineyardId}/growing-profile/evidence?evidence_id=${doc.id}`,
+                                    `/api/arable-fields/${fieldId}/growing-profile/evidence?evidence_id=${doc.id}`,
                                     { method: 'DELETE' }
                                   );
                                   if (res.ok) {
@@ -1230,7 +1237,6 @@ export function VineyardGrowingQuestionnaire({
                           </div>
                         ))}
 
-                        {/* Pending upload indicator */}
                         {evidenceFile && (
                           <div className="flex items-center gap-2 rounded-lg border border-dashed border-[#ccff00]/50 bg-[#ccff00]/5 p-2">
                             <Upload className="h-4 w-4 text-[#ccff00]" />
@@ -1248,7 +1254,6 @@ export function VineyardGrowingQuestionnaire({
                           </div>
                         )}
 
-                        {/* File input */}
                         {!evidenceFile && (
                           <label className="flex items-center gap-2 rounded-lg border border-dashed border-border p-3 cursor-pointer hover:border-muted-foreground/50 transition-colors">
                             <Upload className="h-4 w-4 text-muted-foreground" />
@@ -1388,258 +1393,485 @@ export function VineyardGrowingQuestionnaire({
           {currentStep === 1 && (
             <div className="space-y-4">
               <div>
-                <h3 className="font-semibold text-lg">Chemical Inputs</h3>
+                <h3 className="font-semibold text-lg">Fertiliser, Crop Protection & Seed</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Import your spray diary or add chemicals manually to record all inputs for this vintage.
+                  Synthetic nitrogen fertiliser is typically the largest single emission source in arable cropping.
                 </p>
               </div>
 
-              {/* Import panel */}
-              <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium">Import spray diary</p>
+              {/* Spray diary import */}
+              <div className="rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/20 p-4">
+                <div className="flex items-start gap-3">
+                  <Upload className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">Import spray diary</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Accepts any Excel format — spray schedule, application diary, field records.
+                      Upload your spray schedule spreadsheet (.xlsx) and we will automatically extract and classify all chemical applications.
+                      You can review and edit the data before saving.
                     </p>
+                    <div className="mt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => sprayFileInputRef.current?.click()}
+                        disabled={isImporting}
+                      >
+                        {isImporting ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Analysing...
+                          </>
+                        ) : (
+                          <>
+                            <FileText className="h-4 w-4 mr-2" />
+                            Choose file
+                          </>
+                        )}
+                      </Button>
+                      <input
+                        ref={sprayFileInputRef}
+                        type="file"
+                        accept=".xlsx,.xls"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) handleSprayImport(f);
+                          e.target.value = '';
+                        }}
+                      />
+                    </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => sprayFileInputRef.current?.click()}
-                    disabled={isImporting}
-                  >
-                    {isImporting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Analysing...
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="mr-2 h-4 w-4" />
-                        Import xlsx
-                      </>
-                    )}
-                  </Button>
-                  <input
-                    ref={sprayFileInputRef}
-                    type="file"
-                    accept=".xlsx,.xls"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleSprayImport(file);
-                      e.target.value = '';
-                    }}
-                  />
                 </div>
               </div>
 
-              {/* Chemicals table */}
+              {/* Imported chemicals table */}
               {sprayChemicals.length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">{sprayChemicals.length} chemical{sprayChemicals.length !== 1 ? 's' : ''} recorded</p>
+                    <p className="text-sm font-medium">Imported chemicals ({sprayChemicals.length})</p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSprayChemicals([]);
+                        toast.info('Spray data cleared');
+                      }}
+                      className="text-xs text-muted-foreground"
+                    >
+                      Clear all
+                    </Button>
                   </div>
-
-                  {/* Table header */}
-                  <div className="rounded-lg border border-border overflow-hidden">
-                    <div className="grid grid-cols-[2fr_1fr_0.7fr_1fr_1fr_1fr_68px] gap-x-2 px-3 py-2 bg-muted/30 text-xs text-muted-foreground font-medium">
-                      <span>Chemical</span>
-                      <span>Type</span>
-                      <span>N %</span>
-                      <span>Rate / ha</span>
-                      <span>Total ha</span>
-                      <span>Total used</span>
-                      <span></span>
-                    </div>
-
-                    {sprayChemicals.map((chem, idx) => (
-                      <div
-                        key={idx}
-                        className="grid grid-cols-[2fr_1fr_0.7fr_1fr_1fr_1fr_68px] gap-x-2 px-3 py-2 border-t border-border items-center text-sm"
-                      >
-                        {/* Chemical name */}
-                        <Input
-                          value={chem.chemical_name}
-                          onChange={(e) => updateChemical(idx, { chemical_name: e.target.value })}
-                          className="h-7 text-xs px-2"
-                          placeholder="Product name"
-                        />
-
-                        {/* Type */}
-                        <Select
-                          value={chem.chemical_type}
-                          onValueChange={(v) => updateChemical(idx, { chemical_type: v as ChemicalType })}
+                  <div className="rounded-lg border overflow-x-auto">
+                    <div className="min-w-[700px]">
+                      {/* Header */}
+                      <div className="grid grid-cols-[1fr_100px_60px_80px_80px_80px_68px] gap-2 px-3 py-2 bg-muted/50 text-xs font-medium text-muted-foreground">
+                        <span>Chemical</span>
+                        <span>Type</span>
+                        <span>N%</span>
+                        <span>Rate/ha</span>
+                        <span>Total ha</span>
+                        <span>Total used</span>
+                        <span></span>
+                      </div>
+                      {/* Rows */}
+                      {sprayChemicals.map((chem, idx) => (
+                        <div
+                          key={idx}
+                          className="grid grid-cols-[1fr_100px_60px_80px_80px_80px_68px] gap-2 px-3 py-1.5 items-center border-t text-sm"
                         >
-                          <SelectTrigger className="h-7 text-xs px-2">
-                            <SelectValue>
-                              <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-xs font-medium ${chemicalTypeBadgeClass(chem.chemical_type)}`}>
-                                {CHEMICAL_TYPE_OPTIONS.find((o) => o.value === chem.chemical_type)?.label ?? chem.chemical_type}
-                              </span>
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {CHEMICAL_TYPE_OPTIONS.map((o) => (
-                              <SelectItem key={o.value} value={o.value}>
-                                <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-xs font-medium ${chemicalTypeBadgeClass(o.value)}`}>
-                                  {o.label}
-                                </span>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-
-                        {/* N content % — editable for fertilisers, locked for others */}
-                        <div className="flex items-center gap-0.5">
+                          <Input
+                            value={chem.chemical_name}
+                            onChange={(e) => {
+                              const updated = [...sprayChemicals];
+                              updated[idx] = { ...chem, chemical_name: e.target.value };
+                              setSprayChemicals(updated);
+                            }}
+                            className="h-7 text-xs"
+                          />
+                          <Badge
+                            variant="secondary"
+                            className={`text-[10px] justify-center ${
+                              chem.chemical_type === 'fertiliser' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
+                              chem.chemical_type === 'fungicide' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' :
+                              chem.chemical_type === 'herbicide' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' :
+                              chem.chemical_type === 'insecticide' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
+                              chem.chemical_type === 'growth_regulator' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' :
+                              chem.chemical_type === 'seed_treatment' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' :
+                              ''
+                            }`}
+                          >
+                            {chem.chemical_type === 'growth_regulator' ? 'PGR' :
+                             chem.chemical_type === 'seed_treatment' ? 'Seed Tx' :
+                             chem.chemical_type}
+                          </Badge>
                           <Input
                             type="number"
                             min="0"
                             max="100"
                             step="0.1"
-                            value={chem.chemical_type === 'fertiliser' ? (chem.n_content_percent ?? '') : ''}
-                            onChange={(e) =>
-                              updateChemical(idx, { n_content_percent: parseFloat(e.target.value) || 0 })
-                            }
+                            value={chem.n_content_percent || ''}
                             disabled={chem.chemical_type !== 'fertiliser'}
-                            className="h-7 text-xs px-2 w-14"
-                            placeholder={chem.chemical_type === 'fertiliser' ? '0' : '—'}
+                            onChange={(e) => {
+                              const updated = [...sprayChemicals];
+                              updated[idx] = { ...chem, n_content_percent: parseFloat(e.target.value) || 0 };
+                              setSprayChemicals(updated);
+                              updateForm(deriveSimplifiedFields(updated));
+                            }}
+                            className="h-7 text-xs"
                           />
-                          {chem.chemical_type === 'fertiliser' && chem.library_matched && (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger>
-                                  <span className="text-green-400 text-xs leading-none">✓</span>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p className="text-xs">Matched from chemical library</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          )}
-                        </div>
-
-                        {/* Rate/ha + unit */}
-                        <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={chem.rate_per_ha || ''}
+                              onChange={(e) => {
+                                const newRate = parseFloat(e.target.value) || 0;
+                                const updated = [...sprayChemicals];
+                                updated[idx] = {
+                                  ...chem,
+                                  rate_per_ha: newRate,
+                                  total_amount_used: newRate * (chem.total_ha_sprayed || 0),
+                                };
+                                setSprayChemicals(updated);
+                                updateForm(deriveSimplifiedFields(updated));
+                              }}
+                              className="h-7 text-xs"
+                            />
+                            <span className="text-[10px] text-muted-foreground">{chem.unit}</span>
+                          </div>
                           <Input
                             type="number"
                             min="0"
-                            step="0.01"
-                            value={chem.rate_per_ha || ''}
-                            onChange={(e) => updateChemical(idx, { rate_per_ha: parseFloat(e.target.value) || 0 })}
-                            className="h-7 text-xs px-2 w-16"
-                            placeholder="0"
+                            step="0.1"
+                            value={chem.total_ha_sprayed || ''}
+                            onChange={(e) => {
+                              const newHa = parseFloat(e.target.value) || 0;
+                              const updated = [...sprayChemicals];
+                              updated[idx] = {
+                                ...chem,
+                                total_ha_sprayed: newHa,
+                                total_amount_used: (chem.rate_per_ha || 0) * newHa,
+                              };
+                              setSprayChemicals(updated);
+                              updateForm(deriveSimplifiedFields(updated));
+                            }}
+                            className="h-7 text-xs"
                           />
-                          <Input
-                            value={chem.unit}
-                            onChange={(e) => updateChemical(idx, { unit: e.target.value })}
-                            className="h-7 text-xs px-2 w-12"
-                            placeholder="L"
-                          />
-                        </div>
-
-                        {/* Total ha */}
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={chem.total_ha_sprayed || ''}
-                          onChange={(e) => {
-                            const ha = parseFloat(e.target.value) || 0;
-                            updateChemical(idx, {
-                              total_ha_sprayed: ha,
-                              total_amount_used: parseFloat((chem.rate_per_ha * ha).toFixed(4)),
-                            });
-                          }}
-                          className="h-7 text-xs px-2"
-                          placeholder="ha"
-                        />
-
-                        {/* Total used */}
-                        <div className="text-xs text-muted-foreground">
-                          {chem.total_amount_used > 0
-                            ? `${chem.total_amount_used.toFixed(1)} ${chem.unit}`
-                            : '-'}
-                        </div>
-
-                        {/* Actions */}
-                        <div className="flex items-center gap-0.5">
-                          {!chem.library_matched && (
-                            <button
-                              onClick={async () => {
-                                try {
-                                  const res = await fetch('/api/chemical-library', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                      chemical_name: chem.chemical_name,
-                                      chemical_type: chem.chemical_type,
-                                      n_content_percent: chem.n_content_percent ?? 0,
-                                      fertiliser_subtype: chem.fertiliser_subtype ?? null,
-                                      active_ingredient: null,
-                                      applicable_to: ['vineyard', 'arable', 'orchard'],
-                                    }),
-                                  });
-                                  if (res.status === 409) {
-                                    toast.info(`${chem.chemical_name} is already in the library`);
-                                  } else if (!res.ok) {
-                                    throw new Error('Failed to add chemical');
-                                  } else {
-                                    toast.success(`${chem.chemical_name} added to the chemical library`);
+                          <span className="text-xs text-muted-foreground text-right tabular-nums">
+                            {(chem.total_amount_used || 0).toFixed(1)} {chem.unit}
+                          </span>
+                          <div className="flex items-center gap-0.5">
+                            {!chem.library_matched && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-green-600"
+                                title="Add to chemical library"
+                                onClick={async () => {
+                                  try {
+                                    const res = await fetch('/api/chemical-library', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({
+                                        chemical_name: chem.chemical_name,
+                                        chemical_type: chem.chemical_type,
+                                        n_content_percent: chem.n_content_percent ?? 0,
+                                        fertiliser_subtype: chem.fertiliser_subtype ?? null,
+                                        active_ingredient: null,
+                                        applicable_to: ['vineyard', 'arable', 'orchard'],
+                                      }),
+                                    });
+                                    if (res.status === 409) {
+                                      toast.info(`${chem.chemical_name} is already in the library`);
+                                    } else if (!res.ok) {
+                                      throw new Error('Failed to add chemical');
+                                    } else {
+                                      toast.success(`${chem.chemical_name} added to the chemical library`);
+                                    }
+                                    const updated = [...sprayChemicals];
+                                    updated[idx] = { ...chem, library_matched: true };
+                                    setSprayChemicals(updated);
+                                  } catch {
+                                    toast.error('Failed to add chemical to library');
                                   }
-                                  const updated = [...sprayChemicals];
-                                  updated[idx] = { ...chem, library_matched: true };
-                                  setSprayChemicals(updated);
-                                } catch {
-                                  toast.error('Failed to add chemical to library');
+                                }}
+                              >
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => {
+                                const updated = sprayChemicals.filter((_, i) => i !== idx);
+                                setSprayChemicals(updated);
+                                if (updated.length > 0) {
+                                  updateForm(deriveSimplifiedFields(updated));
                                 }
                               }}
-                              className="text-muted-foreground hover:text-green-600 transition-colors p-1 rounded"
-                              title="Add to chemical library"
                             >
-                              <Plus className="h-3.5 w-3.5" />
-                            </button>
-                          )}
-                          <button
-                            onClick={() => removeChemical(idx)}
-                            className="text-muted-foreground hover:text-destructive transition-colors p-1 rounded"
-                            title="Remove"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-
-                  {/* Unmatched warning */}
                   {sprayChemicals.some((c) => !c.library_matched) && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 px-1">
+                    <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
                       <AlertTriangle className="h-3 w-3" />
                       Some chemicals were not found in our library. Verify their classification and click <Plus className="h-3 w-3 inline" /> to save them for future use.
                     </p>
                   )}
-
-                  {/* Summary row */}
-                  <div className="flex flex-wrap gap-4 text-xs text-muted-foreground px-1">
-                    {(['fertiliser', 'fungicide', 'herbicide', 'insecticide'] as ChemicalType[]).map((type) => {
-                      const count = sprayChemicals.filter((c) => c.chemical_type === type).length;
-                      if (count === 0) return null;
-                      return (
-                        <span key={type} className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 font-medium ${chemicalTypeBadgeClass(type)}`}>
-                          {count} {type}{count !== 1 ? 's' : ''}
-                        </span>
-                      );
-                    })}
-                  </div>
                 </div>
               )}
 
-              {/* Add manually */}
-              <Button variant="outline" size="sm" onClick={addEmptyChemical} className="w-full">
-                + Add chemical manually
-              </Button>
+              <Separator />
 
+              <p className="text-xs text-muted-foreground">
+                {sprayChemicals.length > 0
+                  ? 'The values below have been auto-populated from your spray diary. You can still adjust them manually.'
+                  : 'Or enter your input data manually below.'}
+              </p>
+
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label>Fertiliser type</Label>
+                  <Select
+                    value={form.fertiliser_type}
+                    onValueChange={(v) => updateForm({ fertiliser_type: v as FertiliserType })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FERTILISER_TYPES.map((ft) => (
+                        <SelectItem key={ft.value} value={ft.value}>
+                          {ft.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {form.fertiliser_type !== 'none' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="fert-qty">
+                        Total quantity applied (kg/year)
+                      </Label>
+                      <Input
+                        id="fert-qty"
+                        type="number"
+                        min="0"
+                        value={form.fertiliser_quantity_kg || ''}
+                        onChange={(e) =>
+                          updateForm({ fertiliser_quantity_kg: parseFloat(e.target.value) || 0 })
+                        }
+                        placeholder="e.g. 2000"
+                      />
+                      {form.fertiliser_quantity_kg > 0 && form.area_ha > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {(form.fertiliser_quantity_kg / form.area_ha).toFixed(0)} kg/ha
+                          {form.fertiliser_type === 'synthetic_n' && form.fertiliser_quantity_kg / form.area_ha > 400 && (
+                            <span className="text-amber-600 dark:text-amber-400 ml-1">
+                              High for arable (typical: 100-250 kg N/ha)
+                            </span>
+                          )}
+                        </p>
+                      )}
+                    </div>
+                    <div className="grid gap-2">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Label htmlFor="n-content" className="flex items-center gap-1">
+                              Nitrogen content (%)
+                              <Info className="h-3 w-3 text-muted-foreground" />
+                            </Label>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="max-w-xs text-xs">
+                              Ammonium nitrate: 34.5%. Urea: 46%. CAN: 27%. Manure: 0.5-1%. Compost: 1-2%.
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      <Input
+                        id="n-content"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={form.fertiliser_n_content_percent || ''}
+                        onChange={(e) =>
+                          updateForm({ fertiliser_n_content_percent: parseFloat(e.target.value) || 0 })
+                        }
+                        placeholder="e.g. 34.5"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Pesticides (fungicides, insecticides)</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Includes fungicide treatments and insecticide applications
+                      </p>
+                    </div>
+                    <Switch
+                      checked={form.uses_pesticides}
+                      onCheckedChange={(v) => updateForm({ uses_pesticides: v })}
+                    />
+                  </div>
+                  {form.uses_pesticides && (
+                    <div className="grid gap-3 pl-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="pest-apps">Applications per year</Label>
+                        <Input
+                          id="pest-apps"
+                          type="number"
+                          min="0"
+                          max="30"
+                          value={form.pesticide_applications_per_year || ''}
+                          onChange={(e) =>
+                            updateForm({ pesticide_applications_per_year: parseInt(e.target.value) || 0 })
+                          }
+                          placeholder="e.g. 4"
+                          className="w-32"
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>Pesticide type</Label>
+                        <Select
+                          value={form.pesticide_type}
+                          onValueChange={(v) => updateForm({ pesticide_type: v as ArablePesticideType })}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PESTICIDE_TYPES.map((pt) => (
+                              <SelectItem key={pt.value} value={pt.value}>
+                                {pt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Herbicides</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Chemical weed control (not applicable for organic)
+                      </p>
+                    </div>
+                    <Switch
+                      checked={form.uses_herbicides}
+                      onCheckedChange={(v) => updateForm({ uses_herbicides: v })}
+                    />
+                  </div>
+                  {form.uses_herbicides && (
+                    <div className="grid gap-3 pl-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="herb-apps">Applications per year</Label>
+                        <Input
+                          id="herb-apps"
+                          type="number"
+                          min="0"
+                          max="10"
+                          value={form.herbicide_applications_per_year || ''}
+                          onChange={(e) =>
+                            updateForm({ herbicide_applications_per_year: parseInt(e.target.value) || 0 })
+                          }
+                          placeholder="e.g. 2"
+                          className="w-32"
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>Herbicide type</Label>
+                        <Select
+                          value={form.herbicide_type}
+                          onValueChange={(v) => updateForm({ herbicide_type: v as ArablePesticideType })}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {HERBICIDE_TYPES.map((ht) => (
+                              <SelectItem key={ht.value} value={ht.value}>
+                                {ht.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+
+                  <Separator />
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Growth regulators</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Plant growth regulators (e.g. chlormequat) to reduce lodging
+                      </p>
+                    </div>
+                    <Switch
+                      checked={form.uses_growth_regulators}
+                      onCheckedChange={(v) => updateForm({ uses_growth_regulators: v })}
+                    />
+                  </div>
+                  {form.uses_growth_regulators && (
+                    <div className="grid gap-3 pl-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="gr-apps">Applications per year</Label>
+                        <Input
+                          id="gr-apps"
+                          type="number"
+                          min="0"
+                          max="10"
+                          value={form.growth_regulator_applications || ''}
+                          onChange={(e) =>
+                            updateForm({ growth_regulator_applications: parseInt(e.target.value) || 0 })
+                          }
+                          placeholder="e.g. 2"
+                          className="w-32"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <Separator />
+
+                  <div className="grid gap-2 max-w-[300px]">
+                    <Label htmlFor="seed-rate">Seed rate (kg/ha)</Label>
+                    <Input
+                      id="seed-rate"
+                      type="number"
+                      min="0"
+                      value={form.seed_rate_kg_per_ha || ''}
+                      onChange={(e) =>
+                        updateForm({ seed_rate_kg_per_ha: parseFloat(e.target.value) || 0 })
+                      }
+                      placeholder="e.g. 160"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Typical rates: barley 140-180 kg/ha, wheat 150-200 kg/ha.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -1649,7 +1881,7 @@ export function VineyardGrowingQuestionnaire({
               <div>
                 <h3 className="font-semibold text-lg">Machinery & Fuel</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Diesel consumption for tractors, sprayers, and harvesting equipment.
+                  Diesel consumption for tractors, combine harvesters, sprayers, and other field machinery.
                 </p>
               </div>
 
@@ -1665,17 +1897,17 @@ export function VineyardGrowingQuestionnaire({
                       onChange={(e) =>
                         updateForm({ diesel_litres_per_year: parseFloat(e.target.value) || 0 })
                       }
-                      placeholder="e.g. 500"
+                      placeholder="e.g. 1500"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Total diesel for all vineyard operations. Sector average: 80-150 L/ha/yr.
+                      Total diesel for all field operations. Arable average: 80-150 L/ha/yr.
                     </p>
                     {form.diesel_litres_per_year > 0 && form.area_ha > 0 && (
                       <p className="text-xs text-muted-foreground">
                         {(form.diesel_litres_per_year / form.area_ha).toFixed(0)} L/ha
                         {form.diesel_litres_per_year / form.area_ha > 300 && (
                           <span className="text-amber-600 dark:text-amber-400 ml-1">
-                            ⚠ Above 300 L/ha is unusually high
+                            Above 300 L/ha is unusually high
                           </span>
                         )}
                       </p>
@@ -1691,11 +1923,60 @@ export function VineyardGrowingQuestionnaire({
                       onChange={(e) =>
                         updateForm({ petrol_litres_per_year: parseFloat(e.target.value) || 0 })
                       }
-                      placeholder="e.g. 50"
+                      placeholder="e.g. 20"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Strimmers, chainsaws, ATVs, etc. Typical: 10-30 L/ha/yr.
+                      ATVs, small equipment, etc. Typical: 5-20 L/ha/yr.
                     </p>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="grid gap-4">
+                  <div>
+                    <Label>Grain drying</Label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Energy used for drying grain post-harvest. Select "No drying required" if grain is sold or stored at harvest moisture.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label>Drying fuel type</Label>
+                      <Select
+                        value={form.grain_drying_fuel}
+                        onValueChange={(v) => updateForm({ grain_drying_fuel: v as GrainDryingFuel })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(GRAIN_DRYING_FUEL_LABELS).map(([value, label]) => (
+                            <SelectItem key={value} value={value}>
+                              {label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {form.grain_drying_fuel !== 'none' && (
+                      <div className="grid gap-2">
+                        <Label htmlFor="drying-energy">Energy (kWh per tonne grain)</Label>
+                        <Input
+                          id="drying-energy"
+                          type="number"
+                          min="0"
+                          value={form.grain_drying_energy_kwh_per_tonne || ''}
+                          onChange={(e) =>
+                            updateForm({ grain_drying_energy_kwh_per_tonne: parseFloat(e.target.value) || 0 })
+                          }
+                          placeholder="e.g. 50"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          UK typical: 30-80 kWh/t depending on initial moisture.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1708,16 +1989,16 @@ export function VineyardGrowingQuestionnaire({
               <div>
                 <h3 className="font-semibold text-lg">Irrigation</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Water use and pumping energy for irrigation. Most UK vineyards are rainfed.
+                  Water use and pumping energy. Most UK arable crops are rainfed.
                 </p>
               </div>
 
               <div className="grid gap-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label>Vineyard is irrigated</Label>
+                    <Label>Field is irrigated</Label>
                     <p className="text-xs text-muted-foreground">
-                      Toggle off if your vineyard is entirely rainfed
+                      Toggle off if your field is entirely rainfed (most UK arable)
                     </p>
                   </div>
                   <Switch
@@ -1738,7 +2019,7 @@ export function VineyardGrowingQuestionnaire({
                         onChange={(e) =>
                           updateForm({ water_m3_per_ha: parseFloat(e.target.value) || 0 })
                         }
-                        placeholder="e.g. 200"
+                        placeholder="e.g. 100"
                       />
                     </div>
                     <div className="grid gap-2">
@@ -1763,6 +2044,115 @@ export function VineyardGrowingQuestionnaire({
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Step 5: Transport & Yield */}
+          {currentStep === 4 && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-semibold text-lg">Transport & Yield</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Transport from field to processing facility and annual grain yield.
+                </p>
+              </div>
+
+              <div className="grid gap-4">
+                {/* Yield section */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="grain-yield">Grain yield (tonnes) *</Label>
+                    <Input
+                      id="grain-yield"
+                      type="number"
+                      step="0.1"
+                      min="0.1"
+                      value={form.grain_yield_tonnes || ''}
+                      onChange={(e) => updateForm({ grain_yield_tonnes: parseFloat(e.target.value) || 0 })}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Total harvest from this area. UK barley average: 6-8 t/ha, wheat: 7-9 t/ha.
+                    </p>
+                    {form.grain_yield_tonnes > 0 && form.area_ha > 0 && (
+                      <>
+                        <p className="text-xs text-muted-foreground">
+                          Calculated yield: {(form.grain_yield_tonnes / form.area_ha).toFixed(1)} t/ha
+                        </p>
+                        {form.grain_yield_tonnes / form.area_ha > 15 && (
+                          <p className="text-xs text-amber-600 dark:text-amber-400">
+                            Yield above 15 t/ha is unusually high. Please check your figures.
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="moisture">Grain moisture (%)</Label>
+                    <Input
+                      id="moisture"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="30"
+                      value={form.grain_moisture_percent || ''}
+                      onChange={(e) => updateForm({ grain_moisture_percent: parseFloat(e.target.value) || 0 })}
+                      placeholder="e.g. 14.5"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Standard trading moisture: barley 14.5%, wheat 14.5%.
+                    </p>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Transport section */}
+                <div className="grid gap-4">
+                  <div>
+                    <Label className="flex items-center gap-2">
+                      <Truck className="h-4 w-4" />
+                      Transport to processing facility
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Distance from field to the facility where the grain is processed (e.g. maltings, distillery, mill).
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="transport-distance">Distance (km)</Label>
+                      <Input
+                        id="transport-distance"
+                        type="number"
+                        min="0"
+                        value={form.transport_distance_km ?? ''}
+                        onChange={(e) =>
+                          updateForm({
+                            transport_distance_km: e.target.value ? parseFloat(e.target.value) : null,
+                          })
+                        }
+                        placeholder="e.g. 40"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Transport mode</Label>
+                      <Select
+                        value={form.transport_mode}
+                        onValueChange={(v) =>
+                          updateForm({ transport_mode: v as TransportMode })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="road">Road (HGV)</SelectItem>
+                          <SelectItem value="rail">Rail</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               {/* Impact Preview */}
               <Separator />
@@ -1776,7 +2166,7 @@ export function VineyardGrowingQuestionnaire({
                       <span className="text-xs font-normal text-muted-foreground ml-1">kg CO2e/year</span>
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
-                      {previewResult.total_emissions_per_kg.toFixed(3)} kg CO2e per kg grapes
+                      {previewResult.total_emissions_per_kg.toFixed(3)} kg CO2e per kg grain
                     </div>
                   </div>
                   {previewResult.total_removals > 0 && (
@@ -1810,7 +2200,7 @@ export function VineyardGrowingQuestionnaire({
                     </div>
                   )}
                 </div>
-                <div className="grid grid-cols-4 gap-2 mt-2">
+                <div className="grid grid-cols-5 gap-2 mt-2">
                   <div className="text-center p-2 rounded bg-muted/30">
                     <div className="text-xs text-muted-foreground">Fertiliser & N2O</div>
                     <div className="text-sm font-medium">
@@ -1824,15 +2214,21 @@ export function VineyardGrowingQuestionnaire({
                     </div>
                   </div>
                   <div className="text-center p-2 rounded bg-muted/30">
-                    <div className="text-xs text-muted-foreground">Pesticides</div>
+                    <div className="text-xs text-muted-foreground">Grain Drying</div>
                     <div className="text-sm font-medium">
-                      {previewResult.non_flag_emissions.pesticide_production_co2e.toFixed(0)} kg
+                      {previewResult.non_flag_emissions.grain_drying_co2e.toFixed(0)} kg
                     </div>
                   </div>
                   <div className="text-center p-2 rounded bg-muted/30">
-                    <div className="text-xs text-muted-foreground">Irrigation</div>
+                    <div className="text-xs text-muted-foreground">Seed</div>
                     <div className="text-sm font-medium">
-                      {previewResult.non_flag_emissions.irrigation_energy_co2e.toFixed(0)} kg
+                      {previewResult.non_flag_emissions.seed_production_co2e.toFixed(0)} kg
+                    </div>
+                  </div>
+                  <div className="text-center p-2 rounded bg-muted/30">
+                    <div className="text-xs text-muted-foreground">Transport</div>
+                    <div className="text-sm font-medium">
+                      {previewResult.non_flag_emissions.transport_co2e.toFixed(0)} kg
                     </div>
                   </div>
                 </div>
@@ -1856,15 +2252,7 @@ export function VineyardGrowingQuestionnaire({
         </Button>
 
         {currentStep < STEPS.length - 1 ? (
-          <Button
-            onClick={() => {
-              if (currentStep === 1 && sprayChemicals.length > 0) {
-                // Derive simplified fields from spray chemicals before advancing
-                updateForm(deriveSimplifiedFields(sprayChemicals));
-              }
-              setCurrentStep(currentStep + 1);
-            }}
-          >
+          <Button onClick={() => setCurrentStep(currentStep + 1)}>
             Next
             <ChevronRight className="ml-1 h-4 w-4" />
           </Button>

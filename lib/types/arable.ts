@@ -1,17 +1,18 @@
 /**
- * Fruit Orchard LCA types
+ * Arable Crop LCA types
  *
- * Types for the orchard growing module that calculates environmental impacts
- * for producers who grow their own fruit (apples, pears, cherries, etc.).
+ * Types for the arable growing module that calculates environmental impacts
+ * for producers who grow their own grain crops (barley, wheat, oats, etc.).
  *
  * FLAG Alignment (SBTi Forest, Land and Agriculture):
  *   - Emissions and removals are ALWAYS reported separately (never netted)
- *   - FLAG emissions = land-based (N2O from soils, land use change)
- *   - Non-FLAG emissions = energy/industrial (diesel, fertiliser production, transport)
+ *   - FLAG emissions = land-based (N2O from soils, land use change, lime CO2)
+ *   - Non-FLAG emissions = energy/industrial (diesel, fertiliser production, transport, drying)
  *   - Removals = soil carbon sequestration (practice-based defaults or measured)
  *
  * Methodology references:
  *   - IPCC 2019 Refinement, Chapter 11 (N2O from managed soils)
+ *   - IPCC 2019 Refinement, Chapter 11 (CO2 from lime application)
  *   - IPCC AR6 GWP-100 (N2O = 273)
  *   - SBTi FLAG Guidance v1.2 (March 2026)
  *   - GHG Protocol Land Sector and Removals Standard V1.0 (January 2026)
@@ -29,78 +30,82 @@ export type {
 // Re-export climate zone with an alias for clarity
 export type { VineyardClimateZone as ClimateZone } from './viticulture';
 
+// Re-export transport mode from orchard
+export type { TransportMode } from './orchard';
+
 // ---------------------------------------------------------------------------
-// Orchard-specific enums
+// Arable-specific enums
 // ---------------------------------------------------------------------------
 
-export type OrchardType =
-  | 'apple'
-  | 'pear'
-  | 'cherry'
-  | 'plum'
-  | 'citrus'
-  | 'stone_fruit'
-  | 'mixed'
+export type CropType =
+  | 'barley'
+  | 'wheat'
+  | 'oats'
+  | 'rye'
+  | 'maize'
   | 'other';
 
-export type OrchardCertification =
+export type ArableCertification =
   | 'conventional'
   | 'organic'
-  | 'biodynamic'
   | 'other';
 
-export type TrainingSystem =
-  | 'bush'
-  | 'spindle'
-  | 'espalier'
-  | 'trellis'
-  | 'central_leader'
-  | 'open_vase'
+export type SowingMethod =
+  | 'drilled'
+  | 'broadcast'
+  | 'direct_drill'
   | 'other';
 
-export type OrchardPesticideType =
+export type StrawManagement =
+  | 'incorporated'
+  | 'baled_removed'
+  | 'burned'
+  | 'mulched';
+
+export type GrainDryingFuel =
+  | 'natural_gas'
+  | 'lpg'
+  | 'diesel'
+  | 'biomass'
+  | 'grid_electricity'
+  | 'none';
+
+export type ArablePesticideType =
   | 'generic'
   | 'sulfur'
-  | 'mancozeb'
   | 'synthetic_fungicide'
-  | 'insecticide_codling_moth'
-  | 'insecticide_aphid'
-  | 'herbicide_glyphosate';
-
-export type TransportMode = 'road' | 'rail';
+  | 'herbicide_glyphosate'
+  | 'growth_regulator';
 
 /** IPCC land use categories for dLUC calculation (FLAG-C3) */
 export type PreviousLandUseType =
-  | 'permanent_orchard'
+  | 'permanent_arable'
   | 'grassland'
   | 'forest'
-  | 'arable'
   | 'wetland'
   | 'settlement'
   | 'other_land';
 
 // ---------------------------------------------------------------------------
-// Database row - mirrors public.orchards
+// Database row - mirrors public.arable_fields
 // ---------------------------------------------------------------------------
 
-export interface Orchard {
+export interface ArableField {
   id: string;
   organization_id: string;
   facility_id: string | null;
   name: string;
   hectares: number;
-  orchard_type: OrchardType;
-  fruit_varieties: string[];
+  crop_type: CropType;
+  crop_varieties: string[];
   annual_yield_tonnes: number | null;
   yield_tonnes_per_ha: number | null;
-  certification: OrchardCertification;
+  certification: ArableCertification;
   climate_zone: 'wet' | 'dry' | 'temperate';
 
-  // Orchard-specific
-  planting_year: number | null;
-  tree_density_per_ha: number | null;
-  rootstock_type: string | null;
-  training_system: TrainingSystem | null;
+  // Arable-specific
+  sowing_method: SowingMethod | null;
+  seed_rate_kg_per_ha: number | null;
 
   // Location
   address_line1: string | null;
@@ -111,9 +116,9 @@ export interface Orchard {
   address_lng: number | null;
   location_country_code: string | null;
 
-  /** Land use before orchard establishment (FLAG dLUC) */
+  /** Land use before current arable use (FLAG dLUC) */
   previous_land_use_type: PreviousLandUseType | null;
-  /** Year land was converted to orchard (FLAG 20-year amortisation) */
+  /** Year land was converted to arable (FLAG 20-year amortisation) */
   land_conversion_year: number | null;
 
   is_active: boolean;
@@ -122,12 +127,12 @@ export interface Orchard {
 }
 
 // ---------------------------------------------------------------------------
-// Database row - mirrors public.orchard_growing_profiles
+// Database row - mirrors public.arable_growing_profiles
 // ---------------------------------------------------------------------------
 
-export interface OrchardGrowingProfile {
+export interface ArableGrowingProfile {
   id: string;
-  orchard_id: string;
+  arable_field_id: string;
   organization_id: string;
   harvest_year: number;
 
@@ -135,25 +140,41 @@ export interface OrchardGrowingProfile {
   area_ha: number;
   soil_management: string; // SoilManagement type
 
+  // Step 1: Straw / crop residue
+  straw_management: StrawManagement;
+  straw_yield_tonnes_per_ha: number;
+
+  // Step 1: Lime application
+  lime_applied_kg_per_ha: number;
+  lime_type: 'ite' | 'dolomite' | 'none';
+
   // Step 2: Inputs - Fertiliser
   fertiliser_type: string; // FertiliserType
   fertiliser_quantity_kg: number;
   fertiliser_n_content_percent: number;
 
-  // Step 1: Soil & Land - Crop residue
-  pruning_residue_returned: boolean;
-
   // Step 2: Inputs - Pesticide/Herbicide
   uses_pesticides: boolean;
   pesticide_applications_per_year: number;
-  pesticide_type: OrchardPesticideType;
+  pesticide_type: ArablePesticideType;
   uses_herbicides: boolean;
   herbicide_applications_per_year: number;
-  herbicide_type: OrchardPesticideType;
+  herbicide_type: ArablePesticideType;
+
+  // Step 2: Inputs - Growth regulators
+  uses_growth_regulators: boolean;
+  growth_regulator_applications: number;
+
+  // Step 2: Inputs - Seed
+  seed_rate_kg_per_ha: number;
 
   // Step 3: Machinery & Fuel
   diesel_litres_per_year: number;
   petrol_litres_per_year: number;
+
+  // Step 3: Grain drying
+  grain_drying_fuel: GrainDryingFuel;
+  grain_drying_energy_kwh_per_tonne: number;
 
   // Step 4: Irrigation
   is_irrigated: boolean;
@@ -161,11 +182,12 @@ export interface OrchardGrowingProfile {
   irrigation_energy_source: string; // IrrigationEnergySource
 
   // Yield (allocation denominator)
-  fruit_yield_tonnes: number;
+  grain_yield_tonnes: number;
+  grain_moisture_percent: number;
 
-  // Transport from orchard to facility
+  // Transport from field to facility
   transport_distance_km: number | null;
-  transport_mode: TransportMode | null;
+  transport_mode: 'road' | 'rail' | null;
 
   // Phase 2: Soil carbon measured override
   soil_carbon_override_kg_co2e_per_ha: number | null;
@@ -192,10 +214,6 @@ export interface OrchardGrowingProfile {
   lease_expiry_date?: string | null;
   is_boundary_controlled?: boolean;
 
-  // Pruning residue detail
-  pruning_residue_management_type?: string | null;
-  pruning_residue_measured_kg_per_ha?: number | null;
-
   // Draft support
   is_draft: boolean;
 
@@ -204,51 +222,78 @@ export interface OrchardGrowingProfile {
 }
 
 // ---------------------------------------------------------------------------
-// Calculator input (subset of profile + orchard metadata)
+// Calculator input (subset of profile + field metadata)
 // ---------------------------------------------------------------------------
 
-export interface OrchardCalculatorInput {
-  // From orchard
-  orchard_type: OrchardType;
+export interface ArableCalculatorInput {
+  // From arable field
+  crop_type: CropType;
   climate_zone: 'wet' | 'dry' | 'temperate';
-  certification: OrchardCertification;
+  certification: ArableCertification;
   location_country_code: string | null;
 
   // From growing profile
   area_ha: number;
   soil_management: string; // SoilManagement
-  pruning_residue_returned?: boolean;
-  /** How tree prunings are managed. Determines N2O calculation pathway. */
-  pruning_residue_management_type?: 'in_field' | 'removed_for_biomass' | 'chipped_and_spread';
-  /** Measured dry matter from prunings (kg/ha/yr). Overrides per-crop-type default. */
-  pruning_residue_measured_kg_per_ha?: number;
+
+  // Straw / crop residue
+  straw_management: StrawManagement;
+  straw_yield_tonnes_per_ha: number;
+
+  // Lime
+  lime_applied_kg_per_ha: number;
+  lime_type: 'ite' | 'dolomite' | 'none';
+
+  // Fertiliser
   fertiliser_type: string; // FertiliserType
   fertiliser_quantity_kg: number;
   fertiliser_n_content_percent: number;
+
+  // Pesticide/Herbicide
   uses_pesticides: boolean;
   pesticide_applications_per_year: number;
-  pesticide_type?: OrchardPesticideType;
+  pesticide_type?: ArablePesticideType;
   uses_herbicides: boolean;
   herbicide_applications_per_year: number;
-  herbicide_type?: OrchardPesticideType;
+  herbicide_type?: ArablePesticideType;
+
+  // Growth regulators
+  uses_growth_regulators: boolean;
+  growth_regulator_applications: number;
+
+  // Seed
+  seed_rate_kg_per_ha: number;
+
+  // Machinery & Fuel
   diesel_litres_per_year: number;
   petrol_litres_per_year: number;
+
+  // Grain drying
+  grain_drying_fuel: GrainDryingFuel;
+  grain_drying_energy_kwh_per_tonne: number;
+
+  // Irrigation
   is_irrigated: boolean;
   water_m3_per_ha: number;
   irrigation_energy_source: string; // IrrigationEnergySource
-  fruit_yield_tonnes: number;
+
+  // Yield
+  grain_yield_tonnes: number;
+  grain_moisture_percent: number;
+
+  // Soil carbon
   soil_carbon_override_kg_co2e_per_ha: number | null;
-  /** AWARE water scarcity factor for the orchard location (caller resolves from DB) */
+  /** AWARE water scarcity factor for the field location (caller resolves from DB) */
   aware_factor?: number;
 
-  // Transport from orchard to processing facility
+  // Transport from field to processing facility
   transport_distance_km?: number | null;
-  transport_mode?: TransportMode | null;
+  transport_mode?: 'road' | 'rail' | null;
 
-  // LUC (land use change) - from orchard record (FLAG-C3)
-  /** IPCC land use category before orchard establishment */
+  // LUC (land use change) - from field record (FLAG-C3)
+  /** IPCC land use category before arable establishment */
   previous_land_use_type?: PreviousLandUseType | null;
-  /** Year land was converted to orchard */
+  /** Year land was converted to arable */
   land_conversion_year?: number | null;
   /** Current harvest year (for LUC amortisation calculation) */
   harvest_year?: number;
@@ -274,7 +319,7 @@ export interface OrchardCalculatorInput {
   removal_verification_expiry?: string;
 
   // TNFD LEAP Locate phase
-  /** Ecosystem type at the orchard location (IPBES classification) */
+  /** Ecosystem type at the field location (IPBES classification) */
   ecosystem_type?: 'temperate_forest' | 'mediterranean' | 'grassland' | 'wetland' | 'shrubland' | 'tropical_forest' | 'boreal_forest' | 'semi_arid' | 'other';
   /** Whether the site is within or adjacent to a Key Biodiversity Area or protected area */
   in_biodiversity_sensitive_area?: boolean;
@@ -289,18 +334,20 @@ export interface OrchardCalculatorInput {
 // ---------------------------------------------------------------------------
 
 /**
- * Orchard impact result with FLAG-compliant separation of emissions
+ * Arable impact result with FLAG-compliant separation of emissions
  * and removals. Emissions are never netted against removals.
  */
-export interface OrchardImpactResult {
+export interface ArableImpactResult {
   // FLAG emissions (land-based biological/soil processes)
   flag_emissions: {
     /** Direct N2O from managed soils (IPCC Tier 1 EF1) */
     n2o_direct_co2e: number;
     /** Indirect N2O from volatilisation + leaching (IPCC EF4, EF5) */
     n2o_indirect_co2e: number;
-    /** N2O from crop residue decomposition (tree prunings, IPCC Ch 11) */
+    /** N2O from crop residue decomposition (straw, IPCC Ch 11) */
     n2o_crop_residue_co2e: number;
+    /** CO2 from lime application (IPCC Tier 1) */
+    lime_co2e: number;
     /** dLUC emissions amortised over 20 years (kg CO2e, FLAG-C3) */
     luc_co2e: number;
     /** Land occupation (m2 per year) */
@@ -309,11 +356,11 @@ export interface OrchardImpactResult {
     total_flag_co2e: number;
     /** Gas-level breakdown within FLAG scope (Section 3.1.6) */
     gas_inventory?: {
-      /** kg CO2 from land use change */
-      co2_luc: number;
+      /** kg CO2 from land use change + lime */
+      co2_luc_and_lime: number;
       /** kg N2O (actual mass, not CO2e) */
       n2o_total: number;
-      /** kg CH4 (currently 0 for orchards) */
+      /** kg CH4 (currently 0 for arable in this module) */
       ch4_total: number;
     };
   };
@@ -344,7 +391,13 @@ export interface OrchardImpactResult {
     irrigation_energy_co2e: number;
     /** Embodied CO2e from pesticide/herbicide manufacture */
     pesticide_production_co2e: number;
-    /** Transport from orchard to processing facility (DEFRA tonne-km) */
+    /** Grain drying energy (fuel-specific) */
+    grain_drying_co2e: number;
+    /** Embodied CO2e from seed production */
+    seed_production_co2e: number;
+    /** Embodied CO2e from growth regulator manufacture */
+    growth_regulator_co2e: number;
+    /** Transport from field to processing facility (DEFRA tonne-km) */
     transport_co2e: number;
     /** Total non-FLAG emissions (kg CO2e) */
     total_non_flag_co2e: number;
@@ -365,7 +418,7 @@ export interface OrchardImpactResult {
   human_toxicity_non_carcinogenic: number;
   /** Freshwater eutrophication (kg P eq) - from nutrient runoff */
   freshwater_eutrophication: number;
-  /** Terrestrial acidification (kg SO₂ eq) - from diesel combustion and ammonia volatilisation */
+  /** Terrestrial acidification (kg SO2 eq) - from diesel combustion and ammonia volatilisation */
   terrestrial_acidification: number;
 
   // TNFD LEAP Locate phase metadata (pass-through from input)
@@ -383,13 +436,13 @@ export interface OrchardImpactResult {
   co2_fossil_kg: number;
 
   // Normalised values
-  /** Total emissions per kg of fruit (FLAG + non-FLAG, kg CO2e/kg) */
+  /** Total emissions per kg of grain (FLAG + non-FLAG, kg CO2e/kg) */
   total_emissions_per_kg: number;
-  /** Soil carbon removals per kg of fruit (kg CO2e/kg) */
+  /** Soil carbon removals per kg of grain (kg CO2e/kg) */
   removals_per_kg: number;
-  /** Total emissions for entire orchard area (kg CO2e) */
+  /** Total emissions for entire field area (kg CO2e) */
   total_emissions: number;
-  /** Total removals for entire orchard area (kg CO2e) */
+  /** Total removals for entire field area (kg CO2e) */
   total_removals: number;
 
   // Data quality
@@ -411,12 +464,12 @@ export interface OrchardImpactResult {
 // ---------------------------------------------------------------------------
 
 /** Summary of impacts for one harvest year, used in trend charts */
-export interface HarvestImpactSummary {
+export interface ArableHarvestImpactSummary {
   harvest_year: number;
   profile_id: string;
   is_complete: boolean;
   is_draft: boolean;
-  impacts: OrchardImpactResult;
+  impacts: ArableImpactResult;
   // Normalised headline metrics for charts (per hectare)
   emissions_per_ha: number;
   water_per_ha: number;
@@ -425,26 +478,25 @@ export interface HarvestImpactSummary {
 }
 
 /** Multi-harvest averaged result for LCA calculator */
-export interface MultiHarvestAveragedResult {
-  averaged_impacts: OrchardImpactResult;
+export interface ArableMultiHarvestAveragedResult {
+  averaged_impacts: ArableImpactResult;
   harvests_used: number[];
   method: 'single' | 'average_2yr' | 'median_3yr';
 }
 
 // ---------------------------------------------------------------------------
-// Spray chemical types (mirrors vineyard/arable spray diary pattern)
+// Spray chemical types (mirrors vineyard spray diary pattern)
 // ---------------------------------------------------------------------------
 
-/** Chemical type for orchard spray imports. Uses unified library types. */
-export type OrchardChemicalType = 'fertiliser' | 'fungicide' | 'herbicide' | 'insecticide' | 'other';
+export type ArableChemicalType = 'fertiliser' | 'fungicide' | 'herbicide' | 'insecticide' | 'growth_regulator' | 'seed_treatment' | 'other';
 
-export interface OrchardSprayChemical {
+export interface ArableSprayChemical {
   id: string;
   growing_profile_id: string;
-  orchard_id: string;
+  arable_field_id: string;
   organization_id: string;
   chemical_name: string;
-  chemical_type: OrchardChemicalType;
+  chemical_type: ArableChemicalType;
   unit: string;
   rate_per_ha: number;
   water_rate_l_per_ha: number | null;
@@ -455,24 +507,24 @@ export interface OrchardSprayChemical {
   n_content_percent: number;
   /** Maps to FertiliserType for calculator emission factors. Null for non-fertilisers. */
   fertiliser_subtype: 'synthetic_n' | 'organic_manure' | 'organic_compost' | 'mixed' | null;
-  /** True when this chemical was enriched from the chemical library. */
+  /** True when this chemical was enriched from arable_chemical_library. */
   library_matched: boolean;
   created_at: string;
   updated_at: string;
 }
 
 /** Draft type for form state - no DB identity fields */
-export type OrchardSprayChemicalDraft = Omit<
-  OrchardSprayChemical,
-  'id' | 'growing_profile_id' | 'orchard_id' | 'organization_id' | 'created_at' | 'updated_at'
+export type ArableSprayChemicalDraft = Omit<
+  ArableSprayChemical,
+  'id' | 'growing_profile_id' | 'arable_field_id' | 'organization_id' | 'created_at' | 'updated_at'
 >;
 
-/** Row from the unified chemical_library table */
-export interface OrchardChemicalLibraryRow {
+/** Row from arable_chemical_library */
+export interface ArableChemicalLibraryRow {
   id: string;
   chemical_name: string;
   name_variants: string[];
-  chemical_type: string;
+  chemical_type: ArableChemicalType;
   n_content_percent: number;
   fertiliser_subtype: 'synthetic_n' | 'organic_manure' | 'organic_compost' | 'mixed' | null;
   active_ingredient: string | null;
@@ -483,10 +535,10 @@ export interface OrchardChemicalLibraryRow {
 // Soil carbon evidence (uploaded lab reports)
 // ---------------------------------------------------------------------------
 
-export interface OrchardSoilCarbonEvidence {
+export interface ArableSoilCarbonEvidence {
   id: string;
   growing_profile_id: string;
-  orchard_id: string;
+  arable_field_id: string;
   organization_id: string;
   document_name: string;
   storage_object_path: string;

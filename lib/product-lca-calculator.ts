@@ -16,6 +16,9 @@ import type { VineyardGrowingProfile, Vineyard } from './types/viticulture';
 import { calculateOrchardImpacts } from './orchard-calculator';
 import { calculateMultiHarvestAverage } from './orchard-multi-harvest';
 import type { Orchard } from './types/orchard';
+import { calculateArableImpacts } from './arable-calculator';
+import { calculateArableMultiHarvestAverage } from './arable-multi-harvest';
+import type { ArableField } from './types/arable';
 import { getGridFactor } from './grid-emission-factors';
 import { getAwareFactor } from './calculations/water-risk';
 
@@ -2216,6 +2219,416 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       }
 
       console.log(`[calculateProductCarbonFootprint] ✓ Orchard impacts: emissions=${orchResult.total_emissions.toFixed(1)} kg CO2e, removals=${orchResult.total_removals.toFixed(1)} kg CO2e (${orchResult.flag_removals.methodology}), transport=${orchResult.non_flag_emissions.transport_co2e.toFixed(1)} kg CO2e, per-kg=${orchResult.total_emissions_per_kg.toFixed(4)} kg CO2e/kg fruit`);
+    }
+
+    // ========================================================================
+    // 5c. ARABLE (Grain Growing) — Self-grown grain integration
+    // ========================================================================
+    //
+    // Mirrors viticulture + orchard integration. For producers who grow their
+    // own grain (e.g. barley for whisky/beer, wheat for vodka, rye for gin),
+    // the arable calculator computes field-level emissions from fertiliser N2O,
+    // machinery fuel, pesticides, irrigation, grain drying, transport, lime,
+    // and soil carbon removals.
+    //
+    // Conversion factors (kg grain per litre finished product):
+    //   Whisky (malt):     ~2.7 kg barley per litre (mash → ferment → distil)
+    //   Beer:              ~0.2 kg barley per litre
+    //   Vodka (grain):     ~2.5 kg grain per litre
+    //   Gin (grain):       ~2.5 kg grain per litre
+    //   Default:           ~2.0 kg grain per litre
+
+    const { data: selfGrownArableIngredients } = await supabase
+      .from('product_materials')
+      .select('arable_field_id')
+      .eq('product_id', parseInt(productId))
+      .eq('is_self_grown', true)
+      .not('arable_field_id', 'is', null);
+
+    const arableFieldIds = Array.from(new Set(
+      (selfGrownArableIngredients || []).map((m: any) => m.arable_field_id).filter(Boolean)
+    ));
+
+    const arableFieldId = arableFieldIds[0]; // Process first linked arable field
+    const { data: arableProfiles } = arableFieldId
+      ? await supabase
+          .from('arable_growing_profiles')
+          .select('*, arable_fields(*)')
+          .eq('arable_field_id', arableFieldId)
+          .order('harvest_year', { ascending: false })
+      : { data: null };
+
+    const arableProfile = arableProfiles?.[0];
+
+    if (arableProfile) {
+      const arableField = arableProfile.arable_fields as unknown as ArableField;
+      const arableProfileCount = arableProfiles!.length;
+      console.log(`[calculateProductCarbonFootprint] Processing arable field "${arableField?.name || 'unknown'}" (${arableProfileCount} harvest${arableProfileCount > 1 ? 's' : ''})...`);
+
+      // Resolve AWARE water scarcity factor for arable field country
+      const arableCountryCode = arableField?.location_country_code;
+      let arableAwareFactor = 1.0;
+      if (arableCountryCode) {
+        const arAwareData = await getAwareFactor(supabase, arableCountryCode);
+        if (arAwareData) arableAwareFactor = Number(arAwareData.aware_factor);
+      }
+
+      // Build inputs for all available harvests
+      const arableHarvestInputs = arableProfiles!.map((p: any) => ({
+        harvest_year: p.harvest_year,
+        input: {
+          crop_type: arableField?.crop_type || 'barley',
+          climate_zone: arableField?.climate_zone || 'temperate',
+          certification: arableField?.certification || 'conventional',
+          location_country_code: arableField?.location_country_code || null,
+          aware_factor: arableAwareFactor,
+          area_ha: p.area_ha,
+          soil_management: p.soil_management,
+          straw_management: p.straw_management || 'incorporated',
+          straw_yield_tonnes_per_ha: p.straw_yield_tonnes_per_ha || 0,
+          lime_applied_kg_per_ha: p.lime_applied_kg_per_ha || 0,
+          lime_type: p.lime_type || 'none',
+          fertiliser_type: p.fertiliser_type,
+          fertiliser_quantity_kg: p.fertiliser_quantity_kg,
+          fertiliser_n_content_percent: p.fertiliser_n_content_percent,
+          uses_pesticides: p.uses_pesticides,
+          pesticide_applications_per_year: p.pesticide_applications_per_year,
+          pesticide_type: p.pesticide_type || 'generic',
+          uses_herbicides: p.uses_herbicides,
+          herbicide_applications_per_year: p.herbicide_applications_per_year,
+          herbicide_type: p.herbicide_type || 'generic',
+          uses_growth_regulators: p.uses_growth_regulators ?? false,
+          growth_regulator_applications: p.growth_regulator_applications || 0,
+          seed_rate_kg_per_ha: p.seed_rate_kg_per_ha || 0,
+          diesel_litres_per_year: p.diesel_litres_per_year,
+          petrol_litres_per_year: p.petrol_litres_per_year,
+          grain_drying_fuel: p.grain_drying_fuel || 'none',
+          grain_drying_energy_kwh_per_tonne: p.grain_drying_energy_kwh_per_tonne || 0,
+          is_irrigated: p.is_irrigated,
+          water_m3_per_ha: p.water_m3_per_ha,
+          irrigation_energy_source: p.irrigation_energy_source,
+          grain_yield_tonnes: p.grain_yield_tonnes,
+          grain_moisture_percent: p.grain_moisture_percent || 14.5,
+          transport_distance_km: p.transport_distance_km ?? 0,
+          transport_mode: p.transport_mode || 'road',
+          soil_carbon_override_kg_co2e_per_ha: p.soil_carbon_override_kg_co2e_per_ha,
+          previous_land_use_type: arableField?.previous_land_use_type,
+          land_conversion_year: arableField?.land_conversion_year,
+          harvest_year: p.harvest_year,
+          removal_verification_status: (p as any).removal_verification_status ?? 'unverified',
+          removal_verifier_body: (p as any).removal_verifier_body,
+          removal_verifier_standard: (p as any).removal_verifier_standard,
+          removal_verification_date: (p as any).removal_verification_date,
+          removal_verification_expiry: (p as any).removal_verification_expiry,
+          ecosystem_type: (p as any).ecosystem_type ?? undefined,
+          in_biodiversity_sensitive_area: (p as any).in_biodiversity_sensitive_area ?? false,
+          sensitive_area_details: (p as any).sensitive_area_details ?? undefined,
+          water_stress_index: (p as any).water_stress_index ?? undefined,
+        },
+      }));
+
+      // Multi-harvest averaging (median for 3+, mean for 2, single for 1)
+      const arableMultiResult = calculateArableMultiHarvestAverage(arableHarvestInputs);
+      const arResult = arableMultiResult.averaged_impacts;
+      const arHarvestNote = arableProfileCount > 1
+        ? ` (${arableMultiResult.method}: harvests ${arableMultiResult.harvests_used.join(', ')})`
+        : '';
+
+      // --- Per-unit allocation ---
+      // Arable impacts are computed for the entire field area.
+      // Normalise to per-unit using grain yield and product-specific conversion.
+      const rawUnitSizeAr = product.unit_size_unit === 'ml'
+        ? Number(product.unit_size_value) / 1000.0
+        : Number(product.unit_size_value || 0.75);
+      const unitSizeLitresAr = rawUnitSizeAr > 0 ? rawUnitSizeAr : 0.75;
+
+      // Grain-to-product conversion factor (kg grain per litre finished product)
+      const GRAIN_CONVERSION_FACTORS: Record<string, number> = {
+        whisky: 2.7,   // Malt whisky: ~2.7 kg malted barley per litre
+        beer:   0.2,   // Beer: ~0.2 kg barley per litre (lower grain intensity)
+        spirits: 2.5,  // Grain spirits (vodka, gin): ~2.5 kg per litre
+      };
+      const productTypeAr = (product.product_type || '').toLowerCase();
+      let grainKgPerLitre = GRAIN_CONVERSION_FACTORS[productTypeAr] || 2.0;
+
+      // Refine for specific subtypes
+      if (productTypeAr === 'spirits' || productTypeAr.includes('spirit')) {
+        const productName = (product.name || '').toLowerCase();
+        if (productName.includes('whisky') || productName.includes('whiskey')) {
+          grainKgPerLitre = 2.7;
+        } else if (productName.includes('vodka') || productName.includes('gin')) {
+          grainKgPerLitre = 2.5;
+        }
+      }
+      if (productTypeAr.includes('beer')) {
+        grainKgPerLitre = 0.2;
+      }
+
+      const grainKgPerUnit = unitSizeLitresAr * grainKgPerLitre;
+      const totalUnitsAr = (arableProfile.grain_yield_tonnes * 1000) / grainKgPerUnit;
+
+      // Per-unit impact factors
+      const arFertFieldPerUnit = totalUnitsAr > 0
+        ? (arResult.flag_emissions.total_flag_co2e + arResult.non_flag_emissions.fertiliser_production_co2e) / totalUnitsAr
+        : 0;
+      const arFuelPerUnit = totalUnitsAr > 0
+        ? arResult.non_flag_emissions.machinery_fuel_co2e / totalUnitsAr
+        : 0;
+      const arIrrigationPerUnit = totalUnitsAr > 0
+        ? arResult.non_flag_emissions.irrigation_energy_co2e / totalUnitsAr
+        : 0;
+      const arTransportPerUnit = totalUnitsAr > 0
+        ? arResult.non_flag_emissions.transport_co2e / totalUnitsAr
+        : 0;
+      const arWaterPerUnit = totalUnitsAr > 0
+        ? arResult.water_m3 / totalUnitsAr
+        : 0;
+      const arWaterScarcityPerUnit = totalUnitsAr > 0
+        ? arResult.water_scarcity_m3_eq / totalUnitsAr
+        : 0;
+      const arLandPerUnit = totalUnitsAr > 0
+        ? arResult.flag_emissions.land_use_m2 / totalUnitsAr
+        : 0;
+      const arRemovalsPerUnit = totalUnitsAr > 0
+        ? arResult.total_removals / totalUnitsAr
+        : 0;
+      const arPesticidePerUnit = totalUnitsAr > 0
+        ? arResult.non_flag_emissions.pesticide_production_co2e / totalUnitsAr
+        : 0;
+      const arGrainDryingPerUnit = totalUnitsAr > 0
+        ? arResult.non_flag_emissions.grain_drying_co2e / totalUnitsAr
+        : 0;
+      const arSeedPerUnit = totalUnitsAr > 0
+        ? arResult.non_flag_emissions.seed_production_co2e / totalUnitsAr
+        : 0;
+      const arGrowthRegulatorPerUnit = totalUnitsAr > 0
+        ? arResult.non_flag_emissions.growth_regulator_co2e / totalUnitsAr
+        : 0;
+      const arN2oKgPerUnit = totalUnitsAr > 0
+        ? arResult.n2o_kg / totalUnitsAr
+        : 0;
+      const arLucPerUnit = totalUnitsAr > 0
+        ? arResult.flag_emissions.luc_co2e / totalUnitsAr
+        : 0;
+
+      console.log(`[calculateProductCarbonFootprint] Arable per-unit: ${totalUnitsAr.toFixed(0)} units (${grainKgPerLitre} kg grain/L), fert+N2O=${arFertFieldPerUnit.toFixed(4)}, fuel=${arFuelPerUnit.toFixed(4)}, drying=${arGrainDryingPerUnit.toFixed(4)}, transport=${arTransportPerUnit.toFixed(4)}, removals=${arRemovalsPerUnit.toFixed(4)}`);
+
+      // Synthetic row template (shared fields)
+      const arBaseRow = {
+        product_carbon_footprint_id: lca.id,
+        material_type: 'ingredient' as const,
+        quantity: unitSizeLitresAr,
+        unit: 'L',
+        unit_name: 'L',
+        packaging_category: null,
+        origin_country: arableField?.address_country || null,
+        country_of_origin: arableField?.address_country || null,
+        is_organic: arableField?.certification === 'organic',
+        is_organic_certified: arableField?.certification === 'organic',
+        supplier_product_id: null,
+        data_source: null,
+        data_source_id: null,
+        transport_mode: null,
+        distance_km: null,
+        impact_transport: 0,
+        origin_address: null,
+        origin_lat: arableField?.address_lat || null,
+        origin_lng: arableField?.address_lng || null,
+        origin_country_code: arableField?.location_country_code || null,
+        data_priority: 2 as const,
+        data_quality_tag: 'Secondary_Modelled' as const,
+        supplier_lca_id: null,
+        impact_source: 'secondary_modelled' as const,
+        impact_reference_id: null,
+        gwp_data_source: 'IPCC 2019 Tier 1 / DEFRA 2025',
+        non_gwp_data_source: 'IPCC 2019 Tier 1 / DEFRA 2025',
+        is_hybrid_source: false,
+        category_type: 'MANUFACTURING_MATERIAL',
+      };
+
+      // Row 1: Fertiliser & Field Emissions (N2O + production + pesticides + growth regulators)
+      lcaMaterialsWithImpacts.push({
+        ...arBaseRow,
+        name: '[Arable] Fertiliser & Field Emissions',
+        material_name: '[Arable] Fertiliser & Field Emissions',
+        impact_climate: arFertFieldPerUnit + arPesticidePerUnit + arGrowthRegulatorPerUnit,
+        impact_climate_fossil: (arFertFieldPerUnit * 0.95) + arPesticidePerUnit + arGrowthRegulatorPerUnit,
+        impact_climate_biogenic: 0,
+        impact_climate_dluc: 0,
+        ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0,
+        n2o_kg: arN2oKgPerUnit,
+        impact_water: 0, impact_water_scarcity: 0, impact_land: 0, impact_waste: 0,
+        impact_freshwater_ecotoxicity: totalUnitsAr > 0 ? arResult.freshwater_ecotoxicity / totalUnitsAr : 0,
+        impact_terrestrial_ecotoxicity: totalUnitsAr > 0 ? arResult.terrestrial_ecotoxicity / totalUnitsAr : 0,
+        impact_human_toxicity_non_carcinogenic: totalUnitsAr > 0 ? arResult.human_toxicity_non_carcinogenic / totalUnitsAr : 0,
+        impact_freshwater_eutrophication: totalUnitsAr > 0 ? arResult.freshwater_eutrophication / totalUnitsAr : 0,
+        impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+        confidence_score: 65,
+        methodology: arResult.methodology_notes,
+        source_reference: `Fertiliser: ${arResult.flag_emissions.n2o_direct_co2e.toFixed(1)} kg CO2e direct N2O + ${arResult.flag_emissions.n2o_indirect_co2e.toFixed(1)} kg indirect + ${arResult.non_flag_emissions.fertiliser_production_co2e.toFixed(1)} kg production + ${arResult.flag_emissions.lime_co2e.toFixed(1)} kg lime${arHarvestNote}`,
+        data_quality_grade: arResult.data_quality_grade,
+      });
+
+      // Row 2: Machinery Fuel
+      if (arFuelPerUnit > 0) {
+        lcaMaterialsWithImpacts.push({
+          ...arBaseRow,
+          name: '[Arable] Machinery Fuel',
+          material_name: '[Arable] Machinery Fuel',
+          impact_climate: arFuelPerUnit,
+          impact_climate_fossil: arFuelPerUnit,
+          impact_climate_biogenic: 0, impact_climate_dluc: 0,
+          ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
+          impact_water: 0, impact_water_scarcity: 0, impact_land: 0, impact_waste: 0,
+          impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
+          impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+          confidence_score: 70,
+          methodology: 'DEFRA 2025 fuel combustion factors',
+          source_reference: `Diesel: ${arableProfile.diesel_litres_per_year} L/yr, Petrol: ${arableProfile.petrol_litres_per_year} L/yr. Total: ${arResult.non_flag_emissions.machinery_fuel_co2e.toFixed(1)} kg CO2e / ${totalUnitsAr.toFixed(0)} units`,
+          data_quality_grade: arResult.data_quality_grade,
+        });
+      }
+
+      // Row 3: Grain Drying
+      if (arGrainDryingPerUnit > 0) {
+        lcaMaterialsWithImpacts.push({
+          ...arBaseRow,
+          name: '[Arable] Grain Drying',
+          material_name: '[Arable] Grain Drying',
+          impact_climate: arGrainDryingPerUnit,
+          impact_climate_fossil: arGrainDryingPerUnit,
+          impact_climate_biogenic: 0, impact_climate_dluc: 0,
+          ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
+          impact_water: 0, impact_water_scarcity: 0, impact_land: 0, impact_waste: 0,
+          impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
+          impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+          confidence_score: 65,
+          methodology: 'DEFRA 2025 stationary combustion / grid emission factors',
+          source_reference: `Grain drying fuel: ${arableProfile.grain_drying_fuel}. ${arResult.non_flag_emissions.grain_drying_co2e.toFixed(1)} kg CO2e / ${totalUnitsAr.toFixed(0)} units`,
+          data_quality_grade: arResult.data_quality_grade,
+        });
+      }
+
+      // Row 4: Seed Production
+      if (arSeedPerUnit > 0) {
+        lcaMaterialsWithImpacts.push({
+          ...arBaseRow,
+          name: '[Arable] Seed Production',
+          material_name: '[Arable] Seed Production',
+          impact_climate: arSeedPerUnit,
+          impact_climate_fossil: arSeedPerUnit,
+          impact_climate_biogenic: 0, impact_climate_dluc: 0,
+          ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
+          impact_water: 0, impact_water_scarcity: 0, impact_land: 0, impact_waste: 0,
+          impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
+          impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+          confidence_score: 60,
+          methodology: 'ecoinvent seed production factors',
+          source_reference: `Seed rate: ${arableProfile.seed_rate_kg_per_ha} kg/ha. ${arResult.non_flag_emissions.seed_production_co2e.toFixed(1)} kg CO2e / ${totalUnitsAr.toFixed(0)} units`,
+          data_quality_grade: arResult.data_quality_grade,
+        });
+      }
+
+      // Row 5: Irrigation
+      if (arIrrigationPerUnit > 0 || arWaterPerUnit > 0) {
+        lcaMaterialsWithImpacts.push({
+          ...arBaseRow,
+          name: '[Arable] Irrigation',
+          material_name: '[Arable] Irrigation',
+          impact_climate: arIrrigationPerUnit,
+          impact_climate_fossil: arIrrigationPerUnit,
+          impact_climate_biogenic: 0, impact_climate_dluc: 0,
+          ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
+          impact_water: arWaterPerUnit,
+          impact_water_scarcity: arWaterScarcityPerUnit,
+          impact_land: 0, impact_waste: 0,
+          impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
+          impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+          confidence_score: 60,
+          methodology: 'DEFRA 2025 / grid emission factors',
+          source_reference: `Irrigation: ${arResult.water_m3.toFixed(0)} m3 water, ${arableProfile.irrigation_energy_source}. Energy: ${arResult.non_flag_emissions.irrigation_energy_co2e.toFixed(1)} kg CO2e`,
+          data_quality_grade: arResult.data_quality_grade,
+        });
+      }
+
+      // Row 6: Transport (field to processing facility)
+      if (arTransportPerUnit > 0) {
+        lcaMaterialsWithImpacts.push({
+          ...arBaseRow,
+          name: '[Arable] Transport to Facility',
+          material_name: '[Arable] Transport to Facility',
+          impact_climate: arTransportPerUnit,
+          impact_climate_fossil: arTransportPerUnit,
+          impact_climate_biogenic: 0, impact_climate_dluc: 0,
+          ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
+          impact_water: 0, impact_water_scarcity: 0, impact_land: 0, impact_waste: 0,
+          impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
+          impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+          confidence_score: 70,
+          methodology: 'DEFRA 2024 tonne-km factors',
+          source_reference: `Transport: ${arableProfile.transport_distance_km || 0} km by ${arableProfile.transport_mode || 'road'}. ${arResult.non_flag_emissions.transport_co2e.toFixed(1)} kg CO2e / ${totalUnitsAr.toFixed(0)} units`,
+          data_quality_grade: arResult.data_quality_grade,
+        });
+      }
+
+      // Row 7: Land Occupation
+      lcaMaterialsWithImpacts.push({
+        ...arBaseRow,
+        name: '[Arable] Land Occupation',
+        material_name: '[Arable] Land Occupation',
+        impact_climate: 0,
+        impact_climate_fossil: 0, impact_climate_biogenic: 0, impact_climate_dluc: 0,
+        ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
+        impact_water: 0, impact_water_scarcity: 0,
+        impact_land: arLandPerUnit,
+        impact_waste: 0,
+        impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
+        impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+        confidence_score: 80,
+        methodology: 'Direct land occupation measurement',
+        source_reference: `Arable field: ${arableProfile.area_ha} ha (${arResult.flag_emissions.land_use_m2.toFixed(0)} m2) / ${totalUnitsAr.toFixed(0)} units`,
+        data_quality_grade: 'HIGH',
+      });
+
+      // Row 7b: Land Use Change (dLUC) — IPCC 2019, amortised over 20 years
+      if (arLucPerUnit > 0) {
+        lcaMaterialsWithImpacts.push({
+          ...arBaseRow,
+          name: '[Arable] Land Use Change (dLUC)',
+          material_name: '[Arable] Land Use Change (dLUC)',
+          impact_climate: arLucPerUnit,
+          impact_climate_fossil: 0, impact_climate_biogenic: 0, impact_climate_dluc: arLucPerUnit,
+          ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
+          impact_water: 0, impact_water_scarcity: 0, impact_land: 0, impact_waste: 0,
+          impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
+          impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+          confidence_score: 50,
+          methodology: 'IPCC 2019 direct land use change, amortised 20 years',
+          source_reference: `dLUC: ${arResult.flag_emissions.luc_co2e.toFixed(1)} kg CO2e from ${arableField?.previous_land_use_type || 'unknown'} conversion`,
+          data_quality_grade: 'MEDIUM',
+        });
+      }
+
+      // Row 8: Soil Carbon Removals (FLAG: separate from emissions)
+      if (arRemovalsPerUnit > 0) {
+        lcaMaterialsWithImpacts.push({
+          ...arBaseRow,
+          name: '[Arable Removals] Soil Carbon',
+          material_name: '[Arable Removals] Soil Carbon',
+          impact_climate: 0, // FLAG: removals NEVER stored in impact_climate
+          impact_climate_fossil: 0, impact_climate_biogenic: 0, impact_climate_dluc: 0,
+          ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
+          impact_water: 0, impact_water_scarcity: 0, impact_land: 0, impact_waste: 0,
+          impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
+          impact_removals_co2e: arRemovalsPerUnit,
+          confidence_score: arResult.flag_removals.is_verified ? 75 : 45,
+          methodology: `Soil carbon: ${arResult.flag_removals.methodology}`,
+          source_reference: `Soil management: ${arableProfile.soil_management}. Total removals: ${arResult.total_removals.toFixed(1)} kg CO2e/yr (${arResult.flag_removals.methodology}). Per unit: ${arRemovalsPerUnit.toFixed(4)} kg CO2e`,
+          data_quality_grade: arResult.flag_removals.is_verified ? 'MEDIUM' : 'LOW',
+        });
+      }
+
+      console.log(`[calculateProductCarbonFootprint] ✓ Arable impacts: emissions=${arResult.total_emissions.toFixed(1)} kg CO2e, removals=${arResult.total_removals.toFixed(1)} kg CO2e (${arResult.flag_removals.methodology}), transport=${arResult.non_flag_emissions.transport_co2e.toFixed(1)} kg CO2e, per-kg=${arResult.total_emissions_per_kg.toFixed(4)} kg CO2e/kg grain`);
     }
 
     // 6. Insert all materials with impact values into product_lca_materials

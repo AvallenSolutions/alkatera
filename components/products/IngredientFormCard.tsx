@@ -22,10 +22,14 @@ import { Trash2, Building2, Database, Sprout, Info, MapPin, Calculator, Award, L
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { InlineIngredientSearch } from "@/components/lca/InlineIngredientSearch";
 import { VineyardSelector, type VineyardOption } from "@/components/vineyards/VineyardSelector";
+import { ArableFieldSelector, type ArableFieldOption } from "@/components/arable-fields/ArableFieldSelector";
+import { OrchardSelector, type OrchardOption } from "@/components/orchards/OrchardSelector";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useOrganization } from "@/lib/organizationContext";
 import { useIsAlkateraAdmin } from "@/hooks/usePermissions";
 import { isViticultureEligible } from "@/lib/viticulture-utils";
+import { isArableEligible } from "@/lib/arable-utils";
+import { isOrchardEligible } from "@/lib/orchard-utils";
 import type { VineyardGrowingProfile } from "@/lib/types/viticulture";
 import { LocationPicker, LocationData } from "@/components/shared/LocationPicker";
 import type { DataSource } from "@/lib/types/lca";
@@ -72,9 +76,11 @@ export interface IngredientFormData {
   inbound_container_tare_kg?: number | null;
   inbound_container_reuse_cycles?: number | null;
   inbound_container_ef?: number | null;
-  // Self-grown ingredient (e.g. vineyard grapes)
+  // Self-grown ingredient (e.g. vineyard grapes, arable barley, orchard fruit)
   is_self_grown?: boolean;
   vineyard_id?: string | null;
+  arable_field_id?: string | null;
+  orchard_id?: string | null;
   // ISO 14067 §7: biogenic carbon classification
   is_biogenic_carbon?: boolean;
 }
@@ -268,6 +274,8 @@ export function IngredientFormCard({
   const { currentOrganization } = useOrganization();
   const { isAlkateraAdmin } = useIsAlkateraAdmin();
   const showViticultureToggle = hasFeature('viticulture_beta') && isViticultureEligible(currentOrganization, isAlkateraAdmin);
+  const showArableToggle = hasFeature('arable_beta') && isArableEligible(currentOrganization as any, isAlkateraAdmin);
+  const showOrchardToggle = hasFeature('orchard_beta') && isOrchardEligible(currentOrganization as any, isAlkateraAdmin);
 
   const [containerOpen, setContainerOpen] = useState<boolean>(
     !!(ingredient.inbound_container_type)
@@ -293,6 +301,49 @@ export function IngredientFormCard({
       .catch(() => setGrowingProfile(null))
       .finally(() => setLoadingProfile(false));
   }, [ingredient.vineyard_id, ingredient.is_self_grown]);
+
+  // Arable field growing profile state
+  const [selectedArableField, setSelectedArableField] = useState<ArableFieldOption | null>(null);
+  const [arableProfile, setArableProfile] = useState<any | null>(null);
+  const [loadingArableProfile, setLoadingArableProfile] = useState(false);
+
+  useEffect(() => {
+    if (!ingredient.arable_field_id || !ingredient.is_self_grown) {
+      setArableProfile(null);
+      return;
+    }
+    setLoadingArableProfile(true);
+    fetch(`/api/arable-fields/${ingredient.arable_field_id}/growing-profile`)
+      .then((res) => res.ok ? res.json() : { data: null })
+      .then(({ data }) => {
+        // The route may return an array (multi-harvest) or a single profile.
+        if (Array.isArray(data)) setArableProfile(data[0] || null);
+        else setArableProfile(data || null);
+      })
+      .catch(() => setArableProfile(null))
+      .finally(() => setLoadingArableProfile(false));
+  }, [ingredient.arable_field_id, ingredient.is_self_grown]);
+
+  // Orchard growing profile state
+  const [selectedOrchard, setSelectedOrchard] = useState<OrchardOption | null>(null);
+  const [orchardProfile, setOrchardProfile] = useState<any | null>(null);
+  const [loadingOrchardProfile, setLoadingOrchardProfile] = useState(false);
+
+  useEffect(() => {
+    if (!ingredient.orchard_id || !ingredient.is_self_grown) {
+      setOrchardProfile(null);
+      return;
+    }
+    setLoadingOrchardProfile(true);
+    fetch(`/api/orchards/${ingredient.orchard_id}/growing-profile`)
+      .then((res) => res.ok ? res.json() : { data: null })
+      .then(({ data }) => {
+        if (Array.isArray(data)) setOrchardProfile(data[0] || null);
+        else setOrchardProfile(data || null);
+      })
+      .catch(() => setOrchardProfile(null))
+      .finally(() => setLoadingOrchardProfile(false));
+  }, [ingredient.orchard_id, ingredient.is_self_grown]);
 
   const getContainerPreset = (key: string | null | undefined): ContainerPreset | undefined =>
     CONTAINER_PRESETS.find((p) => p.key === key);
@@ -954,13 +1005,12 @@ export function IngredientFormCard({
             {showViticultureToggle && (
             <div className="flex items-center space-x-2">
               <Checkbox
-                id={`self-grown-${ingredient.tempId}`}
-                checked={ingredient.is_self_grown || false}
+                id={`self-grown-vineyard-${ingredient.tempId}`}
+                checked={ingredient.is_self_grown && !!ingredient.vineyard_id || (ingredient.is_self_grown && !ingredient.arable_field_id && !ingredient.orchard_id && !ingredient.vineyard_id && ingredient.data_source === 'viticulture_primary')}
                 onCheckedChange={(checked) => {
                   const isSelfGrown = checked as boolean;
                   onUpdate(ingredient.tempId, {
                     is_self_grown: isSelfGrown,
-                    // Clear emission factor data when toggling on (viticulture calculator handles it)
                     ...(isSelfGrown ? {
                       data_source: 'viticulture_primary' as any,
                       matched_source_name: undefined,
@@ -970,6 +1020,9 @@ export function IngredientFormCard({
                       ef_source_type: undefined,
                       ef_data_quality_grade: undefined,
                       ef_uncertainty_percent: undefined,
+                      // Clear the other farm FKs (mutually exclusive)
+                      arable_field_id: null,
+                      orchard_id: null,
                     } : {
                       data_source: null,
                       vineyard_id: null,
@@ -978,7 +1031,7 @@ export function IngredientFormCard({
                 }}
               />
               <Label
-                htmlFor={`self-grown-${ingredient.tempId}`}
+                htmlFor={`self-grown-vineyard-${ingredient.tempId}`}
                 className="text-sm font-normal cursor-pointer flex items-center gap-1.5"
               >
                 <Leaf className="h-3.5 w-3.5 text-[#ccff00]" />
@@ -986,9 +1039,84 @@ export function IngredientFormCard({
               </Label>
             </div>
             )}
+
+            {showArableToggle && (
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id={`self-grown-arable-${ingredient.tempId}`}
+                checked={ingredient.is_self_grown && !!ingredient.arable_field_id || (ingredient.is_self_grown && !ingredient.vineyard_id && !ingredient.orchard_id && !ingredient.arable_field_id && ingredient.data_source === 'arable_primary')}
+                onCheckedChange={(checked) => {
+                  const isSelfGrown = checked as boolean;
+                  onUpdate(ingredient.tempId, {
+                    is_self_grown: isSelfGrown,
+                    ...(isSelfGrown ? {
+                      data_source: 'arable_primary' as any,
+                      matched_source_name: undefined,
+                      data_source_id: undefined,
+                      carbon_intensity: undefined,
+                      ef_source: undefined,
+                      ef_source_type: undefined,
+                      ef_data_quality_grade: undefined,
+                      ef_uncertainty_percent: undefined,
+                      vineyard_id: null,
+                      orchard_id: null,
+                    } : {
+                      data_source: null,
+                      arable_field_id: null,
+                    }),
+                  });
+                }}
+              />
+              <Label
+                htmlFor={`self-grown-arable-${ingredient.tempId}`}
+                className="text-sm font-normal cursor-pointer flex items-center gap-1.5"
+              >
+                <Leaf className="h-3.5 w-3.5 text-[#ccff00]" />
+                Grown on our own arable field
+              </Label>
+            </div>
+            )}
+
+            {showOrchardToggle && (
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id={`self-grown-orchard-${ingredient.tempId}`}
+                checked={ingredient.is_self_grown && !!ingredient.orchard_id || (ingredient.is_self_grown && !ingredient.vineyard_id && !ingredient.arable_field_id && !ingredient.orchard_id && ingredient.data_source === 'orchard_primary')}
+                onCheckedChange={(checked) => {
+                  const isSelfGrown = checked as boolean;
+                  onUpdate(ingredient.tempId, {
+                    is_self_grown: isSelfGrown,
+                    ...(isSelfGrown ? {
+                      data_source: 'orchard_primary' as any,
+                      matched_source_name: undefined,
+                      data_source_id: undefined,
+                      carbon_intensity: undefined,
+                      ef_source: undefined,
+                      ef_source_type: undefined,
+                      ef_data_quality_grade: undefined,
+                      ef_uncertainty_percent: undefined,
+                      vineyard_id: null,
+                      arable_field_id: null,
+                    } : {
+                      data_source: null,
+                      orchard_id: null,
+                    }),
+                  });
+                }}
+              />
+              <Label
+                htmlFor={`self-grown-orchard-${ingredient.tempId}`}
+                className="text-sm font-normal cursor-pointer flex items-center gap-1.5"
+              >
+                <Leaf className="h-3.5 w-3.5 text-[#ccff00]" />
+                Grown in our own orchard
+              </Label>
+            </div>
+            )}
           </div>
 
-          {ingredient.is_self_grown && (
+          {/* Vineyard selector + profile status */}
+          {ingredient.is_self_grown && ingredient.data_source === 'viticulture_primary' && (
             <div className="rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5 p-4 space-y-3">
               <VineyardSelector
                 organizationId={organizationId}
@@ -999,7 +1127,6 @@ export function IngredientFormCard({
                 }}
               />
 
-              {/* Growing profile status (read-only, editing happens on the Vineyards page) */}
               {ingredient.vineyard_id && (
                 <>
                   {loadingProfile && (
@@ -1036,6 +1163,120 @@ export function IngredientFormCard({
                         <a href="/vineyards/">
                           <Sprout className="mr-1.5 h-3 w-3" />
                           Complete on Vineyards page
+                        </a>
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Arable field selector + profile status */}
+          {ingredient.is_self_grown && ingredient.data_source === 'arable_primary' && (
+            <div className="rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5 p-4 space-y-3">
+              <ArableFieldSelector
+                organizationId={organizationId}
+                value={ingredient.arable_field_id || ''}
+                onValueChange={(fieldId, field) => {
+                  setSelectedArableField(field);
+                  onUpdate(ingredient.tempId, { arable_field_id: fieldId });
+                }}
+              />
+
+              {ingredient.arable_field_id && (
+                <>
+                  {loadingArableProfile && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Checking growing profile...
+                    </div>
+                  )}
+
+                  {!loadingArableProfile && arableProfile && (
+                    <div className="rounded-md bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 px-3 py-2 space-y-1">
+                      <Badge variant="outline" className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700">
+                        <Sprout className="h-3 w-3 mr-1.5" />
+                        Growing profile complete
+                      </Badge>
+                      <p className="text-xs text-muted-foreground">
+                        {arableProfile.area_ha} ha, {arableProfile.grain_yield_tonnes} t yield,{' '}
+                        {(arableProfile.soil_management || 'conventional tillage').replace(/_/g, ' ')}
+                      </p>
+                    </div>
+                  )}
+
+                  {!loadingArableProfile && !arableProfile && (
+                    <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-2.5">
+                      <p className="text-xs text-amber-800 dark:text-amber-200 mb-2">
+                        This arable field needs a growing profile before we can calculate its environmental impact.
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs border-amber-300 dark:border-amber-700"
+                        asChild
+                      >
+                        <a href="/arable-fields/">
+                          <Sprout className="mr-1.5 h-3 w-3" />
+                          Complete on Arable Fields page
+                        </a>
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Orchard selector + profile status */}
+          {ingredient.is_self_grown && ingredient.data_source === 'orchard_primary' && (
+            <div className="rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5 p-4 space-y-3">
+              <OrchardSelector
+                organizationId={organizationId}
+                value={ingredient.orchard_id || ''}
+                onValueChange={(orchardId, orchard) => {
+                  setSelectedOrchard(orchard);
+                  onUpdate(ingredient.tempId, { orchard_id: orchardId });
+                }}
+              />
+
+              {ingredient.orchard_id && (
+                <>
+                  {loadingOrchardProfile && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Checking growing profile...
+                    </div>
+                  )}
+
+                  {!loadingOrchardProfile && orchardProfile && (
+                    <div className="rounded-md bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 px-3 py-2 space-y-1">
+                      <Badge variant="outline" className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700">
+                        <Sprout className="h-3 w-3 mr-1.5" />
+                        Growing profile complete
+                      </Badge>
+                      <p className="text-xs text-muted-foreground">
+                        {orchardProfile.area_ha} ha, {orchardProfile.fruit_yield_tonnes} t yield,{' '}
+                        {(orchardProfile.soil_management || 'conventional tillage').replace(/_/g, ' ')}
+                      </p>
+                    </div>
+                  )}
+
+                  {!loadingOrchardProfile && !orchardProfile && (
+                    <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-2.5">
+                      <p className="text-xs text-amber-800 dark:text-amber-200 mb-2">
+                        This orchard needs a growing profile before we can calculate its environmental impact.
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs border-amber-300 dark:border-amber-700"
+                        asChild
+                      >
+                        <a href="/orchards/">
+                          <Sprout className="mr-1.5 h-3 w-3" />
+                          Complete on Orchards page
                         </a>
                       </Button>
                     </div>
