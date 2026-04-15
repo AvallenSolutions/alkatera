@@ -1,3 +1,5 @@
+import type { LcaWizardSettings } from '@/types/lca-templates';
+
 export interface Certification {
   name: string;
   evidence_url: string;
@@ -24,6 +26,13 @@ export interface Product {
   is_multipack?: boolean;
   annual_production_volume?: number | null;
   annual_production_unit?: string | null;
+  /**
+   * Subset of WizardFormData used for the most recent LCA run on this product.
+   * Prefills the LCA wizard on next open. Shape matches LcaWizardSettings in
+   * types/lca-templates.ts (excludes functional_unit and derived outputs).
+   * Added in migration 20261800000000_lca_wizard_permanence_and_templates.sql.
+   */
+  last_wizard_settings?: LcaWizardSettings | null;
   created_by?: string | null;
   created_at: string;
   updated_at: string;

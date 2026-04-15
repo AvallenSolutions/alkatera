@@ -30,6 +30,8 @@ import type { ProductLossConfig } from '@/lib/system-boundaries';
 import type { UsePhaseConfig } from '@/lib/use-phase-factors';
 import type { EoLConfig } from '@/lib/end-of-life-factors';
 import type { DistributionConfig } from '@/lib/distribution-factors';
+import { pickLcaSettings } from '@/types/lca-templates';
+import type { LcaReportTemplate, LcaWizardSettings } from '@/types/lca-templates';
 
 // ============================================================================
 // TYPES
@@ -124,6 +126,44 @@ interface WizardContextValue {
   saveProgress: () => Promise<void>;
   finishWizard: () => Promise<void>;
   resetError: () => void;
+
+  // LCA report templates
+  /**
+   * Fetch the named template by id and overlay its settings onto the
+   * current formData (preserving functionalUnit, which is product-specific).
+   * Does not auto-save; the user is expected to review and either save
+   * manually or edit a field to trigger the debounced auto-save.
+   */
+  applyTemplate: (templateId: string) => Promise<void>;
+  /**
+   * Persist the current formData as a new org-scoped template via
+   * POST /api/lca-templates. Throws on failure so the calling dialog
+   * can stay open and surface the error message inline (e.g. on a
+   * duplicate-name 409).
+   */
+  saveAsTemplate: (
+    name: string,
+    description?: string | null,
+    setAsDefault?: boolean,
+  ) => Promise<void>;
+
+  // Template prompt UI state (auto-opened dialogs)
+  /**
+   * True when the wizard has just loaded on a product with no prior
+   * `last_wizard_settings`, so the UI should auto-open the template picker
+   * prompt. Dismissing it (Skip or Apply) sets it back to false and it does
+   * not reopen in this session. Also exposed so any step can call
+   * `openTemplatePicker()` as a manual override.
+   */
+  showTemplatePicker: boolean;
+  openTemplatePicker: () => void;
+  dismissTemplatePicker: () => void;
+  /**
+   * True after `finishWizard()` has successfully persisted the PCF, so the
+   * UI auto-opens the "Save as template?" prompt. Dismissed by Skip or Save.
+   */
+  showSaveTemplatePrompt: boolean;
+  dismissSaveTemplatePrompt: () => void;
 }
 
 const INITIAL_FORM_DATA: WizardFormData = {
@@ -147,6 +187,37 @@ const INITIAL_FORM_DATA: WizardFormData = {
   criticalReviewJustification: '',
   referenceYear: new Date().getFullYear(),
 };
+
+/**
+ * Produce the initial WizardFormData for a freshly-opened wizard (no PCF
+ * yet) by overlaying the product's persisted `last_wizard_settings` onto
+ * the blank defaults.
+ *
+ * Org-scoped templates are NOT auto-applied here. Instead, when no
+ * `last_wizard_settings` exists, `loadMaterialAndFacilityData` flips
+ * `showTemplatePicker` so the shell opens a prompt dialog asking the user
+ * to pick a template (or skip to a blank wizard). That keeps the prefill
+ * explicit and visible instead of silently mutating state behind the user.
+ *
+ * functionalUnit is product-specific and lives on its own column, so it
+ * is never part of the persisted settings blob and always falls through
+ * to INITIAL_FORM_DATA here. loadPcfData() handles the resume case
+ * separately when a pcfId already exists.
+ */
+export function buildInitialFormData(
+  product: { last_wizard_settings?: Partial<LcaWizardSettings> | null } | null,
+): WizardFormData {
+  const source = product?.last_wizard_settings ?? null;
+
+  if (!source) {
+    return INITIAL_FORM_DATA;
+  }
+
+  return {
+    ...INITIAL_FORM_DATA,
+    ...source,
+  } as WizardFormData;
+}
 
 const INITIAL_PROGRESS: WizardProgress = {
   currentStep: 1,
@@ -303,6 +374,10 @@ export function WizardProvider({
   const [pcfId, setPcfId] = useState<string | null>(initialPcfId || null);
   const [formData, setFormData] = useState<WizardFormData>(INITIAL_FORM_DATA);
   const [progress, setProgress] = useState<WizardProgress>(INITIAL_PROGRESS);
+
+  // Template prompt state (Stage 6 — auto-open dialogs instead of nav buttons)
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [showSaveTemplatePrompt, setShowSaveTemplatePrompt] = useState(false);
   const [preCalcState, setPreCalcState] = useState<PreCalculationState>(
     INITIAL_PRE_CALC_STATE
   );
@@ -352,6 +427,24 @@ export function WizardProvider({
       }
 
       setPreCalcState((prev) => ({ ...prev, product: productData }));
+
+      // Fresh-wizard prefill (no PCF to resume):
+      //
+      //   1. products.last_wizard_settings — restore silently from the
+      //      user's most recent run on this product.
+      //   2. No prior settings → start from INITIAL_FORM_DATA AND trigger
+      //      the template picker prompt so the user can explicitly choose
+      //      to start from a saved template or skip to blank defaults.
+      //
+      // Org-scoped templates are no longer auto-applied behind the user's
+      // back — the prompt dialog fetches the list itself and handles the
+      // pick / skip / zero-templates cases.
+      if (!initialPcfId) {
+        setFormData(buildInitialFormData(productData));
+        if (!productData.last_wizard_settings) {
+          setShowTemplatePicker(true);
+        }
+      }
 
       const { data: materialsData, error: materialsError } = materialsResult;
       if (materialsError) throw materialsError;
@@ -1034,13 +1127,29 @@ export function WizardProvider({
 
       if (updateError) throw updateError;
 
-      // Sync system_boundary back to the products table so the product list
-      // and detail pages display the correct boundary (DB uses underscore enum)
+      // Mirror-write to the products table:
+      //   1. last_wizard_settings — always updated, so the next wizard open
+      //      prefills from the user's most recent choices and drift between
+      //      runs for the same product is eliminated.
+      //   2. system_boundary — kept in sync so the product list and detail
+      //      pages display the correct boundary (DB uses underscore enum).
+      const productsUpdate: Record<string, unknown> = {
+        last_wizard_settings: pickLcaSettings(formData),
+      };
       if (formData.systemBoundary) {
-        await supabase
-          .from('products')
-          .update({ system_boundary: boundaryToDbEnum(formData.systemBoundary) })
-          .eq('id', productId);
+        productsUpdate.system_boundary = boundaryToDbEnum(formData.systemBoundary);
+      }
+      const { error: productsUpdateError } = await supabase
+        .from('products')
+        .update(productsUpdate)
+        .eq('id', productId);
+      if (productsUpdateError) {
+        // Non-fatal: the PCF itself saved successfully, the prefill is just a
+        // convenience. Log and swallow so the user doesn't see a scary error.
+        console.warn(
+          '[WizardContext] Mirror-write to products failed (non-fatal):',
+          productsUpdateError,
+        );
       }
 
       lastSavedDataRef.current = currentData;
@@ -1067,6 +1176,99 @@ export function WizardProvider({
   }, [saveProgressInternal, toast]);
 
   // ============================================================================
+  // LCA REPORT TEMPLATES — apply / save-as
+  // ============================================================================
+
+  /**
+   * Fetch an LCA report template and overlay its settings onto the current
+   * formData. functionalUnit is preserved because it's product-specific and
+   * is never part of the persisted settings blob (LcaWizardSettings Omits it).
+   *
+   * Intentionally does NOT call saveProgressInternal — the plan is that the
+   * user reviews the applied settings first. A subsequent field edit will
+   * trigger the existing debounced auto-save, or they can hit Save manually.
+   */
+  const applyTemplate = useCallback(
+    async (templateId: string) => {
+      try {
+        const res = await fetch(`/api/lca-templates/${templateId}`);
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(json?.error || 'Failed to load template');
+        }
+        const template = json?.template as LcaReportTemplate | undefined;
+        if (!template) {
+          throw new Error('Template response was empty');
+        }
+
+        setFormData((prev) => ({
+          ...prev,
+          ...template.settings,
+          // Defensive: LcaWizardSettings Omits functionalUnit so this
+          // spread can't clobber it, but pin it explicitly in case a
+          // legacy/hand-edited row has it stored anyway.
+          functionalUnit: prev.functionalUnit,
+        }));
+
+        sonnerToast.success(`Template "${template.name}" applied`, {
+          description: 'Review the settings and save to persist.',
+        });
+      } catch (err: any) {
+        console.error('[WizardContext] applyTemplate error:', err);
+        sonnerToast.error('Failed to apply template', {
+          description: err?.message || 'Please try again.',
+        });
+      }
+    },
+    [],
+  );
+
+  /**
+   * POST the current formData as a new org-scoped template. Errors are
+   * re-thrown so the calling dialog can keep itself open and display the
+   * message inline (duplicate-name 409, validation 400, etc).
+   */
+  const saveAsTemplate = useCallback(
+    async (
+      name: string,
+      description?: string | null,
+      setAsDefault?: boolean,
+    ) => {
+      const organizationId = preCalcState.product?.organization_id;
+      if (!organizationId) {
+        const msg = 'Organisation context is not loaded yet.';
+        sonnerToast.error('Cannot save template', { description: msg });
+        throw new Error(msg);
+      }
+
+      const res = await fetch('/api/lca-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organizationId,
+          name,
+          description: description ?? null,
+          settings: pickLcaSettings(formData),
+          setAsDefault: setAsDefault === true,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = json?.error || 'Failed to save template';
+        sonnerToast.error('Failed to save template', { description: msg });
+        throw new Error(msg);
+      }
+
+      sonnerToast.success(`Template "${name}" saved`, {
+        description: setAsDefault
+          ? 'This is now the org default for new products.'
+          : 'Available to apply on any product in your organisation.',
+      });
+    },
+    [formData, preCalcState.product?.organization_id],
+  );
+
+  // ============================================================================
   // FINISH WIZARD
   // ============================================================================
 
@@ -1087,6 +1289,12 @@ export function WizardProvider({
         title: 'Compliance wizard complete!',
         description: 'All required ISO 14044 fields have been documented.',
       });
+
+      // Prompt the user to save these settings as a reusable template.
+      // By the finish step every Goal & Scope field is populated, so the
+      // captured blob is complete — unlike the old "Save as template" button
+      // that lived on the Goal step, which could only capture partial data.
+      setShowSaveTemplatePrompt(true);
     } catch (err: any) {
       console.error('[WizardContext] Finish error:', err);
       setError(err.message || 'Failed to complete wizard');
@@ -1153,6 +1361,13 @@ export function WizardProvider({
     saveProgress,
     finishWizard,
     resetError,
+    applyTemplate,
+    saveAsTemplate,
+    showTemplatePicker,
+    openTemplatePicker: () => setShowTemplatePicker(true),
+    dismissTemplatePicker: () => setShowTemplatePicker(false),
+    showSaveTemplatePrompt,
+    dismissSaveTemplatePrompt: () => setShowSaveTemplatePrompt(false),
   };
 
   return (

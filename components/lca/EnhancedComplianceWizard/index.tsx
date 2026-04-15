@@ -17,6 +17,8 @@ import {
 import { WizardProvider, useWizardContext } from './WizardContext';
 import { WizardProgress, CompactProgress, WIZARD_STEPS } from './WizardProgress';
 import { WizardSidebar } from './WizardSidebar';
+import { ApplyTemplateDialog } from './ApplyTemplateDialog';
+import { SaveAsTemplateDialog } from './SaveAsTemplateDialog';
 import {
   Drawer,
   DrawerContent,
@@ -340,6 +342,56 @@ function ErrorDisplay() {
 }
 
 // ============================================================================
+// TEMPLATE PROMPT DIALOGS
+// ============================================================================
+
+/**
+ * Mounts the two auto-opened template dialogs:
+ *
+ *  - ApplyTemplateDialog: opens on wizard load if the product has no prior
+ *    last_wizard_settings, so the user can pick a template or skip before
+ *    filling anything in. Shown as a radio list of org-scoped templates.
+ *
+ *  - SaveAsTemplateDialog: opens after a successful finishWizard(), so the
+ *    user is prompted to save their now-complete Goal & Scope config as a
+ *    reusable template. Intentionally only runs at the end of the flow —
+ *    this avoids the "Save as template" button on the Goal step that could
+ *    only capture partial data.
+ *
+ * Both dialogs are controlled by context state (showTemplatePicker /
+ * showSaveTemplatePrompt) so any step or button can also open them.
+ */
+function TemplatePromptDialogs() {
+  const {
+    preCalcState,
+    showTemplatePicker,
+    dismissTemplatePicker,
+    showSaveTemplatePrompt,
+    dismissSaveTemplatePrompt,
+  } = useWizardContext();
+
+  const organizationId = preCalcState.product?.organization_id ?? null;
+
+  return (
+    <>
+      <ApplyTemplateDialog
+        open={showTemplatePicker}
+        onOpenChange={(next) => {
+          if (!next) dismissTemplatePicker();
+        }}
+        organizationId={organizationId}
+      />
+      <SaveAsTemplateDialog
+        open={showSaveTemplatePrompt}
+        onOpenChange={(next) => {
+          if (!next) dismissSaveTemplatePrompt();
+        }}
+      />
+    </>
+  );
+}
+
+// ============================================================================
 // MAIN WIZARD LAYOUT
 // ============================================================================
 
@@ -427,6 +479,9 @@ function WizardLayout({ onClose }: { onClose?: () => void }) {
 
       {/* Footer with navigation */}
       <WizardFooter />
+
+      {/* Auto-opened template prompts (pick on open, save on finish) */}
+      <TemplatePromptDialogs />
 
       {/* Mobile sidebar drawer */}
       <Drawer>

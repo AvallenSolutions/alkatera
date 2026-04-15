@@ -26,6 +26,7 @@ import { SupportSettings } from '@/components/settings/SupportSettings'
 import { IntegrationsSettings } from '@/components/settings/IntegrationsSettings'
 import { FeatureGate } from '@/components/subscription/FeatureGate'
 import { VineyardSettings } from '@/components/settings/VineyardSettings'
+import { LcaTemplatesSettings } from '@/components/settings/LcaTemplatesSettings'
 import { useIsAlkateraAdmin } from '@/hooks/usePermissions'
 import { isViticultureEligible } from '@/lib/viticulture-utils'
 
@@ -404,6 +405,7 @@ export default function SettingsPage() {
               <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
               {showVineyards && <TabsTrigger value="vineyards">Vineyards</TabsTrigger>}
               <TabsTrigger value="integrations">Integrations</TabsTrigger>
+              <TabsTrigger value="lca-templates">LCA templates</TabsTrigger>
             </>
           )}
           <TabsTrigger value="organisation">Organisation</TabsTrigger>
@@ -1103,6 +1105,10 @@ export default function SettingsPage() {
           <FeatureGate feature="xero_integration_beta">
             <IntegrationsSettings showHeader={false} />
           </FeatureGate>
+        </TabsContent>}
+
+        {isOrgAdmin && <TabsContent value="lca-templates" className="space-y-4">
+          <LcaTemplatesSettings showHeader={true} />
         </TabsContent>}
 
         <TabsContent value="organisation" className="space-y-4">

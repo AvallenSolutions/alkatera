@@ -14,6 +14,12 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'images.unsplash.com',
       },
+      {
+        // Prismic CDN — some seeded products (e.g. Avallen Calvados) have
+        // image URLs pointing at the customer's Prismic media library.
+        protocol: 'https',
+        hostname: 'images.prismic.io',
+      },
     ],
   },
   compiler: {

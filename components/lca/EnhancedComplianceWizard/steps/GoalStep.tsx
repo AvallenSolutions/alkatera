@@ -44,7 +44,15 @@ export function GoalStep() {
 
   return (
     <div className="space-y-6">
-      {/* Section Header */}
+      {/*
+       * Section Header.
+       *
+       * Template actions intentionally live outside this step: the wizard
+       * shell auto-opens ApplyTemplateDialog on load for products with no
+       * prior last_wizard_settings, and auto-opens SaveAsTemplateDialog on
+       * finish. Keeping them out of the Goal step avoids a half-filled
+       * "save as template" blob and a confusing mid-wizard button.
+       */}
       <div>
         <h3 className="text-lg font-semibold">Goal & Purpose</h3>
         <p className="text-sm text-muted-foreground">
