@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+const NO_CACHE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+  'CDN-Cache-Control': 'no-store',
+  'Netlify-CDN-Cache-Control': 'no-store',
+} as const;
 
 /**
  * GET /api/data/sources
@@ -15,7 +22,7 @@ export async function GET(request: NextRequest) {
     if (!token) {
       return NextResponse.json(
         { error: 'Unauthorized - No token provided' },
-        { status: 401 }
+        { status: 401, headers: NO_CACHE_HEADERS }
       );
     }
 
@@ -25,7 +32,7 @@ export async function GET(request: NextRequest) {
     if (!supabaseUrl || !supabaseAnonKey) {
       return NextResponse.json(
         { error: 'Server configuration error' },
-        { status: 500 }
+        { status: 500, headers: NO_CACHE_HEADERS }
       );
     }
 
@@ -42,7 +49,7 @@ export async function GET(request: NextRequest) {
     if (userError || !user?.user) {
       return NextResponse.json(
         { error: 'Unauthorized - Invalid token' },
-        { status: 401 }
+        { status: 401, headers: NO_CACHE_HEADERS }
       );
     }
 
@@ -59,7 +66,7 @@ export async function GET(request: NextRequest) {
       console.error('Error fetching global factors:', error);
       return NextResponse.json(
         { error: 'Failed to fetch data sources' },
-        { status: 500 }
+        { status: 500, headers: NO_CACHE_HEADERS }
       );
     }
 
@@ -80,25 +87,28 @@ export async function GET(request: NextRequest) {
       else if (grade === 'LOW') lowCount++;
     }
 
-    return NextResponse.json({
-      factors: factors || [],
-      grouped,
-      summary: {
-        total: (factors || []).length,
-        by_quality: {
-          high: highCount,
-          medium: mediumCount,
-          low: lowCount,
+    return NextResponse.json(
+      {
+        factors: factors || [],
+        grouped,
+        summary: {
+          total: (factors || []).length,
+          by_quality: {
+            high: highCount,
+            medium: mediumCount,
+            low: lowCount,
+          },
+          categories: Object.keys(grouped),
         },
-        categories: Object.keys(grouped),
       },
-    });
+      { headers: NO_CACHE_HEADERS }
+    );
 
   } catch (error) {
     console.error('Error in data sources API:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers: NO_CACHE_HEADERS }
     );
   }
 }

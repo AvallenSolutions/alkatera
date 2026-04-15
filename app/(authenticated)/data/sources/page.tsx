@@ -278,10 +278,11 @@ export default function DataSourcesPage() {
           return;
         }
 
-        const response = await fetch('/api/data/sources', {
+        const response = await fetch(`/api/data/sources?t=${Date.now()}`, {
           headers: {
             Authorization: `Bearer ${session.access_token}`,
           },
+          cache: 'no-store',
         });
 
         if (!response.ok) {
