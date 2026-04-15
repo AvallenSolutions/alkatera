@@ -49,12 +49,22 @@ interface ApplyTemplateDialogProps {
    * itself stays ignorant of product-load order.
    */
   organizationId: string | null;
+  /**
+   * When true and the org has zero templates, the dialog silently closes
+   * itself instead of showing the "No templates yet" empty state. Used by
+   * the auto-open path (new product, no prior settings) so brand-new orgs
+   * aren't pestered. Manual opens from the GoalStep "Apply template" button
+   * pass `false` so the user sees the empty state and understands why
+   * nothing happened.
+   */
+  autoDismissOnEmpty?: boolean;
 }
 
 export function ApplyTemplateDialog({
   open,
   onOpenChange,
   organizationId,
+  autoDismissOnEmpty = false,
 }: ApplyTemplateDialogProps) {
   const { applyTemplate } = useWizardContext();
 
@@ -87,9 +97,12 @@ export function ApplyTemplateDialog({
         // Default the selection to the org default (first row by API order)
         // so a single Enter/Apply applies the obvious choice.
         setSelectedId(list[0]?.id ?? null);
-        // Auto-dismiss when there's nothing to pick. Avoids showing an
-        // empty prompt to brand-new orgs who've never saved a template.
-        if (list.length === 0) {
+        // Auto-dismiss when there's nothing to pick and this was an auto-
+        // opened prompt. Avoids showing an empty prompt to brand-new orgs
+        // who've never saved a template. Manual opens (GoalStep button)
+        // pass autoDismissOnEmpty=false so the "No templates yet" empty
+        // state shows and the user understands why clicking did nothing.
+        if (list.length === 0 && autoDismissOnEmpty) {
           onOpenChange(false);
         }
       } catch (err: any) {
@@ -103,7 +116,7 @@ export function ApplyTemplateDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, organizationId]);
+  }, [open, organizationId, autoDismissOnEmpty, onOpenChange]);
 
   const handleApply = useCallback(async () => {
     if (!selectedId) return;

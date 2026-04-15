@@ -1,12 +1,13 @@
 'use client';
 
 import React from 'react';
+import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertTriangle, Users } from 'lucide-react';
+import { AlertTriangle, Download, Users } from 'lucide-react';
 import { useWizardContext } from '../WizardContext';
 
 // ============================================================================
@@ -28,7 +29,9 @@ const AUDIENCE_OPTIONS = [
 // ============================================================================
 
 export function GoalStep() {
-  const { formData, updateField } = useWizardContext();
+  const { formData, updateField, openTemplatePicker, preCalcState } =
+    useWizardContext();
+  const hasOrganization = Boolean(preCalcState.product?.organization_id);
 
   const handleAudienceChange = (value: string, checked: boolean) => {
     const current = formData.intendedAudience || [];
@@ -45,20 +48,38 @@ export function GoalStep() {
   return (
     <div className="space-y-6">
       {/*
-       * Section Header.
+       * Section Header + manual "Apply template" trigger.
        *
-       * Template actions intentionally live outside this step: the wizard
-       * shell auto-opens ApplyTemplateDialog on load for products with no
-       * prior last_wizard_settings, and auto-opens SaveAsTemplateDialog on
-       * finish. Keeping them out of the Goal step avoids a half-filled
-       * "save as template" blob and a confusing mid-wizard button.
+       * SaveAsTemplateDialog is intentionally NOT here: it auto-opens on
+       * wizard finish so the saved blob always reflects the complete,
+       * downstream-validated config.
+       *
+       * ApplyTemplateDialog auto-opens on wizard load for products that
+       * have no prior last_wizard_settings, but we still need a manual
+       * trigger so a user re-running an LCA on a product with history
+       * can overlay an org template on their existing settings. Button
+       * dispatches via context (`openTemplatePicker`) so the single
+       * shell-mounted dialog handles both flows.
        */}
-      <div>
-        <h3 className="text-lg font-semibold">Goal & Purpose</h3>
-        <p className="text-sm text-muted-foreground">
-          Define why this Life Cycle Assessment is being conducted. This helps
-          ensure the study is designed appropriately.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-lg font-semibold">Goal & Purpose</h3>
+          <p className="text-sm text-muted-foreground">
+            Define why this Life Cycle Assessment is being conducted. This helps
+            ensure the study is designed appropriately.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={openTemplatePicker}
+          disabled={!hasOrganization}
+          className="shrink-0"
+        >
+          <Download className="h-4 w-4 mr-2" />
+          Apply template
+        </Button>
       </div>
 
       {/* Intended Application */}

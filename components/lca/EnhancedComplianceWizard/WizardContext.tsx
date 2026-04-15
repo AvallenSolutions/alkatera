@@ -159,6 +159,15 @@ interface WizardContextValue {
   openTemplatePicker: () => void;
   dismissTemplatePicker: () => void;
   /**
+   * True when the picker was opened by the auto-trigger (new product, no
+   * prior settings). In that mode the dialog silently auto-dismisses if the
+   * org has zero templates, to keep brand-new orgs friction-free. Manual
+   * opens (GoalStep's "Apply template" button) set this to false so the
+   * user sees the "No templates yet" empty state and understands why
+   * clicking did nothing.
+   */
+  templatePickerAutoDismissOnEmpty: boolean;
+  /**
    * True after `finishWizard()` has successfully persisted the PCF, so the
    * UI auto-opens the "Save as template?" prompt. Dismissed by Skip or Save.
    */
@@ -377,6 +386,10 @@ export function WizardProvider({
 
   // Template prompt state (Stage 6 — auto-open dialogs instead of nav buttons)
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [
+    templatePickerAutoDismissOnEmpty,
+    setTemplatePickerAutoDismissOnEmpty,
+  ] = useState(false);
   const [showSaveTemplatePrompt, setShowSaveTemplatePrompt] = useState(false);
   const [preCalcState, setPreCalcState] = useState<PreCalculationState>(
     INITIAL_PRE_CALC_STATE
@@ -442,6 +455,8 @@ export function WizardProvider({
       if (!initialPcfId) {
         setFormData(buildInitialFormData(productData));
         if (!productData.last_wizard_settings) {
+          // Auto-trigger: silently dismiss if the org has no templates yet.
+          setTemplatePickerAutoDismissOnEmpty(true);
           setShowTemplatePicker(true);
         }
       }
@@ -1364,8 +1379,14 @@ export function WizardProvider({
     applyTemplate,
     saveAsTemplate,
     showTemplatePicker,
-    openTemplatePicker: () => setShowTemplatePicker(true),
+    openTemplatePicker: () => {
+      // Manual open: never auto-dismiss on empty, so the user sees the
+      // "No templates yet" empty state and knows why the button did nothing.
+      setTemplatePickerAutoDismissOnEmpty(false);
+      setShowTemplatePicker(true);
+    },
     dismissTemplatePicker: () => setShowTemplatePicker(false),
+    templatePickerAutoDismissOnEmpty,
     showSaveTemplatePrompt,
     dismissSaveTemplatePrompt: () => setShowSaveTemplatePrompt(false),
   };

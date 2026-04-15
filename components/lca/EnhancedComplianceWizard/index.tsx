@@ -366,6 +366,7 @@ function TemplatePromptDialogs() {
     preCalcState,
     showTemplatePicker,
     dismissTemplatePicker,
+    templatePickerAutoDismissOnEmpty,
     showSaveTemplatePrompt,
     dismissSaveTemplatePrompt,
   } = useWizardContext();
@@ -380,6 +381,7 @@ function TemplatePromptDialogs() {
           if (!next) dismissTemplatePicker();
         }}
         organizationId={organizationId}
+        autoDismissOnEmpty={templatePickerAutoDismissOnEmpty}
       />
       <SaveAsTemplateDialog
         open={showSaveTemplatePrompt}
