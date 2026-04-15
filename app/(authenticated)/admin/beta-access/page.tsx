@@ -54,6 +54,11 @@ const BETA_FEATURES = [
     description: 'Vineyard management and self-grown ingredient LCA calculations with FLAG-aligned soil carbon',
   },
   {
+    code: 'arable_beta',
+    label: 'Arable Fields (Grain Growing)',
+    description: 'Arable field management and self-grown grain LCA calculations with FLAG v1.2 compliance, fertiliser emissions, and multi-harvest averaging',
+  },
+  {
     code: 'orchard_beta',
     label: 'Orchards (Fruit Growing)',
     description: 'Fruit orchard management and LCA calculations with FLAG v1.2 compliance, transport tracking, and multi-harvest averaging',
