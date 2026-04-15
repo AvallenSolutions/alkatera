@@ -1078,6 +1078,11 @@ export function useRecipeEditor(productId: string, organizationId: string) {
     setPackagingForms(items);
   };
 
+  // Replace all ingredient forms with template items
+  const setIngredientsFromTemplate = (items: IngredientFormData[]) => {
+    setIngredientForms(items);
+  };
+
   // Dirty state: compare current forms against last-saved snapshot
   const isDirty = formFingerprint(ingredientForms) !== savedIngredientSnapshot.current ||
     formFingerprint(packagingForms) !== savedPackagingSnapshot.current ||
@@ -1111,6 +1116,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
     saveIngredients,
     savePackaging,
     setPackagingFromTemplate,
+    setIngredientsFromTemplate,
     updateMaturationProfile,
     saveMaturation,
     removeMaturation,

@@ -26,6 +26,7 @@ import { MaturationProfileCard } from "@/components/products/MaturationProfileCa
 import { SearchGuidePanel } from "@/components/products/SearchGuidePanel";
 import { RecipeChecklist } from "@/components/products/RecipeChecklist";
 import { PackagingTemplateDialog } from "@/components/products/PackagingTemplateDialog";
+import { IngredientTemplateDialog } from "@/components/products/IngredientTemplateDialog";
 import { useRecipeEditor } from "@/hooks/useRecipeEditor";
 import { useLinkedSupplierProducts } from "@/hooks/data/useLinkedSupplierProducts";
 import type { IngredientFormData } from "@/components/products/IngredientFormCard";
@@ -57,6 +58,8 @@ export function RecipeEditorPanel({
   const [showBOMImport, setShowBOMImport] = useState(false);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [templateDialogMode, setTemplateDialogMode] = useState<"save" | "browse">("browse");
+  const [showIngredientTemplateDialog, setShowIngredientTemplateDialog] = useState(false);
+  const [ingredientTemplateDialogMode, setIngredientTemplateDialogMode] = useState<"save" | "browse">("browse");
 
   const {
     product,
@@ -86,6 +89,7 @@ export function RecipeEditorPanel({
     saveIngredients,
     savePackaging,
     setPackagingFromTemplate,
+    setIngredientsFromTemplate,
     saveMaturation,
     removeMaturation,
   } = useRecipeEditor(productId, organizationId);
@@ -278,6 +282,31 @@ export function RecipeEditorPanel({
                   <CardDescription>
                     Build your product recipe with environmental impact data
                   </CardDescription>
+                  <div className="flex gap-2 mt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setIngredientTemplateDialogMode("browse");
+                        setShowIngredientTemplateDialog(true);
+                      }}
+                    >
+                      <Copy className="h-3.5 w-3.5 mr-1.5" />
+                      Apply Template
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setIngredientTemplateDialogMode("save");
+                        setShowIngredientTemplateDialog(true);
+                      }}
+                      disabled={ingredientCount === 0}
+                    >
+                      <BookmarkPlus className="h-3.5 w-3.5 mr-1.5" />
+                      Save as Template
+                    </Button>
+                  </div>
                 </div>
               </div>
             </CardHeader>
@@ -505,6 +534,20 @@ export function RecipeEditorPanel({
         onApplyTemplate={(items) => {
           setPackagingFromTemplate(items);
           setShowTemplateDialog(false);
+        }}
+      />
+
+      <IngredientTemplateDialog
+        open={showIngredientTemplateDialog}
+        onOpenChange={setShowIngredientTemplateDialog}
+        organizationId={organizationId}
+        mode={ingredientTemplateDialogMode}
+        currentIngredients={ingredientForms}
+        currentProductVolumeValue={product?.unit_size_value ?? null}
+        currentProductVolumeUnit={product?.unit_size_unit ?? null}
+        onApplyTemplate={(items) => {
+          setIngredientsFromTemplate(items);
+          setShowIngredientTemplateDialog(false);
         }}
       />
     </div>
