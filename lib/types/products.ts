@@ -19,6 +19,14 @@ export interface Product {
   product_category?: string | null;
   unit_size_value?: number | null;
   unit_size_unit?: UnitSizeUnit | null;
+  /**
+   * Bottled alcohol strength as percent (e.g. 46 for 46% ABV).
+   * Drives per-bottle allocation of maturation impacts for aged spirits: water
+   * added at bottling inflates bottle count by (cask_abv / bottle_abv).
+   * NULL falls back to product-category default then 40%.
+   * Added in migration 20261800100000_maturation_abv_and_warehouse_country.sql.
+   */
+  alcohol_content_abv?: number | null;
   product_description?: string | null;
   product_image_url?: string | null;
   certifications?: Certification[];
@@ -44,6 +52,7 @@ export interface CreateProductInput {
   product_category?: string;
   unit_size_value?: number;
   unit_size_unit?: UnitSizeUnit;
+  alcohol_content_abv?: number | null;
   product_description?: string;
   product_image_url?: string;
   certifications?: Certification[];

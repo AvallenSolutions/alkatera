@@ -4,6 +4,7 @@ import type { MaturationProfile } from '../types/maturation';
 import {
   BARREL_CO2E_DEFAULTS,
   ANGEL_SHARE_DEFAULTS,
+  getSpiritTypeDefaults,
 } from '../types/maturation';
 
 // ============================================================================
@@ -24,9 +25,12 @@ function createMockMaturationProfile(overrides: Partial<MaturationProfile> = {})
     climate_zone: 'temperate',
     fill_volume_litres: 200,
     number_of_barrels: 5,
+    cask_fill_abv_percent: null,
     warehouse_energy_kwh_per_barrel_year: 15,
     warehouse_energy_source: 'grid_electricity',
+    warehouse_country_code: null,
     allocation_method: 'cut_off',
+    bottles_produced: null,
     notes: null,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
@@ -466,6 +470,195 @@ describe('calculateMaturationImpacts', () => {
       expect(BARREL_CO2E_DEFAULTS['american_oak_200']).toBe(40);
       expect(BARREL_CO2E_DEFAULTS['french_oak_225']).toBe(55);
       expect(BARREL_CO2E_DEFAULTS['american_oak_500']).toBe(65);
+    });
+  });
+
+  // ==========================================================================
+  // ABV DILUTION TESTS
+  // ==========================================================================
+
+  describe('ABV dilution', () => {
+    it('Scotch 63.5% cask → 46% bottle inflates bottled volume by ~1.38×', () => {
+      const profile = createMockMaturationProfile({
+        number_of_barrels: 1,
+        fill_volume_litres: 200,
+        barrel_volume_litres: 200,
+        aging_duration_months: 120, // 10 years
+        angel_share_percent_per_year: 2.0,
+      });
+
+      const result = calculateMaturationImpacts(profile, {
+        caskFillAbvPercent: 63.5,
+        bottleAbvPercent: 46,
+      });
+
+      const expectedDilution = 63.5 / 46;
+      expect(result.dilution_factor).toBeCloseTo(expectedDilution, 4);
+
+      // Cask-strength output: 200 × 0.98^10 = ~163.4 L
+      const expectedCaskOutput = 200 * Math.pow(0.98, 10);
+      expect(result.output_volume_litres).toBeCloseTo(expectedCaskOutput, 1);
+
+      // Bottled output: ~163.4 × (63.5/46) = ~225.6 L
+      expect(result.output_volume_bottled_litres).toBeCloseTo(expectedCaskOutput * expectedDilution, 1);
+
+      // Bottled output is strictly greater than cask output due to water addition
+      expect(result.output_volume_bottled_litres).toBeGreaterThan(result.output_volume_litres);
+    });
+
+    it('Bourbon 62.5% cask → 45% bottle with continental 5%/yr loss', () => {
+      const profile = createMockMaturationProfile({
+        climate_zone: 'continental',
+        angel_share_percent_per_year: 5.0,
+        aging_duration_months: 48, // 4 years
+        number_of_barrels: 1,
+        fill_volume_litres: 200,
+      });
+
+      const result = calculateMaturationImpacts(profile, {
+        caskFillAbvPercent: 62.5,
+        bottleAbvPercent: 45,
+      });
+
+      const expectedDilution = 62.5 / 45;
+      expect(result.dilution_factor).toBeCloseTo(expectedDilution, 4);
+      expect(result.output_volume_bottled_litres).toBeCloseTo(
+        200 * Math.pow(0.95, 4) * expectedDilution,
+        2
+      );
+    });
+
+    it('Cognac 70% cask → 40% bottle has dilution factor of 1.75', () => {
+      const profile = createMockMaturationProfile({
+        climate_zone: 'temperate',
+        angel_share_percent_per_year: 2.0,
+        aging_duration_months: 72,
+        number_of_barrels: 1,
+        fill_volume_litres: 225,
+        barrel_volume_litres: 225,
+      });
+
+      const result = calculateMaturationImpacts(profile, {
+        caskFillAbvPercent: 70,
+        bottleAbvPercent: 40,
+      });
+
+      expect(result.dilution_factor).toBeCloseTo(1.75, 4);
+    });
+
+    it('no dilution when cask ABV equals bottle ABV (e.g. wine 14%/14%)', () => {
+      const profile = createMockMaturationProfile({
+        fill_volume_litres: 225,
+        barrel_volume_litres: 225,
+        number_of_barrels: 1,
+        aging_duration_months: 18,
+      });
+
+      const result = calculateMaturationImpacts(profile, {
+        caskFillAbvPercent: 14,
+        bottleAbvPercent: 14,
+      });
+
+      expect(result.dilution_factor).toBe(1);
+      expect(result.output_volume_bottled_litres).toBeCloseTo(result.output_volume_litres, 4);
+    });
+
+    it('defaults to no dilution when bottle ABV is omitted', () => {
+      const profile = createMockMaturationProfile({ number_of_barrels: 1 });
+
+      const result = calculateMaturationImpacts(profile, {
+        caskFillAbvPercent: 63.5,
+        // bottleAbvPercent intentionally omitted
+      });
+
+      expect(result.dilution_factor).toBe(1);
+      expect(result.output_volume_bottled_litres).toBeCloseTo(result.output_volume_litres, 4);
+    });
+
+    it('reads cask ABV from profile column when options omit it', () => {
+      const profile = createMockMaturationProfile({
+        number_of_barrels: 1,
+        cask_fill_abv_percent: 70,
+      });
+
+      const result = calculateMaturationImpacts(profile, {
+        bottleAbvPercent: 40,
+      });
+
+      expect(result.dilution_factor).toBeCloseTo(1.75, 4);
+    });
+
+    it('throws when ABV values are zero or negative', () => {
+      const profile = createMockMaturationProfile();
+
+      expect(() =>
+        calculateMaturationImpacts(profile, {
+          caskFillAbvPercent: 0,
+          bottleAbvPercent: 40,
+        })
+      ).toThrow(/Invalid ABV/);
+    });
+
+    it('backward-compat: positional (profile, country, abvFraction) form still works', () => {
+      const profile = createMockMaturationProfile({ number_of_barrels: 1 });
+      // Legacy form passed country code and a fraction (0.63 = 63%)
+      const result = calculateMaturationImpacts(profile, 'GB', 0.63);
+      // With no bottle ABV, cask ABV 63% implies no dilution
+      expect(result.dilution_factor).toBe(1);
+    });
+  });
+
+  // ==========================================================================
+  // SPIRIT TYPE DEFAULTS TESTS
+  // ==========================================================================
+
+  describe('getSpiritTypeDefaults', () => {
+    it('matches "Single Malt Whisky" via substring regex (the seed category)', () => {
+      const defaults = getSpiritTypeDefaults('Single Malt Whisky');
+      expect(defaults.barrel_type).toBe('american_oak_200');
+      expect(defaults.cask_fill_abv_percent).toBe(63.5);
+      expect(defaults.bottle_abv_percent).toBe(46);
+      expect(defaults.climate_zone).toBe('temperate');
+      expect(defaults.aging_months).toBe(120);
+      expect(defaults.barrel_use_number).toBe(2);
+    });
+
+    it('matches "Bourbon" before "Whisky" (order-sensitive)', () => {
+      const defaults = getSpiritTypeDefaults('Bourbon');
+      // Bourbon rule, not whisky rule
+      expect(defaults.climate_zone).toBe('continental');
+      expect(defaults.barrel_use_number).toBe(1);
+      expect(defaults.cask_fill_abv_percent).toBe(62.5);
+    });
+
+    it('matches "Small Batch Rye Whiskey" via rye rule', () => {
+      const defaults = getSpiritTypeDefaults('Small Batch Rye Whiskey');
+      expect(defaults.climate_zone).toBe('continental');
+      expect(defaults.cask_fill_abv_percent).toBe(62.5);
+    });
+
+    it('matches cognac with French oak and heavy dilution', () => {
+      const defaults = getSpiritTypeDefaults('Cognac VSOP');
+      expect(defaults.barrel_type).toBe('french_oak_225');
+      expect(defaults.cask_fill_abv_percent).toBe(70);
+      expect(defaults.bottle_abv_percent).toBe(40);
+    });
+
+    it('matches "Aged Rum" via tropical climate', () => {
+      const defaults = getSpiritTypeDefaults('Aged Rum');
+      expect(defaults.climate_zone).toBe('tropical');
+    });
+
+    it('returns generic fallback for unknown categories', () => {
+      const defaults = getSpiritTypeDefaults('Sparkling Water');
+      expect(defaults.barrel_type).toBe('american_oak_200');
+      expect(defaults.cask_fill_abv_percent).toBe(63);
+      expect(defaults.bottle_abv_percent).toBe(40);
+    });
+
+    it('returns generic fallback for null/undefined', () => {
+      expect(getSpiritTypeDefaults(null).barrel_type).toBe('american_oak_200');
+      expect(getSpiritTypeDefaults(undefined).barrel_type).toBe('american_oak_200');
     });
   });
 });

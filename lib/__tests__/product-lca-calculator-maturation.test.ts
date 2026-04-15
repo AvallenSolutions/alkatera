@@ -106,6 +106,10 @@ function createMockProduct(overrides: Record<string, unknown> = {}) {
     product_image_url: null,
     unit_size_value: 700,
     unit_size_unit: 'ml',
+    // Bottle ABV equal to default cask ABV (63%) makes dilution_factor = 1,
+    // so per-bottle allocation uses cask-strength output volume unchanged.
+    // Per-test overrides can set different ABVs to exercise dilution explicitly.
+    alcohol_content_abv: 63,
     ...overrides,
   };
 }

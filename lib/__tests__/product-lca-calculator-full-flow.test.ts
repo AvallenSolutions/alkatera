@@ -76,7 +76,11 @@ vi.mock('../maturation-calculator', () => ({
     warehouse_co2e_total: 5,
     angel_share_photochemical_ozone: 0.001,
     angel_share_loss_percent_total: 2.5,
+    angel_share_volume_loss_litres: 5,
     output_volume_litres: 200,
+    output_volume_bottled_litres: 275, // post-dilution Scotch-style (200 × 63.5/46)
+    dilution_factor: 1.38,
+    volume_loss_factor: 0.98,
     methodology_notes: 'Test notes',
   })),
 }));

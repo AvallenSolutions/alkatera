@@ -39,6 +39,7 @@ export function EditProductForm({ productId, onSuccess, onCancel }: EditProductF
   const [productCategory, setProductCategory] = useState("");
   const [unitSizeValue, setUnitSizeValue] = useState("");
   const [unitSizeUnit, setUnitSizeUnit] = useState<UnitSizeUnit | "">("");
+  const [alcoholContentAbv, setAlcoholContentAbv] = useState("");
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [certifications, setCertifications] = useState<Certification[]>([]);
@@ -72,6 +73,9 @@ export function EditProductForm({ productId, onSuccess, onCancel }: EditProductF
       setProductCategory(product.product_category || "");
       setUnitSizeValue(product.unit_size_value?.toString() || "");
       setUnitSizeUnit((product.unit_size_unit as UnitSizeUnit) || "");
+      setAlcoholContentAbv(
+        product.alcohol_content_abv != null ? String(product.alcohol_content_abv) : ""
+      );
       setDescription(product.product_description || "");
       setImageUrl(product.product_image_url || "");
       setCertifications(product.certifications || []);
@@ -213,6 +217,7 @@ export function EditProductForm({ productId, onSuccess, onCancel }: EditProductF
         product_category: productCategory || undefined,
         unit_size_value: unitSizeValue ? parseFloat(unitSizeValue) : undefined,
         unit_size_unit: unitSizeUnit || undefined,
+        alcohol_content_abv: alcoholContentAbv.trim() === "" ? null : parseFloat(alcoholContentAbv),
         product_description: description.trim() || undefined,
         product_image_url: imageUrl.trim() || undefined,
         certifications: validCertifications,
@@ -379,6 +384,27 @@ export function EditProductForm({ productId, onSuccess, onCancel }: EditProductF
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="alcohol-content-abv">
+                Alcohol by Volume (%)
+                <span className="text-xs text-muted-foreground font-normal ml-1">(optional)</span>
+              </Label>
+              <Input
+                id="alcohol-content-abv"
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                value={alcoholContentAbv}
+                onChange={(e) => setAlcoholContentAbv(e.target.value)}
+                placeholder="e.g. 46"
+                disabled={isSaving}
+              />
+              <p className="text-xs text-muted-foreground">
+                Strength in the bottle. Drives accurate per-bottle allocation for aged spirits (water added at bottling inflates bottle count by cask ABV / bottle ABV).
+              </p>
             </div>
 
             <div className="space-y-2">

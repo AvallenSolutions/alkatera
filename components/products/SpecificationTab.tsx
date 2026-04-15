@@ -12,6 +12,7 @@ import type { MaturationProfile } from "@/lib/types/maturation";
 import {
   BARREL_TYPE_LABELS,
   CLIMATE_ZONE_LABELS,
+  getSpiritTypeDefaults,
 } from "@/lib/types/maturation";
 import { calculateMaturationImpacts } from "@/lib/maturation-calculator";
 
@@ -19,11 +20,21 @@ interface SpecificationTabProps {
   productId: string;
   ingredients: ProductIngredient[];
   packaging: ProductPackaging[];
+  productCategory?: string | null;
+  productAbvPercent?: number | null;
   onManageIngredients?: () => void;
   onManagePackaging?: () => void;
 }
 
-export function SpecificationTab({ productId, ingredients, packaging, onManageIngredients, onManagePackaging }: SpecificationTabProps) {
+export function SpecificationTab({
+  productId,
+  ingredients,
+  packaging,
+  productCategory,
+  productAbvPercent,
+  onManageIngredients,
+  onManagePackaging,
+}: SpecificationTabProps) {
   const [maturationProfile, setMaturationProfile] = useState<MaturationProfile | null>(null);
 
   useEffect(() => {
@@ -39,7 +50,18 @@ export function SpecificationTab({ productId, ingredients, packaging, onManageIn
   }, [productId]);
 
   const maturationImpacts = maturationProfile
-    ? calculateMaturationImpacts(maturationProfile)
+    ? (() => {
+        const defaults = getSpiritTypeDefaults(productCategory);
+        const caskAbv =
+          (maturationProfile.cask_fill_abv_percent as number | null) ??
+          defaults.cask_fill_abv_percent;
+        const bottleAbv = productAbvPercent ?? defaults.bottle_abv_percent;
+        return calculateMaturationImpacts(maturationProfile, {
+          warehouseCountryCode: maturationProfile.warehouse_country_code ?? null,
+          caskFillAbvPercent: caskAbv,
+          bottleAbvPercent: bottleAbv,
+        });
+      })()
     : null;
 
   // Calculate total ingredient weight

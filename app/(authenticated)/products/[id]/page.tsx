@@ -315,6 +315,8 @@ export default function ProductDashboardPage() {
               productId={productId}
               ingredients={ingredients}
               packaging={packaging}
+              productCategory={product?.product_category ?? null}
+              productAbvPercent={product?.alcohol_content_abv ?? null}
               onManageIngredients={() => openRecipeEditor("ingredients")}
               onManagePackaging={() => openRecipeEditor("packaging")}
             />
@@ -400,6 +402,14 @@ export default function ProductDashboardPage() {
             productId={productId}
             organizationId={currentOrganization?.id || ''}
             productCategory={product?.product_category}
+            productAbvPercent={product?.alcohol_content_abv ?? null}
+            productBottleSizeMl={
+              product?.unit_size_unit === 'ml'
+                ? Number(product?.unit_size_value) || null
+                : product?.unit_size_unit === 'L'
+                  ? (Number(product?.unit_size_value) || 0) * 1000
+                  : null
+            }
             onSaveComplete={() => {
               refetch();
               closeRecipeEditor(true);

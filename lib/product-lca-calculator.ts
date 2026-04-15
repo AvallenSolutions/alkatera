@@ -9,6 +9,7 @@ import { calculateDistance } from './utils/distance-calculator';
 import { boundaryToDbEnum } from './system-boundaries';
 import { calculateMaturationImpacts } from './maturation-calculator';
 import type { MaturationProfile } from './types/maturation';
+import { getSpiritTypeDefaults } from './types/maturation';
 import { calculateViticultureImpacts } from './viticulture-calculator';
 import { calculateMultiVintageAverage } from './viticulture-multi-vintage';
 import type { VineyardGrowingProfile, Vineyard } from './types/viticulture';
@@ -867,6 +868,10 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
     // overwhelming the OpenLCA server.
     const OPENLCA_CONCURRENCY = 4;
     const resolvedFactors = new Map<string, WaterfallResult>();
+    // Failures during parallel pre-resolution are stored here and re-thrown
+    // from within the per-material try/catch below, so they get wrapped with
+    // "Missing emission data" context and trigger LCA record cleanup.
+    const resolveErrors = new Map<string, Error>();
 
     // Build list of materials that need live resolution (not pinned)
     const materialsToResolve = materials.filter(m => !pinnedMaterials?.has(m.material_name));
@@ -883,8 +888,12 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           data_source_id: m.data_source_id,
           organization_id: product.organization_id,
         });
-        const result = await resolveImpactFactors(m as ProductMaterial, quantityKg, product.organization_id, fallbackEvents);
-        resolvedFactors.set(m.material_name, result);
+        try {
+          const result = await resolveImpactFactors(m as ProductMaterial, quantityKg, product.organization_id, fallbackEvents);
+          resolvedFactors.set(m.material_name, result);
+        } catch (err: any) {
+          resolveErrors.set(m.material_name, err instanceof Error ? err : new Error(String(err)));
+        }
       });
 
       // Run with concurrency limit
@@ -900,7 +909,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           await Promise.race(executing);
         }
       }
-      await Promise.allSettled(results);
+      await Promise.all(results);
     }
 
     for (const material of materials) {
@@ -915,6 +924,11 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           resolved = buildResultFromPinnedMaterial(pinnedMaterials.get(material.material_name)!, quantityKg);
         } else if (resolvedFactors.has(material.material_name)) {
           resolved = resolvedFactors.get(material.material_name)!;
+        } else if (resolveErrors.has(material.material_name)) {
+          // Parallel pre-resolution failed for this material — re-throw so
+          // the catch below wraps it with "Missing emission data" and
+          // cleans up the LCA record.
+          throw resolveErrors.get(material.material_name)!;
         } else {
           // Fallback: resolve individually (should not happen, but safe)
           resolved = await resolveImpactFactors(material as ProductMaterial, quantityKg, product.organization_id, fallbackEvents);
@@ -1342,14 +1356,48 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
 
     if (maturationProfile && isMaturationEligible) {
       console.log(`[calculateProductCarbonFootprint] Processing maturation profile (${maturationProfile.barrel_type}, ${maturationProfile.aging_duration_months} months)...`);
-      // HIGH FIX #11: Pass the primary facility's country code so the maturation
-    // calculator can use the warehouse's grid factor rather than a hardcoded UK value.
-    // The primary facility (first in facilityAllocations) is the best proxy for the
-    // warehouse location when a dedicated warehouse_country_code field doesn't exist yet.
-    const warehouseCountryCode = params.facilityAllocations?.[0]
-      ? (await supabase.from('facilities').select('location_country_code').eq('id', params.facilityAllocations[0].facilityId).single()).data?.location_country_code ?? null
-      : null;
-    const matResult = calculateMaturationImpacts(maturationProfile as MaturationProfile, warehouseCountryCode);
+      // Resolve warehouse country: profile-level column first, then primary
+      // facility country, then null (calculator falls back to global average).
+      let warehouseCountryCode: string | null =
+        (maturationProfile as MaturationProfile).warehouse_country_code ?? null;
+      if (!warehouseCountryCode && params.facilityAllocations?.[0]) {
+        const { data: facility } = await supabase
+          .from('facilities')
+          .select('location_country_code')
+          .eq('id', params.facilityAllocations[0].facilityId)
+          .single();
+        warehouseCountryCode = facility?.location_country_code ?? null;
+      }
+
+      // ABV resolution with category-driven fallbacks.
+      // Bottle ABV: product.alcohol_content_abv → category default
+      // Cask ABV:   profile.cask_fill_abv_percent → category default
+      const spiritDefaults = getSpiritTypeDefaults(product.product_category);
+      const bottleAbvPct =
+        Number(product.alcohol_content_abv) > 0
+          ? Number(product.alcohol_content_abv)
+          : spiritDefaults.bottle_abv_percent;
+      const caskFillAbvPct =
+        Number((maturationProfile as MaturationProfile).cask_fill_abv_percent) > 0
+          ? Number((maturationProfile as MaturationProfile).cask_fill_abv_percent)
+          : spiritDefaults.cask_fill_abv_percent;
+
+      if (!product.alcohol_content_abv) {
+        console.warn(
+          `[calculateProductCarbonFootprint] ⚠ Product "${product.name}" has no alcohol_content_abv set; ` +
+          `using category default ${spiritDefaults.bottle_abv_percent}% for per-bottle maturation allocation. ` +
+          `Set alcohol_content_abv on the product for accurate results.`
+        );
+      }
+
+      const matResult = calculateMaturationImpacts(
+        maturationProfile as MaturationProfile,
+        {
+          warehouseCountryCode,
+          caskFillAbvPercent: caskFillAbvPct,
+          bottleAbvPercent: bottleAbvPct,
+        }
+      );
 
       // --- Per-bottle allocation ---
       // Regular materials are already per-functional-unit (per bottle). Maturation
@@ -1368,18 +1416,22 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         );
       }
 
-      // Use user-specified bottle count if set, otherwise derive from output volume
+      // Per-bottle allocation uses BOTTLED volume (after water addition at
+      // bottling strength), not cask-strength volume. Dividing cask-strength
+      // litres by bottle size under-counts bottles by the dilution factor
+      // (~1.38× for Scotch, ~1.75× for cognac) and over-states per-bottle
+      // CO2e by the same factor.
       const totalBottles = maturationProfile.bottles_produced
         ? Number(maturationProfile.bottles_produced)
-        : (matResult.output_volume_litres > 0 && bottleSizeLitres > 0)
-          ? matResult.output_volume_litres / bottleSizeLitres
+        : (matResult.output_volume_bottled_litres > 0 && bottleSizeLitres > 0)
+          ? matResult.output_volume_bottled_litres / bottleSizeLitres
           : 1;
 
       const barrelPerBottle = totalBottles > 0 ? matResult.barrel_total_co2e / totalBottles : 0;
       const warehousePerBottle = totalBottles > 0 ? matResult.warehouse_co2e_total / totalBottles : 0;
       const vocPerBottle = totalBottles > 0 ? matResult.angel_share_photochemical_ozone / totalBottles : 0;
 
-      console.log(`[calculateProductCarbonFootprint] Maturation per-bottle: ${totalBottles.toFixed(0)} bottles from ${matResult.output_volume_litres.toFixed(1)}L (${(bottleSizeLitres * 1000).toFixed(0)}ml/bottle), barrel=${barrelPerBottle.toFixed(4)}/bottle, warehouse=${warehousePerBottle.toFixed(4)}/bottle`);
+      console.log(`[calculateProductCarbonFootprint] Maturation per-bottle: ${totalBottles.toFixed(0)} bottles from ${matResult.output_volume_bottled_litres.toFixed(1)}L bottled (${matResult.output_volume_litres.toFixed(1)}L cask-strength, dilution ${matResult.dilution_factor.toFixed(2)}×, ${(bottleSizeLitres * 1000).toFixed(0)}ml/bottle), barrel=${barrelPerBottle.toFixed(4)}/bottle, warehouse=${warehousePerBottle.toFixed(4)}/bottle`);
 
       // Inject barrel allocation as a synthetic material (per-bottle)
       lcaMaterialsWithImpacts.push({
@@ -1435,7 +1487,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         supplier_lca_id: null,
         confidence_score: 60,
         methodology: 'Cut-off allocation / Literature estimates',
-        source_reference: `Barrel allocation: ${matResult.barrel_total_co2e.toFixed(1)} kg total ÷ ${totalBottles.toFixed(0)} bottles = ${barrelPerBottle.toFixed(4)} kg/bottle (${(bottleSizeLitres * 1000).toFixed(0)}ml, ${matResult.output_volume_litres.toFixed(1)}L output). ${matResult.methodology_notes}`,
+        source_reference: `Barrel allocation: ${matResult.barrel_total_co2e.toFixed(1)} kg total ÷ ${totalBottles.toFixed(0)} bottles = ${barrelPerBottle.toFixed(4)} kg/bottle (${(bottleSizeLitres * 1000).toFixed(0)}ml bottle, ${matResult.output_volume_bottled_litres.toFixed(1)}L bottled output, dilution ${matResult.dilution_factor.toFixed(2)}×). ${matResult.methodology_notes}`,
         impact_source: 'secondary_modelled',
         impact_reference_id: null,
         data_quality_grade: 'LOW',

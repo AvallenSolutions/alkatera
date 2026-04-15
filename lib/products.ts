@@ -106,6 +106,9 @@ export async function updateProduct(input: UpdateProductInput): Promise<Product>
   if (updateData.unit_size_unit !== undefined) {
     updatePayload.unit_size_unit = updateData.unit_size_unit || null;
   }
+  if (updateData.alcohol_content_abv !== undefined) {
+    updatePayload.alcohol_content_abv = updateData.alcohol_content_abv ?? null;
+  }
   // Keep legacy functional_unit text field in sync with structured fields
   if (updateData.unit_size_value !== undefined || updateData.unit_size_unit !== undefined) {
     const val = updateData.unit_size_value ?? updatePayload.unit_size_value;

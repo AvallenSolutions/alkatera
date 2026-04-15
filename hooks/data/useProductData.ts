@@ -67,6 +67,7 @@ export interface Product {
   functional_unit: string;
   unit_size_value: number;
   unit_size_unit: string;
+  alcohol_content_abv?: number | null;
   organization_id: string;
   is_multipack?: boolean;
   annual_production_volume?: number | null;
