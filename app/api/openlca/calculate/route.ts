@@ -4,7 +4,7 @@ import { createOpenLCAClientForDatabase } from '@/lib/openlca/client';
 import type { ImpactResult } from '@/lib/openlca/schema';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 120;
+export const maxDuration = 120; // OpenLCA calculations can take 60-90s
 
 // ReCiPe 2016 MIDPOINT impact category mapping (problem-oriented: kg CO2-eq, m³, etc.)
 const MIDPOINT_CATEGORY_MAPPING: Record<string, string> = {
@@ -12,7 +12,7 @@ const MIDPOINT_CATEGORY_MAPPING: Record<string, string> = {
   'global warming': 'impact_climate',
   'water consumption': 'impact_water',
   'water use': 'impact_water',
-  'land use': 'impact_land',
+  'land use': 'impact_land',  // m²*year from midpoint
   'ozone depletion': 'impact_ozone_depletion',
   'freshwater eutrophication': 'impact_freshwater_eutrophication',
   'marine eutrophication': 'impact_marine_eutrophication',
@@ -30,10 +30,11 @@ const MIDPOINT_CATEGORY_MAPPING: Record<string, string> = {
 };
 
 // ReCiPe 2016 ENDPOINT impact category mapping (damage-oriented: species.yr, DALY)
+// Used for biodiversity/ecosystem damage metrics
 const ENDPOINT_CATEGORY_MAPPING: Record<string, string> = {
-  'ecosystem quality': 'impact_ecosystem_damage',
+  'ecosystem quality': 'impact_ecosystem_damage',  // Total ecosystem damage in species.yr
   'ecosystems': 'impact_ecosystem_damage',
-  'land use': 'impact_land_biodiversity',
+  'land use': 'impact_land_biodiversity',  // Land-related biodiversity damage in species.yr
   'terrestrial ecotoxicity': 'impact_terrestrial_ecotoxicity_endpoint',
   'freshwater ecotoxicity': 'impact_freshwater_ecotoxicity_endpoint',
   'marine ecotoxicity': 'impact_marine_ecotoxicity_endpoint',
@@ -42,341 +43,357 @@ const ENDPOINT_CATEGORY_MAPPING: Record<string, string> = {
   'ecotoxicity: terrestrial': 'impact_terrestrial_ecotoxicity_endpoint',
 };
 
+// Legacy mapping for backward compatibility
+const IMPACT_CATEGORY_MAPPING: Record<string, string> = {
+  ...MIDPOINT_CATEGORY_MAPPING,
+  'terrestrial ecotoxicity': 'impact_terrestrial_ecotoxicity',
+  'freshwater ecotoxicity': 'impact_freshwater_ecotoxicity',
+  'marine ecotoxicity': 'impact_marine_ecotoxicity',
+  'ecotoxicity: freshwater': 'impact_freshwater_ecotoxicity',
+  'ecotoxicity: marine': 'impact_marine_ecotoxicity',
+  'ecotoxicity: terrestrial': 'impact_terrestrial_ecotoxicity',
+};
+
 interface CalculateRequest {
   processId: string;
   quantity: number;
   organizationId: string;
+  /** Which OpenLCA database to calculate against (default: 'ecoinvent') */
   database?: 'ecoinvent' | 'agribalyse';
 }
 
-/**
- * Parse midpoint + endpoint impact results into our flat format
- */
-function parseImpacts(
-  midpointImpacts: ImpactResult[],
-  endpointImpacts: ImpactResult[]
-): Record<string, number> {
-  const parsedImpacts: Record<string, number> = {
-    impact_climate: 0,
-    impact_climate_fossil: 0,
-    impact_climate_biogenic: 0,
-    impact_climate_dluc: 0,
-    impact_water: 0,
-    impact_land: 0,
-    impact_waste: 0,
-    impact_ozone_depletion: 0,
-    impact_terrestrial_ecotoxicity: 0,
-    impact_freshwater_ecotoxicity: 0,
-    impact_marine_ecotoxicity: 0,
-    impact_freshwater_eutrophication: 0,
-    impact_marine_eutrophication: 0,
-    impact_terrestrial_acidification: 0,
-    impact_mineral_resource_scarcity: 0,
-    impact_fossil_resource_scarcity: 0,
-    impact_particulate_matter: 0,
-    impact_ionising_radiation: 0,
-    impact_photochemical_ozone_formation: 0,
-    impact_ecosystem_damage: 0,
-    impact_land_biodiversity: 0,
-    impact_terrestrial_ecotoxicity_endpoint: 0,
-    impact_freshwater_ecotoxicity_endpoint: 0,
-    impact_marine_ecotoxicity_endpoint: 0,
-  };
-
-  for (const impact of midpointImpacts) {
-    const categoryName = impact.impactCategory?.name?.toLowerCase() || '';
-    const value = (impact as any).amount ?? impact.value ?? 0;
-
-    for (const [pattern, field] of Object.entries(MIDPOINT_CATEGORY_MAPPING)) {
-      if (categoryName.includes(pattern)) {
-        parsedImpacts[field] = value;
-        break;
-      }
-    }
-
-    if (categoryName.includes('terrestrial ecotoxicity')) {
-      parsedImpacts.impact_terrestrial_ecotoxicity = value;
-    } else if (categoryName.includes('freshwater ecotoxicity') || categoryName.includes('ecotoxicity: freshwater')) {
-      parsedImpacts.impact_freshwater_ecotoxicity = value;
-    } else if (categoryName.includes('marine ecotoxicity') || categoryName.includes('ecotoxicity: marine')) {
-      parsedImpacts.impact_marine_ecotoxicity = value;
-    }
-  }
-
-  for (const impact of endpointImpacts) {
-    const categoryName = impact.impactCategory?.name?.toLowerCase() || '';
-    const value = (impact as any).amount ?? impact.value ?? 0;
-
-    for (const [pattern, field] of Object.entries(ENDPOINT_CATEGORY_MAPPING)) {
-      if (categoryName.includes(pattern)) {
-        parsedImpacts[field] = value;
-        break;
-      }
-    }
-  }
-
-  if (parsedImpacts.impact_climate > 0 && !parsedImpacts.impact_climate_fossil) {
-    parsedImpacts.impact_climate_fossil = parsedImpacts.impact_climate * 0.85;
-    parsedImpacts.impact_climate_biogenic = parsedImpacts.impact_climate * 0.15;
-  }
-
-  return parsedImpacts;
-}
-
 export async function POST(request: NextRequest) {
-  // ── Fast-path checks (no streaming needed, returns immediately) ──
-  const authHeader = request.headers.get('authorization');
-  const token = authHeader?.replace('Bearer ', '');
-
-  if (!token) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
-  }
-
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
-  });
-
-  const { data: user, error: userError } = await supabase.auth.getUser();
-  if (userError || !user?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  let body: CalculateRequest;
   try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
+    // Check authentication
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
 
-  const { processId, quantity, organizationId, database = 'ecoinvent' } = body;
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  if (!processId || !quantity || !organizationId) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-  }
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (process.env.OPENLCA_SERVER_ENABLED !== 'true') {
-    return NextResponse.json({
-      error: 'OpenLCA not configured',
-      message: 'Set OPENLCA_SERVER_URL and OPENLCA_SERVER_ENABLED=true',
-    }, { status: 503 });
-  }
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
 
-  const client = createOpenLCAClientForDatabase(database);
-  if (!client) {
-    const dbLabel = database === 'agribalyse' ? 'Agribalyse' : 'ecoinvent';
-    return NextResponse.json({
-      error: `OpenLCA ${dbLabel} server not configured`,
-      message: database === 'agribalyse'
-        ? 'Set OPENLCA_AGRIBALYSE_SERVER_URL to enable Agribalyse calculations'
-        : 'Set OPENLCA_SERVER_URL to enable ecoinvent calculations',
-    }, { status: 503 });
-  }
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    });
 
-  // Check cache (gracefully handle missing table)
-  try {
-    const { data: cached, error } = await supabase
-      .from('openlca_impact_cache')
-      .select('*')
-      .eq('organization_id', organizationId)
-      .eq('process_id', processId)
-      .eq('source_database', database)
-      .gt('expires_at', new Date().toISOString())
-      .maybeSingle();
+    const { data: user, error: userError } = await supabase.auth.getUser();
+    if (userError || !user?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-    if (!error && cached) {
-      const scaledImpacts: Record<string, number> = {};
-      const impactColumns = [
-        'impact_climate', 'impact_climate_fossil', 'impact_climate_biogenic',
-        'impact_climate_dluc', 'impact_water', 'impact_land', 'impact_waste',
-        'impact_ozone_depletion', 'impact_terrestrial_ecotoxicity',
-        'impact_freshwater_ecotoxicity', 'impact_marine_ecotoxicity',
-        'impact_freshwater_eutrophication', 'impact_marine_eutrophication',
-        'impact_terrestrial_acidification', 'impact_mineral_resource_scarcity',
-        'impact_fossil_resource_scarcity',
-      ];
-      for (const col of impactColumns) {
-        scaledImpacts[col] = (cached[col] || 0) * quantity;
+    // Parse request body
+    const body: CalculateRequest = await request.json();
+    const { processId, quantity, organizationId, database = 'ecoinvent' } = body;
+
+    if (!processId || !quantity || !organizationId) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    // Check if OpenLCA is enabled
+    if (process.env.OPENLCA_SERVER_ENABLED !== 'true') {
+      return NextResponse.json({
+        error: 'OpenLCA not configured',
+        message: 'Set OPENLCA_SERVER_URL and OPENLCA_SERVER_ENABLED=true',
+      }, { status: 503 });
+    }
+
+    // Create OpenLCA client for the requested database (dual-server architecture)
+    // Each database source (ecoinvent / agribalyse) has its own gdt-server instance
+    const client = createOpenLCAClientForDatabase(database);
+    if (!client) {
+      const dbLabel = database === 'agribalyse' ? 'Agribalyse' : 'ecoinvent';
+      return NextResponse.json({
+        error: `OpenLCA ${dbLabel} server not configured`,
+        message: database === 'agribalyse'
+          ? 'Set OPENLCA_AGRIBALYSE_SERVER_URL to enable Agribalyse calculations'
+          : 'Set OPENLCA_SERVER_URL to enable ecoinvent calculations',
+      }, { status: 503 });
+    }
+
+    // Check cache first (gracefully handle missing table)
+    let cached = null;
+    try {
+      const { data, error } = await supabase
+        .from('openlca_impact_cache')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .eq('process_id', processId)
+        .eq('source_database', database)
+        .gt('expires_at', new Date().toISOString())
+        .maybeSingle();
+
+      if (!error) {
+        cached = data;
+      } else if (!error.message?.includes('does not exist')) {
+        console.warn('[OpenLCA API] Cache query error:', error.message);
       }
+    } catch (cacheError) {
+      console.warn('[OpenLCA API] Cache unavailable, proceeding without cache');
+    }
+
+    if (cached) {
+      // Return cached data scaled by quantity
       return NextResponse.json({
         success: true,
         cached: true,
         database: cached.source_database || database,
-        impacts: scaledImpacts,
+        impacts: {
+          impact_climate: (cached.impact_climate || 0) * quantity,
+          impact_climate_fossil: (cached.impact_climate_fossil || 0) * quantity,
+          impact_climate_biogenic: (cached.impact_climate_biogenic || 0) * quantity,
+          impact_climate_dluc: (cached.impact_climate_dluc || 0) * quantity,
+          impact_water: (cached.impact_water || 0) * quantity,
+          impact_land: (cached.impact_land || 0) * quantity,
+          impact_waste: (cached.impact_waste || 0) * quantity,
+          impact_ozone_depletion: (cached.impact_ozone_depletion || 0) * quantity,
+          impact_terrestrial_ecotoxicity: (cached.impact_terrestrial_ecotoxicity || 0) * quantity,
+          impact_freshwater_ecotoxicity: (cached.impact_freshwater_ecotoxicity || 0) * quantity,
+          impact_marine_ecotoxicity: (cached.impact_marine_ecotoxicity || 0) * quantity,
+          impact_freshwater_eutrophication: (cached.impact_freshwater_eutrophication || 0) * quantity,
+          impact_marine_eutrophication: (cached.impact_marine_eutrophication || 0) * quantity,
+          impact_terrestrial_acidification: (cached.impact_terrestrial_acidification || 0) * quantity,
+          impact_mineral_resource_scarcity: (cached.impact_mineral_resource_scarcity || 0) * quantity,
+          impact_fossil_resource_scarcity: (cached.impact_fossil_resource_scarcity || 0) * quantity,
+        },
         processName: cached.process_name,
         geography: cached.geography,
         source: `OpenLCA Cache: ${cached.process_name}`,
       });
     }
-  } catch {
-    // Cache table may not exist yet - continue to live calculation
-  }
+    // Health check against the target server
+    const isHealthy = await client.healthCheck();
+    if (!isHealthy) {
+      const dbLabel = database === 'agribalyse' ? 'Agribalyse' : 'ecoinvent';
+      return NextResponse.json({
+        error: `OpenLCA ${dbLabel} server not reachable`,
+      }, { status: 503 });
+    }
 
-  // ── Streaming response ──
-  // Netlify has a ~30-second INACTIVITY timeout — if no data is sent back
-  // to the client for 30 seconds, the CDN returns a 504. OpenLCA calculations
-  // take 20-40 seconds. We send keepalive newlines every 5 seconds to keep
-  // the connection alive, then send the JSON result as the final chunk.
-  //
-  // IMPORTANT: The product-lca-calculator uses concurrency 1 (sequential),
-  // so only ONE ingredient calls this endpoint at a time. This prevents
-  // the OpenLCA server from being overwhelmed by concurrent calculations.
-  const encoder = new TextEncoder();
-  const funcStartTime = Date.now();
+    // Get process info and calculate impacts (per 1 kg)
+    // No database switching needed — client is already pointed at the correct server
+    const processInfo = await client.getProcess(processId);
 
-  const stream = new ReadableStream({
-    async start(controller) {
-      const keepalive = setInterval(() => {
-        try {
-          controller.enqueue(encoder.encode('\n'));
-        } catch {
-          clearInterval(keepalive);
-        }
-      }, 5000);
+    // Agribalyse 3.2 ships with EF 3.1 (Environmental Footprint), not ReCiPe.
+    // Use the correct impact method for each database. EF 3.1 is midpoint-only
+    // so we skip the endpoint call for Agribalyse.
+    let midpointImpacts: ImpactResult[] = [];
+    let endpointImpacts: ImpactResult[] = [];
 
-      // Safety timer: send error before Netlify's 60s function kill
-      let responded = false;
-      const safetyTimer = setTimeout(() => {
-        if (!responded) {
-          responded = true;
-          clearInterval(keepalive);
-          try {
-            controller.enqueue(encoder.encode(JSON.stringify({
-              error: `Calculation timed out after 55s for process ${processId} (${database})`,
-            })));
-            controller.close();
-          } catch { /* stream already closed */ }
-        }
-      }, 55000);
+    // Netlify has a hard 60-second function timeout. Some complex processes
+    // (e.g. Ascorbic Acid on Agribalyse) take 60-70s for the endpoint method.
+    // Strategy: run both midpoint and endpoint simultaneously, but impose a
+    // total time budget of 50s. Return whatever completes within that window.
+    // Midpoint (~20-30s) always finishes; endpoint finishes if it can.
+    // Results are cached, so on retry all time goes to the slower method.
+    const TOTAL_BUDGET_MS = 50000; // 50s total, leaving 10s headroom for overhead
 
+    // Helper: run a calculation and capture its result into a mutable ref
+    const runWithCapture = async (
+      method: string,
+      ref: { impacts: ImpactResult[] },
+    ): Promise<void> => {
+      ref.impacts = await client.calculateProcess(processId, method, 1);
+    };
+
+    const midpointRef = { impacts: [] as ImpactResult[] };
+    const endpointRef = { impacts: [] as ImpactResult[] };
+
+    if (database === 'agribalyse') {
       try {
-        const processInfo = await client.getProcess(processId);
+        // Launch both simultaneously
+        const midpointPromise = runWithCapture('ReCiPe 2016 Midpoint (H)', midpointRef);
+        const endpointPromise = runWithCapture('ReCiPe 2016 Endpoint (I)', endpointRef);
 
-        let midpointImpacts: ImpactResult[] = [];
-        let endpointImpacts: ImpactResult[] = [];
+        // Wait for both, but bail at the budget limit
+        await Promise.race([
+          Promise.allSettled([midpointPromise, endpointPromise]),
+          new Promise(resolve => setTimeout(resolve, TOTAL_BUDGET_MS)),
+        ]);
 
-        // Midpoint and endpoint method names differ between databases
-        const midpointMethod = database === 'agribalyse'
-          ? 'ReCiPe 2016 Midpoint (H)'
-          : 'ReCiPe 2016 v1.03, midpoint (H)';
-        const endpointMethod = database === 'agribalyse'
-          ? 'ReCiPe 2016 Endpoint (I)'
-          : 'ReCiPe 2016 v1.03, endpoint (I) no LT';
+        midpointImpacts = midpointRef.impacts;
+        endpointImpacts = endpointRef.impacts;
 
-        // Run both midpoint and endpoint in parallel.
-        // With concurrency 1 at the caller level, only ONE process is being
-        // calculated at a time, so the server handles both methods fine (~33s total).
-        const midpointRef = { impacts: [] as ImpactResult[] };
-        const endpointRef = { impacts: [] as ImpactResult[] };
-
-        const runCalc = async (method: string, ref: { impacts: ImpactResult[] }) => {
-          ref.impacts = await client.calculateProcess(processId, method, 1);
-        };
-
-        if (database === 'agribalyse') {
-          try {
-            await Promise.allSettled([
-              runCalc(midpointMethod, midpointRef),
-              runCalc(endpointMethod, endpointRef),
-            ]);
-            midpointImpacts = midpointRef.impacts;
-            endpointImpacts = endpointRef.impacts;
-          } catch {
-            console.warn('[OpenLCA API] ReCiPe failed on Agribalyse, trying EF 3.1');
-            midpointImpacts = await client.calculateProcess(processId, 'EF 3.1 Method (adapted)', 1);
-          }
-        } else {
-          await Promise.allSettled([
-            runCalc(midpointMethod, midpointRef),
-            runCalc(endpointMethod, endpointRef),
-          ]);
-          midpointImpacts = midpointRef.impacts;
-          endpointImpacts = endpointRef.impacts;
+        if (midpointImpacts.length > 0) {
+          console.log(`[OpenLCA API] Midpoint: ${midpointImpacts.length} categories, Endpoint: ${endpointImpacts.length} categories for ${processId}`);
         }
+      } catch {
+        // ReCiPe failed entirely — fall back to EF 3.1
+        console.warn('[OpenLCA API] ReCiPe not available on Agribalyse, falling back to EF 3.1');
+        midpointImpacts = await client.calculateProcess(processId, 'EF 3.1 Method (adapted)', 1);
+      }
+    } else {
+      // ecoinvent: same parallel strategy
+      const midpointPromise = runWithCapture('ReCiPe 2016 v1.03, midpoint (H)', midpointRef);
+      const endpointPromise = runWithCapture('ReCiPe 2016 v1.03, endpoint (I) no LT', endpointRef);
 
-        console.log(`[OpenLCA API] Midpoint: ${midpointImpacts.length}, Endpoint: ${endpointImpacts.length} for ${processId} (${Date.now() - funcStartTime}ms)`);
+      await Promise.race([
+        Promise.allSettled([midpointPromise, endpointPromise]),
+        new Promise(resolve => setTimeout(resolve, TOTAL_BUDGET_MS)),
+      ]);
 
-        if (midpointImpacts.length === 0 && endpointImpacts.length === 0) {
-          throw new Error(`Both calculations returned no results for process ${processId} (${database})`);
-        }
+      midpointImpacts = midpointRef.impacts;
+      endpointImpacts = endpointRef.impacts;
+      console.log(`[OpenLCA API] Midpoint: ${midpointImpacts.length} categories, Endpoint: ${endpointImpacts.length} categories for ${processId}`);
+    }
 
-        const parsedImpacts = parseImpacts(midpointImpacts, endpointImpacts);
+    // If midpoint failed but endpoint succeeded, something is very wrong
+    if (midpointImpacts.length === 0 && endpointImpacts.length === 0) {
+      throw new Error(`Both midpoint and endpoint calculations timed out for process ${processId} (${database})`);
+    }
 
-        // Cache results (fire-and-forget)
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 30);
-        supabase.from('openlca_impact_cache').upsert({
-          organization_id: organizationId,
-          process_id: processId,
-          source_database: database,
-          process_name: processInfo.name || 'Unknown',
-          geography: (processInfo.location as any)?.code || 'GLO',
-          quantity: 1,
-          unit: 'kg',
-          ...parsedImpacts,
-          impact_method: `${midpointMethod} + ${endpointMethod}`,
-          ecoinvent_version: database === 'agribalyse' ? 'agribalyse_3.2' : '3.12',
-          system_model: database === 'agribalyse' ? 'attributional' : 'cutoff',
-          calculated_at: new Date().toISOString(),
-          expires_at: expiresAt.toISOString(),
-        }, {
-          onConflict: 'organization_id,process_id,source_database',
-        }).then(({ error: cacheError }) => {
-          if (cacheError) console.warn(`[OpenLCA API] Cache write failed: ${cacheError.message}`);
-        });
+    // Parse impacts into our format - combining midpoint and endpoint values
+    const parsedImpacts: Record<string, number> = {
+      // Midpoint values (problem-oriented)
+      impact_climate: 0,
+      impact_climate_fossil: 0,
+      impact_climate_biogenic: 0,
+      impact_climate_dluc: 0,
+      impact_water: 0,
+      impact_land: 0,  // m²*year from midpoint
+      impact_waste: 0,
+      impact_ozone_depletion: 0,
+      impact_terrestrial_ecotoxicity: 0,
+      impact_freshwater_ecotoxicity: 0,
+      impact_marine_ecotoxicity: 0,
+      impact_freshwater_eutrophication: 0,
+      impact_marine_eutrophication: 0,
+      impact_terrestrial_acidification: 0,
+      impact_mineral_resource_scarcity: 0,
+      impact_fossil_resource_scarcity: 0,
+      impact_particulate_matter: 0,
+      impact_ionising_radiation: 0,
+      impact_photochemical_ozone_formation: 0,
+      // Endpoint values (damage-oriented) - for biodiversity metrics
+      impact_ecosystem_damage: 0,  // Total ecosystem damage in species.yr
+      impact_land_biodiversity: 0,  // Land-related biodiversity damage in species.yr
+      impact_terrestrial_ecotoxicity_endpoint: 0,
+      impact_freshwater_ecotoxicity_endpoint: 0,
+      impact_marine_ecotoxicity_endpoint: 0,
+    };
 
-        const scaledImpacts: Record<string, number> = {};
-        for (const [key, value] of Object.entries(parsedImpacts)) {
-          scaledImpacts[key] = value * quantity;
-        }
+    // Parse MIDPOINT impacts (kg CO2-eq, m³, etc.)
+    for (const impact of midpointImpacts) {
+      const categoryName = impact.impactCategory?.name?.toLowerCase() || '';
+      const value = (impact as any).amount ?? impact.value ?? 0;
 
-        const dbLabel = database === 'agribalyse' ? 'Agribalyse 3.2' : 'ecoinvent 3.12';
-        const result = {
-          success: true,
-          cached: false,
-          database,
-          impacts: scaledImpacts,
-          processName: processInfo.name,
-          geography: (processInfo.location as any)?.code || 'GLO',
-          source: `OpenLCA Live: ${processInfo.name} via ${dbLabel}`,
-          methods: { midpoint: midpointMethod, endpoint: endpointMethod },
-        };
-
-        if (!responded) {
-          responded = true;
-          clearTimeout(safetyTimer);
-          clearInterval(keepalive);
-          controller.enqueue(encoder.encode(JSON.stringify(result)));
-          controller.close();
-        }
-
-      } catch (error) {
-        if (!responded) {
-          responded = true;
-          clearTimeout(safetyTimer);
-          clearInterval(keepalive);
-          console.error('[OpenLCA API] Error:', error);
-          controller.enqueue(encoder.encode(JSON.stringify({
-            error: error instanceof Error ? error.message : 'Calculation failed',
-            details: error instanceof Error ? error.stack : undefined,
-          })));
-          controller.close();
+      for (const [pattern, field] of Object.entries(MIDPOINT_CATEGORY_MAPPING)) {
+        if (categoryName.includes(pattern)) {
+          parsedImpacts[field] = value;
+          break;
         }
       }
-    },
-  });
 
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'application/json',
-      'Cache-Control': 'no-cache',
-      'Transfer-Encoding': 'chunked',
-    },
-  });
+      // Also map ecotoxicity from midpoint to standard fields
+      if (categoryName.includes('terrestrial ecotoxicity')) {
+        parsedImpacts.impact_terrestrial_ecotoxicity = value;
+      } else if (categoryName.includes('freshwater ecotoxicity') || categoryName.includes('ecotoxicity: freshwater')) {
+        parsedImpacts.impact_freshwater_ecotoxicity = value;
+      } else if (categoryName.includes('marine ecotoxicity') || categoryName.includes('ecotoxicity: marine')) {
+        parsedImpacts.impact_marine_ecotoxicity = value;
+      }
+    }
+
+    // Parse ENDPOINT impacts (species.yr, DALY)
+    for (const impact of endpointImpacts) {
+      const categoryName = impact.impactCategory?.name?.toLowerCase() || '';
+      const value = (impact as any).amount ?? impact.value ?? 0;
+
+      for (const [pattern, field] of Object.entries(ENDPOINT_CATEGORY_MAPPING)) {
+        if (categoryName.includes(pattern)) {
+          parsedImpacts[field] = value;
+          break;
+        }
+      }
+    }
+
+    // Estimate GHG breakdown if not available
+    if (parsedImpacts.impact_climate > 0 && !parsedImpacts.impact_climate_fossil) {
+      parsedImpacts.impact_climate_fossil = parsedImpacts.impact_climate * 0.85;
+      parsedImpacts.impact_climate_biogenic = parsedImpacts.impact_climate * 0.15;
+    }
+
+    // Try to cache the results (per 1 kg) - gracefully handle missing table
+    try {
+      // Ecoinvent/Agribalyse process factors are stable between database versions,
+      // so a 30-day TTL reduces repeated API calls without risking stale data.
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30);
+
+      const { error: cacheError } = await supabase.from('openlca_impact_cache').upsert({
+        organization_id: organizationId,
+        process_id: processId,
+        source_database: database,
+        process_name: processInfo.name || 'Unknown',
+        geography: (processInfo.location as any)?.code || 'GLO',
+        quantity: 1,
+        unit: 'kg',
+        impact_climate: parsedImpacts.impact_climate,
+        impact_climate_fossil: parsedImpacts.impact_climate_fossil,
+        impact_climate_biogenic: parsedImpacts.impact_climate_biogenic,
+        impact_climate_dluc: parsedImpacts.impact_climate_dluc,
+        impact_water: parsedImpacts.impact_water,
+        impact_land: parsedImpacts.impact_land,
+        impact_waste: parsedImpacts.impact_waste,
+        impact_ozone_depletion: parsedImpacts.impact_ozone_depletion,
+        impact_terrestrial_ecotoxicity: parsedImpacts.impact_terrestrial_ecotoxicity,
+        impact_freshwater_ecotoxicity: parsedImpacts.impact_freshwater_ecotoxicity,
+        impact_marine_ecotoxicity: parsedImpacts.impact_marine_ecotoxicity,
+        impact_freshwater_eutrophication: parsedImpacts.impact_freshwater_eutrophication,
+        impact_marine_eutrophication: parsedImpacts.impact_marine_eutrophication,
+        impact_terrestrial_acidification: parsedImpacts.impact_terrestrial_acidification,
+        impact_mineral_resource_scarcity: parsedImpacts.impact_mineral_resource_scarcity,
+        impact_fossil_resource_scarcity: parsedImpacts.impact_fossil_resource_scarcity,
+        impact_method: database === 'agribalyse' ? 'EF 3.1' : 'ReCiPe 2016 Midpoint (H) + Endpoint (I)',
+        ecoinvent_version: database === 'agribalyse' ? 'agribalyse_3.2' : '3.12',
+        system_model: database === 'agribalyse' ? 'attributional' : 'cutoff',
+        calculated_at: new Date().toISOString(),
+        expires_at: expiresAt.toISOString(),
+      }, {
+        onConflict: 'organization_id,process_id,source_database',
+      });
+
+      if (cacheError) {
+        console.warn(`[OpenLCA API] Cache write failed (table may not exist): ${cacheError.message}`);
+      } else {
+      }
+    } catch (cacheError) {
+      console.warn('[OpenLCA API] Cache write error:', cacheError);
+    }
+
+    // Return impacts scaled by quantity
+    const scaledImpacts: Record<string, number> = {};
+    for (const [key, value] of Object.entries(parsedImpacts)) {
+      scaledImpacts[key] = value * quantity;
+    }
+
+    const dbLabel = database === 'agribalyse' ? 'Agribalyse 3.2' : 'ecoinvent 3.12';
+    return NextResponse.json({
+      success: true,
+      cached: false,
+      database,
+      impacts: scaledImpacts,
+      processName: processInfo.name,
+      geography: (processInfo.location as any)?.code || 'GLO',
+      source: `OpenLCA Live: ${processInfo.name} via ${dbLabel}`,
+      methods: {
+        midpoint: 'ReCiPe 2016 v1.03, midpoint (H)',
+        endpoint: 'ReCiPe 2016 v1.03, endpoint (I) no LT',
+      },
+    });
+
+  } catch (error) {
+    console.error('[OpenLCA API] Error:', error);
+    console.error('[OpenLCA API] Error stack:', error instanceof Error ? error.stack : 'No stack');
+    return NextResponse.json({
+      error: error instanceof Error ? error.message : 'Calculation failed',
+      details: error instanceof Error ? error.stack : undefined,
+    }, { status: 500 });
+  }
 }

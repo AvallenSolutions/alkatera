@@ -104,21 +104,11 @@ export async function POST(request: NextRequest) {
         });
         clearTimeout(timeoutId);
 
-        // Response is streamed (keepalive newlines + JSON). Read full text and parse.
-        const text = await response.text();
-        const jsonStr = text.trim();
-        if (jsonStr) {
-          try {
-            const result = JSON.parse(jsonStr);
-            if (result.success) {
-              return { processId: mat.processId, status: 'cached' as const };
-            }
-            return { processId: mat.processId, status: 'failed' as const, error: result.error || 'Unknown error' };
-          } catch {
-            return { processId: mat.processId, status: 'failed' as const, error: 'Failed to parse response' };
-          }
+        if (response.ok) {
+          return { processId: mat.processId, status: 'cached' as const };
         }
-        return { processId: mat.processId, status: 'failed' as const, error: 'Empty response' };
+        const err = await response.json().catch(() => ({}));
+        return { processId: mat.processId, status: 'failed' as const, error: err.error || response.statusText };
       } catch (err: any) {
         return { processId: mat.processId, status: 'failed' as const, error: err.message };
       }
