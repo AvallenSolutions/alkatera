@@ -368,6 +368,18 @@ export function normalizeToKg(quantity: string | number, unit: string): number {
     case 'liters':
       return qty;
 
+    // --- Discrete / countable units (pass through as-is; emission factors are per-unit) ---
+    case 'unit':
+    case 'units':
+    case 'item':
+    case 'items':
+    case 'piece':
+    case 'pieces':
+    case 'each':
+    case 'ea':
+    case 'pcs':
+      return qty;
+
     default:
       // Unknown unit — passthrough as kg with warning
       console.warn(

@@ -687,12 +687,17 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
             data_source_tag: hasDirectRunData ? 'Direct_Run_Data' : (hasVerifiedFacilityData ? 'Facility_Verified' : 'User_Input'),
           };
 
-          // Use upsert to handle existing allocations for same period
+          // Delete any existing allocations for this product/facility to avoid
+          // "overlapping allocation periods" constraint violation, then insert fresh.
+          await supabase
+            .from('contract_manufacturer_allocations')
+            .delete()
+            .eq('product_id', parseInt(productId))
+            .eq('facility_id', allocation.facilityId);
+
           const { error: insertError } = await supabase
             .from('contract_manufacturer_allocations')
-            .upsert(cmAllocationRecord, {
-              onConflict: 'product_id,facility_id,reporting_period_start,reporting_period_end'
-            });
+            .insert(cmAllocationRecord);
 
           if (insertError) {
             console.warn(`[calculateProductCarbonFootprint] ⚠️ Failed to insert CM allocation for ${allocation.facilityName}:`, insertError);
@@ -2369,16 +2374,17 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       // Deduplicate and fall back to a descriptive marker if no IDs were collected
       const uniqueFactorIds = Array.from(new Set(factorIdsUsed));
       if (uniqueFactorIds.length === 0) {
-        console.warn(`[calculateProductCarbonFootprint] ⚠ No resolved_factor_id found on any material — factor traceability gap`);
-      }
+        console.warn(`[calculateProductCarbonFootprint] ⚠ No resolved_factor_id found on any material — factor traceability gap. Skipping audit log (factor_ids_used requires valid UUIDs).`);
+      } else {
       const { error: auditErr } = await supabase
         .from('calculation_logs')
         .insert({
           organization_id: product.organization_id,
           user_id: (await supabase.auth.getUser()).data.user?.id,
-          calculation_id: lca.id,
+          calculation_id: null, // FK references calculated_emissions, not product_carbon_footprints
           input_data: {
             product_id: productId,
+            product_carbon_footprint_id: lca.id,
             product_name: product.name,
             system_boundary: systemBoundary || 'cradle-to-gate',
             reference_year: referenceYear || new Date().getFullYear(),
@@ -2392,7 +2398,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           output_value: aggregationResult.total_carbon_footprint,
           output_unit: 'kg CO2e per functional unit',
           methodology_version: 'ISO 14067:2018 / GHG Protocol Product v2.1.0',
-          factor_ids_used: uniqueFactorIds.length > 0 ? uniqueFactorIds : ['no-factor-ids-resolved'],
+          factor_ids_used: uniqueFactorIds,
           data_quality_tier: aggregationResult.impacts?.data_quality?.score >= 80 ? 1
             : aggregationResult.impacts?.data_quality?.score >= 50 ? 2 : 3,
           multiplication_proof: `${aggregationResult.total_carbon_footprint.toFixed(6)} kg CO2e = sum of ${lcaMaterialsWithImpacts.length} materials`,
@@ -2402,6 +2408,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         console.warn(`[calculateProductCarbonFootprint] ⚠️ Audit log write failed (non-fatal): ${auditErr.message}`);
       } else {
         console.log(`[calculateProductCarbonFootprint] ✓ Audit log written for LCA ${lca.id}`);
+      }
       }
     } catch (auditWriteErr: any) {
       console.warn(`[calculateProductCarbonFootprint] ⚠️ Audit log write exception (non-fatal): ${auditWriteErr.message}`);

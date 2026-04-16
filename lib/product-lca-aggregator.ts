@@ -1216,15 +1216,16 @@ export async function aggregateProductImpacts(
     return { success: false, total_carbon_footprint: 0, impacts: {}, materials_count: 0, production_sites_count: 0, error: `Failed to update LCA: ${updateError.message}` };
   }
 
-  // 12b. Supersede old completed PCFs for the same product.
+  // 12b. Remove old completed PCFs for the same product.
   // Each calculation creates a new PCF record. Without this cleanup, multiple
   // completed records exist and pages relying on ORDER BY can pick different ones,
   // causing discrepancies (e.g. product page shows 1.95 while passport shows 1.43).
-  // Marking old records as 'superseded' ensures only ONE completed PCF per product.
+  // We mark old records as 'draft' (valid_status only allows draft/pending/completed/failed)
+  // to ensure only ONE completed PCF per product.
   if (lcaData?.product_id) {
     const { error: supersedeError } = await supabase
       .from('product_carbon_footprints')
-      .update({ status: 'superseded', updated_at: new Date().toISOString() })
+      .update({ status: 'draft', updated_at: new Date().toISOString() })
       .eq('product_id', lcaData.product_id)
       .eq('status', 'completed')
       .neq('id', productCarbonFootprintId);
