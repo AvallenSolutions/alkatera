@@ -66,6 +66,7 @@ export default function SupplierProfilePage() {
   const [phone, setPhone] = useState('');
 
   // Upload state
+  const [manualAddress, setManualAddress] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingCatalogue, setUploadingCatalogue] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -506,23 +507,42 @@ export default function SupplierProfilePage() {
           </div>
 
           <div className="space-y-2">
-            <Label>Company Address</Label>
-            <GoogleAddressInput
-              value={address}
-              onAddressSelect={(details) => {
-                setAddress(details.formatted_address);
-                setCity(details.city || '');
-                setLat(details.lat);
-                setLng(details.lng);
-                setCountryCode(details.country_code || '');
-                if (details.country) {
-                  setCountry(details.country);
-                }
-              }}
-              placeholder="Start typing your address..."
-            />
-            {address && (
-              <p className="text-xs text-muted-foreground">{address}</p>
+            <div className="flex items-center justify-between">
+              <Label>Company Address</Label>
+              <button
+                type="button"
+                onClick={() => setManualAddress(v => !v)}
+                className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+              >
+                {manualAddress ? 'Search by address' : "Can't find your address?"}
+              </button>
+            </div>
+            {manualAddress ? (
+              <Input
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="e.g., 37 Crane Boulevard, Ipswich, IP3 9SQ"
+              />
+            ) : (
+              <>
+                <GoogleAddressInput
+                  value={address}
+                  onAddressSelect={(details) => {
+                    setAddress(details.formatted_address);
+                    setCity(details.city || '');
+                    setLat(details.lat);
+                    setLng(details.lng);
+                    setCountryCode(details.country_code || '');
+                    if (details.country) {
+                      setCountry(details.country);
+                    }
+                  }}
+                  placeholder="Start typing your address..."
+                />
+                {address && (
+                  <p className="text-xs text-muted-foreground">{address}</p>
+                )}
+              </>
             )}
           </div>
 

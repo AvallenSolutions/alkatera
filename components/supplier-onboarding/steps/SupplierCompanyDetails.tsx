@@ -32,6 +32,7 @@ export function SupplierCompanyDetails() {
   const [isSaving, setIsSaving] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [manualAddress, setManualAddress] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -215,22 +216,41 @@ export function SupplierCompanyDetails() {
         <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 space-y-4">
           {/* Address - full width */}
           <div className="space-y-2">
-            <Label htmlFor="sup-address" className="text-sm font-medium text-white/70">
-              Address
-            </Label>
-            <GoogleAddressInput
-              value={address}
-              onAddressSelect={(details) => {
-                setAddress(details.formatted_address)
-                setCity(details.city || '')
-                setLat(details.lat)
-                setLng(details.lng)
-                setCountryCode(details.country_code || '')
-                setCountry(details.country || '')
-              }}
-              placeholder="Start typing your address..."
-              className="bg-white/5 border-white/10 text-white placeholder:text-white/20"
-            />
+            <div className="flex items-center justify-between">
+              <Label htmlFor="sup-address" className="text-sm font-medium text-white/70">
+                Address
+              </Label>
+              <button
+                type="button"
+                onClick={() => setManualAddress(v => !v)}
+                className="text-xs text-white/30 hover:text-white/60 underline underline-offset-2"
+              >
+                {manualAddress ? 'Search by address' : "Can't find your address?"}
+              </button>
+            </div>
+            {manualAddress ? (
+              <input
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="e.g., 37 Crane Boulevard, Ipswich, IP3 9SQ"
+                disabled={isSaving}
+                className="w-full rounded-md px-3 py-2 text-sm bg-white/5 border border-white/10 text-white placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-[#ccff00]/50"
+              />
+            ) : (
+              <GoogleAddressInput
+                value={address}
+                onAddressSelect={(details) => {
+                  setAddress(details.formatted_address)
+                  setCity(details.city || '')
+                  setLat(details.lat)
+                  setLng(details.lng)
+                  setCountryCode(details.country_code || '')
+                  setCountry(details.country || '')
+                }}
+                placeholder="Start typing your address..."
+                className="bg-white/5 border-white/10 text-white placeholder:text-white/20"
+              />
+            )}
           </div>
 
           {/* Industry Sector + Phone - half width */}
