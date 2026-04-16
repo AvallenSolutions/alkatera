@@ -219,21 +219,16 @@ export async function POST(request: NextRequest) {
   }
 
   // ── Streaming response ──
-  // Netlify has TWO timeout limits:
-  //   1. ~30-second INACTIVITY timeout (no data sent) → 504
-  //   2. 60-second FUNCTION EXECUTION timeout → function killed mid-stream
+  // Netlify has a ~30-second INACTIVITY timeout — if no data is sent back
+  // to the client for 30 seconds, the CDN returns a 504. OpenLCA calculations
+  // take 20-40 seconds. We send keepalive newlines every 5 seconds to keep
+  // the connection alive, then send the JSON result as the final chunk.
   //
-  // We solve #1 with keepalive newlines every 5 seconds.
-  // We solve #2 by running ONLY midpoint (not endpoint) to keep total time
-  // under 50 seconds even under concurrent load. Endpoint data (for biodiversity
-  // metrics) is nice-to-have and can be fetched in a subsequent request once
-  // midpoint results are cached.
-  //
-  // A 50-second safety timer ensures we always send a response before Netlify
-  // kills the function. If midpoint hasn't finished by then, we send an error.
+  // IMPORTANT: The product-lca-calculator uses concurrency 1 (sequential),
+  // so only ONE ingredient calls this endpoint at a time. This prevents
+  // the OpenLCA server from being overwhelmed by concurrent calculations.
   const encoder = new TextEncoder();
   const funcStartTime = Date.now();
-  const SAFETY_TIMEOUT_MS = 50000; // Must respond before Netlify's 60s kill
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -245,54 +240,73 @@ export async function POST(request: NextRequest) {
         }
       }, 5000);
 
-      // Safety timer: if we haven't responded in 50s, send error and close
+      // Safety timer: send error before Netlify's 60s function kill
       let responded = false;
       const safetyTimer = setTimeout(() => {
         if (!responded) {
           responded = true;
           clearInterval(keepalive);
-          const errorResult = {
-            error: `Calculation timed out after ${SAFETY_TIMEOUT_MS / 1000}s for process ${processId} (${database})`,
-          };
           try {
-            controller.enqueue(encoder.encode(JSON.stringify(errorResult)));
+            controller.enqueue(encoder.encode(JSON.stringify({
+              error: `Calculation timed out after 55s for process ${processId} (${database})`,
+            })));
             controller.close();
           } catch { /* stream already closed */ }
         }
-      }, SAFETY_TIMEOUT_MS);
+      }, 55000);
 
       try {
-        // Get process info (needed for cache and response)
         const processInfo = await client.getProcess(processId);
 
-        // Run MIDPOINT ONLY to stay within Netlify's execution timeout.
-        // With multiple concurrent ingredients, running both midpoint + endpoint
-        // overloads the OpenLCA server and pushes total time past 60s.
-        // Endpoint (biodiversity) data will be populated on subsequent cached requests.
+        let midpointImpacts: ImpactResult[] = [];
+        let endpointImpacts: ImpactResult[] = [];
+
+        // Midpoint and endpoint method names differ between databases
         const midpointMethod = database === 'agribalyse'
           ? 'ReCiPe 2016 Midpoint (H)'
           : 'ReCiPe 2016 v1.03, midpoint (H)';
+        const endpointMethod = database === 'agribalyse'
+          ? 'ReCiPe 2016 Endpoint (I)'
+          : 'ReCiPe 2016 v1.03, endpoint (I) no LT';
 
-        let midpointImpacts: ImpactResult[] = [];
-        try {
-          midpointImpacts = await client.calculateProcess(processId, midpointMethod, 1);
-        } catch (calcErr) {
-          // For Agribalyse, try EF 3.1 as fallback
-          if (database === 'agribalyse') {
-            console.warn('[OpenLCA API] ReCiPe midpoint failed, trying EF 3.1');
+        // Run both midpoint and endpoint in parallel.
+        // With concurrency 1 at the caller level, only ONE process is being
+        // calculated at a time, so the server handles both methods fine (~33s total).
+        const midpointRef = { impacts: [] as ImpactResult[] };
+        const endpointRef = { impacts: [] as ImpactResult[] };
+
+        const runCalc = async (method: string, ref: { impacts: ImpactResult[] }) => {
+          ref.impacts = await client.calculateProcess(processId, method, 1);
+        };
+
+        if (database === 'agribalyse') {
+          try {
+            await Promise.allSettled([
+              runCalc(midpointMethod, midpointRef),
+              runCalc(endpointMethod, endpointRef),
+            ]);
+            midpointImpacts = midpointRef.impacts;
+            endpointImpacts = endpointRef.impacts;
+          } catch {
+            console.warn('[OpenLCA API] ReCiPe failed on Agribalyse, trying EF 3.1');
             midpointImpacts = await client.calculateProcess(processId, 'EF 3.1 Method (adapted)', 1);
-          } else {
-            throw calcErr;
           }
+        } else {
+          await Promise.allSettled([
+            runCalc(midpointMethod, midpointRef),
+            runCalc(endpointMethod, endpointRef),
+          ]);
+          midpointImpacts = midpointRef.impacts;
+          endpointImpacts = endpointRef.impacts;
         }
 
-        if (midpointImpacts.length === 0) {
-          throw new Error(`Midpoint calculation returned no results for process ${processId} (${database})`);
+        console.log(`[OpenLCA API] Midpoint: ${midpointImpacts.length}, Endpoint: ${endpointImpacts.length} for ${processId} (${Date.now() - funcStartTime}ms)`);
+
+        if (midpointImpacts.length === 0 && endpointImpacts.length === 0) {
+          throw new Error(`Both calculations returned no results for process ${processId} (${database})`);
         }
 
-        console.log(`[OpenLCA API] Midpoint: ${midpointImpacts.length} categories for ${processId} (${Date.now() - funcStartTime}ms)`);
-
-        const parsedImpacts = parseImpacts(midpointImpacts, []);
+        const parsedImpacts = parseImpacts(midpointImpacts, endpointImpacts);
 
         // Cache results (fire-and-forget)
         const expiresAt = new Date();
@@ -306,7 +320,7 @@ export async function POST(request: NextRequest) {
           quantity: 1,
           unit: 'kg',
           ...parsedImpacts,
-          impact_method: midpointMethod,
+          impact_method: `${midpointMethod} + ${endpointMethod}`,
           ecoinvent_version: database === 'agribalyse' ? 'agribalyse_3.2' : '3.12',
           system_model: database === 'agribalyse' ? 'attributional' : 'cutoff',
           calculated_at: new Date().toISOString(),
@@ -314,12 +328,9 @@ export async function POST(request: NextRequest) {
         }, {
           onConflict: 'organization_id,process_id,source_database',
         }).then(({ error: cacheError }) => {
-          if (cacheError) {
-            console.warn(`[OpenLCA API] Cache write failed: ${cacheError.message}`);
-          }
+          if (cacheError) console.warn(`[OpenLCA API] Cache write failed: ${cacheError.message}`);
         });
 
-        // Scale by quantity
         const scaledImpacts: Record<string, number> = {};
         for (const [key, value] of Object.entries(parsedImpacts)) {
           scaledImpacts[key] = value * quantity;
@@ -334,7 +345,7 @@ export async function POST(request: NextRequest) {
           processName: processInfo.name,
           geography: (processInfo.location as any)?.code || 'GLO',
           source: `OpenLCA Live: ${processInfo.name} via ${dbLabel}`,
-          methods: { midpoint: midpointMethod },
+          methods: { midpoint: midpointMethod, endpoint: endpointMethod },
         };
 
         if (!responded) {
@@ -351,11 +362,10 @@ export async function POST(request: NextRequest) {
           clearTimeout(safetyTimer);
           clearInterval(keepalive);
           console.error('[OpenLCA API] Error:', error);
-          const errorResult = {
+          controller.enqueue(encoder.encode(JSON.stringify({
             error: error instanceof Error ? error.message : 'Calculation failed',
             details: error instanceof Error ? error.stack : undefined,
-          };
-          controller.enqueue(encoder.encode(JSON.stringify(errorResult)));
+          })));
           controller.close();
         }
       }
