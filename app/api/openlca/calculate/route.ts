@@ -13,7 +13,7 @@ const MIDPOINT_CATEGORY_MAPPING: Record<string, string> = {
   'water consumption': 'impact_water',
   'water use': 'impact_water',
   'land use': 'impact_land',  // m²*year from midpoint
-  'ozone depletion': 'impact_ozone_depletion',
+  'ozone depletion': 'impact_ozone_depletion',             // ReCiPe: "Stratospheric ozone depletion"
   'freshwater eutrophication': 'impact_freshwater_eutrophication',
   'marine eutrophication': 'impact_marine_eutrophication',
   'terrestrial acidification': 'impact_terrestrial_acidification',
@@ -24,9 +24,19 @@ const MIDPOINT_CATEGORY_MAPPING: Record<string, string> = {
   'energy resources: non-renewable, fossil': 'impact_fossil_resource_scarcity',
   'mineral resource scarcity': 'impact_mineral_resource_scarcity',
   'material resources: metals/minerals': 'impact_mineral_resource_scarcity',
-  'particulate matter formation': 'impact_particulate_matter',
+  'particulate matter formation': 'impact_particulate_matter',  // ReCiPe: "Fine particulate matter formation"
   'ionising radiation': 'impact_ionising_radiation',
   'photochemical oxidant formation': 'impact_photochemical_ozone_formation',
+  // ReCiPe 2016 uses "Ozone formation" instead of "Photochemical oxidant formation"
+  'ozone formation, human health': 'impact_photochemical_ozone_formation',
+  'ozone formation, terrestrial': 'impact_photochemical_ozone_formation',
+  'ozone formation': 'impact_photochemical_ozone_formation',
+  // ReCiPe 2016 human toxicity categories
+  'human carcinogenic toxicity': 'impact_human_toxicity_carcinogenic',
+  'human non-carcinogenic toxicity': 'impact_human_toxicity_non_carcinogenic',
+  // EF 3.1 human toxicity names
+  'human toxicity, cancer': 'impact_human_toxicity_carcinogenic',
+  'human toxicity, non-cancer': 'impact_human_toxicity_non_carcinogenic',
 };
 
 // ReCiPe 2016 ENDPOINT impact category mapping (damage-oriented: species.yr, DALY)
@@ -273,6 +283,8 @@ export async function POST(request: NextRequest) {
       impact_particulate_matter: 0,
       impact_ionising_radiation: 0,
       impact_photochemical_ozone_formation: 0,
+      impact_human_toxicity_carcinogenic: 0,
+      impact_human_toxicity_non_carcinogenic: 0,
       // Endpoint values (damage-oriented) - for biodiversity metrics
       impact_ecosystem_damage: 0,  // Total ecosystem damage in species.yr
       impact_land_biodiversity: 0,  // Land-related biodiversity damage in species.yr

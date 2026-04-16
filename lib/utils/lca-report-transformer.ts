@@ -697,7 +697,7 @@ export function transformLCADataForReport(
       category: m.category_type || m.material_type || 'ingredient',
       quantity: (m.quantity || 0).toFixed(3),
       unit: m.unit || m.unit_name || 'kg',
-      origin: m.origin_country || m.country_of_origin || 'Unknown',
+      origin: (m.origin_country || m.country_of_origin || 'Unknown').replace(/^\d+\s+/, ''),
       climateImpact: climateVal.toFixed(4),
       climatePercentage: `${climatePct}%`,
       waterImpact: (m.impact_water || 0).toFixed(4),
@@ -1023,7 +1023,9 @@ export function transformLCADataForReport(
     },
     ghgDetailed: {
       totalGwp100: totalCarbonIncludingBiogenic.toFixed(4),
-      fossilOnlyTotal: totalCarbon.toFixed(4),
+      // ISO 14067 §6.4.9.3: Fossil-only = sum of fossil species only
+      // (excludes biogenic CO₂ and biogenic CH₄)
+      fossilOnlyTotal: (rCo2Fossil + rCo2Dluc + rCh4FossilKgCo2e + rN2oKgCo2e + rHfcPfc).toFixed(4),
       fossilCo2: rCo2Fossil.toFixed(4),
       biogenicCo2: rCo2Biogenic.toFixed(4),
       dlucCo2: rCo2Dluc.toFixed(4),
@@ -1334,6 +1336,14 @@ export function transformLCADataForReport(
         additional.push({
           category: 'Processing / Manufacturing Stage',
           reason: 'Processing is included in the system boundary but reports zero emissions. This may indicate: (a) facility energy use is not yet captured in the inventory, (b) processing data is embedded within raw material factors, or (c) primary facility data has not been collected. This gap should be addressed in future iterations to improve completeness.',
+        });
+      }
+
+      // Fix: If Scope 1 and Scope 2 are both zero, flag the completeness gap
+      if (scope1 === 0 && scope2 === 0 && totalCarbonIncludingBiogenic > 0) {
+        additional.push({
+          category: 'Scope 1 & 2 Emissions (Production Energy)',
+          reason: 'No direct (Scope 1) or energy-related (Scope 2) facility emissions are included in this assessment. This may indicate that no production facilities have been linked, or that contract manufacturer energy data has not been captured. For manufactured products, factory energy use (electricity, gas, steam) typically contributes 5-15% of the total footprint. This gap should be addressed by collecting facility energy data from the production site.',
         });
       }
 

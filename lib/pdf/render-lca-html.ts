@@ -804,8 +804,11 @@ function renderGhgDetailedPage(data: LCAReportData): string {
         <p style="font-size: 11px; color: #44403c; line-height: 1.6;">${escapeHtml(ghg.biogenicNote)}</p>
       </div>
 
-      <div style="font-size: 11px; color: #78716c;">
+      <div style="font-size: 11px; color: #78716c; margin-bottom: 8px;">
         <strong>GWP Method:</strong> ${escapeHtml(ghg.gwpMethod)} — All GWP-100 values from IPCC Sixth Assessment Report (AR6, 2021)
+      </div>
+      <div style="font-size: 10px; color: #a8a29e;">
+        * Per ISO 14067:2018 §6.4.9.3, biogenic CO&#8322; is characterised at GWP=1 for the species inventory but reported separately from the fossil carbon footprint. The net biogenic carbon balance (uptake minus end-of-life release) is excluded from the headline fossil footprint figure.
       </div>
 
       ${renderPageFooter(8)}
