@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useDataQualityMetrics } from '@/hooks/data/useDataQualityMetrics';
 import { useOrganization } from '@/lib/organizationContext';
 import {
@@ -21,10 +29,10 @@ import {
   TrendingUp,
   AlertCircle,
   CheckCircle2,
-  Users,
   Target,
   Award,
   Database,
+  Flame,
 } from 'lucide-react';
 import Link from 'next/link';
 import { PageLoader } from '@/components/ui/page-loader';
@@ -38,9 +46,44 @@ export default function DataQualityDashboard() {
     defraCount,
     supplierVerifiedCount,
     upgradeOpportunities,
+    totalUpgradeOpportunities,
+    carbonAtRisk,
+    productQualityBreakdown,
     loading,
     error,
   } = useDataQualityMetrics(currentOrganization?.id);
+
+  // Upgrade Opportunities filter + pagination state
+  const [opportunityQualityFilter, setOpportunityQualityFilter] = useState<'ALL' | 'LOW' | 'MEDIUM'>('ALL');
+  const [opportunityProductFilter, setOpportunityProductFilter] = useState<string>('ALL');
+  const [visibleCount, setVisibleCount] = useState<number>(10);
+
+  // Reset visible count whenever filters change
+  useEffect(() => {
+    setVisibleCount(10);
+  }, [opportunityQualityFilter, opportunityProductFilter]);
+
+  const filteredOpportunities = upgradeOpportunities
+    .filter(o => opportunityQualityFilter === 'ALL' || o.current_quality === opportunityQualityFilter)
+    .filter(o => opportunityProductFilter === 'ALL' || o.product_id === opportunityProductFilter);
+
+  const visibleOpportunities = filteredOpportunities.slice(0, visibleCount);
+
+  const opportunityProducts = Array.from(
+    new Map(upgradeOpportunities.map(o => [o.product_id, o.product_name])).entries()
+  ).sort((a, b) => a[1].localeCompare(b[1]));
+
+  // Improvement simulator: what would upgrading top 3 materials do to the score?
+  const simulatorData = (() => {
+    if (upgradeOpportunities.length < 3 || distribution.total_count === 0) return null;
+    const top3 = upgradeOpportunities.slice(0, 3);
+    const gainedConfidence = top3.reduce((sum, opp) => sum + opp.confidence_gain, 0);
+    const simulatedScore = Math.min(
+      100,
+      Math.round(averageConfidence + gainedConfidence / distribution.total_count)
+    );
+    return { simulatedScore, top3Names: top3.map(o => o.material_name) };
+  })();
 
   if (loading) {
     return <PageLoader />;
@@ -56,12 +99,6 @@ export default function DataQualityDashboard() {
       </div>
     );
   }
-
-  const getQualityColor = (percentage: number) => {
-    if (percentage >= 70) return 'text-green-600';
-    if (percentage >= 40) return 'text-amber-600';
-    return 'text-red-600';
-  };
 
   const getQualityRating = () => {
     if (averageConfidence >= 85) return { rating: 'Excellent', color: 'text-green-600' };
@@ -84,7 +121,7 @@ export default function DataQualityDashboard() {
       </div>
 
       {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -146,11 +183,30 @@ export default function DataQualityDashboard() {
           </CardHeader>
           <CardContent>
             <div className="flex items-baseline justify-between">
-              <div className="text-3xl font-bold text-purple-600">{upgradeOpportunities.length}</div>
+              <div className="text-3xl font-bold text-purple-600">{totalUpgradeOpportunities}</div>
               <Target className="h-8 w-8 text-purple-600 opacity-20" />
             </div>
             <p className="text-xs text-muted-foreground mt-2">
               Materials where supplier data could make your footprint more accurate
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Carbon at Risk
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-baseline justify-between">
+              <div className="text-3xl font-bold text-orange-600">
+                {carbonAtRisk.toFixed(1)}
+              </div>
+              <Flame className="h-8 w-8 text-orange-600 opacity-20" />
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              kg CO₂e from low-quality materials — most uncertain part of your footprint
             </p>
           </CardContent>
         </Card>
@@ -196,7 +252,7 @@ export default function DataQualityDashboard() {
                       indicatorClassName="bg-green-600"
                     />
                     <p className="text-xs text-muted-foreground pl-6">
-                      Verified directly by your supplier — the most accurate data possible
+                      Primary verified data — supplier EPDs, direct measurements, or peer-reviewed primary datasets
                     </p>
                   </div>
 
@@ -334,76 +390,236 @@ export default function DataQualityDashboard() {
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
 
-        {/* Upgrade Opportunities Tab */}
-        <TabsContent value="opportunities" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Where You Can Improve</CardTitle>
-              <CardDescription>
-                These materials would benefit most from getting better data from your suppliers. They&apos;re ranked by how much it would improve your overall accuracy.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {upgradeOpportunities.length === 0 ? (
-                <div className="text-center py-12">
-                  <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto mb-4" />
-                  <p className="text-lg font-medium">Your data is in great shape!</p>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    All your materials are using well-established data sources.
-                  </p>
-                </div>
-              ) : (
+          {/* Per-product quality breakdown */}
+          {productQualityBreakdown.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Quality by Product</CardTitle>
+                <CardDescription>
+                  Data quality breakdown for each product, sorted by quality score — products most in need of improvement appear first.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Material</TableHead>
                       <TableHead>Product</TableHead>
-                      <TableHead>Current Quality</TableHead>
-                      <TableHead className="text-right">Carbon Impact</TableHead>
-                      <TableHead className="text-right">Potential Improvement</TableHead>
-                      <TableHead>Suggested Action</TableHead>
-                      <TableHead className="w-[100px]"></TableHead>
+                      <TableHead className="text-right">Materials</TableHead>
+                      <TableHead className="text-right">Quality Score</TableHead>
+                      <TableHead className="w-[200px]">Breakdown</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {upgradeOpportunities.map((opp) => (
-                      <TableRow key={opp.material_id}>
-                        <TableCell className="font-medium">{opp.material_name}</TableCell>
-                        <TableCell className="text-muted-foreground">{opp.product_name}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={
-                              opp.current_quality === 'LOW'
-                                ? 'bg-red-50 text-red-700'
-                                : 'bg-amber-50 text-amber-700'
-                            }
+                    {productQualityBreakdown.map((row) => (
+                      <TableRow key={row.product_id}>
+                        <TableCell className="font-medium">
+                          <Link
+                            href={`/products/${row.product_id}`}
+                            className="hover:underline"
                           >
-                            {opp.current_quality} ({opp.current_confidence}%)
-                          </Badge>
+                            {row.product_name}
+                          </Link>
                         </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {opp.ghg_impact.toFixed(2)}
+                        <TableCell className="text-right text-muted-foreground">
+                          {row.material_count}
                         </TableCell>
                         <TableCell className="text-right">
-                          <span className="text-green-600 font-medium">
-                            +{opp.confidence_gain}%
+                          <span className={
+                            row.quality_score >= 70
+                              ? 'text-green-600 font-medium'
+                              : row.quality_score >= 40
+                              ? 'text-amber-600 font-medium'
+                              : 'text-red-600 font-medium'
+                          }>
+                            {row.quality_score}%
                           </span>
                         </TableCell>
                         <TableCell>
-                          <span className="text-xs text-muted-foreground">{opp.recommendation}</span>
-                        </TableCell>
-                        <TableCell>
-                          <Button variant="outline" size="sm" asChild>
-                            <Link href={`/products/${opp.product_id}`}>View</Link>
-                          </Button>
+                          <div className="flex gap-0.5 items-center">
+                            {row.high_count > 0 && (
+                              <div
+                                className="h-3 rounded-sm bg-green-500"
+                                style={{ width: `${(row.high_count / row.material_count) * 120}px` }}
+                                title={`${row.high_count} high quality`}
+                              />
+                            )}
+                            {row.medium_count > 0 && (
+                              <div
+                                className="h-3 rounded-sm bg-amber-400"
+                                style={{ width: `${(row.medium_count / row.material_count) * 120}px` }}
+                                title={`${row.medium_count} medium quality`}
+                              />
+                            )}
+                            {row.low_count > 0 && (
+                              <div
+                                className="h-3 rounded-sm bg-red-400"
+                                style={{ width: `${(row.low_count / row.material_count) * 120}px` }}
+                                title={`${row.low_count} low quality`}
+                              />
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Upgrade Opportunities Tab */}
+        <TabsContent value="opportunities" className="space-y-4">
+          {/* Improvement simulator */}
+          {simulatorData && (
+            <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
+              <TrendingUp className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-800 dark:text-blue-200">
+                <span className="font-medium">Improvement estimate:</span> If you upgraded your top
+                3 materials ({simulatorData.top3Names.join(', ')}) to high-quality data, your
+                overall score could improve from{' '}
+                <span className="font-semibold">{averageConfidence}%</span> to{' '}
+                <span className="font-semibold">{simulatorData.simulatedScore}%</span>.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <div>
+                  <CardTitle>Where You Can Improve</CardTitle>
+                  <CardDescription className="mt-1">
+                    Ranked by how much upgrading each material would improve your overall accuracy.{' '}
+                    {filteredOpportunities.length !== totalUpgradeOpportunities
+                      ? `Showing ${filteredOpportunities.length} of ${totalUpgradeOpportunities} materials.`
+                      : `${totalUpgradeOpportunities} material${totalUpgradeOpportunities !== 1 ? 's' : ''} identified.`}
+                  </CardDescription>
+                </div>
+                {/* Filters */}
+                <div className="flex gap-2 flex-shrink-0">
+                  <Select
+                    value={opportunityQualityFilter}
+                    onValueChange={(v) => setOpportunityQualityFilter(v as 'ALL' | 'LOW' | 'MEDIUM')}
+                  >
+                    <SelectTrigger className="w-[130px] h-9 text-sm">
+                      <SelectValue placeholder="Quality" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">All quality</SelectItem>
+                      <SelectItem value="LOW">Low only</SelectItem>
+                      <SelectItem value="MEDIUM">Medium only</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {opportunityProducts.length > 1 && (
+                    <Select
+                      value={opportunityProductFilter}
+                      onValueChange={setOpportunityProductFilter}
+                    >
+                      <SelectTrigger className="w-[160px] h-9 text-sm">
+                        <SelectValue placeholder="All products" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALL">All products</SelectItem>
+                        {opportunityProducts.map(([id, name]) => (
+                          <SelectItem key={id} value={id}>{name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {filteredOpportunities.length === 0 ? (
+                <div className="text-center py-12">
+                  <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto mb-4" />
+                  <p className="text-lg font-medium">
+                    {upgradeOpportunities.length === 0
+                      ? 'Your data is in great shape!'
+                      : 'No results match the current filters.'}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    {upgradeOpportunities.length === 0
+                      ? 'All your materials are using well-established data sources.'
+                      : 'Try adjusting the quality or product filter above.'}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Material</TableHead>
+                        <TableHead>Product</TableHead>
+                        <TableHead>Current Quality</TableHead>
+                        <TableHead className="text-right">Carbon Impact</TableHead>
+                        <TableHead className="text-right">Potential Improvement</TableHead>
+                        <TableHead>Suggested Action</TableHead>
+                        <TableHead className="w-[120px]"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {visibleOpportunities.map((opp) => (
+                        <TableRow key={opp.material_id}>
+                          <TableCell className="font-medium">{opp.material_name}</TableCell>
+                          <TableCell className="text-muted-foreground">{opp.product_name}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={
+                                opp.current_quality === 'LOW'
+                                  ? 'bg-red-50 text-red-700'
+                                  : 'bg-amber-50 text-amber-700'
+                              }
+                            >
+                              {opp.current_quality} ({opp.current_confidence}%)
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {opp.ghg_impact.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className="text-green-600 font-medium">
+                              +{opp.confidence_gain}%
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-xs text-muted-foreground">{opp.recommendation}</span>
+                          </TableCell>
+                          <TableCell>
+                            <Button variant="outline" size="sm" asChild>
+                              <Link href={`/products/${opp.product_id}`}>View product</Link>
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+
+                  {/* Pagination footer */}
+                  {filteredOpportunities.length > visibleCount && (
+                    <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                      <p className="text-sm text-muted-foreground">
+                        Showing {visibleCount} of {filteredOpportunities.length}
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setVisibleCount(v => v + 10)}
+                      >
+                        Show more
+                      </Button>
+                    </div>
+                  )}
+                  {filteredOpportunities.length <= visibleCount && filteredOpportunities.length > 10 && (
+                    <p className="text-sm text-muted-foreground text-center mt-4 pt-4 border-t">
+                      Showing all {filteredOpportunities.length} results
+                    </p>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>

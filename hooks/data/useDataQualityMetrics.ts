@@ -43,6 +43,16 @@ export interface UpgradeOpportunity {
   recommendation: string;
 }
 
+export interface ProductQualityRow {
+  product_id: string;
+  product_name: string;
+  material_count: number;
+  high_count: number;
+  medium_count: number;
+  low_count: number;
+  quality_score: number; // % of HIGH materials
+}
+
 export interface DataQualityMetrics {
   distribution: DataQualityDistribution;
   averageConfidence: number;
@@ -50,6 +60,9 @@ export interface DataQualityMetrics {
   defraCount: number;
   supplierVerifiedCount: number;
   upgradeOpportunities: UpgradeOpportunity[];
+  totalUpgradeOpportunities: number;
+  carbonAtRisk: number;
+  productQualityBreakdown: ProductQualityRow[];
   loading: boolean;
   error: string | null;
 }
@@ -117,6 +130,96 @@ function deriveConfidence(m: Record<string, any>): number {
 }
 
 /**
+ * Build a material-specific suggested action based on the material's name,
+ * category, current quality grade, and carbon impact.
+ *
+ * The goal is to tell the user exactly what to ask their supplier for —
+ * not just "request supplier data" but "ask for cullet %, furnace energy
+ * mix, and manufacturing location" for a glass bottle, for example.
+ */
+function buildRecommendation(
+  m: Record<string, any>,
+  grade: 'LOW' | 'MEDIUM',
+  ghgImpact: number
+): string {
+  const name = (m.name || '').toLowerCase();
+  const category = (m.category_type || '').toLowerCase();
+  const isHighImpact = ghgImpact > 1; // >1 kg CO₂e per unit is meaningful for a drinks product
+  const isSubstantial = ghgImpact > 0.1;
+  const urgent = grade === 'LOW' && isHighImpact;
+  const prefix = urgent ? 'Priority: ' : '';
+
+  // ── Packaging: glass ────────────────────────────────────────────
+  if (/\bglass\b|bottle/.test(name)) {
+    return `${prefix}Ask glass supplier for EPD or cullet %, furnace energy mix, and plant location — recycled cullet cuts impact by up to 30%`;
+  }
+
+  // ── Packaging: aluminium ────────────────────────────────────────
+  if (/alumin(i)?um|\bcap\b|\bfoil\b|\bcan\b|closure/.test(name)) {
+    return `${prefix}Request primary vs recycled aluminium split and smelter location — recycled aluminium is ~95% lower impact than primary`;
+  }
+
+  // ── Packaging: plastic ──────────────────────────────────────────
+  if (/\bpet\b|hdpe|ldpe|plastic|polymer|resin|\bpp\b|bioplastic/.test(name)) {
+    return `${prefix}Ask packaging supplier for recycled content %, resin grade, and their EPD — rPET can be 60%+ lower than virgin`;
+  }
+
+  // ── Packaging: paper/cardboard ──────────────────────────────────
+  if (/paper|cardboard|\bboard\b|carton|case|outer|\bsrp\b|fibre|fiber/.test(name)) {
+    return 'Ask supplier for FSC/PEFC certification, recycled content, and mill location — usually low impact but quick to verify';
+  }
+
+  // ── Packaging: label ────────────────────────────────────────────
+  if (/label|sleeve|shrink/.test(name)) {
+    return 'Low impact overall — update when next changing label spec with your printer';
+  }
+
+  // ── Ingredients: juice / extract / powder ───────────────────────
+  if (
+    /juice|extract|puree|concentrate|powder|pulp|syrup|honey|sugar|spice/.test(name) ||
+    category.includes('ingredient') ||
+    category.includes('agricultural')
+  ) {
+    return `${prefix}Request farm origin, yield per hectare, and processing energy from grower/processor — crop-specific data replaces a generic proxy`;
+  }
+
+  // ── Transport ───────────────────────────────────────────────────
+  if (category.includes('transport') || /\bfreight\b|shipping|haulage|\blogistics\b/.test(name)) {
+    return 'Verify actual route distance, transport mode (road/rail/sea/air), and load factor with your logistics provider';
+  }
+
+  // ── Energy ──────────────────────────────────────────────────────
+  if (
+    category.includes('energy') ||
+    /electric|\bgas\b|\bsteam\b|\bheat\b|fuel|diesel|natural gas/.test(name)
+  ) {
+    return `${prefix}Switch to your supplier's market-based Scope 2 factor — REGOs or renewable contracts can cut this to near zero`;
+  }
+
+  // ── Water ───────────────────────────────────────────────────────
+  if (category.includes('water') || /^water$|\bwater\b/.test(name)) {
+    return 'Usually low carbon impact — confirm water source and check local scarcity risk in the Water Footprint view';
+  }
+
+  // ── Waste / end-of-life ─────────────────────────────────────────
+  if (category.includes('waste') || /waste|disposal|recycling|landfill|incinerat/.test(name)) {
+    return 'Verify the actual disposal pathway with your waste contractor — regional defaults often understate incineration share';
+  }
+
+  // ── Generic fallbacks based on grade + impact ───────────────────
+  if (grade === 'LOW') {
+    if (isHighImpact) return 'Priority: request supplier-specific emission factor (EPD, product passport, or measured data)';
+    if (isSubstantial) return 'Ask supplier for their own emission factor or manufacturer-specific data';
+    return 'Currently uses a generic proxy — refine when next updating this product';
+  }
+  // MEDIUM grade fallback
+  if (isHighImpact) {
+    return 'Verify regional data matches actual supplier geography, then request a site-specific EPD';
+  }
+  return 'Uses a regional average — ask supplier if they have site-specific data to share';
+}
+
+/**
  * Determine if the material uses DEFRA data, checking multiple columns.
  */
 function isDefraSource(m: Record<string, any>): boolean {
@@ -164,6 +267,8 @@ export function useDataQualityMetrics(organizationId: string | undefined): DataQ
   const [defraCount, setDefraCount] = useState<number>(0);
   const [supplierVerifiedCount, setSupplierVerifiedCount] = useState<number>(0);
   const [upgradeOpportunities, setUpgradeOpportunities] = useState<UpgradeOpportunity[]>([]);
+  const [carbonAtRisk, setCarbonAtRisk] = useState<number>(0);
+  const [productQualityBreakdown, setProductQualityBreakdown] = useState<ProductQualityRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -178,11 +283,12 @@ export function useDataQualityMetrics(organizationId: string | undefined): DataQ
         setLoading(true);
         setError(null);
 
-        // 1. Fetch all LCAs for this org
+        // 1. Fetch all LCAs for this org, ordered newest-first so deduplication keeps the latest
         const { data: lcas, error: lcasError } = await supabase
           .from('product_carbon_footprints')
-          .select('id, product_id')
-          .eq('organization_id', organizationId);
+          .select('id, product_id, created_at')
+          .eq('organization_id', organizationId)
+          .order('created_at', { ascending: false });
 
         if (lcasError) throw lcasError;
 
@@ -192,9 +298,23 @@ export function useDataQualityMetrics(organizationId: string | undefined): DataQ
           return;
         }
 
-        const lcaIds = lcas.map(l => l.id);
+        // 2. Deduplicate: keep only the most recent LCA per product.
+        //    Because results are ordered descending by created_at, the first
+        //    occurrence of each product_id is always the latest run.
+        const latestLcaMap = new Map<string, string>(); // product_id → lca_id
+        for (const lca of lcas) {
+          if (!latestLcaMap.has(lca.product_id)) {
+            latestLcaMap.set(lca.product_id, lca.id);
+          }
+        }
+        const lcaIds = Array.from(latestLcaMap.values());
 
-        // 2. Fetch products for name lookup
+        // Reverse map: lca_id → product_id (only latest LCAs)
+        const lcaProductMap = new Map<string, string>(
+          Array.from(latestLcaMap.entries()).map(([productId, lcaId]) => [lcaId, productId])
+        );
+
+        // 3. Fetch products for name lookup
         const { data: products, error: productsError } = await supabase
           .from('products')
           .select('id, name')
@@ -203,11 +323,8 @@ export function useDataQualityMetrics(organizationId: string | undefined): DataQ
         if (productsError) throw productsError;
 
         const productMap = new Map((products || []).map(p => [p.id, p.name]));
-        const lcaProductMap = new Map(lcas.map(l => [l.id, l.product_id]));
 
-        // 3. Fetch materials with ALL available quality columns
-        //    This includes both new columns (data_quality_grade, gwp_data_source, etc.)
-        //    and legacy columns (data_priority, data_quality_tag, impact_source) for fallback derivation
+        // 4. Fetch materials with ALL available quality columns from latest LCAs only
         const { data: materials, error: materialsError } = await supabase
           .from('product_carbon_footprint_materials')
           .select(`
@@ -240,7 +357,7 @@ export function useDataQualityMetrics(organizationId: string | undefined): DataQ
           return;
         }
 
-        // 4. Derive quality for each material using all available signals
+        // 5. Single-pass computation over all materials
         const totalCount = materials.length;
         let highCount = 0;
         let mediumCount = 0;
@@ -249,9 +366,22 @@ export function useDataQualityMetrics(organizationId: string | undefined): DataQ
         let hybridCount = 0;
         let defraUsageCount = 0;
         let supplierCount = 0;
+        let carbonAtRiskTotal = 0;
+
+        // Per-product quality tracking
+        const productQualityMap = new Map<string, {
+          product_name: string;
+          high: number;
+          medium: number;
+          low: number;
+        }>();
 
         for (const m of materials) {
           const grade = deriveQualityGrade(m);
+          const productId = lcaProductMap.get(m.product_carbon_footprint_id) || '';
+          const productName = productMap.get(productId) || 'Unknown Product';
+
+          // Distribution counts
           if (grade === 'HIGH') highCount++;
           else if (grade === 'MEDIUM') mediumCount++;
           else lowCount++;
@@ -261,6 +391,23 @@ export function useDataQualityMetrics(organizationId: string | undefined): DataQ
           if (isHybrid(m)) hybridCount++;
           if (isDefraSource(m)) defraUsageCount++;
           if (isSupplierVerified(m)) supplierCount++;
+
+          // Carbon at risk: LOW quality materials only
+          if (grade === 'LOW') {
+            carbonAtRiskTotal += m.impact_climate || 0;
+          }
+
+          // Per-product breakdown
+          const existing = productQualityMap.get(productId) ?? {
+            product_name: productName,
+            high: 0,
+            medium: 0,
+            low: 0,
+          };
+          if (grade === 'HIGH') existing.high++;
+          else if (grade === 'MEDIUM') existing.medium++;
+          else existing.low++;
+          productQualityMap.set(productId, existing);
         }
 
         setDistribution({
@@ -277,9 +424,28 @@ export function useDataQualityMetrics(organizationId: string | undefined): DataQ
         setHybridSourcesCount(hybridCount);
         setDefraCount(defraUsageCount);
         setSupplierVerifiedCount(supplierCount);
+        setCarbonAtRisk(carbonAtRiskTotal);
 
-        // 5. Build upgrade opportunities from non-HIGH, non-supplier materials
-        const opportunities: UpgradeOpportunity[] = materials
+        // Build per-product breakdown, sorted worst-first (lowest quality_score at top)
+        const breakdown: ProductQualityRow[] = Array.from(productQualityMap.entries())
+          .map(([product_id, v]) => {
+            const total = v.high + v.medium + v.low;
+            return {
+              product_id,
+              product_name: v.product_name,
+              material_count: total,
+              high_count: v.high,
+              medium_count: v.medium,
+              low_count: v.low,
+              quality_score: total > 0 ? Math.round((v.high / total) * 100) : 0,
+            };
+          })
+          .sort((a, b) => a.quality_score - b.quality_score);
+
+        setProductQualityBreakdown(breakdown);
+
+        // 6. Build upgrade opportunities — full sorted list, no slice (page handles pagination)
+        const allOpportunities: UpgradeOpportunity[] = materials
           .filter(m => {
             const grade = deriveQualityGrade(m);
             return grade === 'LOW' || grade === 'MEDIUM';
@@ -293,14 +459,7 @@ export function useDataQualityMetrics(organizationId: string | undefined): DataQ
             const confidenceGain = potentialConfidence - currentConfidence;
             const priorityScore = (ghgImpact * confidenceGain) / 100;
 
-            let recommendation = '';
-            if (ghgImpact > 10) {
-              recommendation = 'High impact material — priority supplier engagement';
-            } else if (ghgImpact > 1) {
-              recommendation = 'Medium impact — request supplier data';
-            } else {
-              recommendation = 'Low impact — consider when next updating this product';
-            }
+            const recommendation = buildRecommendation(m, currentQuality, ghgImpact);
 
             const productId = lcaProductMap.get(m.product_carbon_footprint_id) || '';
             const productName = productMap.get(productId) || 'Unknown Product';
@@ -319,10 +478,9 @@ export function useDataQualityMetrics(organizationId: string | undefined): DataQ
               recommendation,
             };
           })
-          .sort((a, b) => b.priority_score - a.priority_score)
-          .slice(0, 10);
+          .sort((a, b) => b.priority_score - a.priority_score);
 
-        setUpgradeOpportunities(opportunities);
+        setUpgradeOpportunities(allOpportunities);
         setLoading(false);
       } catch (err) {
         console.error('Error fetching data quality metrics:', err);
@@ -341,6 +499,9 @@ export function useDataQualityMetrics(organizationId: string | undefined): DataQ
     defraCount,
     supplierVerifiedCount,
     upgradeOpportunities,
+    totalUpgradeOpportunities: upgradeOpportunities.length,
+    carbonAtRisk,
+    productQualityBreakdown,
     loading,
     error,
   };
