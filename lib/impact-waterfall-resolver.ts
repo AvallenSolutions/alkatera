@@ -861,7 +861,7 @@ export async function resolveImpactFactors(
           return { ok: false, is404: false, isTimeout: false, error: 'No impact data in response' };
         }
         const errorData = await response.json().catch(() => ({}));
-        const errMsg = errorData.error || response.statusText;
+        const errMsg = errorData.error || response.statusText || `HTTP ${response.status}`;
         const is404 = errMsg.includes('404') || response.status === 404;
         return { ok: false, is404, isTimeout: false, error: errMsg };
       } catch (err: any) {

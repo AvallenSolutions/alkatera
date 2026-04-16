@@ -200,12 +200,11 @@ export async function POST(request: NextRequest) {
     const endpointRef = { impacts: [] as ImpactResult[] };
 
     if (database === 'agribalyse') {
+      // Try ReCiPe first (preferred for consistency with ecoinvent results)
       try {
-        // Launch both simultaneously
         const midpointPromise = runWithCapture('ReCiPe 2016 Midpoint (H)', midpointRef);
         const endpointPromise = runWithCapture('ReCiPe 2016 Endpoint (I)', endpointRef);
 
-        // Wait for both, but bail at the budget limit
         await Promise.race([
           Promise.allSettled([midpointPromise, endpointPromise]),
           new Promise(resolve => setTimeout(resolve, TOTAL_BUDGET_MS)),
@@ -215,12 +214,22 @@ export async function POST(request: NextRequest) {
         endpointImpacts = endpointRef.impacts;
 
         if (midpointImpacts.length > 0) {
-          console.log(`[OpenLCA API] Midpoint: ${midpointImpacts.length} categories, Endpoint: ${endpointImpacts.length} categories for ${processId}`);
+          console.log(`[OpenLCA API] Agribalyse ReCiPe: Midpoint: ${midpointImpacts.length}, Endpoint: ${endpointImpacts.length} for ${processId}`);
         }
-      } catch {
-        // ReCiPe failed entirely — fall back to EF 3.1
-        console.warn('[OpenLCA API] ReCiPe not available on Agribalyse, falling back to EF 3.1');
-        midpointImpacts = await client.calculateProcess(processId, 'EF 3.1 Method (adapted)', 1);
+      } catch (recipeErr) {
+        console.warn(`[OpenLCA API] ReCiPe calculation threw for ${processId}:`, recipeErr instanceof Error ? recipeErr.message : recipeErr);
+      }
+
+      // If ReCiPe produced no results (method missing, process incompatible, or timeout),
+      // fall back to EF 3.1 which is Agribalyse's native method
+      if (midpointImpacts.length === 0) {
+        try {
+          console.log(`[OpenLCA API] ReCiPe returned no results for ${processId}, trying EF 3.1 fallback...`);
+          midpointImpacts = await client.calculateProcess(processId, 'EF 3.1 Method (adapted)', 1);
+          console.log(`[OpenLCA API] EF 3.1 fallback: ${midpointImpacts.length} categories for ${processId}`);
+        } catch (efErr) {
+          console.warn(`[OpenLCA API] EF 3.1 fallback also failed for ${processId}:`, efErr instanceof Error ? efErr.message : efErr);
+        }
       }
     } else {
       // ecoinvent: same parallel strategy
@@ -237,9 +246,9 @@ export async function POST(request: NextRequest) {
       console.log(`[OpenLCA API] Midpoint: ${midpointImpacts.length} categories, Endpoint: ${endpointImpacts.length} categories for ${processId}`);
     }
 
-    // If midpoint failed but endpoint succeeded, something is very wrong
+    // If no impact data was produced by any method, fail with a clear error
     if (midpointImpacts.length === 0 && endpointImpacts.length === 0) {
-      throw new Error(`Both midpoint and endpoint calculations timed out for process ${processId} (${database})`);
+      throw new Error(`No impact results for process ${processId} (${database}). Tried ReCiPe 2016${database === 'agribalyse' ? ' and EF 3.1' : ''}. The process may not support direct calculation.`);
     }
 
     // Parse impacts into our format - combining midpoint and endpoint values
