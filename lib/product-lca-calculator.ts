@@ -869,7 +869,12 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
     // Pre-resolve all impact factors in parallel (OpenLCA calls are the slow part).
     // This turns N sequential API calls into concurrent ones, capped at 4 to avoid
     // overwhelming the OpenLCA server.
-    const OPENLCA_CONCURRENCY = 4;
+    // OpenLCA's gdt-server struggles with concurrent calculations — each
+    // process calculation takes 15-30s of CPU. Running multiple in parallel
+    // causes them all to slow down and exceed Netlify's 60s function timeout.
+    // Sequential execution is more reliable: each finishes in ~20s, and
+    // results are cached so subsequent LCA runs are instant.
+    const OPENLCA_CONCURRENCY = 1;
     const resolvedFactors = new Map<string, WaterfallResult>();
     // Failures during parallel pre-resolution are stored here and re-thrown
     // from within the per-material try/catch below, so they get wrapped with
