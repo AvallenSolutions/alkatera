@@ -515,9 +515,8 @@ export default function SupplierProfilePage() {
                 setLat(details.lat);
                 setLng(details.lng);
                 setCountryCode(details.country_code || '');
-                // Also update the plain country field from the address
-                if (details.country_code) {
-                  setCountry(details.country_code);
+                if (details.country) {
+                  setCountry(details.country);
                 }
               }}
               placeholder="Start typing your address..."

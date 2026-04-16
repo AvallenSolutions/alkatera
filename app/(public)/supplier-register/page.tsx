@@ -183,8 +183,13 @@ export default function SupplierRegisterPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Sign in failed');
 
-      // Register as supplier (idempotent — if already registered, returns success)
-      await acceptRegistration(user.id, '', user.user_metadata?.full_name || '');
+      // Only call registration if the user is not already marked as a supplier.
+      // Calling it unconditionally risks creating duplicate supplier records for
+      // existing suppliers whose invitation-created record pre-dates the user_id
+      // idempotency check.
+      if (!user.user_metadata?.is_supplier) {
+        await acceptRegistration(user.id, '', user.user_metadata?.full_name || '');
+      }
 
       setSuccess(true);
       setTimeout(() => {

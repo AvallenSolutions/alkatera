@@ -166,6 +166,7 @@ export function SupplierCompanyDetails() {
           lat,
           lng,
           country_code: countryCode.trim() || null,
+          country: country.trim() || null,
           industry_sector: industrySector.trim() || null,
           phone: phone.trim() || null,
           contact_name: contactName.trim() || null,
@@ -225,7 +226,7 @@ export function SupplierCompanyDetails() {
                 setLat(details.lat)
                 setLng(details.lng)
                 setCountryCode(details.country_code || '')
-                setCountry(details.country_code || country)
+                setCountry(details.country || '')
               }}
               placeholder="Start typing your address..."
               className="bg-white/5 border-white/10 text-white placeholder:text-white/20"

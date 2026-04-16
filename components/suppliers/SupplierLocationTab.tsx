@@ -67,6 +67,7 @@ export function SupplierLocationTab(props: SupplierLocationTabProps) {
     lat: number;
     lng: number;
     country_code: string;
+    country: string;
     city?: string;
     locality_level: 'city' | 'region' | 'country';
   }) => {

@@ -40,10 +40,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'platform_supplier_id is required' }, { status: 400 });
     }
 
-    // Step 1: Get the platform supplier's contact email
+    // Step 1: Get the platform supplier's contact email and user_id
     const { data: platformSupplier, error: psError } = await adminClient
       .from('platform_suppliers')
-      .select('id, contact_email, name')
+      .select('id, contact_email, name, user_id')
       .eq('id', platformSupplierId)
       .maybeSingle();
 
@@ -56,16 +56,38 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ supplier: null, products: [] });
     }
 
-    // Step 2: Find the linked supplier by email match
-    const { data: supplier, error: supplierError } = await adminClient
-      .from('suppliers')
-      .select('id, name, contact_email, address, city, country, country_code, lat, lng, website, organization_id, user_id, created_at')
-      .eq('contact_email', platformSupplier.contact_email)
-      .maybeSingle();
+    // Step 2: Find the linked supplier — try user_id first (most reliable), then fall back to
+    // case-insensitive email match (handles case mismatches between admin entry and auth email).
+    const selectCols = 'id, name, contact_email, address, city, country, country_code, lat, lng, website, organization_id, user_id, created_at';
 
-    if (supplierError) {
-      console.error('Error fetching supplier:', supplierError);
-      return NextResponse.json({ error: 'Failed to fetch supplier' }, { status: 500 });
+    let supplier = null;
+
+    // Try user_id first — set during self-service registration.
+    // Use limit(1) + order to handle edge cases where duplicate supplier records exist.
+    if ((platformSupplier as any).user_id) {
+      const { data, error } = await adminClient
+        .from('suppliers')
+        .select(selectCols)
+        .eq('user_id', (platformSupplier as any).user_id)
+        .order('created_at', { ascending: true })
+        .limit(1);
+      if (error) console.warn('user_id lookup error:', error);
+      else supplier = data?.[0] ?? null;
+    }
+
+    // Fallback: case-insensitive email match
+    if (!supplier) {
+      const { data, error } = await adminClient
+        .from('suppliers')
+        .select(selectCols)
+        .ilike('contact_email', platformSupplier.contact_email)
+        .order('created_at', { ascending: true })
+        .limit(1);
+      if (error) {
+        console.error('Error fetching supplier by email:', error);
+        return NextResponse.json({ error: 'Failed to fetch supplier' }, { status: 500 });
+      }
+      supplier = data?.[0] ?? null;
     }
 
     if (!supplier) {

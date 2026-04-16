@@ -24,6 +24,7 @@ interface GoogleAddressInputProps {
     lat: number;
     lng: number;
     country_code: string;
+    country: string;
     city?: string;
     locality_level: 'city' | 'region' | 'country';
   }) => void;
@@ -152,6 +153,15 @@ export function GoogleAddressInput({
     return '';
   };
 
+  const extractCountryName = (addressComponents: any[]): string => {
+    for (const component of addressComponents) {
+      if (component.types.includes('country')) {
+        return component.long_name || '';
+      }
+    }
+    return '';
+  };
+
   const extractCity = (addressComponents: any[]): string | undefined => {
     for (const component of addressComponents) {
       if (
@@ -199,6 +209,7 @@ export function GoogleAddressInput({
       const lat = place.geometry.location.lat;
       const lng = place.geometry.location.lng;
       const country_code = extractCountryCode(place.address_components || []);
+      const country = extractCountryName(place.address_components || []);
       const city = extractCity(place.address_components || []);
       const formatted_address = place.formatted_address || place.name || '';
 
@@ -209,6 +220,7 @@ export function GoogleAddressInput({
         lat,
         lng,
         country_code,
+        country,
         city,
         locality_level: localityLevel,
       });
