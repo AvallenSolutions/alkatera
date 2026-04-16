@@ -167,14 +167,8 @@ export async function POST(request: NextRequest) {
         source: `OpenLCA Cache: ${cached.process_name}`,
       });
     }
-    // Health check against the target server
-    const isHealthy = await client.healthCheck();
-    if (!isHealthy) {
-      const dbLabel = database === 'agribalyse' ? 'Agribalyse' : 'ecoinvent';
-      return NextResponse.json({
-        error: `OpenLCA ${dbLabel} server not reachable`,
-      }, { status: 503 });
-    }
+    // Skip health check — it wastes 3-5 seconds of our tight 30s budget.
+    // If the server is down, the calculation call will fail with a clear error.
 
     // Get process info and calculate impacts (per 1 kg)
     // No database switching needed — client is already pointed at the correct server
