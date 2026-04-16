@@ -74,6 +74,22 @@ export interface FacilityEmissionsData {
   allocatedWaste: number;
   attributionRatio: number;
   productVolume: number; // units of this product produced at the facility
+  /** Country code for the facility (ISO 3166-1 alpha-2) */
+  countryCode?: string;
+  /** Grid emission factor used for Scope 2 electricity (kg CO₂e/kWh) */
+  gridEmissionFactor?: number;
+  /** Total electricity consumption attributed to this product (kWh) */
+  electricityKwh?: number;
+  /** Whether electricity data came from direct run data vs facility-level allocation */
+  dataSource?: 'direct_run' | 'facility_allocation';
+  /** Breakdown of energy types with their emissions (from utility data) */
+  energyBreakdown?: Array<{
+    type: string;
+    quantity: number;
+    unit: string;
+    emissions: number;
+    scope: 'Scope 1' | 'Scope 2';
+  }>;
 }
 
 export interface AggregationResult {
@@ -1134,6 +1150,30 @@ export async function aggregateProductImpacts(
       is_embedded_in_materials: true,
       outbound_included: isStageIncluded(effectiveBoundary, 'distribution'),
     },
+
+    // Per-facility processing detail for report transparency
+    facility_detail: facilityEmissions && facilityEmissions.length > 0
+      ? facilityEmissions.map(fe => {
+          const units = fe.productVolume > 0 ? fe.productVolume : 1;
+          return {
+            facility_name: fe.facilityName,
+            country_code: fe.countryCode || null,
+            is_contract_manufacturer: fe.isContractManufacturer,
+            data_source: fe.dataSource || 'facility_allocation',
+            attribution_ratio: fe.attributionRatio,
+            production_volume: fe.productVolume,
+            // Per-unit values (consistent with other impacts in aggregated_impacts)
+            per_unit_total: fe.allocatedEmissions / units,
+            per_unit_scope1: fe.scope1Emissions / units,
+            per_unit_scope2: fe.scope2Emissions / units,
+            per_unit_water_litres: fe.allocatedWater / units,
+            per_unit_waste_kg: fe.allocatedWaste / units,
+            electricity_kwh: fe.electricityKwh || 0,
+            grid_emission_factor: fe.gridEmissionFactor || null,
+            energy_breakdown: fe.energyBreakdown || [],
+          };
+        })
+      : undefined,
 
     materials_count: materials.length,
     production_sites_count: facilityEmissions?.length || 0,

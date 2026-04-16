@@ -423,6 +423,9 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         // activity-entries section below where the deduplication logic runs.
         let waterFromUtilityTable = 0;
 
+        // Collect per-energy-type breakdown for report transparency
+        const energyBreakdown: Array<{ type: string; quantity: number; unit: string; emissions: number; scope: 'Scope 1' | 'Scope 2' }> = [];
+
         if (utilityEntries && utilityEntries.length > 0) {
           console.log(`[calculateProductCarbonFootprint] Found ${utilityEntries.length} utility entries for ${allocation.facilityName}`);
 
@@ -490,6 +493,15 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
               scope2Raw += co2e;
             }
             facilityTotalEmissions += co2e;
+
+            // Collect energy type breakdown for report
+            energyBreakdown.push({
+              type: entry.utility_type,
+              quantity: Number(entry.quantity),
+              unit: entry.unit || (entry.utility_type === 'natural_gas' ? 'kWh' : 'units'),
+              emissions: co2e,
+              scope: config.scope,
+            });
           }
 
           console.log(`[calculateProductCarbonFootprint] Utility-based emissions for ${allocation.facilityName}:`, {
@@ -542,6 +554,17 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           // ─── Path A: Direct run data (highest quality) ───
           // Scope 2 from direct run electricity — product-specific, no attribution needed
           const runScope2 = runElectricityKwh * gridFactorResult.factor;
+
+          // Add direct run electricity to energy breakdown
+          if (runElectricityKwh > 0) {
+            energyBreakdown.push({
+              type: 'electricity_grid',
+              quantity: runElectricityKwh,
+              unit: 'kWh',
+              emissions: runScope2,
+              scope: 'Scope 2',
+            });
+          }
 
           // Scope 1 from utility data (fuels, gas, etc.) — still needs attribution
           // because fuel usage is facility-level, not product-specific
@@ -645,6 +668,13 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
 
         // Collect for aggregator (passed directly, bypasses broken DB trigger)
         const isContractManufacturer = allocation.operationalControl === 'third_party';
+        // Compute total electricity kWh for this facility (attributed)
+        const totalElectricityKwh = hasDirectRunData
+          ? runElectricityKwh
+          : (utilityEntries || [])
+              .filter((e: any) => e.utility_type === 'electricity_grid')
+              .reduce((sum: number, e: any) => sum + Number(e.quantity || 0), 0) * attributionRatio;
+
         collectedFacilityEmissions.push({
           facilityId: allocation.facilityId,
           facilityName: allocation.facilityName,
@@ -656,6 +686,11 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           allocatedWaste,
           attributionRatio,
           productVolume: allocation.productionVolume,
+          countryCode: facilityCountryCode || undefined,
+          gridEmissionFactor: gridFactorResult.factor,
+          electricityKwh: totalElectricityKwh,
+          dataSource: hasDirectRunData ? 'direct_run' : 'facility_allocation',
+          energyBreakdown: energyBreakdown.length > 0 ? energyBreakdown : undefined,
         });
 
         // Route to correct table based on facility ownership

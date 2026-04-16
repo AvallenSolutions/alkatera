@@ -347,6 +347,33 @@ export interface LCAReportData {
     };
   };
 
+  /** Processing & Manufacturing breakdown by facility */
+  processingDetail?: {
+    totalProcessingEmissions: string;
+    percentOfTotal: string;
+    facilities: Array<{
+      name: string;
+      countryCode: string | null;
+      isContractManufacturer: boolean;
+      dataSource: string;
+      attributionRatio: string;
+      productionVolume: number;
+      totalEmissions: string;
+      scope1Emissions: string;
+      scope2Emissions: string;
+      electricityKwh: string;
+      gridEmissionFactor: string | null;
+      waterLitres: string;
+      energyBreakdown: Array<{
+        type: string;
+        quantity: string;
+        unit: string;
+        emissions: string;
+        scope: string;
+      }>;
+    }>;
+  };
+
   /** FLAG removals (SBTi Forest, Land and Agriculture) - only when viticulture data exists */
   flagRemovals?: {
     soilCarbonCo2e: number;

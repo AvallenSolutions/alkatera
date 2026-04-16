@@ -712,6 +712,129 @@ function renderViticulturePage(data: LCAReportData): string {
     </div>`;
 }
 
+function renderProcessingPage(data: LCAReportData): string {
+  const pd = data.processingDetail;
+  if (!pd || pd.facilities.length === 0) return ''; // No processing data — skip page
+
+  const fmtNum = (s: string) => {
+    const n = parseFloat(s);
+    return n < 0.001 && n > 0 ? n.toExponential(2) : s;
+  };
+
+  // Count contract manufacturers vs owned
+  const ownedCount = pd.facilities.filter(f => !f.isContractManufacturer).length;
+  const cmCount = pd.facilities.filter(f => f.isContractManufacturer).length;
+
+  return `
+    <div class="page light-page">
+      ${renderSectionHeader('05c', 'Processing & Manufacturing')}
+
+      <!-- Headline metrics -->
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;">
+        <div class="metric-card" style="text-align: center;">
+          <div class="metric-label">Processing Emissions</div>
+          <div class="metric-value" style="font-size: 28px;">${fmtNum(pd.totalProcessingEmissions)}</div>
+          <div class="metric-unit">kg CO&#8322;e per functional unit</div>
+        </div>
+        <div class="metric-card" style="text-align: center;">
+          <div class="metric-label">Share of Product Footprint</div>
+          <div class="metric-value" style="font-size: 28px;">${pd.percentOfTotal}%</div>
+          <div class="metric-unit">of total lifecycle emissions</div>
+        </div>
+        <div class="metric-card" style="text-align: center;">
+          <div class="metric-label">Manufacturing Facilities</div>
+          <div class="metric-value" style="font-size: 28px;">${pd.facilities.length}</div>
+          <div class="metric-unit">${ownedCount > 0 ? `${ownedCount} owned` : ''}${ownedCount > 0 && cmCount > 0 ? ', ' : ''}${cmCount > 0 ? `${cmCount} contract` : ''}</div>
+        </div>
+      </div>
+
+      <!-- Per-facility breakdown -->
+      ${pd.facilities.map((facility, idx) => `
+        <div style="background: ${facility.isContractManufacturer ? '#fefce8' : '#f0fdf4'}; border: 1px solid ${facility.isContractManufacturer ? '#fde68a' : '#bbf7d0'}; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+
+          <!-- Facility header -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <div>
+              <span style="font-size: 14px; font-weight: 700; color: #1c1917;">${escapeHtml(facility.name)}</span>
+              ${facility.countryCode ? `<span style="font-size: 11px; color: #78716c; margin-left: 8px;">(${facility.countryCode})</span>` : ''}
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <span style="font-size: 10px; padding: 3px 10px; border-radius: 12px; font-weight: 600; background: ${facility.isContractManufacturer ? '#fef9c3; color: #854d0e' : '#dcfce7; color: #166534'};">${facility.isContractManufacturer ? 'Contract Manufacturer (Scope 3)' : 'Owned Facility (Scope 1 & 2)'}</span>
+              <span style="font-size: 10px; padding: 3px 10px; border-radius: 12px; background: #f5f5f4; color: #57534e; font-weight: 500;">${facility.dataSource}</span>
+            </div>
+          </div>
+
+          <!-- Emissions grid -->
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px;">
+            <div style="background: white; border-radius: 8px; padding: 10px; text-align: center;">
+              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #a8a29e; margin-bottom: 4px;">Total</div>
+              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #1c1917;">${fmtNum(facility.totalEmissions)}</div>
+              <div style="font-size: 9px; color: #78716c;">kg CO&#8322;e/unit</div>
+            </div>
+            <div style="background: white; border-radius: 8px; padding: 10px; text-align: center;">
+              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #a8a29e; margin-bottom: 4px;">Scope 1</div>
+              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #dc2626;">${fmtNum(facility.scope1Emissions)}</div>
+              <div style="font-size: 9px; color: #78716c;">kg CO&#8322;e/unit</div>
+            </div>
+            <div style="background: white; border-radius: 8px; padding: 10px; text-align: center;">
+              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #a8a29e; margin-bottom: 4px;">Scope 2</div>
+              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #2563eb;">${fmtNum(facility.scope2Emissions)}</div>
+              <div style="font-size: 9px; color: #78716c;">kg CO&#8322;e/unit</div>
+            </div>
+            <div style="background: white; border-radius: 8px; padding: 10px; text-align: center;">
+              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #a8a29e; margin-bottom: 4px;">Water</div>
+              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #0891b2;">${facility.waterLitres}</div>
+              <div style="font-size: 9px; color: #78716c;">litres/unit</div>
+            </div>
+          </div>
+
+          ${facility.energyBreakdown.length > 0 ? `
+          <!-- Energy breakdown table -->
+          <table class="data-table" style="margin-bottom: 8px;">
+            <thead>
+              <tr>
+                <th>Energy Source</th>
+                <th style="text-align: right;">Quantity</th>
+                <th>Unit</th>
+                <th style="text-align: right;">Emissions (kg CO&#8322;e)</th>
+                <th>Scope</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${facility.energyBreakdown.map(e => `
+                <tr>
+                  <td>${escapeHtml(e.type)}</td>
+                  <td style="text-align: right; font-family: 'Fira Code', monospace; font-size: 11px;">${e.quantity}</td>
+                  <td style="font-size: 11px; color: #78716c;">${e.unit}</td>
+                  <td style="text-align: right; font-family: 'Fira Code', monospace; font-size: 11px;">${e.emissions}</td>
+                  <td style="font-size: 11px; color: ${e.scope === 'Scope 1' ? '#dc2626' : '#2563eb'};">${e.scope}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          ` : ''}
+
+          <!-- Attribution info -->
+          <div style="font-size: 10px; color: #78716c; display: flex; gap: 16px; flex-wrap: wrap;">
+            <span>Attribution: ${facility.attributionRatio}% of facility output</span>
+            <span>Production volume: ${facility.productionVolume.toLocaleString()} units</span>
+            ${facility.gridEmissionFactor ? `<span>Grid factor: ${facility.gridEmissionFactor}</span>` : ''}
+            ${parseFloat(facility.electricityKwh) > 0 ? `<span>Electricity: ${facility.electricityKwh} kWh (attributed)</span>` : ''}
+          </div>
+        </div>
+      `).join('')}
+
+      <!-- Methodology note -->
+      <div style="background: #fafaf9; border-radius: 8px; padding: 14px; font-size: 11px; color: #57534e;">
+        <div style="font-weight: 600; margin-bottom: 6px; color: #1c1917;">Methodology</div>
+        <div style="margin-bottom: 4px;">Processing emissions are allocated to the product using physical allocation by production volume (ISO 14044 Clause 4.3.4). Scope 1 factors from DEFRA 2025 GHG Conversion Factors; Scope 2 electricity from IEA/DEFRA 2023 country-specific grid emission factors.</div>
+        <div>Contract manufacturer emissions are classified as Scope 3 Category 1 (Purchased Goods and Services) per GHG Protocol Product Standard &sect;6.3.3. Owned facility emissions are classified as Scope 1 (direct combustion) and Scope 2 (purchased electricity/heat).</div>
+      </div>
+
+      ${renderPageFooter(undefined, true)}
+    </div>`;
+}
+
 function renderGhgDetailedPage(data: LCAReportData): string {
   const ghg = data.ghgDetailed;
 
@@ -1590,6 +1713,7 @@ export function renderLcaReportHtml(data: LCAReportData): string {
     renderDataQualityPage(data),
     renderClimatePage(data),
     renderViticulturePage(data),
+    renderProcessingPage(data),
     renderGhgDetailedPage(data),
     renderEnvironmentalImpactsPages(data),
     renderIngredientBreakdownPage(data),

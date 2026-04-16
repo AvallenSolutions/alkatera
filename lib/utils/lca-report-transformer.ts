@@ -89,6 +89,28 @@ interface AggregatedImpacts {
       hfc_pfc?: number;
     };
   };
+  facility_detail?: Array<{
+    facility_name: string;
+    country_code: string | null;
+    is_contract_manufacturer: boolean;
+    data_source: string;
+    attribution_ratio: number;
+    production_volume: number;
+    per_unit_total: number;
+    per_unit_scope1: number;
+    per_unit_scope2: number;
+    per_unit_water_litres: number;
+    per_unit_waste_kg: number;
+    electricity_kwh: number;
+    grid_emission_factor: number | null;
+    energy_breakdown: Array<{
+      type: string;
+      quantity: number;
+      unit: string;
+      emissions: number;
+      scope: string;
+    }>;
+  }>;
 }
 
 interface LCADatabaseData {
@@ -1468,6 +1490,51 @@ export function transformLCADataForReport(
         },
       };
     })() : undefined,
+
+    // Processing & Manufacturing breakdown by facility
+    processingDetail: (() => {
+      const facilityDetail = impacts.facility_detail;
+      if (!facilityDetail || facilityDetail.length === 0) return undefined;
+
+      const ENERGY_TYPE_LABELS: Record<string, string> = {
+        electricity_grid: 'Electricity (grid)',
+        natural_gas: 'Natural gas',
+        diesel_stationary: 'Diesel (stationary)',
+        diesel_mobile: 'Diesel (mobile)',
+        petrol_mobile: 'Petrol (mobile)',
+        lpg: 'LPG',
+        heavy_fuel_oil: 'Heavy fuel oil',
+        biomass_solid: 'Biomass (solid)',
+        refrigerant_leakage: 'Refrigerant leakage (HFC-134a)',
+        heat_steam_purchased: 'Purchased heat/steam',
+      };
+
+      return {
+        totalProcessingEmissions: processing.toFixed(4),
+        percentOfTotal: processingPct.toFixed(1),
+        facilities: facilityDetail.map((f: any) => ({
+          name: f.facility_name,
+          countryCode: f.country_code,
+          isContractManufacturer: f.is_contract_manufacturer,
+          dataSource: f.data_source === 'direct_run' ? 'Direct production run data' : 'Facility-level allocation',
+          attributionRatio: (f.attribution_ratio * 100).toFixed(1),
+          productionVolume: f.production_volume,
+          totalEmissions: f.per_unit_total.toFixed(6),
+          scope1Emissions: f.per_unit_scope1.toFixed(6),
+          scope2Emissions: f.per_unit_scope2.toFixed(6),
+          electricityKwh: (f.electricity_kwh || 0).toFixed(1),
+          gridEmissionFactor: f.grid_emission_factor ? `${f.grid_emission_factor.toFixed(4)} kg CO\u2082e/kWh` : null,
+          waterLitres: f.per_unit_water_litres.toFixed(2),
+          energyBreakdown: (f.energy_breakdown || []).map((e: any) => ({
+            type: ENERGY_TYPE_LABELS[e.type] || e.type,
+            quantity: Number(e.quantity).toFixed(2),
+            unit: e.unit,
+            emissions: Number(e.emissions).toFixed(4),
+            scope: e.scope,
+          })),
+        })),
+      };
+    })(),
 
     // FLAG removals (SBTi Forest, Land and Agriculture)
     flagRemovals: flagRemovals && (flagRemovals.soil_carbon_co2e || 0) > 0 ? {
