@@ -222,18 +222,23 @@ function renderEolMethodologySection(data: LCAReportData): string {
 }
 
 function renderGoalAndScopePage(data: LCAReportData): string {
-  const assumptions = data.goalAndScope.assumptionsAndLimitations.map(al =>
-    `<div style="display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f5f5f4;">
+  const allAssumptions = data.goalAndScope.assumptionsAndLimitations;
+  const renderAssumption = (al: { type: string; text: string }) =>
+    `<div style="display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f5f5f4;">
       <span class="badge ${al.type === 'Assumption' ? 'badge-low' : 'badge-medium'}" style="flex-shrink: 0; align-self: flex-start; margin-top: 2px;">${escapeHtml(al.type)}</span>
-      <span style="font-size: 12px; color: #44403c; line-height: 1.5;">${escapeHtml(al.text)}</span>
-    </div>`
-  ).join('');
+      <span style="font-size: 11px; color: #44403c; line-height: 1.4;">${escapeHtml(al.text)}</span>
+    </div>`;
+
+  // Split assumptions: first 4 on page 1, rest on continuation page
+  const PAGE1_MAX = 4;
+  const page1Assumptions = allAssumptions.slice(0, PAGE1_MAX);
+  const overflowAssumptions = allAssumptions.slice(PAGE1_MAX);
 
   const audience = data.goalAndScope.intendedAudience.map(a =>
     `<span style="display: inline-block; padding: 3px 10px; background: #f0fdf4; color: #166534; border-radius: 8px; font-size: 11px; margin-right: 6px; margin-bottom: 4px;">${escapeHtml(a)}</span>`
   ).join('');
 
-  return `
+  const page1 = `
     <div class="page light-page">
       ${renderSectionHeader('02', 'Goal & Scope Definition')}
 
@@ -282,13 +287,30 @@ function renderGoalAndScopePage(data: LCAReportData): string {
 
       <div style="margin-bottom: 20px;">
         <div style="font-size: 11px; font-weight: 600; color: #1c1917; margin-bottom: 8px;">Assumptions &amp; Limitations</div>
-        ${assumptions}
+        ${page1Assumptions.map(renderAssumption).join('')}
+      </div>
+
+      ${overflowAssumptions.length === 0 ? renderEolMethodologySection(data) : ''}
+
+      ${renderPageFooter(2)}
+    </div>`;
+
+  // Continuation page for remaining assumptions + EoL methodology
+  const page2 = overflowAssumptions.length > 0 ? `
+    <div class="page light-page">
+      ${renderSectionHeader('02', 'Goal & Scope Definition (cont.)')}
+
+      <div style="margin-bottom: 20px;">
+        <div style="font-size: 11px; font-weight: 600; color: #1c1917; margin-bottom: 8px;">Assumptions &amp; Limitations (continued)</div>
+        ${overflowAssumptions.map(renderAssumption).join('')}
       </div>
 
       ${renderEolMethodologySection(data)}
 
-      ${renderPageFooter(2)}
-    </div>`;
+      ${renderPageFooter()}
+    </div>` : '';
+
+  return page1 + page2;
 }
 
 function renderMethodologyPage(data: LCAReportData): string {
@@ -725,31 +747,7 @@ function renderProcessingPage(data: LCAReportData): string {
   const ownedCount = pd.facilities.filter(f => !f.isContractManufacturer).length;
   const cmCount = pd.facilities.filter(f => f.isContractManufacturer).length;
 
-  return `
-    <div class="page light-page">
-      ${renderSectionHeader('05c', 'Processing & Manufacturing')}
-
-      <!-- Headline metrics -->
-      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;">
-        <div class="metric-card" style="text-align: center;">
-          <div class="metric-label">Processing Emissions</div>
-          <div class="metric-value" style="font-size: 28px;">${fmtNum(pd.totalProcessingEmissions)}</div>
-          <div class="metric-unit">kg CO&#8322;e per functional unit</div>
-        </div>
-        <div class="metric-card" style="text-align: center;">
-          <div class="metric-label">Share of Product Footprint</div>
-          <div class="metric-value" style="font-size: 28px;">${pd.percentOfTotal}%</div>
-          <div class="metric-unit">of total lifecycle emissions</div>
-        </div>
-        <div class="metric-card" style="text-align: center;">
-          <div class="metric-label">Manufacturing Facilities</div>
-          <div class="metric-value" style="font-size: 28px;">${pd.facilities.length}</div>
-          <div class="metric-unit">${ownedCount > 0 ? `${ownedCount} owned` : ''}${ownedCount > 0 && cmCount > 0 ? ', ' : ''}${cmCount > 0 ? `${cmCount} contract` : ''}</div>
-        </div>
-      </div>
-
-      <!-- Per-facility breakdown -->
-      ${pd.facilities.map((facility, idx) => `
+  const renderFacilityCard = (facility: typeof pd.facilities[0]) => `
         <div style="background: ${facility.isContractManufacturer ? '#fefce8' : '#f0fdf4'}; border: 1px solid ${facility.isContractManufacturer ? '#fde68a' : '#bbf7d0'}; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
 
           <!-- Facility header -->
@@ -765,6 +763,28 @@ function renderProcessingPage(data: LCAReportData): string {
           </div>
 
           <!-- Emissions grid -->
+          ${facility.isContractManufacturer ? `
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px;">
+            <div style="background: white; border-radius: 8px; padding: 10px; text-align: center;">
+              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #a8a29e; margin-bottom: 4px;">Scope 3 Total</div>
+              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #1c1917;">${fmtNum(facility.totalEmissions)}</div>
+              <div style="font-size: 9px; color: #78716c;">kg CO&#8322;e/unit</div>
+            </div>
+            <div style="background: white; border-radius: 8px; padding: 10px; text-align: center;">
+              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #a8a29e; margin-bottom: 4px;">Combustion</div>
+              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #dc2626;">${fmtNum(facility.scope1Emissions)}</div>
+              <div style="font-size: 9px; color: #78716c;">kg CO&#8322;e/unit</div>
+            </div>
+            <div style="background: white; border-radius: 8px; padding: 10px; text-align: center;">
+              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #a8a29e; margin-bottom: 4px;">Electricity</div>
+              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #2563eb;">${fmtNum(facility.scope2Emissions)}</div>
+              <div style="font-size: 9px; color: #78716c;">kg CO&#8322;e/unit</div>
+            </div>
+          </div>
+          <div style="font-size: 10px; color: #92400e; background: #fffbeb; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; border-left: 3px solid #f59e0b;">
+            All emissions from this contract manufacturer are classified as <strong>Scope 3 Category 1</strong> (Purchased Goods and Services) in the product footprint. The combustion/electricity split shows the emission source at the facility level.
+          </div>
+          ` : `
           <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px;">
             <div style="background: white; border-radius: 8px; padding: 10px; text-align: center;">
               <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #a8a29e; margin-bottom: 4px;">Total</div>
@@ -787,6 +807,7 @@ function renderProcessingPage(data: LCAReportData): string {
               <div style="font-size: 9px; color: #78716c;">litres/unit</div>
             </div>
           </div>
+          `}
 
           ${facility.energyBreakdown.length > 0 ? `
           <!-- Energy breakdown table -->
@@ -797,19 +818,23 @@ function renderProcessingPage(data: LCAReportData): string {
                 <th style="text-align: right;">Quantity</th>
                 <th>Unit</th>
                 <th style="text-align: right;">Emissions (kg CO&#8322;e)</th>
-                <th>Scope</th>
+                <th>${facility.isContractManufacturer ? 'Source' : 'Scope'}</th>
               </tr>
             </thead>
             <tbody>
-              ${facility.energyBreakdown.map(e => `
+              ${facility.energyBreakdown.map(e => {
+                const scopeLabel = facility.isContractManufacturer
+                  ? (e.scope === 'Scope 1' ? 'Combustion' : 'Electricity')
+                  : e.scope;
+                return `
                 <tr>
                   <td>${escapeHtml(e.type)}</td>
                   <td style="text-align: right; font-family: 'Fira Code', monospace; font-size: 11px;">${e.quantity}</td>
                   <td style="font-size: 11px; color: #78716c;">${e.unit}</td>
                   <td style="text-align: right; font-family: 'Fira Code', monospace; font-size: 11px;">${e.emissions}</td>
-                  <td style="font-size: 11px; color: ${e.scope === 'Scope 1' ? '#dc2626' : '#2563eb'};">${e.scope}</td>
-                </tr>
-              `).join('')}
+                  <td style="font-size: 11px; color: ${e.scope === 'Scope 1' ? '#dc2626' : '#2563eb'};">${scopeLabel}</td>
+                </tr>`;
+              }).join('')}
             </tbody>
           </table>
           ` : ''}
@@ -821,18 +846,63 @@ function renderProcessingPage(data: LCAReportData): string {
             ${facility.gridEmissionFactor ? `<span>Grid factor: ${facility.gridEmissionFactor}</span>` : ''}
             ${parseFloat(facility.electricityKwh) > 0 ? `<span>Electricity: ${facility.electricityKwh} kWh (attributed)</span>` : ''}
           </div>
-        </div>
-      `).join('')}
+        </div>`;
 
-      <!-- Methodology note -->
+  const methodologyNote = `
       <div style="background: #fafaf9; border-radius: 8px; padding: 14px; font-size: 11px; color: #57534e;">
         <div style="font-weight: 600; margin-bottom: 6px; color: #1c1917;">Methodology</div>
         <div style="margin-bottom: 4px;">Processing emissions are allocated to the product using physical allocation by production volume (ISO 14044 Clause 4.3.4). Scope 1 factors from DEFRA 2025 GHG Conversion Factors; Scope 2 electricity from IEA/DEFRA 2023 country-specific grid emission factors.</div>
         <div>Contract manufacturer emissions are classified as Scope 3 Category 1 (Purchased Goods and Services) per GHG Protocol Product Standard &sect;6.3.3. Owned facility emissions are classified as Scope 1 (direct combustion) and Scope 2 (purchased electricity/heat).</div>
+      </div>`;
+
+  // Page 1: headline metrics + first facility
+  const page1 = `
+    <div class="page light-page">
+      ${renderSectionHeader('05c', 'Processing & Manufacturing')}
+
+      <!-- Headline metrics -->
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;">
+        <div class="metric-card" style="text-align: center;">
+          <div class="metric-label">Processing Emissions</div>
+          <div class="metric-value" style="font-size: 28px;">${fmtNum(pd.totalProcessingEmissions)}</div>
+          <div class="metric-unit">kg CO&#8322;e per functional unit</div>
+        </div>
+        <div class="metric-card" style="text-align: center;">
+          <div class="metric-label">Share of Product Footprint</div>
+          <div class="metric-value" style="font-size: 28px;">${pd.percentOfTotal}%</div>
+          <div class="metric-unit">of total lifecycle emissions</div>
+        </div>
+        <div class="metric-card" style="text-align: center;">
+          <div class="metric-label">Manufacturing Facilities</div>
+          <div class="metric-value" style="font-size: 28px;">${pd.facilities.length}</div>
+          <div class="metric-unit">${ownedCount > 0 ? `${ownedCount} owned` : ''}${ownedCount > 0 && cmCount > 0 ? ', ' : ''}${cmCount > 0 ? `${cmCount} contract` : ''}</div>
+        </div>
       </div>
+
+      ${renderFacilityCard(pd.facilities[0])}
+
+      ${pd.facilities.length === 1 ? methodologyNote : ''}
 
       ${renderPageFooter(undefined, true)}
     </div>`;
+
+  // Continuation pages: remaining facilities (1 per page), methodology on last
+  const remainingFacilities = pd.facilities.slice(1);
+  const continuationPages = remainingFacilities.map((facility, idx) => {
+    const isLastFacility = idx === remainingFacilities.length - 1;
+    return `
+    <div class="page light-page">
+      ${renderSectionHeader('05c', 'Processing & Manufacturing (cont.)')}
+
+      ${renderFacilityCard(facility)}
+
+      ${isLastFacility ? methodologyNote : ''}
+
+      ${renderPageFooter(undefined, true)}
+    </div>`;
+  }).join('');
+
+  return page1 + continuationPages;
 }
 
 function renderGhgDetailedPage(data: LCAReportData): string {
