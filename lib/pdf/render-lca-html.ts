@@ -616,6 +616,16 @@ function renderClimatePage(data: LCAReportData): string {
         ).join('')}
       </div>
 
+      ${data.contractManufacturingNote ? `
+        <div style="margin-top: 20px; padding: 14px 16px; background: rgba(204, 255, 0, 0.08); border-left: 3px solid #ccff00; border-radius: 6px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+            <span style="font-size: 9px; font-family: 'Fira Code', monospace; color: #ccff00; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600;">Scope Attribution Note</span>
+            <span style="font-size: 9px; padding: 2px 8px; background: #ccff00; color: #1c1917; border-radius: 10px; font-weight: 700;">CORRECT</span>
+          </div>
+          <div style="font-size: 11px; color: #d6d3d1; line-height: 1.55;">${escapeHtml(data.contractManufacturingNote.explanation)}</div>
+        </div>
+      ` : ''}
+
       ${renderPageFooter(7, true)}
     </div>`;
 }
@@ -1116,11 +1126,23 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
         ? `<div style="font-size: 8px; color: #78716c; margin-top: 2px;">incl. ${escapeHtml((ing as any).containerCO2)} kg CO₂e inbound container (${escapeHtml((ing as any).containerType || '')})</div>`
         : '';
 
+      // Inbound freight transport sub-line — makes embedded transport emissions
+      // visible so the ingredient table reconciles against the lifecycle stage totals.
+      const transportNote = (ing as any).transportCO2
+        ? `<div style="font-size: 8px; color: #78716c; margin-top: 2px;">incl. ${escapeHtml((ing as any).transportCO2)} kg CO₂e inbound transport${(ing as any).transportMode ? ` · ${escapeHtml((ing as any).transportMode)}` : ''}${(ing as any).transportDistance ? ` · ${escapeHtml((ing as any).transportDistance)} km` : ''}</div>`
+        : '';
+
+      // Implausibility warning — e.g. "Road freight from Lima, Peru at 10,113 km".
+      // Shown in the Origin cell so the user connects the origin to the transport choice.
+      const originWarning = (ing as any).transportWarning
+        ? `<div style="font-size: 8px; color: #b45309; margin-top: 2px; line-height: 1.3;">&#x26A0; ${escapeHtml((ing as any).transportWarning)}</div>`
+        : '';
+
       return `<tr>
         ${ingredientCell}
         <td>${escapeHtml(ing.quantity)} ${escapeHtml(ing.unit)}</td>
-        <td>${escapeHtml(ing.origin)}</td>
-        <td style="font-weight: 500;">${escapeHtml(ing.climateImpact)}${containerNote}</td>
+        <td>${escapeHtml(ing.origin)}${originWarning}</td>
+        <td style="font-weight: 500;">${escapeHtml(ing.climateImpact)}${containerNote}${transportNote}</td>
         <td><span style="color: #ccff00;">${escapeHtml(ing.climatePercentage)}</span></td>
         <td>${escapeHtml(ing.acidification)}</td>
         <td>${escapeHtml(ing.eutrophication)}</td>
@@ -1384,18 +1406,29 @@ function renderSupplyChainPage(data: LCAReportData): string {
   const networkHtml = data.supplyChain.network.map(category => `
     <div style="margin-bottom: 24px;">
       <h3 style="font-size: 14px; font-weight: 600; color: #1c1917; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e7e5e4;">${escapeHtml(category.category)}</h3>
-      ${category.items.map(item => `
-        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #fafaf9;">
-          <div>
-            <div style="font-size: 14px; font-weight: 500;">${escapeHtml(item.name)}</div>
-            <div style="font-size: 12px; color: #78716c;">${escapeHtml(item.location)}</div>
+      ${category.items.map(item => {
+        const modeLabel = item.mode ? escapeHtml(item.mode) : 'Mode not specified';
+        const warningHtml = item.warning ? `
+          <div style="margin-top: 6px; padding: 6px 8px; background: #fef3c7; border-left: 3px solid #f59e0b; border-radius: 3px; font-size: 11px; color: #92400e;">
+            &#9888; ${escapeHtml(item.warning)}
           </div>
-          <div style="text-align: right;">
-            <div style="font-size: 14px; color: #44403c;">${escapeHtml(item.distance)}</div>
-            <div style="font-size: 12px; color: #78716c;">${escapeHtml(item.co2)}</div>
+        ` : '';
+        return `
+        <div style="padding: 8px 0; border-bottom: 1px solid #fafaf9;">
+          <div style="display: flex; justify-content: space-between;">
+            <div>
+              <div style="font-size: 14px; font-weight: 500;">${escapeHtml(item.name)}</div>
+              <div style="font-size: 12px; color: #78716c;">${escapeHtml(item.location)}</div>
+              <div style="font-size: 11px; color: #a8a29e; margin-top: 2px;">Transport: ${modeLabel}</div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 14px; color: #44403c;">${escapeHtml(item.distance)}</div>
+              <div style="font-size: 12px; color: #78716c;">${escapeHtml(item.co2)}</div>
+            </div>
           </div>
+          ${warningHtml}
         </div>
-      `).join('')}
+      `;}).join('')}
     </div>
   `).join('');
 
@@ -1725,6 +1758,62 @@ function renderCriticalReviewDisclosure(data: LCAReportData): string {
   return page1 + page2;
 }
 
+function renderAiCriticalReviewPage(data: LCAReportData): string {
+  const ai = data.criticalReview?.aiReview;
+  if (!ai) return '';
+
+  const ratingStyles: Record<string, { bg: string; color: string; label: string }> = {
+    pass: { bg: '#dcfce7', color: '#166534', label: 'PASS' },
+    qualified_pass: { bg: '#fef3c7', color: '#92400e', label: 'PASS WITH QUALIFICATIONS' },
+    needs_remediation: { bg: '#fee2e2', color: '#991b1b', label: 'NEEDS REMEDIATION' },
+  };
+  const rs = ratingStyles[ai.rating] || ratingStyles.qualified_pass;
+
+  const statusStyles: Record<string, { bg: string; color: string; icon: string; label: string }> = {
+    conforms: { bg: '#dcfce7', color: '#166534', icon: '\u2713', label: 'Conforms' },
+    minor_gap: { bg: '#fef3c7', color: '#92400e', icon: '!', label: 'Minor gap' },
+    major_gap: { bg: '#fee2e2', color: '#991b1b', icon: '\u2717', label: 'Major gap' },
+  };
+
+  const findingsHtml = ai.findings.map(f => {
+    const ss = statusStyles[f.status] || statusStyles.minor_gap;
+    return `
+      <div style="padding: 12px 14px; border: 1px solid #e7e5e4; border-left: 3px solid ${ss.color}; border-radius: 6px; margin-bottom: 10px; background: #fafaf9;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 6px;">
+          <div style="font-size: 11px; font-family: 'Fira Code', monospace; font-weight: 600; color: #1c1917;">${escapeHtml(f.clause)}</div>
+          <span style="font-size: 9px; padding: 2px 8px; background: ${ss.bg}; color: ${ss.color}; border-radius: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap;">${ss.icon} ${ss.label}</span>
+        </div>
+        <div style="font-size: 12px; color: #44403c; line-height: 1.55;">${escapeHtml(f.summary)}</div>
+        ${f.detail ? `<div style="font-size: 11px; color: #78716c; line-height: 1.5; margin-top: 6px;">${escapeHtml(f.detail)}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="page light-page">
+      ${renderSectionHeader('15b', 'AI-Assisted Internal Review')}
+
+      <div style="padding: 16px 18px; background: ${rs.bg}; border-radius: 8px; margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <div style="font-size: 10px; font-family: 'Fira Code', monospace; color: ${rs.color}; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700;">Overall Rating</div>
+          <div style="font-size: 11px; padding: 4px 12px; background: ${rs.color}; color: white; border-radius: 12px; font-weight: 700; letter-spacing: 0.5px;">${rs.label}</div>
+        </div>
+        <p style="font-size: 13px; line-height: 1.6; color: ${rs.color}; margin: 0;">${escapeHtml(ai.verdict)}</p>
+      </div>
+
+      <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #1c1917;">Findings by ISO 14044 / 14067 Clause</h3>
+      ${findingsHtml}
+
+      <div style="margin-top: 16px; padding: 12px 14px; background: #f5f5f4; border: 1px solid #e7e5e4; border-radius: 6px;">
+        <div style="font-size: 10px; font-family: 'Fira Code', monospace; color: #78716c; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px;">Reviewer Attribution</div>
+        <p style="font-size: 11px; line-height: 1.5; color: #57534e; margin: 0;">${escapeHtml(ai.reviewerNote)}</p>
+        <p style="font-size: 10px; color: #a8a29e; margin: 6px 0 0; font-family: 'Fira Code', monospace;">Review date: ${escapeHtml(ai.reviewDate)}</p>
+      </div>
+
+      ${renderPageFooter(18)}
+    </div>`;
+}
+
 // ============================================================================
 // SHARED ELEMENTS
 // ============================================================================
@@ -1795,6 +1884,7 @@ export function renderLcaReportHtml(data: LCAReportData): string {
     renderInterpretationPage(data),
     renderUncertaintySensitivityPage(data),
     renderCriticalReviewDisclosure(data),
+    renderAiCriticalReviewPage(data),
     renderCommitmentPage(data),
   ].filter(Boolean).join('\n');
 

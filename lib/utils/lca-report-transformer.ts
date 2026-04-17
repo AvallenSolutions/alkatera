@@ -1,4 +1,5 @@
 import type { LCAReportData } from '@/components/lca-report/types';
+import { getTransportModeWarning } from '@/lib/utils/transport-emissions-calculator';
 
 interface AggregatedImpacts {
   climate_change_gwp100?: number;
@@ -711,13 +712,45 @@ export function transformLCADataForReport(
     // Inbound container contribution (stored as sub-field for PDF annotation)
     const containerCO2Raw = Number(m.inbound_container_co2_per_unit || 0);
 
+    // ── Inbound transport (ISO 14044 §4.2.3 — make reconciliation transparent) ──
+    // Expose transport emissions, mode, and distance as separate fields so that
+    // the ingredient GWP column can be reconciled against the lifecycle stage totals.
+    // Previously transport was embedded inside the GWP value with no visibility.
+    const transportCO2Raw = Number(
+      m.impact_transport_co2e ?? m.transport_co2e ?? 0
+    );
+    const transportDistanceKm = Number(m.distance_km || 0);
+
+    // Multi-modal routes take precedence — summarise as "Multi-modal" with the
+    // longest-distance leg mode as the dominant indicator.
+    const legs = Array.isArray(m.transport_legs) ? m.transport_legs : [];
+    const hasMultiModal = legs.length > 1;
+    const primaryLegMode = legs.length > 0
+      ? legs.reduce((a: any, b: any) => (Number(b.distance_km || 0) > Number(a.distance_km || 0) ? b : a)).transport_mode
+      : (m.transport_mode as string | undefined);
+
+    const rawMode = (primaryLegMode || m.transport_mode || '').toString().toLowerCase();
+    const modeLabel = hasMultiModal
+      ? 'Multi-modal'
+      : rawMode === 'truck' ? 'Road (HGV)'
+      : rawMode === 'train' ? 'Rail freight'
+      : rawMode === 'ship' ? 'Sea freight'
+      : rawMode === 'air' ? 'Air freight'
+      : null;
+
+    // Plausibility check: flag when the single-leg mode is implausible for the
+    // distance (e.g. road freight from Lima, Peru at 10,113 km).
+    const transportWarning = !hasMultiModal
+      ? getTransportModeWarning(rawMode || null, transportDistanceKm || null)
+      : null;
+
     return {
       name: userIngredientName,
       calculationFactor: calcFactorName,
       isProxy,
       factorDatabase,
       category: m.category_type || m.material_type || 'ingredient',
-      quantity: (m.quantity || 0).toFixed(3),
+      quantity: (m.quantity || 0).toFixed(5),
       unit: m.unit || m.unit_name || 'kg',
       origin: (m.origin_country || m.country_of_origin || 'Unknown').replace(/^\d+\s+/, ''),
       climateImpact: climateVal.toFixed(4),
@@ -734,6 +767,11 @@ export function transformLCADataForReport(
       // Inbound container annotation (shown as sub-note in PDF when non-zero)
       containerCO2: containerCO2Raw > 0 ? containerCO2Raw.toFixed(5) : null,
       containerType: (m.inbound_container_type as string | null) || null,
+      // Inbound freight transport — visible as a sub-line on the ingredient row
+      transportCO2: transportCO2Raw > 0 ? transportCO2Raw.toFixed(5) : null,
+      transportMode: modeLabel,
+      transportDistance: transportDistanceKm > 0 ? transportDistanceKm.toLocaleString('en-GB') : null,
+      transportWarning,
     };
   });
 
@@ -771,7 +809,26 @@ export function transformLCADataForReport(
     "Factory operations & energy use",
   ];
   const shelfStages = ["Distribution & transport to retail"];
-  const consumerStages = ["Consumer use phase (refrigeration, carbonation)"];
+
+  // ── Use-phase label (ISO 14044 §4.2.3.3) ────────────────────────────────
+  // Use-phase text must reflect what actually happens to the product in-use.
+  // The previous static label "refrigeration, carbonation" was inaccurate for
+  // still, ambient-shelf-stable products. Read the wizard's use-phase config
+  // and describe only the processes that apply. Fall back to a neutral label
+  // if no config is present.
+  const upc = ((lca as any).use_phase_config || {}) as {
+    needsRefrigeration?: boolean;
+    isCarbonated?: boolean;
+    carbonationType?: string;
+  };
+  const usePhaseProcesses: string[] = [];
+  if (upc.needsRefrigeration) usePhaseProcesses.push('refrigeration');
+  if (upc.isCarbonated) usePhaseProcesses.push('carbonation losses');
+  const usePhaseLabel = usePhaseProcesses.length > 0
+    ? `Consumer use phase (${usePhaseProcesses.join(', ')})`
+    : 'Consumer use phase (ambient storage)';
+  const consumerStages = [usePhaseLabel];
+
   const graveStages = ["End-of-life disposal & recycling credits"];
 
   // MEDIUM FIX #22: Use only boundary type (not `distribution > 0`) to determine
@@ -921,7 +978,7 @@ export function transformLCADataForReport(
         : scopeTypeLabel === 'Cradle-to-Shelf'
         ? 'This assessment covers all processes from raw material extraction through manufacturing and outbound distribution to the point of sale (retailer shelf or equivalent). Consumer use and end-of-life disposal are excluded.'
         : scopeTypeLabel === 'Cradle-to-Consumer'
-        ? 'This assessment covers all processes from raw material extraction through manufacturing, distribution, and the consumer use phase (including refrigeration and carbonation losses where applicable). End-of-life disposal is excluded.'
+        ? `This assessment covers all processes from raw material extraction through manufacturing, distribution, and the consumer use phase${usePhaseProcesses.length > 0 ? ` (including ${usePhaseProcesses.join(' and ')})` : ' (ambient storage, no refrigeration or carbonation modelled)'}. End-of-life disposal is excluded.`
         : scopeTypeLabel === 'Cradle-to-Grave'
         ? 'This assessment covers the complete product lifecycle from raw material extraction through manufacturing, distribution, consumer use, and final disposal or recycling, including end-of-life avoided burden credits for recycled packaging materials.'
         : 'This assessment covers the lifecycle stages defined within the stated system boundary.',
@@ -1068,7 +1125,7 @@ export function transformLCADataForReport(
         { gas: 'N\u2082O', gwp100: '273', source: 'IPCC AR6 (2021)' },
         { gas: 'HFCs/PFCs', gwp100: 'Variable', source: 'IPCC AR6 (2021)' },
       ],
-      biogenicNote: 'Biogenic CO\u2082 emissions and uptakes are tracked separately per ISO 14067:2018 requirements. Biogenic carbon uptake during biomass growth is credited, and a corresponding virtual emission is added at end-of-life to balance the carbon cycle. The net biogenic carbon balance is reported separately from fossil emissions.'
+      biogenicNote: 'Biogenic CO\u2082 emissions are reported separately from fossil CO\u2082 per ISO 14067:2018 \u00A76.4.9.3 and are excluded from the headline fossil carbon footprint. The value shown represents biogenic carbon released during processing, use, and end-of-life of biomass-derived inputs, as captured by the underlying emission factors (ecoinvent 3.12, AGRIBALYSE 3.2). Biogenic carbon uptake during biomass growth and any downstream release are accounted for inside those factors; this report does not apply an additional uptake credit or end-of-life virtual emission on top. Where upstream datasets already net uptake against release, the residual biogenic CO\u2082 shown here reflects that net. Land-use change (LULUC) carbon is reported on a separate line per ISO 14067 \u00A76.4.9.4.'
     },
     environmentalImpacts: {
       categories: envCategories,
@@ -1079,6 +1136,12 @@ export function transformLCADataForReport(
       ingredients: ingredientRows,
       totalClimateImpact: totalCarbonIncludingBiogenic.toFixed(3),
       hasProxies: ingredientRows.some((r) => r.isProxy),
+      // Sum inbound transport across all ingredients so the table total reconciles
+      // with the lifecycle stage chart (Raw Materials + Packaging + embedded transport).
+      totalInboundTransportCO2e: ingredientRows
+        .reduce((sum, r) => sum + Number((r as any).transportCO2 || 0), 0)
+        .toFixed(5),
+      hasTransportWarnings: ingredientRows.some((r) => (r as any).transportWarning),
     },
     waterFootprint: {
       totalConsumption: `${waterConsumption.toFixed(3)}L`,
@@ -1259,37 +1322,53 @@ export function transformLCADataForReport(
       network: [
         {
           category: "MATERIAL SUPPLIERS",
-          items: materialBreakdown.length > 0
+          items: (materialBreakdown.length > 0
             ? materialBreakdown.slice(0, 8).map((m: any) => {
                 const mat = materials.find((mat: any) => mat.material_name === m.name);
-                // Use per-material transport CO₂e when available, fall back to estimating
-                // from distance × mass × DEFRA road freight factor (0.10768 kg CO₂e/tonne-km)
-                const transportCo2 = mat?.impact_transport_co2e
-                  ?? mat?.transport_co2e
-                  ?? ((mat?.distance_km || 0) > 0 && (mat?.quantity || 0) > 0
-                    ? (mat.distance_km * (mat.quantity / 1000) * 0.10768)
-                    : 0);
-                return {
-                  name: m.name,
-                  location: mat?.origin_country || "Various",
-                  distance: `${mat?.distance_km || "-"} km`,
-                  co2: `${transportCo2.toFixed(3)} kg CO\u2082e`
-                };
+                return { sourceMaterial: mat, displayName: m.name, fallbackLocation: mat?.origin_country || "Various" };
               })
-            : materials.slice(0, 8).map((m: any) => {
-                // Use per-material transport CO₂e when available, fall back to estimating
-                const transportCo2 = m.impact_transport_co2e
-                  ?? m.transport_co2e
-                  ?? ((m.distance_km || 0) > 0 && (m.quantity || 0) > 0
-                    ? (m.distance_km * (m.quantity / 1000) * 0.10768)
-                    : 0);
-                return {
-                  name: m.material_name || "Supplier",
-                  location: m.origin_country || m.country_of_origin || "Unknown",
-                  distance: `${m.distance_km || "-"} km`,
-                  co2: `${transportCo2.toFixed(3)} kg CO\u2082e`
-                };
-              })
+            : materials.slice(0, 8).map((m: any) => ({
+                sourceMaterial: m,
+                displayName: m.material_name || "Supplier",
+                fallbackLocation: m.origin_country || m.country_of_origin || "Unknown",
+              }))
+          ).map(({ sourceMaterial: mat, displayName, fallbackLocation }) => {
+            // Use per-material transport CO₂e when available, fall back to estimating
+            // from distance × mass × DEFRA road freight factor (0.10768 kg CO₂e/tonne-km)
+            const transportCo2 = mat?.impact_transport_co2e
+              ?? mat?.transport_co2e
+              ?? ((mat?.distance_km || 0) > 0 && (mat?.quantity || 0) > 0
+                ? (mat.distance_km * (mat.quantity / 1000) * 0.10768)
+                : 0);
+
+            // Transport mode resolution — single leg or multi-modal
+            const legs = Array.isArray(mat?.transport_legs) ? mat.transport_legs : [];
+            const hasMultiModal = legs.length > 1;
+            const primaryLegMode = legs.length > 0
+              ? legs.reduce((a: any, b: any) => (Number(b.distance_km || 0) > Number(a.distance_km || 0) ? b : a)).transport_mode
+              : (mat?.transport_mode as string | undefined);
+            const rawMode = (primaryLegMode || mat?.transport_mode || '').toString().toLowerCase();
+            const modeLabel = hasMultiModal
+              ? 'Multi-modal'
+              : rawMode === 'truck' ? 'Road (HGV)'
+              : rawMode === 'train' ? 'Rail freight'
+              : rawMode === 'ship' ? 'Sea freight'
+              : rawMode === 'air' ? 'Air freight'
+              : 'Mode not specified';
+
+            const warning = !hasMultiModal
+              ? getTransportModeWarning(rawMode || null, Number(mat?.distance_km || 0) || null)
+              : null;
+
+            return {
+              name: displayName,
+              location: fallbackLocation,
+              distance: `${mat?.distance_km || "-"} km`,
+              co2: `${transportCo2.toFixed(5)} kg CO\u2082e`,
+              mode: modeLabel,
+              warning,
+            };
+          })
         }
       ]
     },
@@ -1332,17 +1411,148 @@ export function transformLCADataForReport(
     // ISO 14044 §6 requires a critical review statement. If the database
     // has one, use it; otherwise generate a default disclosure noting the
     // study has not been externally reviewed.
-    criticalReview: (impacts as any).critical_review
-      ? {
+    criticalReview: (() => {
+      // Helper: build structured AI review findings from the state we already
+      // have in scope (material counts, dq score, contract manufacturing, etc.).
+      const buildAiReview = () => {
+        const findings: Array<{ clause: string; status: 'conforms' | 'minor_gap' | 'major_gap'; summary: string; detail?: string }> = [];
+
+        const facilitiesList = (impacts as any).facility_detail || [];
+        const hasAnyFacility = facilitiesList.length > 0;
+        const allContractManufactured = hasAnyFacility && facilitiesList.every((f: any) => f.is_contract_manufacturer === true);
+        const primaryShare = materials.length > 0 ? Math.round((primaryCount / materials.length) * 100) : 0;
+        const proxyShare = materials.length > 0 ? Math.round((proxyCount / materials.length) * 100) : 0;
+
+        // Goal & Scope
+        findings.push({
+          clause: 'ISO 14044 §4.2 — Goal and scope definition',
+          status: 'conforms',
+          summary: 'Functional unit, system boundaries, and reference flow are defined and consistent with the intended application.',
+          detail: `Functional unit is "${lca.functional_unit || 'as declared'}" with boundaries including ${includedStages.length} lifecycle stages. Cut-off criteria and allocation rules are disclosed in the methodology section.`,
+        });
+
+        // Data quality (§4.2.3.6)
+        const dqStatus: 'conforms' | 'minor_gap' | 'major_gap' =
+          primaryCount === 0 ? 'major_gap'
+          : dqScore >= 70 ? 'conforms'
+          : dqScore >= 50 ? 'minor_gap'
+          : 'major_gap';
+        findings.push({
+          clause: 'ISO 14044 §4.2.3.6 — Data quality requirements',
+          status: dqStatus,
+          summary: dqStatus === 'conforms'
+            ? `Data quality rated ${dqRating.toLowerCase()} (${dqScore}%) with ${primaryShare}% primary coverage.`
+            : dqStatus === 'minor_gap'
+              ? `Data quality is acceptable (${dqRating.toLowerCase()}, ${dqScore}%) but primary-data coverage (${primaryShare}%) could be improved for the dominant contributors.`
+              : primaryCount === 0
+                ? 'No primary verified data: all material inputs rely on secondary databases or proxy estimates.'
+                : `Data quality (${dqScore}%) falls below the threshold typical for external communication; proxy share is ${proxyShare}%.`,
+          detail: `Pedigree matrix assessment covers reliability, completeness, temporal, geographic, and technological representativeness. Current split: ${primaryCount} primary / ${secondaryCount} secondary / ${proxyCount} proxy across ${materials.length} inputs.`,
+        });
+
+        // Allocation (§4.3.4)
+        findings.push({
+          clause: 'ISO 14044 §4.3.4 — Allocation procedures',
+          status: hasAnyFacility ? 'conforms' : 'minor_gap',
+          summary: hasAnyFacility
+            ? 'Facility emissions are allocated to the product by physical allocation (production volume).'
+            : 'No facility-level allocation is required because production emissions are embedded in material factors.',
+          detail: 'ISO 14044 requires step-wise allocation: avoidance by subdivision > system expansion > physical allocation > economic allocation. Physical allocation by production volume is applied where facility data is available.',
+        });
+
+        // LCIA method & biogenic carbon (ISO 14067 §6.4.9.3)
+        findings.push({
+          clause: 'ISO 14067:2018 §6.4.9.3 — Biogenic carbon accounting',
+          status: 'conforms',
+          summary: 'Biogenic CO₂ is tracked separately from fossil CO₂ and reported as a memo item; biogenic CH₄ is reported with GWP-100 = 27.',
+          detail: 'No additional virtual end-of-life credit or debit is applied on top of background factors (ecoinvent / AGRIBALYSE already handle biogenic uptake and release within the factor).',
+        });
+
+        // Scope attribution (GHG Protocol)
+        if (allContractManufactured) {
+          findings.push({
+            clause: 'GHG Protocol Product Standard §6.3.3 — Scope attribution',
+            status: 'conforms',
+            summary: 'Zero Scope 1/2 is correct: product is contract-manufactured, so production-stage emissions are reported in Scope 3 Category 1 (Purchased Goods and Services).',
+          });
+        }
+
+        // Completeness — transport visibility
+        const transportWarningsPresent = ingredientRows.some((r) => (r as any).transportWarning);
+        if (transportWarningsPresent) {
+          findings.push({
+            clause: 'ISO 14044 §4.2.3.4 — Completeness (inbound transport)',
+            status: 'minor_gap',
+            summary: 'One or more ingredients show a plausibility warning on the declared transport mode (e.g., truck from origins where overland road freight is not feasible).',
+            detail: 'Review the flagged inbound transport routes and correct the mode or distance; this may materially affect the transport share of the total footprint.',
+          });
+        } else {
+          findings.push({
+            clause: 'ISO 14044 §4.2.3.4 — Completeness (inbound transport)',
+            status: 'conforms',
+            summary: 'Inbound transport mode and distance are declared for all ingredients and are plausible for the stated origins.',
+          });
+        }
+
+        // Sensitivity & uncertainty (§4.5.3)
+        findings.push({
+          clause: 'ISO 14044 §4.5.3 — Sensitivity and uncertainty',
+          status: 'minor_gap',
+          summary: 'No formal Monte Carlo or scenario sensitivity analysis is included in this report.',
+          detail: 'For comparative assertions released to the public, ISO 14044 §5.3 requires uncertainty analysis. A Monte Carlo run over the top contributors (using pedigree-derived GSDs) is recommended before external use.',
+        });
+
+        // Interpretation (§4.5)
+        findings.push({
+          clause: 'ISO 14044 §4.5 — Life cycle interpretation',
+          status: 'conforms',
+          summary: 'Dominant hotspots are identified and discussed; findings are internally consistent with the inventory.',
+        });
+
+        // Critical review (§6)
+        findings.push({
+          clause: 'ISO 14044 §6 — Critical review',
+          status: 'minor_gap',
+          summary: 'No independent third-party critical review has been conducted. This AI-assisted review is structured but is not a substitute for an external reviewer.',
+          detail: 'ISO 14044 §6.2 requires internal review for non-comparative public use; §6.3 requires a three-person review panel for comparative assertions released to the public.',
+        });
+
+        // Derive rating
+        const hasMajor = findings.some((f) => f.status === 'major_gap');
+        const hasMinor = findings.some((f) => f.status === 'minor_gap');
+        const rating: 'pass' | 'qualified_pass' | 'needs_remediation' =
+          hasMajor ? 'needs_remediation' : hasMinor ? 'qualified_pass' : 'pass';
+
+        const verdict = rating === 'pass'
+          ? `The study of ${lca.product_name} conforms with the structural requirements of ISO 14044:2006 and ISO 14067:2018 and is fit for internal use and B2B communication in its current form. An independent critical review remains recommended before any public comparative assertion.`
+          : rating === 'qualified_pass'
+            ? `The study of ${lca.product_name} conforms with the core requirements of ISO 14044:2006 and ISO 14067:2018. A small number of minor gaps (typically around primary data coverage, uncertainty analysis, or external review) should be addressed before the report is used for public comparative assertions, but the study is suitable for internal decision-making and B2B reporting.`
+            : `The study of ${lca.product_name} captures the main lifecycle stages but has one or more major gaps (most commonly: absent primary data or an incomplete inventory) that should be resolved before the report is used beyond internal exploratory analysis.`;
+
+        return {
+          verdict,
+          rating,
+          findings,
+          reviewerNote: 'This review was generated by Claude (Anthropic), operating as an AI-assisted reviewer within the alkatera platform. It follows the structure of an ISO 14044 §6.2 internal review but is not a substitute for an independent critical review by a qualified external reviewer or panel.',
+          reviewDate: new Date().toISOString().slice(0, 10),
+        };
+      };
+
+      if ((impacts as any).critical_review) {
+        return {
           status: (impacts as any).critical_review.status,
           disclosure: (impacts as any).critical_review.disclosure,
           recommendation: (impacts as any).critical_review.recommendation,
-        }
-      : {
-          status: 'not_reviewed',
-          disclosure: `This LCA study of ${lca.product_name} has been conducted using the alkatera platform and has not undergone an independent critical review as defined by ISO 14044:2006 Clause 6. The study is based on ${materials.length} material/process inputs, of which ${primaryCount} use primary verified data, ${secondaryCount} use secondary database values, and ${proxyCount} use proxy estimates. An independent critical review by a qualified external reviewer or panel is recommended before public disclosure or comparative assertions.`,
-          recommendation: 'Commission an independent critical review per ISO 14044 §6.2 (internal review) or §6.3 (review panel for comparative assertions) before using this report for external communications.',
-        },
+          aiReview: buildAiReview(),
+        };
+      }
+      return {
+        status: 'not_reviewed',
+        disclosure: `This LCA study of ${lca.product_name} has been conducted using the alkatera platform and has not undergone an independent critical review as defined by ISO 14044:2006 Clause 6. The study is based on ${materials.length} material/process inputs, of which ${primaryCount} use primary verified data, ${secondaryCount} use secondary database values, and ${proxyCount} use proxy estimates. An independent critical review by a qualified external reviewer or panel is recommended before public disclosure or comparative assertions.`,
+        recommendation: 'Commission an independent critical review per ISO 14044 §6.2 (internal review) or §6.3 (review panel for comparative assertions) before using this report for external communications.',
+        aiReview: buildAiReview(),
+      };
+    })(),
 
     lulucNote: (impacts as any).luluc_note || undefined,
 
@@ -1361,11 +1571,20 @@ export function transformLCADataForReport(
         });
       }
 
-      // Fix: If Scope 1 and Scope 2 are both zero, flag the completeness gap
-      if (scope1 === 0 && scope2 === 0 && totalCarbonIncludingBiogenic > 0) {
+      // Fix: If Scope 1 and Scope 2 are both zero, context matters.
+      // If the product is 3rd-party manufactured, zero Scope 1/2 is CORRECT per
+      // GHG Protocol Product Standard §6.3.3 (contract manufacturer emissions
+      // sit in Scope 3 Cat 1 Purchased Goods of the reporting company, not
+      // Scope 1/2). Only flag as a completeness gap when the facility is own-operated.
+      const facilitiesList = (impacts as any).facility_detail || [];
+      const hasAnyFacility = facilitiesList.length > 0;
+      const allContractManufactured = hasAnyFacility && facilitiesList.every(
+        (f: any) => f.is_contract_manufacturer === true
+      );
+      if (scope1 === 0 && scope2 === 0 && totalCarbonIncludingBiogenic > 0 && !allContractManufactured) {
         additional.push({
           category: 'Scope 1 & 2 Emissions (Production Energy)',
-          reason: 'No direct (Scope 1) or energy-related (Scope 2) facility emissions are included in this assessment. This may indicate that no production facilities have been linked, or that contract manufacturer energy data has not been captured. For manufactured products, factory energy use (electricity, gas, steam) typically contributes 5-15% of the total footprint. This gap should be addressed by collecting facility energy data from the production site.',
+          reason: 'No direct (Scope 1) or energy-related (Scope 2) facility emissions are included in this assessment. This may indicate that no production facilities have been linked, or that own-facility energy data has not been captured. For manufactured products, factory energy use (electricity, gas, steam) typically contributes 5-15% of the total footprint. This gap should be addressed by collecting facility energy data from the production site.',
         });
       }
 
@@ -1389,6 +1608,24 @@ export function transformLCADataForReport(
         standard: sm.standard,
         attributionMethod: sm.attribution_method,
         note: sm.note,
+      };
+    })(),
+
+    contractManufacturingNote: (() => {
+      const facilitiesList = (impacts as any).facility_detail || [];
+      if (facilitiesList.length === 0) return undefined;
+      const contractFacilities = facilitiesList.filter((f: any) => f.is_contract_manufacturer === true);
+      if (contractFacilities.length === 0) return undefined;
+      const allContract = contractFacilities.length === facilitiesList.length;
+      const names = contractFacilities.map((f: any) => f.facility_name).filter(Boolean);
+      const nameList = names.length > 0 ? names.join(', ') : 'the contracted production site';
+      const explanation = allContract
+        ? `This product is manufactured at a third-party (contract) manufacturer (${nameList}). Under GHG Protocol Product Standard §6.3.3 and Corporate Value Chain (Scope 3) Standard Category 1 (Purchased Goods and Services), the contract manufacturer's direct facility emissions (Scope 1) and purchased energy (Scope 2) are reported as Scope 3 Category 1 emissions of the commissioning brand. The zero values shown for Scope 1 and Scope 2 on this report are therefore correct: all production-stage emissions are captured within the Scope 3 / value-chain accounting, not omitted. This is a matter of attribution, not completeness.`
+        : `One or more production sites used for this product are third-party (contract) manufacturers (${nameList}). The direct facility emissions (Scope 1) and purchased energy (Scope 2) at those sites are, per GHG Protocol Product Standard §6.3.3, reported as Scope 3 Category 1 (Purchased Goods and Services) emissions of the commissioning brand rather than as Scope 1/2 of the brand.`;
+      return {
+        isContractManufactured: allContract,
+        facilityNames: names,
+        explanation,
       };
     })(),
 

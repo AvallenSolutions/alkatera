@@ -141,10 +141,26 @@ export interface LCAReportData {
       dataQualityGrade: string;
       /** Confidence score 0–100 */
       confidenceScore: number;
+      /** Inbound transport CO₂e per functional unit (kg CO₂e), shown as a separate sub-line */
+      transportCO2?: string | null;
+      /** Transport mode used for inbound logistics (Road, Rail, Sea, Air) — human-readable label */
+      transportMode?: string | null;
+      /** Transport distance in km (formatted as string, e.g. "10,113") */
+      transportDistance?: string | null;
+      /** Plausibility warning when the mode is implausible for the distance */
+      transportWarning?: string | null;
+      /** Inbound container CO₂e per functional unit (separate from freight transport) */
+      containerCO2?: string | null;
+      /** Container type label */
+      containerType?: string | null;
     }>;
     totalClimateImpact: string;
     /** True if any ingredients use proxy factors */
     hasProxies: boolean;
+    /** Sum of all inbound transport emissions across ingredients (kg CO₂e) */
+    totalInboundTransportCO2e?: string;
+    /** True if any ingredient has a transport-mode plausibility warning */
+    hasTransportWarnings?: boolean;
   };
   waterFootprint: {
     totalConsumption: string;
@@ -212,6 +228,10 @@ export interface LCAReportData {
         location: string;
         distance: string;
         co2: string;
+        /** Transport mode label (Road, Rail, Sea, Air, Multi-modal) */
+        mode?: string;
+        /** Plausibility warning (non-null when mode/distance combination is implausible) */
+        warning?: string | null;
       }>;
     }>;
   };
@@ -267,6 +287,29 @@ export interface LCAReportData {
     status: string;
     disclosure: string;
     recommendation: string;
+    /**
+     * AI-authored critical review following ISO 14044 §6.2 internal review structure.
+     * This is NOT a substitute for a formal third-party review, but gives the user
+     * a structured expert walkthrough of compliance, completeness, and data quality
+     * before they commission external review or publish internally.
+     */
+    aiReview?: {
+      /** Short overall verdict (2-3 sentences) */
+      verdict: string;
+      /** Overall compliance rating: Pass / Pass with qualifications / Needs remediation */
+      rating: 'pass' | 'qualified_pass' | 'needs_remediation';
+      /** Structured findings across ISO 14044 chapters */
+      findings: Array<{
+        clause: string;      // e.g. "ISO 14044 §4.2.3.6 — Data quality"
+        status: 'conforms' | 'minor_gap' | 'major_gap';
+        summary: string;     // one-line statement
+        detail?: string;     // optional longer explanation
+      }>;
+      /** Reviewer attribution (always Claude — AI-assisted, not independent) */
+      reviewerNote: string;
+      /** Date the review was generated */
+      reviewDate: string;
+    };
   };
 
   /** LULUC justification note */
@@ -280,6 +323,19 @@ export interface LCAReportData {
     standard: string;
     attributionMethod: string;
     note: string;
+  };
+
+  /**
+   * Contract-manufacturing attribution note. When the product is produced at a
+   * 3rd-party (contract) manufacturer, the manufacturer's direct (Scope 1) and
+   * energy-related (Scope 2) emissions sit in the reporting company's Scope 3
+   * Category 1 (Purchased Goods and Services) per GHG Protocol Product Standard
+   * §6.3.3. Zero Scope 1/2 is therefore CORRECT, not a data gap.
+   */
+  contractManufacturingNote?: {
+    isContractManufactured: boolean;
+    facilityNames: string[];
+    explanation: string;
   };
 
   /** Transport emissions accounting note */
