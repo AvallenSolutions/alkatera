@@ -139,7 +139,7 @@ function deriveConfidence(m: Record<string, any>): number {
  */
 function buildRecommendation(
   m: Record<string, any>,
-  grade: 'LOW' | 'MEDIUM',
+  grade: 'LOW' | 'MEDIUM' | 'HIGH',
   ghgImpact: number
 ): string {
   const name = (m.name || '').toLowerCase();
