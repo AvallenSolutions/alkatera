@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createOpenLCAClientForDatabase } from '@/lib/openlca/client';
-import type { ImpactResult } from '@/lib/openlca/schema';
+import { ProviderLinking, type ImpactResult } from '@/lib/openlca/schema';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120; // OpenLCA calculations can take 60-90s
@@ -210,10 +210,87 @@ export async function POST(request: NextRequest) {
     const endpointRef = { impacts: [] as ImpactResult[] };
 
     if (database === 'agribalyse') {
-      // Try ReCiPe first (preferred for consistency with ecoinvent results)
+      // AGRIBALYSE FIX: The "calculate directly from Process" shortcut fails
+      // for many Agribalyse unit processes because their inputs lack default
+      // providers — OpenLCA's auto-linker silently returns empty impacts.
+      // Build an explicit product system via data/create-system, which runs
+      // the full linker and produces a calculable graph.
+      //
+      // Product systems are stable per process, so we cache the mapping in
+      // agribalyse_product_systems to pay the ~5-10s build cost only once
+      // per ingredient across the whole platform.
+
+      // 1. Look up cached product system
+      let productSystemId: string | null = null;
       try {
-        const midpointPromise = runWithCapture('ReCiPe 2016 Midpoint (H)', midpointRef);
-        const endpointPromise = runWithCapture('ReCiPe 2016 Endpoint (I)', endpointRef);
+        const { data: cachedSystem } = await supabase
+          .from('agribalyse_product_systems')
+          .select('product_system_id')
+          .eq('process_id', processId)
+          .maybeSingle();
+        if (cachedSystem?.product_system_id) {
+          productSystemId = cachedSystem.product_system_id;
+          console.log(`[OpenLCA API] Agribalyse: using cached product system ${productSystemId} for ${processId}`);
+        }
+      } catch (psCacheErr) {
+        console.warn('[OpenLCA API] Product system cache lookup failed, will rebuild:', psCacheErr);
+      }
+
+      // 2. If not cached, build one and persist it
+      if (!productSystemId) {
+        try {
+          console.log(`[OpenLCA API] Agribalyse: building product system for ${processId} (first-time cost ~5-10s)`);
+          const buildStart = Date.now();
+          const systemRef = await client.createProductSystem(processId, {
+            preferUnitProcesses: false,
+            providerLinking: ProviderLinking.PREFER_DEFAULTS,
+            cutoff: 1e-5,
+          });
+          productSystemId = systemRef['@id'] || null;
+          const buildMs = Date.now() - buildStart;
+
+          if (productSystemId) {
+            void supabase.from('agribalyse_product_systems').upsert({
+              process_id: processId,
+              product_system_id: productSystemId,
+              process_name: processInfo.name || null,
+              linking_config: {
+                preferUnitProcesses: false,
+                providerLinking: ProviderLinking.PREFER_DEFAULTS,
+                cutoff: 1e-5,
+              },
+              build_duration_ms: buildMs,
+              last_verified_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'process_id' }).then(({ error }) => {
+              if (error && !error.message?.includes('does not exist')) {
+                console.warn('[OpenLCA API] Failed to cache product system:', error.message);
+              }
+            });
+            console.log(`[OpenLCA API] Agribalyse: built product system ${productSystemId} in ${buildMs}ms`);
+          }
+        } catch (buildErr) {
+          console.warn(`[OpenLCA API] Agribalyse: product system build failed for ${processId}:`, buildErr instanceof Error ? buildErr.message : buildErr);
+        }
+      }
+
+      // 3. Helper to run a calc against the product system (or fall back to
+      //    the raw process target if we failed to build a system)
+      const runAgribalyse = async (
+        method: string,
+        ref: { impacts: ImpactResult[] },
+      ): Promise<void> => {
+        if (productSystemId) {
+          ref.impacts = await client.calculateProductSystem(productSystemId, method, 1);
+        } else {
+          ref.impacts = await client.calculateProcess(processId, method, 1);
+        }
+      };
+
+      // 4. Try ReCiPe first (consistent with ecoinvent output)
+      try {
+        const midpointPromise = runAgribalyse('ReCiPe 2016 Midpoint (H)', midpointRef);
+        const endpointPromise = runAgribalyse('ReCiPe 2016 Endpoint (I)', endpointRef);
 
         await Promise.race([
           Promise.allSettled([midpointPromise, endpointPromise]),
@@ -230,15 +307,48 @@ export async function POST(request: NextRequest) {
         console.warn(`[OpenLCA API] ReCiPe calculation threw for ${processId}:`, recipeErr instanceof Error ? recipeErr.message : recipeErr);
       }
 
-      // If ReCiPe produced no results (method missing, process incompatible, or timeout),
-      // fall back to EF 3.1 which is Agribalyse's native method
+      // 5. EF 3.1 fallback — Agribalyse's native method
       if (midpointImpacts.length === 0) {
         try {
           console.log(`[OpenLCA API] ReCiPe returned no results for ${processId}, trying EF 3.1 fallback...`);
-          midpointImpacts = await client.calculateProcess(processId, 'EF 3.1 Method (adapted)', 1);
+          if (productSystemId) {
+            midpointImpacts = await client.calculateProductSystem(productSystemId, 'EF 3.1 Method (adapted)', 1);
+          } else {
+            midpointImpacts = await client.calculateProcess(processId, 'EF 3.1 Method (adapted)', 1);
+          }
           console.log(`[OpenLCA API] EF 3.1 fallback: ${midpointImpacts.length} categories for ${processId}`);
         } catch (efErr) {
           console.warn(`[OpenLCA API] EF 3.1 fallback also failed for ${processId}:`, efErr instanceof Error ? efErr.message : efErr);
+        }
+      }
+
+      // 6. LAST-RESORT fallback — if a cached product system produced zero
+      //    results (e.g. the server was reloaded and the system id is stale),
+      //    rebuild and retry once with EF 3.1.
+      if (midpointImpacts.length === 0 && productSystemId) {
+        console.warn(`[OpenLCA API] Cached product system ${productSystemId} yielded no impacts; rebuilding once for ${processId}`);
+        try {
+          const rebuilt = await client.createProductSystem(processId, {
+            preferUnitProcesses: false,
+            providerLinking: ProviderLinking.PREFER_DEFAULTS,
+            cutoff: 1e-5,
+          });
+          const newId = rebuilt['@id'];
+          if (newId) {
+            midpointImpacts = await client.calculateProductSystem(newId, 'EF 3.1 Method (adapted)', 1);
+            if (midpointImpacts.length > 0) {
+              void supabase.from('agribalyse_product_systems').upsert({
+                process_id: processId,
+                product_system_id: newId,
+                process_name: processInfo.name || null,
+                last_verified_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              }, { onConflict: 'process_id' });
+              console.log(`[OpenLCA API] Rebuild succeeded: new product system ${newId}`);
+            }
+          }
+        } catch (rebuildErr) {
+          console.warn(`[OpenLCA API] Rebuild attempt also failed for ${processId}:`, rebuildErr instanceof Error ? rebuildErr.message : rebuildErr);
         }
       }
     } else {

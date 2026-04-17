@@ -17,6 +17,7 @@ import {
   ContributionResult,
   UpstreamTree,
   LinkingConfig,
+  ProviderLinking,
   Ref,
   Flow,
   ResultRef,
@@ -502,22 +503,95 @@ export class OpenLCAClient {
     impactMethodName: string,
     amount: number = 1
   ): Promise<ImpactResult[]> {
+    return this.calculateTarget(
+      { '@type': 'Process', '@id': processId },
+      impactMethodName,
+      amount,
+    );
+  }
+
+  /**
+   * Calculate impacts against a pre-built ProductSystem.
+   *
+   * REQUIRED for Agribalyse processes: Agribalyse unit processes often have
+   * ambiguous or missing default providers on their inputs. The "calculate
+   * directly from Process" shortcut (used by calculateProcess) relies on
+   * OpenLCA's on-the-fly auto-linker, which silently returns an empty impact
+   * array when it cannot resolve providers — this is the root cause of the
+   * "No impact results for process" errors on ingredients like salt and
+   * ascorbic acid.
+   *
+   * Building an explicit product system via `data/create-system` runs the full
+   * linker with explicit provider-resolution rules and produces a calculable
+   * graph. Callers should cache the resulting product system ID (they are
+   * stable per process) so the ~5-10s build cost is paid once.
+   */
+  async calculateProductSystem(
+    productSystemId: string,
+    impactMethodName: string,
+    amount: number = 1
+  ): Promise<ImpactResult[]> {
+    return this.calculateTarget(
+      { '@type': 'ProductSystem', '@id': productSystemId },
+      impactMethodName,
+      amount,
+    );
+  }
+
+  /**
+   * Build a product system for a process using Agribalyse-appropriate linking
+   * rules, calculate its impacts, and return the product system ID so the
+   * caller can cache it.
+   *
+   * Linking config rationale for Agribalyse:
+   *   - preferUnitProcesses: false — prefer aggregated/system processes when
+   *     available; they have pre-linked supply chains and calculate cleanly.
+   *   - providerLinking: 'PREFER_DEFAULTS' — use the default provider declared
+   *     on each input flow; fall back to first candidate if none is declared.
+   *   - cutoff: 1e-5 — mirror Agribalyse 3.2's documented cutoff to keep the
+   *     resolved graph bounded.
+   */
+  async buildAndCalculateProductSystem(
+    processId: string,
+    impactMethodName: string,
+    amount: number = 1,
+    linkingConfig?: LinkingConfig,
+  ): Promise<{ productSystemId: string; impacts: ImpactResult[] }> {
+    const config: LinkingConfig = linkingConfig ?? {
+      preferUnitProcesses: false,
+      providerLinking: ProviderLinking.PREFER_DEFAULTS,
+      cutoff: 1e-5,
+    };
+
+    const systemRef = await this.createProductSystem(processId, config);
+    const productSystemId = systemRef['@id'];
+    if (!productSystemId) {
+      throw new Error(`Product system creation for process ${processId} returned no @id`);
+    }
+
+    const impacts = await this.calculateProductSystem(productSystemId, impactMethodName, amount);
+    return { productSystemId, impacts };
+  }
+
+  /**
+   * Internal: run a calculation against any target (Process or ProductSystem),
+   * wait for it, fetch total impacts, and dispose the result.
+   */
+  private async calculateTarget(
+    target: { '@type': 'Process' | 'ProductSystem'; '@id': string },
+    impactMethodName: string,
+    amount: number,
+  ): Promise<ImpactResult[]> {
     let resultId: string | null = null;
 
     try {
-      // Find impact method
       const impactMethod = await this.findImpactMethod(impactMethodName);
       if (!impactMethod) {
         throw new Error(`Impact method not found: ${impactMethodName}`);
       }
 
-      // OpenLCA 2.x: Calculate directly from process using 'target' parameter
-      // This avoids needing to create a product system first
       const setup = {
-        target: {
-          '@type': 'Process',
-          '@id': processId,
-        },
+        target,
         impactMethod: {
           '@type': 'ImpactMethod',
           '@id': impactMethod['@id'],
@@ -525,19 +599,13 @@ export class OpenLCAClient {
         amount,
       };
 
-      // Run calculation (cast to unknown first to satisfy TypeScript)
       const resultRef = await this.calculate(setup as unknown as CalculationSetup);
       resultId = resultRef['@id'];
 
-      // Wait for result to be ready
       await this.waitForResult(resultId);
-
-      // Get impacts
       const impacts = await this.getTotalImpacts(resultId);
-
       return impacts;
     } finally {
-      // Always dispose result to free memory
       if (resultId) {
         await this.dispose(resultId);
       }
