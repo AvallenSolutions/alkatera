@@ -76,6 +76,7 @@ interface NavItem {
   icon?: any
   children?: NavItem[]
   badge?: number
+  betaBadge?: boolean // Renders an inline "BETA" pill next to the label
   minTier?: number // Minimum tier level required (1=Seed, 2=Blossom, 3=Canopy)
   featureCode?: string // Optional feature code requirement
   requireAnyFeature?: string[] // Show if user has ANY of these features
@@ -96,6 +97,13 @@ const navigationStructure: NavItem[] = [
     href: '/dashboard/',
     icon: LayoutDashboard,
     minTier: 1,
+  },
+  {
+    name: 'Pulse',
+    href: '/pulse/',
+    icon: Activity,
+    minTier: 1,
+    betaBadge: true,
   },
   {
     name: 'Capture Data',
@@ -353,6 +361,8 @@ export function Sidebar({ className }: SidebarProps) {
         if (item.viticultureOnly && !viticultureVisible) return false
         // Hide items that require any of a set of features (none enabled = hidden)
         if (item.requireAnyFeature && !item.requireAnyFeature.some(f => hasFeature(f as any))) return false
+        // Hide beta/feature-flagged items when the feature is not enabled
+        if (item.featureCode && !hasFeature(item.featureCode as any)) return false
         // Hide items restricted to specific orgs
         if (item.allowedOrgs && currentOrganization?.id && !item.allowedOrgs.includes(currentOrganization.id)) return false
         return true
@@ -571,7 +581,16 @@ export function Sidebar({ className }: SidebarProps) {
                       {IconComponent && <IconComponent className={cn('h-4 w-4 flex-shrink-0', active || hasActiveChild(item) ? 'text-neon-lime' : '')} />}
                     </Link>
                   </TooltipTrigger>
-                  <TooltipContent side="right">{item.name}</TooltipContent>
+                  <TooltipContent side="right">
+                    <span className="flex items-center gap-1.5">
+                      {item.name}
+                      {item.betaBadge && (
+                        <span className="rounded bg-neon-lime/20 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-neon-lime">
+                          Beta
+                        </span>
+                      )}
+                    </span>
+                  </TooltipContent>
                 </Tooltip>
               )
             }
@@ -756,7 +775,12 @@ export function Sidebar({ className }: SidebarProps) {
                   'h-4 w-4 flex-shrink-0 transition-colors',
                   active ? 'text-neon-lime' : ''
                 )} />}
-                <span className="truncate">{item.name}</span>
+                <span className="truncate flex-1">{item.name}</span>
+                {item.betaBadge && (
+                  <span className="rounded bg-neon-lime/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-neon-lime">
+                    Beta
+                  </span>
+                )}
               </Link>
             )
           })}

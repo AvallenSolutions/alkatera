@@ -21,6 +21,8 @@ import { AlertCircle, ChevronLeft, ChevronRight, Loader2, Save, CheckCircle2 } f
 import { toast } from 'sonner'
 import { useOrganization } from '@/lib/organizationContext'
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client'
+import { FeatureGate } from '@/components/subscription/FeatureGate'
+import { useSubscription } from '@/hooks/useSubscription'
 
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
@@ -142,6 +144,7 @@ function statusColour(s: 'complete' | 'partial' | 'empty') {
 export default function NatureAssessmentPage() {
   const { currentOrganization } = useOrganization()
   const supabase = getSupabaseBrowserClient()
+  const { hasFeature } = useSubscription()
 
   const [currentSection, setCurrentSection] = useState(0)
   const [form, setForm] = useState<NatureForm>(EMPTY_FORM)
@@ -299,6 +302,10 @@ export default function NatureAssessmentPage() {
 
   /* ---- render helpers ---- */
   const progress = overallProgress(form, locateSummary)
+
+  if (!hasFeature('viticulture_beta') && !hasFeature('orchard_beta') && !hasFeature('arable_beta')) {
+    return <FeatureGate feature="orchard_beta" />
+  }
 
   if (loading) {
     return (

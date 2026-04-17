@@ -39,7 +39,7 @@ import { requestBetaAccess } from "@/lib/feedback";
 
 interface FeatureGateProps {
   feature: FeatureCode;
-  children: React.ReactNode;
+  children?: React.ReactNode;
   fallback?: React.ReactNode;
   showLockIcon?: boolean;
   showUpgradePrompt?: boolean;

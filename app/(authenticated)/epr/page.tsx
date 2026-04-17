@@ -25,6 +25,7 @@ import {
   Dog,
   Sparkles,
 } from 'lucide-react';
+import { FeatureGate } from '@/components/subscription/FeatureGate';
 import {
   REPORTING_DEADLINES,
   type ReportingDeadline,
@@ -320,6 +321,7 @@ export default function EPRDashboardPage() {
   const isPending = !settingsExist && (!obligation || obligation.size === 'below_threshold');
 
   return (
+    <FeatureGate feature="epr_beta">
     <div className="space-y-6 animate-fade-in-up">
       <PageHeader onRefresh={fetchData} />
 
@@ -419,6 +421,7 @@ export default function EPRDashboardPage() {
       {/* Quick Actions */}
       <QuickActions wizardCompleted={wizardCompleted} />
     </div>
+    </FeatureGate>
   );
 }
 
