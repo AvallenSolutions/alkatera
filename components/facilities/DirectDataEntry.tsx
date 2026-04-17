@@ -25,6 +25,8 @@ import {
 import type { Cadence, Period } from "@/lib/log-data/period-utils";
 import { UtilityBillImportDialog } from "./UtilityBillImportDialog";
 import { UtilityRolloverDialog } from "./UtilityRolloverDialog";
+import { WaterBillImportDialog } from "./WaterBillImportDialog";
+import { WasteBillImportDialog } from "./WasteBillImportDialog";
 
 // =============================================================================
 // Types
@@ -77,6 +79,8 @@ export function DirectDataEntry({
   const [activeTab, setActiveTab] = useState("utilities");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showBillImport, setShowBillImport] = useState(false);
+  const [showWaterImport, setShowWaterImport] = useState(false);
+  const [showWasteImport, setShowWasteImport] = useState(false);
   const [showRollover, setShowRollover] = useState(false);
 
   // Utility rows
@@ -503,9 +507,14 @@ export function DirectDataEntry({
           <TabsContent value="water" className="space-y-4 mt-4">
             <div className="flex items-center justify-between">
               <Label className="text-sm font-semibold">Water Entries</Label>
-              <Button variant="outline" size="sm" onClick={addWaterRow} disabled={isSubmitting}>
-                <Plus className="h-4 w-4 mr-1" /> Add Row
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setShowWaterImport(true)} disabled={isSubmitting}>
+                  <Upload className="h-4 w-4 mr-1" /> Upload Bill
+                </Button>
+                <Button variant="outline" size="sm" onClick={addWaterRow} disabled={isSubmitting}>
+                  <Plus className="h-4 w-4 mr-1" /> Add Row
+                </Button>
+              </div>
             </div>
 
             {waterRows.map((row, i) => (
@@ -587,9 +596,14 @@ export function DirectDataEntry({
           <TabsContent value="waste" className="space-y-4 mt-4">
             <div className="flex items-center justify-between">
               <Label className="text-sm font-semibold">Waste Entries</Label>
-              <Button variant="outline" size="sm" onClick={addWasteRow} disabled={isSubmitting}>
-                <Plus className="h-4 w-4 mr-1" /> Add Row
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setShowWasteImport(true)} disabled={isSubmitting}>
+                  <Upload className="h-4 w-4 mr-1" /> Upload Invoice
+                </Button>
+                <Button variant="outline" size="sm" onClick={addWasteRow} disabled={isSubmitting}>
+                  <Plus className="h-4 w-4 mr-1" /> Add Row
+                </Button>
+              </div>
             </div>
 
             {wasteRows.map((row, i) => (
@@ -686,6 +700,28 @@ export function DirectDataEntry({
         organizationId={organizationId}
         onDataSaved={() => {
           setShowBillImport(false)
+          onDataSaved?.()
+        }}
+      />
+
+      <WaterBillImportDialog
+        open={showWaterImport}
+        onClose={() => setShowWaterImport(false)}
+        facilityId={facilityId}
+        organizationId={organizationId}
+        onDataSaved={() => {
+          setShowWaterImport(false)
+          onDataSaved?.()
+        }}
+      />
+
+      <WasteBillImportDialog
+        open={showWasteImport}
+        onClose={() => setShowWasteImport(false)}
+        facilityId={facilityId}
+        organizationId={organizationId}
+        onDataSaved={() => {
+          setShowWasteImport(false)
           onDataSaved?.()
         }}
       />

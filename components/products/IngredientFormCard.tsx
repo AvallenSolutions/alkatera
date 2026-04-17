@@ -76,6 +76,7 @@ export interface IngredientFormData {
   inbound_container_tare_kg?: number | null;
   inbound_container_reuse_cycles?: number | null;
   inbound_container_ef?: number | null;
+  inbound_container_material?: string | null;
   // Self-grown ingredient (e.g. vineyard grapes, arable barley, orchard fruit)
   is_self_grown?: boolean;
   vineyard_id?: string | null;
@@ -102,27 +103,27 @@ export interface ContainerPreset {
 export const CONTAINER_PRESETS: ContainerPreset[] = [
   {
     key: 'ibc_1000l',
-    label: 'IBC 1000L (HDPE)',
+    label: 'IBC 1000L (composite)',
     volume_l: 1000,
-    tare_kg: 25,
+    tare_kg: 57,  // HDPE inner bottle (~25kg) + steel cage (~20kg) + pallet base (~12kg) — IBCTanks.com industry standard
     reuse_cycles: 10,  // Industry avg for rental-pool IBCs (WRAP guidance)
     is_reusable: true,
-    material: 'HDPE',
+    material: 'HDPE + steel',
   },
   {
     key: 'ibc_500l',
-    label: 'IBC 500L (HDPE)',
+    label: 'IBC 500L (composite)',
     volume_l: 500,
-    tare_kg: 16,
+    tare_kg: 45,  // Proportional estimate for composite 500L IBC — IBCTanks.com
     reuse_cycles: 10,  // Industry avg for rental-pool IBCs (WRAP guidance)
     is_reusable: true,
-    material: 'HDPE',
+    material: 'HDPE + steel',
   },
   {
     key: 'drum_200l',
     label: 'Drum 200L (HDPE)',
     volume_l: 200,
-    tare_kg: 8.5,
+    tare_kg: 10,  // Standard closed-head HDPE drum — industry manufacturer specs
     reuse_cycles: 1,
     is_reusable: false,
     material: 'HDPE',
@@ -131,7 +132,7 @@ export const CONTAINER_PRESETS: ContainerPreset[] = [
     key: 'flexitank_24000l',
     label: 'Flexitank 24000L (LDPE)',
     volume_l: 24000,
-    tare_kg: 30,
+    tare_kg: 48,  // LDPE bladder + steel support pipes + PP fabric + valves — LAF Technology specs
     reuse_cycles: 1,
     is_reusable: false,
     material: 'LDPE',
@@ -140,7 +141,7 @@ export const CONTAINER_PRESETS: ContainerPreset[] = [
     key: 'bulk_tanker_25000l',
     label: 'Bulk tanker 25000L (stainless steel)',
     volume_l: 25000,
-    tare_kg: 20000,
+    tare_kg: 20000,  // Full tractor-trailer rig incl. stainless tank body
     reuse_cycles: 300,
     is_reusable: true,
     material: 'Stainless steel',
@@ -182,6 +183,20 @@ export const CONTAINER_PRESETS: ContainerPreset[] = [
     is_reusable: false,
     material: '',
   },
+];
+
+// kg CO₂e per kg of material — used for custom container EF lookup.
+// Values from DEFRA 2025 / Ecoinvent 3.12 averages.
+export const CONTAINER_MATERIAL_OPTIONS: { value: string; label: string; ef: number }[] = [
+  { value: 'hdpe',       label: 'HDPE (high-density polyethylene)',   ef: 1.93 },
+  { value: 'ldpe',       label: 'LDPE (low-density polyethylene)',    ef: 2.10 },
+  { value: 'pp',         label: 'PP (polypropylene)',                 ef: 1.72 },
+  { value: 'pet',        label: 'PET (polyethylene terephthalate)',   ef: 3.40 },
+  { value: 'steel_mild', label: 'Steel (mild / carbon)',              ef: 1.46 },
+  { value: 'steel_ss',   label: 'Stainless steel',                   ef: 2.89 },
+  { value: 'aluminium',  label: 'Aluminium',                         ef: 8.24 },
+  { value: 'glass',      label: 'Glass',                             ef: 0.85 },
+  { value: 'cardboard',  label: 'Cardboard / fibreboard',            ef: 0.94 },
 ];
 
 interface ProductionFacility {
@@ -356,13 +371,16 @@ export function IngredientFormCard({
     const tare = Number(ingredient.inbound_container_tare_kg ?? (preset?.tare_kg ?? 0));
     const volume = Number(ingredient.inbound_container_volume_l ?? (preset?.volume_l ?? 0));
     const cycles = Math.max(1, Number(ingredient.inbound_container_reuse_cycles ?? (preset?.reuse_cycles ?? 1)));
-    // EF: use override if set, otherwise use a known approximate for the preview
+    // EF: use manual override first, then preset approximation, then material lookup for custom
     const EF_APPROX: Record<string, number> = {
       ibc_1000l: 1.93, ibc_500l: 1.93, drum_200l: 1.93,
       flexitank_24000l: 2.10, bulk_tanker_25000l: 2.89,
       bottle_700ml_glass: 0.85, bottle_750ml_glass: 0.85, bottle_1l_glass: 0.85,
     };
-    const ef = Number(ingredient.inbound_container_ef ?? EF_APPROX[ingredient.inbound_container_type ?? ''] ?? 0);
+    const materialEf = ingredient.inbound_container_type === 'custom' && ingredient.inbound_container_material
+      ? (CONTAINER_MATERIAL_OPTIONS.find(m => m.value === ingredient.inbound_container_material)?.ef ?? 0)
+      : 0;
+    const ef = Number(ingredient.inbound_container_ef ?? EF_APPROX[ingredient.inbound_container_type ?? ''] ?? materialEf);
 
     if (!ef || !tare || !volume) return null;
 
@@ -1638,7 +1656,9 @@ export function IngredientFormCard({
                       inbound_container_volume_l: preset && preset.volume_l > 0 ? preset.volume_l : null,
                       inbound_container_tare_kg: preset && preset.tare_kg > 0 ? preset.tare_kg : null,
                       inbound_container_reuse_cycles: preset ? preset.reuse_cycles : 1,
-                      inbound_container_ef: null, // always clear override when switching preset
+                      inbound_container_ef: null,
+                      // clear material when switching to a preset (presets have known EFs)
+                      inbound_container_material: null,
                     });
                   }}
                 >
@@ -1677,21 +1697,42 @@ export function IngredientFormCard({
                       />
                     </div>
                     <div>
-                      <Label htmlFor={`container-tare-${ingredient.tempId}`}>Tare weight (kg)</Label>
-                      <Input
-                        id={`container-tare-${ingredient.tempId}`}
-                        type="number"
-                        min={0.01}
-                        step="any"
-                        value={ingredient.inbound_container_tare_kg ?? ''}
-                        readOnly={ingredient.inbound_container_type !== 'custom'}
-                        className={ingredient.inbound_container_type !== 'custom' ? 'bg-muted cursor-not-allowed' : ''}
-                        onChange={(e) => {
-                          if (ingredient.inbound_container_type === 'custom') {
-                            onUpdate(ingredient.tempId, { inbound_container_tare_kg: parseFloat(e.target.value) || null });
-                          }
-                        }}
-                      />
+                      {(() => {
+                        const preset = getContainerPreset(ingredient.inbound_container_type ?? '');
+                        const isOverridden = preset && ingredient.inbound_container_tare_kg != null
+                          && ingredient.inbound_container_tare_kg !== preset.tare_kg;
+                        return (
+                          <>
+                            <div className="flex items-center justify-between mb-1">
+                              <Label htmlFor={`container-tare-${ingredient.tempId}`}>Tare weight (kg)</Label>
+                              {isOverridden && (
+                                <button
+                                  type="button"
+                                  className="text-xs text-muted-foreground hover:text-foreground underline"
+                                  onClick={() => onUpdate(ingredient.tempId, { inbound_container_tare_kg: preset!.tare_kg })}
+                                >
+                                  Reset to {preset!.tare_kg} kg
+                                </button>
+                              )}
+                            </div>
+                            <Input
+                              id={`container-tare-${ingredient.tempId}`}
+                              type="number"
+                              min={0.01}
+                              step="any"
+                              value={ingredient.inbound_container_tare_kg ?? ''}
+                              onChange={(e) =>
+                                onUpdate(ingredient.tempId, { inbound_container_tare_kg: parseFloat(e.target.value) || null })
+                              }
+                            />
+                            {preset && !isOverridden && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Industry default — edit if your actual container differs.
+                              </p>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
 
@@ -1752,26 +1793,68 @@ export function IngredientFormCard({
                     );
                   })()}
 
-                  {/* EF override — custom only */}
+                  {/* Material + EF — custom only */}
                   {ingredient.inbound_container_type === 'custom' && (
-                    <div>
-                      <Label htmlFor={`container-ef-${ingredient.tempId}`}>
-                        Emission factor (kg CO₂e / kg material)
-                        <span className="text-muted-foreground font-normal ml-1">(optional)</span>
-                      </Label>
-                      <Input
-                        id={`container-ef-${ingredient.tempId}`}
-                        type="number"
-                        min={0}
-                        step="any"
-                        placeholder="Leave blank to use platform default"
-                        value={ingredient.inbound_container_ef ?? ''}
-                        onChange={(e) =>
-                          onUpdate(ingredient.tempId, {
-                            inbound_container_ef: parseFloat(e.target.value) || null,
-                          })
-                        }
-                      />
+                    <div className="space-y-3">
+                      <div>
+                        <Label htmlFor={`container-material-${ingredient.tempId}`}>
+                          Container material <span className="text-destructive">*</span>
+                        </Label>
+                        <Select
+                          value={ingredient.inbound_container_material ?? '__none__'}
+                          onValueChange={(v) =>
+                            onUpdate(ingredient.tempId, {
+                              inbound_container_material: v === '__none__' ? null : v,
+                              // clear any manual EF override when material changes — let lookup take over
+                              inbound_container_ef: null,
+                            })
+                          }
+                        >
+                          <SelectTrigger id={`container-material-${ingredient.tempId}`}>
+                            <SelectValue placeholder="Select material…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">— Select material —</SelectItem>
+                            {CONTAINER_MATERIAL_OPTIONS.map((m) => (
+                              <SelectItem key={m.value} value={m.value}>
+                                {m.label}
+                                <span className="ml-2 text-xs text-muted-foreground">
+                                  ({m.ef} kg CO₂e/kg)
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Used to calculate the container&apos;s manufacturing footprint.
+                          Select the primary material by weight.
+                        </p>
+                      </div>
+
+                      {/* EF override — advanced, only shown after material is set */}
+                      {ingredient.inbound_container_material && (
+                        <div>
+                          <Label htmlFor={`container-ef-${ingredient.tempId}`}>
+                            Emission factor override (kg CO₂e / kg material)
+                            <span className="text-muted-foreground font-normal ml-1">(optional)</span>
+                          </Label>
+                          <Input
+                            id={`container-ef-${ingredient.tempId}`}
+                            type="number"
+                            min={0}
+                            step="any"
+                            placeholder={`Leave blank to use material default (${
+                              CONTAINER_MATERIAL_OPTIONS.find(m => m.value === ingredient.inbound_container_material)?.ef ?? '—'
+                            } kg CO₂e/kg)`}
+                            value={ingredient.inbound_container_ef ?? ''}
+                            onChange={(e) =>
+                              onUpdate(ingredient.tempId, {
+                                inbound_container_ef: parseFloat(e.target.value) || null,
+                              })
+                            }
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
 

@@ -9,10 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Upload, FileText, Loader2, CheckCircle2, Trash2, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabaseClient'
-import { UTILITY_TYPES } from '@/lib/constants/utility-types'
-import type { ExtractedBillData, ExtractedUtilityEntry } from '@/app/api/utilities/import-from-pdf/route'
+import type { ExtractedFacilityBillData, ExtractedWaterEntry } from '@/app/api/facilities/import-bill/route'
 
-interface UtilityBillImportDialogProps {
+interface WaterBillImportDialogProps {
   open: boolean
   onClose: () => void
   facilityId: string
@@ -22,17 +21,32 @@ interface UtilityBillImportDialogProps {
 
 type Step = 'upload' | 'extracting' | 'review'
 
-export function UtilityBillImportDialog({
+const WATER_CATEGORIES = [
+  { value: 'water_intake', label: 'Water Intake' },
+  { value: 'water_discharge', label: 'Wastewater Discharge' },
+  { value: 'water_recycled', label: 'Recycled Water' },
+]
+
+const WATER_SOURCES = [
+  { value: 'municipal', label: 'Municipal Supply' },
+  { value: 'groundwater', label: 'Groundwater' },
+  { value: 'surface_water', label: 'Surface Water' },
+  { value: 'recycled', label: 'Recycled' },
+  { value: 'rainwater', label: 'Rainwater' },
+  { value: 'other', label: 'Other' },
+]
+
+export function WaterBillImportDialog({
   open,
   onClose,
   facilityId,
   organizationId,
   onDataSaved,
-}: UtilityBillImportDialogProps) {
+}: WaterBillImportDialogProps) {
   const [step, setStep] = useState<Step>('upload')
   const [dragOver, setDragOver] = useState(false)
-  const [extracted, setExtracted] = useState<ExtractedBillData | null>(null)
-  const [entries, setEntries] = useState<ExtractedUtilityEntry[]>([])
+  const [extracted, setExtracted] = useState<ExtractedFacilityBillData<ExtractedWaterEntry> | null>(null)
+  const [entries, setEntries] = useState<ExtractedWaterEntry[]>([])
   const [periodStart, setPeriodStart] = useState('')
   const [periodEnd, setPeriodEnd] = useState('')
   const [billName, setBillName] = useState('')
@@ -57,7 +71,7 @@ export function UtilityBillImportDialog({
   }
 
   const processFile = useCallback(async (file: File) => {
-    const maxSize = 20 * 1024 * 1024 // 20MB
+    const maxSize = 20 * 1024 * 1024
     if (file.size > maxSize) { toast.error('File must be under 20MB'); return }
 
     const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
@@ -72,21 +86,19 @@ export function UtilityBillImportDialog({
       const form = new FormData()
       form.append('file', file)
       form.append('organizationId', organizationId)
+      form.append('mode', 'water')
 
-      const res = await fetch('/api/utilities/import-from-pdf', {
-        method: 'POST',
-        body: form,
-      })
+      const res = await fetch('/api/facilities/import-bill', { method: 'POST', body: form })
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
         throw new Error(body.error || 'Extraction failed')
       }
 
-      const data: ExtractedBillData = await res.json()
+      const data: ExtractedFacilityBillData<ExtractedWaterEntry> = await res.json()
 
       if (!data.entries || data.entries.length === 0) {
-        toast.error('No utility consumption data found in this document')
+        toast.error('No water consumption data found in this document')
         setStep('upload')
         return
       }
@@ -95,8 +107,6 @@ export function UtilityBillImportDialog({
       setEntries(data.entries)
       setPeriodStart(data.period_start ?? '')
       setPeriodEnd(data.period_end ?? '')
-      // Pre-fill a sensible default label: "{supplier} {start} to {end}".
-      // Falls back to the filename stem if the supplier wasn't identified.
       const defaultName = data.supplier_name
         ? `${data.supplier_name}${data.period_start ? ` ${data.period_start}` : ''}`
         : file.name.replace(/\.[^.]+$/, '')
@@ -120,15 +130,10 @@ export function UtilityBillImportDialog({
     if (file) processFile(file)
   }
 
-  const updateEntry = (i: number, field: keyof ExtractedUtilityEntry, value: string | number) => {
+  const updateEntry = (i: number, field: keyof ExtractedWaterEntry, value: string | number) => {
     setEntries(prev => {
       const next = [...prev]
-      next[i] = { ...next[i], [field]: value }
-      // Auto-fill unit when type changes
-      if (field === 'utility_type') {
-        const info = UTILITY_TYPES.find(u => u.value === value)
-        if (info) next[i].unit = info.defaultUnit
-      }
+      next[i] = { ...next[i], [field]: value } as ExtractedWaterEntry
       return next
     })
   }
@@ -136,73 +141,52 @@ export function UtilityBillImportDialog({
   const removeEntry = (i: number) => setEntries(prev => prev.filter((_, idx) => idx !== i))
 
   const handleSave = async () => {
-    if (!periodStart || !periodEnd) {
-      toast.error('Please set the billing period')
-      return
-    }
-    const valid = entries.filter(e => e.utility_type && e.quantity > 0)
-    if (valid.length === 0) {
-      toast.error('No valid entries to save')
-      return
-    }
+    if (!periodStart || !periodEnd) { toast.error('Please set the billing period'); return }
+    const valid = entries.filter(e => e.activity_category && e.quantity > 0)
+    if (valid.length === 0) { toast.error('No valid entries to save'); return }
 
     setIsSaving(true)
     try {
-      const { data: userData, error: userError } = await supabase.auth.getUser()
-      if (userError || !userData.user) throw new Error('Not authenticated')
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Not authenticated')
 
       for (const entry of valid) {
-        const utilityInfo = UTILITY_TYPES.find(u => u.value === entry.utility_type)
-        const unit = entry.unit || utilityInfo?.defaultUnit || 'kWh'
-
-        const trimmedName = billName.trim()
-        const entryName = trimmedName
-          ? (valid.length > 1 ? `${trimmedName} — ${utilityInfo?.label || entry.utility_type}` : trimmedName)
+        const trimmed = billName.trim()
+        const catLabel = WATER_CATEGORIES.find(c => c.value === entry.activity_category)?.label || entry.activity_category
+        const entryName = trimmed
+          ? (valid.length > 1 ? `${trimmed} — ${catLabel}` : trimmed)
           : null
 
-        const { error: utilError } = await supabase.from('utility_data_entries').insert({
-          facility_id: facilityId,
-          utility_type: entry.utility_type,
-          quantity: entry.quantity,
-          unit,
-          reporting_period_start: periodStart,
-          reporting_period_end: periodEnd,
-          data_quality: 'actual',
-          calculated_scope: '',
-          created_by: userData.user.id,
-          name: entryName,
-        })
-        if (utilError) throw utilError
-
-        // Dual-write for legacy compatibility
-        const category = utilityInfo?.scope === '1' ? 'Scope 1' : 'Scope 2'
-        await supabase.from('activity_data').insert({
-          organization_id: organizationId,
-          facility_id: facilityId,
-          user_id: userData.user.id,
-          name: entryName || `${utilityInfo?.label || entry.utility_type} - ${periodStart} to ${periodEnd}`,
-          category,
-          quantity: entry.quantity,
-          unit,
-          fuel_type: utilityInfo?.fuelType || entry.utility_type,
-          activity_date: periodEnd,
-          reporting_period_start: periodStart,
-          reporting_period_end: periodEnd,
-        })
-      }
-
-      // Trigger emissions calculation
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (session) {
-          const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/invoke-scope1-2-calculations`
-          await fetch(url, {
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/add-facility-activity-entry`,
+          {
             method: 'POST',
-            headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ organization_id: organizationId }),
-          })
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${session.access_token}`,
+              apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+            },
+            body: JSON.stringify({
+              facility_id: facilityId,
+              organization_id: organizationId,
+              activity_category: entry.activity_category,
+              activity_date: periodStart,
+              reporting_period_start: periodStart,
+              reporting_period_end: periodEnd,
+              quantity: entry.quantity,
+              unit: entry.unit || 'm³',
+              data_provenance: 'primary_measured_onsite',
+              allocation_basis: 'none',
+              water_source_type: entry.water_source_type || undefined,
+              name: entryName,
+            }),
+          }
+        )
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}))
+          throw new Error(body.error || 'Failed to save entry')
         }
-      } catch { /* non-blocking */ }
+      }
 
       toast.success(`${valid.length} ${valid.length === 1 ? 'entry' : 'entries'} imported from bill`)
       onDataSaved()
@@ -218,15 +202,12 @@ export function UtilityBillImportDialog({
     <Dialog open={open} onOpenChange={o => { if (!o) handleClose() }}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Import from utility bill</DialogTitle>
+          <DialogTitle>Import from water bill</DialogTitle>
           <DialogDescription>
-            Upload a PDF or photo of your electricity, gas, or fuel bill and we&apos;ll extract the consumption data automatically.
+            Upload a PDF or photo of your water or wastewater bill and we&apos;ll extract the consumption data automatically.
           </DialogDescription>
         </DialogHeader>
 
-        {/* ------------------------------------------------------------------ */}
-        {/* Step 1: Upload */}
-        {/* ------------------------------------------------------------------ */}
         {step === 'upload' && (
           <div className="space-y-4">
             <input
@@ -252,14 +233,11 @@ export function UtilityBillImportDialog({
               </div>
             </button>
             <p className="text-xs text-muted-foreground text-center">
-              Works with electricity, gas, LPG, diesel, and other energy bills.
+              Works with water supply and wastewater bills (e.g. Thames Water, SUEZ).
             </p>
           </div>
         )}
 
-        {/* ------------------------------------------------------------------ */}
-        {/* Step 2: Extracting */}
-        {/* ------------------------------------------------------------------ */}
         {step === 'extracting' && (
           <div className="flex flex-col items-center gap-4 py-8">
             <Loader2 className="w-10 h-10 animate-spin text-primary" />
@@ -270,9 +248,6 @@ export function UtilityBillImportDialog({
           </div>
         )}
 
-        {/* ------------------------------------------------------------------ */}
-        {/* Step 3: Review */}
-        {/* ------------------------------------------------------------------ */}
         {step === 'review' && extracted && (
           <div className="space-y-5">
             {extracted.supplier_name && (
@@ -282,60 +257,47 @@ export function UtilityBillImportDialog({
               </div>
             )}
 
-            {/* Bill name / label */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">Bill name</Label>
               <Input
                 value={billName}
                 onChange={(e) => setBillName(e.target.value)}
-                placeholder="e.g. Solar meter Q1 2026, Main grid supply"
+                placeholder="e.g. Thames Water Q1 2026"
               />
               <p className="text-xs text-muted-foreground">
                 Used to identify this bill if you have multiple for the same facility and period.
               </p>
             </div>
 
-            {/* Billing period */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">Billing period</Label>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">From</Label>
-                  <Input
-                    type="date"
-                    value={periodStart}
-                    onChange={e => setPeriodStart(e.target.value)}
-                  />
+                  <Input type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">To</Label>
-                  <Input
-                    type="date"
-                    value={periodEnd}
-                    onChange={e => setPeriodEnd(e.target.value)}
-                  />
+                  <Input type="date" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} />
                 </div>
               </div>
             </div>
 
-            {/* Extracted entries */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Consumption data</Label>
+              <Label className="text-sm font-medium">Water data</Label>
               <div className="space-y-2">
                 {entries.map((entry, i) => (
                   <div key={i} className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-end p-3 border rounded-lg">
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Type</Label>
                       <Select
-                        value={entry.utility_type}
-                        onValueChange={v => updateEntry(i, 'utility_type', v)}
+                        value={entry.activity_category}
+                        onValueChange={v => updateEntry(i, 'activity_category', v)}
                       >
-                        <SelectTrigger className="h-8 text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
+                        <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          {UTILITY_TYPES.map(u => (
-                            <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
+                          {WATER_CATEGORIES.map(c => (
+                            <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -383,10 +345,7 @@ export function UtilityBillImportDialog({
                 {isSaving ? (
                   <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</>
                 ) : (
-                  <>
-                    <FileText className="w-4 h-4 mr-2" />
-                    Add {entries.length} {entries.length === 1 ? 'entry' : 'entries'} to records
-                  </>
+                  <><FileText className="w-4 h-4 mr-2" />Add {entries.length} {entries.length === 1 ? 'entry' : 'entries'} to records</>
                 )}
               </Button>
             </div>

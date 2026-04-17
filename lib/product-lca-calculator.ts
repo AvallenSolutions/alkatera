@@ -43,6 +43,11 @@ export interface CalculatePCFParams {
   /** When set, re-use the exact emission factor values from this PCF instead of
    *  re-resolving through the waterfall. Enables deterministic re-calculation. */
   pinnedPcfId?: string;
+  /** When set, promote this existing draft PCF row to a full calculation
+   *  (UPDATE in place) rather than inserting a new row. Used by the wizard's
+   *  autosave flow so draft state survives the calc without creating a
+   *  duplicate row. */
+  draftPcfId?: string;
 }
 
 /** @deprecated Use CalculatePCFParams instead */
@@ -296,25 +301,44 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       }
     }
 
-    // 4. Create product_lca record
-    const { data: lca, error: lcaError } = await supabase
-      .from('product_carbon_footprints')
-      .insert({
-        organization_id: product.organization_id,
-        product_id: parseInt(productId),
-        product_name: product.name,
-        product_description: product.product_description,
-        product_image_url: product.product_image_url,
-        functional_unit: buildFunctionalUnit(functionalUnit, product),
-        system_boundary: systemBoundary || 'cradle-to-gate',
-        reference_year: referenceYear || new Date().getFullYear(),
-        lca_version: '1.0',
-        lca_scope_type: systemBoundary || 'cradle-to-gate',
-        status: 'pending',
-        created_at: new Date().toISOString()
-      })
-      .select()
-      .single();
+    // 4. Create or promote product_lca record.
+    // When draftPcfId is set, we UPDATE the existing draft row in place so
+    // the wizard's pre-calculation autosave state carries through to the
+    // final calculation (no duplicate row). Otherwise we INSERT a fresh row.
+    const corePayload = {
+      organization_id: product.organization_id,
+      product_id: parseInt(productId),
+      product_name: product.name,
+      product_description: product.product_description,
+      product_image_url: product.product_image_url,
+      functional_unit: buildFunctionalUnit(functionalUnit, product),
+      system_boundary: systemBoundary || 'cradle-to-gate',
+      reference_year: referenceYear || new Date().getFullYear(),
+      lca_version: '1.0',
+      lca_scope_type: systemBoundary || 'cradle-to-gate',
+      status: 'pending',
+    };
+
+    let lca: any;
+    let lcaError: any;
+    if (params.draftPcfId) {
+      const { data, error } = await supabase
+        .from('product_carbon_footprints')
+        .update({ ...corePayload, updated_at: new Date().toISOString() })
+        .eq('id', params.draftPcfId)
+        .select()
+        .single();
+      lca = data;
+      lcaError = error;
+    } else {
+      const { data, error } = await supabase
+        .from('product_carbon_footprints')
+        .insert({ ...corePayload, created_at: new Date().toISOString() })
+        .select()
+        .single();
+      lca = data;
+      lcaError = error;
+    }
 
     if (lcaError || !lca) {
       throw new Error(`Failed to create LCA: ${lcaError?.message || 'Unknown error'}`);
@@ -1147,6 +1171,19 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
             const containerVolumeL = Number((material as any).inbound_container_volume_l || 0);
             const reuseCycles      = Math.max(1, Number((material as any).inbound_container_reuse_cycles || 1));
             let   containerEf      = Number((material as any).inbound_container_ef || 0);
+
+            // For custom containers: look up EF from the stored material field
+            if (!containerEf && containerType === 'custom') {
+              const containerMaterial = (material as any).inbound_container_material as string | null;
+              if (containerMaterial) {
+                const MATERIAL_EF: Record<string, number> = {
+                  hdpe: 1.93, ldpe: 2.10, pp: 1.72, pet: 3.40,
+                  steel_mild: 1.46, steel_ss: 2.89, aluminium: 8.24,
+                  glass: 0.85, cardboard: 0.94,
+                };
+                containerEf = MATERIAL_EF[containerMaterial] ?? 0;
+              }
+            }
 
             // Look up EF from staging_emission_factors when not overridden inline
             if (!containerEf && containerType !== 'custom') {

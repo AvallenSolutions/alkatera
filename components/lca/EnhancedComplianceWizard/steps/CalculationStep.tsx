@@ -28,6 +28,7 @@ import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 export function CalculationStep() {
   const {
     productId,
+    pcfId,
     preCalcState,
     setPreCalcState,
     onCalculationComplete,
@@ -143,6 +144,7 @@ export function CalculationStep() {
         distributionConfig: formData.distributionConfig,
         productLossConfig: formData.productLossConfig,
         pinnedPcfId: usePinnedFactors && previousPcfId ? previousPcfId : undefined,
+        draftPcfId: pcfId ?? undefined,
         onProgress: (step: string, percent: number) => {
           setPreCalcState((prev) => ({
             ...prev,

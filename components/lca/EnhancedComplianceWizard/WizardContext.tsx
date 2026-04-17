@@ -405,6 +405,15 @@ export function WizardProvider({
   // Auto-save debounce ref
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedDataRef = useRef<string>('');
+  // Guards the facility-allocation autosave effect from firing on the initial
+  // load hydration (we only want saves triggered by real user edits).
+  const initialLoadDoneRef = useRef<boolean>(false);
+  // Prevents concurrent draft-PCF creation if multiple edits race.
+  const draftCreationRef = useRef<Promise<string | null> | null>(null);
+  // Holds the latest saveProgressInternal closure so callers declared earlier
+  // in the component (updateField, useEffect) can invoke it without hitting
+  // a use-before-declaration error.
+  const saveProgressRef = useRef<() => Promise<void>>(async () => {});
 
   // ============================================================================
   // LOAD MATERIAL & FACILITY DATA (steps 1-3)
@@ -441,6 +450,29 @@ export function WizardProvider({
 
       setPreCalcState((prev) => ({ ...prev, product: productData }));
 
+      // Look up an existing draft PCF for this product so the wizard
+      // resumes where the user left off. We only do this when the caller
+      // didn't pass an explicit pcfId (that path is for editing a completed
+      // LCA; drafts are a separate "in-progress" concept).
+      let resumedDraftPcfId: string | null = null;
+      let resumedDraftData: any = null;
+      if (!initialPcfId) {
+        const { data: existingDraft } = await sb
+          .from('product_carbon_footprints')
+          .select('id, draft_data')
+          .eq('product_id', parseInt(productId, 10))
+          .eq('organization_id', productData.organization_id)
+          .eq('status', 'draft')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (existingDraft?.id) {
+          resumedDraftPcfId = existingDraft.id;
+          resumedDraftData = existingDraft.draft_data ?? null;
+          setPcfId(existingDraft.id);
+        }
+      }
+
       // Fresh-wizard prefill (no PCF to resume):
       //
       //   1. products.last_wizard_settings — restore silently from the
@@ -452,7 +484,7 @@ export function WizardProvider({
       // Org-scoped templates are no longer auto-applied behind the user's
       // back — the prompt dialog fetches the list itself and handles the
       // pick / skip / zero-templates cases.
-      if (!initialPcfId) {
+      if (!initialPcfId && !resumedDraftPcfId) {
         setFormData(buildInitialFormData(productData));
         if (!productData.last_wizard_settings) {
           // Auto-trigger: silently dismiss if the org has no templates yet.
@@ -581,6 +613,18 @@ export function WizardProvider({
         });
       }
 
+      // If we're resuming a draft, overlay the persisted facility allocations
+      // on top of the freshly-loaded defaults. Merge by facilityId so newly
+      // linked facilities still get their default session; removed ones are
+      // dropped naturally.
+      let effectiveAllocations = allocations;
+      if (resumedDraftData?.facilityAllocations && Array.isArray(resumedDraftData.facilityAllocations)) {
+        const savedByFacility = new Map<string, FacilityAllocation>(
+          (resumedDraftData.facilityAllocations as FacilityAllocation[]).map((a) => [a.facilityId, a])
+        );
+        effectiveAllocations = allocations.map((a) => savedByFacility.get(a.facilityId) ?? a);
+      }
+
       // ── SHOW WIZARD IMMEDIATELY ──
       // Set initial state with materials in 'validating' status so the wizard
       // renders instantly. Validation runs in the background below.
@@ -590,7 +634,7 @@ export function WizardProvider({
         canCalculate: false, // Will be updated after validation
         missingCount: 0,
         linkedFacilities: facilities,
-        facilityAllocations: allocations,
+        facilityAllocations: effectiveAllocations,
         reportingSessions: allSessions,
         materialDataLoaded: true,
         materialDataLoading: true, // Still validating
@@ -600,9 +644,14 @@ export function WizardProvider({
       setLoading(false);
 
       // Load PCF data if editing an existing calculation (fast DB read)
-      if (initialPcfId) {
-        await loadPcfData(initialPcfId);
+      const pcfToLoad = initialPcfId ?? resumedDraftPcfId;
+      if (pcfToLoad) {
+        await loadPcfData(pcfToLoad);
       }
+
+      // Mark initial load complete so subsequent allocation mutations
+      // trigger the facility-allocation autosave effect.
+      initialLoadDoneRef.current = true;
 
       // ── BACKGROUND PHASE: validate materials asynchronously ──
       // This resolves emission factors (including OpenLCA API calls) without
@@ -1003,17 +1052,16 @@ export function WizardProvider({
         });
       }
 
-      // Trigger debounced auto-save (only when pcfId exists)
-      if (pcfId) {
-        if (saveTimeoutRef.current) {
-          clearTimeout(saveTimeoutRef.current);
-        }
-        saveTimeoutRef.current = setTimeout(() => {
-          saveProgressInternal();
-        }, 2000);
+      // Trigger debounced auto-save. saveProgressInternal creates a draft
+      // PCF lazily if none exists yet, so we no longer gate on pcfId.
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
       }
+      saveTimeoutRef.current = setTimeout(() => {
+        saveProgressRef.current();
+      }, 2000);
     },
-    [pcfId]
+    [pcfId, showGuide]
   );
 
   const goToStep = useCallback((step: number) => {
@@ -1060,11 +1108,64 @@ export function WizardProvider({
   }, []);
 
   // ============================================================================
-  // SAVE PROGRESS (only when pcfId exists)
+  // DRAFT PCF CREATION
+  // ============================================================================
+
+  /**
+   * Ensure a draft PCF row exists for this wizard session. The row is created
+   * on the first user edit (not on mount) so that abandoned wizards don't
+   * leave orphan rows. Subsequent saves update this row in place; the
+   * calculator promotes it from 'draft' → 'pending' → 'completed'.
+   */
+  const ensureDraftPcf = useCallback(async (): Promise<string | null> => {
+    if (pcfId) return pcfId;
+    if (draftCreationRef.current) return draftCreationRef.current;
+
+    const product = preCalcState.product;
+    if (!product) return null;
+
+    const creation = (async () => {
+      const { data: created, error: createError } = await supabase
+        .from('product_carbon_footprints')
+        .insert({
+          organization_id: product.organization_id,
+          product_id: parseInt(productId, 10),
+          product_name: product.name,
+          product_description: product.product_description,
+          product_image_url: product.product_image_url,
+          functional_unit: `1 ${product.unit || 'unit'} of ${product.name || 'product'}`,
+          system_boundary: formData.systemBoundary || 'cradle-to-gate',
+          lca_scope_type: formData.systemBoundary || 'cradle-to-gate',
+          reference_year: formData.referenceYear || new Date().getFullYear(),
+          status: 'draft',
+          lca_version: '1.0',
+        })
+        .select('id')
+        .single();
+
+      if (createError || !created) {
+        console.error('[WizardContext] Draft PCF creation failed:', createError);
+        return null;
+      }
+      setPcfId(created.id);
+      return created.id as string;
+    })();
+
+    draftCreationRef.current = creation;
+    try {
+      return await creation;
+    } finally {
+      draftCreationRef.current = null;
+    }
+  }, [pcfId, preCalcState.product, productId, formData.systemBoundary, formData.referenceYear]);
+
+  // ============================================================================
+  // SAVE PROGRESS (creates draft PCF if needed, then saves)
   // ============================================================================
 
   const saveProgressInternal = useCallback(async () => {
-    if (!pcfId) return; // Can't save before PCF exists
+    const activePcfId = pcfId ?? (await ensureDraftPcf());
+    if (!activePcfId) return;
 
     const currentData = JSON.stringify(formData);
     if (currentData === lastSavedDataRef.current) {
@@ -1118,6 +1219,12 @@ export function WizardProvider({
           formData.criticalReviewJustification || null,
         reference_year: formData.referenceYear,
         wizard_progress: wizardProgress,
+        // Persist pre-calculation state so the wizard can resume mid-flow.
+        // Materials are authoritative in product_materials; we only need to
+        // snapshot the user-editable facility allocations here.
+        draft_data: {
+          facilityAllocations: preCalcState.facilityAllocations,
+        },
         updated_at: new Date().toISOString(),
       };
 
@@ -1138,7 +1245,7 @@ export function WizardProvider({
       const { error: updateError } = await supabase
         .from('product_carbon_footprints')
         .update(updatePayload)
-        .eq('id', pcfId);
+        .eq('id', activePcfId);
 
       if (updateError) throw updateError;
 
@@ -1180,7 +1287,12 @@ export function WizardProvider({
     } finally {
       setSaving(false);
     }
-  }, [formData, progress, pcfId]);
+  }, [formData, progress, pcfId, preCalcState.facilityAllocations, ensureDraftPcf]);
+
+  // Keep the ref pointing at the freshest saveProgressInternal closure so
+  // earlier-declared callbacks (updateField, effects) can call it without a
+  // circular declaration order.
+  saveProgressRef.current = saveProgressInternal;
 
   const saveProgress = useCallback(async () => {
     await saveProgressInternal();
@@ -1322,6 +1434,24 @@ export function WizardProvider({
       setSaving(false);
     }
   }, [saveProgressInternal, onComplete, toast]);
+
+  // ============================================================================
+  // AUTOSAVE: facility allocation changes
+  // ============================================================================
+
+  // Debounced autosave triggered by user edits to facility allocations. The
+  // initialLoadDoneRef guard skips the first render where allocations are
+  // populated by loadMaterialAndFacilityData (we don't want to create a
+  // draft PCF on pure mount, only on real user interaction).
+  useEffect(() => {
+    if (!initialLoadDoneRef.current) return;
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = setTimeout(() => {
+      saveProgressRef.current();
+    }, 2000);
+  }, [preCalcState.facilityAllocations]);
 
   // ============================================================================
   // CLEANUP

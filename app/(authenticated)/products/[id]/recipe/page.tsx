@@ -376,6 +376,7 @@ export default function ProductRecipePage() {
           inbound_container_tare_kg:      item.inbound_container_tare_kg      ?? null,
           inbound_container_reuse_cycles: item.inbound_container_reuse_cycles ?? null,
           inbound_container_ef:           item.inbound_container_ef           ?? null,
+          inbound_container_material:     item.inbound_container_material     ?? null,
           // Self-grown farm links
           is_self_grown:                  item.is_self_grown ?? false,
           vineyard_id:                    item.vineyard_id     ?? null,
@@ -628,6 +629,7 @@ export default function ProductRecipePage() {
       materialData.inbound_container_tare_kg = form.inbound_container_tare_kg ?? null;
       materialData.inbound_container_reuse_cycles = form.inbound_container_reuse_cycles ?? null;
       materialData.inbound_container_ef = form.inbound_container_ef ?? null;
+      materialData.inbound_container_material = form.inbound_container_material ?? null;
       // Self-grown farm links — let the LCA calculator pull in field-level
       // emissions from vineyard / arable / orchard growing profiles.
       materialData.is_self_grown = form.is_self_grown ?? false;
@@ -867,6 +869,7 @@ export default function ProductRecipePage() {
       inbound_container_tare_kg:      form.inbound_container_tare_kg      ?? null,
       inbound_container_reuse_cycles: form.inbound_container_reuse_cycles ?? null,
       inbound_container_ef:           form.inbound_container_ef           ?? null,
+      inbound_container_material:     form.inbound_container_material     ?? null,
       // Self-grown farm links
       is_self_grown:                  form.is_self_grown                  ?? false,
       vineyard_id:                    form.vineyard_id                    ?? null,
@@ -1042,6 +1045,7 @@ export default function ProductRecipePage() {
         materialData.inbound_container_tare_kg      = form.inbound_container_tare_kg      ?? null;
         materialData.inbound_container_reuse_cycles = form.inbound_container_reuse_cycles ?? null;
         materialData.inbound_container_ef           = form.inbound_container_ef           ?? null;
+        materialData.inbound_container_material     = form.inbound_container_material     ?? null;
 
         // Self-grown farm links — used by the LCA calculator to pull field-level
         // emissions from vineyard / arable / orchard growing profiles.
