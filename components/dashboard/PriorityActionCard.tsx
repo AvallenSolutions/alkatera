@@ -414,7 +414,47 @@ export function generatePriorityActions(data: {
     });
   }
 
-  // If user has data but no data-driven actions fired (everything looks good!), give a positive nudge
+  // ── Phase 3: Enrichment opportunities ──────────────────────────────────
+  // Low-priority nudges that help users progress once the urgent/medium slots
+  // are satisfied. Keep these generic and only trigger for users past basic
+  // setup, so they don't drown out real setup guidance.
+  const basicsDone = data.hasFacilities && data.hasProducts;
+
+  if (basicsDone) {
+    actions.push({
+      id: 'opportunity-utility-bill',
+      priority: 'low',
+      title: 'Import your latest utility bill',
+      description: 'Upload a PDF and we\'ll extract the energy data automatically.',
+      impactValue: 'Saves manual entry',
+      category: 'energy',
+      href: '/company/facilities',
+    });
+
+    actions.push({
+      id: 'opportunity-data-quality',
+      priority: 'low',
+      title: 'Review data quality gaps',
+      description: 'See which data points need measured values to strengthen your reports.',
+      impactValue: 'Improves report confidence',
+      category: 'climate',
+      href: '/data/quality',
+    });
+  }
+
+  if (hasAnyEmissionsData) {
+    actions.push({
+      id: 'opportunity-set-target',
+      priority: 'low',
+      title: 'Set an emissions reduction target',
+      description: 'Define a science-based target so you can track progress over time.',
+      impactValue: 'Guides strategy',
+      category: 'climate',
+      href: '/pulse/targets',
+    });
+  }
+
+  // If user has data but nothing at all fired (everything looks good!), give a positive nudge
   if (actions.length === 0) {
     actions.push({
       id: 'all-good',

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,7 @@ import {
   SkipForward,
   Leaf,
   Box,
+  Loader2,
 } from "lucide-react";
 import { BOMUploadDialog } from "./BOMUploadDialog";
 import { BOMReviewTable, createReviewableItems, type ReviewableBOMItem } from "./BOMReviewTable";
@@ -42,7 +43,7 @@ function normalise(s: string): string {
   return s.toLowerCase().trim().replace(/[^a-z0-9 ]/g, "");
 }
 
-type ImportStep = "upload" | "review" | "matching" | "match_review";
+type ImportStep = "upload" | "auto_parsing" | "review" | "matching" | "match_review";
 
 interface BOMImportFlowProps {
   open: boolean;
@@ -52,6 +53,13 @@ interface BOMImportFlowProps {
     packaging: PackagingFormData[]
   ) => void;
   organizationId: string;
+  /**
+   * Optional pre-supplied file. When provided, the upload step is skipped and
+   * the file is sent straight to /api/bom/parse on open. Used by the Universal
+   * Dropzone carry-through flow so users don't re-upload a file they already
+   * dropped in the header.
+   */
+  initialFile?: File | null;
 }
 
 export function BOMImportFlow({
@@ -59,11 +67,14 @@ export function BOMImportFlow({
   onOpenChange,
   onImportComplete,
   organizationId,
+  initialFile,
 }: BOMImportFlowProps) {
   const [step, setStep] = useState<ImportStep>("upload");
   const [reviewItems, setReviewItems] = useState<ReviewableBOMItem[]>([]);
   const [metadata, setMetadata] = useState<BOMParseResult["metadata"]>({});
   const [isImporting, setIsImporting] = useState(false);
+  const [autoParseError, setAutoParseError] = useState<string | null>(null);
+  const autoParsedRef = useRef(false);
 
   // Matching state
   const [selectedItems, setSelectedItems] = useState<ReviewableBOMItem[]>([]);
@@ -146,6 +157,41 @@ export function BOMImportFlow({
     setMetadata(extractedMetadata);
     setStep("review");
   };
+
+  // Carry-through: when a file is provided externally (e.g. from the
+  // Universal Dropzone), skip the upload step and parse it directly.
+  useEffect(() => {
+    if (!open) {
+      autoParsedRef.current = false;
+      setAutoParseError(null);
+      return;
+    }
+    if (!initialFile || autoParsedRef.current) return;
+    autoParsedRef.current = true;
+    setStep("auto_parsing");
+    setAutoParseError(null);
+
+    (async () => {
+      try {
+        const fd = new FormData();
+        fd.append("file", initialFile);
+        const res = await fetch("/api/bom/parse", { method: "POST", body: fd });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || "Failed to parse BOM");
+        }
+        const result = await res.json();
+        if (!result.success || !result.items?.length) {
+          throw new Error(result.errors?.[0] || "No items could be extracted");
+        }
+        handleItemsExtracted(result.items, result.metadata || {});
+      } catch (err: any) {
+        setAutoParseError(err?.message || "Failed to parse uploaded BOM");
+        setStep("upload");
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialFile]);
 
   const handleReviewComplete = async (items: ReviewableBOMItem[]) => {
     setSelectedItems(items);
@@ -370,15 +416,43 @@ export function BOMImportFlow({
     return { matched, needReview, unlinked, total: states.length };
   })();
 
+  // ── Render: Auto-parse step (carry-through from Universal Dropzone) ──
+
+  if (step === "auto_parsing") {
+    return (
+      <Dialog open={open} onOpenChange={handleClose}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Parsing your BOM</DialogTitle>
+            <DialogDescription>
+              Reading the file you uploaded — this usually takes a few seconds.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-3 py-6">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <p className="text-xs text-muted-foreground">Extracting ingredients and packaging…</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   // ── Render: Upload step ────────────────────────────────────────────
 
   if (step === "upload") {
     return (
-      <BOMUploadDialog
-        open={open}
-        onOpenChange={handleClose}
-        onItemsExtracted={handleItemsExtracted}
-      />
+      <>
+        {autoParseError && (
+          <div className="fixed top-4 right-4 z-[100] max-w-sm rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300">
+            Couldn&apos;t parse the uploaded BOM: {autoParseError}. Try uploading it manually.
+          </div>
+        )}
+        <BOMUploadDialog
+          open={open}
+          onOpenChange={handleClose}
+          onItemsExtracted={handleItemsExtracted}
+        />
+      </>
     );
   }
 

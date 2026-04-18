@@ -15,8 +15,9 @@ import {
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { LogOut, User, Menu, X, Building2, Check, ChevronsUpDown, Search, MessageSquare } from 'lucide-react'
+import { LogOut, User, Menu, X, Building2, Check, ChevronsUpDown, Search, MessageSquare, Upload } from 'lucide-react'
 import { CommandPalette } from '@/components/dashboard/CommandPalette'
+import { UniversalDropzone } from '@/components/layouts/UniversalDropzone'
 import {
   Command,
   CommandEmpty,
@@ -155,6 +156,19 @@ export function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
             }
           />
           <NotificationBell />
+          <UniversalDropzone
+            trigger={
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 h-9 border-[#ccff00]/40 hover:bg-[#ccff00]/10"
+                title="Upload anything — we'll figure out what it is"
+              >
+                <Upload className="h-4 w-4" />
+                <span className="hidden sm:inline">Upload</span>
+              </Button>
+            }
+          />
           <ThemeToggle />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

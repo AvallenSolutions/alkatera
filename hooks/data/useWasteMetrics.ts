@@ -8,6 +8,10 @@ import {
   getTreatmentCircularityScore,
   isCircularTreatment,
 } from '@/lib/calculations/waste-circularity';
+import {
+  fetchHistoricalSustainabilityMetrics,
+  type MetricSource,
+} from '@/lib/trends/historical-fallback';
 
 export interface WasteStreamItem {
   id: string;
@@ -104,6 +108,12 @@ export interface WasteMetrics {
   end_of_life_scenarios: EndOfLifeScenario[];
   targets: CircularityTarget | null;
   waste_streams: WasteStreamItem[];
+  /**
+   * 'operational' when totals come from measured facility_activity_entries,
+   * 'imported' when falling back to a historical sustainability-report row
+   * for the same reporting year.
+   */
+  source?: MetricSource;
 }
 
 // Constants imported from @/lib/calculations/waste-circularity for consistency
@@ -411,11 +421,31 @@ export function useWasteMetrics(year?: number) {
         zero_waste_to_landfill_target: targetsData.zero_waste_to_landfill_target || false,
       } : null;
 
+      const hasOperationalWaste = totalWasteKg > 0;
+
+      // Fall back to historical_imports when no operational waste entries
+      // exist for this year. Imported values never overwrite operational
+      // totals — they only fill gaps.
+      let imported: { totalKg: number; diversionRate: number } | null = null;
+      if (!hasOperationalWaste) {
+        const hist = await fetchHistoricalSustainabilityMetrics(
+          supabase,
+          currentOrganization.id,
+          currentYear,
+        );
+        if (hist && (hist.waste_tonnes || hist.waste_diversion_rate_pct)) {
+          imported = {
+            totalKg: (hist.waste_tonnes ?? 0) * 1000,
+            diversionRate: hist.waste_diversion_rate_pct ?? 0,
+          };
+        }
+      }
+
       setMetrics({
-        total_waste_kg: totalWasteKg,
+        total_waste_kg: imported ? imported.totalKg : totalWasteKg,
         total_waste_emissions_kg_co2e: totalEmissions,
-        waste_diversion_rate: diversionRate,
-        circularity_rate: diversionRate,
+        waste_diversion_rate: imported ? imported.diversionRate : diversionRate,
+        circularity_rate: imported ? imported.diversionRate : diversionRate,
         hazardous_waste_kg: hazardousWasteKg,
         hazardous_waste_percentage: totalWasteKg > 0 ? (hazardousWasteKg / totalWasteKg) * 100 : 0,
         recycled_content_avg: circularityMetrics?.avg_recycled_content || 0,
@@ -429,6 +459,7 @@ export function useWasteMetrics(year?: number) {
         end_of_life_scenarios: endOfLifeScenarios,
         targets,
         waste_streams: wasteStreams,
+        source: hasOperationalWaste ? 'operational' : (imported ? 'imported' : undefined),
       });
 
     } catch (err) {

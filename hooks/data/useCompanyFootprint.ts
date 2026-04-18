@@ -7,6 +7,11 @@ import {
   calculateCorporateEmissions,
   ScopeBreakdown,
 } from '@/lib/calculations/corporate-emissions';
+import {
+  fetchHistoricalSustainabilityMetrics,
+  historicalTotalKgCo2e,
+  type MetricSource,
+} from '@/lib/trends/historical-fallback';
 
 interface CompanyFootprint {
   year: number;
@@ -15,6 +20,12 @@ interface CompanyFootprint {
   status: 'Draft' | 'Finalized';
   last_updated: string | null;
   has_data: boolean;
+  /**
+   * Provenance of this footprint — 'operational' when sourced from measured /
+   * calculated activity data, 'imported' when falling back to a historical
+   * sustainability-report row. Absent when has_data is false.
+   */
+  source?: MetricSource;
 }
 
 /**
@@ -60,18 +71,49 @@ export function useCompanyFootprint(year?: number) {
           status: 'Draft',
           last_updated: new Date().toISOString(),
           has_data: true,
+          source: 'operational',
         });
         setPreviewMode(false);
       } else {
-        setFootprint({
-          year: targetYear,
-          total_emissions: 0,
-          breakdown: null,
-          status: 'Draft',
-          last_updated: null,
-          has_data: false,
-        });
-        setPreviewMode(false);
+        // Fall back to historical_imports for this year if a sustainability
+        // report has been imported. Imported values never replace operational
+        // data — they only fill empty years.
+        const historical = await fetchHistoricalSustainabilityMetrics(
+          supabase,
+          currentOrganization.id,
+          targetYear,
+        );
+        const importedTotal = historical ? historicalTotalKgCo2e(historical) : undefined;
+        if (historical && importedTotal !== undefined) {
+          const s1Kg = (historical.scope1_tco2e ?? 0) * 1000;
+          const s2Kg = (historical.scope2_tco2e_market ?? historical.scope2_tco2e_location ?? 0) * 1000;
+          const s3Kg = (historical.scope3_tco2e ?? 0) * 1000;
+          setFootprint({
+            year: targetYear,
+            total_emissions: importedTotal,
+            breakdown: {
+              total: importedTotal,
+              scope1: s1Kg,
+              scope2: s2Kg,
+              scope3: { total: s3Kg, byCategory: {} },
+            } as unknown as ScopeBreakdown,
+            status: 'Draft',
+            last_updated: null,
+            has_data: true,
+            source: 'imported',
+          });
+          setPreviewMode(false);
+        } else {
+          setFootprint({
+            year: targetYear,
+            total_emissions: 0,
+            breakdown: null,
+            status: 'Draft',
+            last_updated: null,
+            has_data: false,
+          });
+          setPreviewMode(false);
+        }
       }
     } catch (err: any) {
       console.error('Error fetching company footprint:', err);

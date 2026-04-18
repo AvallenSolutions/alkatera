@@ -61,6 +61,11 @@ import { useOrganization } from '@/lib/organizationContext'
 import { isViticultureEligible } from '@/lib/viticulture-utils'
 import { Badge } from '@/components/ui/badge'
 import { useSubscription } from '@/hooks/useSubscription'
+import {
+  getCompletedMilestones,
+  MILESTONE_META,
+  type MilestoneCode,
+} from '@/lib/data-readiness'
 import { TierBadge } from '@/components/subscription/TierBadge'
 import { UsageMeterCompact } from '@/components/subscription/UsageMeter'
 import {
@@ -85,6 +90,9 @@ interface NavItem {
   viticultureOnly?: boolean // Only shown for Wine orgs + platform admin
   allowedOrgs?: string[] // Restrict to specific org IDs (temporary gating)
   type?: 'link' | 'divider' // Non-clickable section dividers
+  requiresMilestone?: MilestoneCode // Progressive unlock: hide until data milestone met
+  lockReason?: 'tier' | 'milestone' // Set dynamically
+  unlockHint?: string // Set dynamically for milestone-gated items
 }
 
 // Navigation configuration with tier requirements
@@ -104,6 +112,14 @@ const navigationStructure: NavItem[] = [
     icon: Activity,
     minTier: 1,
     betaBadge: true,
+    requiresMilestone: 'has_product',
+    children: [
+      { name: 'Dashboard',         href: '/pulse/',                           icon: Activity,   minTier: 1 },
+      { name: 'Financial',         href: '/pulse/financial/',                 icon: TrendingUp, minTier: 1 },
+      { name: 'Impact Valuation',  href: '/pulse/financial/impact-valuation/', icon: TrendingUp, minTier: 3 },
+      { name: 'Targets',           href: '/pulse/targets/',                   icon: TrendingUp, minTier: 1 },
+      { name: 'Prices',            href: '/pulse/settings/shadow-prices/',    icon: TrendingUp, minTier: 1 },
+    ],
   },
   {
     name: 'Capture Data',
@@ -124,6 +140,7 @@ const navigationStructure: NavItem[] = [
     href: '/data/scope-1-2/',
     icon: Flame,
     minTier: 1,
+    requiresMilestone: 'has_facility',
     children: [
       { name: 'Company Emissions', href: '/data/scope-1-2/', icon: Flame,     minTier: 1 },
       { name: 'Spend Data',        href: '/data/spend-data/', icon: ArrowUpCircle, minTier: 1, featureCode: 'xero_integration_beta' },
@@ -143,7 +160,7 @@ const navigationStructure: NavItem[] = [
       { name: 'Company Vitality',    href: '/performance/',      icon: Sparkles, minTier: 2 },
       { name: 'Products',            href: '/products/',         icon: Package,  minTier: 1 },
       { name: 'Nature Assessment',   href: '/nature-assessment/',icon: TreePine, minTier: 2, requireAnyFeature: ['viticulture_beta', 'orchard_beta', 'arable_beta'] },
-      { name: 'LCA Reports',         href: '/reports/lcas/',     icon: Award,    minTier: 2 },
+      { name: 'LCA Reports',         href: '/reports/lcas/',     icon: Award,    minTier: 2, requiresMilestone: 'has_lca' },
     ],
   },
   {
@@ -199,9 +216,11 @@ const navigationStructure: NavItem[] = [
     icon: FileText,
     minTier: 1,
     children: [
-      { name: 'Sustainability Reports', href: '/reports/sustainability/',    icon: TrendingUp, minTier: 1 },
-      { name: 'LCA Reports',            href: '/reports/lcas/',              icon: Award,      minTier: 2 },
-      { name: 'Impact Valuation',       href: '/reports/impact-valuation/', icon: TrendingUp, minTier: 3 },
+      { name: 'Sustainability Reports', href: '/reports/sustainability/',    icon: TrendingUp, minTier: 1, requiresMilestone: 'has_product' },
+      { name: 'LCA Reports',            href: '/reports/lcas/',              icon: Award,      minTier: 2, requiresMilestone: 'has_lca' },
+      { name: 'Historical Imports',     href: '/reports/historical/',        icon: Library,    minTier: 1 },
+      // Impact Valuation moved to Pulse -> Financial. Old link still
+      // resolves via the redirect at /reports/impact-valuation.
     ],
   },
   {
@@ -226,7 +245,7 @@ const navigationStructure: NavItem[] = [
           { name: 'Audit Trail',   href: '/epr/audit/',        icon: Activity,        minTier: 1 },
         ],
       },
-      { name: 'Certifications', href: '/certifications/', icon: Award, minTier: 2 },
+      { name: 'Certifications', href: '/certifications/', icon: Award, minTier: 2, requiresMilestone: 'has_lca' },
     ],
   },
 
@@ -331,6 +350,7 @@ export function Sidebar({ className }: SidebarProps) {
   const [isAlkateraAdmin, setIsAlkateraAdmin] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
   const { usage, tierName, tierLevel, hasFeature, isLoading: subscriptionLoading } = useSubscription()
+  const completedMilestones = getCompletedMilestones(usage)
 
   const [isCollapsed, setIsCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -371,14 +391,27 @@ export function Sidebar({ className }: SidebarProps) {
         // Dividers pass through unchanged
         if (item.type === 'divider') return item
 
-        const isLocked = (item.minTier && tierLevel < item.minTier) ||
-          (item.featureCode && !hasFeature(item.featureCode as any))
+        const tierLocked = !!(item.minTier && tierLevel < item.minTier)
+        const featureLocked = !!(item.featureCode && !hasFeature(item.featureCode as any))
+        const milestoneLocked = !!(
+          item.requiresMilestone && !completedMilestones.has(item.requiresMilestone)
+        )
+        const isLocked = tierLocked || featureLocked || milestoneLocked
         const requiredTierName = item.minTier ? tierDisplayNames[item.minTier] : undefined
+        // Tier/feature gates take priority over milestone (upgrade is the real blocker)
+        const lockReason: 'tier' | 'milestone' | undefined = isLocked
+          ? (tierLocked || featureLocked ? 'tier' : 'milestone')
+          : undefined
+        const unlockHint = milestoneLocked && item.requiresMilestone
+          ? MILESTONE_META[item.requiresMilestone].unlockHint
+          : undefined
 
         return {
           ...item,
-          locked: !!isLocked,
+          locked: isLocked,
           requiredTierName,
+          lockReason,
+          unlockHint,
           // Recursively process children (but keep them even if locked)
           children: item.children ? filterNavItems(item.children) : undefined,
         }
@@ -555,9 +588,14 @@ export function Sidebar({ className }: SidebarProps) {
                       </Link>
                     </TooltipTrigger>
                     <TooltipContent side="right">
-                      <div className="flex items-center gap-1.5">
-                        {item.name}
-                        <Lock className="h-3 w-3" />
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1.5">
+                          {item.name}
+                          <Lock className="h-3 w-3" />
+                        </div>
+                        {item.unlockHint && (
+                          <span className="text-[10px] text-muted-foreground">{item.unlockHint}</span>
+                        )}
                       </div>
                     </TooltipContent>
                   </Tooltip>
@@ -597,30 +635,21 @@ export function Sidebar({ className }: SidebarProps) {
 
             // ── Expanded state (existing behaviour) ──
 
-            // Locked top-level item (no children) — show greyed out with lock
-            if (item.locked && !hasChildren) {
+            // Locked top-level item (with or without children) — show greyed out with lock.
+            // For milestone-gated items, link to the action href so users can complete the milestone;
+            // for tier-gated items, keep linking to the feature page as before.
+            if (item.locked) {
+              const milestoneTarget = item.lockReason === 'milestone' && item.requiresMilestone
+                ? MILESTONE_META[item.requiresMilestone].actionHref
+                : null
+              const lockHref = milestoneTarget ?? item.href
+              const lockTitle = item.unlockHint ?? `Upgrade to ${item.requiredTierName} to unlock`
               return (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  href={lockHref}
                   className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative opacity-40 hover:opacity-60 cursor-pointer"
-                  title={`Upgrade to ${item.requiredTierName} to unlock`}
-                >
-                  {IconComponent && <IconComponent className="h-4 w-4 flex-shrink-0 text-muted-foreground" />}
-                  <span className="truncate flex-1">{item.name}</span>
-                  <Lock className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
-                </Link>
-              )
-            }
-
-            // Locked parent item with children — show collapsed with lock, click goes to feature page
-            if (item.locked && hasChildren) {
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative opacity-40 hover:opacity-60 cursor-pointer"
-                  title={`Upgrade to ${item.requiredTierName} to unlock`}
+                  title={lockTitle}
                 >
                   {IconComponent && <IconComponent className="h-4 w-4 flex-shrink-0 text-muted-foreground" />}
                   <span className="truncate flex-1">{item.name}</span>
@@ -665,12 +694,18 @@ export function Sidebar({ className }: SidebarProps) {
                         if (childHasChildren) {
                           // Locked child with children — navigates to the feature gate page
                           if (child.locked) {
+                            const childMilestoneTarget = child.lockReason === 'milestone' && child.requiresMilestone
+                              ? MILESTONE_META[child.requiresMilestone].actionHref
+                              : null
+                            const childLockHref = childMilestoneTarget ?? child.href
+                            const childLockTitle = child.unlockHint
+                              ?? (child.featureCode?.endsWith('_beta') ? 'Beta access required' : `Upgrade to ${child.requiredTierName} to unlock`)
                             return (
                               <Link
                                 key={child.href}
-                                href={child.href}
+                                href={childLockHref}
                                 className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm opacity-40 hover:opacity-60 transition-opacity mt-1"
-                                title={child.featureCode?.endsWith('_beta') ? 'Beta access required' : `Upgrade to ${child.requiredTierName} to unlock`}
+                                title={childLockTitle}
                               >
                                 {ChildIcon && <ChildIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />}
                                 <span className="truncate flex-1 text-left text-muted-foreground">{child.name}</span>
@@ -730,6 +765,28 @@ export function Sidebar({ className }: SidebarProps) {
                                 </div>
                               )}
                             </div>
+                          )
+                        }
+
+                        // Locked flat child (no nested children)
+                        if (child.locked) {
+                          const flatMilestoneTarget = child.lockReason === 'milestone' && child.requiresMilestone
+                            ? MILESTONE_META[child.requiresMilestone].actionHref
+                            : null
+                          const flatLockHref = flatMilestoneTarget ?? child.href
+                          const flatLockTitle = child.unlockHint
+                            ?? (child.featureCode?.endsWith('_beta') ? 'Beta access required' : `Upgrade to ${child.requiredTierName} to unlock`)
+                          return (
+                            <Link
+                              key={child.href}
+                              href={flatLockHref}
+                              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm opacity-40 hover:opacity-60 transition-opacity"
+                              title={flatLockTitle}
+                            >
+                              {ChildIcon && <ChildIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />}
+                              <span className="truncate flex-1 text-left text-muted-foreground">{child.name}</span>
+                              <Lock className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
+                            </Link>
                           )
                         }
 

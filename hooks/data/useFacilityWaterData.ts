@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { useOrganization } from '@/lib/organizationContext';
+import { fetchHistoricalSustainabilityMetrics } from '@/lib/trends/historical-fallback';
 
 export interface FacilityWaterEntry {
   id: string;
@@ -66,6 +67,9 @@ export interface FacilityWaterSummary {
 
 export interface CompanyWaterOverview {
   organization_id: string;
+  /** 'operational' when computed from facility activity entries; 'imported' when
+   *  falling back to a historical sustainability-report row for the same year. */
+  source?: 'operational' | 'imported';
   // OPERATIONAL WATER (Direct facility consumption)
   operational_intake_m3: number;
   operational_discharge_m3: number;
@@ -174,7 +178,36 @@ export function useFacilityWaterData(year?: number) {
       if (summariesResult.error) throw summariesResult.error;
       if (timeSeriesResult.error) throw timeSeriesResult.error;
 
-      setCompanyOverview(overviewResult.data);
+      // Dual-source fallback: if operational water is zero for this year but
+      // a historical sustainability report carries a water_m3 figure, overlay
+      // the imported value and flag the source accordingly. Never overwrites
+      // operational data.
+      const rawOverview = overviewResult.data as CompanyWaterOverview | null;
+      const hasOperationalWater = !!rawOverview && (
+        (rawOverview.total_water_footprint_m3 ?? 0) > 0 ||
+        (rawOverview.operational_intake_m3 ?? 0) > 0
+      );
+      if (rawOverview && hasOperationalWater) {
+        setCompanyOverview({ ...rawOverview, source: 'operational' });
+      } else {
+        const hist = await fetchHistoricalSustainabilityMetrics(
+          supabase,
+          currentOrganization.id,
+          selectedYear,
+        );
+        if (hist?.water_m3 && hist.water_m3 > 0 && rawOverview) {
+          setCompanyOverview({
+            ...rawOverview,
+            total_water_footprint_m3: hist.water_m3,
+            total_scarcity_weighted_m3: hist.water_m3,
+            total_consumption_m3: hist.water_m3,
+            operational_intake_m3: hist.water_m3,
+            source: 'imported',
+          });
+        } else {
+          setCompanyOverview(rawOverview);
+        }
+      }
       setFacilitySummaries(summariesResult.data || []);
 
       // Transform facility_activity_entries into time series data

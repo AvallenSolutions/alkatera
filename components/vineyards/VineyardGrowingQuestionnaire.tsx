@@ -42,6 +42,7 @@ import {
   Plus,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useIngestStash } from '@/hooks/useIngestStash';
 import { calculateViticultureImpacts } from '@/lib/viticulture-calculator';
 import { SOIL_CARBON_REMOVAL_DEFAULTS } from '@/lib/ghg-constants';
 import type {
@@ -373,6 +374,13 @@ export function VineyardGrowingQuestionnaire({
       setIsImporting(false);
     }
   }
+
+  // Pick up files stashed by the Universal Dropzone (header upload button).
+  useIngestStash('spray', handleSprayImport);
+  useIngestStash('evidence', (file) => {
+    setEvidenceFile(file);
+    toast.info('Evidence ready to upload — complete the questionnaire and click Save to attach it.');
+  });
 
   // Build vintage year options (current year down to current-10)
   const vintageYearOptions = Array.from({ length: 11 }, (_, i) => currentYear - i);

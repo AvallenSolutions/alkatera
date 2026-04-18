@@ -43,6 +43,7 @@ import {
   Plus,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useIngestStash } from '@/hooks/useIngestStash';
 import { calculateArableImpacts } from '@/lib/arable-calculator';
 import {
   ARABLE_PESTICIDE_TYPE_LABELS,
@@ -366,6 +367,13 @@ export function ArableGrowingQuestionnaire({
       setIsImporting(false);
     }
   }
+
+  // Pick up files stashed by the Universal Dropzone (header upload button).
+  useIngestStash('spray', handleSprayImport);
+  useIngestStash('evidence', (file) => {
+    setEvidenceFile(file);
+    toast.info('Evidence ready to upload — complete the questionnaire and click Save to attach it.');
+  });
 
   // Build harvest year options (current year down to current-10)
   const harvestYearOptions = Array.from({ length: 11 }, (_, i) => currentYear - i);

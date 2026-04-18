@@ -43,6 +43,7 @@ export function useSetupProgress(): SetupProgress {
   const [productsCount, setProductsCount] = useState(0)
   const [suppliersCount, setSuppliersCount] = useState(0)
   const [membersCount, setMembersCount] = useState(0)
+  const [pendingInvitesCount, setPendingInvitesCount] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [isDismissed, setIsDismissed] = useState(false)
 
@@ -68,7 +69,7 @@ export function useSetupProgress(): SetupProgress {
     setIsLoading(true)
 
     try {
-      const [facilities, products, suppliers, members] = await Promise.all([
+      const [facilities, products, suppliers, members, pendingInvites] = await Promise.all([
         supabase
           .from('facilities')
           .select('id', { count: 'exact', head: true })
@@ -85,6 +86,11 @@ export function useSetupProgress(): SetupProgress {
           .from('organization_members')
           .select('id', { count: 'exact', head: true })
           .eq('organization_id', orgId),
+        supabase
+          .from('team_invitations')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', orgId)
+          .eq('status', 'pending'),
       ])
 
       // Discard stale response if org changed during fetch
@@ -94,6 +100,7 @@ export function useSetupProgress(): SetupProgress {
       setProductsCount(products.count ?? 0)
       setSuppliersCount(suppliers.count ?? 0)
       setMembersCount(members.count ?? 0)
+      setPendingInvitesCount(pendingInvites.count ?? 0)
     } catch (err) {
       if (generation !== fetchGenRef.current) return
       console.error('Error fetching setup progress:', err)
@@ -111,7 +118,9 @@ export function useSetupProgress(): SetupProgress {
   const hasFacilities = facilitiesCount > 0
   const hasProducts = productsCount > 0
   const hasSuppliers = suppliersCount > 0
-  const hasTeamMembers = membersCount > 1
+  // "Team member" is satisfied by any accepted member beyond the owner OR any pending invite.
+  // Inviting is the owner's action; acceptance is outside their control.
+  const hasTeamMembers = membersCount > 1 || pendingInvitesCount > 0
 
   const milestones: SetupMilestone[] = [
     { key: 'facilities', label: 'Add a facility', done: hasFacilities, href: '/company/facilities' },

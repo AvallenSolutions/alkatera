@@ -28,6 +28,7 @@ import { RecipeChecklist } from "@/components/products/RecipeChecklist";
 import { PackagingTemplateDialog } from "@/components/products/PackagingTemplateDialog";
 import { IngredientTemplateDialog } from "@/components/products/IngredientTemplateDialog";
 import { useRecipeEditor } from "@/hooks/useRecipeEditor";
+import { useIngestStash } from "@/hooks/useIngestStash";
 import { useLinkedSupplierProducts } from "@/hooks/data/useLinkedSupplierProducts";
 import type { IngredientFormData } from "@/components/products/IngredientFormCard";
 import type { PackagingFormData } from "@/components/products/PackagingFormCard";
@@ -62,6 +63,13 @@ export function RecipeEditorPanel({
   const { products: linkedSupplierProducts } = useLinkedSupplierProducts(organizationId);
   const [activeTab, setActiveTab] = useState(initialTab);
   const [showBOMImport, setShowBOMImport] = useState(false);
+  const [initialBomFile, setInitialBomFile] = useState<File | null>(null);
+
+  // Pick up BOM files stashed by the Universal Dropzone (header upload button).
+  useIngestStash('bom', (file) => {
+    setInitialBomFile(file);
+    setShowBOMImport(true);
+  });
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [templateDialogMode, setTemplateDialogMode] = useState<"save" | "browse">("browse");
   const [showIngredientTemplateDialog, setShowIngredientTemplateDialog] = useState(false);
@@ -530,9 +538,13 @@ export function RecipeEditorPanel({
 
       <BOMImportFlow
         open={showBOMImport}
-        onOpenChange={setShowBOMImport}
+        onOpenChange={(next) => {
+          setShowBOMImport(next);
+          if (!next) setInitialBomFile(null);
+        }}
         onImportComplete={handleBOMImportComplete}
         organizationId={organizationId}
+        initialFile={initialBomFile}
       />
 
       <PackagingTemplateDialog

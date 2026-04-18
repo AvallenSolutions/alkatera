@@ -14,14 +14,16 @@ import { useProductSpotlight } from '@/hooks/data/useProductSpotlight';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { RefreshCw, Package, ArrowRight } from 'lucide-react';
+import { RefreshCw, Package, ArrowRight, Sparkles } from 'lucide-react';
 
 import { VitalityScoreHero, calculateVitalityScores } from '@/components/vitality/VitalityScoreHero';
 import { getBenchmarkForProductType } from '@/lib/industry-benchmarks';
 import { fetchProducts } from '@/lib/products';
-import { PriorityActionsList, generatePriorityActions } from '@/components/dashboard/PriorityActionCard';
+import { generatePriorityActions } from '@/components/dashboard/PriorityActionCard';
+import { ThreeThingsTodayHero } from '@/components/dashboard/ThreeThingsTodayHero';
 import { SetupProgressBanner } from '@/components/dashboard/SetupProgressBanner';
 import { useSetupProgress } from '@/hooks/data/useSetupProgress';
+import { useHeroDismissal } from '@/hooks/useHeroDismissal';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { InlineErrorBoundary } from '@/components/ErrorBoundary';
 import { usePersistedYear, useLatestDataYear } from '@/hooks/usePersistedYear';
@@ -135,6 +137,7 @@ export default function DashboardPage() {
   const { products: spotlightProducts, loading: spotlightLoading } = useProductSpotlight();
 
   const setupProgress = useSetupProgress();
+  const heroDismissal = useHeroDismissal();
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Fetch product categories for industry benchmark lookup
@@ -324,6 +327,26 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Three Things Today — highest-leverage priority actions, hero position */}
+      {!setupProgress.isLoading && heroDismissal.isVisible && (
+        <ThreeThingsTodayHero
+          actions={priorityActions}
+          onHideForToday={heroDismissal.hideForToday}
+          onHidePermanently={heroDismissal.hidePermanently}
+        />
+      )}
+      {!setupProgress.isLoading && !heroDismissal.isVisible && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-2 text-xs text-muted-foreground hover:text-foreground self-start -mt-2"
+          onClick={heroDismissal.restore}
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          Show priority actions
+        </Button>
+      )}
+
       {/* Setup Progress Banner — shows for new users until all milestones are done */}
       {!setupProgress.isLoading && !setupProgress.isDismissed && (
         <SetupProgressBanner progress={setupProgress} />
@@ -368,6 +391,7 @@ export default function DashboardPage() {
                 href="/reports/company-footprint"
                 loading={footprintLoading}
                 higherIsBetter={false}
+                source={footprint?.source}
               />
               <StatCard
                 label="Water Impact"
@@ -377,6 +401,7 @@ export default function DashboardPage() {
                 href="/performance"
                 loading={metricsLoading}
                 higherIsBetter={false}
+                source={waterCompanyOverview?.source}
               />
               <StatCard
                 label="Living Wage Compliance"
@@ -395,6 +420,7 @@ export default function DashboardPage() {
                 href="/performance"
                 loading={wasteLoading}
                 higherIsBetter={true}
+                source={wasteMetrics?.source}
               />
             </div>
           </div>
@@ -503,38 +529,12 @@ export default function DashboardPage() {
         </CardContent>
       </Card>}
 
-      {/* ── BOTTOM ROW ────────────────────────────────────────────── */}
-      {!isAnyDataLoading && <div className="grid gap-6 lg:grid-cols-2">
-        {/* Priority Actions */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                Priority Actions
-                {priorityActions.filter(a => a.priority === 'high').length > 0 && (
-                  <span className="text-xs px-2 py-0.5 bg-red-500/20 text-red-500 dark:text-red-400 rounded-full font-medium">
-                    {priorityActions.filter(a => a.priority === 'high').length} urgent
-                  </span>
-                )}
-              </span>
-              <span className="text-sm font-normal text-muted-foreground">
-                {priorityActions.length} action{priorityActions.length !== 1 ? 's' : ''}
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <PriorityActionsList
-              actions={priorityActions}
-              maxVisible={4}
-            />
-          </CardContent>
-        </Card>
-
-        {/* Recent Activity */}
+      {/* ── BOTTOM ROW — Recent Activity ──────────────────────────── */}
+      {!isAnyDataLoading && (
         <InlineErrorBoundary>
           <RecentActivityWidget />
         </InlineErrorBoundary>
-      </div>}
+      )}
     </div>
   );
 }
