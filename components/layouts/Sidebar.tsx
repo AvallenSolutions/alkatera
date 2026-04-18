@@ -112,6 +112,7 @@ const navigationStructure: NavItem[] = [
     icon: Activity,
     minTier: 1,
     betaBadge: true,
+    featureCode: 'pulse_beta',
     requiresMilestone: 'has_product',
     children: [
       { name: 'Dashboard',         href: '/pulse/',                           icon: Activity,   minTier: 1 },

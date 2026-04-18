@@ -501,6 +501,18 @@ const featureInfo: Partial<Record<FeatureCode, FeatureInfo>> = {
     icon: Wheat,
     category: "Products & LCA",
   },
+  pulse_beta: {
+    name: "Pulse (Beta)",
+    description:
+      "Real-time sustainability signals, shadow prices, and year-over-year trend widgets. Currently in private beta.",
+    benefits: [
+      "Live metric snapshots and shadow-price feeds",
+      "Drill-down trend analysis across scope 1/2/3",
+      "Early-access to new Pulse widgets as they ship",
+    ],
+    icon: Link2,
+    category: "Platform",
+  },
   knowledge_bank_manage: {
     name: "Knowledge Bank (Upload & Manage)",
     description:
@@ -591,6 +603,7 @@ const featureNames: Record<FeatureCode, string> = {
   viticulture_beta: "Viticulture (Beta)",
   orchard_beta: "Orchards (Beta)",
   arable_beta: "Arable Fields (Beta)",
+  pulse_beta: "Pulse (Beta)",
 };
 
 const tierDisplayNames: Record<TierName, string> = {
