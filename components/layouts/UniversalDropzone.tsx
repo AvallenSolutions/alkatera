@@ -315,6 +315,7 @@ export function UniversalDropzone({ trigger }: UniversalDropzoneProps) {
             onSave={handleSave}
             canSave={canSave()}
             needsFacility={needsFacility}
+            onClose={() => handleOpenChange(false)}
           />
         )}
 
@@ -366,6 +367,10 @@ interface ReviewPanelProps {
   onSave: () => void
   canSave: boolean
   needsFacility: boolean
+  /** Closes the Universal Dropzone dialog. Essential for hand-off paths where
+   *  we navigate to another page — if we don't close, the dialog stays mounted
+   *  in the persistent AppLayout and covers the target page. */
+  onClose: () => void
 }
 
 function ReviewPanel(props: ReviewPanelProps) {
@@ -428,7 +433,7 @@ function ReviewPanel(props: ReviewPanelProps) {
 
   if (result.type === 'bom') {
     return (
-      <BomHandoffPanel bom={result.bom} />
+      <BomHandoffPanel bom={result.bom} onClose={props.onClose} />
     )
   }
 
@@ -966,7 +971,7 @@ function useOrgProducts(orgId: string | undefined) {
   return { products, loading, error, refresh }
 }
 
-function BomHandoffPanel({ bom }: { bom?: BomPayload }) {
+function BomHandoffPanel({ bom, onClose }: { bom?: BomPayload; onClose: () => void }) {
   const { currentOrganization } = useOrganization()
   const orgId = currentOrganization?.id
   const { products, loading, error } = useOrgProducts(orgId)
@@ -1056,9 +1061,10 @@ function BomHandoffPanel({ bom }: { bom?: BomPayload }) {
           setProductId={setProductId}
           deepLink={attachDeepLink}
           stashId={stashId}
+          onClose={onClose}
         />
       ) : (
-        <CreateFromBomPanel bom={bom} orgId={orgId} stashId={stashId} />
+        <CreateFromBomPanel bom={bom} orgId={orgId} stashId={stashId} onClose={onClose} />
       )}
     </div>
   )
@@ -1072,6 +1078,7 @@ function AttachToExistingPanel({
   setProductId,
   deepLink,
   stashId,
+  onClose,
 }: {
   products: Array<{ id: string; name: string }>
   loading: boolean
@@ -1080,6 +1087,7 @@ function AttachToExistingPanel({
   setProductId: (id: string) => void
   deepLink: string | null
   stashId?: string
+  onClose: () => void
 }) {
   return (
     <div className="space-y-4">
@@ -1119,7 +1127,7 @@ function AttachToExistingPanel({
       <div className="flex items-center justify-end gap-2 pt-1">
         <Button asChild size="sm" disabled={!deepLink}>
           {deepLink ? (
-            <Link href={deepLink}>
+            <Link href={deepLink} onClick={onClose}>
               <Package className="h-3.5 w-3.5 mr-1.5" />
               Open product
             </Link>
@@ -1136,10 +1144,12 @@ function CreateFromBomPanel({
   bom,
   orgId,
   stashId,
+  onClose,
 }: {
   bom?: BomPayload
   orgId?: string
   stashId?: string
+  onClose: () => void
 }) {
   const router = useRouter()
   const [name, setName] = useState(bom?.product_name || '')
@@ -1183,6 +1193,10 @@ function CreateFromBomPanel({
       const params = stashId
         ? `?${new URLSearchParams({ stash_id: stashId, stash_kind: 'bom' }).toString()}`
         : ''
+      // Close the Dropzone dialog BEFORE navigating — otherwise it stays
+      // mounted on top of the recipe editor and blocks the BOM wizard from
+      // auto-opening underneath.
+      onClose()
       router.push(`/products/${created.id}/recipe${params}`)
     } catch (err: any) {
       toast.error(err?.message || 'Failed to create product')
