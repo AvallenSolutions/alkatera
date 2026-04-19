@@ -28,6 +28,7 @@ import type { PackagingCategory } from "@/lib/types/lca";
 import { OpenLCAConfigDialog } from "@/components/lca/OpenLCAConfigDialog";
 import { BOMImportFlow } from "@/components/products/BOMImportFlow";
 import { useAutoSave } from "@/hooks/useAutoSave";
+import { useIngestStash } from "@/hooks/useIngestStash";
 
 interface Product {
   id: string;
@@ -63,6 +64,15 @@ export default function ProductRecipePage() {
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || "overview");
   const [showOpenLCAConfig, setShowOpenLCAConfig] = useState(false);
   const [showBOMImport, setShowBOMImport] = useState(false);
+  const [initialBomFile, setInitialBomFile] = useState<File | null>(null);
+
+  // Pick up BOM files stashed by the Universal Dropzone (header Upload button).
+  // When arriving at this page via the carry-through deep link, the hook
+  // downloads the stashed PDF and auto-opens the BOMImportFlow with it.
+  useIngestStash('bom', (file) => {
+    setInitialBomFile(file);
+    setShowBOMImport(true);
+  });
 
   const [ingredientForms, setIngredientForms] = useState<IngredientFormData[]>([
     {
@@ -1772,9 +1782,13 @@ export default function ProductRecipePage() {
 
       <BOMImportFlow
         open={showBOMImport}
-        onOpenChange={setShowBOMImport}
+        onOpenChange={(next) => {
+          setShowBOMImport(next);
+          if (!next) setInitialBomFile(null);
+        }}
         onImportComplete={handleBOMImportComplete}
         organizationId={currentOrganization?.id || ''}
+        initialFile={initialBomFile}
       />
     </div>
   );
