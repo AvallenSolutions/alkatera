@@ -306,6 +306,15 @@ export function BOMImportFlow({
 
       for (const item of items) {
         const match = getMatchSelection(item.cleanName, states);
+        // Pull the full SearchResultForMatch so we can carry through the
+        // matched source's display name + co2_factor into the form. Without
+        // this, the import saves only the DB ids and the ingredient cards
+        // render as if nothing was matched.
+        const stateForItem = states[normalise(item.cleanName)];
+        const selectedResult =
+          stateForItem && stateForItem.selectedIndex != null
+            ? stateForItem.searchResults[stateForItem.selectedIndex]
+            : undefined;
 
         if (item.itemType === "ingredient") {
           const ingredientData: IngredientFormData = {
@@ -314,6 +323,8 @@ export function BOMImportFlow({
             data_source: match?.data_source ?? null,
             data_source_id: match?.data_source_id ?? undefined,
             supplier_product_id: match?.supplier_product_id ?? undefined,
+            matched_source_name: selectedResult?.name,
+            carbon_intensity: selectedResult?.co2_factor ?? undefined,
             amount: item.quantity ?? 0,
             unit: mapUnit(item.unit),
             origin_country: "",
@@ -329,6 +340,8 @@ export function BOMImportFlow({
             data_source: match?.data_source ?? null,
             data_source_id: match?.data_source_id ?? undefined,
             supplier_product_id: match?.supplier_product_id ?? undefined,
+            matched_source_name: selectedResult?.name,
+            carbon_intensity: selectedResult?.co2_factor ?? undefined,
             amount: item.quantity ?? 0,
             unit: mapUnit(item.unit),
             packaging_category: detectPackagingCategory(item.cleanName),

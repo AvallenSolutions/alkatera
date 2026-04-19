@@ -869,6 +869,26 @@ export default function ProductRecipePage() {
       const rawDist = form.transport_legs?.[0]?.distanceKm
         ?? (form.distance_km && Number(form.distance_km) > 0 ? Number(form.distance_km) : null);
       const completePair = rawMode != null && rawDist != null && rawDist > 0;
+
+      // Carry the matched emission factor through. BOMImportFlow writes
+      // data_source / data_source_id / supplier_product_id / carbon_intensity
+      // onto the form after the match step; the DB has a data_source_integrity
+      // CHECK requiring (openlca → data_source_id NOT NULL, supplier →
+      // supplier_product_id NOT NULL), so we only emit the fields when the
+      // right id is present.
+      const dataSourceFields: Record<string, unknown> = {};
+      if (form.data_source === 'openlca' && form.data_source_id) {
+        dataSourceFields.data_source = 'openlca';
+        dataSourceFields.data_source_id = form.data_source_id;
+        if (form.openlca_database) dataSourceFields.openlca_database = form.openlca_database;
+      } else if (form.data_source === 'supplier' && form.supplier_product_id) {
+        dataSourceFields.data_source = 'supplier';
+        dataSourceFields.supplier_product_id = form.supplier_product_id;
+      }
+      if (form.carbon_intensity != null && Number(form.carbon_intensity) > 0) {
+        dataSourceFields.cached_co2_factor = Number(form.carbon_intensity);
+      }
+
       return {
         product_id: parseInt(productId),
         material_name: form.name,
@@ -881,6 +901,7 @@ export default function ProductRecipePage() {
         transport_mode: completePair ? rawMode : null,
         distance_km: completePair ? rawDist : null,
         transport_legs: (form.transport_legs && form.transport_legs.length > 0) ? form.transport_legs : null,
+        ...dataSourceFields,
       // Inbound delivery container
       inbound_container_type:         form.inbound_container_type         ?? null,
       inbound_container_volume_l:     form.inbound_container_volume_l     ?? null,
@@ -937,6 +958,21 @@ export default function ProductRecipePage() {
       const rawMode = form.transport_mode ?? null;
       const rawDist = form.distance_km && Number(form.distance_km) > 0 ? Number(form.distance_km) : null;
       const completePair = rawMode != null && rawDist != null;
+
+      // Data source + emission factor carry-through from the BOM match step.
+      const dataSourceFields: Record<string, unknown> = {};
+      if (form.data_source === 'openlca' && form.data_source_id) {
+        dataSourceFields.data_source = 'openlca';
+        dataSourceFields.data_source_id = form.data_source_id;
+        if (form.openlca_database) dataSourceFields.openlca_database = form.openlca_database;
+      } else if (form.data_source === 'supplier' && form.supplier_product_id) {
+        dataSourceFields.data_source = 'supplier';
+        dataSourceFields.supplier_product_id = form.supplier_product_id;
+      }
+      if (form.carbon_intensity != null && Number(form.carbon_intensity) > 0) {
+        dataSourceFields.cached_co2_factor = Number(form.carbon_intensity);
+      }
+
       return {
         product_id: parseInt(productId),
         material_name: form.name,
@@ -948,6 +984,7 @@ export default function ProductRecipePage() {
         origin_country: form.origin_country || null,
         transport_mode: completePair ? rawMode : null,
         distance_km: completePair ? rawDist : null,
+        ...dataSourceFields,
       };
     }).filter(m => m.quantity > 0);
 
