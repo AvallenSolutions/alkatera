@@ -390,12 +390,12 @@ function ReviewPanel(props: ReviewPanelProps) {
         </div>
         <p className="text-xs text-muted-foreground">Were you trying to do one of these?</p>
         <div className="grid grid-cols-2 gap-2">
-          <ManualLink href="/company/facilities" icon={<Zap className="h-3.5 w-3.5" />} label="Utility bill" />
-          <ManualLink href="/company/facilities" icon={<Droplets className="h-3.5 w-3.5" />} label="Water bill" />
-          <ManualLink href="/company/facilities" icon={<Trash2 className="h-3.5 w-3.5" />} label="Waste invoice" />
-          <ManualLink href="/products" icon={<FileSpreadsheet className="h-3.5 w-3.5" />} label="Product workbook" />
-          <ManualLink href="/vineyards" icon={<Leaf className="h-3.5 w-3.5" />} label="Spray diary" />
-          <ManualLink href="/products" icon={<ScrollText className="h-3.5 w-3.5" />} label="Bill of materials" />
+          <ManualLink href="/company/facilities" icon={<Zap className="h-3.5 w-3.5" />} label="Utility bill" onClose={props.onClose} />
+          <ManualLink href="/company/facilities" icon={<Droplets className="h-3.5 w-3.5" />} label="Water bill" onClose={props.onClose} />
+          <ManualLink href="/company/facilities" icon={<Trash2 className="h-3.5 w-3.5" />} label="Waste invoice" onClose={props.onClose} />
+          <ManualLink href="/products" icon={<FileSpreadsheet className="h-3.5 w-3.5" />} label="Product workbook" onClose={props.onClose} />
+          <ManualLink href="/vineyards" icon={<Leaf className="h-3.5 w-3.5" />} label="Spray diary" onClose={props.onClose} />
+          <ManualLink href="/products" icon={<ScrollText className="h-3.5 w-3.5" />} label="Bill of materials" onClose={props.onClose} />
         </div>
       </div>
     )
@@ -414,6 +414,7 @@ function ReviewPanel(props: ReviewPanelProps) {
             : undefined
         }
         stashId={result.sprayDiary?.stashId}
+        onClose={props.onClose}
       />
     )
   }
@@ -427,6 +428,7 @@ function ReviewPanel(props: ReviewPanelProps) {
         description="Pick the asset this evidence is for — we'll carry the file across so you don't re-upload."
         extraNote={result.soilCarbonEvidence?.note}
         stashId={result.soilCarbonEvidence?.stashId}
+        onClose={props.onClose}
       />
     )
   }
@@ -439,13 +441,13 @@ function ReviewPanel(props: ReviewPanelProps) {
 
   if (result.type === 'historical_sustainability_report') {
     return (
-      <HistoricalReportPanel result={result} />
+      <HistoricalReportPanel result={result} onClose={props.onClose} />
     )
   }
 
   if (result.type === 'historical_lca_report') {
     return (
-      <HistoricalLcaPanel result={result} />
+      <HistoricalLcaPanel result={result} onClose={props.onClose} />
     )
   }
 
@@ -463,7 +465,7 @@ function ReviewPanel(props: ReviewPanelProps) {
         </div>
         <div className="flex items-center justify-end gap-2 pt-1">
           <Button asChild size="sm">
-            <Link href="/data/spend-data">Open spend data</Link>
+            <Link href="/data/spend-data" onClick={props.onClose}>Open spend data</Link>
           </Button>
         </div>
       </div>
@@ -496,7 +498,7 @@ function ReviewPanel(props: ReviewPanelProps) {
         </p>
         <div className="flex items-center justify-end gap-2 pt-1">
           <Button asChild size="sm">
-            <Link href="/products/bulk-import">Open bulk import</Link>
+            <Link href="/products/import" onClick={props.onClose}>Open bulk import</Link>
           </Button>
         </div>
       </div>
@@ -638,7 +640,7 @@ function ReviewPanel(props: ReviewPanelProps) {
 // historical_imports.extracted_data as-is so schema evolves without migrations.
 // ───────────────────────────────────────────────────────────────────────────────
 
-function HistoricalReportPanel({ result }: { result: IngestResponse }) {
+function HistoricalReportPanel({ result, onClose }: { result: IngestResponse; onClose: () => void }) {
   const { currentOrganization } = useOrganization()
   const data = result.historicalSustainabilityReport || {}
   const [form, setForm] = useState({
@@ -705,7 +707,7 @@ function HistoricalReportPanel({ result }: { result: IngestResponse }) {
         </div>
         <p className="text-sm font-medium">Saved</p>
         <Button asChild size="sm" variant="outline">
-          <Link href="/reports/historical">View historical imports</Link>
+          <Link href="/reports/historical" onClick={onClose}>View historical imports</Link>
         </Button>
       </div>
     )
@@ -765,7 +767,7 @@ function HistoricalReportPanel({ result }: { result: IngestResponse }) {
 // HistoricalLcaPanel — review + save panel for prior LCA studies.
 // ───────────────────────────────────────────────────────────────────────────────
 
-function HistoricalLcaPanel({ result }: { result: IngestResponse }) {
+function HistoricalLcaPanel({ result, onClose }: { result: IngestResponse; onClose: () => void }) {
   const { currentOrganization } = useOrganization()
   const data = result.historicalLcaReport || {}
   const [form, setForm] = useState({
@@ -833,7 +835,7 @@ function HistoricalLcaPanel({ result }: { result: IngestResponse }) {
         </div>
         <p className="text-sm font-medium">Saved</p>
         <Button asChild size="sm" variant="outline">
-          <Link href="/reports/historical">View historical imports</Link>
+          <Link href="/reports/historical" onClick={onClose}>View historical imports</Link>
         </Button>
       </div>
     )
@@ -1282,14 +1284,16 @@ function ManualLink({
   href,
   icon,
   label,
+  onClose,
 }: {
   href: string
   icon: React.ReactNode
   label: string
+  onClose?: () => void
 }) {
   return (
     <Button asChild variant="outline" size="sm" className="justify-start gap-2 h-auto py-2">
-      <Link href={href}>
+      <Link href={href} onClick={onClose}>
         {icon}
         <span className="text-xs">{label}</span>
       </Link>
@@ -1318,6 +1322,10 @@ interface AssetHandoffPanelProps {
   description: string
   extraNote?: string
   stashId?: string
+  /** Closes the Universal Dropzone dialog. Must fire before navigation or the
+   *  dialog stays mounted on top of the target asset page and blocks the
+   *  carry-through wizards from auto-opening. */
+  onClose: () => void
 }
 
 const ASSET_TYPES: { value: AssetKind; label: string; icon: React.ReactNode; apiPath: string; pageBase: string }[] = [
@@ -1326,7 +1334,7 @@ const ASSET_TYPES: { value: AssetKind; label: string; icon: React.ReactNode; api
   { value: 'arable-fields', label: 'Arable field', icon: <Wheat className="h-3.5 w-3.5" />,    apiPath: '/api/arable-fields', pageBase: '/arable-fields' },
 ]
 
-function AssetHandoffPanel({ kind, detectedLabel, icon, description, extraNote, stashId }: AssetHandoffPanelProps) {
+function AssetHandoffPanel({ kind, detectedLabel, icon, description, extraNote, stashId, onClose }: AssetHandoffPanelProps) {
   const [assetKind, setAssetKind] = useState<AssetKind | null>(null)
   const [assets, setAssets] = useState<AssetOption[]>([])
   const [assetId, setAssetId] = useState<string>('')
@@ -1450,7 +1458,7 @@ function AssetHandoffPanel({ kind, detectedLabel, icon, description, extraNote, 
       <div className="flex items-center justify-end gap-2 pt-1">
         <Button asChild size="sm" disabled={!deepLink}>
           {deepLink ? (
-            <Link href={deepLink}>
+            <Link href={deepLink} onClick={onClose}>
               Open {typeMeta?.label.toLowerCase()}
             </Link>
           ) : (
