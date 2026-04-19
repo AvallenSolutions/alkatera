@@ -141,13 +141,32 @@ export function RecipeEditorPanel({
     importedIngredients: IngredientFormData[],
     importedPackaging: PackagingFormData[]
   ) => {
-    // BOM import is handled by the hook's fetchProductData after import
-    await fetchProductData();
-    onSaveComplete?.();
+    // BOMImportFlow hands us form-shaped arrays but never writes to DB — push
+    // them into the hook's form state so the rows show up immediately in the
+    // recipe cards. User then clicks Save on each section to persist.
+    //
+    // We prepend any *existing* valid form rows so running BOM import on a
+    // product that already has ingredients merges rather than wipes.
+    if (importedIngredients.length > 0) {
+      const currentValid = ingredientForms.filter(
+        (f) => f.name && Number(f.amount) > 0,
+      );
+      setIngredientsFromTemplate([...currentValid, ...importedIngredients]);
+    }
+    if (importedPackaging.length > 0) {
+      const currentValid = packagingForms.filter(
+        (f) => f.name && (Number(f.amount) > 0 || Number(f.net_weight_g) > 0) && f.packaging_category,
+      );
+      setPackagingFromTemplate([...currentValid, ...importedPackaging]);
+    }
+
     if (importedIngredients.length > 0 && importedPackaging.length === 0) {
       setActiveTab('ingredients');
     } else if (importedPackaging.length > 0 && importedIngredients.length === 0) {
       setActiveTab('packaging');
+    } else if (importedIngredients.length > 0) {
+      // Mixed — default to ingredients tab (they're the more common editing target first)
+      setActiveTab('ingredients');
     }
   };
 
