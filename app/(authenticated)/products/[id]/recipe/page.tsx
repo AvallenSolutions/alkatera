@@ -860,19 +860,27 @@ export default function ProductRecipePage() {
       throw new Error(`Failed to clear existing ingredients: ${deleteError.message}`);
     }
 
-    const materialsToInsert = validForms.map(form => ({
-      product_id: parseInt(productId),
-      material_name: form.name,
-      matched_source_name: form.matched_source_name || null,
-      quantity: Number(form.amount),
-      unit: form.unit,
-      material_type: 'ingredient',
-      origin_country: form.origin_country || null,
-      is_organic_certified: form.is_organic_certified || false,
-      // Derive single-leg backward-compat fields from transport_legs[0] (or legacy fields)
-      transport_mode: form.transport_legs?.[0]?.transportMode ?? form.transport_mode ?? 'truck',
-      distance_km:    form.transport_legs?.[0]?.distanceKm    ?? (form.distance_km ? Number(form.distance_km) : null),
-      transport_legs: (form.transport_legs && form.transport_legs.length > 0) ? form.transport_legs : null,
+    const materialsToInsert = validForms.map(form => {
+      // Transport data — honour the DB `transport_data_completeness` CHECK:
+      // either BOTH transport_mode and distance_km are set, or BOTH are null.
+      // Partial data (e.g. mode='truck' without a distance, as BOM imports
+      // land with) must get nulled out on both sides.
+      const rawMode = form.transport_legs?.[0]?.transportMode ?? form.transport_mode ?? null;
+      const rawDist = form.transport_legs?.[0]?.distanceKm
+        ?? (form.distance_km && Number(form.distance_km) > 0 ? Number(form.distance_km) : null);
+      const completePair = rawMode != null && rawDist != null && rawDist > 0;
+      return {
+        product_id: parseInt(productId),
+        material_name: form.name,
+        matched_source_name: form.matched_source_name || null,
+        quantity: Number(form.amount),
+        unit: form.unit,
+        material_type: 'ingredient',
+        origin_country: form.origin_country || null,
+        is_organic_certified: form.is_organic_certified || false,
+        transport_mode: completePair ? rawMode : null,
+        distance_km: completePair ? rawDist : null,
+        transport_legs: (form.transport_legs && form.transport_legs.length > 0) ? form.transport_legs : null,
       // Inbound delivery container
       inbound_container_type:         form.inbound_container_type         ?? null,
       inbound_container_volume_l:     form.inbound_container_volume_l     ?? null,
@@ -885,7 +893,8 @@ export default function ProductRecipePage() {
       vineyard_id:                    form.vineyard_id                    ?? null,
       arable_field_id:                form.arable_field_id                ?? null,
       orchard_id:                     form.orchard_id                     ?? null,
-    }));
+      };
+    });
 
     const { error: insertError } = await supabase
       .from('product_materials')
@@ -922,6 +931,12 @@ export default function ProductRecipePage() {
     const materialsToInsert = validForms.map(form => {
       let quantity = Number(form.net_weight_g) || Number(form.amount);
       if (!quantity || quantity <= 0 || isNaN(quantity)) quantity = 0;
+      // Same transport-pair normalisation as ingredients — either both set or
+      // both null to satisfy the product_materials.transport_data_completeness
+      // check constraint.
+      const rawMode = form.transport_mode ?? null;
+      const rawDist = form.distance_km && Number(form.distance_km) > 0 ? Number(form.distance_km) : null;
+      const completePair = rawMode != null && rawDist != null;
       return {
         product_id: parseInt(productId),
         material_name: form.name,
@@ -931,8 +946,8 @@ export default function ProductRecipePage() {
         material_type: 'packaging' as const,
         packaging_category: form.packaging_category || null,
         origin_country: form.origin_country || null,
-        transport_mode: form.transport_mode || 'truck',
-        distance_km: form.distance_km ? Number(form.distance_km) : null,
+        transport_mode: completePair ? rawMode : null,
+        distance_km: completePair ? rawDist : null,
       };
     }).filter(m => m.quantity > 0);
 
