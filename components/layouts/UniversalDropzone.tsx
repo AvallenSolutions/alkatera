@@ -48,6 +48,7 @@ import {
   saveWasteBill,
 } from '@/lib/ingest/save-extracted'
 import type { IngestResponse } from '@/app/api/ingest/auto/route'
+import type { ExtractedBillData } from '@/app/api/utilities/import-from-pdf/route'
 
 type Step = 'upload' | 'analysing' | 'review' | 'saving' | 'saved'
 
@@ -602,16 +603,36 @@ function ReviewPanel(props: ReviewPanelProps) {
         />
       </div>
 
+      {/* Enrichment chips — only for utility bills; water/waste don't extract these. */}
+      {result.type === 'utility_bill' && result.utilityBill && (
+        <UtilityBillEnrichmentSummary bill={result.utilityBill} />
+      )}
+
       {bill?.entries && bill.entries.length > 0 && (
         <div className="rounded-md border border-border p-3 text-xs space-y-1 max-h-32 overflow-y-auto">
           {bill.entries.map((e, i) => {
             const qty = (e as any).quantity
             const unit = (e as any).unit
             const cat = (e as any).utility_type || (e as any).activity_category
+            const rateBreakdown = (e as any).rate_breakdown as
+              | Array<{ label: string; kwh: number }>
+              | undefined
             return (
-              <div key={i} className="flex justify-between">
-                <span className="text-muted-foreground">{cat}</span>
-                <span className="font-mono">{qty} {unit}</span>
+              <div key={i} className="space-y-0.5">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">{cat}</span>
+                  <span className="font-mono">{qty} {unit}</span>
+                </div>
+                {rateBreakdown && rateBreakdown.length > 0 && (
+                  <div className="pl-3 space-y-0.5">
+                    {rateBreakdown.map((rb, j) => (
+                      <div key={j} className="flex justify-between text-[10px] text-muted-foreground">
+                        <span>{rb.label}</span>
+                        <span className="font-mono">{rb.kwh} kWh</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )
           })}
@@ -1276,6 +1297,78 @@ function CreateFromBomPanel({
           Create product &amp; attach BOM
         </Button>
       </div>
+    </div>
+  )
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// UtilityBillEnrichmentSummary — surfaces the non-kWh data Claude pulled from
+// the bill (MPAN, meter type, fuel mix, etc.) so users can sanity-check it
+// before saving. All fields are optional; only chips with real values render.
+// ───────────────────────────────────────────────────────────────────────────────
+
+function UtilityBillEnrichmentSummary({ bill }: { bill: ExtractedBillData }) {
+  // First electricity entry — we show MPAN / meter_type for it.
+  const elec = bill.entries.find((e) => e.utility_type === 'electricity_grid')
+  // Any gas entry — for MPRN.
+  const gas = bill.entries.find(
+    (e) => e.utility_type === 'natural_gas' || e.utility_type === 'natural_gas_m3',
+  )
+
+  const chips: Array<{ label: string; value: string; tone?: 'emerald' | 'amber' }> = []
+  if (elec?.mpan) chips.push({ label: 'MPAN', value: elec.mpan })
+  if (gas?.mprn) chips.push({ label: 'MPRN', value: gas.mprn })
+  if (elec?.meter_type) {
+    chips.push({
+      label: 'Meter',
+      value: elec.meter_type.replace(/_/g, ' '),
+    })
+  }
+  if (bill.supply_postcode) chips.push({ label: 'Postcode', value: bill.supply_postcode })
+  if (bill.gsp_group) chips.push({ label: 'Region', value: bill.gsp_group })
+  if (bill.is_green_tariff) chips.push({ label: 'Tariff', value: '100% renewable', tone: 'emerald' })
+
+  if (chips.length === 0 && !bill.fuel_mix) return null
+
+  return (
+    <div className="rounded-md border border-border bg-muted/20 p-3 space-y-2">
+      <p className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+        Also extracted
+      </p>
+      {chips.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {chips.map((c) => (
+            <span
+              key={`${c.label}-${c.value}`}
+              className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                c.tone === 'emerald'
+                  ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                  : 'bg-background border border-border text-muted-foreground'
+              }`}
+            >
+              <span className="opacity-60 mr-1">{c.label}</span>
+              {c.value}
+            </span>
+          ))}
+        </div>
+      )}
+      {bill.fuel_mix && (
+        <div className="text-[11px] text-muted-foreground">
+          <span className="font-medium text-foreground">Fuel mix</span>
+          {bill.fuel_mix.source ? ` (${bill.fuel_mix.source})` : ''}
+          {': '}
+          {[
+            { label: 'Renewable', pct: bill.fuel_mix.renewable_pct },
+            { label: 'Gas', pct: bill.fuel_mix.gas_pct },
+            { label: 'Nuclear', pct: bill.fuel_mix.nuclear_pct },
+            { label: 'Coal', pct: bill.fuel_mix.coal_pct },
+            { label: 'Other', pct: bill.fuel_mix.other_pct },
+          ]
+            .filter((x) => typeof x.pct === 'number')
+            .map((x) => `${x.label} ${Math.round(x.pct as number)}%`)
+            .join(' · ') || '—'}
+        </div>
+      )}
     </div>
   )
 }

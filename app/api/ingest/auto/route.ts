@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
 import { createClient } from '@supabase/supabase-js'
 import { parseImportXLSX } from '@/lib/bulk-import/xlsx-parser'
+import { BILL_TOOL_INPUT_SCHEMA } from '@/lib/claude/bill-schemas'
 import type { ExtractedBillData } from '@/app/api/utilities/import-from-pdf/route'
 import type {
   ExtractedFacilityBillData,
@@ -356,34 +357,10 @@ export async function POST(request: NextRequest) {
         {
           name: 'extract_utility_bill',
           description:
-            'Use for energy / utility bills — electricity, natural gas, LPG, diesel, HFO, biomass, district heat, or vehicle fuel. Extract the consumption quantities.',
-          input_schema: {
-            type: 'object' as const,
-            properties: {
-              supplier_name: { type: 'string', description: 'Utility supplier name (e.g. British Gas, EDF).' },
-              period_start: { type: 'string', description: 'Billing period start in YYYY-MM-DD.' },
-              period_end: { type: 'string', description: 'Billing period end in YYYY-MM-DD.' },
-              entries: {
-                type: 'array',
-                description: 'One entry per utility type on the bill.',
-                items: {
-                  type: 'object',
-                  properties: {
-                    utility_type: {
-                      type: 'string',
-                      enum: UTILITY_TYPE_VALUES,
-                      description:
-                        'Map to one of: electricity_grid, natural_gas (kWh), natural_gas_m3, lpg (litre), diesel_stationary, heavy_fuel_oil, biomass_solid (kg), heat_steam_purchased, diesel_mobile, petrol_mobile.',
-                    },
-                    quantity: { type: 'number', description: 'Consumption quantity, not cost.' },
-                    unit: { type: 'string', description: 'kWh, m3, litre, kg.' },
-                  },
-                  required: ['utility_type', 'quantity', 'unit'],
-                },
-              },
-            },
-            required: ['entries'],
-          },
+            'Use for energy / utility bills — electricity, natural gas, LPG, diesel, HFO, biomass, district heat, or vehicle fuel. Captures consumption + MPAN/MPRN + meter type + rate breakdown + fuel mix for time-of-use analysis and market-based Scope 2.',
+          // Reuses the same schema as /api/utilities/import-from-pdf — keeps
+          // both entry points extracting identical data.
+          input_schema: BILL_TOOL_INPUT_SCHEMA,
         },
         {
           name: 'extract_water_bill',

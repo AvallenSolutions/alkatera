@@ -64,6 +64,11 @@ export async function saveUtilityBill(
         : trimmedName
       : null
 
+    // Strip whitespace from supply-point IDs so future lookups by exact match
+    // work regardless of how the PDF formatted them.
+    const mpan = entry.mpan ? String(entry.mpan).replace(/\s+/g, '') : null
+    const mprn = entry.mprn ? String(entry.mprn).replace(/\s+/g, '') : null
+
     const { error: utilError } = await supabase.from('utility_data_entries').insert({
       facility_id: common.facilityId,
       utility_type: entry.utility_type,
@@ -75,6 +80,26 @@ export async function saveUtilityBill(
       calculated_scope: '',
       created_by: common.userId,
       name: entryName,
+      // Enriched fields from the broadened Claude extractor. All nullable;
+      // older rows continue to carry nulls.
+      mpan,
+      mprn,
+      meter_type: entry.meter_type ?? null,
+      rate_breakdown:
+        entry.rate_breakdown && entry.rate_breakdown.length > 0
+          ? entry.rate_breakdown
+          : null,
+      emissions_factor_g_per_kwh: entry.emissions_factor_g_per_kwh ?? null,
+      // Bill-level metadata gets copied onto every entry of the bill so any
+      // single row carries full context without a join.
+      fuel_mix: bill.fuel_mix ?? null,
+      is_green_tariff: bill.is_green_tariff ?? null,
+      supply_address: bill.supply_address ?? null,
+      supply_postcode: bill.supply_postcode ?? null,
+      gsp_group: bill.gsp_group ?? null,
+      account_number: bill.account_number ?? null,
+      ccl_amount_gbp: bill.ccl_amount_gbp ?? null,
+      total_charged_gbp: bill.total_charged_gbp ?? null,
     })
     if (utilError) throw utilError
 
