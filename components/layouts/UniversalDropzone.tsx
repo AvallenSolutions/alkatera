@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import {
@@ -427,10 +428,7 @@ function ReviewPanel(props: ReviewPanelProps) {
 
   if (result.type === 'bom') {
     return (
-      <BomHandoffPanel
-        note={result.bom?.note}
-        stashId={result.bom?.stashId}
-      />
+      <BomHandoffPanel bom={result.bom} />
     )
   }
 
@@ -924,32 +922,91 @@ function MetricField({
   )
 }
 
-function BomHandoffPanel({ note, stashId }: { note?: string; stashId?: string }) {
+type BomPayload = NonNullable<IngestResponse['bom']>
+
+const PRODUCT_CATEGORY_OPTIONS: BomPayload['product_category'][] = [
+  'Spirits',
+  'Beer & Cider',
+  'Wine',
+  'Ready-to-Drink & Cocktails',
+  'Non-Alcoholic',
+]
+
+// Loads products client-side (matches lib/products.ts's fetchProducts pattern).
+// The earlier `fetch('/api/products')` was hitting a non-existent route — this
+// path uses Supabase directly with RLS handling the org scope.
+function useOrgProducts(orgId: string | undefined) {
   const [products, setProducts] = useState<Array<{ id: string; name: string }>>([])
-  const [productId, setProductId] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
+  const refresh = useCallback(async () => {
+    if (!orgId) return
     setLoading(true)
-    fetch('/api/products')
-      .then((r) => r.ok ? r.json() : Promise.reject(new Error(`${r.status}`)))
-      .then((body) => {
-        if (cancelled) return
-        const list = Array.isArray(body?.data) ? body.data : (Array.isArray(body) ? body : [])
-        const mapped = list.map((p: any) => ({ id: p.id, name: p.name })).filter((p: any) => p.id && p.name)
-        setProducts(mapped)
-        if (mapped.length === 1) setProductId(mapped[0].id)
-      })
-      .catch(() => {
-        if (!cancelled) setError('Couldn\'t load products.')
-      })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
-  }, [])
+    setError(null)
+    try {
+      const { data, error: err } = await supabase
+        .from('products')
+        .select('id, name')
+        .eq('organization_id', orgId)
+        .order('created_at', { ascending: false })
+      if (err) throw err
+      setProducts((data || []) as Array<{ id: string; name: string }>)
+    } catch (err: any) {
+      setError(err?.message || "Couldn't load products.")
+    } finally {
+      setLoading(false)
+    }
+  }, [orgId])
 
-  const deepLink = productId
+  useEffect(() => {
+    refresh()
+  }, [refresh])
+
+  return { products, loading, error, refresh }
+}
+
+function BomHandoffPanel({ bom }: { bom?: BomPayload }) {
+  const { currentOrganization } = useOrganization()
+  const orgId = currentOrganization?.id
+  const { products, loading, error } = useOrgProducts(orgId)
+  const stashId = bom?.stashId
+
+  // Default mode: if the BOM extractor returned a product name AND no existing
+  // product already matches, lean the user toward "Create new". Otherwise
+  // default to "Attach to existing".
+  const extractedName = (bom?.product_name || '').trim()
+  const probableExisting = useMemo(
+    () => extractedName
+      ? products.find((p) => p.name.toLowerCase().trim() === extractedName.toLowerCase())
+      : undefined,
+    [products, extractedName],
+  )
+
+  const [mode, setMode] = useState<'attach' | 'create'>('attach')
+  const [productId, setProductId] = useState('')
+
+  // Auto-select a sensible default: existing match if found, else the only
+  // product if count === 1, else nothing. Re-runs when products load.
+  useEffect(() => {
+    if (!products.length) return
+    if (probableExisting) {
+      setProductId(probableExisting.id)
+      setMode('attach')
+    } else if (products.length === 1 && !extractedName) {
+      setProductId(products[0].id)
+    } else if (!productId && extractedName) {
+      // New product — switch mode so the user sees the create form first.
+      setMode('create')
+    }
+  }, [products, probableExisting, extractedName, productId])
+
+  // If there are zero products at all, Create is the only option.
+  useEffect(() => {
+    if (!loading && products.length === 0) setMode('create')
+  }, [loading, products.length])
+
+  const attachDeepLink = productId
     ? (() => {
         const base = `/products/${productId}/recipe`
         if (!stashId) return base
@@ -965,11 +1022,67 @@ function BomHandoffPanel({ note, stashId }: { note?: string; stashId?: string })
         <div className="text-sm">
           <p className="font-medium">We detected a bill of materials.</p>
           <p className="text-xs text-muted-foreground mt-1">
-            {note || 'Pick the product to attach these items to — the recipe editor will parse them automatically.'}
+            {bom?.note || 'Attach to an existing product, or create a new one from the details we pulled.'}
           </p>
         </div>
       </div>
 
+      {/* Mode toggle — hidden if there are zero products (only Create makes sense). */}
+      {products.length > 0 && (
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            size="sm"
+            variant={mode === 'attach' ? 'default' : 'outline'}
+            onClick={() => setMode('attach')}
+          >
+            Attach to existing
+          </Button>
+          <Button
+            size="sm"
+            variant={mode === 'create' ? 'default' : 'outline'}
+            onClick={() => setMode('create')}
+          >
+            Create new product
+          </Button>
+        </div>
+      )}
+
+      {mode === 'attach' ? (
+        <AttachToExistingPanel
+          products={products}
+          loading={loading}
+          error={error}
+          productId={productId}
+          setProductId={setProductId}
+          deepLink={attachDeepLink}
+          stashId={stashId}
+        />
+      ) : (
+        <CreateFromBomPanel bom={bom} orgId={orgId} stashId={stashId} />
+      )}
+    </div>
+  )
+}
+
+function AttachToExistingPanel({
+  products,
+  loading,
+  error,
+  productId,
+  setProductId,
+  deepLink,
+  stashId,
+}: {
+  products: Array<{ id: string; name: string }>
+  loading: boolean
+  error: string | null
+  productId: string
+  setProductId: (id: string) => void
+  deepLink: string | null
+  stashId?: string
+}) {
+  return (
+    <div className="space-y-4">
       <div className="space-y-1.5">
         <Label htmlFor="dropzone-bom-product" className="text-xs">Attach to product</Label>
         {loading ? (
@@ -979,13 +1092,7 @@ function BomHandoffPanel({ note, stashId }: { note?: string; stashId?: string })
         ) : error ? (
           <p className="text-xs text-amber-600 dark:text-amber-400">{error}</p>
         ) : products.length === 0 ? (
-          <p className="text-xs text-muted-foreground">
-            No products yet.{' '}
-            <Link href="/products/new" className="underline">
-              Create one
-            </Link>
-            .
-          </p>
+          <p className="text-xs text-muted-foreground">No products yet — use Create new product instead.</p>
         ) : (
           <Select value={productId} onValueChange={setProductId}>
             <SelectTrigger id="dropzone-bom-product">
@@ -1004,7 +1111,7 @@ function BomHandoffPanel({ note, stashId }: { note?: string; stashId?: string })
         <p>
           <span className="font-medium text-foreground">Next step:</span>{' '}
           {stashId
-            ? 'Open the product — we\'ll carry the file across and parse it automatically.'
+            ? "Open the product — we'll carry the file across and parse it automatically."
             : 'Open the product, then use the BOM upload button inside the recipe editor.'}
         </p>
       </div>
@@ -1019,6 +1126,138 @@ function BomHandoffPanel({ note, stashId }: { note?: string; stashId?: string })
           ) : (
             <span>Open product</span>
           )}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function CreateFromBomPanel({
+  bom,
+  orgId,
+  stashId,
+}: {
+  bom?: BomPayload
+  orgId?: string
+  stashId?: string
+}) {
+  const router = useRouter()
+  const [name, setName] = useState(bom?.product_name || '')
+  const [sku, setSku] = useState(bom?.product_sku || '')
+  const [category, setCategory] = useState<string>(bom?.product_category || '')
+  const [description, setDescription] = useState(bom?.product_description || '')
+  const [unitSizeValue, setUnitSizeValue] = useState<string>(
+    bom?.unit_size_value !== undefined ? String(bom.unit_size_value) : '',
+  )
+  const [unitSizeUnit, setUnitSizeUnit] = useState(bom?.unit_size_unit || '')
+  const [creating, setCreating] = useState(false)
+
+  const canCreate = Boolean(orgId && name.trim())
+
+  const handleCreate = async () => {
+    if (!orgId || !name.trim()) return
+    setCreating(true)
+    try {
+      const { data: userData } = await supabase.auth.getUser()
+      if (!userData?.user) throw new Error('Not authenticated')
+
+      const unitNumeric = unitSizeValue ? Number(unitSizeValue) : null
+      const { data: created, error: createErr } = await supabase
+        .from('products')
+        .insert({
+          organization_id: orgId,
+          name: name.trim(),
+          sku: sku.trim() || null,
+          product_category: category || null,
+          product_description: description.trim() || null,
+          unit_size_value: Number.isFinite(unitNumeric as number) ? unitNumeric : null,
+          unit_size_unit: unitSizeUnit.trim() || null,
+          created_by: userData.user.id,
+          is_draft: false,
+        })
+        .select('id')
+        .single()
+      if (createErr || !created) throw new Error(createErr?.message || 'Could not create product')
+
+      toast.success(`Created ${name.trim()} — opening recipe editor…`)
+      const params = stashId
+        ? `?${new URLSearchParams({ stash_id: stashId, stash_kind: 'bom' }).toString()}`
+        : ''
+      router.push(`/products/${created.id}/recipe${params}`)
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to create product')
+      setCreating(false)
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-[11px] text-muted-foreground">
+        We pre-filled these from the BOM. Edit anything and we&apos;ll create the product, then open the recipe editor with your BOM already loaded.
+      </p>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-1.5 col-span-2">
+          <Label htmlFor="bom-product-name" className="text-xs">Product name *</Label>
+          <Input id="bom-product-name" value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="bom-product-sku" className="text-xs">SKU</Label>
+          <Input id="bom-product-sku" value={sku} onChange={(e) => setSku(e.target.value)} />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="bom-product-category" className="text-xs">Category</Label>
+          <Select value={category} onValueChange={setCategory}>
+            <SelectTrigger id="bom-product-category">
+              <SelectValue placeholder="Select category" />
+            </SelectTrigger>
+            <SelectContent>
+              {PRODUCT_CATEGORY_OPTIONS.filter(Boolean).map((c) => (
+                <SelectItem key={c as string} value={c as string}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5 col-span-2">
+          <Label htmlFor="bom-product-description" className="text-xs">Description</Label>
+          <Input
+            id="bom-product-description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="bom-unit-size" className="text-xs">Unit size</Label>
+          <Input
+            id="bom-unit-size"
+            type="number"
+            inputMode="decimal"
+            value={unitSizeValue}
+            onChange={(e) => setUnitSizeValue(e.target.value)}
+            placeholder="e.g. 750"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="bom-unit-unit" className="text-xs">Unit</Label>
+          <Input
+            id="bom-unit-unit"
+            value={unitSizeUnit}
+            onChange={(e) => setUnitSizeUnit(e.target.value)}
+            placeholder="ml, L, g…"
+          />
+        </div>
+      </div>
+
+      {bom?.supplier_name && (
+        <p className="text-[11px] text-muted-foreground italic">
+          Supplier in the BOM: {bom.supplier_name}
+        </p>
+      )}
+
+      <div className="flex items-center justify-end gap-2 pt-1">
+        <Button size="sm" onClick={handleCreate} disabled={!canCreate || creating}>
+          {creating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Package className="h-3.5 w-3.5 mr-1.5" />}
+          Create product &amp; attach BOM
         </Button>
       </div>
     </div>

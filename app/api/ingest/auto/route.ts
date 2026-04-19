@@ -143,9 +143,19 @@ export interface IngestResponse {
   }
   // For BOM PDFs — the file is stashed so the product-edit page can open
   // the existing BOM import wizard with it pre-loaded (skipping re-upload).
+  // Structured product metadata is also extracted so users can create a
+  // new product right from the dropzone when the BOM references a product
+  // that doesn't exist yet.
   bom?: {
     note?: string
     stashId?: string
+    product_name?: string
+    product_sku?: string
+    product_category?: 'Spirits' | 'Beer & Cider' | 'Wine' | 'Ready-to-Drink & Cocktails' | 'Non-Alcoholic'
+    supplier_name?: string
+    product_description?: string
+    unit_size_value?: number
+    unit_size_unit?: string
   }
   // For soil-carbon evidence PDFs — the file is stashed so the target growing
   // profile page can pick it up with a single param round-trip.
@@ -450,13 +460,42 @@ export async function POST(request: NextRequest) {
         {
           name: 'identify_bom',
           description:
-            'Use for bills of materials (BOM), ingredient lists, or formulation sheets tied to a product. Typically shows SKUs / ingredient names with quantities and units, often with cost columns. Identification only — we don\'t extract items from this schema.',
+            'Use for bills of materials (BOM), ingredient lists, or formulation sheets tied to a product. Typically shows SKUs / ingredient names with quantities and units, often with cost columns. Return ONLY the product-level metadata extracted from the header — do NOT extract line items here (that happens later in a dedicated parser).',
           input_schema: {
             type: 'object' as const,
             properties: {
               note: {
                 type: 'string',
-                description: 'Optional one-line note: product name, SKU, or what the BOM appears to describe.',
+                description: 'One short sentence describing what the BOM covers — product name, SKU, and supplier in a single human-readable line.',
+              },
+              product_name: {
+                type: 'string',
+                description: 'The product this BOM describes, as shown in the header. E.g. "Three Spirit Nightcap".',
+              },
+              product_sku: {
+                type: 'string',
+                description: 'Product SKU from the BOM header, if present.',
+              },
+              product_category: {
+                type: 'string',
+                enum: ['Spirits', 'Beer & Cider', 'Wine', 'Ready-to-Drink & Cocktails', 'Non-Alcoholic'],
+                description: 'Best-fit category. Pick the closest match; omit if unclear.',
+              },
+              supplier_name: {
+                type: 'string',
+                description: 'Organisation that owns the BOM, as shown in the document header.',
+              },
+              product_description: {
+                type: 'string',
+                description: 'One-line description of the product if the BOM provides one (e.g. "non-alcoholic drink").',
+              },
+              unit_size_value: {
+                type: 'number',
+                description: 'Unit size numeric value if stated (e.g. 750 for a 750ml bottle, 330 for a 330ml can).',
+              },
+              unit_size_unit: {
+                type: 'string',
+                description: 'Unit of the size (ml, L, g, kg, etc.).',
               },
             },
           },
@@ -614,11 +653,11 @@ export async function POST(request: NextRequest) {
           wasteBill: toolUse.input as ExtractedFacilityBillData<ExtractedWasteEntry>,
         } satisfies IngestResponse)
       case 'identify_bom': {
-        const input = toolUse.input as { note?: string }
+        const input = toolUse.input as IngestResponse['bom']
         const stashId = await stashFile(serviceClient, file, organizationId, user.id)
         return NextResponse.json({
           type: 'bom',
-          bom: { note: input?.note, stashId: stashId ?? undefined },
+          bom: { ...(input || {}), stashId: stashId ?? undefined },
         } satisfies IngestResponse)
       }
       case 'identify_soil_carbon_evidence': {
