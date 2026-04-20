@@ -109,7 +109,9 @@ export type FeatureCode =
   // Arable Fields / Grain Growing (beta)
   | "arable_beta"
   // Pulse (beta)
-  | "pulse_beta";
+  | "pulse_beta"
+  // Breww brewery-management integration (beta)
+  | "breww_integration_beta";
 
 export type TierName = "seed" | "blossom" | "canopy";
 export type TierLevel = 1 | 2 | 3;
@@ -423,7 +425,7 @@ export function useSubscription() {
   const hasFeature = useCallback(
     (featureCode: FeatureCode): boolean => {
       // Beta features require explicit admin grant via feature_flags — tier fallback is intentionally skipped
-      const betaOnlyFeatures: FeatureCode[] = ['impact_valuation_beta', 'epr_beta', 'xero_integration_beta', 'viticulture_beta', 'orchard_beta', 'arable_beta', 'pulse_beta'];
+      const betaOnlyFeatures: FeatureCode[] = ['impact_valuation_beta', 'epr_beta', 'xero_integration_beta', 'viticulture_beta', 'orchard_beta', 'arable_beta', 'pulse_beta', 'breww_integration_beta'];
       if (betaOnlyFeatures.includes(featureCode)) {
         return state.usage?.features?.includes(featureCode) ?? false;
       }
@@ -545,6 +547,8 @@ function getRequiredTierForFeature(featureCode: FeatureCode): TierName {
     "arable_beta",
     // Pulse — admin-granted only during beta
     "pulse_beta",
+    // Breww brewery integration — canopy tier OR admin-granted via feature_flags
+    "breww_integration_beta",
   ];
 
   const blossomFeatures: FeatureCode[] = [
