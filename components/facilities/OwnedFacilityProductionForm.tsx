@@ -368,9 +368,9 @@ export function OwnedFacilityProductionForm({
         </AlertDescription>
       </Alert>
 
-      <Card className="bg-slate-900/50 border-slate-800">
+      <Card className="bg-card dark:bg-slate-900/50 border-border dark:border-slate-800">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-white">
+          <CardTitle className="flex items-center gap-2 text-foreground">
             <Calendar className="h-5 w-5 text-blue-400" />
             Reporting Period
           </CardTitle>
@@ -387,7 +387,7 @@ export function OwnedFacilityProductionForm({
                 type="date"
                 value={reportingPeriodStart}
                 onChange={(e) => setReportingPeriodStart(e.target.value)}
-                className="bg-slate-800 border-slate-700"
+                className="bg-background dark:bg-slate-800 border-border dark:border-slate-700"
               />
             </div>
             <div>
@@ -397,7 +397,7 @@ export function OwnedFacilityProductionForm({
                 type="date"
                 value={reportingPeriodEnd}
                 onChange={(e) => setReportingPeriodEnd(e.target.value)}
-                className="bg-slate-800 border-slate-700"
+                className="bg-background dark:bg-slate-800 border-border dark:border-slate-700"
               />
             </div>
           </div>
@@ -445,9 +445,9 @@ export function OwnedFacilityProductionForm({
                 placeholder="e.g., 100000"
                 value={facilityTotalEmissions || ""}
                 onChange={(e) => setFacilityTotalEmissions(parseFloat(e.target.value) || null)}
-                className="bg-slate-800 border-slate-700"
+                className="bg-background dark:bg-slate-800 border-border dark:border-slate-700"
               />
-              <p className="text-xs text-slate-400 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Enter the total Scope 1 & 2 emissions for {facilityName} during this period
               </p>
             </div>
@@ -455,9 +455,9 @@ export function OwnedFacilityProductionForm({
         </Card>
       )}
 
-      <Card className="bg-slate-900/50 border-slate-800">
+      <Card className="bg-card dark:bg-slate-900/50 border-border dark:border-slate-800">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-white">
+          <CardTitle className="flex items-center gap-2 text-foreground">
             <Building2 className="h-5 w-5 text-blue-400" />
             Product Production Volume
           </CardTitle>
@@ -468,8 +468,8 @@ export function OwnedFacilityProductionForm({
         <CardContent className="space-y-6">
           <div className="space-y-4">
             <div>
-              <Label className="text-base font-medium text-white">Product Volume</Label>
-              <p className="text-xs text-slate-400 mb-2">The amount of this specific product manufactured</p>
+              <Label className="text-base font-medium text-foreground">Product Volume</Label>
+              <p className="text-xs text-muted-foreground mb-2">The amount of this specific product manufactured</p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="productVolume">Volume</Label>
@@ -481,13 +481,13 @@ export function OwnedFacilityProductionForm({
                     placeholder="e.g., 50000"
                     value={productVolume}
                     onChange={(e) => setProductVolume(e.target.value)}
-                    className="bg-slate-800 border-slate-700"
+                    className="bg-background dark:bg-slate-800 border-border dark:border-slate-700"
                   />
                 </div>
                 <div>
                   <Label htmlFor="productUnit">Unit</Label>
                   <Select value={productVolumeUnit} onValueChange={setProductVolumeUnit}>
-                    <SelectTrigger className="bg-slate-800 border-slate-700">
+                    <SelectTrigger className="bg-background dark:bg-slate-800 border-border dark:border-slate-700">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -504,15 +504,15 @@ export function OwnedFacilityProductionForm({
 
             {facilityTotalProduction && (
               <div className="pt-4 border-t border-slate-700">
-                <Label className="text-base font-medium text-white">Facility Total Production</Label>
-                <p className="text-xs text-slate-400 mb-2">
+                <Label className="text-base font-medium text-foreground">Facility Total Production</Label>
+                <p className="text-xs text-muted-foreground mb-2">
                   Auto-loaded from facility data for allocation calculation
                 </p>
-                <div className="p-4 bg-slate-800/50 rounded-md border border-slate-700">
-                  <p className="text-2xl font-bold text-white">
+                <div className="p-4 bg-muted/40 dark:bg-slate-800/50 rounded-md border border-border dark:border-slate-700">
+                  <p className="text-2xl font-bold text-foreground">
                     {facilityTotalProduction.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                   </p>
-                  <p className="text-xs text-slate-400 mt-1">{productVolumeUnit}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{productVolumeUnit}</p>
                 </div>
               </div>
             )}
@@ -533,60 +533,60 @@ export function OwnedFacilityProductionForm({
               <div className="p-4 bg-blue-500/10 rounded-md border border-blue-500/20">
                 <div className="flex items-center gap-2 mb-1">
                   <Percent className="h-4 w-4 text-blue-400" />
-                  <p className="text-xs text-slate-400">Allocation %</p>
+                  <p className="text-xs text-muted-foreground">Allocation %</p>
                 </div>
                 <p className="text-2xl font-bold text-blue-400 font-mono">
                   {allocationPercentage.toFixed(2)}%
                 </p>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   of facility output
                 </p>
               </div>
               <div className="p-4 bg-lime-500/10 rounded-md border border-lime-500/20">
                 <div className="flex items-center gap-2 mb-1">
                   <Factory className="h-4 w-4 text-lime-400" />
-                  <p className="text-xs text-slate-400">CO₂e</p>
+                  <p className="text-xs text-muted-foreground">CO₂e</p>
                 </div>
                 <p className="text-2xl font-bold text-lime-400 font-mono">
                   {allocatedEmissions.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </p>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   kg CO₂e ({emissionIntensity.toFixed(4)}/{productVolumeUnit})
                 </p>
               </div>
               <div className="p-4 bg-blue-400/10 rounded-md border border-blue-400/20">
                 <div className="flex items-center gap-2 mb-1">
                   <Building2 className="h-4 w-4 text-blue-400" />
-                  <p className="text-xs text-slate-400">Water</p>
+                  <p className="text-xs text-muted-foreground">Water</p>
                 </div>
                 <p className="text-2xl font-bold text-blue-400 font-mono">
                   {((facilityTotalWater || 0) * allocationPercentage / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </p>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   litres ({((facilityTotalWater || 0) * allocationPercentage / 100 / (parseFloat(productVolume) || 1)).toFixed(4)}/{productVolumeUnit})
                 </p>
               </div>
               <div className="p-4 bg-amber-500/10 rounded-md border border-amber-500/20">
                 <div className="flex items-center gap-2 mb-1">
                   <Building2 className="h-4 w-4 text-amber-400" />
-                  <p className="text-xs text-slate-400">Waste</p>
+                  <p className="text-xs text-muted-foreground">Waste</p>
                 </div>
                 <p className="text-2xl font-bold text-amber-400 font-mono">
                   {((facilityTotalWaste || 0) * allocationPercentage / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </p>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   kg ({((facilityTotalWaste || 0) * allocationPercentage / 100 / (parseFloat(productVolume) || 1)).toFixed(4)}/{productVolumeUnit})
                 </p>
               </div>
-              <div className="p-4 bg-slate-700/30 rounded-md border border-slate-600/20">
+              <div className="p-4 bg-muted/60 dark:bg-slate-700/30 rounded-md border border-border dark:border-slate-600/20">
                 <div className="flex items-center gap-2 mb-1">
-                  <Factory className="h-4 w-4 text-slate-400" />
-                  <p className="text-xs text-slate-400">Facility Total</p>
+                  <Factory className="h-4 w-4 text-muted-foreground" />
+                  <p className="text-xs text-muted-foreground">Facility Total</p>
                 </div>
-                <p className="text-2xl font-bold text-white font-mono">
+                <p className="text-2xl font-bold text-foreground font-mono">
                   {(facilityTotalProduction || 0).toLocaleString()}
                 </p>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   {productVolumeUnit}
                 </p>
               </div>
@@ -595,13 +595,13 @@ export function OwnedFacilityProductionForm({
             <div className="mt-6 pt-6 border-t border-slate-700">
               <div className="flex items-center justify-between text-sm">
                 <div>
-                  <p className="text-slate-400">Calculation Method:</p>
+                  <p className="text-muted-foreground">Calculation Method:</p>
                   <p className="text-white font-medium">Production Volume Allocation</p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap justify-end">
                   <Badge className="bg-blue-500/20 text-blue-300">Scope 1 & 2</Badge>
                   <Badge className="bg-green-500/20 text-green-300">Owned Facility</Badge>
-                  <Badge variant="outline" className="text-slate-300">
+                  <Badge variant="outline" className="text-foreground">
                     DEFRA {emissionFactorYear || (reportingPeriodEnd ? new Date(reportingPeriodEnd).getFullYear() : new Date().getFullYear())}
                   </Badge>
                 </div>

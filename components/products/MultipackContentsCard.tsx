@@ -46,15 +46,15 @@ export function MultipackContentsCard({ productId, productName, onEdit }: Multip
 
   if (isLoading) {
     return (
-      <Card className="backdrop-blur-xl bg-white/5 border border-white/10 animate-pulse">
+      <Card className="backdrop-blur-xl bg-card dark:bg-white/5 border border-border dark:border-white/10 animate-pulse">
         <CardHeader>
-          <div className="h-6 w-48 bg-white/10 rounded" />
-          <div className="h-4 w-32 bg-white/10 rounded mt-2" />
+          <div className="h-6 w-48 bg-muted dark:bg-white/10 rounded" />
+          <div className="h-4 w-32 bg-muted dark:bg-white/10 rounded mt-2" />
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            <div className="h-16 bg-white/10 rounded" />
-            <div className="h-16 bg-white/10 rounded" />
+            <div className="h-16 bg-muted dark:bg-white/10 rounded" />
+            <div className="h-16 bg-muted dark:bg-white/10 rounded" />
           </div>
         </CardContent>
       </Card>
@@ -70,13 +70,13 @@ export function MultipackContentsCard({ productId, productName, onEdit }: Multip
               <Layers className="h-5 w-5 text-indigo-400" />
             </div>
             <div>
-              <CardTitle className="text-white flex items-center gap-2">
+              <CardTitle className="text-foreground flex items-center gap-2">
                 Multipack Contents
-                <Badge className="bg-indigo-500/20 text-indigo-300 border-indigo-500/30">
+                <Badge className="bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border-indigo-500/30">
                   {totalUnits} units
                 </Badge>
               </CardTitle>
-              <CardDescription className="text-slate-400">
+              <CardDescription className="text-muted-foreground">
                 {components.length} product{components.length !== 1 ? "s" : ""} in this multipack
               </CardDescription>
             </div>
@@ -102,7 +102,7 @@ export function MultipackContentsCard({ productId, productName, onEdit }: Multip
               key={component.id}
               href={`/products/${component.component_product_id}`}
             >
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer group">
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/40 dark:bg-white/5 border border-border dark:border-white/10 hover:bg-muted/60 dark:hover:bg-white/10 transition-colors cursor-pointer group">
                 {component.component_product?.product_image_url ? (
                   <img
                     src={component.component_product.product_image_url}
@@ -110,23 +110,23 @@ export function MultipackContentsCard({ productId, productName, onEdit }: Multip
                     className="w-12 h-12 rounded object-cover"
                   />
                 ) : (
-                  <div className="w-12 h-12 rounded bg-slate-800 flex items-center justify-center">
-                    <Package className="h-6 w-6 text-slate-500" />
+                  <div className="w-12 h-12 rounded bg-muted dark:bg-slate-800 flex items-center justify-center">
+                    <Package className="h-6 w-6 text-muted-foreground" />
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-white truncate">
+                    <span className="font-medium text-foreground truncate">
                       {component.component_product?.name || "Unknown Product"}
                     </span>
                     {component.component_product?.is_multipack && (
-                      <Badge variant="secondary" className="text-xs bg-purple-500/20 text-purple-300">
+                      <Badge variant="secondary" className="text-xs bg-purple-500/20 text-purple-700 dark:text-purple-300">
                         <Layers className="h-3 w-3 mr-1" />
                         Multipack
                       </Badge>
                     )}
                   </div>
-                  <div className="text-xs text-slate-400">
+                  <div className="text-xs text-muted-foreground">
                     {component.component_product?.sku && (
                       <span>SKU: {component.component_product.sku}</span>
                     )}
@@ -140,10 +140,10 @@ export function MultipackContentsCard({ productId, productName, onEdit }: Multip
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge className="bg-indigo-500/20 text-indigo-300 border-indigo-500/30">
+                  <Badge className="bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border-indigo-500/30">
                     x{component.quantity}
                   </Badge>
-                  <ArrowRight className="h-4 w-4 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
               </div>
             </Link>
@@ -152,22 +152,22 @@ export function MultipackContentsCard({ productId, productName, onEdit }: Multip
 
         {/* Secondary Packaging */}
         {packaging.length > 0 && (
-          <div className="pt-3 border-t border-white/10">
+          <div className="pt-3 border-t border-border dark:border-white/10">
             <div className="flex items-center gap-2 mb-3">
-              <Box className="h-4 w-4 text-slate-400" />
-              <span className="text-sm text-slate-400">Secondary Packaging</span>
-              <span className="text-xs text-slate-500">({totalPackagingWeight}g total)</span>
+              <Box className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Secondary Packaging</span>
+              <span className="text-xs text-muted-foreground">({totalPackagingWeight}g total)</span>
             </div>
             <div className="flex flex-wrap gap-2">
               {packaging.map((pkg) => (
                 <Badge
                   key={pkg.id}
                   variant="outline"
-                  className="bg-white/5 text-slate-300 border-slate-700"
+                  className="bg-muted/40 dark:bg-white/5 text-foreground border-border dark:border-slate-700"
                 >
                   {pkg.material_name} ({pkg.weight_grams}g)
                   {pkg.is_recyclable && (
-                    <span className="ml-1 text-green-400">♻</span>
+                    <span className="ml-1 text-green-600 dark:text-green-400">♻</span>
                   )}
                 </Badge>
               ))}
@@ -181,8 +181,8 @@ export function MultipackContentsCard({ productId, productName, onEdit }: Multip
             c.component_product?.certifications &&
             c.component_product.certifications.length > 0
         ) && (
-          <div className="pt-3 border-t border-white/10">
-            <span className="text-sm text-slate-400 block mb-2">
+          <div className="pt-3 border-t border-border dark:border-white/10">
+            <span className="text-sm text-muted-foreground block mb-2">
               Certifications from components
             </span>
             <div className="flex flex-wrap gap-2">
@@ -198,7 +198,7 @@ export function MultipackContentsCard({ productId, productName, onEdit }: Multip
               ).map((certName) => (
                 <Badge
                   key={certName}
-                  className="bg-green-500/20 text-green-300 border-green-500/30"
+                  className="bg-green-500/20 text-green-700 dark:text-green-300 border-green-500/30"
                 >
                   {certName}
                 </Badge>

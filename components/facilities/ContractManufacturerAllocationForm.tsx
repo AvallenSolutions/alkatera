@@ -607,9 +607,9 @@ export function ContractManufacturerAllocationForm({
         </AlertDescription>
       </Alert>
 
-      <Card className="bg-slate-900/50 border-slate-800">
+      <Card className="bg-card dark:bg-slate-900/50 border-border dark:border-slate-800">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-white">
+          <CardTitle className="flex items-center gap-2 text-foreground">
             <Calendar className="h-5 w-5 text-lime-400" />
             Reporting Period
           </CardTitle>
@@ -626,7 +626,7 @@ export function ContractManufacturerAllocationForm({
                 type="date"
                 value={reportingPeriodStart}
                 onChange={(e) => setReportingPeriodStart(e.target.value)}
-                className="bg-slate-800 border-slate-700"
+                className="bg-background dark:bg-slate-800 border-border dark:border-slate-700"
               />
             </div>
             <div>
@@ -636,16 +636,16 @@ export function ContractManufacturerAllocationForm({
                 type="date"
                 value={reportingPeriodEnd}
                 onChange={(e) => setReportingPeriodEnd(e.target.value)}
-                className="bg-slate-800 border-slate-700"
+                className="bg-background dark:bg-slate-800 border-border dark:border-slate-700"
               />
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <Card className="bg-slate-900/50 border-slate-800">
+      <Card className="bg-card dark:bg-slate-900/50 border-border dark:border-slate-800">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-white">
+          <CardTitle className="flex items-center gap-2 text-foreground">
             <Factory className="h-5 w-5 text-lime-400" />
             Total Facility Production
             {loadingFacilityData && <Loader2 className="h-4 w-4 animate-spin text-blue-400" />}
@@ -677,7 +677,7 @@ export function ContractManufacturerAllocationForm({
                 placeholder="e.g., 1000000"
                 value={totalFacilityProductionVolume}
                 onChange={(e) => !isDataAutoLoaded && setTotalFacilityProductionVolume(e.target.value)}
-                className={`bg-slate-800 border-slate-700 ${isDataAutoLoaded ? 'opacity-60 cursor-not-allowed' : ''}`}
+                className={`bg-background dark:bg-slate-800 border-border dark:border-slate-700 ${isDataAutoLoaded ? 'opacity-60 cursor-not-allowed' : ''}`}
                 disabled={loadingFacilityData || isDataAutoLoaded}
                 readOnly={isDataAutoLoaded}
               />
@@ -688,7 +688,7 @@ export function ContractManufacturerAllocationForm({
                 {isDataAutoLoaded && <Badge className="bg-blue-500/20 text-blue-300 text-xs">Auto-loaded</Badge>}
               </Label>
               <Select value={productionVolumeUnit} onValueChange={(value) => !isDataAutoLoaded && setProductionVolumeUnit(value)} disabled={loadingFacilityData || isDataAutoLoaded}>
-                <SelectTrigger className={`bg-slate-800 border-slate-700 ${isDataAutoLoaded ? 'opacity-60' : ''}`}>
+                <SelectTrigger className={`bg-background dark:bg-slate-800 border-border dark:border-slate-700 ${isDataAutoLoaded ? 'opacity-60' : ''}`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -759,9 +759,9 @@ export function ContractManufacturerAllocationForm({
       </Card>
 
       {!useProxyData && (
-        <Card className="bg-slate-900/50 border-slate-800">
+        <Card className="bg-card dark:bg-slate-900/50 border-border dark:border-slate-800">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-white">
+            <CardTitle className="flex items-center gap-2 text-foreground">
               <Zap className="h-5 w-5 text-lime-400" />
               Input B: Facility Energy & Emissions
             </CardTitle>
@@ -771,7 +771,7 @@ export function ContractManufacturerAllocationForm({
           </CardHeader>
           <CardContent className="space-y-4">
             <Tabs value={co2eEntryMethod} onValueChange={(v) => setCo2eEntryMethod(v as "direct" | "calculated_from_energy")}>
-              <TabsList className="grid w-full grid-cols-2 bg-slate-800">
+              <TabsList className="grid w-full grid-cols-2 bg-muted dark:bg-slate-800">
                 <TabsTrigger value="direct">Direct CO2e Entry</TabsTrigger>
                 <TabsTrigger value="calculated_from_energy">Raw Energy Data</TabsTrigger>
               </TabsList>
@@ -787,9 +787,9 @@ export function ContractManufacturerAllocationForm({
                   placeholder="e.g., 50000"
                   value={directCo2eValue}
                   onChange={(e) => setDirectCo2eValue(e.target.value)}
-                  className="bg-slate-800 border-slate-700"
+                  className="bg-background dark:bg-slate-800 border-border dark:border-slate-700"
                 />
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   Enter the total CO2e if already calculated
                 </p>
               </div>
@@ -803,7 +803,7 @@ export function ContractManufacturerAllocationForm({
                     value={emissionFactorYear.toString()}
                     onValueChange={(v) => setEmissionFactorYear(parseInt(v))}
                   >
-                    <SelectTrigger className="w-32 bg-slate-800 border-slate-700">
+                    <SelectTrigger className="w-32 bg-background dark:bg-slate-800 border-border dark:border-slate-700">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -822,13 +822,13 @@ export function ContractManufacturerAllocationForm({
               </div>
 
               {energyInputs.length === 0 ? (
-                <div className="text-center py-8 text-slate-400">
+                <div className="text-center py-8 text-muted-foreground">
                   No energy sources added. Click &quot;Add Energy Source&quot; to begin.
                 </div>
               ) : (
                 <div className="space-y-3">
                   {energyInputs.map((input) => (
-                    <Card key={input.id} className="bg-slate-800/50 border-slate-700">
+                    <Card key={input.id} className="bg-muted/40 dark:bg-slate-800/50 border-border dark:border-slate-700">
                       <CardContent className="p-4">
                         <div className="grid grid-cols-12 gap-3 items-end">
                           <div className="col-span-4">
@@ -837,7 +837,7 @@ export function ContractManufacturerAllocationForm({
                               value={input.fuelType}
                               onValueChange={(v) => updateEnergyInput(input.id, "fuelType", v)}
                             >
-                              <SelectTrigger className="bg-slate-900 border-slate-600">
+                              <SelectTrigger className="bg-background dark:bg-slate-900 border-border dark:border-slate-600">
                                 <SelectValue placeholder="Select fuel" />
                               </SelectTrigger>
                               <SelectContent>
@@ -858,7 +858,7 @@ export function ContractManufacturerAllocationForm({
                               placeholder="0"
                               value={input.consumptionValue}
                               onChange={(e) => updateEnergyInput(input.id, "consumptionValue", e.target.value)}
-                              className="bg-slate-900 border-slate-600"
+                              className="bg-background dark:bg-slate-900 border-border dark:border-slate-600"
                             />
                           </div>
                           <div className="col-span-2">
@@ -866,12 +866,12 @@ export function ContractManufacturerAllocationForm({
                             <Input
                               value={input.consumptionUnit}
                               disabled
-                              className="bg-slate-900 border-slate-600"
+                              className="bg-background dark:bg-slate-900 border-border dark:border-slate-600"
                             />
                           </div>
                           <div className="col-span-2">
                             <Label className="text-xs">CO2e (kg)</Label>
-                            <div className="h-10 px-3 flex items-center bg-slate-900 border border-slate-600 rounded-md text-lime-400 font-mono">
+                            <div className="h-10 px-3 flex items-center bg-background dark:bg-slate-900 border border-border dark:border-slate-600 rounded-md text-lime-400 font-mono">
                               {input.calculatedCo2e.toFixed(2)}
                             </div>
                           </div>
@@ -887,7 +887,7 @@ export function ContractManufacturerAllocationForm({
                           </div>
                         </div>
                         {input.emissionFactorUsed > 0 && (
-                          <p className="text-xs text-slate-500 mt-2">
+                          <p className="text-xs text-muted-foreground mt-2">
                             Factor: {input.emissionFactorUsed} kgCO2e/{input.consumptionUnit} (DEFRA {input.emissionFactorYear})
                           </p>
                         )}
@@ -900,7 +900,7 @@ export function ContractManufacturerAllocationForm({
               {energyInputs.length > 0 && (
                 <div className="flex justify-end pt-2">
                   <div className="text-right">
-                    <p className="text-xs text-slate-400">Total Facility CO2e</p>
+                    <p className="text-xs text-muted-foreground">Total Facility CO2e</p>
                     <p className="text-xl font-bold text-lime-400 font-mono">
                       {totalFacilityCo2e.toLocaleString(undefined, { maximumFractionDigits: 2 })} kg
                     </p>
@@ -913,9 +913,9 @@ export function ContractManufacturerAllocationForm({
       </Card>
       )}
 
-      <Card className="bg-slate-900/50 border-slate-800">
+      <Card className="bg-card dark:bg-slate-900/50 border-border dark:border-slate-800">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-white">
+          <CardTitle className="flex items-center gap-2 text-foreground">
             <Calculator className="h-5 w-5 text-lime-400" />
             Input C: Client Production Volume
           </CardTitle>
@@ -935,7 +935,7 @@ export function ContractManufacturerAllocationForm({
                 placeholder="e.g., 100000"
                 value={clientProductionVolume}
                 onChange={(e) => setClientProductionVolume(e.target.value)}
-                className="bg-slate-800 border-slate-700"
+                className="bg-background dark:bg-slate-800 border-border dark:border-slate-700"
               />
             </div>
             <div>
@@ -943,7 +943,7 @@ export function ContractManufacturerAllocationForm({
               <Input
                 value={PRODUCTION_UNITS.find((u) => u.value === productionVolumeUnit)?.label || productionVolumeUnit}
                 disabled
-                className="bg-slate-800 border-slate-700"
+                className="bg-background dark:bg-slate-800 border-border dark:border-slate-700"
               />
             </div>
           </div>
@@ -1011,49 +1011,49 @@ export function ContractManufacturerAllocationForm({
         <CardContent>
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
             <div className="p-4 bg-blue-500/10 rounded-md border border-blue-500/20">
-              <p className="text-xs text-slate-400">Attribution Ratio</p>
+              <p className="text-xs text-muted-foreground">Attribution Ratio</p>
               <p className="text-2xl font-bold text-blue-400 font-mono">
                 {(attributionRatio * 100).toFixed(2)}%
               </p>
-              <p className="text-xs text-slate-500 mt-1">of facility output</p>
+              <p className="text-xs text-muted-foreground mt-1">of facility output</p>
             </div>
             <div className="p-4 bg-lime-500/10 rounded-md border border-lime-500/20">
-              <p className="text-xs text-slate-400">CO₂e</p>
+              <p className="text-xs text-muted-foreground">CO₂e</p>
               <p className="text-2xl font-bold text-lime-400 font-mono">
                 {allocatedEmissions.toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </p>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 kg ({emissionIntensity.toFixed(4)}/{productionVolumeUnit})
               </p>
             </div>
             <div className="p-4 bg-blue-400/10 rounded-md border border-blue-400/20">
-              <p className="text-xs text-slate-400">Water</p>
+              <p className="text-xs text-muted-foreground">Water</p>
               <p className="text-2xl font-bold text-blue-400 font-mono">
                 {allocatedWater.toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </p>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 litres ({waterIntensity.toFixed(4)}/{productionVolumeUnit})
               </p>
             </div>
             <div className="p-4 bg-amber-500/10 rounded-md border border-amber-500/20">
-              <p className="text-xs text-slate-400">Waste</p>
+              <p className="text-xs text-muted-foreground">Waste</p>
               <p className="text-2xl font-bold text-amber-400 font-mono">
                 {allocatedWaste.toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </p>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 kg ({wasteIntensity.toFixed(4)}/{productionVolumeUnit})
               </p>
             </div>
-            <div className="p-4 bg-slate-700/30 rounded-md border border-slate-600/20">
-              <p className="text-xs text-slate-400">Total Facility</p>
-              <p className="text-2xl font-bold text-white font-mono">
+            <div className="p-4 bg-muted/60 dark:bg-slate-700/30 rounded-md border border-border dark:border-slate-600/20">
+              <p className="text-xs text-muted-foreground">Total Facility</p>
+              <p className="text-2xl font-bold text-foreground font-mono">
                 {totalFacilityCo2e.toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </p>
-              <p className="text-xs text-slate-500 mt-1">kg CO₂e</p>
+              <p className="text-xs text-muted-foreground mt-1">kg CO₂e</p>
             </div>
           </div>
 
-          <div className="mt-4 pt-4 border-t border-slate-700">
+          <div className="mt-4 pt-4 border-t border-border dark:border-slate-700">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2 flex-wrap">
                 {useProxyData ? (
@@ -1064,16 +1064,16 @@ export function ContractManufacturerAllocationForm({
                     <Badge variant="outline" className="text-amber-300">
                       +{proxyMapping?.recommended_buffer_percentage}% Buffer
                     </Badge>
-                    <Badge variant="outline" className="text-slate-300">
+                    <Badge variant="outline" className="text-foreground">
                       Ecoinvent {proxyMapping?.ecoinvent_version}
                     </Badge>
                   </>
                 ) : (
                   <>
-                    <Badge variant="outline" className="text-slate-300">
+                    <Badge variant="outline" className="text-foreground">
                       {co2eEntryMethod === "direct" ? "Direct Entry" : "Calculated from Energy"}
                     </Badge>
-                    <Badge variant="outline" className="text-slate-300">
+                    <Badge variant="outline" className="text-foreground">
                       DEFRA {emissionFactorYear}
                     </Badge>
                   </>

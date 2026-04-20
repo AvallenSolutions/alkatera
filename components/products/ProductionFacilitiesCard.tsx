@@ -180,20 +180,20 @@ export function ProductionFacilitiesCard({
 
   if (loading) {
     return (
-      <Card className="bg-slate-900/50 border-slate-800">
+      <Card className="bg-card dark:bg-slate-900/50 border-border dark:border-slate-800">
         <CardContent className="p-6">
-          <div className="animate-pulse text-slate-400">Loading facilities...</div>
+          <div className="animate-pulse text-muted-foreground">Loading facilities...</div>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="bg-slate-900/50 border-slate-800">
+    <Card className="bg-card dark:bg-slate-900/50 border-border dark:border-slate-800">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-white flex items-center gap-2">
+            <CardTitle className="text-foreground flex items-center gap-2">
               <Factory className="h-5 w-5 text-blue-400" />
               Production Facilities
             </CardTitle>
@@ -214,9 +214,9 @@ export function ProductionFacilitiesCard({
       <CardContent className="space-y-6">
         {facilities.length === 0 ? (
           <div className="text-center py-12">
-            <Factory className="h-12 w-12 mx-auto mb-4 text-slate-600" />
-            <h4 className="text-lg font-medium text-white mb-2">No Production Facilities</h4>
-            <p className="text-sm text-slate-400 mb-4 max-w-md mx-auto">
+            <Factory className="h-12 w-12 mx-auto mb-4 text-muted-foreground/60" />
+            <h4 className="text-lg font-medium text-foreground mb-2">No Production Facilities</h4>
+            <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
               Assign facilities to track where this product is manufactured and allocate
               production emissions
             </p>
@@ -232,35 +232,35 @@ export function ProductionFacilitiesCard({
           <>
             {/* Summary Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 bg-slate-800/50 rounded-md border border-slate-700">
+              <div className="p-4 bg-muted/40 dark:bg-slate-800/50 rounded-md border border-border dark:border-slate-700">
                 <div className="flex items-center gap-2 mb-1">
                   <Building2 className="h-4 w-4 text-blue-400" />
-                  <span className="text-xs text-slate-400">Total Facilities</span>
+                  <span className="text-xs text-muted-foreground">Total Facilities</span>
                 </div>
-                <p className="text-2xl font-bold text-white">{stats.total}</p>
+                <p className="text-2xl font-bold text-foreground">{stats.total}</p>
               </div>
 
-              <div className="p-4 bg-slate-800/50 rounded-md border border-slate-700">
+              <div className="p-4 bg-muted/40 dark:bg-slate-800/50 rounded-md border border-border dark:border-slate-700">
                 <div className="flex items-center gap-2 mb-1">
                   <CheckCircle2 className="h-4 w-4 text-green-400" />
-                  <span className="text-xs text-slate-400">With Allocations</span>
+                  <span className="text-xs text-muted-foreground">With Allocations</span>
                 </div>
-                <p className="text-2xl font-bold text-white">
+                <p className="text-2xl font-bold text-foreground">
                   {stats.withAllocations}/{stats.total}
                 </p>
               </div>
 
-              <div className="p-4 bg-slate-800/50 rounded-md border border-slate-700">
+              <div className="p-4 bg-muted/40 dark:bg-slate-800/50 rounded-md border border-border dark:border-slate-700">
                 <div className="flex items-center gap-2 mb-1">
                   <TrendingUp className="h-4 w-4 text-lime-400" />
-                  <span className="text-xs text-slate-400">Total Allocated</span>
+                  <span className="text-xs text-muted-foreground">Total Allocated</span>
                 </div>
                 <p className="text-xl font-bold text-lime-400">
                   {getTotalAllocatedEmissions().toLocaleString(undefined, {
                     maximumFractionDigits: 0,
                   })}
                 </p>
-                <p className="text-xs text-slate-500">kg CO₂e</p>
+                <p className="text-xs text-muted-foreground">kg CO₂e</p>
               </div>
             </div>
 
@@ -269,15 +269,15 @@ export function ProductionFacilitiesCard({
               {facilities.map((facility) => (
                 <div
                   key={facility.facilityId}
-                  className="p-4 bg-slate-800/50 rounded-md border border-slate-700 hover:border-lime-500/50 transition-all cursor-pointer"
+                  className="p-4 bg-muted/40 dark:bg-slate-800/50 rounded-md border border-border dark:border-slate-700 hover:border-lime-600/50 dark:hover:border-lime-500/50 transition-all cursor-pointer"
                   onClick={() => handleFacilityClick(facility.facilityId)}
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-medium text-white">{facility.facilityName}</h4>
+                        <h4 className="font-medium text-foreground">{facility.facilityName}</h4>
                         {facility.primaryFacility && (
-                          <Badge className="bg-blue-500/20 text-blue-300 text-xs">
+                          <Badge className="bg-blue-500/20 text-blue-700 dark:text-blue-300 text-xs">
                             Primary
                           </Badge>
                         )}
@@ -285,8 +285,8 @@ export function ProductionFacilitiesCard({
                           variant="outline"
                           className={
                             facility.operationalControl === "owned"
-                              ? "border-green-500/50 text-green-300"
-                              : "border-blue-500/50 text-blue-300"
+                              ? "border-green-500/50 text-green-700 dark:text-green-300"
+                              : "border-blue-500/50 text-blue-700 dark:text-blue-300"
                           }
                         >
                           {facility.operationalControl === "owned" ? "Owned" : "3rd Party"}
@@ -300,7 +300,7 @@ export function ProductionFacilitiesCard({
                         )}
                       </div>
                       {facility.city && (
-                        <div className="flex items-center gap-1 text-sm text-slate-400">
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
                           <MapPin className="h-3 w-3" />
                           <span>
                             {facility.city}, {facility.country}
@@ -311,7 +311,7 @@ export function ProductionFacilitiesCard({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-slate-400 hover:text-lime-400"
+                      className="text-muted-foreground hover:text-lime-400"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleFacilityClick(facility.facilityId);
@@ -321,7 +321,7 @@ export function ProductionFacilitiesCard({
                     </Button>
                   </div>
 
-                  <div className="flex items-center justify-between pt-3 border-t border-slate-700">
+                  <div className="flex items-center justify-between pt-3 border-t border-border dark:border-slate-700">
                     {facility.hasAllocations && facility.latestAllocation ? (
                       <>
                         <div className="flex items-center gap-2">
@@ -334,7 +334,7 @@ export function ProductionFacilitiesCard({
                               )}{" "}
                               kg CO₂e
                             </p>
-                            <p className="text-xs text-slate-400">
+                            <p className="text-xs text-muted-foreground">
                               {new Date(
                                 facility.latestAllocation.reporting_period_start
                               ).toLocaleDateString()}{" "}
@@ -348,8 +348,8 @@ export function ProductionFacilitiesCard({
                         <Badge
                           className={
                             facility.latestAllocation.status === "verified"
-                              ? "bg-green-500/20 text-green-300"
-                              : "bg-amber-500/20 text-amber-300"
+                              ? "bg-green-500/20 text-green-700 dark:text-green-300"
+                              : "bg-amber-500/20 text-amber-700 dark:text-amber-300"
                           }
                         >
                           {facility.latestAllocation.status}
