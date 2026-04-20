@@ -513,6 +513,18 @@ const featureInfo: Partial<Record<FeatureCode, FeatureInfo>> = {
     icon: Link2,
     category: "Platform",
   },
+  breww_integration_beta: {
+    name: "Breww Integration (Beta)",
+    description:
+      "Connect your Breww account to sync production volumes and products directly into alkatera. No more typing in hectolitres.",
+    benefits: [
+      "Pull production volumes per product per month",
+      "Keep emissions-per-hectolitre live as you brew",
+      "Skip the manual monthly data entry",
+    ],
+    icon: Link2,
+    category: "Integrations",
+  },
   knowledge_bank_manage: {
     name: "Knowledge Bank (Upload & Manage)",
     description:
@@ -604,6 +616,7 @@ const featureNames: Record<FeatureCode, string> = {
   orchard_beta: "Orchards (Beta)",
   arable_beta: "Arable Fields (Beta)",
   pulse_beta: "Pulse (Beta)",
+  breww_integration_beta: "Breww Integration (Beta)",
 };
 
 const tierDisplayNames: Record<TierName, string> = {
