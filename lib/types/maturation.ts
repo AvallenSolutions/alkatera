@@ -75,6 +75,29 @@ export interface MaturationProfile {
 }
 
 // ---------------------------------------------------------------------------
+// Liquid Template payload — volume-independent subset of MaturationProfile
+// stored in ingredients_templates.maturation JSONB. Excludes id/product_id/
+// organization_id/timestamps and batch-level fields (bottles_produced,
+// number_of_barrels, fill_volume_litres) which must be re-entered per product.
+// ---------------------------------------------------------------------------
+
+export interface MaturationTemplateData {
+  barrel_type: BarrelType;
+  barrel_volume_litres: number;
+  barrel_use_number: number;
+  barrel_co2e_new: number | null;
+  aging_duration_months: number;
+  angel_share_percent_per_year: number;
+  climate_zone: ClimateZone;
+  cask_fill_abv_percent: number | null;
+  warehouse_energy_kwh_per_barrel_year: number;
+  warehouse_energy_source: EnergySource;
+  warehouse_country_code: string | null;
+  allocation_method: AllocationMethod;
+  notes: string | null;
+}
+
+// ---------------------------------------------------------------------------
 // Calculator output
 // ---------------------------------------------------------------------------
 

@@ -325,7 +325,7 @@ export function RecipeEditorPanel({
                       }}
                     >
                       <Copy className="h-3.5 w-3.5 mr-1.5" />
-                      Apply Template
+                      Apply Liquid Template
                     </Button>
                     <Button
                       variant="outline"
@@ -337,7 +337,7 @@ export function RecipeEditorPanel({
                       disabled={ingredientCount === 0}
                     >
                       <BookmarkPlus className="h-3.5 w-3.5 mr-1.5" />
-                      Save as Template
+                      Save as Liquid Template
                     </Button>
                   </div>
                 </div>
@@ -586,9 +586,15 @@ export function RecipeEditorPanel({
         currentIngredients={ingredientForms}
         currentProductVolumeValue={product?.unit_size_value ?? null}
         currentProductVolumeUnit={product?.unit_size_unit ?? null}
+        currentMaturation={maturationProfile}
+        productId={productId}
+        productCategory={productCategory ?? null}
         onApplyTemplate={(items) => {
           setIngredientsFromTemplate(items);
           setShowIngredientTemplateDialog(false);
+        }}
+        onMaturationApplied={() => {
+          fetchProductData();
         }}
       />
     </div>

@@ -5,6 +5,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { toast } from "sonner";
 import type { IngredientFormData } from "@/components/products/IngredientFormCard";
 import type { DistributionLeg } from "@/lib/distribution-factors";
+import type { MaturationProfile, MaturationTemplateData } from "@/lib/types/maturation";
 
 export interface IngredientTemplateItem {
   name: string;
@@ -44,9 +45,74 @@ export interface IngredientTemplate {
   source_volume_value: number | null;
   source_volume_unit: string | null;
   items: IngredientTemplateItem[];
+  maturation: MaturationTemplateData | null;
+  has_maturation: boolean;
   created_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Strip batch-level and DB-managed fields from a full MaturationProfile
+ * so it can be stored as a reusable Liquid Template payload.
+ */
+export function maturationProfileToTemplate(
+  profile: MaturationProfile
+): MaturationTemplateData {
+  return {
+    barrel_type: profile.barrel_type,
+    barrel_volume_litres: profile.barrel_volume_litres,
+    barrel_use_number: profile.barrel_use_number,
+    barrel_co2e_new: profile.barrel_co2e_new,
+    aging_duration_months: profile.aging_duration_months,
+    angel_share_percent_per_year: profile.angel_share_percent_per_year,
+    climate_zone: profile.climate_zone,
+    cask_fill_abv_percent: profile.cask_fill_abv_percent,
+    warehouse_energy_kwh_per_barrel_year: profile.warehouse_energy_kwh_per_barrel_year,
+    warehouse_energy_source: profile.warehouse_energy_source,
+    warehouse_country_code: profile.warehouse_country_code,
+    allocation_method: profile.allocation_method,
+    notes: profile.notes,
+  };
+}
+
+/**
+ * Upsert a maturation template into public.maturation_profiles for the given
+ * product. Supabase JS lacks native ON CONFLICT, so we select first then
+ * insert-or-update. Batch-level fields default to placeholders that the user
+ * must revisit on the Maturation Profile card.
+ */
+export async function applyMaturationTemplate(
+  template: MaturationTemplateData,
+  productId: number,
+  organizationId: string
+): Promise<void> {
+  const supabase = getSupabaseBrowserClient();
+  const { data: existing, error: selectError } = await supabase
+    .from("maturation_profiles")
+    .select("id")
+    .eq("product_id", productId)
+    .maybeSingle();
+
+  if (selectError) throw selectError;
+
+  if (existing?.id) {
+    const { error } = await supabase
+      .from("maturation_profiles")
+      .update(template)
+      .eq("id", existing.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from("maturation_profiles").insert({
+      ...template,
+      product_id: productId,
+      organization_id: organizationId,
+      fill_volume_litres: template.barrel_volume_litres,
+      number_of_barrels: 1,
+      bottles_produced: null,
+    });
+    if (error) throw error;
+  }
 }
 
 /**
@@ -178,7 +244,8 @@ export function useIngredientsTemplates(organizationId: string) {
       description: string | null,
       items: IngredientFormData[],
       sourceVolumeValue: number | null,
-      sourceVolumeUnit: string | null
+      sourceVolumeUnit: string | null,
+      maturation: MaturationTemplateData | null = null
     ) => {
       const supabase = getSupabaseBrowserClient();
       const {
@@ -196,6 +263,7 @@ export function useIngredientsTemplates(organizationId: string) {
         source_volume_value: sourceVolumeValue,
         source_volume_unit: sourceVolumeUnit,
         items: templateItems,
+        maturation,
         created_by: user?.id || null,
       });
 
@@ -208,7 +276,7 @@ export function useIngredientsTemplates(organizationId: string) {
         throw error;
       }
 
-      toast.success("Ingredients template saved");
+      toast.success(maturation ? "Liquid template saved" : "Ingredients template saved");
       await fetchTemplates();
     },
     [organizationId, fetchTemplates]
@@ -263,20 +331,26 @@ export function useIngredientsTemplates(organizationId: string) {
       id: string,
       items: IngredientFormData[],
       sourceVolumeValue: number | null,
-      sourceVolumeUnit: string | null
+      sourceVolumeUnit: string | null,
+      maturation: MaturationTemplateData | null | undefined = undefined
     ) => {
       const supabase = getSupabaseBrowserClient();
       const templateItems = items
         .filter((item) => item.name.trim())
         .map(ingredientToTemplateItem);
 
+      const updatePayload: Record<string, unknown> = {
+        items: templateItems,
+        source_volume_value: sourceVolumeValue,
+        source_volume_unit: sourceVolumeUnit,
+      };
+      if (maturation !== undefined) {
+        updatePayload.maturation = maturation;
+      }
+
       const { error } = await supabase
         .from("ingredients_templates")
-        .update({
-          items: templateItems,
-          source_volume_value: sourceVolumeValue,
-          source_volume_unit: sourceVolumeUnit,
-        })
+        .update(updatePayload)
         .eq("id", id);
 
       if (error) {
