@@ -3,6 +3,11 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import * as cheerio from 'cheerio';
 
+// Scraping up to 10 pages + a Claude call comfortably exceeds the default
+// 10s function timeout. Without this, sites like buswhisky.com time out before
+// Claude responds and the client sees a generic "something went wrong" error.
+export const maxDuration = 90;
+
 // SSRF protection: block private/internal IP ranges
 const BLOCKED_HOSTS = [
   /^localhost$/i,
@@ -217,36 +222,58 @@ export async function POST(request: NextRequest) {
     const visitedUrls = new Set<string>([normalizedUrl]);
     const baseHost = parsedUrl.host;
 
-    // Crawl subpages — prioritise pages likely to contain products
-    const productKeywords = /product|shop|range|beer|wine|spirit|drink|cider|whisky|gin|vodka|rum|ale|lager|blend|vintage|collection|store/i;
-    const subpageLinks = mainPage.links
-      .filter(link => {
-        try {
-          const linkUrl = new URL(link, normalizedUrl);
-          return linkUrl.host === baseHost && !visitedUrls.has(linkUrl.href);
-        } catch { return false; }
-      })
-      .sort((a, b) => {
-        // Prioritise product-related links
-        const aScore = productKeywords.test(a) ? 1 : 0;
-        const bScore = productKeywords.test(b) ? 1 : 0;
-        return bScore - aScore;
-      })
-      .slice(0, 9); // Up to 9 subpages + main = 10 total
-
-    for (const link of subpageLinks) {
+    // Crawl subpages — prioritise pages likely to contain products.
+    // Score the path + query only: the hostname itself often contains a
+    // keyword like "whisky" or "wine" on branded domains, which would
+    // otherwise make every link score equally and defeat the sort.
+    // Shop/cart/account pages are actively deprioritised.
+    const productKeywords = /product|shop|store|range|collection|catalog|beer|wine|spirit|cider|whisky|whiskey|gin|vodka|rum|ale|lager|slijterij|boutique|tienda|negozio/i;
+    const skipKeywords = /account|login|signin|signup|register|winkelwagen|cart|checkout|basket|wishlist|privacy|terms|contact/i;
+    // Dedupe by pathname so tracking params don't eat subpage slots
+    // (buswhisky.com had three /bed-breakfast-...?ft-ticket=… duplicates).
+    const seenPaths = new Set<string>();
+    const resolvedLinks: string[] = [];
+    for (const link of mainPage.links) {
       try {
-        const absoluteUrl = new URL(link, normalizedUrl).href;
-        if (visitedUrls.has(absoluteUrl)) continue;
-        visitedUrls.add(absoluteUrl);
+        const u = new URL(link, normalizedUrl);
+        if (u.host !== baseHost) continue;
+        if (visitedUrls.has(u.href)) continue;
+        if (seenPaths.has(u.pathname)) continue;
+        seenPaths.add(u.pathname);
+        resolvedLinks.push(u.href);
+      } catch { /* ignore */ }
+    }
+    const subpageLinks = resolvedLinks
+      .map(href => {
+        const path = (() => { try { return new URL(href).pathname + new URL(href).search; } catch { return href; } })();
+        const score =
+          skipKeywords.test(path) ? -1 :
+          productKeywords.test(path) ? 1 :
+          0;
+        return { href, score };
+      })
+      .filter(x => x.score >= 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 9) // Up to 9 subpages + main = 10 total
+      .map(x => x.href);
 
-        const subPage = await fetchPageData(absoluteUrl, normalizedUrl);
-        if (subPage) {
-          allText += `\n\n--- Page: ${absoluteUrl} ---\n\n${subPage.text}`;
-          allImages = [...allImages, ...subPage.images];
+    // Fetch subpages in parallel — sequential fetching burns the function
+    // budget before Claude even starts (buswhisky.com: 7.5s → 2.8s).
+    const subPages = await Promise.all(
+      subpageLinks.map(async (absoluteUrl) => {
+        visitedUrls.add(absoluteUrl);
+        try {
+          return { url: absoluteUrl, data: await fetchPageData(absoluteUrl, normalizedUrl) };
+        } catch {
+          return { url: absoluteUrl, data: null };
         }
-      } catch {
-        // Skip failed subpages
+      }),
+    );
+
+    for (const { url: absoluteUrl, data: subPage } of subPages) {
+      if (subPage) {
+        allText += `\n\n--- Page: ${absoluteUrl} ---\n\n${subPage.text}`;
+        allImages = [...allImages, ...subPage.images];
       }
     }
 
