@@ -3,25 +3,21 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   listDrinks,
   listRecentBatches,
-  listBatchIngredientsUsed,
+  listAllStockItemsUsed,
   listContainerTypes,
+  batchDate,
+  batchVolumeHl,
   type BrewwBatch,
   type BrewwDrink,
+  type BrewwStockItemUsed,
+  type BrewwContainerType,
 } from './client'
 
 // Breww sync service — one-shot pull of the last 12 months of data.
-// Non-incremental by design: all tables have unique constraints and we upsert,
-// so running sync twice is idempotent.
-//
-// Three tables populated:
-//   brewery_production_runs    — monthly volume per product
-//   breww_ingredient_usage     — 12-month ingredient totals per product
-//   breww_container_types      — packaging container master data
+// Idempotent: upserts against unique constraints, so re-running is safe.
 
 const PROVIDER_SLUG = 'breww'
 const MONTHS_BACK = 12
-// Max concurrent ingredient-usage fetches. Breww allows 60 req/min.
-const INGREDIENT_CONCURRENCY = 5
 
 export interface SyncResult {
   batchesFetched: number
@@ -30,12 +26,6 @@ export interface SyncResult {
   totalHl: number
   ingredientsUpserted: number
   containerTypesUpserted: number
-}
-
-function batchVolumeHl(b: BrewwBatch): number {
-  if (typeof b.volume_hl === 'number' && Number.isFinite(b.volume_hl)) return b.volume_hl
-  if (typeof b.volume_l === 'number' && Number.isFinite(b.volume_l)) return b.volume_l / 100
-  return 0
 }
 
 function monthBounds(iso: string): { start: string; end: string } | null {
@@ -58,7 +48,6 @@ function windowBounds(monthsBack: number): { start: string; end: string } {
   }
 }
 
-/** Run all Breww-related syncs and return counts. */
 export async function syncBreww(
   serviceClient: SupabaseClient,
   organizationId: string,
@@ -70,11 +59,14 @@ export async function syncBreww(
     return d.toISOString()
   })()
 
-  // Fetch drinks, batches, and container types in parallel.
-  const [drinks, batches, containerTypes] = await Promise.all([
+  const [drinks, batches, containerTypes, stockItems] = await Promise.all([
     listDrinks(apiKey),
     listRecentBatches(apiKey, sinceISO),
     listContainerTypes(apiKey),
+    listAllStockItemsUsed(apiKey).catch((err) => {
+      console.warn('[breww/sync] stock-items-used fetch failed:', err?.message ?? err)
+      return [] as BrewwStockItemUsed[]
+    }),
   ])
 
   const drinkById = new Map<string, BrewwDrink>()
@@ -85,7 +77,7 @@ export async function syncBreww(
   )
 
   const ingredientsUpserted = await syncIngredientUsage(
-    serviceClient, organizationId, apiKey, batches, drinkById,
+    serviceClient, organizationId, batches, drinkById, stockItems,
   )
 
   const containerTypesUpserted = await syncContainerTypes(
@@ -110,9 +102,8 @@ async function syncProductionRuns(
   batches: BrewwBatch[],
   drinkById: Map<string, BrewwDrink>,
 ): Promise<[number, number]> {
-  type Key = string
   const aggregates = new Map<
-    Key,
+    string,
     {
       product_external_id: string
       product_name: string
@@ -124,14 +115,13 @@ async function syncProductionRuns(
   >()
 
   for (const b of batches) {
-    const iso = b.brewed_at || b.packaged_at
+    const iso = batchDate(b)
     if (!iso) continue
     const bounds = monthBounds(iso)
     if (!bounds) continue
-    const pid = String(b.drink_id ?? b.product_id ?? '')
+    const pid = b.drink ? String(b.drink.id) : ''
     if (!pid) continue
-    const drink = drinkById.get(pid)
-    const name = b.product_name || drink?.name || `Product ${pid}`
+    const name = b.drink?.name || drinkById.get(pid)?.name || `Product ${pid}`
     const key = `${pid}|${bounds.start}`
     const vol = batchVolumeHl(b)
     const cur = aggregates.get(key)
@@ -174,19 +164,34 @@ async function syncProductionRuns(
 
 // ─── Ingredient usage ─────────────────────────────────────────────────────────
 
+function ingredientNameOf(item: BrewwStockItemUsed): string | null {
+  return (
+    item.stock_received?.stock_item?.name ||
+    item.stock_received?.name ||
+    null
+  )
+}
+
 async function syncIngredientUsage(
   serviceClient: SupabaseClient,
   organizationId: string,
-  apiKey: string,
   batches: BrewwBatch[],
   drinkById: Map<string, BrewwDrink>,
+  stockItems: BrewwStockItemUsed[],
 ): Promise<number> {
+  if (stockItems.length === 0) return 0
   const window = windowBounds(MONTHS_BACK)
 
-  // Aggregate: (product_external_id, ingredient_name) → { total_quantity, unit }
-  type IngKey = string
+  // Map batch id → drink info so we can aggregate per product.
+  const batchToDrink = new Map<string, { id: string; name: string }>()
+  for (const b of batches) {
+    if (!b.drink) continue
+    const name = b.drink.name || drinkById.get(String(b.drink.id))?.name || `Product ${b.drink.id}`
+    batchToDrink.set(String(b.id), { id: String(b.drink.id), name })
+  }
+
   const aggregates = new Map<
-    IngKey,
+    string,
     {
       product_external_id: string
       product_name: string
@@ -196,43 +201,27 @@ async function syncIngredientUsage(
     }
   >()
 
-  // Fetch stock-items-used for all batches with controlled concurrency.
-  const batchChunks: BrewwBatch[][] = []
-  for (let i = 0; i < batches.length; i += INGREDIENT_CONCURRENCY) {
-    batchChunks.push(batches.slice(i, i + INGREDIENT_CONCURRENCY))
-  }
-
-  for (const chunk of batchChunks) {
-    const results = await Promise.allSettled(
-      chunk.map((b) => listBatchIngredientsUsed(apiKey, b.id)),
-    )
-    for (let i = 0; i < chunk.length; i++) {
-      const b = chunk[i]
-      const result = results[i]
-      if (result.status === 'rejected') {
-        console.warn(`[breww/sync] ingredient fetch failed for batch ${b.id}:`, result.reason)
-        continue
-      }
-      const pid = String(b.drink_id ?? b.product_id ?? '')
-      if (!pid) continue
-      const drink = drinkById.get(pid)
-      const productName = b.product_name || drink?.name || `Product ${pid}`
-
-      for (const item of result.value) {
-        const key = `${pid}|${item.stock_item_name}`
-        const cur = aggregates.get(key)
-        if (cur) {
-          cur.total_quantity += item.quantity
-        } else {
-          aggregates.set(key, {
-            product_external_id: pid,
-            product_name: productName,
-            ingredient_name: item.stock_item_name,
-            total_quantity: item.quantity,
-            unit: item.unit || 'kg',
-          })
-        }
-      }
+  for (const item of stockItems) {
+    const batchId = item.drink_batch?.id ? String(item.drink_batch.id) : ''
+    const drink = batchToDrink.get(batchId)
+    if (!drink) continue
+    const name = ingredientNameOf(item)
+    if (!name) continue
+    const key = `${drink.id}|${name}`
+    const cur = aggregates.get(key)
+    const qty = Number(item.quantity) || 0
+    if (cur) {
+      cur.total_quantity += qty
+    } else {
+      aggregates.set(key, {
+        product_external_id: drink.id,
+        product_name: drink.name,
+        ingredient_name: name,
+        total_quantity: qty,
+        // Breww quantities are SI (kg for solids, litres for liquids). Default to kg;
+        // a future enhancement can read unit hints off stock_received.stock_item.
+        unit: 'kg',
+      })
     }
   }
 
@@ -262,10 +251,12 @@ async function syncIngredientUsage(
 async function syncContainerTypes(
   serviceClient: SupabaseClient,
   organizationId: string,
-  containerTypes: Awaited<ReturnType<typeof listContainerTypes>>,
+  containerTypes: BrewwContainerType[],
 ): Promise<number> {
   let upserted = 0
   for (const ct of containerTypes) {
+    const litres = ct.gross_capacity?.litre ?? null
+    const kg = ct.default_weight?.kg ?? null
     const { error } = await serviceClient
       .from('breww_container_types')
       .upsert(
@@ -273,9 +264,9 @@ async function syncContainerTypes(
           organization_id: organizationId,
           external_id: String(ct.id),
           name: ct.name,
-          volume_ml: ct.volume_ml ?? null,
-          weight_g: ct.weight_g ?? null,
-          material_type: ct.material_type ?? null,
+          volume_ml: litres != null ? litres * 1000 : null,
+          weight_g: kg != null ? kg * 1000 : null,
+          material_type: ct.type ?? null,
           synced_at: new Date().toISOString(),
         },
         { onConflict: 'organization_id,external_id' },

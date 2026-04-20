@@ -16,36 +16,53 @@ export interface BrewwSite {
 }
 
 export interface BrewwDrink {
-  id: string | number
+  id: number
   name: string
-  sku?: string | null
+}
+
+export interface BrewwVolume {
+  litre?: number | null
+  us_gallon?: number | null
+}
+
+export interface BrewwWeight {
+  kg?: number | null
+  lb?: number | null
 }
 
 export interface BrewwBatch {
-  id: string | number
-  drink_id?: string | number
-  product_id?: string | number // fallback field name
-  product_name?: string
-  brewed_at?: string // ISO date
-  packaged_at?: string
-  volume_hl?: number
-  volume_l?: number
+  id: number
+  drink: BrewwDrink | null
+  batch_code?: string | null
+  status?: string | null
+  abv?: number | null
+  datetime_started?: string | null
+  datetime_completed?: string | null
+  planned_start_date?: string | null
+  planned_volume?: BrewwVolume | null
+  total_volume?: BrewwVolume | null
 }
 
+// /drink-batch-stock-items-used — top-level, filterable by drink_batch.
+// `stock_received` is the nested allocation; the ingredient name lives under
+// `stock_received.stock_item.name` in practice. Flagged optional to tolerate shape drift.
 export interface BrewwStockItemUsed {
-  id: string | number
-  stock_item_id: string | number
-  stock_item_name: string
+  id: number
+  drink_batch?: { id: number } | null
   quantity: number
-  unit: string
+  stock_received?: {
+    id?: number
+    stock_item?: { id?: number; name?: string | null } | null
+    name?: string | null
+  } | null
 }
 
 export interface BrewwContainerType {
-  id: string | number
+  id: number
   name: string
-  volume_ml?: number | null
-  weight_g?: number | null
-  material_type?: string | null
+  type?: string | null
+  gross_capacity?: BrewwVolume | null
+  default_weight?: BrewwWeight | null
 }
 
 class BrewwError extends Error {
@@ -110,24 +127,31 @@ export async function listDrinks(apiKey: string): Promise<BrewwDrink[]> {
   return brewwGetAll<BrewwDrink>('/drinks', apiKey)
 }
 
+/** Pick the most useful date on a batch (started → completed → planned). */
+export function batchDate(b: BrewwBatch): string | null {
+  return b.datetime_started || b.datetime_completed || b.planned_start_date || null
+}
+
+/** Convert a batch's best volume reading to hectolitres. */
+export function batchVolumeHl(b: BrewwBatch): number {
+  const litres = b.total_volume?.litre ?? b.planned_volume?.litre ?? 0
+  return (litres || 0) / 100
+}
+
 /** Drink batches since the given ISO date, across all pages. */
 export async function listRecentBatches(apiKey: string, sinceISO: string): Promise<BrewwBatch[]> {
-  const qs = new URLSearchParams({ since: sinceISO })
-  const batches = await brewwGetAll<BrewwBatch>(`/drink-batches?${qs.toString()}`, apiKey)
+  const batches = await brewwGetAll<BrewwBatch>('/drink-batches', apiKey)
   const since = new Date(sinceISO).getTime()
   return batches.filter((b) => {
-    const ts = b.brewed_at || b.packaged_at
+    const ts = batchDate(b)
     if (!ts) return true
     return new Date(ts).getTime() >= since
   })
 }
 
-/** Stock items (ingredients + packaging) consumed by a specific batch. */
-export async function listBatchIngredientsUsed(
-  apiKey: string,
-  batchId: string | number,
-): Promise<BrewwStockItemUsed[]> {
-  return brewwGetAll<BrewwStockItemUsed>(`/drink-batches/${batchId}/stock-items-used`, apiKey)
+/** All stock-item-used allocations. Top-level endpoint; filter by batch client-side. */
+export async function listAllStockItemsUsed(apiKey: string): Promise<BrewwStockItemUsed[]> {
+  return brewwGetAll<BrewwStockItemUsed>('/drink-batch-stock-items-used', apiKey)
 }
 
 /** All container types defined in the account. */
