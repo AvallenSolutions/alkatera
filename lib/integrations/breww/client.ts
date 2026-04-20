@@ -65,6 +65,78 @@ export interface BrewwContainerType {
   default_weight?: BrewwWeight | null
 }
 
+// /stock-items — master ingredient/material catalogue.
+export interface BrewwStockItem {
+  id: number
+  name: string
+  type?: string | null       // e.g. 'malt', 'hop', 'yeast', 'adjunct', 'packaging'
+  sub_type?: string | null
+  unit_stock_tracking_type?: string | null
+  obsolete?: boolean | null
+}
+
+// /ingredient-batches — prepped ingredients (yeast props, dry-hop blends).
+export interface BrewwIngredientBatch {
+  id: number
+  name?: string | null
+  stock_item?: { id: number; name?: string | null } | null
+  total_volume?: BrewwVolume | null
+  total_weight?: BrewwWeight | null
+  created_at?: string | null
+}
+
+// /ingredient-batch-stock-items-used — what went into an ingredient batch.
+export interface BrewwIngredientBatchStockItemUsed {
+  id: number
+  ingredient_batch?: { id: number } | null
+  drink_batch?: { id: number } | null
+  quantity: number
+  stock_received?: {
+    id?: number
+    stock_item?: { id?: number; name?: string | null } | null
+    name?: string | null
+  } | null
+}
+
+// /products — finished-goods SKU catalogue.
+export interface BrewwProduct {
+  id: number
+  name: string
+  sku?: string | null
+  only_container_type?: { id: number; name?: string | null } | null
+  liquid_volume_gross?: BrewwVolume | null
+  liquid_volume_taxable?: BrewwVolume | null
+  net_weight?: BrewwWeight | null
+  weight?: BrewwWeight | null
+  total_packaged_beer_quantity?: number | null
+  component_drinks?: Array<{ drink?: { id: number; name?: string | null } | null; quantity?: number | null }> | null
+  component_stock_items?: Array<{ stock_item?: { id: number; name?: string | null } | null; quantity?: number | null }> | null
+  obsolete?: boolean | null
+}
+
+// /planned-packagings — batch → SKU plan & actual packaged counts.
+export interface BrewwPlannedPackaging {
+  id: number
+  drink_batch?: { id: number } | null
+  product?: { id: number; name?: string | null } | null
+  quantity?: number | null
+  quantity_packaged_so_far?: number | null
+  volume?: BrewwVolume | null
+  date?: string | null
+  expected_release_date?: string | null
+}
+
+// /drink-batch-actions — actual packaging executions + losses.
+export interface BrewwDrinkBatchAction {
+  id: number
+  drink_batch?: { id: number } | null
+  action_type?: string | null
+  container_type?: { id: number; name?: string | null } | null
+  volume_successful?: BrewwVolume | null
+  volume_lost?: BrewwVolume | null
+  datetime?: string | null
+}
+
 class BrewwError extends Error {
   constructor(public status: number, message: string) {
     super(message)
@@ -138,11 +210,16 @@ export function batchVolumeHl(b: BrewwBatch): number {
   return (litres || 0) / 100
 }
 
+// Breww's /drink-batches returns all statuses. We want In-progress (2) and
+// Complete (3) — Planned batches have no allocations and would skew aggregates.
+const ACTIVE_BATCH_STATUSES = new Set(['2', '3', 'In-progress', 'Complete'])
+
 /** Drink batches since the given ISO date, across all pages. */
 export async function listRecentBatches(apiKey: string, sinceISO: string): Promise<BrewwBatch[]> {
   const batches = await brewwGetAll<BrewwBatch>('/drink-batches', apiKey)
   const since = new Date(sinceISO).getTime()
   return batches.filter((b) => {
+    if (b.status != null && !ACTIVE_BATCH_STATUSES.has(String(b.status))) return false
     const ts = batchDate(b)
     if (!ts) return true
     return new Date(ts).getTime() >= since
@@ -157,6 +234,41 @@ export async function listAllStockItemsUsed(apiKey: string): Promise<BrewwStockI
 /** All container types defined in the account. */
 export async function listContainerTypes(apiKey: string): Promise<BrewwContainerType[]> {
   return brewwGetAll<BrewwContainerType>('/container-types', apiKey)
+}
+
+/** Stock-item catalogue (malt, hops, yeast, packaging, etc.). */
+export async function listStockItems(apiKey: string): Promise<BrewwStockItem[]> {
+  return brewwGetAll<BrewwStockItem>('/stock-items', apiKey)
+}
+
+/** Prepped ingredient batches (e.g. yeast propagation, dry-hop blends). */
+export async function listIngredientBatches(apiKey: string): Promise<BrewwIngredientBatch[]> {
+  return brewwGetAll<BrewwIngredientBatch>('/ingredient-batches', apiKey)
+}
+
+/** Raw materials consumed by ingredient batches. */
+export async function listIngredientBatchStockItemsUsed(
+  apiKey: string,
+): Promise<BrewwIngredientBatchStockItemUsed[]> {
+  return brewwGetAll<BrewwIngredientBatchStockItemUsed>(
+    '/ingredient-batch-stock-items-used',
+    apiKey,
+  )
+}
+
+/** Finished-goods SKUs. */
+export async function listProducts(apiKey: string): Promise<BrewwProduct[]> {
+  return brewwGetAll<BrewwProduct>('/products', apiKey)
+}
+
+/** Planned (and partly-executed) packaging runs — batch → SKU plan. */
+export async function listPlannedPackagings(apiKey: string): Promise<BrewwPlannedPackaging[]> {
+  return brewwGetAll<BrewwPlannedPackaging>('/planned-packagings', apiKey)
+}
+
+/** Actual packaging actions with volume-successful / volume-lost. */
+export async function listDrinkBatchActions(apiKey: string): Promise<BrewwDrinkBatchAction[]> {
+  return brewwGetAll<BrewwDrinkBatchAction>('/drink-batch-actions', apiKey)
 }
 
 export { BrewwError }

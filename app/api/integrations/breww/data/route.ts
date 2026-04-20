@@ -15,14 +15,18 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = request.nextUrl
     const organizationId = searchParams.get('organizationId')
-    const table = searchParams.get('table') as 'production' | 'ingredients' | 'containers' | null
+    type DataTable = 'production' | 'ingredients' | 'containers' | 'stock_items' | 'skus' | 'packaging_runs'
+    const VALID_TABLES: DataTable[] = [
+      'production', 'ingredients', 'containers', 'stock_items', 'skus', 'packaging_runs',
+    ]
+    const table = searchParams.get('table') as DataTable | null
 
     if (!organizationId) {
       return NextResponse.json({ error: 'organizationId required' }, { status: 400 })
     }
-    if (!table || !['production', 'ingredients', 'containers'].includes(table)) {
+    if (!table || !VALID_TABLES.includes(table)) {
       return NextResponse.json(
-        { error: 'table must be one of: production, ingredients, containers' },
+        { error: `table must be one of: ${VALID_TABLES.join(', ')}` },
         { status: 400 },
       )
     }
@@ -41,13 +45,24 @@ export async function GET(request: NextRequest) {
       .maybeSingle()
     if (!membership) return NextResponse.json({ error: 'Access denied' }, { status: 403 })
 
-    const TABLE_MAP = {
+    const TABLE_MAP: Record<DataTable, string> = {
       production: 'brewery_production_runs',
       ingredients: 'breww_ingredient_usage',
       containers: 'breww_container_types',
-    } as const
+      stock_items: 'breww_stock_items',
+      skus: 'breww_products_skus',
+      packaging_runs: 'breww_packaging_runs',
+    }
 
-    const orderCol = table === 'containers' ? 'name' : 'product_name'
+    const ORDER_COL: Record<DataTable, string> = {
+      production: 'product_name',
+      ingredients: 'product_name',
+      containers: 'name',
+      stock_items: 'name',
+      skus: 'name',
+      packaging_runs: 'product_name',
+    }
+    const orderCol = ORDER_COL[table]
     const { data, error } = await serviceClient
       .from(TABLE_MAP[table])
       .select('*')

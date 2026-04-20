@@ -91,10 +91,13 @@ export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCa
       if (!quiet) {
         const hl = body.totalHl?.toFixed?.(1) ?? '0'
         const runs = body.runsUpserted ?? 0
+        const skus = body.skusUpserted ?? 0
         const ing = body.ingredientsUpserted ?? 0
+        const stock = body.stockItemsUpserted ?? 0
         const ct = body.containerTypesUpserted ?? 0
+        const pkg = body.packagingRunsUpserted ?? 0
         toast.success(
-          `Synced ${runs} product-months (${hl} hL), ${ing} ingredient records, ${ct} container types`,
+          `Synced ${runs} product-months (${hl} hL), ${skus} SKUs, ${ing} ingredients (from ${stock} stock items), ${ct} container types, ${pkg} packaging runs`,
         )
       }
       onChanged()
