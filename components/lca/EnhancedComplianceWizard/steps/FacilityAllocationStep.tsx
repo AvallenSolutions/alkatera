@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -17,9 +18,29 @@ import {
   Factory,
   Building2,
   Users,
+  Link2,
 } from 'lucide-react';
 import { PRODUCTION_UNITS } from '../types';
 import { useWizardContext } from '../WizardContext';
+
+interface BrewwSkuBreakdown {
+  sku_external_id: string;
+  sku_name: string;
+  litres: number;
+  fraction: number;
+}
+
+interface BrewwProductProduction {
+  linked: boolean;
+  drink_name?: string;
+  sku_name?: string;
+  sku_container?: string;
+  totalHl?: number;
+  skuPackagedLitres?: number;
+  totalDrinkPackagedLitres?: number;
+  allocationFraction?: number;
+  skuBreakdown?: BrewwSkuBreakdown[];
+}
 
 // ============================================================================
 // MAIN COMPONENT
@@ -33,6 +54,38 @@ export function FacilityAllocationStep() {
     facilityAllocations,
     reportingSessions,
   } = preCalcState;
+
+  const productId = preCalcState.product?.id;
+  const organizationId = preCalcState.product?.organization_id;
+  const [breww, setBreww] = useState<BrewwProductProduction | null>(null);
+  const [brewwLoading, setBrewwLoading] = useState(false);
+
+  useEffect(() => {
+    if (!productId || !organizationId) return;
+    let cancelled = false;
+    setBrewwLoading(true);
+    fetch(`/api/integrations/breww/product-production?organizationId=${organizationId}&productId=${productId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body) => { if (!cancelled && body) setBreww(body); })
+      .catch(() => { /* silent, Breww is optional */ })
+      .finally(() => { if (!cancelled) setBrewwLoading(false); });
+    return () => { cancelled = true };
+  }, [productId, organizationId]);
+
+  const applyBrewwVolumes = () => {
+    if (!breww?.linked || !breww.skuPackagedLitres || !breww.totalDrinkPackagedLitres) return;
+    const sku = String(breww.skuPackagedLitres);
+    const total = String(breww.totalDrinkPackagedLitres);
+    setPreCalcState((prev) => ({
+      ...prev,
+      facilityAllocations: prev.facilityAllocations.map((a) => ({
+        ...a,
+        productionVolume: sku,
+        facilityTotalProduction: total,
+        productionVolumeUnit: 'litres',
+      })),
+    }));
+  };
 
   const updateAllocation = (
     facilityId: string,
@@ -79,6 +132,61 @@ export function FacilityAllocationStep() {
           Confirm the production volumes and reporting periods for your LCA calculation.
         </p>
       </div>
+
+      {/* Breww allocation banner */}
+      {breww?.linked && breww.skuBreakdown && breww.skuBreakdown.length > 0 && (
+        <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-4 space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2">
+              <Link2 className="h-4 w-4 text-blue-600 mt-0.5" />
+              <div className="space-y-0.5">
+                <p className="text-sm font-medium">
+                  Breww data: {breww.drink_name}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {breww.totalDrinkPackagedLitres?.toLocaleString()} L packaged across {breww.skuBreakdown.length} container format{breww.skuBreakdown.length === 1 ? '' : 's'} in the last 12 months. This container ({breww.sku_container}) = {((breww.allocationFraction ?? 0) * 100).toFixed(1)}%.
+                </p>
+              </div>
+            </div>
+            {breww.skuPackagedLitres ? (
+              <Button size="sm" variant="outline" onClick={applyBrewwVolumes}>
+                Use Breww volumes
+              </Button>
+            ) : null}
+          </div>
+
+          <div className="space-y-1">
+            {breww.skuBreakdown.map((s) => {
+              const isThis = breww.sku_container === s.sku_name;
+              return (
+                <div
+                  key={s.sku_external_id}
+                  className={`flex items-center justify-between text-xs rounded px-2 py-1.5 ${
+                    isThis ? 'bg-blue-500/10 border border-blue-500/30' : ''
+                  }`}
+                >
+                  <span className={isThis ? 'font-medium' : 'text-muted-foreground'}>
+                    {isThis && <CheckCircle2 className="h-3 w-3 inline mr-1 text-blue-600" />}
+                    {s.sku_name}
+                  </span>
+                  <span className="tabular-nums">
+                    {s.litres.toLocaleString()} L · {(s.fraction * 100).toFixed(1)}%
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {breww.skuPackagedLitres === 0 && (
+            <Alert className="bg-amber-500/10 border-amber-500/30">
+              <Info className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-xs">
+                This product is linked to a Breww SKU with no packaged volume recorded. Link it to a different SKU, or enter volumes manually below.
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+      )}
 
       {/* Pre-populated info */}
       {linkedFacilities.length > 0 &&
