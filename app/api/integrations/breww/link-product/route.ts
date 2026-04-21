@@ -10,7 +10,7 @@ import { createClient } from '@supabase/supabase-js'
 // Removes the link.
 
 async function verifyMembership(
-  serviceClient: ReturnType<typeof createClient>,
+  serviceClient: any,
   organizationId: string,
   userId: string,
 ) {

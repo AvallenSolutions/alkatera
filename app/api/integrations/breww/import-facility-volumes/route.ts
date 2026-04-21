@@ -199,7 +199,7 @@ interface MonthRow {
 }
 
 async function buildPreview(
-  service: ReturnType<typeof createClient>,
+  service: any,
   organizationId: string,
   linkedSiteIds: string[],
   takenPeriods: Set<string>,
