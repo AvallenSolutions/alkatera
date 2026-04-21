@@ -10,6 +10,7 @@ import { PageLoader } from "@/components/ui/page-loader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ArrowLeft, AlertCircle, FileBarChart, Settings, FileText, Info, Calculator, Factory, Globe } from "lucide-react";
 import { ProductHeader } from "@/components/products/ProductHeader";
+import { BrewwSuggestionBanner } from "@/components/products/BrewwSuggestionBanner";
 import { OverviewTab } from "@/components/products/OverviewTab";
 import { SpecificationTab } from "@/components/products/SpecificationTab";
 import { FacilitiesTab } from "@/components/products/FacilitiesTab";
@@ -212,6 +213,7 @@ export default function ProductDashboardPage() {
         <div data-guide="product-header">
         <ProductHeader
           product={{
+            id: productId,
             name: product.name,
             sku: product.sku || "",
             image_url: product.product_image_url,
@@ -247,6 +249,10 @@ export default function ProductDashboardPage() {
             <Calculator className="mr-2 h-4 w-4" />
             Create LCA
           </Button>
+        </div>
+
+        <div className="mb-6">
+          <BrewwSuggestionBanner productId={productId} productName={product.name} />
         </div>
 
         {!isHealthy && (

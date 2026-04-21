@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { PageLoader } from "@/components/ui/page-loader";
 import { toast } from "sonner";
 import { EditFacilityDialog } from "@/components/facilities/EditFacilityDialog";
+import { BrewwLinkBadge as FacilityBrewwLinkBadge } from "@/components/facilities/BrewwLinkBadge";
 import { DirectDataEntry } from "@/components/facilities/DirectDataEntry";
 import { ProductionVolumeManager } from "@/components/facilities/ProductionVolumeManager";
 import { DataQualityConfidenceCard } from "@/components/facilities/DataQualityConfidenceCard";
@@ -276,13 +277,14 @@ export default function FacilityDetailPage() {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 mt-4">
+        <div className="flex flex-wrap gap-2 mt-4 items-center">
           {facility.functions.map((func: string) => (
             <Badge key={func} variant="secondary">{func}</Badge>
           ))}
           <Badge className={facility.operational_control === 'owned' ? 'bg-green-600' : 'bg-blue-600'}>
             {facility.operational_control === 'owned' ? 'Owned' : 'Third-Party'}
           </Badge>
+          <FacilityBrewwLinkBadge facilityId={facility.id} />
         </div>
       </div>
 

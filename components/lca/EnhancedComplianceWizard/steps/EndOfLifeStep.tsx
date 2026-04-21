@@ -35,6 +35,47 @@ interface MaterialRow {
   quantity: number;
   unit: string;
   pathways: RegionalDefaults;
+  /** True when defaults were seeded from the material's stored circularity fields (reuse_trips, end_of_life_pathway, recyclability_percent) rather than regional averages. */
+  fromCircularity?: boolean;
+  circularityLabel?: string;
+}
+
+// Build pathway defaults from a material's stored circularity fields.
+// Returns null if nothing is set on the row.
+function circularityPathways(
+  storedPathway: string | null | undefined,
+  recyclabilityPct: number | null,
+  regional: RegionalDefaults,
+): RegionalDefaults | null {
+  if (!storedPathway && recyclabilityPct == null) return null;
+
+  // Base: either 100% of the stored pathway, or the regional default.
+  const base: RegionalDefaults = storedPathway
+    ? (() => {
+        const map: Record<string, RegionalDefaults> = {
+          recycling: { recycling: 100, landfill: 0, incineration: 0, composting: 0, anaerobic_digestion: 0 },
+          reuse: { recycling: 100, landfill: 0, incineration: 0, composting: 0, anaerobic_digestion: 0 },
+          landfill: { recycling: 0, landfill: 100, incineration: 0, composting: 0, anaerobic_digestion: 0 },
+          incineration: { recycling: 0, landfill: 0, incineration: 100, composting: 0, anaerobic_digestion: 0 },
+          composting: { recycling: 0, landfill: 0, incineration: 0, composting: 100, anaerobic_digestion: 0 },
+        };
+        return map[storedPathway] ?? { ...regional };
+      })()
+    : { ...regional };
+
+  // Apply recyclability cap on recycling share and redistribute by regional
+  // landfill/incineration ratio.
+  if (recyclabilityPct != null && base.recycling > recyclabilityPct) {
+    const excess = base.recycling - recyclabilityPct;
+    const lf = regional.landfill ?? 0;
+    const inc = regional.incineration ?? 0;
+    const lfShare = lf + inc > 0 ? lf / (lf + inc) : 0.7;
+    base.recycling = recyclabilityPct;
+    base.landfill = (base.landfill ?? 0) + excess * lfShare;
+    base.incineration = (base.incineration ?? 0) + excess * (1 - lfShare);
+  }
+
+  return base;
 }
 
 // ============================================================================
@@ -82,13 +123,27 @@ export function EndOfLifeStep() {
         ? `${mat.material_name}`
         : label;
 
+      const regional = getRegionalDefaults(config.region, factorKey);
+      const storedPathway = (mat as any).end_of_life_pathway as string | null | undefined;
+      const rawRecyclability = (mat as any).recyclability_percent;
+      const recyclabilityPct = Number.isFinite(Number(rawRecyclability))
+        ? Math.max(0, Math.min(100, Number(rawRecyclability)))
+        : null;
+      const fromCirc = circularityPathways(storedPathway, recyclabilityPct, regional);
+
+      const circParts: string[] = [];
+      if (storedPathway) circParts.push(`${storedPathway} pathway`);
+      if (recyclabilityPct != null) circParts.push(`${recyclabilityPct}% recyclable`);
+
       rows.push({
         id: mat.id || `${factorKey}-${rows.length}`,
         name: displayName,
         factorKey,
         quantity,
         unit: mat.unit || 'kg',
-        pathways: getRegionalDefaults(config.region, factorKey),
+        pathways: fromCirc ?? regional,
+        fromCircularity: !!fromCirc,
+        circularityLabel: circParts.length > 0 ? circParts.join(' · ') : undefined,
       });
     }
 
@@ -123,10 +178,14 @@ export function EndOfLifeStep() {
 
     for (const row of materialRows) {
       if (!pathways[row.id]) {
-        // Try backwards-compat key (factorKey), then fall back to defaults
+        // Try backwards-compat key (factorKey), then fall back to defaults.
+        // Rows seeded from material circularity fields use row.pathways
+        // directly so the stored pathway/recyclability wins over regional.
         const legacy = existing[row.factorKey];
-        const defaults = getRegionalDefaults(config.region, row.factorKey);
-        pathways[row.id] = legacy
+        const defaults = row.fromCircularity
+          ? row.pathways
+          : getRegionalDefaults(config.region, row.factorKey);
+        pathways[row.id] = legacy && !row.fromCircularity
           ? { ...defaults, ...legacy }
           : defaults;
         changed = true;
@@ -140,10 +199,17 @@ export function EndOfLifeStep() {
   }, [materialRows.length]);
 
   const updateRegion = (region: EoLRegion) => {
-    // Reset all pathways to new region defaults
+    // Reset all pathways to new region defaults, but preserve rows that were
+    // seeded from material circularity fields — the user set reuse_trips /
+    // recyclability on the packaging itself, which trumps regional averages.
     const pathways: Record<string, RegionalDefaults> = {};
     for (const row of materialRows) {
-      pathways[row.id] = getRegionalDefaults(region, row.factorKey);
+      if (row.fromCircularity) {
+        const prior = config.pathways[row.id] || row.pathways;
+        pathways[row.id] = { anaerobic_digestion: 0, ...prior };
+      } else {
+        pathways[row.id] = getRegionalDefaults(region, row.factorKey);
+      }
     }
     updateField('eolConfig', { region, pathways });
   };
@@ -271,9 +337,23 @@ export function EndOfLifeStep() {
                       className="border-b last:border-b-0"
                     >
                       <td className="p-2">
-                        <div className="font-medium text-xs">{row.name}</div>
+                        <div className="font-medium text-xs flex items-center gap-1.5 flex-wrap">
+                          {row.name}
+                          {row.fromCircularity && (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-full border border-[#ccff00]/40 bg-[#ccff00]/10 px-1.5 py-0.5 text-[9px] font-medium text-[#8da300] dark:text-[#ccff00]"
+                              title={row.circularityLabel || 'Seeded from packaging circularity'}
+                            >
+                              <Recycle className="h-2.5 w-2.5" />
+                              From packaging defaults
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[10px] text-muted-foreground">
                           {MATERIAL_TYPE_LABELS[row.factorKey] || row.factorKey}
+                          {row.fromCircularity && row.circularityLabel && (
+                            <> · {row.circularityLabel}</>
+                          )}
                         </div>
                       </td>
                       <td className="p-2 text-right text-xs text-muted-foreground tabular-nums">

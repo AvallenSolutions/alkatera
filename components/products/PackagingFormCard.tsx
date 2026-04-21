@@ -16,7 +16,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Trash2, Building2, Database, Sprout, Info, Package, Tag, Grip, Box, MapPin, Calculator, Truck, Layers, FileText, ChevronDown, ChevronRight, Plus, Loader2, Shield, CheckCircle2 } from "lucide-react";
+import { Trash2, Building2, Database, Sprout, Info, Package, Tag, Grip, Box, MapPin, Calculator, Truck, Layers, FileText, ChevronDown, ChevronRight, Plus, Loader2, Shield, CheckCircle2, Recycle } from "lucide-react";
+import { lookupPackagingDefaults } from "@/lib/constants/packaging-defaults";
 import {
   Collapsible,
   CollapsibleContent,
@@ -91,6 +92,11 @@ export interface PackagingFormData {
   epr_uk_nation?: EPRUKNation;
   epr_is_drinks_container: boolean;
   units_per_group: number | string;
+  // Circularity (optional — defaults to '' / null for all construction sites)
+  reuse_trips?: number | string;
+  recyclability_percent?: number | string;
+  end_of_life_pathway?: '' | 'landfill' | 'incineration' | 'recycling' | 'composting' | 'reuse' | 'unknown';
+  biobased_content_percentage?: number | string;
 }
 
 interface ProductionFacility {
@@ -1105,6 +1111,15 @@ export function PackagingFormCard({
                 </div>
               )}
 
+              {/* ── Circularity ─────────────────────────────────────────────
+                  Reuse amortisation + recycled content + end-of-life. Shown
+                  for primary + shared packaging; skipped for labels/closures
+                  where reuse doesn't make sense. */}
+              {packaging.packaging_category &&
+                ['container', 'secondary', 'tertiary'].includes(packaging.packaging_category) && (
+                <CircularitySection packaging={packaging} onUpdate={onUpdate} />
+              )}
+
               {/* EPR Material Breakdown Section */}
               <PackagingComponentEditor
                 components={packaging.components || []}
@@ -1436,5 +1451,179 @@ export function PackagingFormCard({
         </div>
       </div>
     </Card>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Circularity section: reuse amortisation + recycled content + recyclability
+// + end-of-life pathway. Collapsible to keep the form visually lean.
+// ────────────────────────────────────────────────────────────────────────────
+function CircularitySection({
+  packaging,
+  onUpdate,
+}: {
+  packaging: PackagingFormData;
+  onUpdate: (tempId: string, updates: Partial<PackagingFormData>) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(
+    !!(packaging.reuse_trips || packaging.recyclability_percent || packaging.end_of_life_pathway),
+  );
+  const trips = Number(packaging.reuse_trips) || 1;
+  const netWeightG = Number(packaging.net_weight_g) || 0;
+  const amortisedG = trips > 1 ? netWeightG / trips : netWeightG;
+  const isReusable = trips > 1;
+
+  const applyDefaults = () => {
+    const defaults = lookupPackagingDefaults(packaging.name);
+    if (!defaults) return;
+    const patch: Partial<PackagingFormData> = {};
+    if (defaults.reuse_trips && !packaging.reuse_trips) patch.reuse_trips = defaults.reuse_trips;
+    if (defaults.recycled_content_percentage != null && !packaging.recycled_content_percentage) {
+      patch.recycled_content_percentage = defaults.recycled_content_percentage;
+    }
+    if (defaults.recyclability_percent != null && !packaging.recyclability_percent) {
+      patch.recyclability_percent = defaults.recyclability_percent;
+    }
+    if (defaults.end_of_life_pathway && !packaging.end_of_life_pathway) {
+      patch.end_of_life_pathway = defaults.end_of_life_pathway;
+    }
+    if (Object.keys(patch).length > 0) onUpdate(packaging.tempId, patch);
+  };
+
+  const hasSuggestion = !!lookupPackagingDefaults(packaging.name);
+
+  return (
+    <div className="pt-2 border-t">
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" size="sm" className="gap-2 p-0 h-auto hover:bg-transparent w-full justify-start">
+            {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            <Recycle className="h-4 w-4 text-emerald-600" />
+            <span className="text-sm font-medium">Circularity</span>
+            {isReusable && (
+              <Badge variant="secondary" className="text-[10px] h-5 bg-emerald-50 text-emerald-700 border-emerald-200">
+                Reusable · {trips} trips
+              </Badge>
+            )}
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="mt-3 space-y-4">
+          {hasSuggestion && (
+            <Button type="button" variant="outline" size="sm" onClick={applyDefaults} className="h-7 text-xs">
+              Suggest defaults for &ldquo;{packaging.name}&rdquo;
+            </Button>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor={`reuse-trips-${packaging.tempId}`}>Reuse trips</Label>
+              <Input
+                id={`reuse-trips-${packaging.tempId}`}
+                type="number"
+                step="1"
+                min="1"
+                placeholder="Single use"
+                value={packaging.reuse_trips}
+                onChange={(e) => onUpdate(packaging.tempId, { reuse_trips: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Typical: firkin 100, keg 150, refillable glass 30. Leave blank for single-use.
+              </p>
+              {isReusable && netWeightG > 0 && (
+                <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1 font-medium">
+                  Per-unit impact: {amortisedG.toFixed(1)} g ({netWeightG.toFixed(0)} g ÷ {trips} trips)
+                </p>
+              )}
+            </div>
+
+            {packaging.packaging_category !== 'container' && (
+              <div>
+                <Label htmlFor={`recycled-nc-${packaging.tempId}`}>Recycled Content (%)</Label>
+                <Input
+                  id={`recycled-nc-${packaging.tempId}`}
+                  type="number"
+                  step="1"
+                  min="0"
+                  max="100"
+                  placeholder="0"
+                  value={packaging.recycled_content_percentage}
+                  onChange={(e) => onUpdate(packaging.tempId, { recycled_content_percentage: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  % of feedstock that is recycled material.
+                </p>
+              </div>
+            )}
+
+            <div>
+              <Label htmlFor={`recyclability-${packaging.tempId}`}>Recyclability (%)</Label>
+              <Input
+                id={`recyclability-${packaging.tempId}`}
+                type="number"
+                step="1"
+                min="0"
+                max="100"
+                placeholder="0"
+                value={packaging.recyclability_percent}
+                onChange={(e) => onUpdate(packaging.tempId, { recyclability_percent: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                % of this item that is recyclable in its destination market.
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor={`eol-${packaging.tempId}`}>End-of-life pathway</Label>
+              <Select
+                value={packaging.end_of_life_pathway || '__none__'}
+                onValueChange={(value) => onUpdate(packaging.tempId, {
+                  end_of_life_pathway: value === '__none__' ? '' : (value as PackagingFormData['end_of_life_pathway']),
+                })}
+              >
+                <SelectTrigger id={`eol-${packaging.tempId}`}>
+                  <SelectValue placeholder="Select pathway" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Not specified</SelectItem>
+                  <SelectItem value="reuse">Reuse</SelectItem>
+                  <SelectItem value="recycling">Recycling</SelectItem>
+                  <SelectItem value="composting">Composting</SelectItem>
+                  <SelectItem value="incineration">Incineration (with energy recovery)</SelectItem>
+                  <SelectItem value="landfill">Landfill</SelectItem>
+                  <SelectItem value="unknown">Unknown</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Most common fate for this item after consumer use.
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor={`biobased-${packaging.tempId}`}>Bio-based content (%)</Label>
+              <Input
+                id={`biobased-${packaging.tempId}`}
+                type="number"
+                step="1"
+                min="0"
+                max="100"
+                placeholder="0"
+                value={packaging.biobased_content_percentage}
+                onChange={(e) => onUpdate(packaging.tempId, { biobased_content_percentage: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                % of feedstock from renewable biological sources (optional).
+              </p>
+            </div>
+          </div>
+
+          <Alert className="bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900">
+            <Info className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
+            <AlertDescription className="text-xs text-emerald-900 dark:text-emerald-100">
+              Reuse trips amortise container weight across its service life (9 kg firkin ÷ 100 trips = 90 g/unit). Recycled content applies a 50% credit against the virgin-material climate impact (PAS 2050 cut-off).
+            </AlertDescription>
+          </Alert>
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
   );
 }

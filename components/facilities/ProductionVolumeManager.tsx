@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Package, Plus, Trash2 } from "lucide-react";
+import { Loader2, Package, Plus, Trash2, Download } from "lucide-react";
+import { BrewwImportDialog } from "@/components/facilities/BrewwImportDialog";
 import { toast } from "sonner";
 import { useReportingPeriod } from "@/hooks/useReportingPeriod";
 import { PRODUCTION_UNITS, FACILITY_ACTIVITY_TYPES } from "@/lib/constants/utility-types";
@@ -45,6 +46,27 @@ export function ProductionVolumeManager({
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [showBrewwImport, setShowBrewwImport] = useState(false);
+  const [brewwAvailable, setBrewwAvailable] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const res = await fetch(
+          `/api/integrations/breww/import-facility-volumes?organizationId=${organizationId}&facilityId=${facilityId}`,
+        );
+        if (!res.ok) return;
+        const body = await res.json();
+        if (cancelled) return;
+        setBrewwAvailable(body.connected === true);
+      } catch {
+        /* no-op — Breww unavailable */
+      }
+    };
+    check();
+    return () => { cancelled = true };
+  }, [facilityId, organizationId]);
 
   // Form state
   const [volume, setVolume] = useState("");
@@ -161,13 +183,36 @@ export function ProductionVolumeManager({
             </div>
           </div>
           {!showForm && (
-            <Button variant="outline" size="sm" onClick={() => setShowForm(true)}>
-              <Plus className="h-4 w-4 mr-1" /> Add Volume
-            </Button>
+            <div className="flex gap-2">
+              {brewwAvailable && (
+                <Button variant="outline" size="sm" onClick={() => setShowBrewwImport(true)}>
+                  <Download className="h-4 w-4 mr-1" /> Import from Breww
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={() => setShowForm(true)}>
+                <Plus className="h-4 w-4 mr-1" /> Add Volume
+              </Button>
+            </div>
           )}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Prominent Breww import CTA when this facility is linked */}
+        {brewwAvailable && !showForm && volumes.length === 0 && (
+          <div className="rounded-lg border border-[#ccff00]/40 bg-[#ccff00]/10 p-3 flex items-center gap-3">
+            <Download className="h-4 w-4 text-[#8da300] dark:text-[#ccff00] flex-shrink-0" />
+            <div className="flex-1 min-w-0 text-sm">
+              <div className="font-medium">Breww has production data for this site</div>
+              <div className="text-xs text-muted-foreground">
+                Review monthly brewing and packaging volumes from Breww and import what you need.
+              </div>
+            </div>
+            <Button size="sm" onClick={() => setShowBrewwImport(true)}>
+              Review and import
+            </Button>
+          </div>
+        )}
+
         {/* Add Form */}
         {showForm && (
           <div className="p-4 border rounded-lg bg-muted/30 space-y-4">
@@ -289,6 +334,18 @@ export function ProductionVolumeManager({
           </div>
         )}
       </CardContent>
+
+      {showBrewwImport && (
+        <BrewwImportDialog
+          open={showBrewwImport}
+          facilityId={facilityId}
+          organizationId={organizationId}
+          onClose={(imported) => {
+            setShowBrewwImport(false);
+            if (imported) fetchVolumes();
+          }}
+        />
+      )}
     </Card>
   );
 }

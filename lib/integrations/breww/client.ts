@@ -41,6 +41,11 @@ export interface BrewwBatch {
   planned_start_date?: string | null
   planned_volume?: BrewwVolume | null
   total_volume?: BrewwVolume | null
+  // Site where brewing happened. Breww's shape varies across endpoints;
+  // tolerate bare id, nested object, or legacy `brewery` alias.
+  site?: number | string | { id?: number | string; name?: string | null } | null
+  site_id?: number | string | null
+  brewery?: number | string | { id?: number | string; name?: string | null } | null
 }
 
 // /drink-batch-stock-items-used — top-level, filterable by drink_batch.
@@ -63,6 +68,12 @@ export interface BrewwContainerType {
   type?: string | null
   gross_capacity?: BrewwVolume | null
   default_weight?: BrewwWeight | null
+  default_net_weight?: BrewwWeight | null
+  // KEG-type containers can be marked as single-use (disposable plastic kegs).
+  // Absent/false = reusable. CASK sub_types (firkin, pin) are always reusable.
+  keg_single_use?: boolean | null
+  cask_sub_type?: string | null
+  smallpack_sub_type?: string | null
 }
 
 // /stock-items — master ingredient/material catalogue.
@@ -99,19 +110,33 @@ export interface BrewwIngredientBatchStockItemUsed {
 }
 
 // /products — finished-goods SKU catalogue.
+// Real shape (confirmed via sample response):
+// - `only_container_type` is a bare numeric id (not an object). Look up the
+//   name via `breww_container_types`.
+// - `component_drinks[].drink_id` and `drink_name` live at the top level of
+//   each entry (no nested `drink` object).
+// - There is no `sku` field; the Breww short code is `code`.
 export interface BrewwProduct {
   id: number
   name: string
-  sku?: string | null
-  only_container_type?: { id: number; name?: string | null } | null
+  code?: string | null
+  only_container_type?: number | null
+  only_drink_type?: number | null
   liquid_volume_gross?: BrewwVolume | null
   liquid_volume_taxable?: BrewwVolume | null
   net_weight?: BrewwWeight | null
   weight?: BrewwWeight | null
   total_packaged_beer_quantity?: number | null
-  component_drinks?: Array<{ drink?: { id: number; name?: string | null } | null; quantity?: number | null }> | null
-  component_stock_items?: Array<{ stock_item?: { id: number; name?: string | null } | null; quantity?: number | null }> | null
+  component_drinks?: Array<{
+    drink_id?: string | number | null
+    drink_name?: string | null
+    container_type?: string | null
+    container_type_id?: number | null
+    quantity_in_product?: number | null
+  }> | null
+  component_stock_items?: Array<any> | null
   obsolete?: boolean | null
+  type?: number | null
 }
 
 // /planned-packagings — batch → SKU plan & actual packaged counts.
@@ -124,6 +149,33 @@ export interface BrewwPlannedPackaging {
   volume?: BrewwVolume | null
   date?: string | null
   expected_release_date?: string | null
+  // Site where packaging happened. Shape varies; probe defensively.
+  site?: number | string | { id?: number | string; name?: string | null } | null
+  site_id?: number | string | null
+  packaging_site?: number | string | { id?: number | string; name?: string | null } | null
+}
+
+// Helper: extract (id, name) from any of the site fields we've seen on Breww.
+export function extractSite(obj: any): { id: string; name: string | null } | null {
+  const raw =
+    obj?.site ??
+    obj?.site_id ??
+    obj?.packaging_site ??
+    obj?.brewery ??
+    null
+  if (raw == null) return null
+  if (typeof raw === 'number' || typeof raw === 'string') {
+    return { id: String(raw), name: null }
+  }
+  if (typeof raw === 'object' && raw.id != null) {
+    return { id: String(raw.id), name: raw.name ?? null }
+  }
+  return null
+}
+
+/** List Breww sites. */
+export async function listSites(apiKey: string): Promise<BrewwSite[]> {
+  return brewwGetAll<BrewwSite>('/sites', apiKey)
 }
 
 // /drink-batch-actions — actual packaging executions + losses.

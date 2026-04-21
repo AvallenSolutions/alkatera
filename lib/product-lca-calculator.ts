@@ -17,6 +17,7 @@ import { calculateMultiHarvestAverage } from './orchard-multi-harvest';
 import type { Orchard } from './types/orchard';
 import { getGridFactor } from './grid-emission-factors';
 import { getAwareFactor } from './calculations/water-risk';
+import { DEFAULT_RECYCLED_CONTENT_CREDIT } from './constants/packaging-defaults';
 
 export interface FacilityAllocationInput {
   facilityId: string;
@@ -1023,6 +1024,60 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
               error.message
             );
           }
+        }
+
+        // Circularity: reuse + recycled content.
+        // For reusable containers (firkin = 100 trips, keg = 150, refillable
+        // bottle = 30) the same physical item serves multiple sales, so the
+        // per-unit packaging impact is 1/N of the single-trip impact. The
+        // quantity column stores the full container weight; we amortise here.
+        //
+        // Recycled-content credit: recycled inputs typically carry ~50% of
+        // virgin-material footprint (PAS 2050 cut-off convention). Applied as
+        // a multiplier on the climate impact only — water/land/etc. stay as
+        // reported by the factor since the credit is material-specific and
+        // most published factors are already for virgin inputs.
+        const rawReuseTrips = (material as any).reuse_trips;
+        const reuseTrips = Number.isFinite(Number(rawReuseTrips)) && Number(rawReuseTrips) >= 1
+          ? Number(rawReuseTrips)
+          : 1;
+        const rawRecycledPct = (material as any).recycled_content_percentage;
+        const recycledPct = Number.isFinite(Number(rawRecycledPct))
+          ? Math.max(0, Math.min(100, Number(rawRecycledPct)))
+          : 0;
+        const recycledMultiplier = 1 - (recycledPct / 100) * DEFAULT_RECYCLED_CONTENT_CREDIT;
+
+        if (material.material_type === 'packaging' && reuseTrips > 1) {
+          console.log(
+            `[calculateProductCarbonFootprint] Applying reuse amortisation: ÷${reuseTrips} trips for ${material.material_name}`
+          );
+          resolved.impact_climate /= reuseTrips;
+          resolved.impact_climate_fossil /= reuseTrips;
+          resolved.impact_climate_biogenic /= reuseTrips;
+          resolved.impact_climate_dluc /= reuseTrips;
+          if (resolved.ch4_kg) resolved.ch4_kg /= reuseTrips;
+          if (resolved.ch4_fossil_kg) resolved.ch4_fossil_kg /= reuseTrips;
+          if (resolved.ch4_biogenic_kg) resolved.ch4_biogenic_kg /= reuseTrips;
+          if (resolved.n2o_kg) resolved.n2o_kg /= reuseTrips;
+          resolved.impact_water /= reuseTrips;
+          resolved.impact_water_scarcity /= reuseTrips;
+          resolved.impact_land /= reuseTrips;
+          resolved.impact_waste /= reuseTrips;
+          if (resolved.impact_terrestrial_ecotoxicity) resolved.impact_terrestrial_ecotoxicity /= reuseTrips;
+          if (resolved.impact_freshwater_eutrophication) resolved.impact_freshwater_eutrophication /= reuseTrips;
+          if (resolved.impact_terrestrial_acidification) resolved.impact_terrestrial_acidification /= reuseTrips;
+          if (resolved.impact_fossil_resource_scarcity) resolved.impact_fossil_resource_scarcity /= reuseTrips;
+          transportEmissions /= reuseTrips;
+        }
+
+        if (material.material_type === 'packaging' && recycledMultiplier < 1) {
+          console.log(
+            `[calculateProductCarbonFootprint] Applying recycled-content credit: ×${recycledMultiplier.toFixed(3)} (${recycledPct}% recycled) for ${material.material_name}`
+          );
+          resolved.impact_climate *= recycledMultiplier;
+          resolved.impact_climate_fossil *= recycledMultiplier;
+          resolved.impact_climate_biogenic *= recycledMultiplier;
+          resolved.impact_climate_dluc *= recycledMultiplier;
         }
 
         // ISO 14044 §4.3.4.2 — Physical allocation for shared packaging

@@ -15,9 +15,26 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
 import {
-  Link2, Link2Off, Loader2, CheckCircle2, AlertTriangle, RefreshCcw, ExternalLink,
+  Link2, Link2Off, Loader2, CheckCircle2, AlertTriangle, RefreshCcw, ExternalLink, MoreHorizontal,
 } from 'lucide-react'
 
 interface ConnectionRow {
@@ -44,7 +61,11 @@ export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCa
   const [apiKey, setApiKey] = useState('')
   const [connecting, setConnecting] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [syncPhase, setSyncPhase] = useState<{ label: string; index: number; total: number } | null>(null)
+  const [rebuilding, setRebuilding] = useState(false)
   const [disconnecting, setDisconnecting] = useState(false)
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false)
+  const [showErrorDetails, setShowErrorDetails] = useState(false)
 
   const isConnected = connection?.status === 'active'
   const inError = connection?.status === 'error' || connection?.sync_status === 'error'
@@ -62,7 +83,7 @@ export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCa
         const body = await res.json().catch(() => ({}))
         throw new Error(body.error || 'Connection failed')
       }
-      toast.success('Breww connected — running first sync')
+      toast.success('Breww connected', { description: 'Running your first sync now...' })
       setDialogOpen(false)
       setApiKey('')
       onChanged()
@@ -77,34 +98,101 @@ export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCa
   const handleSync = async (quiet = false) => {
     if (!orgId) return
     setSyncing(true)
+    setSyncPhase(null)
+
+    const notifyDone = (body: any) => {
+      if (quiet) return
+      const hl = body?.totalHl?.toFixed?.(1) ?? '0'
+      const skus = body?.skusUpserted ?? 0
+      const ing = body?.ingredientsUpserted ?? 0
+      const ct = body?.containerTypesUpserted ?? 0
+      toast.success('Synced Breww data', {
+        description: `${skus} products · ${hl} hL · ${ing} ingredients · ${ct} packaging types`,
+      })
+    }
+
+    // Try SSE stream first for live progress; fall back to one-shot POST.
     try {
-      const res = await fetch('/api/integrations/breww/sync', {
+      const res = await fetch(`/api/integrations/breww/sync/stream?organizationId=${orgId}`)
+      if (!res.ok || !res.body) throw new Error('stream_unavailable')
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let finalResult: any = null
+      let streamError: string | null = null
+
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const parts = buffer.split('\n\n')
+        buffer = parts.pop() ?? ''
+        for (const part of parts) {
+          const line = part.split('\n').find((l) => l.startsWith('data:'))
+          if (!line) continue
+          try {
+            const evt = JSON.parse(line.slice(5).trim())
+            if (evt.type === 'phase') {
+              setSyncPhase({ label: evt.label, index: evt.index, total: evt.total })
+            } else if (evt.type === 'done') {
+              finalResult = evt.result
+            } else if (evt.type === 'error') {
+              streamError = evt.message || 'Sync failed'
+            }
+          } catch { /* ignore */ }
+        }
+      }
+
+      if (streamError) throw new Error(streamError)
+      notifyDone(finalResult)
+      onChanged()
+    } catch (err: any) {
+      if (err?.message && err.message !== 'stream_unavailable') {
+        toast.error('Sync failed', { description: err.message })
+      } else {
+        // Fallback: one-shot sync.
+        try {
+          const res = await fetch('/api/integrations/breww/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ organizationId: orgId }),
+          })
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}))
+            throw new Error(body.error || 'Sync failed')
+          }
+          const body = await res.json()
+          notifyDone(body)
+          onChanged()
+        } catch (err2: any) {
+          toast.error('Sync failed', { description: err2.message || 'Please try again' })
+        }
+      }
+    } finally {
+      setSyncing(false)
+      setSyncPhase(null)
+    }
+  }
+
+  const handleRebuildPackaging = async () => {
+    if (!orgId) return
+    setRebuilding(true)
+    try {
+      const res = await fetch('/api/integrations/breww/rebuild-packaging', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ organizationId: orgId }),
       })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error || 'Sync failed')
-      }
-      const body = await res.json()
-      if (!quiet) {
-        const hl = body.totalHl?.toFixed?.(1) ?? '0'
-        const runs = body.runsUpserted ?? 0
-        const skus = body.skusUpserted ?? 0
-        const ing = body.ingredientsUpserted ?? 0
-        const stock = body.stockItemsUpserted ?? 0
-        const ct = body.containerTypesUpserted ?? 0
-        const pkg = body.packagingRunsUpserted ?? 0
-        toast.success(
-          `Synced ${runs} product-months (${hl} hL), ${skus} SKUs, ${ing} ingredients (from ${stock} stock items), ${ct} container types, ${pkg} packaging runs`,
-        )
-      }
-      onChanged()
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body.error || 'Rebuild failed')
+      toast.success('Packaging rebuilt', {
+        description: `${body.processed} product${body.processed === 1 ? '' : 's'} updated with latest container defaults`,
+      })
     } catch (err: any) {
-      toast.error(err.message || 'Sync failed')
+      toast.error('Rebuild failed', { description: err.message || 'Please try again' })
     } finally {
-      setSyncing(false)
+      setRebuilding(false)
     }
   }
 
@@ -120,6 +208,7 @@ export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCa
         throw new Error(body.error || 'Disconnect failed')
       }
       toast.success('Breww disconnected')
+      setConfirmDisconnect(false)
       onChanged()
     } catch (err: any) {
       toast.error(err.message || 'Disconnect failed')
@@ -153,7 +242,7 @@ export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCa
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Syncs production volumes, batch ingredients, and packaging types from your Breww account.
+              Syncs production volumes, batch ingredients and packaging types from your Breww account. Links to your alka<strong>tera</strong> products and facilities so recipes and footprints update automatically.
             </p>
             {isConnected && connection?.last_sync_at && (
               <div className="mt-2 flex items-center gap-3 flex-wrap">
@@ -172,10 +261,37 @@ export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCa
               </div>
             )}
             {inError && connection?.sync_error && (
-              <p className="text-[11px] text-amber-700 dark:text-amber-300 mt-2 flex items-center gap-1.5">
-                <AlertTriangle className="h-3 w-3" />
-                {connection.sync_error.slice(0, 160)}
-              </p>
+              <div className="mt-2">
+                <div className="text-[11px] text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
+                  <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+                  <span>Sync failed. </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowErrorDetails((v) => !v)}
+                    className="underline"
+                  >
+                    {showErrorDetails ? 'Hide' : 'Show'} technical details
+                  </button>
+                </div>
+                {showErrorDetails && (
+                  <div className="mt-1.5 flex items-start gap-2">
+                    <pre className="flex-1 whitespace-pre-wrap text-[11px] font-mono bg-muted/50 rounded border p-2 overflow-x-auto max-h-32 overflow-y-auto">
+                      {connection.sync_error}
+                    </pre>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-[11px]"
+                      onClick={() => {
+                        navigator.clipboard.writeText(connection.sync_error || '')
+                        toast.success('Copied error to clipboard')
+                      }}
+                    >
+                      Copy
+                    </Button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
@@ -194,24 +310,45 @@ export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCa
                   className="gap-1.5"
                 >
                   {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5" />}
-                  Sync now
+                  {syncing && syncPhase
+                    ? `${syncPhase.label} (${syncPhase.index + 1}/${syncPhase.total})`
+                    : 'Sync now'}
                 </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={handleDisconnect}
-                  disabled={disconnecting}
-                  className="text-muted-foreground hover:text-red-500 gap-1.5"
-                >
-                  {disconnecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2Off className="h-3.5 w-3.5" />}
-                  Disconnect
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={handleRebuildPackaging}
+                      disabled={rebuilding}
+                    >
+                      {rebuilding ? (
+                        <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                      ) : (
+                        <RefreshCcw className="h-3.5 w-3.5 mr-2" />
+                      )}
+                      Rebuild packaging
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => setConfirmDisconnect(true)}
+                      className="text-red-600 focus:text-red-600"
+                    >
+                      <Link2Off className="h-3.5 w-3.5 mr-2" />
+                      Disconnect
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </>
             )}
           </div>
         </CardContent>
       </Card>
 
+      {/* Connect dialog */}
       <Dialog open={dialogOpen} onOpenChange={(next) => { if (!connecting) setDialogOpen(next) }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -228,7 +365,7 @@ export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCa
                 type="password"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                placeholder="brw_…"
+                placeholder="brw_..."
                 autoComplete="off"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleConnect()
@@ -250,6 +387,29 @@ export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCa
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Disconnect confirmation */}
+      <AlertDialog open={confirmDisconnect} onOpenChange={(next) => { if (!disconnecting) setConfirmDisconnect(next) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disconnect Breww?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your synced data stays in place. Links between Breww SKUs and your alka<strong>tera</strong> products remain intact, so reconnecting later will pick up where you left off. You&apos;ll just stop receiving fresh data until you reconnect.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={disconnecting}>Keep connected</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleDisconnect() }}
+              disabled={disconnecting}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {disconnecting && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+              Disconnect
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }

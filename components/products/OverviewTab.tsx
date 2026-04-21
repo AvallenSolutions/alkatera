@@ -20,6 +20,7 @@ import { ProductHeroImpact, ContainerType } from "./ProductHeroImpact";
 import { QuickImpactBar, ImpactCategory, ImpactSummaryCard } from "./QuickImpactBar";
 import { ImpactAccordion, ImpactAccordionGroup, SimpleBreakdownTable } from "./ImpactAccordion";
 import { MultipackContentsCard } from "./MultipackContentsCard";
+import { ProductProductionSparkline } from "./ProductProductionSparkline";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 import { useState } from "react";
@@ -238,6 +239,12 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           onEdit={onEditMultipack}
         />
       )}
+
+      {/* Brewery production sparkline (only shows if linked to Breww) */}
+      <ProductProductionSparkline
+        organizationId={product.organization_id}
+        productId={product.id}
+      />
 
       {/* Quick Impact Summary Bar */}
       <div className="border rounded-xl p-4">

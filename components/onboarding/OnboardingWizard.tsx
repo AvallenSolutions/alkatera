@@ -15,6 +15,7 @@ import { PersonalizationStep } from './steps/PersonalizationStep'
 import { CompanyBasics } from './steps/CompanyBasics'
 import { RoadmapStep } from './steps/RoadmapStep'
 import { PreviewDashboard } from './steps/PreviewDashboard'
+import { ConnectToolsStep } from './steps/ConnectToolsStep'
 import { FirstProductStep } from './steps/FirstProductStep'
 import { FacilitiesSetup } from './steps/FacilitiesSetup'
 import { CoreMetricsStep } from './steps/CoreMetricsStep'
@@ -45,6 +46,7 @@ const STEP_COMPONENTS: Record<string, React.ComponentType> = {
   'company-basics': CompanyBasics,
   'roadmap': RoadmapStep,
   'preview-dashboard': PreviewDashboard,
+  'connect-tools': ConnectToolsStep,
   'first-product': FirstProductStep,
   'facilities-setup': FacilitiesSetup,
   'core-metrics': CoreMetricsStep,

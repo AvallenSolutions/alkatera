@@ -27,6 +27,7 @@ import { PackagingFormCard, PackagingFormData } from "@/components/products/Pack
 import type { PackagingCategory } from "@/lib/types/lca";
 import { OpenLCAConfigDialog } from "@/components/lca/OpenLCAConfigDialog";
 import { BOMImportFlow } from "@/components/products/BOMImportFlow";
+import { BrewwRecipeImportDialog } from "@/components/products/BrewwRecipeImportDialog";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { useIngestStash } from "@/hooks/useIngestStash";
 
@@ -65,6 +66,9 @@ export default function ProductRecipePage() {
   const [showOpenLCAConfig, setShowOpenLCAConfig] = useState(false);
   const [showBOMImport, setShowBOMImport] = useState(false);
   const [initialBomFile, setInitialBomFile] = useState<File | null>(null);
+  const [brewwLinked, setBrewwLinked] = useState(false);
+  const [brewwConnected, setBrewwConnected] = useState(false);
+  const [showBrewwImport, setShowBrewwImport] = useState(false);
 
   // Pick up BOM files stashed by the Universal Dropzone (header Upload button).
   // When arriving at this page via the carry-through deep link, the hook
@@ -112,6 +116,10 @@ export default function ProductRecipePage() {
       epr_uk_nation: undefined,
       epr_is_drinks_container: false,
       units_per_group: 1,
+      reuse_trips: '',
+      recyclability_percent: '',
+      end_of_life_pathway: '',
+      biobased_content_percentage: '',
     }
   ]);
 
@@ -144,6 +152,10 @@ export default function ProductRecipePage() {
       recycled_content_percentage: String(f.recycled_content_percentage || ''),
       printing_process: f.printing_process || '',
       is_organic_certified: f.is_organic_certified || false,
+      reuse_trips: String(f.reuse_trips || ''),
+      recyclability_percent: String(f.recyclability_percent || ''),
+      end_of_life_pathway: f.end_of_life_pathway || '',
+      biobased_content_percentage: String(f.biobased_content_percentage || ''),
     })));
   }, []);
   // --- End autosave infrastructure ---
@@ -152,6 +164,34 @@ export default function ProductRecipePage() {
     if (productId && currentOrganization?.id) {
       fetchProductData();
     }
+  }, [productId, currentOrganization?.id]);
+
+  // Check whether this alkatera product is linked to a Breww SKU — if so,
+  // offer the "Import recipe from Breww" action in the header.
+  useEffect(() => {
+    let cancelled = false;
+    const checkLink = async () => {
+      if (!productId || !currentOrganization?.id) return;
+      const [{ data: link }, { data: conn }] = await Promise.all([
+        supabase
+          .from('breww_product_links')
+          .select('id')
+          .eq('organization_id', currentOrganization.id)
+          .eq('alkatera_product_id', productId)
+          .maybeSingle(),
+        supabase
+          .from('integration_connections')
+          .select('status')
+          .eq('organization_id', currentOrganization.id)
+          .eq('provider_slug', 'breww')
+          .maybeSingle(),
+      ]);
+      if (cancelled) return;
+      setBrewwLinked(!!link);
+      setBrewwConnected(conn?.status === 'active');
+    };
+    checkLink();
+    return () => { cancelled = true; };
   }, [productId, currentOrganization?.id]);
 
   const fetchProductData = async () => {
@@ -458,6 +498,10 @@ export default function ProductRecipePage() {
             epr_uk_nation: item.epr_uk_nation || undefined,
             epr_is_drinks_container: item.epr_is_drinks_container || false,
             units_per_group: item.units_per_group || 1,
+            reuse_trips: item.reuse_trips ?? '',
+            recyclability_percent: item.recyclability_percent ?? '',
+            end_of_life_pathway: item.end_of_life_pathway || '',
+            biobased_content_percentage: item.biobased_content_percentage ?? '',
           };
         }));
       }
@@ -543,6 +587,10 @@ export default function ProductRecipePage() {
         epr_uk_nation: undefined,
         epr_is_drinks_container: false,
         units_per_group: 1,
+        reuse_trips: '',
+        recyclability_percent: '',
+        end_of_life_pathway: '',
+        biobased_content_percentage: '',
       }
     ]);
   };
@@ -575,6 +623,10 @@ export default function ProductRecipePage() {
         epr_uk_nation: undefined,
         epr_is_drinks_container: false,
         units_per_group: 1,
+        reuse_trips: '',
+        recyclability_percent: '',
+        end_of_life_pathway: '',
+        biobased_content_percentage: '',
       }
     ]);
     // Show a helpful toast
@@ -732,6 +784,17 @@ export default function ProductRecipePage() {
       if (form.epr_uk_nation) materialData.epr_uk_nation = form.epr_uk_nation;
       materialData.epr_is_drinks_container = form.epr_is_drinks_container || false;
       materialData.units_per_group = Number(form.units_per_group) || 1;
+      // Circularity
+      materialData.reuse_trips = form.reuse_trips && Number(form.reuse_trips) >= 1
+        ? Number(form.reuse_trips)
+        : null;
+      materialData.recyclability_percent = form.recyclability_percent !== ''
+        ? Number(form.recyclability_percent)
+        : null;
+      materialData.end_of_life_pathway = form.end_of_life_pathway || null;
+      materialData.biobased_content_percentage = form.biobased_content_percentage !== ''
+        ? Number(form.biobased_content_percentage)
+        : null;
       return materialData;
     };
 
@@ -1487,6 +1550,28 @@ export default function ProductRecipePage() {
           </p>
         </div>
         <div className="flex gap-2">
+          {brewwLinked && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setShowBrewwImport(true)}
+              className="bg-[#8da300] hover:bg-[#708200] text-black"
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              Import from Breww
+            </Button>
+          )}
+          {!brewwLinked && brewwConnected && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push('/settings/integrations/breww?tab=products')}
+              className="text-[#8da300] dark:text-[#ccff00] border-[#ccff00]/40"
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              Link to Breww
+            </Button>
+          )}
           <Button
             variant="default"
             size="sm"
@@ -1842,6 +1927,16 @@ export default function ProductRecipePage() {
         organizationId={currentOrganization?.id || ''}
         initialFile={initialBomFile}
       />
+
+      {brewwLinked && currentOrganization?.id && (
+        <BrewwRecipeImportDialog
+          open={showBrewwImport}
+          onOpenChange={setShowBrewwImport}
+          organizationId={currentOrganization.id}
+          productId={productId}
+          onImported={fetchProductData}
+        />
+      )}
     </div>
   );
 }

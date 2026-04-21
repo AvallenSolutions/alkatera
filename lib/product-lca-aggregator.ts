@@ -520,8 +520,20 @@ export async function aggregateProductImpacts(
 
     for (const material of materials as Material[]) {
       const materialType = (material.material_type || '').toLowerCase();
-      const quantity = Number(material.quantity || 0);
-      if (quantity <= 0) continue;
+      const rawQuantity = Number(material.quantity || 0);
+      if (rawQuantity <= 0) continue;
+
+      // Circularity: reuse_trips amortises a reusable container's physical
+      // material over many sales trips. The same 9 kg firkin serves 100 pints
+      // before going for scrap, so the EoL burden attributable to one pint is
+      // 1/100 of the scrap-event emissions. Must match the production-side
+      // divisor applied in product-lca-calculator.ts, otherwise reusables get
+      // a 100× EoL over-count.
+      const rawReuseTrips = (material as any).reuse_trips;
+      const reuseTrips = Number.isFinite(Number(rawReuseTrips)) && Number(rawReuseTrips) >= 1
+        ? Number(rawReuseTrips)
+        : 1;
+      const quantity = rawQuantity / reuseTrips;
 
       // HIGH FIX #6: EoL should only apply to PACKAGING materials and food-waste
       // ingredients. PRIMARY ingredients (barley, water, hops, grapes, etc.) are
@@ -544,8 +556,48 @@ export async function aggregateProductImpacts(
 
       const factorKey = getMaterialFactorKey(packagingCategory || 'other', material.material_name);
 
-      // Get user pathway overrides if available — keyed by material ID or factorKey
-      const pathwayOverrides = eolConfig?.pathways?.[material.id] || eolConfig?.pathways?.[factorKey];
+      // Get user pathway overrides from the wizard (keyed by material ID or factorKey).
+      // If none set, derive overrides from the material's stored circularity fields
+      // so a firkin marked "reuse" isn't defaulted to the regional recycling mix.
+      let pathwayOverrides = eolConfig?.pathways?.[material.id] || eolConfig?.pathways?.[factorKey];
+
+      const storedPathway = (material as any).end_of_life_pathway as string | null | undefined;
+      if (!pathwayOverrides && storedPathway) {
+        const pathwayMap: Record<string, { recycling: number; landfill: number; incineration: number; composting: number; anaerobic_digestion: number }> = {
+          recycling: { recycling: 100, landfill: 0, incineration: 0, composting: 0, anaerobic_digestion: 0 },
+          reuse: { recycling: 100, landfill: 0, incineration: 0, composting: 0, anaerobic_digestion: 0 },
+          landfill: { recycling: 0, landfill: 100, incineration: 0, composting: 0, anaerobic_digestion: 0 },
+          incineration: { recycling: 0, landfill: 0, incineration: 100, composting: 0, anaerobic_digestion: 0 },
+          composting: { recycling: 0, landfill: 0, incineration: 0, composting: 100, anaerobic_digestion: 0 },
+        };
+        if (pathwayMap[storedPathway]) {
+          pathwayOverrides = pathwayMap[storedPathway];
+        }
+      }
+
+      // Recyclability cap: if this item is only partly recyclable (e.g. a
+      // laminated pouch at 70%), clamp the recycling share and push the
+      // remainder into the regional landfill/incineration split. Prevents
+      // overstated recycling credits.
+      const rawRecyclability = (material as any).recyclability_percent;
+      const recyclabilityPct = Number.isFinite(Number(rawRecyclability))
+        ? Math.max(0, Math.min(100, Number(rawRecyclability)))
+        : null;
+      if (recyclabilityPct != null && pathwayOverrides && pathwayOverrides.recycling > recyclabilityPct) {
+        const regional = getRegionalDefaults(eolRegion, factorKey);
+        const excess = pathwayOverrides.recycling - recyclabilityPct;
+        // Split excess between landfill and incineration according to the
+        // regional ratio between the two; fall back to 70/30 if both zero.
+        const lf = regional.landfill ?? 0;
+        const inc = regional.incineration ?? 0;
+        const lfShare = lf + inc > 0 ? lf / (lf + inc) : 0.7;
+        pathwayOverrides = {
+          ...pathwayOverrides,
+          recycling: recyclabilityPct,
+          landfill: (pathwayOverrides.landfill ?? 0) + excess * lfShare,
+          incineration: (pathwayOverrides.incineration ?? 0) + excess * (1 - lfShare),
+        };
+      }
 
       const eolResult = calculateMaterialEoL(quantity, factorKey, eolRegion, pathwayOverrides);
 

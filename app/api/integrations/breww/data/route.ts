@@ -15,9 +15,9 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = request.nextUrl
     const organizationId = searchParams.get('organizationId')
-    type DataTable = 'production' | 'ingredients' | 'containers' | 'stock_items' | 'skus' | 'packaging_runs'
+    type DataTable = 'production' | 'ingredients' | 'containers' | 'stock_items' | 'skus' | 'packaging_runs' | 'product_links' | 'sites' | 'facility_links'
     const VALID_TABLES: DataTable[] = [
-      'production', 'ingredients', 'containers', 'stock_items', 'skus', 'packaging_runs',
+      'production', 'ingredients', 'containers', 'stock_items', 'skus', 'packaging_runs', 'product_links', 'sites', 'facility_links',
     ]
     const table = searchParams.get('table') as DataTable | null
 
@@ -52,6 +52,9 @@ export async function GET(request: NextRequest) {
       stock_items: 'breww_stock_items',
       skus: 'breww_products_skus',
       packaging_runs: 'breww_packaging_runs',
+      product_links: 'breww_product_links',
+      sites: 'breww_sites',
+      facility_links: 'breww_facility_links',
     }
 
     const ORDER_COL: Record<DataTable, string> = {
@@ -61,6 +64,9 @@ export async function GET(request: NextRequest) {
       stock_items: 'name',
       skus: 'name',
       packaging_runs: 'product_name',
+      product_links: 'linked_at',
+      sites: 'name',
+      facility_links: 'linked_at',
     }
     const orderCol = ORDER_COL[table]
     const { data, error } = await serviceClient

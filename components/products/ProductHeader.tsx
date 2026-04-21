@@ -4,9 +4,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Edit, CheckCircle2, AlertCircle, Layers } from "lucide-react";
 import Image from "next/image";
+import { BrewwLinkBadge } from "./BrewwLinkBadge";
 
 interface ProductHeaderProps {
   product: {
+    id?: string | number;
     name: string;
     sku: string;
     image_url?: string;
@@ -68,6 +70,7 @@ export function ProductHeader({ product, isHealthy, onEdit }: ProductHeaderProps
                       Setup Incomplete
                     </Badge>
                   )}
+                  {product.id != null && <BrewwLinkBadge productId={product.id} />}
                 </div>
                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
                   {product.sku && (

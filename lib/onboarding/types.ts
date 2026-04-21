@@ -27,6 +27,7 @@ export type OnboardingStep =
   // Phase 2: Quick Wins
   | 'roadmap'
   | 'preview-dashboard'
+  | 'connect-tools'
   | 'first-product'
   // Phase 3: Core Data Setup
   | 'facilities-setup'
@@ -70,17 +71,18 @@ export const ONBOARDING_STEPS: OnboardingStepConfig[] = [
   // Phase 2
   { id: 'roadmap', phase: 'quick-wins', title: 'Your Roadmap', description: 'Your sustainability journey', skippable: false, index: 4 },
   { id: 'preview-dashboard', phase: 'quick-wins', title: 'Preview', description: 'See your future dashboard', skippable: true, index: 5 },
-  { id: 'first-product', phase: 'quick-wins', title: 'First Product', description: 'Add your first product', skippable: true, index: 6 },
+  { id: 'connect-tools', phase: 'quick-wins', title: 'Connect Tools', description: 'Skip manual entry by connecting what you already use', skippable: true, index: 6 },
+  { id: 'first-product', phase: 'quick-wins', title: 'First Product', description: 'Add your first product', skippable: true, index: 7 },
   // Phase 3
-  { id: 'facilities-setup', phase: 'core-setup', title: 'Facilities', description: 'Map your operations', skippable: true, index: 7 },
-  { id: 'core-metrics', phase: 'core-setup', title: 'Metrics', description: 'What will you track?', skippable: true, index: 8 },
-  { id: 'data-entry-method', phase: 'core-setup', title: 'Data Entry', description: 'Choose how to add data', skippable: true, index: 9 },
+  { id: 'facilities-setup', phase: 'core-setup', title: 'Facilities', description: 'Map your operations', skippable: true, index: 8 },
+  { id: 'core-metrics', phase: 'core-setup', title: 'Metrics', description: 'What will you track?', skippable: true, index: 9 },
+  { id: 'data-entry-method', phase: 'core-setup', title: 'Data Entry', description: 'Choose how to add data', skippable: true, index: 10 },
   // Phase 4
-  { id: 'foundation-complete', phase: 'first-insights', title: 'Insights', description: 'Your progress so far', skippable: false, index: 10 },
+  { id: 'foundation-complete', phase: 'first-insights', title: 'Insights', description: 'Your progress so far', skippable: false, index: 11 },
   // Phase 5
-  { id: 'feature-showcase', phase: 'power-features', title: 'Features', description: 'Unlock capabilities', skippable: false, index: 11 },
-  { id: 'invite-team', phase: 'power-features', title: 'Team', description: 'Invite colleagues', skippable: true, index: 12 },
-  { id: 'completion', phase: 'power-features', title: 'Complete', description: 'You did it!', skippable: false, index: 13 },
+  { id: 'feature-showcase', phase: 'power-features', title: 'Features', description: 'Unlock capabilities', skippable: false, index: 12 },
+  { id: 'invite-team', phase: 'power-features', title: 'Team', description: 'Invite colleagues', skippable: true, index: 13 },
+  { id: 'completion', phase: 'power-features', title: 'Complete', description: 'You did it!', skippable: false, index: 14 },
 ]
 
 /** Member onboarding: streamlined 6-step flow for invited team members */

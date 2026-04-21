@@ -32,6 +32,7 @@ import {
   RecentActivityWidget,
   ImpactValueWidget,
   CanopyCreditsWidget,
+  BreweryProductionWidget,
 } from '@/components/dashboard/widgets';
 
 /** Animated loading visual shown while dashboard data is streaming in. */
@@ -429,6 +430,9 @@ export default function DashboardPage() {
           <div className="lg:col-span-4 space-y-4">
             <InlineErrorBoundary>
               <ImpactValueWidget />
+            </InlineErrorBoundary>
+            <InlineErrorBoundary>
+              <BreweryProductionWidget />
             </InlineErrorBoundary>
             {/* Hidden - Expert Consulting not ready for public viewing
             <InlineErrorBoundary>
