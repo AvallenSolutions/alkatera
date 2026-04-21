@@ -47,6 +47,8 @@ import {
   ORCHARD_PESTICIDE_ECOTOX_PROFILES,
   ORCHARD_TRANSPORT_EF,
   ORCHARD_SO2_EQ_PER_HA_DEFAULT,
+  ORCHARD_PRUNING_DM_BY_AGE,
+  ORCHARD_BIOMASS_C_ACCUMULATION,
 } from './ghg-constants';
 
 import { getGridFactor } from './grid-emission-factors';
@@ -190,10 +192,11 @@ export function calculateOrchardImpacts(
   if (residueManagementType !== 'removed_for_biomass') {
     const factors = ORCHARD_CROP_RESIDUE_FACTORS[orchardType] || ORCHARD_CROP_RESIDUE_FACTORS.other;
 
-    // Use measured dry matter if provided (primary data), otherwise per-crop-type default
+    // Use measured dry matter if provided (primary data)
+    // Otherwise use age-graduated default when tree_age is known, else per-crop-type mature default
     const pruningDmPerHa = input.pruning_residue_measured_kg_per_ha != null
       ? input.pruning_residue_measured_kg_per_ha / 1000 // convert kg to tonnes
-      : factors.pruning_dm_per_ha;
+      : getOrchardPruningDmForAge(orchardType, input.tree_age);
 
     // For chipped_and_spread, apply 0.7 decomposition factor to N fraction
     const effectiveNFraction = residueManagementType === 'chipped_and_spread'
@@ -335,6 +338,25 @@ export function calculateOrchardImpacts(
   }
 
   // ========================================================================
+  // 6b. ABOVE-GROUND BIOMASS CARBON REMOVAL (FLAG: perennial woody biomass)
+  // ========================================================================
+  // Fruit trees accumulate carbon in permanent woody structures. This is the
+  // above-ground + below-ground biomass pool per IPCC 2019 Vol 4 Ch 2.
+  // Only calculable when tree age is known (planting_year on the Orchard record).
+
+  let biomassCarbonCo2e = 0;
+  let biomassCarbonMethodology: 'age_based_default' | 'not_calculated' = 'not_calculated';
+  let biomassCarbonWarning: string | undefined;
+
+  if (input.tree_age != null && input.tree_age >= 0) {
+    const accumulationRate = getOrchardBiomassAccumulationRate(orchardType, input.tree_age);
+    biomassCarbonCo2e = accumulationRate * input.area_ha * 1000 * C_TO_CO2E;
+    biomassCarbonMethodology = 'age_based_default';
+  } else {
+    biomassCarbonWarning = 'Orchard planting year not recorded — above-ground biomass carbon removal cannot be estimated. Add planting year to your orchard to improve accuracy.';
+  }
+
+  // ========================================================================
   // 7. TRANSPORT: Orchard to processing facility (non-FLAG)
   // ========================================================================
 
@@ -360,7 +382,7 @@ export function calculateOrchardImpacts(
     transportCo2e;
 
   const totalEmissions = totalFlagEmissions + totalNonFlagEmissions;
-  const totalRemovals = soilCarbonCo2e;
+  const totalRemovals = soilCarbonCo2e + biomassCarbonCo2e;
 
   const fruitYieldKg = input.fruit_yield_tonnes * 1000;
   const totalEmissionsPerKg = fruitYieldKg > 0 ? totalEmissions / fruitYieldKg : 0;
@@ -423,6 +445,9 @@ export function calculateOrchardImpacts(
       removal_verification_status: removalVerificationStatus,
       removals_meet_lsr_standard: removalsMeetLsrStandard,
       removals_warning: removalsWarning,
+      biomass_carbon_co2e: biomassCarbonCo2e,
+      biomass_carbon_methodology: biomassCarbonMethodology,
+      biomass_carbon_warning: biomassCarbonWarning,
     },
     non_flag_emissions: {
       fertiliser_production_co2e: fertiliserProductionCo2e,
@@ -538,9 +563,48 @@ function assessDataQuality(
     score += 1;
   }
 
+  // Tree age (enables accurate biomass removal + pruning DM graduation)
+  if (input.tree_age != null) {
+    score += 1;
+  }
+
+  // Total: max 11
   if (score >= 8) return 'HIGH';
   if (score >= 5) return 'MEDIUM';
   return 'LOW';
+}
+
+// ---------------------------------------------------------------------------
+// Perennial crop helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Return the age-appropriate orchard pruning dry matter (t DM/ha/yr).
+ * Falls back to the mature-tree default for that crop type when age is unknown.
+ */
+function getOrchardPruningDmForAge(orchardType: string, treeAge: number | null | undefined): number {
+  const factors = ORCHARD_CROP_RESIDUE_FACTORS[orchardType] || ORCHARD_CROP_RESIDUE_FACTORS.other;
+  if (treeAge == null) return factors.pruning_dm_per_ha;
+
+  const brackets = ORCHARD_PRUNING_DM_BY_AGE[orchardType] || ORCHARD_PRUNING_DM_BY_AGE.other;
+  for (const bracket of brackets) {
+    if (treeAge <= bracket.max_age) return bracket.dm_t_per_ha;
+  }
+  return factors.pruning_dm_per_ha;
+}
+
+/**
+ * Return the annual above-ground biomass carbon accumulation rate (tC/ha/yr)
+ * for an orchard of the given type and age.
+ */
+function getOrchardBiomassAccumulationRate(orchardType: string, treeAge: number): number {
+  const brackets = ORCHARD_BIOMASS_C_ACCUMULATION[orchardType] || ORCHARD_BIOMASS_C_ACCUMULATION.other;
+  for (const bracket of brackets) {
+    if (treeAge >= bracket.age_from && treeAge < bracket.age_to) {
+      return bracket.tc_per_ha_per_yr;
+    }
+  }
+  return brackets[brackets.length - 1].tc_per_ha_per_yr;
 }
 
 // ---------------------------------------------------------------------------
@@ -555,7 +619,8 @@ function buildMethodologyNotes(
   const zone = climateZone as 'wet' | 'dry' | 'temperate';
   const parts: string[] = [];
 
-  parts.push(`Orchard LCA (${orchardType}): ${input.area_ha} ha, ${input.fruit_yield_tonnes} t yield`);
+  const ageNote = input.tree_age != null ? `, tree age ${input.tree_age} yrs` : '';
+  parts.push(`Orchard LCA (${orchardType}): ${input.area_ha} ha, ${input.fruit_yield_tonnes} t yield${ageNote}`);
   parts.push(`Climate zone: ${climateZone} (IPCC EF1=${IPCC_N2O_FACTORS.EF1[zone]})`);
 
   if (input.fertiliser_type !== 'none') {

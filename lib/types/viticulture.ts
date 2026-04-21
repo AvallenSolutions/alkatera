@@ -105,6 +105,8 @@ export interface Vineyard {
   previous_land_use_type: PreviousLandUseType | null;
   /** Year land was converted to vineyard (FLAG 20-year amortisation) */
   land_conversion_year: number | null;
+  /** Year vines were planted (may differ from land_conversion_year if land was fallow first) */
+  vine_planting_year: number | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -233,6 +235,8 @@ export interface ViticultureCalculatorInput {
   land_conversion_year?: number | null;
   /** Current vintage year (for LUC amortisation calculation) */
   vintage_year?: number;
+  /** Vine age in years at the time of this vintage (derived: vintage_year - vine_planting_year) */
+  vine_age?: number | null;
 
   // Land ownership boundary (GHG Protocol LSR v1.0)
   /** Operational boundary: owned, leased, rental, or contract growing */
@@ -313,6 +317,16 @@ export interface ViticultureImpactResult {
     removals_meet_lsr_standard: boolean;
     /** Warning when removals use practice-based defaults without third-party verification */
     removals_warning?: string;
+    /**
+     * Above-ground + below-ground woody biomass carbon accumulation (kg CO2e/yr).
+     * Only calculated when vine_age is known. Zero when vine_planting_year is absent.
+     * IPCC 2019 Vol 4 Ch 2 (above-ground biomass carbon pool).
+     */
+    biomass_carbon_co2e: number;
+    /** Methodology used for biomass carbon estimate */
+    biomass_carbon_methodology: 'age_based_default' | 'not_calculated';
+    /** Warning shown when vine planting year is unknown and biomass cannot be estimated */
+    biomass_carbon_warning?: string;
   };
 
   // Non-FLAG emissions (energy/industrial)

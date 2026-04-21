@@ -88,6 +88,7 @@ interface QuestionnaireProps {
   vineyardCountryCode: string | null;
   vineyardPreviousLandUse?: PreviousLandUseType | null;
   vineyardLandConversionYear?: number | null;
+  vineyardPlantingYear?: number | null;
   existingProfile?: VineyardGrowingProfile | null;
   vintageYear?: number;
   copyFromData?: Record<string, any>;
@@ -160,6 +161,7 @@ export function VineyardGrowingQuestionnaire({
   vineyardCountryCode,
   vineyardPreviousLandUse,
   vineyardLandConversionYear,
+  vineyardPlantingYear,
   existingProfile,
   vintageYear,
   copyFromData,
@@ -599,6 +601,9 @@ export function VineyardGrowingQuestionnaire({
     previous_land_use_type: form.previous_land_use_type,
     land_conversion_year: form.land_conversion_year,
     vintage_year: selectedVintageYear,
+    vine_age: vineyardPlantingYear != null && selectedVintageYear != null
+      ? selectedVintageYear - vineyardPlantingYear
+      : null,
     land_ownership_type: (form.land_ownership_type || undefined) as 'owned' | 'leased' | 'rental' | 'contract_growing' | undefined,
     lease_expiry_date: form.lease_expiry_date || null,
     is_boundary_controlled: form.is_boundary_controlled,

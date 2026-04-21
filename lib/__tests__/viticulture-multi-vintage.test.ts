@@ -187,6 +187,42 @@ describe('calculateMultiVintageAverage', () => {
     });
   });
 
+  describe('perennial: biomass carbon pass-through', () => {
+    it('should preserve biomass_carbon fields in averaged result', () => {
+      const result = calculateMultiVintageAverage([
+        { vintage_year: 2023, input: { ...BASE_INPUT, vine_age: 8 } },
+        { vintage_year: 2024, input: { ...BASE_INPUT, vine_age: 9 } },
+        { vintage_year: 2025, input: { ...BASE_INPUT, vine_age: 10 } },
+      ]);
+
+      expect(result.averaged_impacts.flag_removals.biomass_carbon_co2e).toBeGreaterThan(0);
+      expect(result.averaged_impacts.flag_removals.biomass_carbon_methodology).toBe('age_based_default');
+      expect(result.averaged_impacts.flag_removals.biomass_carbon_warning).toBeUndefined();
+    });
+
+    it('should preserve warning when age is missing across all vintages', () => {
+      const result = calculateMultiVintageAverage([
+        { vintage_year: 2024, input: BASE_INPUT },
+        { vintage_year: 2025, input: BASE_INPUT },
+      ]);
+      expect(result.averaged_impacts.flag_removals.biomass_carbon_co2e).toBe(0);
+      expect(result.averaged_impacts.flag_removals.biomass_carbon_methodology).toBe('not_calculated');
+      expect(result.averaged_impacts.flag_removals.biomass_carbon_warning).toBeDefined();
+    });
+
+    it('should include biomass removal in total_removals of averaged result', () => {
+      const result = calculateMultiVintageAverage([
+        { vintage_year: 2024, input: { ...BASE_INPUT, vine_age: 3 } },
+        { vintage_year: 2025, input: { ...BASE_INPUT, vine_age: 4 } },
+      ]);
+      expect(result.averaged_impacts.total_removals).toBeCloseTo(
+        result.averaged_impacts.flag_removals.soil_carbon_co2e +
+          result.averaged_impacts.flag_removals.biomass_carbon_co2e,
+        4
+      );
+    });
+  });
+
   describe('edge cases', () => {
     it('should throw on empty input', () => {
       expect(() => calculateMultiVintageAverage([])).toThrow('At least one vintage input is required');

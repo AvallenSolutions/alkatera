@@ -320,13 +320,15 @@ export function VineyardImpactOverview({ impacts, profile }: VineyardImpactOverv
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <DetailRow label="Total soil carbon removals" value={`${fmt(impacts.total_removals)} kg CO\u2082e`} bold />
+            <DetailRow label="Total FLAG removals" value={`${fmt(impacts.total_removals)} kg CO\u2082e`} bold />
             <DetailRow label="Per hectare" value={`${fmt(removalsPerHa)} kg CO\u2082e/ha`} muted />
             <div className="border-t pt-2 mt-2">
-              <DetailRow label="Soil management" value={SOIL_LABELS[profile.soil_management] || profile.soil_management} />
+              <DetailRow label="Soil carbon" value={`${fmt(impacts.flag_removals.soil_carbon_co2e)} kg CO\u2082e`} />
+              <DetailRow label="Soil management" value={SOIL_LABELS[profile.soil_management] || profile.soil_management} muted />
               <DetailRow
-                label="Methodology"
+                label="Soil methodology"
                 value={impacts.flag_removals.methodology === 'measured' ? 'Verified measurement' : 'Practice-based default'}
+                muted
               />
               {impacts.flag_removals.is_verified && (
                 <Badge variant="outline" className="mt-1 bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 border-green-200 dark:border-green-800">
@@ -334,11 +336,27 @@ export function VineyardImpactOverview({ impacts, profile }: VineyardImpactOverv
                 </Badge>
               )}
             </div>
+            <div className="border-t pt-2 mt-2">
+              <DetailRow label="Above-ground biomass carbon" value={`${fmt(impacts.flag_removals.biomass_carbon_co2e)} kg CO\u2082e`} />
+              <DetailRow
+                label="Biomass methodology"
+                value={impacts.flag_removals.biomass_carbon_methodology === 'age_based_default' ? 'Age-based default (IPCC 2019 Vol 4 Ch 2)' : 'Not calculated'}
+                muted
+              />
+            </div>
             {impacts.flag_removals.removals_warning && (
               <div className="flex items-start gap-2 mt-2 p-2 rounded-md bg-amber-500/10 border border-amber-500/20">
                 <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
                 <p className="text-xs text-amber-700 dark:text-amber-400">
                   {impacts.flag_removals.removals_warning}
+                </p>
+              </div>
+            )}
+            {impacts.flag_removals.biomass_carbon_warning && (
+              <div className="flex items-start gap-2 mt-2 p-2 rounded-md bg-blue-500/10 border border-blue-500/20">
+                <Info className="h-3.5 w-3.5 text-blue-500 shrink-0 mt-0.5" />
+                <p className="text-xs text-blue-700 dark:text-blue-400">
+                  {impacts.flag_removals.biomass_carbon_warning}
                 </p>
               </div>
             )}

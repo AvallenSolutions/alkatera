@@ -204,13 +204,114 @@ export const AGROCHEMICAL_PRODUCTION_FACTORS = {
 // Vine prunings are classified as "above-ground residue" with known N content.
 
 export const CROP_RESIDUE_FACTORS = {
-  /** Dry matter of vine prunings returned to soil (t DM/ha/yr, established vines) */
+  /** Dry matter of vine prunings returned to soil (t DM/ha/yr, established mature vines ≥8 yrs) */
   VINE_PRUNING_DM_PER_HA: 2.5,
   /** N content of vine prunings (fraction of DM, IPCC Table 11.2) */
   VINE_PRUNING_N_FRACTION: 0.008,  // 0.8%
   /** Ratio of above-ground to below-ground residue N (R_BG:AG for perennial crops) */
   ROOT_TURNOVER_RATIO: 0.4,        // 40% of above-ground N is also released by root turnover
 } as const;
+
+/**
+ * Age-graduated vine pruning dry matter (t DM/ha/yr).
+ *
+ * Vines in establishment produce minimal prunings; dry matter increases as the
+ * canopy develops. Default of 2.5 t DM/ha assumes mature vines (≥8 years).
+ * Using the correct age-based value prevents overstating crop residue N2O for
+ * young vineyards.
+ *
+ * Sources:
+ *   - IPCC 2019 Refinement, Chapter 11, Table 11.2
+ *   - Gallo et al. (2015) Biomass and Bioenergy — vine pruning biomass survey
+ *   - WineGB Carbon Calculator background data (2025)
+ */
+export const VINE_PRUNING_DM_BY_AGE: ReadonlyArray<{
+  max_age: number;
+  dm_t_per_ha: number;
+}> = [
+  { max_age: 2,  dm_t_per_ha: 0.0 }, // pre-production, negligible prunings
+  { max_age: 4,  dm_t_per_ha: 0.5 }, // young vines, canopy establishing
+  { max_age: 7,  dm_t_per_ha: 1.2 }, // developing canopy
+  { max_age: 99, dm_t_per_ha: 2.5 }, // mature vines (≥8 yrs) — current default
+];
+
+/**
+ * Age-graduated orchard pruning dry matter (t DM/ha/yr) by crop type.
+ *
+ * Tree orchards produce more pruning biomass than vines, with higher values
+ * for larger-canopy species (apple/pear) vs stone fruit.
+ *
+ * Sources:
+ *   - IPCC 2019 Refinement, Chapter 11, Table 11.2
+ *   - FAO Fruit Tree Guidelines (2020)
+ */
+export const ORCHARD_PRUNING_DM_BY_AGE: Readonly<
+  Record<string, ReadonlyArray<{ max_age: number; dm_t_per_ha: number }>>
+> = {
+  apple:       [{ max_age: 3, dm_t_per_ha: 0.0 }, { max_age: 6, dm_t_per_ha: 1.5 }, { max_age: 10, dm_t_per_ha: 2.5 }, { max_age: 99, dm_t_per_ha: 4.0 }],
+  pear:        [{ max_age: 3, dm_t_per_ha: 0.0 }, { max_age: 6, dm_t_per_ha: 1.2 }, { max_age: 10, dm_t_per_ha: 2.0 }, { max_age: 99, dm_t_per_ha: 3.0 }],
+  cherry:      [{ max_age: 3, dm_t_per_ha: 0.0 }, { max_age: 6, dm_t_per_ha: 1.0 }, { max_age: 10, dm_t_per_ha: 1.8 }, { max_age: 99, dm_t_per_ha: 2.5 }],
+  plum:        [{ max_age: 3, dm_t_per_ha: 0.0 }, { max_age: 6, dm_t_per_ha: 1.0 }, { max_age: 10, dm_t_per_ha: 1.8 }, { max_age: 99, dm_t_per_ha: 2.5 }],
+  citrus:      [{ max_age: 3, dm_t_per_ha: 0.0 }, { max_age: 6, dm_t_per_ha: 1.3 }, { max_age: 10, dm_t_per_ha: 2.2 }, { max_age: 99, dm_t_per_ha: 3.5 }],
+  stone_fruit: [{ max_age: 3, dm_t_per_ha: 0.0 }, { max_age: 6, dm_t_per_ha: 1.0 }, { max_age: 10, dm_t_per_ha: 1.8 }, { max_age: 99, dm_t_per_ha: 2.5 }],
+  mixed:       [{ max_age: 3, dm_t_per_ha: 0.0 }, { max_age: 6, dm_t_per_ha: 1.3 }, { max_age: 10, dm_t_per_ha: 2.2 }, { max_age: 99, dm_t_per_ha: 3.5 }],
+  other:       [{ max_age: 3, dm_t_per_ha: 0.0 }, { max_age: 6, dm_t_per_ha: 1.2 }, { max_age: 10, dm_t_per_ha: 2.0 }, { max_age: 99, dm_t_per_ha: 3.0 }],
+};
+
+/**
+ * Above-ground woody biomass carbon accumulation rate for vineyards
+ * (tonnes C per hectare per year).
+ *
+ * Vines accumulate woody biomass in the trunk, cordons, and permanent root
+ * system over their lifespan. This represents a genuine FLAG removal under
+ * IPCC 2019 Vol 4 Ch 2 (above-ground + below-ground biomass carbon pools)
+ * and is distinct from soil organic carbon.
+ *
+ * Rates decline as vines approach their biomass steady state (~25 years).
+ * Old vines (>25 years) continue to accumulate very slowly.
+ *
+ * Sources:
+ *   - IPCC 2019 Refinement, Vol 4, Ch 2, Table 2.2 (permanent crops)
+ *   - Vázquez-Rowe et al. (2012) Int J Life Cycle Assess — vineyard biomass carbon
+ *   - Renaud-Gentié et al. (2014) Int J Life Cycle Assess — vine carbon pools
+ *   - Conservative lower-bound of published ranges
+ */
+export const VINE_BIOMASS_C_ACCUMULATION: ReadonlyArray<{
+  age_from: number;
+  age_to: number;
+  tc_per_ha_per_yr: number;
+}> = [
+  { age_from: 0,  age_to: 5,  tc_per_ha_per_yr: 0.08 }, // establishment, rapid canopy growth
+  { age_from: 5,  age_to: 15, tc_per_ha_per_yr: 0.04 }, // active growth, biomass building
+  { age_from: 15, age_to: 25, tc_per_ha_per_yr: 0.02 }, // slowing, approaching steady state
+  { age_from: 25, age_to: 99, tc_per_ha_per_yr: 0.01 }, // old vines, minimal net accumulation
+];
+
+/**
+ * Above-ground woody biomass carbon accumulation rate for orchards
+ * (tonnes C per hectare per year), by crop type.
+ *
+ * Fruit trees accumulate more biomass than vines due to larger canopy and
+ * deeper root systems. Rates are higher for large-canopy species (apple/pear)
+ * and lower for stone fruit and citrus.
+ *
+ * Sources:
+ *   - IPCC 2019 Refinement, Vol 4, Ch 2, Table 2.2 (permanent crops)
+ *   - FAO Fruit Tree Guidelines (2020)
+ *   - Conservative lower-bound of published ranges
+ */
+export const ORCHARD_BIOMASS_C_ACCUMULATION: Readonly<
+  Record<string, ReadonlyArray<{ age_from: number; age_to: number; tc_per_ha_per_yr: number }>>
+> = {
+  apple:       [{ age_from: 0, age_to: 5, tc_per_ha_per_yr: 0.18 }, { age_from: 5, age_to: 15, tc_per_ha_per_yr: 0.10 }, { age_from: 15, age_to: 25, tc_per_ha_per_yr: 0.05 }, { age_from: 25, age_to: 99, tc_per_ha_per_yr: 0.02 }],
+  pear:        [{ age_from: 0, age_to: 5, tc_per_ha_per_yr: 0.15 }, { age_from: 5, age_to: 15, tc_per_ha_per_yr: 0.08 }, { age_from: 15, age_to: 25, tc_per_ha_per_yr: 0.04 }, { age_from: 25, age_to: 99, tc_per_ha_per_yr: 0.02 }],
+  cherry:      [{ age_from: 0, age_to: 5, tc_per_ha_per_yr: 0.12 }, { age_from: 5, age_to: 15, tc_per_ha_per_yr: 0.07 }, { age_from: 15, age_to: 25, tc_per_ha_per_yr: 0.03 }, { age_from: 25, age_to: 99, tc_per_ha_per_yr: 0.01 }],
+  plum:        [{ age_from: 0, age_to: 5, tc_per_ha_per_yr: 0.12 }, { age_from: 5, age_to: 15, tc_per_ha_per_yr: 0.07 }, { age_from: 15, age_to: 25, tc_per_ha_per_yr: 0.03 }, { age_from: 25, age_to: 99, tc_per_ha_per_yr: 0.01 }],
+  citrus:      [{ age_from: 0, age_to: 5, tc_per_ha_per_yr: 0.14 }, { age_from: 5, age_to: 15, tc_per_ha_per_yr: 0.08 }, { age_from: 15, age_to: 25, tc_per_ha_per_yr: 0.04 }, { age_from: 25, age_to: 99, tc_per_ha_per_yr: 0.02 }],
+  stone_fruit: [{ age_from: 0, age_to: 5, tc_per_ha_per_yr: 0.12 }, { age_from: 5, age_to: 15, tc_per_ha_per_yr: 0.07 }, { age_from: 15, age_to: 25, tc_per_ha_per_yr: 0.03 }, { age_from: 25, age_to: 99, tc_per_ha_per_yr: 0.01 }],
+  mixed:       [{ age_from: 0, age_to: 5, tc_per_ha_per_yr: 0.15 }, { age_from: 5, age_to: 15, tc_per_ha_per_yr: 0.08 }, { age_from: 15, age_to: 25, tc_per_ha_per_yr: 0.04 }, { age_from: 25, age_to: 99, tc_per_ha_per_yr: 0.02 }],
+  other:       [{ age_from: 0, age_to: 5, tc_per_ha_per_yr: 0.13 }, { age_from: 5, age_to: 15, tc_per_ha_per_yr: 0.07 }, { age_from: 15, age_to: 25, tc_per_ha_per_yr: 0.03 }, { age_from: 25, age_to: 99, tc_per_ha_per_yr: 0.015 }],
+};
 
 // ---------------------------------------------------------------------------
 // Pesticide Application Ecotoxicity Factors (USEtox 2.0 / PestLCI consensus)

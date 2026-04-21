@@ -12,6 +12,8 @@ import {
   IPCC_CARBON_STOCK_DEFAULTS,
   C_TO_CO2E,
   LUC_AMORTISATION_YEARS,
+  ORCHARD_PRUNING_DM_BY_AGE,
+  ORCHARD_BIOMASS_C_ACCUMULATION,
 } from '../ghg-constants';
 
 // ---------------------------------------------------------------------------
@@ -474,6 +476,241 @@ describe('calculateOrchardImpacts', () => {
       expect(result.flag_removals.is_verified).toBe(false);
       expect(result.flag_removals.removals_meet_lsr_standard).toBe(false);
       expect(result.flag_removals.removals_warning).toContain('expired');
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // Perennial crop: age-graduated pruning dry matter
+  // --------------------------------------------------------------------------
+
+  describe('perennial: age-graduated pruning dry matter', () => {
+    it('should use mature default (4.0 t DM/ha for apple) when tree_age not provided', () => {
+      const result = calculateOrchardImpacts(conventionalApple);
+      // Baseline pruning matches ORCHARD_CROP_RESIDUE_FACTORS.apple.pruning_dm_per_ha
+      expect(ORCHARD_CROP_RESIDUE_FACTORS.apple.pruning_dm_per_ha).toBe(4.0);
+      expect(result.flag_emissions.n2o_crop_residue_co2e).toBeGreaterThan(0);
+    });
+
+    it('should return zero pruning residue N2O for pre-production apple trees (age ≤ 3)', () => {
+      const youngAppleBaseline = calculateOrchardImpacts({
+        ...conventionalApple,
+        tree_age: 2,
+        fertiliser_quantity_kg: 0, // isolate pruning residue
+        fertiliser_n_content_percent: 0,
+      });
+      // 0 t DM/ha pruning + 0 fertiliser → no residue N2O
+      expect(youngAppleBaseline.flag_emissions.n2o_crop_residue_co2e).toBe(0);
+    });
+
+    it('should scale pruning residue N2O proportionally with apple age brackets', () => {
+      // Brackets for apple: age ≤3 → 0.0; ≤6 → 1.5; ≤10 → 2.5; >10 → 4.0
+      const isolatedApple = {
+        ...conventionalApple,
+        fertiliser_quantity_kg: 0,
+        fertiliser_n_content_percent: 0,
+      };
+      const young = calculateOrchardImpacts({ ...isolatedApple, tree_age: 5 });
+      const middle = calculateOrchardImpacts({ ...isolatedApple, tree_age: 8 });
+      const mature = calculateOrchardImpacts({ ...isolatedApple, tree_age: 20 });
+
+      // 1.5 / 4.0 = 0.375
+      expect(
+        young.flag_emissions.n2o_crop_residue_co2e /
+          mature.flag_emissions.n2o_crop_residue_co2e
+      ).toBeCloseTo(1.5 / 4.0, 3);
+      // 2.5 / 4.0 = 0.625
+      expect(
+        middle.flag_emissions.n2o_crop_residue_co2e /
+          mature.flag_emissions.n2o_crop_residue_co2e
+      ).toBeCloseTo(2.5 / 4.0, 3);
+    });
+
+    it('should match published ORCHARD_PRUNING_DM_BY_AGE apple values', () => {
+      expect(ORCHARD_PRUNING_DM_BY_AGE.apple).toEqual([
+        { max_age: 3, dm_t_per_ha: 0.0 },
+        { max_age: 6, dm_t_per_ha: 1.5 },
+        { max_age: 10, dm_t_per_ha: 2.5 },
+        { max_age: 99, dm_t_per_ha: 4.0 },
+      ]);
+    });
+
+    it('should fall back to "other" brackets for unknown orchard type', () => {
+      expect(ORCHARD_PRUNING_DM_BY_AGE.other).toBeDefined();
+      expect(ORCHARD_BIOMASS_C_ACCUMULATION.other).toBeDefined();
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // Perennial crop: above-ground biomass carbon removal
+  // --------------------------------------------------------------------------
+
+  describe('perennial: above-ground biomass carbon removal', () => {
+    it('should return zero biomass removal and warning when tree_age is missing', () => {
+      const result = calculateOrchardImpacts(normandyApple);
+      expect(result.flag_removals.biomass_carbon_co2e).toBe(0);
+      expect(result.flag_removals.biomass_carbon_methodology).toBe('not_calculated');
+      expect(result.flag_removals.biomass_carbon_warning).toBeDefined();
+      expect(result.flag_removals.biomass_carbon_warning).toContain('planting year');
+    });
+
+    it('should calculate biomass carbon for young apple orchard (age 3, 0-5 bracket)', () => {
+      const result = calculateOrchardImpacts({
+        ...normandyApple,
+        tree_age: 3,
+      });
+      // apple 0-5: 0.18 tC/ha/yr × 15 ha × 1000 × 44/12
+      const expected = 0.18 * 15 * 1000 * C_TO_CO2E;
+      expect(result.flag_removals.biomass_carbon_co2e).toBeCloseTo(expected, 2);
+      expect(result.flag_removals.biomass_carbon_methodology).toBe('age_based_default');
+    });
+
+    it('should calculate biomass carbon for active-growth apple (age 10, 5-15 bracket)', () => {
+      const result = calculateOrchardImpacts({
+        ...normandyApple,
+        tree_age: 10,
+      });
+      const expected = 0.10 * 15 * 1000 * C_TO_CO2E;
+      expect(result.flag_removals.biomass_carbon_co2e).toBeCloseTo(expected, 2);
+    });
+
+    it('should calculate biomass carbon for mature apple (age 20, 15-25 bracket)', () => {
+      const result = calculateOrchardImpacts({
+        ...normandyApple,
+        tree_age: 20,
+      });
+      const expected = 0.05 * 15 * 1000 * C_TO_CO2E;
+      expect(result.flag_removals.biomass_carbon_co2e).toBeCloseTo(expected, 2);
+    });
+
+    it('should calculate biomass carbon for old apple (age 30, 25-99 bracket)', () => {
+      const result = calculateOrchardImpacts({
+        ...normandyApple,
+        tree_age: 30,
+      });
+      const expected = 0.02 * 15 * 1000 * C_TO_CO2E;
+      expect(result.flag_removals.biomass_carbon_co2e).toBeCloseTo(expected, 2);
+    });
+
+    it('should use citrus-specific rates for citrus orchard', () => {
+      const result = calculateOrchardImpacts({
+        ...irrigatedCitrus,
+        tree_age: 10,
+      });
+      // citrus 5-15: 0.08 tC/ha/yr × 20 ha
+      const expected = 0.08 * 20 * 1000 * C_TO_CO2E;
+      expect(result.flag_removals.biomass_carbon_co2e).toBeCloseTo(expected, 2);
+    });
+
+    it('should respect age-bracket boundaries (age_to exclusive)', () => {
+      // apple age 5 → 5-15 bracket (0.10), not 0-5 (0.18)
+      const result = calculateOrchardImpacts({
+        ...normandyApple,
+        tree_age: 5,
+      });
+      expect(result.flag_removals.biomass_carbon_co2e).toBeCloseTo(
+        0.10 * 15 * 1000 * C_TO_CO2E,
+        2
+      );
+    });
+
+    it('should scale linearly with orchard area', () => {
+      const small = calculateOrchardImpacts({
+        ...normandyApple,
+        area_ha: 1,
+        tree_age: 8,
+      });
+      const large = calculateOrchardImpacts({
+        ...normandyApple,
+        area_ha: 10,
+        tree_age: 8,
+      });
+      expect(large.flag_removals.biomass_carbon_co2e).toBeCloseTo(
+        small.flag_removals.biomass_carbon_co2e * 10,
+        2
+      );
+    });
+
+    it('should include biomass removal in total_removals', () => {
+      const result = calculateOrchardImpacts({
+        ...normandyApple,
+        tree_age: 4, // young, highest accumulation rate
+      });
+      expect(result.flag_removals.biomass_carbon_co2e).toBeGreaterThan(0);
+      expect(result.total_removals).toBeCloseTo(
+        result.flag_removals.soil_carbon_co2e +
+          result.flag_removals.biomass_carbon_co2e,
+        6
+      );
+    });
+
+    it('should never net biomass removal against emissions (FLAG separation)', () => {
+      const result = calculateOrchardImpacts({
+        ...normandyApple,
+        tree_age: 4,
+      });
+      const manualEmissions =
+        result.flag_emissions.total_flag_co2e +
+        result.non_flag_emissions.total_non_flag_co2e;
+      expect(result.total_emissions).toBeCloseTo(manualEmissions, 6);
+    });
+
+    it('should show higher biomass accumulation for apple vs cherry (larger canopy)', () => {
+      const apple = calculateOrchardImpacts({
+        ...normandyApple,
+        orchard_type: 'apple',
+        tree_age: 4,
+      });
+      const cherry = calculateOrchardImpacts({
+        ...normandyApple,
+        orchard_type: 'cherry',
+        tree_age: 4,
+      });
+      // apple 0-5 = 0.18, cherry 0-5 = 0.12
+      expect(apple.flag_removals.biomass_carbon_co2e).toBeGreaterThan(
+        cherry.flag_removals.biomass_carbon_co2e
+      );
+      expect(
+        apple.flag_removals.biomass_carbon_co2e /
+          cherry.flag_removals.biomass_carbon_co2e
+      ).toBeCloseTo(0.18 / 0.12, 3);
+    });
+
+    it('should match published ORCHARD_BIOMASS_C_ACCUMULATION apple values', () => {
+      expect(ORCHARD_BIOMASS_C_ACCUMULATION.apple).toEqual([
+        { age_from: 0, age_to: 5, tc_per_ha_per_yr: 0.18 },
+        { age_from: 5, age_to: 15, tc_per_ha_per_yr: 0.10 },
+        { age_from: 15, age_to: 25, tc_per_ha_per_yr: 0.05 },
+        { age_from: 25, age_to: 99, tc_per_ha_per_yr: 0.02 },
+      ]);
+    });
+
+    it('should fall back to oldest bracket rate for very old trees (age > 99)', () => {
+      const result = calculateOrchardImpacts({
+        ...normandyApple,
+        tree_age: 150,
+      });
+      const expected = 0.02 * 15 * 1000 * C_TO_CO2E; // apple 25-99 rate
+      expect(result.flag_removals.biomass_carbon_co2e).toBeCloseTo(expected, 2);
+    });
+
+    it('should handle negative age as missing data', () => {
+      const result = calculateOrchardImpacts({
+        ...normandyApple,
+        tree_age: -2,
+      });
+      expect(result.flag_removals.biomass_carbon_co2e).toBe(0);
+      expect(result.flag_removals.biomass_carbon_methodology).toBe('not_calculated');
+    });
+
+    it('should use "other" bracket for unknown orchard types', () => {
+      const result = calculateOrchardImpacts({
+        ...normandyApple,
+        orchard_type: 'other' as any,
+        tree_age: 4,
+      });
+      // other 0-5 = 0.13
+      const expected = 0.13 * 15 * 1000 * C_TO_CO2E;
+      expect(result.flag_removals.biomass_carbon_co2e).toBeCloseTo(expected, 2);
     });
   });
 });

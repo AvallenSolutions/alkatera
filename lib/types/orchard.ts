@@ -252,6 +252,8 @@ export interface OrchardCalculatorInput {
   land_conversion_year?: number | null;
   /** Current harvest year (for LUC amortisation calculation) */
   harvest_year?: number;
+  /** Tree age in years at the time of this harvest (derived: harvest_year - planting_year) */
+  tree_age?: number | null;
 
   // Land ownership boundary (GHG Protocol LSR v1.0)
   /** Operational boundary: owned, leased, rental, or contract growing */
@@ -332,6 +334,16 @@ export interface OrchardImpactResult {
     removals_meet_lsr_standard: boolean;
     /** Warning when removals use practice-based defaults without third-party verification */
     removals_warning?: string;
+    /**
+     * Above-ground + below-ground woody biomass carbon accumulation (kg CO2e/yr).
+     * Only calculated when tree age is known (planting_year on the Orchard record).
+     * IPCC 2019 Vol 4 Ch 2 (above-ground biomass carbon pool).
+     */
+    biomass_carbon_co2e: number;
+    /** Methodology used for biomass carbon estimate */
+    biomass_carbon_methodology: 'age_based_default' | 'not_calculated';
+    /** Warning shown when planting year is unknown and biomass cannot be estimated */
+    biomass_carbon_warning?: string;
   };
 
   // Non-FLAG emissions (energy/industrial)

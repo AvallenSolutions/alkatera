@@ -134,6 +134,7 @@ export async function POST(request: NextRequest) {
         address_lat: body.address_lat || null,
         address_lng: body.address_lng || null,
         location_country_code: body.location_country_code || null,
+        vine_planting_year: body.vine_planting_year || null,
       })
       .select()
       .single();

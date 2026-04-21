@@ -124,6 +124,9 @@ function combineImpacts(
       removal_verification_status: first.flag_removals.removal_verification_status,
       removals_meet_lsr_standard: results.every((r) => r.flag_removals.removals_meet_lsr_standard),
       removals_warning: first.flag_removals.removals_warning,
+      biomass_carbon_co2e: reduce(results.map((r) => r.flag_removals.biomass_carbon_co2e)),
+      biomass_carbon_methodology: first.flag_removals.biomass_carbon_methodology,
+      biomass_carbon_warning: first.flag_removals.biomass_carbon_warning,
     },
     non_flag_emissions: {
       fertiliser_production_co2e: reduce(results.map((r) => r.non_flag_emissions.fertiliser_production_co2e)),

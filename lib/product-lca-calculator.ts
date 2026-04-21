@@ -1712,6 +1712,9 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           previous_land_use_type: vineyard?.previous_land_use_type,
           land_conversion_year: vineyard?.land_conversion_year,
           vintage_year: p.vintage_year,
+          vine_age: vineyard?.vine_planting_year != null
+            ? p.vintage_year - vineyard.vine_planting_year
+            : null,
           removal_verification_status: (p as any).removal_verification_status ?? 'unverified',
           removal_verifier_body: (p as any).removal_verifier_body,
           removal_verifier_standard: (p as any).removal_verifier_standard,
@@ -2026,6 +2029,9 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           previous_land_use_type: orchard?.previous_land_use_type,
           land_conversion_year: orchard?.land_conversion_year,
           harvest_year: p.harvest_year,
+          tree_age: orchard?.planting_year != null
+            ? p.harvest_year - orchard.planting_year
+            : null,
           removal_verification_status: (p as any).removal_verification_status ?? 'unverified',
           removal_verifier_body: (p as any).removal_verifier_body,
           removal_verifier_standard: (p as any).removal_verifier_standard,

@@ -129,6 +129,7 @@ export default function VineyardDetailPage() {
             vineyardCountryCode={vineyard.location_country_code}
             vineyardPreviousLandUse={vineyard.previous_land_use_type}
             vineyardLandConversionYear={vineyard.land_conversion_year}
+            vineyardPlantingYear={vineyard.vine_planting_year}
             existingProfile={editProfile}
             vintageYear={questionnaireYear}
             copyFromData={!editProfile ? copyFromData : undefined}

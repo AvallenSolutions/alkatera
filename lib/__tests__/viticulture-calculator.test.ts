@@ -11,6 +11,8 @@ import {
   VINEYARD_CARBON_STOCK,
   C_TO_CO2E,
   LUC_AMORTISATION_YEARS,
+  VINE_PRUNING_DM_BY_AGE,
+  VINE_BIOMASS_C_ACCUMULATION,
 } from '../ghg-constants';
 import type { ViticultureCalculatorInput } from '../types/viticulture';
 
@@ -972,6 +974,324 @@ describe('calculateViticultureImpacts', () => {
       expect(withTnfd.flag_emissions.total_flag_co2e).toBe(baseline.flag_emissions.total_flag_co2e);
       expect(withTnfd.non_flag_emissions.total_non_flag_co2e).toBe(baseline.non_flag_emissions.total_non_flag_co2e);
       expect(withTnfd.total_emissions).toBe(baseline.total_emissions);
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // Perennial crop: pruning dry matter graduation by vine age
+  // --------------------------------------------------------------------------
+
+  describe('perennial: age-graduated pruning dry matter', () => {
+    it('should use mature default (2.5 t DM/ha) when vine_age not provided', () => {
+      const result = calculateViticultureImpacts(UK_VINEYARD_BASELINE);
+      // Baseline (no vine_age) should match original behaviour
+      // Crop residue N2O proportional to DM; with 2.5 t DM/ha and 5 ha → 12.5 t DM
+      const aboveGroundN = CROP_RESIDUE_FACTORS.VINE_PRUNING_DM_PER_HA *
+                            CROP_RESIDUE_FACTORS.VINE_PRUNING_N_FRACTION *
+                            UK_VINEYARD_BASELINE.area_ha;
+      expect(aboveGroundN).toBeCloseTo(2.5 * 0.008 * 5, 6);
+      expect(result.flag_emissions.n2o_crop_residue_co2e).toBeGreaterThan(0);
+    });
+
+    it('should use 0.0 t DM/ha for pre-production vines (age ≤ 2)', () => {
+      const youngVine = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        vine_age: 1,
+      });
+      // No pruning residue → N2O from prunings ~ 0 (only organic residues remain)
+      expect(youngVine.flag_emissions.n2o_crop_residue_co2e).toBe(0);
+    });
+
+    it('should use 0.5 t DM/ha for young vines (age 3-4)', () => {
+      const youngResult = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        vine_age: 3,
+      });
+      const matureResult = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        vine_age: 10,
+      });
+      // Young vines produce 0.5/2.5 = 20% of mature pruning → proportionally lower N2O
+      expect(youngResult.flag_emissions.n2o_crop_residue_co2e).toBeLessThan(
+        matureResult.flag_emissions.n2o_crop_residue_co2e
+      );
+      expect(
+        youngResult.flag_emissions.n2o_crop_residue_co2e /
+          matureResult.flag_emissions.n2o_crop_residue_co2e
+      ).toBeCloseTo(0.5 / 2.5, 3);
+    });
+
+    it('should use 1.2 t DM/ha for developing vines (age 5-7)', () => {
+      const developingResult = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        vine_age: 6,
+      });
+      const matureResult = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        vine_age: 10,
+      });
+      expect(
+        developingResult.flag_emissions.n2o_crop_residue_co2e /
+          matureResult.flag_emissions.n2o_crop_residue_co2e
+      ).toBeCloseTo(1.2 / 2.5, 3);
+    });
+
+    it('should use mature 2.5 t DM/ha default for age ≥ 8', () => {
+      const ages = [8, 15, 30, 50];
+      const baseline = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        vine_age: 8,
+      }).flag_emissions.n2o_crop_residue_co2e;
+      for (const age of ages) {
+        const result = calculateViticultureImpacts({
+          ...UK_VINEYARD_BASELINE,
+          vine_age: age,
+        });
+        expect(result.flag_emissions.n2o_crop_residue_co2e).toBeCloseTo(baseline, 6);
+      }
+    });
+
+    it('should match exact boundary values for each age bracket', () => {
+      const boundaries: Array<[number, number]> = [
+        [0, 0.0],
+        [2, 0.0],
+        [3, 0.5],
+        [4, 0.5],
+        [5, 1.2],
+        [7, 1.2],
+        [8, 2.5],
+        [99, 2.5],
+      ];
+      for (const [age, expectedDm] of boundaries) {
+        const result = calculateViticultureImpacts({
+          ...UK_VINEYARD_BASELINE,
+          vine_age: age,
+        });
+        if (expectedDm === 0) {
+          expect(result.flag_emissions.n2o_crop_residue_co2e).toBe(0);
+        } else {
+          const scale = expectedDm / CROP_RESIDUE_FACTORS.VINE_PRUNING_DM_PER_HA;
+          const mature = calculateViticultureImpacts({
+            ...UK_VINEYARD_BASELINE,
+            vine_age: 99,
+          });
+          expect(result.flag_emissions.n2o_crop_residue_co2e).toBeCloseTo(
+            mature.flag_emissions.n2o_crop_residue_co2e * scale,
+            4
+          );
+        }
+      }
+    });
+
+    it('should match the published VINE_PRUNING_DM_BY_AGE table', () => {
+      expect(VINE_PRUNING_DM_BY_AGE).toEqual([
+        { max_age: 2, dm_t_per_ha: 0.0 },
+        { max_age: 4, dm_t_per_ha: 0.5 },
+        { max_age: 7, dm_t_per_ha: 1.2 },
+        { max_age: 99, dm_t_per_ha: 2.5 },
+      ]);
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // Perennial crop: above-ground biomass carbon removal
+  // --------------------------------------------------------------------------
+
+  describe('perennial: above-ground biomass carbon removal', () => {
+    it('should return zero biomass removal and a warning when vine_age is missing', () => {
+      const result = calculateViticultureImpacts(UK_VINEYARD_BASELINE);
+      expect(result.flag_removals.biomass_carbon_co2e).toBe(0);
+      expect(result.flag_removals.biomass_carbon_methodology).toBe('not_calculated');
+      expect(result.flag_removals.biomass_carbon_warning).toBeDefined();
+      expect(result.flag_removals.biomass_carbon_warning).toContain('planting year');
+    });
+
+    it('should return zero biomass removal when vine_age is null', () => {
+      const result = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        vine_age: null,
+      });
+      expect(result.flag_removals.biomass_carbon_co2e).toBe(0);
+      expect(result.flag_removals.biomass_carbon_methodology).toBe('not_calculated');
+    });
+
+    it('should calculate biomass carbon using formula rate × area × 1000 × 44/12 (age 2)', () => {
+      const result = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        vine_age: 2,
+      });
+      // 0-5 bracket: 0.08 tC/ha/yr × 5 ha × 1000 kg/t × 44/12 = 1466.67 kg CO2e/yr
+      const expected = 0.08 * 5 * 1000 * C_TO_CO2E;
+      expect(result.flag_removals.biomass_carbon_co2e).toBeCloseTo(expected, 2);
+      expect(result.flag_removals.biomass_carbon_methodology).toBe('age_based_default');
+      expect(result.flag_removals.biomass_carbon_warning).toBeUndefined();
+    });
+
+    it('should calculate biomass carbon for active growth phase (age 10)', () => {
+      const result = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        vine_age: 10,
+      });
+      // 5-15 bracket: 0.04 tC/ha/yr
+      const expected = 0.04 * 5 * 1000 * C_TO_CO2E;
+      expect(result.flag_removals.biomass_carbon_co2e).toBeCloseTo(expected, 2);
+    });
+
+    it('should calculate biomass carbon approaching steady state (age 20)', () => {
+      const result = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        vine_age: 20,
+      });
+      // 15-25 bracket: 0.02 tC/ha/yr
+      const expected = 0.02 * 5 * 1000 * C_TO_CO2E;
+      expect(result.flag_removals.biomass_carbon_co2e).toBeCloseTo(expected, 2);
+    });
+
+    it('should calculate biomass carbon for old vines (age 30)', () => {
+      const result = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        vine_age: 30,
+      });
+      // 25-99 bracket: 0.01 tC/ha/yr
+      const expected = 0.01 * 5 * 1000 * C_TO_CO2E;
+      expect(result.flag_removals.biomass_carbon_co2e).toBeCloseTo(expected, 2);
+    });
+
+    it('should handle age 0 (just planted) using first bracket (0-5)', () => {
+      const result = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        vine_age: 0,
+      });
+      const expected = 0.08 * 5 * 1000 * C_TO_CO2E;
+      expect(result.flag_removals.biomass_carbon_co2e).toBeCloseTo(expected, 2);
+    });
+
+    it('should fall back to oldest bracket rate for extremely old vines', () => {
+      // age 100+ falls past age_to: 99 upper bound; fallback is last bracket's rate (0.01)
+      const result = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        vine_age: 120,
+      });
+      const expected = 0.01 * 5 * 1000 * C_TO_CO2E;
+      expect(result.flag_removals.biomass_carbon_co2e).toBeCloseTo(expected, 2);
+    });
+
+    it('should scale biomass removal linearly with area', () => {
+      const small = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        area_ha: 1,
+        vine_age: 10,
+      });
+      const large = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        area_ha: 10,
+        vine_age: 10,
+      });
+      expect(large.flag_removals.biomass_carbon_co2e).toBeCloseTo(
+        small.flag_removals.biomass_carbon_co2e * 10,
+        2
+      );
+    });
+
+    it('should respect age-bracket boundaries (age_to is exclusive)', () => {
+      // age 5: should map to 5-15 bracket (0.04), NOT 0-5 (0.08)
+      const at5 = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        vine_age: 5,
+      });
+      expect(at5.flag_removals.biomass_carbon_co2e).toBeCloseTo(
+        0.04 * 5 * 1000 * C_TO_CO2E,
+        2
+      );
+      // age 15: should map to 15-25 bracket (0.02)
+      const at15 = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        vine_age: 15,
+      });
+      expect(at15.flag_removals.biomass_carbon_co2e).toBeCloseTo(
+        0.02 * 5 * 1000 * C_TO_CO2E,
+        2
+      );
+      // age 25: should map to 25-99 bracket (0.01)
+      const at25 = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        vine_age: 25,
+      });
+      expect(at25.flag_removals.biomass_carbon_co2e).toBeCloseTo(
+        0.01 * 5 * 1000 * C_TO_CO2E,
+        2
+      );
+    });
+
+    it('should include biomass removal in total_removals (FLAG removal)', () => {
+      const result = calculateViticultureImpacts({
+        ...ORGANIC_VINEYARD,
+        vine_age: 3, // young, active biomass accumulation
+      });
+      expect(result.flag_removals.biomass_carbon_co2e).toBeGreaterThan(0);
+      expect(result.flag_removals.soil_carbon_co2e).toBeGreaterThan(0);
+      expect(result.total_removals).toBeCloseTo(
+        result.flag_removals.soil_carbon_co2e +
+          result.flag_removals.biomass_carbon_co2e,
+        6
+      );
+    });
+
+    it('should never net biomass removal against emissions', () => {
+      const result = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        vine_age: 3,
+      });
+      // total_emissions MUST exclude biomass removal (FLAG separation, SBTi/LSR)
+      const manualEmissions =
+        result.flag_emissions.total_flag_co2e +
+        result.non_flag_emissions.total_non_flag_co2e;
+      expect(result.total_emissions).toBeCloseTo(manualEmissions, 6);
+      expect(result.total_emissions).not.toEqual(
+        result.total_emissions - result.flag_removals.biomass_carbon_co2e
+      );
+    });
+
+    it('should match IPCC 2019 Vol 4 Ch 2 plausibility range (40-130 kg CO2e/ha/yr for active growth)', () => {
+      // Per plan spec: "biomass adds ~40-130 kg CO2e/ha/yr for active growth phase"
+      const result = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        vine_age: 3, // 0-5 bracket, 0.08 tC/ha/yr
+        area_ha: 1,
+      });
+      expect(result.flag_removals.biomass_carbon_co2e).toBeGreaterThan(40);
+      expect(result.flag_removals.biomass_carbon_co2e).toBeLessThan(600);
+    });
+
+    it('should match the published VINE_BIOMASS_C_ACCUMULATION table', () => {
+      expect(VINE_BIOMASS_C_ACCUMULATION).toEqual([
+        { age_from: 0, age_to: 5, tc_per_ha_per_yr: 0.08 },
+        { age_from: 5, age_to: 15, tc_per_ha_per_yr: 0.04 },
+        { age_from: 15, age_to: 25, tc_per_ha_per_yr: 0.02 },
+        { age_from: 25, age_to: 99, tc_per_ha_per_yr: 0.01 },
+      ]);
+    });
+
+    it('should handle negative age gracefully (treat as missing)', () => {
+      const result = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        vine_age: -1,
+      });
+      // Negative age is invalid data; should not produce a biomass removal
+      expect(result.flag_removals.biomass_carbon_co2e).toBe(0);
+      expect(result.flag_removals.biomass_carbon_methodology).toBe('not_calculated');
+    });
+
+    it('should reward data quality when vine age is provided', () => {
+      const qualityOrder = { LOW: 0, MEDIUM: 1, HIGH: 2 };
+      const withoutAge = calculateViticultureImpacts(UK_VINEYARD_BASELINE);
+      const withAge = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        vine_age: 10,
+      });
+      expect(qualityOrder[withAge.data_quality_grade]).toBeGreaterThanOrEqual(
+        qualityOrder[withoutAge.data_quality_grade]
+      );
     });
   });
 

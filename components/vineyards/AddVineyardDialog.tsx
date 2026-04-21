@@ -50,6 +50,7 @@ export function AddVineyardDialog({
     hectares: '',
     grape_varieties: '',
     annual_yield_tonnes: '',
+    vine_planting_year: '',
     certification: 'conventional' as VineyardCertification,
     climate_zone: 'temperate' as VineyardClimateZone,
     facility_id: '',
@@ -88,6 +89,9 @@ export function AddVineyardDialog({
         annual_yield_tonnes: editVineyard.annual_yield_tonnes
           ? String(editVineyard.annual_yield_tonnes)
           : '',
+        vine_planting_year: editVineyard.vine_planting_year
+          ? String(editVineyard.vine_planting_year)
+          : '',
         certification: editVineyard.certification,
         climate_zone: editVineyard.climate_zone,
         facility_id: editVineyard.facility_id || '',
@@ -104,6 +108,7 @@ export function AddVineyardDialog({
         hectares: '',
         grape_varieties: '',
         annual_yield_tonnes: '',
+        vine_planting_year: '',
         certification: 'conventional',
         climate_zone: 'temperate',
         facility_id: '',
@@ -132,6 +137,9 @@ export function AddVineyardDialog({
           : [],
         annual_yield_tonnes: form.annual_yield_tonnes
           ? parseFloat(form.annual_yield_tonnes)
+          : null,
+        vine_planting_year: form.vine_planting_year
+          ? parseInt(form.vine_planting_year, 10)
           : null,
         certification: form.certification,
         climate_zone: form.climate_zone,
@@ -229,6 +237,25 @@ export function AddVineyardDialog({
                 placeholder="e.g. 30"
               />
             </div>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="vine_planting_year">Vine planting year</Label>
+            <Input
+              id="vine_planting_year"
+              type="number"
+              step="1"
+              min="1800"
+              max={new Date().getFullYear()}
+              value={form.vine_planting_year}
+              onChange={(e) =>
+                setForm({ ...form, vine_planting_year: e.target.value })
+              }
+              placeholder={`e.g. ${new Date().getFullYear() - 10}`}
+            />
+            <p className="text-xs text-muted-foreground">
+              The year your vines were planted. Used to calculate above-ground biomass carbon removal and calibrate pruning dry matter estimates.
+            </p>
           </div>
 
           <div className="grid gap-2">

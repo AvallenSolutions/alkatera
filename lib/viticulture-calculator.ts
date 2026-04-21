@@ -46,6 +46,8 @@ import {
   C_TO_CO2E,
   LUC_AMORTISATION_YEARS,
   VINE_SO2_EQ_PER_HA_DEFAULT,
+  VINE_PRUNING_DM_BY_AGE,
+  VINE_BIOMASS_C_ACCUMULATION,
 } from './ghg-constants';
 
 import { getGridFactor } from './grid-emission-factors';
@@ -219,10 +221,11 @@ export function calculateViticultureImpacts(
   );
 
   if (residueManagementType !== 'removed_for_biomass') {
-    // Use measured dry matter if provided (primary data), otherwise default constant
+    // Use measured dry matter if provided (primary data)
+    // Otherwise use age-graduated default when vine_age is known, else fall back to mature default
     const pruningDmPerHa = input.pruning_residue_measured_kg_per_ha != null
       ? input.pruning_residue_measured_kg_per_ha / 1000 // convert kg to tonnes
-      : CROP_RESIDUE_FACTORS.VINE_PRUNING_DM_PER_HA;
+      : getVinePruningDmForAge(input.vine_age);
 
     // For chipped_and_spread, apply 0.7 decomposition factor to N fraction
     const effectiveNFraction = residueManagementType === 'chipped_and_spread'
@@ -372,6 +375,26 @@ export function calculateViticultureImpacts(
   }
 
   // ========================================================================
+  // 6b. ABOVE-GROUND BIOMASS CARBON REMOVAL (FLAG: perennial woody biomass)
+  // ========================================================================
+  // Vines accumulate carbon in permanent woody structures (trunk, cordons, roots).
+  // This is the above-ground + below-ground biomass pool per IPCC 2019 Vol 4 Ch 2.
+  // Only calculable when vine age is known.
+
+  let biomassCarbonCo2e = 0;
+  let biomassCarbonMethodology: 'age_based_default' | 'not_calculated' = 'not_calculated';
+  let biomassCarbonWarning: string | undefined;
+
+  if (input.vine_age != null && input.vine_age >= 0) {
+    const accumulationRate = getVineBiomassAccumulationRate(input.vine_age);
+    // tC/ha/yr → kg CO2e/yr (× 1000 for kg, × C_TO_CO2E for CO2e conversion)
+    biomassCarbonCo2e = accumulationRate * input.area_ha * 1000 * C_TO_CO2E;
+    biomassCarbonMethodology = 'age_based_default';
+  } else {
+    biomassCarbonWarning = 'Vine planting year not recorded — above-ground biomass carbon removal cannot be estimated. Add vine planting year to your vineyard to improve accuracy.';
+  }
+
+  // ========================================================================
   // TOTALS AND NORMALISATION
   // ========================================================================
 
@@ -383,7 +406,7 @@ export function calculateViticultureImpacts(
     pesticideProductionCo2e;
 
   const totalEmissions = totalFlagEmissions + totalNonFlagEmissions;
-  const totalRemovals = soilCarbonCo2e;
+  const totalRemovals = soilCarbonCo2e + biomassCarbonCo2e;
 
   // Per-kg normalisation (kg CO2e per kg of grapes)
   const grapeYieldKg = input.grape_yield_tonnes * 1000;
@@ -450,6 +473,9 @@ export function calculateViticultureImpacts(
       removal_verification_status: removalVerificationStatus,
       removals_meet_lsr_standard: removalsMeetLsrStandard,
       removals_warning: removalsWarning,
+      biomass_carbon_co2e: biomassCarbonCo2e,
+      biomass_carbon_methodology: biomassCarbonMethodology,
+      biomass_carbon_warning: biomassCarbonWarning,
     },
     non_flag_emissions: {
       fertiliser_production_co2e: fertiliserProductionCo2e,
@@ -585,10 +611,45 @@ function assessDataQuality(
     score += 1;
   }
 
-  // Total: max 10
+  // Vine age (enables accurate biomass removal + pruning DM graduation)
+  if (input.vine_age != null) {
+    score += 1;
+  }
+
+  // Total: max 11
   if (score >= 8) return 'HIGH';
   if (score >= 5) return 'MEDIUM';
   return 'LOW';
+}
+
+// ---------------------------------------------------------------------------
+// Perennial crop helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Return the age-appropriate vine pruning dry matter (t DM/ha/yr).
+ * Falls back to the mature-vine default when age is unknown.
+ */
+function getVinePruningDmForAge(vineAge: number | null | undefined): number {
+  if (vineAge == null) return CROP_RESIDUE_FACTORS.VINE_PRUNING_DM_PER_HA;
+  for (const bracket of VINE_PRUNING_DM_BY_AGE) {
+    if (vineAge <= bracket.max_age) return bracket.dm_t_per_ha;
+  }
+  return CROP_RESIDUE_FACTORS.VINE_PRUNING_DM_PER_HA;
+}
+
+/**
+ * Return the annual above-ground biomass carbon accumulation rate (tC/ha/yr)
+ * for vines at the given age.
+ */
+function getVineBiomassAccumulationRate(vineAge: number): number {
+  for (const bracket of VINE_BIOMASS_C_ACCUMULATION) {
+    if (vineAge >= bracket.age_from && vineAge < bracket.age_to) {
+      return bracket.tc_per_ha_per_yr;
+    }
+  }
+  // Fallback to oldest bracket rate
+  return VINE_BIOMASS_C_ACCUMULATION[VINE_BIOMASS_C_ACCUMULATION.length - 1].tc_per_ha_per_yr;
 }
 
 // ---------------------------------------------------------------------------
@@ -601,7 +662,8 @@ function buildMethodologyNotes(
 ): string {
   const parts: string[] = [];
 
-  parts.push(`Viticulture LCA: ${input.area_ha} ha, ${input.grape_yield_tonnes} t yield`);
+  const ageNote = input.vine_age != null ? `, vine age ${input.vine_age} yrs` : '';
+  parts.push(`Viticulture LCA: ${input.area_ha} ha, ${input.grape_yield_tonnes} t yield${ageNote}`);
   parts.push(`Climate zone: ${climateZone} (IPCC EF1=${IPCC_N2O_FACTORS.EF1[climateZone]})`);
 
   if (input.fertiliser_type !== 'none') {
