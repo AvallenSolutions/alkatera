@@ -9,7 +9,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import {
   AlertTriangle,
   CheckCircle2,
-  ExternalLink,
   Info,
   Shield,
   UserCheck,
@@ -54,7 +53,7 @@ const REVIEW_TYPE_OPTIONS: ReviewTypeOption[] = [
     label: 'Independent Third-Party Expert Review',
     description: 'Verified by qualified independent experts, including for comparative assertions',
     icon: Shield,
-    requirement: 'Conducted by Impact Focus, our expert consulting partner',
+    requirement: 'Qualified independent LCA expert or review panel',
     audience: ['customers_b2b', 'customers_b2c', 'regulators', 'investors', 'public', 'comparative assertions'],
   },
 ];
@@ -253,31 +252,6 @@ export function ReviewStep() {
                   ? 'This matches the recommended review level for your use case.'
                   : 'This differs from the recommended review level. Ensure this is appropriate for your disclosure plans.'}
               </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Impact Focus CTA */}
-      {formData.criticalReviewType === 'external' && (
-        <Card className="border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/50 dark:bg-emerald-950/20">
-          <CardContent className="flex items-start gap-3 p-4">
-            <Shield className="h-5 w-5 text-emerald-600 mt-0.5 shrink-0" />
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-emerald-900 dark:text-emerald-100">
-                Independent review provided by Impact Focus
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Our expert consulting partner Impact Focus will carry out the third-party verification
-                of your LCA report. This is an additional service at an external cost.
-              </p>
-              <a
-                href="/expert-partners/"
-                className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 mt-1"
-              >
-                Learn more about Impact Focus
-                <ExternalLink className="h-3 w-3" />
-              </a>
             </div>
           </CardContent>
         </Card>

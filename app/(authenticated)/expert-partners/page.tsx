@@ -3,7 +3,6 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import Image from 'next/image'
 import {
   Handshake,
   ExternalLink,
@@ -11,112 +10,169 @@ import {
   Leaf,
   Award,
   BarChart3,
-  FileCheck,
-  MessageSquare,
-  Users,
-  Shield,
   Sparkles,
+  Target,
+  TrendingDown,
+  FileText,
+  Scale,
+  GraduationCap,
+  Megaphone,
+  Star,
+  Monitor,
+  ClipboardList,
+  Search,
+  type LucideIcon,
 } from 'lucide-react'
-import { useSubscription } from '@/hooks/useSubscription'
 import { usePartnerCredits } from '@/hooks/data/usePartnerCredits'
 import { useOrganization } from '@/lib/organizationContext'
 import { redirect } from 'next/navigation'
+import { cn } from '@/lib/utils'
 
 // Temporarily restrict to alkatera Demo org until Impact Focus contract is signed
-const EXPERT_PARTNERS_ALLOWED_ORGS = ['2d86de84-e24e-458b-84b9-fd4057998bda'];
+const EXPERT_PARTNERS_ALLOWED_ORGS = ['2d86de84-e24e-458b-84b9-fd4057998bda']
 
-const SERVICE_AREAS = [
+interface Service {
+  icon: LucideIcon
+  title: string
+  description: string
+}
+
+interface ServiceCategory {
+  label: string
+  tagline: string
+  accent: 'emerald' | 'blue' | 'amber' | 'violet'
+  services: Service[]
+}
+
+const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
-    icon: Leaf,
-    title: 'Sustainability Strategy',
-    description: 'Develop a clear roadmap that aligns environmental goals with commercial reality.',
+    label: 'Strategy and Planning',
+    tagline: 'Building the foundations for long-term sustainability performance',
+    accent: 'emerald',
+    services: [
+      {
+        icon: Target,
+        title: 'Sustainability Strategy Development and Implementation',
+        description: 'For organisations ready to set formal sustainability targets but uncertain where to start. Impact Focus builds practical, commercially grounded strategies that create a clear path from ambition to action.',
+      },
+      {
+        icon: BarChart3,
+        title: 'Sustainability Management Strategy',
+        description: 'For businesses that have started their sustainability journey but need a coherent framework to manage, measure, and improve performance over time.',
+      },
+      {
+        icon: Leaf,
+        title: 'Biodiversity Strategy',
+        description: 'For producers and land managers wanting to understand the ecological impact of their operations and build a credible nature recovery or biodiversity net gain plan.',
+      },
+      {
+        icon: TrendingDown,
+        title: 'Carbon Reduction Planning and Net Zero Roadmaps',
+        description: 'For organisations that have completed their carbon footprint and now need a credible, costed reduction plan with realistic milestones and accountability.',
+      },
+    ],
   },
   {
-    icon: Award,
-    title: 'B Corp Certification',
-    description: 'Expert guidance through the B Impact Assessment, gap analysis, and submission process.',
+    label: 'Reporting and Compliance',
+    tagline: 'Meeting the expectations of regulators, investors, and buyers',
+    accent: 'blue',
+    services: [
+      {
+        icon: ClipboardList,
+        title: 'Materiality Assessments and Stakeholder Engagement',
+        description: 'For businesses preparing for investor scrutiny, CSRD obligations, or sustainability reporting who need to identify and prioritise their most significant topics through structured stakeholder dialogue.',
+      },
+      {
+        icon: Search,
+        title: 'ESG Due Diligence and Reporting Advisory',
+        description: 'For brands seeking investment, preparing for acquisition, or responding to lender requirements who need to demonstrate ESG readiness with confidence.',
+      },
+      {
+        icon: FileText,
+        title: 'Sustainability and Impact Report Creation',
+        description: 'For businesses ready to publish their first sustainability report but lacking the in-house resource to manage content development, design, and delivery end to end.',
+      },
+      {
+        icon: Scale,
+        title: 'Regulatory Compliance Guidance and Reporting Support',
+        description: 'For suppliers and brands facing new CSRD, EUDR, modern slavery, or packaging obligations who need help understanding what applies to them and building a structured response.',
+      },
+    ],
   },
   {
-    icon: BarChart3,
-    title: 'Carbon Management',
-    description: 'From baselining to reduction planning, with practical steps tailored to your operations.',
+    label: 'Certification and Standards',
+    tagline: 'Achieving the credentials that open doors and build trust',
+    accent: 'amber',
+    services: [
+      {
+        icon: Award,
+        title: 'B Corp Certification Support',
+        description: 'For businesses committed to B Corp but struggling to navigate the B Impact Assessment, gap analysis, improvement planning, and submission process.',
+      },
+      {
+        icon: Star,
+        title: 'EcoVadis Ratings Preparation and Improvement',
+        description: 'For suppliers asked by a major retailer, buyer, or brand owner to achieve or improve an EcoVadis score within a defined timeframe.',
+      },
+    ],
   },
   {
-    icon: FileCheck,
-    title: 'Third-Party Verification',
-    description: 'Independent review of your LCA reports and sustainability claims for added credibility.',
-  },
-  {
-    icon: MessageSquare,
-    title: 'ESG Communications',
-    description: 'Articulate your sustainability story with confidence, avoiding greenwashing risk.',
-  },
-  {
-    icon: Shield,
-    title: 'Impact Reporting',
-    description: 'Produce reports that satisfy buyers, investors, and certification bodies.',
-  },
-  {
-    icon: Users,
-    title: 'Stakeholder Engagement',
-    description: 'Build meaningful dialogue with suppliers, customers, and communities on sustainability.',
+    label: 'Communications and Capability',
+    tagline: 'Telling your story clearly and building the team behind it',
+    accent: 'violet',
+    services: [
+      {
+        icon: Megaphone,
+        title: 'Sustainability Communications and Storytelling',
+        description: 'For brands with a strong sustainability story but no clear way to communicate it without greenwashing risk. Impact Focus helps translate data and commitments into authentic, compelling narratives.',
+      },
+      {
+        icon: GraduationCap,
+        title: 'Training and Capacity-Building Programmes',
+        description: 'For teams that need to build internal sustainability literacy before they can own their own data collection, reporting, or stakeholder communication.',
+      },
+      {
+        icon: Monitor,
+        title: 'Digital Accessibility Audits, Training and Remediation',
+        description: 'For organisations that need to meet WCAG standards, respond to an accessibility complaint, or embed accessibility as a standard practice across their digital estate.',
+      },
+    ],
   },
 ]
 
-const TEAM_MEMBERS = [
-  {
-    name: 'Rosie Davenport',
-    role: 'Founder and Lead Consultant',
-    photo: '/images/partners/impact-focus/rosie.webp',
-    bio: 'Over 25 years in sustainability, communications, and journalism. Cambridge Institute for Sustainability Leadership graduate, accredited GRI Sustainability Professional, and trained B Leader. Former Group Editor of Harpers Wine and Spirit and Drinks Editor at The Grocer.',
+const ACCENT_STYLES = {
+  emerald: {
+    section: 'border-l-emerald-500',
+    iconBg: 'bg-emerald-100 dark:bg-emerald-900/40',
+    iconColor: 'text-emerald-600 dark:text-emerald-400',
+    badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+    cardBorder: 'hover:border-emerald-300 dark:hover:border-emerald-700',
   },
-  {
-    name: 'Fleur Record-Smith',
-    role: 'Sustainability and B Corp Consultant',
-    photo: '/images/partners/impact-focus/fleur.webp',
-    bio: 'Over 15 years hands-on sustainability experience in hospitality. Founded an award-winning, B Corp-certified hospitality venue. MSc in Sustainability and trained B Leader, with expertise in carbon management, environmental impact assessments, and net-zero goal-setting.',
+  blue: {
+    section: 'border-l-blue-500',
+    iconBg: 'bg-blue-100 dark:bg-blue-900/40',
+    iconColor: 'text-blue-600 dark:text-blue-400',
+    badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+    cardBorder: 'hover:border-blue-300 dark:hover:border-blue-700',
   },
-  {
-    name: 'Chipo Mbawu',
-    role: 'Social Impact and Ethical Business Consultant',
-    photo: '/images/partners/impact-focus/chipo.webp',
-    bio: 'Specialises in human rights, environmental due diligence, stakeholder engagement, and social ESG dimensions. Three years as Project Manager at The Shift. Experience spans North-South partnerships, gender empowerment, and corporate sustainability strategy.',
+  amber: {
+    section: 'border-l-amber-500',
+    iconBg: 'bg-amber-100 dark:bg-amber-900/40',
+    iconColor: 'text-amber-600 dark:text-amber-400',
+    badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+    cardBorder: 'hover:border-amber-300 dark:hover:border-amber-700',
   },
-  {
-    name: 'Kate Sweet',
-    role: 'PR and Communications Consultant',
-    photo: '/images/partners/impact-focus/kate-sweet.webp',
-    bio: '30 years wine industry experience. Developed communications strategies for organic, biodynamic, and regenerative viticulture brands. Eight years as PR and Events Manager at Brown-Forman Wines. Clients include Familia Torres and International Wineries for Climate Action.',
+  violet: {
+    section: 'border-l-violet-500',
+    iconBg: 'bg-violet-100 dark:bg-violet-900/40',
+    iconColor: 'text-violet-600 dark:text-violet-400',
+    badge: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300',
+    cardBorder: 'hover:border-violet-300 dark:hover:border-violet-700',
   },
-  {
-    name: 'Kate Hempsall',
-    role: 'PR and Communications Consultant',
-    photo: '/images/partners/impact-focus/kate-hempsall.webp',
-    bio: 'Communications strategist with a strong track record in brewing and hospitality. Twelve years as Head of Communications at Charles Wells, three years at Carlsberg. Member of the British Guild of Beer Writers and Chartered Institute of Public Relations.',
-  },
-  {
-    name: 'Lucy Savage-Mountain',
-    role: 'Creative and Reporting Design Lead',
-    photo: '/images/partners/impact-focus/lucy.webp',
-    bio: 'Over 24 years design and branding experience, beginning at William Reed Publishing. Expertise in making sustainability data compelling through infographics. Founded Brighton-based design agency Add Tonic in 2011.',
-  },
-  {
-    name: 'Caz Brunnen',
-    role: 'Digital Accessibility Consultant',
-    photo: '/images/partners/impact-focus/caz.webp',
-    bio: 'Over eight years web development with five years digital accessibility specialisation. Delivered accessibility programmes for McDonald\'s, Commonwealth Bank of Australia, and Rugby Australia. Advocates for embedding accessibility into organisational operations.',
-  },
-  {
-    name: 'Kim Jurriaans',
-    role: 'Editor and Content Consultant',
-    photo: '/images/partners/impact-focus/kim.webp',
-    bio: 'Writer and multimedia producer with 20 years international journalism and non-profit communication experience, including six years with the UN Food and Agriculture Organization. Passionate about helping sustainability-forward organisations tell evidence-backed stories.',
-  },
-]
+}
 
 export default function ExpertPartnersPage() {
-  const { tierName } = useSubscription()
-  const { creditStatus, creditAmount, isCanopy, isBetaProgramme } = usePartnerCredits()
+  const { creditStatus, creditAmount, isCanopy, isBetaProgramme, monthsSubscribed, billingInterval } = usePartnerCredits()
   const { currentOrganization } = useOrganization()
   const isCanopyWithCredit = isCanopy && !isBetaProgramme
 
@@ -126,7 +182,7 @@ export default function ExpertPartnersPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       {/* Header */}
       <div className="space-y-2">
         <div className="flex items-center gap-3">
@@ -157,22 +213,37 @@ export default function ExpertPartnersPage() {
             </div>
             {isCanopyWithCredit && (creditStatus === 'available' || creditStatus === 'pending') && (
               <Badge variant="neon-lime" className="text-sm px-3 py-1 shrink-0">
-                {creditStatus === 'available'
-                  ? `£${creditAmount} credit available`
-                  : 'Credit pending'}
+                {creditStatus === 'available' ? `£${creditAmount} credit available` : 'Credit pending'}
               </Badge>
             )}
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Discount banner for all tiers */}
           <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50">
             <Sparkles className="h-4 w-4 text-emerald-600 shrink-0" />
             <p className="text-sm text-emerald-800 dark:text-emerald-200">
               {isCanopyWithCredit && creditStatus === 'available' ? (
                 <>You have <strong>£{creditAmount} in consulting credits</strong> to use with Impact Focus. Contact them to redeem.</>
               ) : isCanopyWithCredit && creditStatus === 'pending' ? (
-                <>Your <strong>£{creditAmount} consulting credit</strong> is building. Keep your Canopy subscription active to unlock it.</>
+                <span className="flex items-center gap-3 w-full">
+                  <span className="flex-1">
+                    Your <strong>£{creditAmount} consulting credit</strong> is building.{' '}
+                    <span className="text-emerald-700 dark:text-emerald-300">{monthsSubscribed} of 6 months complete.</span>
+                  </span>
+                  <span className="flex gap-1 shrink-0">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <span
+                        key={i}
+                        className={cn(
+                          'h-2 w-4 rounded-full',
+                          i < monthsSubscribed
+                            ? 'bg-emerald-500'
+                            : 'bg-emerald-200 dark:bg-emerald-900'
+                        )}
+                      />
+                    ))}
+                  </span>
+                </span>
               ) : isCanopyWithCredit && creditStatus === 'redeemed' ? (
                 <>Your consulting credit has been redeemed. You still receive a discount on all Impact Focus services as an alka<strong>tera</strong> user.</>
               ) : (
@@ -180,8 +251,6 @@ export default function ExpertPartnersPage() {
               )}
             </p>
           </div>
-
-          {/* CTAs */}
           <div className="flex flex-wrap gap-3">
             <Button asChild className="bg-emerald-600 hover:bg-emerald-700">
               <a href="https://www.impactfocus.co.uk" target="_blank" rel="noopener noreferrer">
@@ -225,70 +294,125 @@ export default function ExpertPartnersPage() {
         </CardContent>
       </Card>
 
-      {/* Service Areas */}
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Service Areas</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {SERVICE_AREAS.map((service) => (
-            <Card key={service.title} className="hover:shadow-md transition-shadow">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <service.icon className="h-4 w-4 text-emerald-600" />
-                  {service.title}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">{service.description}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
+      {/* Service Categories */}
+      <div className="space-y-10">
+        <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">What Impact Focus can help with</h2>
 
-      {/* Meet the Team */}
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Meet the Team</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {TEAM_MEMBERS.map((member) => (
-            <Card key={member.name} className="overflow-hidden">
-              <div className="aspect-[4/3] relative">
-                <Image
-                  src={member.photo}
-                  alt={member.name}
-                  fill
-                  className="object-cover object-top"
-                  sizes="(max-width: 768px) 50vw, (max-width: 1024px) 25vw, 25vw"
-                />
+        {SERVICE_CATEGORIES.map((category) => {
+          const styles = ACCENT_STYLES[category.accent]
+          return (
+            <div key={category.label} className="space-y-4">
+              {/* Category header */}
+              <div className={cn('pl-4 border-l-4', styles.section)}>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                    {category.label}
+                  </h3>
+                  <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', styles.badge)}>
+                    {category.services.length} {category.services.length === 1 ? 'service' : 'services'}
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-0.5">{category.tagline}</p>
               </div>
-              <CardContent className="pt-4 pb-5">
-                <p className="font-semibold text-sm">{member.name}</p>
-                <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">{member.role}</p>
-                <p className="text-xs text-muted-foreground mt-2 leading-relaxed">{member.bio}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+
+              {/* Service cards */}
+              <div className="grid gap-3 md:grid-cols-2">
+                {category.services.map((service) => {
+                  const Icon = service.icon
+                  return (
+                    <Card
+                      key={service.title}
+                      className={cn(
+                        'transition-all duration-200 hover:shadow-md border',
+                        styles.cardBorder
+                      )}
+                    >
+                      <CardContent className="p-5">
+                        <div className="flex gap-4">
+                          <div className={cn('rounded-lg p-2.5 shrink-0 h-fit', styles.iconBg)}>
+                            <Icon className={cn('h-5 w-5', styles.iconColor)} />
+                          </div>
+                          <div className="space-y-1.5">
+                            <p className="font-semibold text-sm leading-snug text-slate-900 dark:text-slate-100">
+                              {service.title}
+                            </p>
+                            <p className="text-sm text-muted-foreground leading-relaxed">
+                              {service.description}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
       </div>
 
-      {/* Canopy Credit Status (detailed) */}
-      {isCanopyWithCredit && creditStatus === 'pending' && (
+      {/* Canopy Credit Progress */}
+      {isCanopyWithCredit && creditStatus === 'pending' && billingInterval === 'monthly' && (
         <Card className="border-amber-200 dark:border-amber-800/50">
-          <CardHeader>
+          <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-amber-500" />
               Your Consulting Credit
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-5">
             <p className="text-sm text-muted-foreground">
-              As a Canopy subscriber, you will receive <strong>£{creditAmount} in Impact Focus consulting credits</strong> after
-              6 continuous months of subscription (or immediately with an annual plan).
+              As a Canopy subscriber, you unlock <strong>£{creditAmount} in Impact Focus consulting credits</strong> after
+              6 continuous months. Each month you stay subscribed, you earn another bar.
             </p>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" asChild>
-                <a href="/settings/">View Subscription</a>
-              </Button>
+
+            {/* 6-bar tracker */}
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                {Array.from({ length: 6 }).map((_, i) => {
+                  const complete = i < monthsSubscribed
+                  const current = i === monthsSubscribed
+                  return (
+                    <div key={i} className="flex-1 space-y-1.5">
+                      <div
+                        className={cn(
+                          'h-10 rounded-lg transition-all duration-500 flex items-center justify-center',
+                          complete
+                            ? 'bg-emerald-500 dark:bg-emerald-500'
+                            : current
+                              ? 'bg-emerald-100 dark:bg-emerald-900/50 border-2 border-emerald-400 border-dashed'
+                              : 'bg-muted border border-border'
+                        )}
+                      >
+                        {complete && (
+                          <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                        {current && (
+                          <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">Now</span>
+                        )}
+                      </div>
+                      <p className="text-center text-xs text-muted-foreground">Mo {i + 1}</p>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
+
+            {/* Summary line */}
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">
+                {monthsSubscribed} of 6 months complete
+              </span>
+              <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                {6 - monthsSubscribed} {6 - monthsSubscribed === 1 ? 'month' : 'months'} to go
+              </span>
+            </div>
+
+            <Button variant="outline" size="sm" asChild>
+              <a href="/settings/">View Subscription</a>
+            </Button>
           </CardContent>
         </Card>
       )}

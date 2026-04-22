@@ -16,6 +16,7 @@ import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client'
 import { useOrganization } from '@/lib/organizationContext'
 import { PageLoader } from '@/components/ui/page-loader'
 import { QuickGenerateDialog } from '@/components/report-builder/QuickGenerateDialog'
+import { VerificationCard } from '@/components/partners/VerificationCard'
 import { GenerationProgress } from '@/components/report-builder/GenerationProgress'
 import { useReportBuilder } from '@/hooks/useReportBuilder'
 import { useReportProgress } from '@/hooks/useReportProgress'
@@ -415,6 +416,9 @@ function SustainabilityReportsHub() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ── Impact Focus report creation ─────────────────────────────────── */}
+      <VerificationCard variant="report-creation" />
 
       {/* ── Tabs ────────────────────────────────────────────────────────────── */}
       <Tabs value={activeTab} onValueChange={handleTabChange}>
