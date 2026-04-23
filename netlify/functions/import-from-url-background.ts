@@ -28,6 +28,212 @@ interface PageData {
   links: string[];
 }
 
+// ───────────────────────────────────────────────────────────────────────────────
+// Shopify fast path.
+//
+// Most drinks brand sites are Shopify. Instead of scraping HTML + asking Claude
+// to guess at products (which was returning empty results for warnersdistillery.com
+// despite the page clearly listing 23 products), hit /products.json directly and
+// map the structured response. Faster, cheaper, and catches every product not
+// just the ones we can cram into the HTML snippet we send Claude.
+// ───────────────────────────────────────────────────────────────────────────────
+
+interface ShopifyVariant {
+  id: number;
+  title: string;
+  option1: string | null;
+  option2: string | null;
+  grams: number;
+  sku: string | null;
+}
+interface ShopifyImage { src: string; alt?: string | null }
+interface ShopifyProduct {
+  id: number;
+  title: string;
+  handle: string;
+  body_html: string;
+  vendor?: string;
+  product_type?: string;
+  tags?: string[] | string;
+  variants: ShopifyVariant[];
+  images: ShopifyImage[];
+}
+
+function isShopify(html: string): boolean {
+  return /cdn\.shopify\.com|Shopify\.theme|shopify-section/.test(html);
+}
+
+function stripHtml(html: string): string {
+  return html
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function parseAbvFromText(text: string): number | null {
+  // Match things like "40% ABV", "ABV 40%", "40%abv", "37.5% vol"
+  const m =
+    text.match(/(\d{1,2}(?:\.\d+)?)\s*%\s*(?:abv|vol)/i) ||
+    text.match(/abv[^\d%]{0,8}(\d{1,2}(?:\.\d+)?)\s*%/i);
+  if (!m) return null;
+  const n = parseFloat(m[1]);
+  return Number.isFinite(n) && n > 0 && n < 100 ? n : null;
+}
+
+function parseSizeFromText(text: string): { value: number; unit: 'ml' | 'cl' | 'l' } | null {
+  // Handle "70cl", "700ml", "1L", "1.5L", "5 cl"
+  const m = text.match(/(\d+(?:\.\d+)?)\s*(ml|cl|l)\b/i);
+  if (!m) return null;
+  const value = parseFloat(m[1]);
+  const unit = m[2].toLowerCase() as 'ml' | 'cl' | 'l';
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return { value, unit };
+}
+
+function categoriseShopifyProduct(
+  p: ShopifyProduct,
+): 'Spirits' | 'Beer & Cider' | 'Wine' | 'Ready-to-Drink & Cocktails' | 'Non-Alcoholic' {
+  const haystack = [
+    p.product_type || '',
+    Array.isArray(p.tags) ? p.tags.join(' ') : (p.tags || ''),
+    p.title,
+  ]
+    .join(' ')
+    .toLowerCase();
+  if (/alcohol[- ]?free|non[- ]?alcoholic|0\s*%/.test(haystack)) return 'Non-Alcoholic';
+  if (/\b(beer|lager|ale|ipa|stout|cider)\b/.test(haystack)) return 'Beer & Cider';
+  if (/\b(wine|champagne|prosecco|rose|sparkling)\b/.test(haystack)) return 'Wine';
+  if (/\b(rtd|ready[- ]to[- ]drink|cocktail|spritz|hard seltzer)\b/.test(haystack)) return 'Ready-to-Drink & Cocktails';
+  // Default to Spirits — the overwhelming majority of Shopify drinks brands.
+  return 'Spirits';
+}
+
+function packagingFromShopify(p: ShopifyProduct): 'glass_bottle' | 'aluminium_can' | 'keg_cask' | 'pet_bag' | null {
+  const haystack = [
+    p.product_type || '',
+    Array.isArray(p.tags) ? p.tags.join(' ') : (p.tags || ''),
+    p.title,
+  ]
+    .join(' ')
+    .toLowerCase();
+  if (/\bcan\b/.test(haystack)) return 'aluminium_can';
+  if (/\bkeg|cask\b/.test(haystack)) return 'keg_cask';
+  if (/\bbag[- ]in[- ]box\b/.test(haystack)) return 'pet_bag';
+  if (/\bbottle\b/.test(haystack)) return 'glass_bottle';
+  return null; // caller leaves null so user sets it in the review step
+}
+
+async function fetchShopifyProducts(
+  origin: string,
+  collectionHandle: string | null,
+): Promise<ShopifyProduct[] | null> {
+  // /products.json and /collections/{handle}/products.json both paginate at
+  // 30 by default; limit=250 is the documented Shopify max per page.
+  const basePath = collectionHandle
+    ? `/collections/${collectionHandle}/products.json`
+    : '/products.json';
+
+  const all: ShopifyProduct[] = [];
+  for (let page = 1; page <= 10; page++) {
+    const target = `${origin}${basePath}?limit=250&page=${page}`;
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      const res = await fetch(target, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; alkatera/1.0; +https://alkatera.com)',
+          Accept: 'application/json',
+        },
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (!res.ok) return all.length > 0 ? all : null;
+      const body = (await res.json()) as { products?: ShopifyProduct[] };
+      const batch = body.products || [];
+      all.push(...batch);
+      if (batch.length < 250) break;
+    } catch {
+      return all.length > 0 ? all : null;
+    }
+  }
+  return all.length > 0 ? all : null;
+}
+
+interface ExtractedProductShape {
+  name: string;
+  description: string;
+  abv: number | null;
+  unit_size_value: number | null;
+  unit_size_unit: 'ml' | 'cl' | 'l' | null;
+  product_category: string;
+  product_image_url: string | null;
+  packaging_type: 'glass_bottle' | 'aluminium_can' | 'keg_cask' | 'pet_bag' | null;
+  ingredients: string[];
+  certifications: string[];
+}
+
+function mapShopifyToExtracted(products: ShopifyProduct[]): ExtractedProductShape[] {
+  const out: ExtractedProductShape[] = [];
+  for (const p of products) {
+    const plainBody = stripHtml(p.body_html || '');
+    const bodyAbv = parseAbvFromText(plainBody + ' ' + p.title);
+    const category = categoriseShopifyProduct(p);
+    const packaging = packagingFromShopify(p);
+    const imageUrl = p.images?.[0]?.src || null;
+    const tagsArr = Array.isArray(p.tags)
+      ? p.tags
+      : typeof p.tags === 'string'
+        ? p.tags.split(',').map((t) => t.trim()).filter(Boolean)
+        : [];
+    // Short description: first ~200 chars of the plain body.
+    const description = plainBody.length > 220 ? plainBody.slice(0, 217) + '…' : plainBody || p.title;
+
+    // One entry per variant if they differ in size. Shopify variants for a
+    // single-size product show as ["Default Title"] or a single option — we
+    // collapse those into one product row.
+    const variants = p.variants || [];
+    const sizeVariants = variants
+      .map((v) => ({ variant: v, size: parseSizeFromText(v.title || v.option1 || '') }))
+      .filter((x) => x.size);
+
+    if (sizeVariants.length >= 2) {
+      for (const { variant, size } of sizeVariants) {
+        out.push({
+          name: `${p.title} ${variant.option1 || variant.title}`.trim(),
+          description,
+          abv: bodyAbv,
+          unit_size_value: size!.value,
+          unit_size_unit: size!.unit,
+          product_category: category,
+          product_image_url: imageUrl,
+          packaging_type: packaging,
+          ingredients: [],
+          certifications: tagsArr.filter((t) => /organic|b[- ]?corp|soil association|vegan|fair ?trade|rainforest/i.test(t)),
+        });
+      }
+    } else {
+      const first = sizeVariants[0]?.size || parseSizeFromText(p.title);
+      out.push({
+        name: p.title,
+        description,
+        abv: bodyAbv,
+        unit_size_value: first?.value ?? null,
+        unit_size_unit: first?.unit ?? null,
+        product_category: category,
+        product_image_url: imageUrl,
+        packaging_type: packaging,
+        ingredients: [],
+        certifications: tagsArr.filter((t) => /organic|b[- ]?corp|soil association|vegan|fair ?trade|rainforest/i.test(t)),
+      });
+    }
+  }
+  return out;
+}
+
 async function fetchPageData(url: string): Promise<PageData | null> {
   try {
     const controller = new AbortController();
@@ -175,6 +381,67 @@ export const handler = async (event: { body?: string | null; headers: Record<str
     await updateJob({ status: 'scraping', phase_message: 'Scanning the homepage…' });
 
     const parsedUrl = new URL(url);
+
+    // ── Shopify fast path ────────────────────────────────────────────────────
+    // Most drinks brand sites are Shopify. Hitting /products.json returns
+    // structured JSON for every product and bypasses the HTML+Claude flow
+    // entirely — fixes the "No products found" case on big stores like
+    // warnersdistillery.com and costs no Anthropic tokens.
+    try {
+      const origin = `${parsedUrl.protocol}//${parsedUrl.host}`;
+      const collectionMatch = parsedUrl.pathname.match(/^\/collections\/([^/]+)/);
+      const collectionHandle = collectionMatch ? collectionMatch[1] : null;
+
+      // Probe homepage for Shopify markers first so we don't hit /products.json
+      // on sites that aren't Shopify (some platforms happen to return 200).
+      const probeController = new AbortController();
+      const probeTimeout = setTimeout(() => probeController.abort(), 10000);
+      const probeRes = await fetch(origin, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; alkatera/1.0; +https://alkatera.com)' },
+        redirect: 'follow',
+        signal: probeController.signal,
+      }).catch(() => null);
+      clearTimeout(probeTimeout);
+      const probeHtml = probeRes && probeRes.ok ? await probeRes.text().catch(() => '') : '';
+
+      if (probeHtml && isShopify(probeHtml)) {
+        await updateJob({ phase_message: 'Reading Shopify product catalogue…' });
+
+        // Try the scoped collection first (if any), then fall back to the
+        // full shop catalogue. A collection URL usually means the user wants
+        // that subset; /products.json gives us everything.
+        let shopifyProducts = collectionHandle
+          ? await fetchShopifyProducts(origin, collectionHandle)
+          : null;
+        if (!shopifyProducts || shopifyProducts.length === 0) {
+          shopifyProducts = await fetchShopifyProducts(origin, null);
+        }
+
+        if (shopifyProducts && shopifyProducts.length > 0) {
+          // Try to pull org description from the probe HTML's meta description.
+          const metaDescMatch = probeHtml.match(
+            /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i,
+          );
+          const orgDescription = metaDescMatch ? metaDescMatch[1].trim() : null;
+
+          const mapped = mapShopifyToExtracted(shopifyProducts);
+
+          await updateJob({
+            status: 'completed',
+            phase_message: null,
+            pages_analyzed: 1,
+            products: mapped,
+            org_certifications: [],
+            org_description: orgDescription,
+          });
+          return { statusCode: 200, body: 'ok' };
+        }
+      }
+    } catch (shopifyErr) {
+      console.error('[import-from-url-background] Shopify fast path failed, falling back:', shopifyErr);
+      // fall through to the generic HTML + Claude flow
+    }
+
     const mainPage = await fetchPageData(url);
     if (!mainPage) {
       await updateJob({
