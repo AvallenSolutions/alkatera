@@ -1749,27 +1749,53 @@ export function transformLCADataForReport(
       return {
         totalProcessingEmissions: processing.toFixed(4),
         percentOfTotal: processingPct.toFixed(1),
-        facilities: facilityDetail.map((f: any) => ({
-          name: f.facility_name,
-          countryCode: f.country_code,
-          isContractManufacturer: f.is_contract_manufacturer,
-          dataSource: f.data_source === 'direct_run' ? 'Direct production run data' : 'Facility-level allocation',
-          attributionRatio: (f.attribution_ratio * 100).toFixed(1),
-          productionVolume: f.production_volume,
-          totalEmissions: f.per_unit_total.toFixed(6),
-          scope1Emissions: f.per_unit_scope1.toFixed(6),
-          scope2Emissions: f.per_unit_scope2.toFixed(6),
-          electricityKwh: (f.electricity_kwh || 0).toFixed(1),
-          gridEmissionFactor: f.grid_emission_factor ? `${f.grid_emission_factor.toFixed(4)} kg CO\u2082e/kWh` : null,
-          waterLitres: f.per_unit_water_litres.toFixed(2),
-          energyBreakdown: (f.energy_breakdown || []).map((e: any) => ({
-            type: ENERGY_TYPE_LABELS[e.type] || e.type,
-            quantity: Number(e.quantity).toFixed(2),
-            unit: e.unit,
-            emissions: Number(e.emissions).toFixed(4),
-            scope: e.scope,
-          })),
-        })),
+        facilities: facilityDetail.map((f: any) => {
+          const mode: 'primary' | 'archetype_proxy' | 'hybrid' = f.data_collection_mode || 'primary';
+          const dataSourceLabel =
+            mode === 'archetype_proxy'
+              ? `Secondary \u2014 Archetype proxy (${f.archetype_name || 'industry typical'})`
+              : mode === 'hybrid'
+                ? `Hybrid \u2014 Archetype + primary (${f.archetype_name || 'industry typical'})`
+                : f.data_source === 'direct_run'
+                  ? 'Direct production run data'
+                  : 'Facility-level allocation';
+          const upgradeActions: string[] = mode !== 'primary'
+            ? [
+                'Request total electricity consumption (kWh) and total production for the reporting period; apply volume-based allocation for per-unit intensity.',
+                'Collect thermal-energy invoices (natural gas, LPG, heavy fuel oil) for the reporting period.',
+                'Agree a physical-allocation methodology in writing per ISO 14044 \u00a74.3.4.2 when the facility runs multiple lines.',
+                'Consider installing sub-meters on the specific line(s) producing your product.',
+              ]
+            : [];
+          return {
+            name: f.facility_name,
+            countryCode: f.country_code,
+            isContractManufacturer: f.is_contract_manufacturer,
+            dataSource: dataSourceLabel,
+            attributionRatio: (f.attribution_ratio * 100).toFixed(1),
+            productionVolume: f.production_volume,
+            totalEmissions: f.per_unit_total.toFixed(6),
+            scope1Emissions: f.per_unit_scope1.toFixed(6),
+            scope2Emissions: f.per_unit_scope2.toFixed(6),
+            electricityKwh: (f.electricity_kwh || 0).toFixed(1),
+            gridEmissionFactor: f.grid_emission_factor ? `${f.grid_emission_factor.toFixed(4)} kg CO\u2082e/kWh` : null,
+            waterLitres: f.per_unit_water_litres.toFixed(2),
+            energyBreakdown: (f.energy_breakdown || []).map((e: any) => ({
+              type: ENERGY_TYPE_LABELS[e.type] || e.type,
+              quantity: Number(e.quantity).toFixed(2),
+              unit: e.unit,
+              emissions: Number(e.emissions).toFixed(4),
+              scope: e.scope,
+            })),
+            dataCollectionMode: mode,
+            archetypeName: f.archetype_name || null,
+            proxyJustification: f.proxy_justification || null,
+            proxyPedigree: f.proxy_pedigree || null,
+            proxyUncertaintyPct: f.proxy_uncertainty_pct || null,
+            proxySourceCitation: f.proxy_source_citation || null,
+            upgradeActions,
+          };
+        }),
       };
     })(),
 

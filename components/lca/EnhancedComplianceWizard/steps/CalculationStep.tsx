@@ -113,7 +113,16 @@ export function CalculationStep() {
 
     try {
       const validAllocations = facilityAllocations
-        .filter((a) => a.productionVolume && a.facilityTotalProduction)
+        .filter((a) => {
+          // Primary data requires both the client volume and facility total
+          // for physical allocation. Proxy/hybrid modes only need the client
+          // volume — the archetype supplies per-unit intensity directly.
+          const mode = a.dataCollectionMode ?? 'primary';
+          if (mode === 'primary') {
+            return a.productionVolume && a.facilityTotalProduction;
+          }
+          return a.productionVolume && a.archetypeId;
+        })
         .map((a) => ({
           facilityId: a.facilityId,
           facilityName: a.facilityName,
@@ -122,7 +131,11 @@ export function CalculationStep() {
           reportingPeriodEnd: a.reportingPeriodEnd,
           productionVolume: parseFloat(a.productionVolume),
           productionVolumeUnit: a.productionVolumeUnit,
-          facilityTotalProduction: parseFloat(a.facilityTotalProduction),
+          facilityTotalProduction: parseFloat(a.facilityTotalProduction || a.productionVolume),
+          dataCollectionMode: a.dataCollectionMode ?? 'primary',
+          archetypeId: a.archetypeId ?? null,
+          proxyJustification: a.proxyJustification,
+          hybridOverrides: a.hybridOverrides,
         }));
 
       // Map boundary value to calculator format (lowercase with hyphens)

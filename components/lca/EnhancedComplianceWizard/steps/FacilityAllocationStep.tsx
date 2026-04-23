@@ -20,8 +20,10 @@ import {
   Users,
   Link2,
 } from 'lucide-react';
-import { PRODUCTION_UNITS } from '../types';
+import { PRODUCTION_UNITS, type DataCollectionMode, type HybridArchetypeOverrides } from '../types';
 import { useWizardContext } from '../WizardContext';
+import { FacilityArchetypeProxyForm } from '@/components/facilities/FacilityArchetypeProxyForm';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 interface BrewwSkuBreakdown {
   sku_external_id: string;
@@ -96,6 +98,18 @@ export function FacilityAllocationStep() {
       ...prev,
       facilityAllocations: prev.facilityAllocations.map((a) =>
         a.facilityId === facilityId ? { ...a, [field]: value } : a
+      ),
+    }));
+  };
+
+  const updateAllocationFields = (
+    facilityId: string,
+    patch: Record<string, unknown>
+  ) => {
+    setPreCalcState((prev) => ({
+      ...prev,
+      facilityAllocations: prev.facilityAllocations.map((a) =>
+        a.facilityId === facilityId ? { ...a, ...patch } : a
       ),
     }));
   };
@@ -221,6 +235,77 @@ export function FacilityAllocationStep() {
                   {allocation.facilityName}
                 </p>
               </div>
+
+              {/* Data collection mode selector */}
+              {allocation.operationalControl === 'third_party' && (
+                <div className="space-y-2">
+                  <Label className="text-xs">Data collection mode</Label>
+                  <RadioGroup
+                    value={allocation.dataCollectionMode ?? 'primary'}
+                    onValueChange={(value) =>
+                      updateAllocationFields(allocation.facilityId, {
+                        dataCollectionMode: value as DataCollectionMode,
+                      })
+                    }
+                    className="grid grid-cols-1 md:grid-cols-3 gap-2"
+                  >
+                    <label className="flex items-start gap-2 rounded border p-2 cursor-pointer hover:bg-muted/50">
+                      <RadioGroupItem value="primary" className="mt-0.5" />
+                      <div className="text-xs">
+                        <div className="font-medium">Primary data</div>
+                        <div className="text-muted-foreground">
+                          Facility supplies energy/water figures for the period.
+                        </div>
+                      </div>
+                    </label>
+                    <label className="flex items-start gap-2 rounded border p-2 cursor-pointer hover:bg-muted/50">
+                      <RadioGroupItem value="archetype_proxy" className="mt-0.5" />
+                      <div className="text-xs">
+                        <div className="font-medium">Archetype proxy</div>
+                        <div className="text-muted-foreground">
+                          Facility cannot supply data — use industry typical values.
+                        </div>
+                      </div>
+                    </label>
+                    <label className="flex items-start gap-2 rounded border p-2 cursor-pointer hover:bg-muted/50">
+                      <RadioGroupItem value="hybrid" className="mt-0.5" />
+                      <div className="text-xs">
+                        <div className="font-medium">Hybrid</div>
+                        <div className="text-muted-foreground">
+                          Mix what you know with archetype defaults.
+                        </div>
+                      </div>
+                    </label>
+                  </RadioGroup>
+                </div>
+              )}
+
+              {/* Proxy / hybrid configuration */}
+              {allocation.operationalControl === 'third_party' &&
+                (allocation.dataCollectionMode === 'archetype_proxy' ||
+                  allocation.dataCollectionMode === 'hybrid') && (
+                  <FacilityArchetypeProxyForm
+                    mode={allocation.dataCollectionMode}
+                    selectedArchetypeId={allocation.archetypeId ?? null}
+                    onArchetypeChange={(id) =>
+                      updateAllocationFields(allocation.facilityId, {
+                        archetypeId: id,
+                      })
+                    }
+                    justification={allocation.proxyJustification ?? ''}
+                    onJustificationChange={(v) =>
+                      updateAllocationFields(allocation.facilityId, {
+                        proxyJustification: v,
+                      })
+                    }
+                    hybridOverrides={allocation.hybridOverrides as HybridArchetypeOverrides | undefined}
+                    onHybridOverridesChange={(o) =>
+                      updateAllocationFields(allocation.facilityId, {
+                        hybridOverrides: o,
+                      })
+                    }
+                  />
+                )}
 
               {/* Session selector */}
               {(reportingSessions[allocation.facilityId] || []).length >

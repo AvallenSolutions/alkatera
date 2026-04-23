@@ -75,6 +75,15 @@ export interface LinkedFacility {
   };
 }
 
+export type DataCollectionMode = 'primary' | 'archetype_proxy' | 'hybrid';
+
+export interface HybridArchetypeOverrides {
+  electricity_kwh_per_unit?: number;
+  natural_gas_kwh_per_unit?: number;
+  thermal_fuel_kwh_per_unit?: number;
+  water_litres_per_unit?: number;
+}
+
 export interface FacilityAllocation {
   facilityId: string;
   facilityName: string;
@@ -85,6 +94,13 @@ export interface FacilityAllocation {
   productionVolumeUnit: string;
   facilityTotalProduction: string;
   selectedSessionId?: string;
+
+  // Proxy-mode fields. `primary` is the default and requires no extra data.
+  dataCollectionMode?: DataCollectionMode;
+  archetypeId?: string | null;
+  archetypeSlug?: string | null;
+  proxyJustification?: string;
+  hybridOverrides?: HybridArchetypeOverrides;
 }
 
 export interface ReportingSession {

@@ -856,6 +856,35 @@ function renderProcessingPage(data: LCAReportData): string {
             ${facility.gridEmissionFactor ? `<span>Grid factor: ${facility.gridEmissionFactor}</span>` : ''}
             ${parseFloat(facility.electricityKwh) > 0 ? `<span>Electricity: ${facility.electricityKwh} kWh (attributed)</span>` : ''}
           </div>
+
+          ${facility.dataCollectionMode && facility.dataCollectionMode !== 'primary' ? `
+          <!-- Data Quality Declaration (ISO 14044 §4.2.3.6 / ISO 14067 §6.3.5) -->
+          <div style="margin-top: 12px; background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
+              <div style="font-size: 11px; font-weight: 700; color: #92400e; text-transform: uppercase; letter-spacing: 1px;">Secondary data &mdash; ${facility.dataCollectionMode === 'archetype_proxy' ? 'Archetype proxy' : 'Hybrid (archetype + primary)'}</div>
+              ${facility.proxyUncertaintyPct ? `<div style="font-size: 10px; color: #92400e;">Uncertainty: &plusmn;${facility.proxyUncertaintyPct}%</div>` : ''}
+            </div>
+            ${facility.archetypeName ? `<div style="font-size: 11px; margin-bottom: 6px;"><strong>Archetype:</strong> ${escapeHtml(facility.archetypeName)}</div>` : ''}
+            ${facility.proxyJustification ? `<div style="font-size: 11px; margin-bottom: 8px; color: #44403c;"><strong>Justification:</strong> ${escapeHtml(facility.proxyJustification)}</div>` : ''}
+            ${facility.proxyPedigree ? `
+              <div style="font-size: 10px; color: #57534e; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 8px;">
+                <div><strong>R:</strong> ${facility.proxyPedigree.reliability}</div>
+                <div><strong>C:</strong> ${facility.proxyPedigree.completeness}</div>
+                <div><strong>T:</strong> ${facility.proxyPedigree.temporal}</div>
+                <div><strong>G:</strong> ${facility.proxyPedigree.geographical}</div>
+                <div><strong>Tech:</strong> ${facility.proxyPedigree.technological}</div>
+              </div>
+              <div style="font-size: 9px; color: #a8a29e; margin-bottom: 8px;">Pedigree matrix (1 best &ndash; 5 worst): Reliability, Completeness, Temporal, Geographical, Technological</div>
+            ` : ''}
+            ${facility.proxySourceCitation ? `<div style="font-size: 10px; color: #78716c; margin-bottom: 8px;"><strong>Source:</strong> ${escapeHtml(facility.proxySourceCitation)}</div>` : ''}
+            ${facility.upgradeActions && facility.upgradeActions.length > 0 ? `
+              <div style="font-size: 11px; font-weight: 600; color: #92400e; margin-top: 8px; margin-bottom: 4px;">Data Improvement Plan</div>
+              <ul style="font-size: 10px; color: #44403c; padding-left: 16px; margin: 0;">
+                ${facility.upgradeActions.map(a => `<li style="margin-bottom: 2px;">${escapeHtml(a)}</li>`).join('')}
+              </ul>
+            ` : ''}
+          </div>
+          ` : ''}
         </div>`;
 
   const methodologyNote = `

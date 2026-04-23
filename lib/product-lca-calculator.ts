@@ -18,6 +18,20 @@ import type { Orchard } from './types/orchard';
 import { getGridFactor } from './grid-emission-factors';
 import { getAwareFactor } from './calculations/water-risk';
 import { DEFAULT_RECYCLED_CONTENT_CREDIT } from './constants/packaging-defaults';
+import {
+  getFacilityArchetypeById,
+  resolveProxyEmissions,
+  type FacilityArchetype,
+} from './facility-archetypes';
+
+export type FacilityDataCollectionMode = 'primary' | 'archetype_proxy' | 'hybrid';
+
+export interface FacilityArchetypeOverrides {
+  electricity_kwh_per_unit?: number;
+  natural_gas_kwh_per_unit?: number;
+  thermal_fuel_kwh_per_unit?: number;
+  water_litres_per_unit?: number;
+}
 
 export interface FacilityAllocationInput {
   facilityId: string;
@@ -28,6 +42,17 @@ export interface FacilityAllocationInput {
   productionVolume: number;
   productionVolumeUnit: string;
   facilityTotalProduction: number;
+
+  /**
+   * How data was collected. Defaults to 'primary' (the historical behaviour).
+   * When 'archetype_proxy' or 'hybrid', the calculator pulls industry-typical
+   * intensities from facility_archetypes instead of (or in addition to)
+   * querying utility_data_entries.
+   */
+  dataCollectionMode?: FacilityDataCollectionMode;
+  archetypeId?: string | null;
+  proxyJustification?: string;
+  hybridOverrides?: FacilityArchetypeOverrides;
 }
 
 export interface CalculatePCFParams {
@@ -400,6 +425,161 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         );
         if (gridFactorResult.dataGapWarning) {
           console.warn(`[calculateProductCarbonFootprint] ⚠️ DATA GAP — ${allocation.facilityName}: ${gridFactorResult.dataGapWarning}`);
+        }
+
+        // ─── Facility archetype proxy branch ─────────────────────────────────
+        // If the user has declared they cannot obtain primary data from this
+        // facility, resolve emissions from industry-typical intensities
+        // (facility_archetypes) instead of querying utility_data_entries.
+        // Reported transparently per ISO 14044 §4.2.3.6.
+        const collectionMode = allocation.dataCollectionMode ?? 'primary';
+        if (collectionMode === 'archetype_proxy' || collectionMode === 'hybrid') {
+          if (!allocation.archetypeId) {
+            throw new Error(
+              `Facility "${allocation.facilityName}" is set to ${collectionMode} mode but no archetype was selected. Pick a facility archetype in the wizard before recalculating.`
+            );
+          }
+          const archetype: FacilityArchetype | null = await getFacilityArchetypeById(
+            supabase as any,
+            allocation.archetypeId,
+          );
+          if (!archetype) {
+            throw new Error(
+              `Facility archetype ${allocation.archetypeId} not found — reference data may not be seeded.`
+            );
+          }
+
+          const proxy = resolveProxyEmissions({
+            archetype,
+            mode: collectionMode,
+            clientProductionVolume: allocation.productionVolume,
+            clientProductionUnit: allocation.productionVolumeUnit || 'litres',
+            gridEmissionFactor: gridFactorResult.factor,
+            gridFactorSource: gridFactorResult.source,
+            overrides: allocation.hybridOverrides,
+          });
+
+          const isContractManufacturer = allocation.operationalControl === 'third_party';
+
+          const energyBreakdown: Array<{ type: string; quantity: number; unit: string; emissions: number; scope: 'Scope 1' | 'Scope 2' }> = [];
+          if (proxy.breakdown.electricityKwh > 0) {
+            energyBreakdown.push({
+              type: 'electricity_grid',
+              quantity: proxy.breakdown.electricityKwh,
+              unit: 'kWh',
+              emissions: proxy.breakdown.electricityCo2eKg,
+              scope: 'Scope 2',
+            });
+          }
+          if (proxy.breakdown.naturalGasKwh > 0) {
+            energyBreakdown.push({
+              type: 'natural_gas',
+              quantity: proxy.breakdown.naturalGasKwh,
+              unit: 'kWh',
+              emissions: proxy.breakdown.naturalGasCo2eKg,
+              scope: 'Scope 1',
+            });
+          }
+          if (proxy.breakdown.thermalFuelKwh > 0) {
+            energyBreakdown.push({
+              type: 'thermal_fuel',
+              quantity: proxy.breakdown.thermalFuelKwh,
+              unit: 'kWh',
+              emissions: proxy.breakdown.thermalFuelCo2eKg,
+              scope: 'Scope 1',
+            });
+          }
+
+          collectedFacilityEmissions.push({
+            facilityId: allocation.facilityId,
+            facilityName: allocation.facilityName,
+            isContractManufacturer,
+            allocatedEmissions: proxy.breakdown.totalKg,
+            scope1Emissions: proxy.breakdown.scope1Kg,
+            scope2Emissions: proxy.breakdown.scope2Kg,
+            allocatedWater: proxy.breakdown.waterLitres,
+            allocatedWaste: 0,
+            // Proxy resolution is per-unit × client volume, so the attribution
+            // ratio is implicit in the volume. Surfaced as 1.0 for the report.
+            attributionRatio: 1,
+            productVolume: allocation.productionVolume,
+            countryCode: facilityCountryCode || undefined,
+            gridEmissionFactor: gridFactorResult.factor,
+            electricityKwh: proxy.breakdown.electricityKwh,
+            dataSource: 'facility_allocation',
+            energyBreakdown,
+            dataCollectionMode: collectionMode,
+            archetypeSlug: archetype.slug,
+            archetypeName: archetype.displayName,
+            proxyJustification: allocation.proxyJustification,
+            proxyPedigree: proxy.pedigreeScores,
+            proxyUncertaintyPct: proxy.uncertaintyPct,
+            proxySourceCitation: archetype.sourceCitation,
+          });
+
+          if (isContractManufacturer) {
+            const cmRecord = {
+              organization_id: product.organization_id,
+              product_id: parseInt(productId),
+              facility_id: allocation.facilityId,
+              reporting_period_start: allocation.reportingPeriodStart,
+              reporting_period_end: allocation.reportingPeriodEnd,
+              total_facility_production_volume: allocation.facilityTotalProduction || allocation.productionVolume,
+              production_volume_unit: allocation.productionVolumeUnit || 'units',
+              total_facility_co2e_kg: proxy.breakdown.totalKg,
+              co2e_entry_method: 'calculated_from_energy',
+              client_production_volume: allocation.productionVolume,
+              scope1_emissions_kg_co2e: proxy.breakdown.scope1Kg,
+              scope2_emissions_kg_co2e: proxy.breakdown.scope2Kg,
+              scope3_emissions_kg_co2e: 0,
+              allocated_water_litres: proxy.breakdown.waterLitres,
+              allocated_waste_kg: 0,
+              status: 'provisional',
+              is_energy_intensive_process: false,
+              data_source_tag: collectionMode === 'hybrid' ? 'Hybrid - Archetype + Primary' : 'Secondary - Archetype Proxy',
+              data_collection_mode: collectionMode,
+              archetype_id: archetype.id,
+              proxy_basis_snapshot: {
+                archetype_id: archetype.id,
+                slug: archetype.slug,
+                display_name: archetype.displayName,
+                unit: archetype.unit,
+                electricity_kwh_per_unit: archetype.electricityKwhPerUnit,
+                natural_gas_kwh_per_unit: archetype.naturalGasKwhPerUnit,
+                thermal_fuel_kwh_per_unit: archetype.thermalFuelKwhPerUnit,
+                water_litres_per_unit: archetype.waterLitresPerUnit,
+                pedigree: proxy.pedigreeScores,
+                uncertainty_pct: archetype.uncertaintyPct,
+                source_citation: archetype.sourceCitation,
+                source_url: archetype.sourceUrl,
+                source_year: archetype.sourceYear,
+                resolved_at: new Date().toISOString(),
+                emission_factors: proxy.emissionFactors,
+              },
+              proxy_justification: allocation.proxyJustification ?? null,
+              hybrid_overrides: collectionMode === 'hybrid' ? allocation.hybridOverrides ?? null : null,
+            };
+
+            await supabase
+              .from('contract_manufacturer_allocations')
+              .delete()
+              .eq('product_id', parseInt(productId))
+              .eq('facility_id', allocation.facilityId)
+              .is('superseded_at', null);
+
+            const { error: insertError } = await supabase
+              .from('contract_manufacturer_allocations')
+              .insert(cmRecord);
+
+            if (insertError) {
+              console.warn(`[calculateProductCarbonFootprint] ⚠️ Failed to insert proxy CM allocation for ${allocation.facilityName}:`, insertError);
+            } else {
+              console.log(`[calculateProductCarbonFootprint] 🟡 Created ${collectionMode} CM allocation for ${allocation.facilityName}: ${proxy.breakdown.totalKg.toFixed(2)} kg CO2e (${archetype.displayName})`);
+            }
+          }
+
+          // Skip the primary-data utility query path for this allocation
+          continue;
         }
 
         // ─── Check for direct production run resource data (highest quality) ───

@@ -90,6 +90,29 @@ export interface FacilityEmissionsData {
     emissions: number;
     scope: 'Scope 1' | 'Scope 2';
   }>;
+  /**
+   * How the facility's data was collected. Surfaced in the report's Data
+   * Quality Declaration section per ISO 14044 §4.2.3.6 / ISO 14067 §6.3.5.
+   */
+  dataCollectionMode?: 'primary' | 'archetype_proxy' | 'hybrid';
+  /** When proxy-backed: slug of the archetype used. */
+  archetypeSlug?: string;
+  /** When proxy-backed: display name of the archetype (for report readability). */
+  archetypeName?: string;
+  /** When proxy-backed: user-supplied justification for not having primary data. */
+  proxyJustification?: string;
+  /** When proxy-backed: pedigree matrix scores (1 best – 5 worst). */
+  proxyPedigree?: {
+    reliability: number;
+    completeness: number;
+    temporal: number;
+    geographical: number;
+    technological: number;
+  };
+  /** When proxy-backed: ± uncertainty percent applied to the emissions. */
+  proxyUncertaintyPct?: number;
+  /** When proxy-backed: citation for the archetype source. */
+  proxySourceCitation?: string;
 }
 
 export interface AggregationResult {
@@ -1223,6 +1246,13 @@ export async function aggregateProductImpacts(
             electricity_kwh: fe.electricityKwh || 0,
             grid_emission_factor: fe.gridEmissionFactor || null,
             energy_breakdown: fe.energyBreakdown || [],
+            data_collection_mode: fe.dataCollectionMode || 'primary',
+            archetype_slug: fe.archetypeSlug || null,
+            archetype_name: fe.archetypeName || null,
+            proxy_justification: fe.proxyJustification || null,
+            proxy_pedigree: fe.proxyPedigree || null,
+            proxy_uncertainty_pct: fe.proxyUncertaintyPct || null,
+            proxy_source_citation: fe.proxySourceCitation || null,
           };
         })
       : undefined,

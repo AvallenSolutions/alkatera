@@ -427,6 +427,20 @@ export interface LCAReportData {
         emissions: string;
         scope: string;
       }>;
+      /** How the data was collected per ISO 14044 §4.2.3.6. */
+      dataCollectionMode?: 'primary' | 'archetype_proxy' | 'hybrid';
+      archetypeName?: string | null;
+      proxyJustification?: string | null;
+      proxyPedigree?: {
+        reliability: number;
+        completeness: number;
+        temporal: number;
+        geographical: number;
+        technological: number;
+      } | null;
+      proxyUncertaintyPct?: number | null;
+      proxySourceCitation?: string | null;
+      upgradeActions?: string[];
     }>;
   };
 
