@@ -31,7 +31,6 @@ import { usePersistedYear, useLatestDataYear } from '@/hooks/usePersistedYear';
 
 import {
   RecentActivityWidget,
-  ImpactValueWidget,
   CanopyCreditsWidget,
   BreweryProductionWidget,
 } from '@/components/dashboard/widgets';
@@ -439,11 +438,8 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Zone 3 — Impact Value (beta feature gate) */}
+          {/* Zone 3 */}
           <div className="lg:col-span-4 space-y-4">
-            <InlineErrorBoundary>
-              <ImpactValueWidget />
-            </InlineErrorBoundary>
             <InlineErrorBoundary>
               <BreweryProductionWidget />
             </InlineErrorBoundary>
