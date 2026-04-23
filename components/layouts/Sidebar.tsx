@@ -247,6 +247,7 @@ const navigationStructure: NavItem[] = [
         ],
       },
       { name: 'Certifications', href: '/certifications/', icon: Award, minTier: 2, requiresMilestone: 'has_lca' },
+      { name: 'Evidence Library', href: '/evidence-library/', icon: Library, minTier: 1 },
     ],
   },
 

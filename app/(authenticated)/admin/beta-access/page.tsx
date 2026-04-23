@@ -34,6 +34,11 @@ interface Organization {
 /** The beta features that can be toggled */
 const BETA_FEATURES = [
   {
+    code: 'pulse_beta',
+    label: 'Pulse',
+    description: 'Access to the Pulse analytics dashboard (financial, impact valuation, targets)',
+  },
+  {
     code: 'impact_valuation_beta',
     label: 'Impact Valuation',
     description: 'Access to the Impact Valuation module and dashboard widget',

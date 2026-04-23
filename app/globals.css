@@ -373,3 +373,22 @@
 .gaia-action-button:hover {
   box-shadow: 0 0 15px hsla(160, 84%, 39%, 0.3);
 }
+
+/* ─── Pulse — react-grid-layout theme overrides ───────────────────────── */
+.pulse-grid-editing .react-grid-item {
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.pulse-grid-editing .react-grid-item.react-draggable-dragging {
+  transition: none;
+  z-index: 50;
+  box-shadow: 0 12px 32px rgba(204, 255, 0, 0.18);
+}
+.pulse-grid-editing .react-grid-placeholder {
+  background: rgba(204, 255, 0, 0.18);
+  border: 1.5px dashed rgba(204, 255, 0, 0.55);
+  border-radius: 0.75rem;
+  opacity: 1;
+}
+.pulse-grid-editing .react-resizable-handle {
+  filter: invert(0.6);
+}

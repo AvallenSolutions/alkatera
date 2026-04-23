@@ -5,7 +5,15 @@
       "name": "dev",
       "runtimeExecutable": "/bin/bash",
       "runtimeArgs": ["-c", "export PATH=/usr/local/bin:$PATH && pnpm dev --port 8888"],
-      "port": 8888
+      "port": 8888,
+      "autoPort": false
+    },
+    {
+      "name": "dev-alt",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "export PATH=/usr/local/bin:$PATH && pnpm dev --port 8889"],
+      "port": 8889,
+      "autoPort": false
     }
   ]
 }
