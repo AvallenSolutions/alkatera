@@ -73,20 +73,31 @@ export function UniversalDropzone({ trigger }: UniversalDropzoneProps) {
   const [step, setStep] = useState<Step>('upload')
   const [dragOver, setDragOver] = useState(false)
   const [result, setResult] = useState<IngestResponse | null>(null)
+  const [phaseMessage, setPhaseMessage] = useState<string>('')
+  // Bulk upload: when a user drops more than one file, we process them serially
+  // through the existing review flow. `queue` is the remaining files after
+  // the one currently being reviewed; `queueTotal` is the original batch size.
+  const [queue, setQueue] = useState<File[]>([])
+  const [queueTotal, setQueueTotal] = useState(0)
   const [facilities, setFacilities] = useState<Facility[]>([])
   const [selectedFacilityId, setSelectedFacilityId] = useState<string>('')
   const [billName, setBillName] = useState('')
   const [periodStart, setPeriodStart] = useState('')
   const [periodEnd, setPeriodEnd] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const pollAbortRef = useRef<{ cancelled: boolean } | null>(null)
 
   const reset = useCallback(() => {
+    if (pollAbortRef.current) pollAbortRef.current.cancelled = true
     setStep('upload')
     setDragOver(false)
     setResult(null)
+    setPhaseMessage('')
     setBillName('')
     setPeriodStart('')
     setPeriodEnd('')
+    setQueue([])
+    setQueueTotal(0)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }, [])
 
@@ -126,6 +137,9 @@ export function UniversalDropzone({ trigger }: UniversalDropzoneProps) {
       }
 
       setStep('analysing')
+      setPhaseMessage('Uploading…')
+      const abortFlag = { cancelled: false }
+      pollAbortRef.current = abortFlag
       try {
         const form = new FormData()
         form.append('file', file)
@@ -139,7 +153,35 @@ export function UniversalDropzone({ trigger }: UniversalDropzoneProps) {
           const body = await res.json().catch(() => ({}))
           throw new Error(body.error || 'Upload failed')
         }
-        const data = (await res.json()) as IngestResponse
+        const { jobId } = (await res.json()) as { jobId: string }
+        if (!jobId) throw new Error('No job ID returned')
+
+        // Poll until completed/failed. 3 min cap mirrors the import-from-url
+        // flow — the background function can run 15 min, but if the classifier
+        // hasn't returned in 3 something is wrong and the user shouldn't wait.
+        const start = Date.now()
+        const POLL_MS = 2000
+        const TIMEOUT_MS = 3 * 60 * 1000
+        let data: IngestResponse | null = null
+        while (!abortFlag.cancelled) {
+          if (Date.now() - start > TIMEOUT_MS) {
+            throw new Error('This is taking longer than expected — please try again.')
+          }
+          await new Promise((r) => setTimeout(r, POLL_MS))
+          if (abortFlag.cancelled) return
+          const pollRes = await fetch(`/api/ingest/auto/${jobId}`)
+          if (!pollRes.ok) continue
+          const job = await pollRes.json()
+          if (job.phaseMessage) setPhaseMessage(job.phaseMessage)
+          if (job.status === 'failed') {
+            throw new Error(job.error || 'Document analysis failed')
+          }
+          if (job.status === 'completed') {
+            data = job.result as IngestResponse
+            break
+          }
+        }
+        if (abortFlag.cancelled || !data) return
         setResult(data)
 
         // Pre-fill the review form from extracted data, where available.
@@ -169,16 +211,45 @@ export function UniversalDropzone({ trigger }: UniversalDropzoneProps) {
     [orgId],
   )
 
+  const startBatch = useCallback(
+    (files: File[]) => {
+      if (files.length === 0) return
+      const [first, ...rest] = files
+      setQueue(rest)
+      setQueueTotal(files.length)
+      processFile(first)
+    },
+    [processFile],
+  )
+
+  const advanceQueue = useCallback(() => {
+    if (queue.length === 0) {
+      setQueueTotal(0)
+      return false
+    }
+    const [next, ...rest] = queue
+    setQueue(rest)
+    // Reset review-step state but keep queueTotal so the "X of N" indicator
+    // stays accurate across the batch.
+    setResult(null)
+    setPhaseMessage('')
+    setBillName('')
+    setPeriodStart('')
+    setPeriodEnd('')
+    processFile(next)
+    return true
+  }, [queue, processFile])
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setDragOver(false)
-    const file = e.dataTransfer.files?.[0]
-    if (file) processFile(file)
+    const files = Array.from(e.dataTransfer.files || [])
+    if (files.length) startBatch(files)
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) processFile(file)
+    const files = Array.from(e.target.files || [])
+    if (files.length) startBatch(files)
   }
 
   const needsFacility =
@@ -249,9 +320,14 @@ export function UniversalDropzone({ trigger }: UniversalDropzoneProps) {
             Upload anything
           </DialogTitle>
           <DialogDescription>
-            Drop a utility bill, water bill, waste invoice, or a product workbook.
-            We&apos;ll figure out what it is and file it in the right place.
+            Drop one or more utility bills, water bills, waste invoices, or product workbooks.
+            We&apos;ll figure out what each one is and file it in the right place.
           </DialogDescription>
+          {queueTotal > 1 && (
+            <p className="text-xs text-muted-foreground pt-1">
+              File {queueTotal - queue.length} of {queueTotal}
+            </p>
+          )}
         </DialogHeader>
 
         {step === 'upload' && (
@@ -260,6 +336,7 @@ export function UniversalDropzone({ trigger }: UniversalDropzoneProps) {
               ref={fileInputRef}
               type="file"
               accept={ACCEPT}
+              multiple
               className="hidden"
               onChange={handleFileChange}
             />
@@ -279,9 +356,9 @@ export function UniversalDropzone({ trigger }: UniversalDropzoneProps) {
             >
               <Upload className="w-8 h-8 text-muted-foreground" />
               <div className="text-center">
-                <p className="font-medium text-sm">Drop your file here or click to browse</p>
+                <p className="font-medium text-sm">Drop files here or click to browse</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  PDF, image, or Excel · up to 20MB
+                  PDF, image, or Excel · up to 20MB each · multiple files supported
                 </p>
               </div>
             </button>
@@ -294,9 +371,11 @@ export function UniversalDropzone({ trigger }: UniversalDropzoneProps) {
         {step === 'analysing' && (
           <div className="flex flex-col items-center gap-3 py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            <p className="text-sm font-medium">Analysing your document…</p>
+            <p className="text-sm font-medium">
+              {phaseMessage || 'Analysing your document…'}
+            </p>
             <p className="text-xs text-muted-foreground">
-              Usually takes a few seconds
+              Larger PDFs can take up to a minute
             </p>
           </div>
         )}
@@ -335,14 +414,30 @@ export function UniversalDropzone({ trigger }: UniversalDropzoneProps) {
             <p className="text-sm font-medium">
               Saved to <span className="font-semibold">{detectedFacilityName()}</span>
             </p>
-            <div className="flex items-center gap-2 pt-2">
-              <Button variant="outline" size="sm" onClick={() => reset()}>
-                Upload another
-              </Button>
-              <Button size="sm" onClick={() => handleOpenChange(false)}>
-                Done
-              </Button>
-            </div>
+            {queue.length > 0 ? (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  {queue.length} {queue.length === 1 ? 'file' : 'files'} left in this batch
+                </p>
+                <div className="flex items-center gap-2 pt-2">
+                  <Button variant="outline" size="sm" onClick={() => reset()}>
+                    Stop batch
+                  </Button>
+                  <Button size="sm" onClick={() => advanceQueue()}>
+                    Next file
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center gap-2 pt-2">
+                <Button variant="outline" size="sm" onClick={() => reset()}>
+                  Upload another
+                </Button>
+                <Button size="sm" onClick={() => handleOpenChange(false)}>
+                  Done
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </DialogContent>

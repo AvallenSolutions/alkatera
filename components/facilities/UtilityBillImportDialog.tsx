@@ -148,70 +148,27 @@ export function UtilityBillImportDialog({
 
     setIsSaving(true)
     try {
-      const { data: userData, error: userError } = await supabase.auth.getUser()
-      if (userError || !userData.user) throw new Error('Not authenticated')
-
-      for (const entry of valid) {
-        const utilityInfo = UTILITY_TYPES.find(u => u.value === entry.utility_type)
-        const unit = entry.unit || utilityInfo?.defaultUnit || 'kWh'
-
-        const trimmedName = billName.trim()
-        const entryName = trimmedName
-          ? (valid.length > 1 ? `${trimmedName} — ${utilityInfo?.label || entry.utility_type}` : trimmedName)
-          : null
-
-        // Strip whitespace from supply-point IDs so future lookups by exact
-        // match work regardless of how the PDF formatted them.
-        const mpan = entry.mpan ? String(entry.mpan).replace(/\s+/g, '') : null
-        const mprn = entry.mprn ? String(entry.mprn).replace(/\s+/g, '') : null
-
-        const { error: utilError } = await supabase.from('utility_data_entries').insert({
-          facility_id: facilityId,
-          utility_type: entry.utility_type,
-          quantity: entry.quantity,
-          unit,
-          reporting_period_start: periodStart,
-          reporting_period_end: periodEnd,
-          data_quality: 'actual',
-          calculated_scope: '',
-          created_by: userData.user.id,
-          name: entryName,
-          // Time-of-use + market-based-Scope-2 enrichment (optional; null if
-          // Claude couldn't extract them from the document).
-          mpan,
-          mprn,
-          meter_type: entry.meter_type ?? null,
-          rate_breakdown:
-            entry.rate_breakdown && entry.rate_breakdown.length > 0
-              ? entry.rate_breakdown
-              : null,
-          emissions_factor_g_per_kwh: entry.emissions_factor_g_per_kwh ?? null,
-          fuel_mix: extracted?.fuel_mix ?? null,
-          is_green_tariff: extracted?.is_green_tariff ?? null,
-          supply_address: extracted?.supply_address ?? null,
-          supply_postcode: extracted?.supply_postcode ?? null,
-          gsp_group: extracted?.gsp_group ?? null,
-          account_number: extracted?.account_number ?? null,
-          ccl_amount_gbp: extracted?.ccl_amount_gbp ?? null,
-          total_charged_gbp: extracted?.total_charged_gbp ?? null,
-        })
-        if (utilError) throw utilError
-
-        // Dual-write for legacy compatibility
-        const category = utilityInfo?.scope === '1' ? 'Scope 1' : 'Scope 2'
-        await supabase.from('activity_data').insert({
-          organization_id: organizationId,
-          facility_id: facilityId,
-          user_id: userData.user.id,
-          name: entryName || `${utilityInfo?.label || entry.utility_type} - ${periodStart} to ${periodEnd}`,
-          category,
-          quantity: entry.quantity,
-          unit,
-          fuel_type: utilityInfo?.fuelType || entry.utility_type,
-          activity_date: periodEnd,
-          reporting_period_start: periodStart,
-          reporting_period_end: periodEnd,
-        })
+      // Route through server API so the insert runs on the service-role
+      // client — avoids the PostgREST schema cache miss on enrichment columns
+      // that previously produced "Could not find account_number" errors.
+      const res = await fetch('/api/utilities/save-bill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          facilityId,
+          organizationId,
+          periodStart,
+          periodEnd,
+          billName,
+          bill: {
+            ...(extracted || {}),
+            entries: valid,
+          },
+        }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || 'Failed to save utility bill')
       }
 
       // Trigger emissions calculation

@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabaseClient'
-import { UTILITY_TYPES, WATER_CATEGORIES, WASTE_CATEGORIES } from '@/lib/constants/utility-types'
+import { WATER_CATEGORIES, WASTE_CATEGORIES } from '@/lib/constants/utility-types'
 import type { ExtractedBillData } from '@/app/api/utilities/import-from-pdf/route'
 import type {
   ExtractedFacilityBillData,
@@ -48,83 +48,31 @@ export async function saveUtilityBill(
   bill: ExtractedBillData,
   common: SaveBillCommon,
 ): Promise<{ saved: number }> {
-  const valid = (bill.entries || []).filter(
-    (e) => e.utility_type && e.quantity > 0,
-  )
-  if (valid.length === 0) throw new Error('No valid utility entries to save')
-
-  const trimmedName = (common.billName || '').trim()
-
-  for (const entry of valid) {
-    const utilityInfo = UTILITY_TYPES.find((u) => u.value === entry.utility_type)
-    const unit = entry.unit || utilityInfo?.defaultUnit || 'kWh'
-    const entryName = trimmedName
-      ? valid.length > 1
-        ? `${trimmedName} — ${utilityInfo?.label || entry.utility_type}`
-        : trimmedName
-      : null
-
-    // Strip whitespace from supply-point IDs so future lookups by exact match
-    // work regardless of how the PDF formatted them.
-    const mpan = entry.mpan ? String(entry.mpan).replace(/\s+/g, '') : null
-    const mprn = entry.mprn ? String(entry.mprn).replace(/\s+/g, '') : null
-
-    const { error: utilError } = await supabase.from('utility_data_entries').insert({
-      facility_id: common.facilityId,
-      utility_type: entry.utility_type,
-      quantity: entry.quantity,
-      unit,
-      reporting_period_start: common.periodStart,
-      reporting_period_end: common.periodEnd,
-      data_quality: 'actual',
-      calculated_scope: '',
-      created_by: common.userId,
-      name: entryName,
-      // Enriched fields from the broadened Claude extractor. All nullable;
-      // older rows continue to carry nulls.
-      mpan,
-      mprn,
-      meter_type: entry.meter_type ?? null,
-      rate_breakdown:
-        entry.rate_breakdown && entry.rate_breakdown.length > 0
-          ? entry.rate_breakdown
-          : null,
-      emissions_factor_g_per_kwh: entry.emissions_factor_g_per_kwh ?? null,
-      // Bill-level metadata gets copied onto every entry of the bill so any
-      // single row carries full context without a join.
-      fuel_mix: bill.fuel_mix ?? null,
-      is_green_tariff: bill.is_green_tariff ?? null,
-      supply_address: bill.supply_address ?? null,
-      supply_postcode: bill.supply_postcode ?? null,
-      gsp_group: bill.gsp_group ?? null,
-      account_number: bill.account_number ?? null,
-      ccl_amount_gbp: bill.ccl_amount_gbp ?? null,
-      total_charged_gbp: bill.total_charged_gbp ?? null,
-    })
-    if (utilError) throw utilError
-
-    const category = utilityInfo?.scope === '1' ? 'Scope 1' : 'Scope 2'
-    await supabase.from('activity_data').insert({
-      organization_id: common.organizationId,
-      facility_id: common.facilityId,
-      user_id: common.userId,
-      name:
-        entryName ||
-        `${utilityInfo?.label || entry.utility_type} - ${common.periodStart} to ${common.periodEnd}`,
-      category,
-      quantity: entry.quantity,
-      unit,
-      fuel_type: utilityInfo?.fuelType || entry.utility_type,
-      activity_date: common.periodEnd,
-      reporting_period_start: common.periodStart,
-      reporting_period_end: common.periodEnd,
-    })
+  // Delegates to /api/utilities/save-bill which runs on the service-role
+  // client — the previous anon-client insert was hitting a PostgREST schema
+  // cache miss on enrichment columns (account_number, mpan, etc.) and
+  // failing with "Could not find the 'account_number' column…".
+  const res = await fetch('/api/utilities/save-bill', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      facilityId: common.facilityId,
+      organizationId: common.organizationId,
+      periodStart: common.periodStart,
+      periodEnd: common.periodEnd,
+      billName: common.billName,
+      bill,
+    }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error || 'Failed to save utility bill')
   }
+  const data = (await res.json()) as { saved: number }
 
-  // Non-blocking emissions recalc — fire and forget.
   triggerScope12Recalc(common.organizationId)
 
-  return { saved: valid.length }
+  return { saved: data.saved }
 }
 
 async function saveFacilityActivityEntries<
