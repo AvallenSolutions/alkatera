@@ -21,7 +21,8 @@ import { DirectDataEntry } from "@/components/facilities/DirectDataEntry";
 import { ProductionVolumeManager } from "@/components/facilities/ProductionVolumeManager";
 import { DataQualityConfidenceCard } from "@/components/facilities/DataQualityConfidenceCard";
 import { ProductionRunDataEntry } from "@/components/facilities/ProductionRunDataEntry";
-import { Sparkles, ExternalLink } from "lucide-react";
+import { Sparkles, ExternalLink, Settings2, HelpCircle } from "lucide-react";
+import { FacilityDataSourcingDialog } from "@/components/facilities/FacilityDataSourcingDialog";
 import { UTILITY_TYPES } from "@/lib/constants/utility-types";
 
 interface Facility {
@@ -109,6 +110,7 @@ export default function FacilityDetailPage() {
     notes: string;
   } | null>(null);
   const [editSaving, setEditSaving] = useState(false);
+  const [sourcingDialogOpen, setSourcingDialogOpen] = useState(false);
 
   const loadFacilityData = useCallback(async () => {
     try {
@@ -313,6 +315,26 @@ export default function FacilityDetailPage() {
         </div>
       </div>
 
+      {facility.operational_control === 'third_party' &&
+        (!facility.default_data_collection_mode || facility.default_data_collection_mode === 'primary') && (
+          <Alert className="mb-6 border-blue-400/60 bg-blue-500/10">
+            <HelpCircle className="h-4 w-4 text-blue-500" />
+            <AlertDescription>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 space-y-2">
+                  <p className="font-semibold">Can this facility share their energy and water data with you?</p>
+                  <p className="text-sm text-muted-foreground">
+                    If yes, keep entering real data below. If not, tell us and we&apos;ll use an industry average so you can still run an LCA for products made here.
+                  </p>
+                </div>
+                <Button size="sm" onClick={() => setSourcingDialogOpen(true)}>
+                  Set up data source
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+      )}
+
       {facility.default_data_collection_mode && facility.default_data_collection_mode !== 'primary' && (
         <Alert className="mb-6 border-amber-400/60 bg-amber-500/10">
           <Sparkles className="h-4 w-4 text-amber-500" />
@@ -345,9 +367,29 @@ export default function FacilityDetailPage() {
                   </a>
                 )}
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSourcingDialogOpen(true)}
+              >
+                <Settings2 className="h-3.5 w-3.5 mr-1.5" />
+                Change
+              </Button>
             </div>
           </AlertDescription>
         </Alert>
+      )}
+
+      {facility.operational_control === 'third_party' && (
+        <FacilityDataSourcingDialog
+          open={sourcingDialogOpen}
+          onOpenChange={setSourcingDialogOpen}
+          facilityId={facility.id}
+          initialMode={(facility.default_data_collection_mode as any) || 'primary'}
+          initialArchetypeId={facility.default_archetype_id ?? null}
+          initialJustification={facility.default_proxy_justification ?? ''}
+          onSaved={loadFacilityData}
+        />
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
