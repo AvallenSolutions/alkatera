@@ -162,6 +162,12 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
           if (data.state) {
             // Replay any updates the user made while we were fetching
             let merged = data.state as OnboardingState
+            // Migration: the 'connect-tools' step was removed from the owner
+            // flow. If a user's saved state still points at it, advance them
+            // to 'first-product' so the wizard doesn't render a blank step.
+            if ((merged.currentStep as string) === 'connect-tools') {
+              merged = { ...merged, currentStep: 'first-product' }
+            }
             const pending = pendingUpdatesRef.current
             pendingUpdatesRef.current = []
             for (const updater of pending) {

@@ -218,6 +218,7 @@ export default function PlatformDashboardPage() {
         organizations={organizations}
         suppliers={platformSuppliers}
         loading={false}
+        onOrganizationUpdated={fetchData}
       />
 
       {/* Integrations */}

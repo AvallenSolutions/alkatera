@@ -24,6 +24,7 @@ import { ThreeThingsTodayHero } from '@/components/dashboard/ThreeThingsTodayHer
 import { SetupProgressBanner } from '@/components/dashboard/SetupProgressBanner';
 import { useSetupProgress } from '@/hooks/data/useSetupProgress';
 import { useHeroDismissal } from '@/hooks/useHeroDismissal';
+import { useOnboarding } from '@/lib/onboarding';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { InlineErrorBoundary } from '@/components/ErrorBoundary';
 import { usePersistedYear, useLatestDataYear } from '@/hooks/usePersistedYear';
@@ -140,6 +141,18 @@ export default function DashboardPage() {
   const setupProgress = useSetupProgress();
   const heroDismissal = useHeroDismissal();
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Onboarding writes facilities/products/team records while the wizard is
+  // overlaid on this page. useSetupProgress fetches on mount, so without a
+  // refetch it keeps the stale pre-onboarding zeros. Watch the wizard state
+  // and refetch whenever a step completes or the flow finishes.
+  const { state: onboardingState } = useOnboarding();
+  const onboardingCompletedCount = onboardingState.completedSteps.length;
+  const onboardingFinished = onboardingState.completed;
+  const setupRefetch = setupProgress.refetch;
+  useEffect(() => {
+    setupRefetch();
+  }, [onboardingCompletedCount, onboardingFinished, setupRefetch]);
 
   // Fetch product categories for industry benchmark lookup
   const [productCategories, setProductCategories] = useState<(string | null)[]>([]);

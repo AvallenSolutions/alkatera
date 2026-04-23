@@ -167,6 +167,7 @@ function generateRosaGreeting(personalization?: PersonalizationData): { subtitle
     cider: 'cider',
     non_alcoholic: 'non-alcoholic beverages',
     rtd: 'RTDs',
+    functional: 'functional beverages',
   }
   const beverageText = personalization.beverageTypes?.length
     ? personalization.beverageTypes

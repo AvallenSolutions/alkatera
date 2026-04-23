@@ -297,7 +297,7 @@ export function generatePriorityActions(data: {
     });
   }
 
-  if (data.hasFacilities && data.hasProducts && !data.hasSuppliers) {
+  if (!data.hasSuppliers) {
     actions.push({
       id: 'setup-suppliers',
       priority: 'medium',
@@ -309,7 +309,7 @@ export function generatePriorityActions(data: {
     });
   }
 
-  if (data.hasFacilities && data.hasProducts && !data.hasTeamMembers) {
+  if (!data.hasTeamMembers) {
     actions.push({
       id: 'setup-team',
       priority: 'low',

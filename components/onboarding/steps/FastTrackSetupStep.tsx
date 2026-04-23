@@ -20,6 +20,7 @@ const BEVERAGE_OPTIONS: { value: BeverageType; label: string; icon: string }[] =
   { value: 'wine', label: 'Wine', icon: '🍷' },
   { value: 'rtd', label: 'RTD', icon: '🥤' },
   { value: 'non_alcoholic', label: 'Non-Alcoholic', icon: '💧' },
+  { value: 'functional', label: 'Functional', icon: '⚡' },
 ]
 
 const TEAM_SIZE_OPTIONS: { value: CompanySize; label: string }[] = [
@@ -37,6 +38,7 @@ const BEVERAGE_TO_PRODUCT_TYPE: Record<BeverageType, string> = {
   wine: 'Wine',
   rtd: 'Ready-to-Drink & Cocktails',
   non_alcoholic: 'Non-Alcoholic',
+  functional: 'Non-Alcoholic',
   other: 'Non-Alcoholic',
 }
 

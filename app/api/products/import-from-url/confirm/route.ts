@@ -36,6 +36,13 @@ export interface ProductToConfirm {
   ingredients?: string[];
   certifications?: string[];
   included: boolean;
+  /** User flagged this row as a multipack (e.g. a 3-bottle gift pack). */
+  is_multipack?: boolean;
+  /**
+   * Components that make up this multipack. Each entry references another
+   * row in the same products[] array by its original (pre-filter) index.
+   */
+  multipack_components?: Array<{ component_index: number; quantity: number }>;
 }
 
 const PACKAGING_TYPE_NAMES: Record<string, string> = {
@@ -74,7 +81,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'products array is required' }, { status: 400 });
     }
 
-    const includedProducts = products.filter(p => p.included);
+    // Map original (full-array) index → included-array index so the client's
+    // multipack_components references survive the `included` filter.
+    const originalIdxToIncludedIdx = new Map<number, number>();
+    const includedProducts: ProductToConfirm[] = [];
+    products.forEach((p, origIdx) => {
+      if (p.included) {
+        originalIdxToIncludedIdx.set(origIdx, includedProducts.length);
+        includedProducts.push(p);
+      }
+    });
+
     if (includedProducts.length === 0) {
       return NextResponse.json({ error: 'No products selected for import' }, { status: 400 });
     }
@@ -89,6 +106,7 @@ export async function POST(request: NextRequest) {
       unit_size_unit: p.unit_size_unit,
       product_category: p.product_category,
       is_draft: true,
+      is_multipack: p.is_multipack === true,
       certifications: p.certifications?.length
         ? p.certifications.map(name => ({ name }))
         : null,
@@ -102,6 +120,37 @@ export async function POST(request: NextRequest) {
     if (error) throw error;
 
     const createdIds: string[] = (data ?? []).map((p: any) => String(p.id));
+
+    // Wire up multipack components now that every product has a real ID.
+    const multipackRows: Array<{
+      multipack_product_id: string;
+      component_product_id: string;
+      quantity: number;
+    }> = [];
+    includedProducts.forEach((p, idx) => {
+      if (!p.is_multipack || !p.multipack_components?.length) return;
+      const multipackId = createdIds[idx];
+      if (!multipackId) return;
+      for (const comp of p.multipack_components) {
+        const componentIncludedIdx = originalIdxToIncludedIdx.get(comp.component_index);
+        if (componentIncludedIdx === undefined) continue; // component wasn't included
+        const componentId = createdIds[componentIncludedIdx];
+        if (!componentId || componentId === multipackId) continue;
+        const quantity = Number.isFinite(comp.quantity) && comp.quantity > 0 ? Math.floor(comp.quantity) : 1;
+        multipackRows.push({
+          multipack_product_id: multipackId,
+          component_product_id: componentId,
+          quantity,
+        });
+      }
+    });
+
+    if (multipackRows.length > 0) {
+      const { error: mpError } = await supabase.from('multipack_components').insert(multipackRows);
+      if (mpError) {
+        console.error('[import-from-url/confirm] Failed to insert multipack components:', mpError);
+      }
+    }
 
     // Increment product count for subscription tracking (once per product created)
     for (let i = 0; i < includedProducts.length; i++) {
@@ -117,6 +166,10 @@ export async function POST(request: NextRequest) {
       const product = includedProducts[i];
       const productId = createdIds[i];
       if (!productId) continue;
+
+      // Multipacks inherit packaging/ingredients from their components,
+      // so skip the auto-create step for them.
+      if (product.is_multipack) continue;
 
       // Packaging
       const packagingKey = product.packaging_type;

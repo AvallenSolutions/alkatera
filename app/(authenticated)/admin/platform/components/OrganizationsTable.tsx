@@ -22,6 +22,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Search,
   ArrowUpDown,
   ChevronDown,
@@ -33,14 +41,18 @@ import {
   Beaker,
   Calendar,
   Activity,
+  Pencil,
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
+import { toast } from "sonner";
+import { supabase } from "@/lib/supabaseClient";
 import type { OrganizationInfo } from "../types";
 
 interface OrganizationsTableProps {
   organizations: OrganizationInfo[];
   loading: boolean;
   bare?: boolean;
+  onUpdated?: () => void;
 }
 
 type SortField = "name" | "created_at" | "member_count" | "product_count" | "facility_count" | "subscription_tier";
@@ -72,13 +84,55 @@ function getStatusVariant(status: string | null): "default" | "secondary" | "out
   }
 }
 
-export function OrganizationsTable({ organizations, loading, bare }: OrganizationsTableProps) {
+export function OrganizationsTable({ organizations, loading, bare, onUpdated }: OrganizationsTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [filterTier, setFilterTier] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [expandedOrgs, setExpandedOrgs] = useState<Set<string>>(new Set());
+  const [editingOrg, setEditingOrg] = useState<OrganizationInfo | null>(null);
+  const [editTier, setEditTier] = useState<string>("seed");
+  const [editStatus, setEditStatus] = useState<string>("active");
+  const [saving, setSaving] = useState(false);
+
+  const openEdit = (org: OrganizationInfo) => {
+    setEditingOrg(org);
+    setEditTier(org.subscription_tier || "seed");
+    setEditStatus(org.subscription_status || "active");
+  };
+
+  const handleSave = async () => {
+    if (!editingOrg) return;
+    setSaving(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error("Not authenticated");
+
+      const res = await fetch(`/api/admin/organizations/${editingOrg.id}/subscription`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          subscription_tier: editTier,
+          subscription_status: editStatus,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to update subscription");
+
+      toast.success(`Updated ${editingOrg.name} to ${editTier} / ${editStatus}`);
+      setEditingOrg(null);
+      onUpdated?.();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update subscription");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const toggleExpand = (orgId: string) => {
     setExpandedOrgs((prev) => {
@@ -371,6 +425,19 @@ export function OrganizationsTable({ organizations, loading, bare }: Organizatio
                             </div>
                           </div>
                         </div>
+                        <div className="px-4 mt-4 flex justify-end">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEdit(org);
+                            }}
+                          >
+                            <Pencil className="h-3.5 w-3.5 mr-2" />
+                            Edit subscription
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )}
@@ -379,6 +446,54 @@ export function OrganizationsTable({ organizations, loading, bare }: Organizatio
             )}
           </TableBody>
         </Table>
+
+      <Dialog open={!!editingOrg} onOpenChange={(open) => !open && setEditingOrg(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit subscription</DialogTitle>
+            <DialogDescription>{editingOrg?.name}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Tier</label>
+              <Select value={editTier} onValueChange={setEditTier}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="seed">Seed</SelectItem>
+                  <SelectItem value="blossom">Blossom</SelectItem>
+                  <SelectItem value="canopy">Canopy</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Status</label>
+              <Select value={editStatus} onValueChange={setEditStatus}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="trial">Trial</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="past_due">Past due</SelectItem>
+                  <SelectItem value="suspended">Suspended</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingOrg(null)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 

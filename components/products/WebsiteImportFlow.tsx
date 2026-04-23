@@ -16,6 +16,7 @@ import {
   AlertCircle,
   X,
   Check,
+  Boxes,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -39,6 +40,10 @@ export interface ExtractedProduct {
   ingredients: string[]
   certifications: string[]
   included: boolean
+  /** User flag: this row is a multipack (e.g. 3-bottle gift set). */
+  is_multipack: boolean
+  /** Components that make up the multipack, referenced by index in this array. */
+  multipack_components: Array<{ component_index: number; quantity: number }>
 }
 
 interface WebsiteImportFlowProps {
@@ -127,6 +132,8 @@ export function WebsiteImportFlow({
         ingredients: p.ingredients ?? [],
         certifications: p.certifications ?? [],
         included: true,
+        is_multipack: false,
+        multipack_components: [],
       })))
       if (data.orgCertifications?.length || data.orgDescription) {
         setOrgData({ certifications: data.orgCertifications ?? [], description: data.orgDescription ?? null })
@@ -172,6 +179,42 @@ export function WebsiteImportFlow({
 
   const updateProduct = (index: number, field: keyof ExtractedProduct, value: any) => {
     setProducts(prev => prev.map((p, i) => i === index ? { ...p, [field]: value } : p))
+  }
+
+  const toggleMultipack = (index: number) => {
+    setProducts(prev => prev.map((p, i) => {
+      if (i !== index) return p
+      const next = !p.is_multipack
+      return {
+        ...p,
+        is_multipack: next,
+        multipack_components: next ? p.multipack_components : [],
+      }
+    }))
+  }
+
+  const toggleMultipackComponent = (multipackIndex: number, componentIndex: number) => {
+    setProducts(prev => prev.map((p, i) => {
+      if (i !== multipackIndex) return p
+      const existing = p.multipack_components.find(c => c.component_index === componentIndex)
+      const nextComponents = existing
+        ? p.multipack_components.filter(c => c.component_index !== componentIndex)
+        : [...p.multipack_components, { component_index: componentIndex, quantity: 1 }]
+      return { ...p, multipack_components: nextComponents }
+    }))
+  }
+
+  const setComponentQuantity = (multipackIndex: number, componentIndex: number, quantity: number) => {
+    const safeQty = Number.isFinite(quantity) && quantity > 0 ? Math.floor(quantity) : 1
+    setProducts(prev => prev.map((p, i) => {
+      if (i !== multipackIndex) return p
+      return {
+        ...p,
+        multipack_components: p.multipack_components.map(c =>
+          c.component_index === componentIndex ? { ...c, quantity: safeQty } : c,
+        ),
+      }
+    }))
   }
 
   const selectedCount = products.filter(p => p.included).length
@@ -352,7 +395,66 @@ export function WebsiteImportFlow({
                               {product.unit_size_value}{product.unit_size_unit}
                             </Badge>
                           )}
+                          <button
+                            type="button"
+                            onClick={() => toggleMultipack(index)}
+                            disabled={!product.included}
+                            className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs transition-colors ${
+                              product.is_multipack
+                                ? 'border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400'
+                                : 'border-border text-muted-foreground hover:text-foreground'
+                            } ${!product.included ? 'opacity-40 cursor-not-allowed' : ''}`}
+                          >
+                            <Boxes className="h-3 w-3" />
+                            Multipack
+                          </button>
                         </div>
+
+                        {product.is_multipack && product.included && (
+                          <div className="rounded border border-amber-500/40 bg-amber-50/60 dark:bg-amber-950/20 p-2 mt-1 space-y-1.5">
+                            <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
+                              Which products make up this multipack?
+                            </p>
+                            {products.filter((_, i) => i !== index && products[i].included).length === 0 ? (
+                              <p className="text-xs text-muted-foreground">
+                                Keep at least one other product selected above to use as a multipack component.
+                              </p>
+                            ) : (
+                              <div className="space-y-1">
+                                {products.map((candidate, cIdx) => {
+                                  if (cIdx === index || !candidate.included) return null
+                                  const selected = product.multipack_components.find(c => c.component_index === cIdx)
+                                  return (
+                                    <div key={cIdx} className="flex items-center gap-2 text-xs">
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleMultipackComponent(index, cIdx)}
+                                        className={`h-4 w-4 shrink-0 rounded border flex items-center justify-center ${
+                                          selected ? 'bg-amber-500 border-amber-500' : 'border-muted-foreground/40'
+                                        }`}
+                                      >
+                                        {selected && <Check className="h-2.5 w-2.5 text-white" />}
+                                      </button>
+                                      <span className="flex-1 truncate">{candidate.name || 'Untitled product'}</span>
+                                      {selected && (
+                                        <div className="flex items-center gap-1">
+                                          <span className="text-muted-foreground">×</span>
+                                          <Input
+                                            type="number"
+                                            min={1}
+                                            value={selected.quantity}
+                                            onChange={e => setComponentQuantity(index, cIdx, parseInt(e.target.value, 10))}
+                                            className="h-6 w-14 text-xs px-1.5"
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

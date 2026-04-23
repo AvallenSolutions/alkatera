@@ -10,12 +10,14 @@ interface OrganizationsAndSuppliersCardProps {
   organizations: OrganizationInfo[];
   suppliers: PlatformSupplier[];
   loading: boolean;
+  onOrganizationUpdated?: () => void;
 }
 
 export function OrganizationsAndSuppliersCard({
   organizations,
   suppliers,
   loading,
+  onOrganizationUpdated,
 }: OrganizationsAndSuppliersCardProps) {
   return (
     <Card>
@@ -33,7 +35,7 @@ export function OrganizationsAndSuppliersCard({
             </TabsTrigger>
           </TabsList>
           <TabsContent value="organisations" className="mt-4">
-            <OrganizationsTable organizations={organizations} loading={loading} bare />
+            <OrganizationsTable organizations={organizations} loading={loading} bare onUpdated={onOrganizationUpdated} />
           </TabsContent>
           <TabsContent value="suppliers" className="mt-4">
             <SuppliersTable suppliers={suppliers} loading={loading} />

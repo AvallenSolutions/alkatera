@@ -23,6 +23,7 @@ const BEVERAGE_OPTIONS: { value: BeverageType; label: string }[] = [
   { value: 'cider', label: 'Cider' },
   { value: 'non_alcoholic', label: 'Non-alcoholic beverages' },
   { value: 'rtd', label: 'RTD (Ready-to-drink cocktails)' },
+  { value: 'functional', label: 'Functional beverages' },
   { value: 'other', label: 'Other' },
 ]
 
