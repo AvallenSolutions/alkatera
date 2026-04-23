@@ -52,6 +52,17 @@ export async function GET() {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
+  // Only orgs with the pulse_beta flag get insight/anomaly tiles — they read
+  // from Pulse-only tables that shouldn't leak into the UI for non-Pulse orgs.
+  const { data: orgRow } = await service
+    .from('organizations')
+    .select('feature_flags')
+    .eq('id', organizationId)
+    .maybeSingle();
+  const pulseEnabled = Boolean(
+    (orgRow as any)?.feature_flags?.pulse_beta === true,
+  );
+
   const [
     insightRes,
     anomaliesRes,
@@ -61,18 +72,22 @@ export async function GET() {
     completedLcasCount,
     draftLca,
   ] = await Promise.all([
-    service
-      .from('dashboard_insights')
-      .select('headline, generated_at')
-      .eq('organization_id', organizationId)
-      .order('generated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    service
-      .from('dashboard_anomalies')
-      .select('severity, status')
-      .eq('organization_id', organizationId)
-      .gte('detected_at', new Date(Date.now() - 14 * 86400_000).toISOString()),
+    pulseEnabled
+      ? service
+          .from('dashboard_insights')
+          .select('headline, generated_at')
+          .eq('organization_id', organizationId)
+          .order('generated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null } as any),
+    pulseEnabled
+      ? service
+          .from('dashboard_anomalies')
+          .select('severity, status')
+          .eq('organization_id', organizationId)
+          .gte('detected_at', new Date(Date.now() - 14 * 86400_000).toISOString())
+      : Promise.resolve({ data: [], error: null } as any),
     service.from('products').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId),
     service.from('facilities').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId),
     service.from('suppliers').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId),
@@ -91,11 +106,16 @@ export async function GET() {
   ]);
 
   // Anomalies summary
-  const openAnomalies = (anomaliesRes.data ?? []).filter((r: any) => r.status !== 'resolved');
-  const topSev = openAnomalies.reduce<'low' | 'medium' | 'high' | null>((acc, r: any) => {
-    const order = { low: 0, medium: 1, high: 2 } as const;
-    if (!acc) return r.severity ?? null;
-    return order[(r.severity as keyof typeof order) ?? 'low'] > order[acc] ? r.severity : acc;
+  type Severity = 'low' | 'medium' | 'high';
+  const anomalyRows: Array<{ severity?: string | null; status?: string | null }> =
+    Array.isArray((anomaliesRes as any).data) ? (anomaliesRes as any).data : [];
+  const openAnomalies = anomalyRows.filter(r => r.status !== 'resolved');
+  const severityOrder: Record<Severity, number> = { low: 0, medium: 1, high: 2 };
+  const topSev: Severity | null = openAnomalies.reduce<Severity | null>((acc, r) => {
+    const sev = (r.severity as Severity | null | undefined) ?? null;
+    if (!sev) return acc;
+    if (!acc) return sev;
+    return severityOrder[sev] > severityOrder[acc] ? sev : acc;
   }, null);
 
   // Next deadline in the next 12 months

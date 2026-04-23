@@ -594,6 +594,13 @@ async function toolQueryPulseMetrics(
   ctx: ToolContext,
   input: { metric_key: MetricKey; start_date?: string; end_date?: string },
 ): Promise<ToolResult> {
+  if (!(await hasPulseBeta(ctx))) {
+    return {
+      is_error: false,
+      content: JSON.stringify({ points: [], note: 'Pulse is not enabled for this organisation yet.' }),
+      audit: { tool: 'query_pulse_metrics', pulse_disabled: true },
+    };
+  }
   if (!input?.metric_key || !(input.metric_key in METRIC_DEFINITIONS)) {
     return {
       is_error: true,
@@ -752,6 +759,13 @@ async function toolListRecentAnomalies(
   ctx: ToolContext,
   input: { days?: number; min_severity?: 'low' | 'medium' | 'high' },
 ): Promise<ToolResult> {
+  if (!(await hasPulseBeta(ctx))) {
+    return {
+      is_error: false,
+      content: JSON.stringify({ anomalies: [], note: 'Pulse is not enabled for this organisation yet.' }),
+      audit: { tool: 'list_recent_anomalies', pulse_disabled: true },
+    };
+  }
   const days = Math.max(1, Math.min(90, Number(input?.days ?? 14)));
   const since = new Date();
   since.setDate(since.getDate() - days);
@@ -892,6 +906,13 @@ async function toolListInsights(
   ctx: ToolContext,
   input: { days?: number; limit?: number },
 ): Promise<ToolResult> {
+  if (!(await hasPulseBeta(ctx))) {
+    return {
+      is_error: false,
+      content: JSON.stringify({ entries: [], note: 'Pulse is not enabled for this organisation yet.' }),
+      audit: { tool: 'list_insights', pulse_disabled: true },
+    };
+  }
   const days = Math.min(Math.max(input?.days ?? 7, 1), 60);
   const limit = Math.min(Math.max(input?.limit ?? 10, 1), 30);
   const since = new Date();
@@ -911,6 +932,15 @@ async function toolListInsights(
     content: JSON.stringify(data ?? []),
     audit: { tool: 'list_insights', row_count: data?.length ?? 0, days },
   };
+}
+
+async function hasPulseBeta(ctx: ToolContext): Promise<boolean> {
+  const { data } = await ctx.supabase
+    .from('organizations')
+    .select('feature_flags')
+    .eq('id', ctx.organizationId)
+    .maybeSingle();
+  return Boolean((data as any)?.feature_flags?.pulse_beta === true);
 }
 
 // ─── Deep-read tools ────────────────────────────────────────────────────────
