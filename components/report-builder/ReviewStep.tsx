@@ -63,7 +63,7 @@ export function ReviewStep({ config, onChange, onSaveDefaults, defaultsSaved }: 
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) return;
-    if (file.size > 5 * 1024 * 1024) return;
+    if (file.size > 10 * 1024 * 1024) return;
 
     setUploading(true);
     setUploadError(null);

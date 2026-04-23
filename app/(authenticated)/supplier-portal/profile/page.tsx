@@ -138,8 +138,8 @@ export default function SupplierProfilePage() {
       setError('Please upload a JPG, PNG, or WebP image');
       return;
     }
-    if (file.size > 2 * 1024 * 1024) {
-      setError('Logo must be under 2MB');
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Logo must be under 10MB');
       return;
     }
 
@@ -440,7 +440,7 @@ export default function SupplierProfilePage() {
 
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">
-                Upload your company logo. JPG, PNG, or WebP, max 2MB.
+                Upload your company logo. JPG, PNG, or WebP, max 10MB.
               </p>
               <input
                 ref={logoInputRef}

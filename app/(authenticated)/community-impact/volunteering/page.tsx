@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Users, PlusCircle, Trash2, Calendar, Clock, MapPin, Camera, X, Image as ImageIcon } from 'lucide-react';
+import { Users, PlusCircle, Trash2, Calendar, Clock, MapPin, Camera, X, Image as ImageIcon, Repeat } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { PlacesAutocomplete } from '@/components/ui/places-autocomplete';
 import { useOrganization } from '@/lib/organizationContext';
 import { format } from 'date-fns';
@@ -45,7 +46,15 @@ interface VolunteerActivity {
   description: string | null;
   location: string | null;
   photo_urls: string[] | null;
+  series_id: string | null;
 }
+
+const RECURRENCE_OPTIONS = [
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'biweekly', label: 'Every 2 weeks' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'quarterly', label: 'Quarterly' },
+] as const;
 
 export default function VolunteeringPage() {
   return (
@@ -75,6 +84,11 @@ function VolunteeringPageContent() {
     partner_organization: '',
     description: '',
     location: '',
+  });
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrence, setRecurrence] = useState<{ frequency: string; end_date: string }>({
+    frequency: 'monthly',
+    end_date: '',
   });
 
   useEffect(() => {
@@ -180,6 +194,8 @@ function VolunteeringPageContent() {
     photoPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
     setSelectedPhotos([]);
     setPhotoPreviewUrls([]);
+    setIsRecurring(false);
+    setRecurrence({ frequency: 'monthly', end_date: '' });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -196,6 +212,12 @@ function VolunteeringPageContent() {
 
       if (session?.access_token) {
         headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
+      if (isRecurring && !recurrence.end_date) {
+        toast.error('Please choose a repeat-until date');
+        setIsSubmitting(false);
+        return;
       }
 
       // Upload photos first
@@ -217,6 +239,9 @@ function VolunteeringPageContent() {
           description: formData.description || null,
           location: formData.location || null,
           photo_urls: photoUrls.length > 0 ? photoUrls : [],
+          recurrence: isRecurring
+            ? { frequency: recurrence.frequency, end_date: recurrence.end_date }
+            : null,
         }),
       });
 
@@ -225,7 +250,13 @@ function VolunteeringPageContent() {
         throw new Error(errorData?.error || 'Failed to add volunteer activity');
       }
 
-      toast.success('Volunteer activity logged successfully');
+      const result = await response.json().catch(() => null);
+      const created = result?.created ?? 1;
+      toast.success(
+        created > 1
+          ? `Logged ${created} recurring activities`
+          : 'Volunteer activity logged successfully'
+      );
       setOpen(false);
       resetForm();
       fetchActivities();
@@ -237,17 +268,28 @@ function VolunteeringPageContent() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this activity?')) return;
+  const handleDelete = async (activity: VolunteerActivity) => {
+    let url = `/api/community-impact/volunteering?id=${activity.id}`;
+    let message = 'Activity deleted successfully';
+
+    if (activity.series_id) {
+      const deleteAll = confirm(
+        'This activity is part of a recurring series. Click OK to delete the entire series, or Cancel to delete only this occurrence.'
+      );
+      if (deleteAll) {
+        url = `/api/community-impact/volunteering?series_id=${activity.series_id}`;
+        message = 'Recurring series deleted';
+      } else {
+        if (!confirm('Delete just this occurrence?')) return;
+      }
+    } else {
+      if (!confirm('Are you sure you want to delete this activity?')) return;
+    }
 
     try {
-      const response = await fetch(`/api/community-impact/volunteering?id=${id}`, {
-        method: 'DELETE',
-      });
-
+      const response = await fetch(url, { method: 'DELETE' });
       if (!response.ok) throw new Error('Failed to delete activity');
-
-      toast.success('Activity deleted successfully');
+      toast.success(message);
       fetchActivities();
     } catch (error) {
       console.error('Error deleting activity:', error);
@@ -323,7 +365,7 @@ function VolunteeringPageContent() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Date *</Label>
+                    <Label>{isRecurring ? 'Start Date *' : 'Date *'}</Label>
                     <Input
                       type="date"
                       value={formData.activity_date}
@@ -331,6 +373,57 @@ function VolunteeringPageContent() {
                       required
                     />
                   </div>
+                </div>
+
+                <div className="rounded-lg border border-border p-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-1.5 cursor-pointer" htmlFor="recurring-toggle">
+                      <Repeat className="h-3.5 w-3.5" />
+                      Repeats regularly
+                    </Label>
+                    <Switch
+                      id="recurring-toggle"
+                      checked={isRecurring}
+                      onCheckedChange={setIsRecurring}
+                    />
+                  </div>
+                  {isRecurring && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Frequency</Label>
+                        <Select
+                          value={recurrence.frequency}
+                          onValueChange={(value) => setRecurrence({ ...recurrence, frequency: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {RECURRENCE_OPTIONS.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Repeat until *</Label>
+                        <Input
+                          type="date"
+                          value={recurrence.end_date}
+                          min={formData.activity_date || undefined}
+                          onChange={(e) => setRecurrence({ ...recurrence, end_date: e.target.value })}
+                          required={isRecurring}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground col-span-2">
+                        One entry will be created per occurrence, using the same hours,
+                        participants and details. You can edit or delete individual
+                        occurrences later.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -538,7 +631,15 @@ function VolunteeringPageContent() {
                   <TableRow key={activity.id}>
                     <TableCell>
                       <div>
-                        <p className="font-medium">{activity.activity_name}</p>
+                        <p className="font-medium flex items-center gap-1.5">
+                          {activity.activity_name}
+                          {activity.series_id && (
+                            <Badge variant="secondary" className="text-xs font-normal">
+                              <Repeat className="h-3 w-3 mr-1" />
+                              Recurring
+                            </Badge>
+                          )}
+                        </p>
                         {activity.partner_organization && (
                           <p className="text-sm text-muted-foreground">
                             with {activity.partner_organization}
@@ -578,7 +679,7 @@ function VolunteeringPageContent() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleDelete(activity.id)}
+                        onClick={() => handleDelete(activity)}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>

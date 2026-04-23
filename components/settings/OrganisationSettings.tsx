@@ -184,8 +184,8 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
       toast.error('Please select an image file');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Logo must be under 5MB');
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Logo must be under 10MB');
       return;
     }
 
@@ -458,7 +458,7 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
                     )}
                     <div>
                       <p className="text-sm font-medium">Upload logo</p>
-                      <p className="text-xs text-muted-foreground">PNG, JPG or SVG, max 5MB</p>
+                      <p className="text-xs text-muted-foreground">PNG, JPG or SVG, max 10MB</p>
                     </div>
                   </label>
                 </div>

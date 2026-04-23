@@ -71,7 +71,7 @@ export function FastTrackSetupStep() {
     const file = e.target.files?.[0]
     if (!file) return
     if (!file.type.startsWith('image/')) { toast.error('Please select an image file'); return }
-    if (file.size > 5 * 1024 * 1024) { toast.error('Logo must be under 5MB'); return }
+    if (file.size > 10 * 1024 * 1024) { toast.error('Logo must be under 10MB'); return }
 
     setUploadingLogo(true)
     try {
@@ -189,7 +189,7 @@ export function FastTrackSetupStep() {
               )}
               <div>
                 <p className="text-sm text-white/60">{uploadingLogo ? 'Uploading...' : 'Upload your logo'}</p>
-                <p className="text-xs text-white/30">PNG, JPG or SVG, max 5MB</p>
+                <p className="text-xs text-white/30">PNG, JPG or SVG, max 10MB</p>
               </div>
             </button>
           )}

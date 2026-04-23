@@ -449,8 +449,8 @@ export default function SupplierProductDetailPage() {
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Image must be under 5MB');
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Image must be under 10MB');
       return;
     }
 
@@ -705,7 +705,7 @@ export default function SupplierProductDetailPage() {
                   accept=".jpg,.jpeg,.png,.webp"
                   onChange={handleImageUpload}
                 />
-                <p className="text-xs text-muted-foreground mt-2">JPG, PNG or WebP. Max 5MB.</p>
+                <p className="text-xs text-muted-foreground mt-2">JPG, PNG or WebP. Max 10MB.</p>
               </div>
             </div>
           </div>

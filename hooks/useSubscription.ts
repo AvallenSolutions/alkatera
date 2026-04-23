@@ -530,7 +530,7 @@ function getRequiredTierForFeature(featureCode: FeatureCode): TierName {
     "rosa_ai_unlimited", "greenwash_unlimited",
     // ESG (Canopy only)
     "people_wellbeing", "people_training", "governance_ethics",
-    "community_local_impact", "community_impact_stories",
+    "community_impact_stories",
     // Certifications (Canopy only)
     "csrd_compliance", "gri_standards",
     "iso_14001", "iso_50001", "sbti_targets",
@@ -565,7 +565,7 @@ function getRequiredTierForFeature(featureCode: FeatureCode): TierName {
     "rosa_ai_100", "greenwash_documents",
     // ESG (Blossom+)
     "people_fair_work", "people_diversity_inclusion",
-    "community_charitable_giving", "community_volunteering",
+    "community_charitable_giving", "community_volunteering", "community_local_impact",
     // Certifications (Blossom+)
     "bcorp_tracking", "cdp_tracking",
     // Resources (Blossom+)

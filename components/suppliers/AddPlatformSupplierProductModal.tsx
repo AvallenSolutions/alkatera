@@ -130,8 +130,8 @@ export function AddPlatformSupplierProductModal({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image must be less than 5MB");
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Image must be less than 10MB");
       return;
     }
 
@@ -569,7 +569,7 @@ export function AddPlatformSupplierProductModal({
                             onChange={handleImageSelect}
                           />
                         </div>
-                        <p className="text-xs text-muted-foreground mt-2">PNG, JPG, GIF up to 5MB</p>
+                        <p className="text-xs text-muted-foreground mt-2">PNG, JPG, GIF up to 10MB</p>
                       </div>
                     )}
                   </div>

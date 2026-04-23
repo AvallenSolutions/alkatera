@@ -29,9 +29,9 @@ export function BrandingPanel({ config, onChange }: BrandingPanelProps) {
       return;
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      alert('File size must be less than 5MB');
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('File size must be less than 10MB');
       return;
     }
 
@@ -118,7 +118,7 @@ export function BrandingPanel({ config, onChange }: BrandingPanelProps) {
       <div className="space-y-3">
         <Label>Company Logo</Label>
         <p className="text-sm text-muted-foreground">
-          Upload your organization&apos;s logo (PNG, JPG, or SVG, max 5MB)
+          Upload your organization&apos;s logo (PNG, JPG, or SVG, max 10MB)
         </p>
 
         {logoPreview ? (
@@ -160,7 +160,7 @@ export function BrandingPanel({ config, onChange }: BrandingPanelProps) {
                   <>
                     <Upload className="h-8 w-8 text-muted-foreground" />
                     <p className="text-sm font-medium">Click to upload logo</p>
-                    <p className="text-xs text-muted-foreground">PNG, JPG, or SVG (max 5MB)</p>
+                    <p className="text-xs text-muted-foreground">PNG, JPG, or SVG (max 10MB)</p>
                   </>
                 )}
               </div>

@@ -124,8 +124,8 @@ export default function NewProductLCAPage() {
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error("Image must be less than 5MB");
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error("Image must be less than 10MB");
         return;
       }
 
@@ -786,7 +786,7 @@ export default function NewProductLCAPage() {
                       disabled={isSubmitting || isSavingDraft}
                     />
                     <p className="text-xs text-muted-foreground mt-2">
-                      PNG, JPG up to 5MB
+                      PNG, JPG up to 10MB
                     </p>
                   </div>
                 </div>

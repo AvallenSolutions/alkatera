@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { ArrowLeft, ArrowRight, Building2, Upload, X, ImageIcon, Loader2, SkipForward } from 'lucide-react'
 import { toast } from 'sonner'
 
-const MAX_LOGO_SIZE = 2 * 1024 * 1024 // 2MB
+const MAX_LOGO_SIZE = 10 * 1024 * 1024 // 10MB
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 
 export function SupplierCompanyIdentity() {
@@ -63,7 +63,7 @@ export function SupplierCompanyIdentity() {
     }
 
     if (file.size > MAX_LOGO_SIZE) {
-      toast.error('Logo must be under 2MB')
+      toast.error('Logo must be under 10MB')
       return
     }
 
@@ -264,7 +264,7 @@ export function SupplierCompanyIdentity() {
                 }}
               />
             </div>
-            <p className="text-[11px] text-white/30">JPG, PNG, or WebP. Max 2MB.</p>
+            <p className="text-[11px] text-white/30">JPG, PNG, or WebP. Max 10MB.</p>
           </div>
 
           {/* Description */}
