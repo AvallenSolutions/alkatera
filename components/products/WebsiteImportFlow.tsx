@@ -74,7 +74,9 @@ export function WebsiteImportFlow({
   const [isConfirming, setIsConfirming] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [orgData, setOrgData] = useState<{ certifications: string[]; description: string | null } | null>(null)
+  const [scanPhase, setScanPhase] = useState<string>('Starting import…')
   const autoScanDoneRef = useRef(false)
+  const pollAbortRef = useRef<AbortController | null>(null)
 
   // Auto-scan when a URL is already known — never ask the user to enter it twice
   useEffect(() => {
@@ -89,11 +91,14 @@ export function WebsiteImportFlow({
   }, [open])
 
   const handleClose = () => {
+    pollAbortRef.current?.abort()
+    pollAbortRef.current = null
     setStage('url-entry')
     setUrl('')
     setProducts([])
     setError(null)
     setOrgData(null)
+    setScanPhase('Starting import…')
     onClose()
   }
 
@@ -102,44 +107,83 @@ export function WebsiteImportFlow({
     if (!target) return
     if (scanUrl) setUrl(scanUrl)
     setError(null)
+    setScanPhase('Starting import…')
     setStage('scanning')
 
+    pollAbortRef.current?.abort()
+    const abort = new AbortController()
+    pollAbortRef.current = abort
+
     try {
-      const response = await fetch('/api/products/import-from-url', {
+      const startRes = await fetch('/api/products/import-from-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: target }),
+        signal: abort.signal,
       })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        setError(data.error || 'Failed to scan website')
+      const startData = await startRes.json()
+      if (!startRes.ok || !startData.jobId) {
+        setError(startData.error || 'Failed to start import')
         setStage('url-entry')
         return
       }
 
-      if (!data.products || data.products.length === 0) {
-        setError('No products were found on that website. Try linking directly to a products or shop page.')
-        setStage('url-entry')
-        return
+      const jobId = startData.jobId as string
+      // Poll every 2s for up to ~3 minutes. The work itself runs in a Netlify
+      // background function so it is not bound by serverless timeout limits.
+      const deadline = Date.now() + 3 * 60 * 1000
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 2000))
+        if (abort.signal.aborted) return
+
+        const statusRes = await fetch(`/api/products/import-from-url/${jobId}`, {
+          signal: abort.signal,
+        })
+        if (!statusRes.ok) {
+          setError('Lost contact with the import job. Please try again.')
+          setStage('url-entry')
+          return
+        }
+        const statusData = await statusRes.json()
+        if (statusData.phaseMessage) setScanPhase(statusData.phaseMessage)
+
+        if (statusData.status === 'failed') {
+          setError(statusData.error || 'Import failed')
+          setStage('url-entry')
+          return
+        }
+        if (statusData.status === 'completed') {
+          const products = (statusData.products || []) as ExtractedProduct[]
+          if (products.length === 0) {
+            setError('No products were found on that website. Try linking directly to a products or shop page.')
+            setStage('url-entry')
+            return
+          }
+          setPagesAnalyzed(statusData.pagesAnalyzed || 1)
+          setProducts(products.map((p: ExtractedProduct) => ({
+            ...p,
+            packaging_type: p.packaging_type ?? null,
+            ingredients: p.ingredients ?? [],
+            certifications: p.certifications ?? [],
+            included: true,
+            is_multipack: false,
+            multipack_components: [],
+          })))
+          if (statusData.orgCertifications?.length || statusData.orgDescription) {
+            setOrgData({
+              certifications: statusData.orgCertifications ?? [],
+              description: statusData.orgDescription ?? null,
+            })
+          }
+          setStage('review')
+          return
+        }
       }
 
-      setPagesAnalyzed(data.pagesAnalyzed || 1)
-      setProducts(data.products.map((p: ExtractedProduct) => ({
-        ...p,
-        packaging_type: p.packaging_type ?? null,
-        ingredients: p.ingredients ?? [],
-        certifications: p.certifications ?? [],
-        included: true,
-        is_multipack: false,
-        multipack_components: [],
-      })))
-      if (data.orgCertifications?.length || data.orgDescription) {
-        setOrgData({ certifications: data.orgCertifications ?? [], description: data.orgDescription ?? null })
-      }
-      setStage('review')
-    } catch {
+      setError('This import is taking longer than expected. Please try again, or link directly to a products or shop page.')
+      setStage('url-entry')
+    } catch (err: any) {
+      if (err?.name === 'AbortError') return
       setError('Something went wrong. Please check your connection and try again.')
       setStage('url-entry')
     }
@@ -281,9 +325,10 @@ export function WebsiteImportFlow({
             <div className="flex flex-col items-center justify-center py-12 space-y-4">
               <Loader2 className="h-10 w-10 animate-spin text-emerald-500" />
               <div className="text-center space-y-1">
-                <p className="font-medium">Scanning {url}...</p>
-                <p className="text-sm text-muted-foreground">
-                  Finding products across your website. This takes about 15-30 seconds.
+                <p className="font-medium">Scanning {url}</p>
+                <p className="text-sm text-muted-foreground">{scanPhase}</p>
+                <p className="text-xs text-muted-foreground">
+                  Large catalogues can take up to a minute.
                 </p>
               </div>
             </div>
