@@ -19,13 +19,24 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { runSafeSql, SAFE_SQL_ALLOWED_TABLES } from './safe-sql';
 import { ALL_METRIC_KEYS, METRIC_DEFINITIONS, type MetricKey } from '@/lib/pulse/metric-keys';
 import { listMemories, saveMemory, type MemoryScope } from './memory';
+import { proposeAction } from './actions';
 import { getBenchmarkForProductType } from '@/lib/industry-benchmarks';
 
 export interface ToolContext {
   supabase: SupabaseClient;
   organizationId: string;
   userId: string;
+  /** Optional conversation id for attaching pending actions. */
+  conversationId?: string | null;
 }
+
+/** Tool names that create a pending action (user must confirm). */
+export const ACTION_TOOL_NAMES = [
+  'propose_log_utility_entry',
+  'propose_set_target',
+  'propose_add_supplier',
+] as const;
+export type ActionToolName = typeof ACTION_TOOL_NAMES[number];
 
 export interface ToolDefinition {
   name: string;
@@ -307,6 +318,67 @@ export const ROSA_TOOLS: ToolDefinition[] = [
       required: ['scope', 'key', 'value'],
     },
   },
+  // ───────────── Action tools (confirmation-gated) ─────────────
+  {
+    name: 'propose_log_utility_entry',
+    description:
+      "Propose logging a utility meter reading or bill (electricity, gas, water, fuel) for a facility. The user MUST confirm before the row is written. Use when the user says something like 'log 2,400 kWh at our distillery for October'. Always include all required fields; ask the user for missing ones first.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        facility_id: { type: 'string', description: 'Facility UUID (from list_facilities).' },
+        utility_type: {
+          type: 'string',
+          description: "electricity | natural_gas | water_intake | fuel_diesel | fuel_petrol | lpg | other",
+        },
+        quantity: { type: 'number', description: 'Numeric quantity.' },
+        unit: { type: 'string', description: 'Unit string, e.g. kWh, m3, litres.' },
+        reporting_period_start: { type: 'string', description: 'ISO date (YYYY-MM-DD) start of the period this reading covers.' },
+        reporting_period_end: { type: 'string', description: 'ISO date (YYYY-MM-DD) end of period.' },
+        activity_date: { type: 'string', description: 'Optional invoice or meter-read date.' },
+        notes: { type: 'string', description: 'Optional free-text notes.' },
+      },
+      required: ['facility_id', 'utility_type', 'quantity', 'unit', 'reporting_period_start', 'reporting_period_end'],
+    },
+  },
+  {
+    name: 'propose_set_target',
+    description:
+      "Propose creating a new sustainability target (e.g. 'cut Scope 1+2 by 30% by 2030'). Writes to sustainability_targets after user confirmation. Pair baseline with target so progress is measurable.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        metric_key: { type: 'string', description: 'Metric key, e.g. total_co2e, water_consumption.' },
+        baseline_value: { type: 'number', description: 'Baseline numeric value.' },
+        baseline_date: { type: 'string', description: 'ISO date of the baseline.' },
+        target_value: { type: 'number', description: 'Target numeric value.' },
+        target_date: { type: 'string', description: 'ISO date by which to hit the target.' },
+        scope: { type: 'string', description: "Optional scope descriptor, e.g. 'scope_1_2' or 'scope_3'." },
+        methodology: { type: 'string', description: 'Optional methodology note, e.g. SBTi aligned.' },
+        notes: { type: 'string', description: 'Optional notes.' },
+      },
+      required: ['metric_key', 'baseline_value', 'baseline_date', 'target_value', 'target_date'],
+    },
+  },
+  {
+    name: 'propose_add_supplier',
+    description:
+      "Propose adding a new supplier record. Writes to suppliers after user confirmation. Useful when the user mentions a partner by name that isn't on the list yet.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Supplier company name.' },
+        contact_name: { type: 'string', description: 'Optional contact person.' },
+        contact_email: { type: 'string', description: 'Optional contact email.' },
+        industry_sector: { type: 'string', description: 'Optional industry sector.' },
+        country: { type: 'string', description: 'Optional country.' },
+        website: { type: 'string', description: 'Optional website URL.' },
+        annual_spend: { type: 'number', description: 'Optional annual spend in GBP.' },
+        notes: { type: 'string', description: 'Optional notes.' },
+      },
+      required: ['name'],
+    },
+  },
 ];
 
 /** Shape returned by the dispatcher. `is_error=true` lets Claude self-correct. */
@@ -372,6 +444,10 @@ export async function executeTool(
         return await toolListMemories(ctx);
       case 'save_memory':
         return await toolSaveMemory(ctx, input as { scope: MemoryScope; key: string; value: string });
+      case 'propose_log_utility_entry':
+      case 'propose_set_target':
+      case 'propose_add_supplier':
+        return await toolProposeAction(ctx, name as ActionToolName, input as Record<string, unknown>);
       default:
         return {
           is_error: true,
@@ -1111,4 +1187,83 @@ async function toolSaveMemory(
     content: JSON.stringify({ saved: true, id: res.id, scope, key: input.key }),
     audit: { tool: 'save_memory', scope, key: input.key },
   };
+}
+
+// ─── Action proposers ───────────────────────────────────────────────────────
+
+function buildActionPreview(toolName: ActionToolName, p: Record<string, unknown>): string {
+  switch (toolName) {
+    case 'propose_log_utility_entry': {
+      const qty = p.quantity;
+      const unit = p.unit;
+      const ut = p.utility_type;
+      const start = p.reporting_period_start;
+      const end = p.reporting_period_end;
+      return `Log ${qty} ${unit} of ${ut} for the period ${start} to ${end}.`;
+    }
+    case 'propose_set_target': {
+      return `Set target: ${p.metric_key} from ${p.baseline_value} (${p.baseline_date}) to ${p.target_value} by ${p.target_date}.`;
+    }
+    case 'propose_add_supplier': {
+      return `Add supplier "${p.name}"${p.country ? ` (${p.country})` : ''}${p.contact_email ? `, contact ${p.contact_email}` : ''}.`;
+    }
+    default:
+      return `Perform action: ${toolName}`;
+  }
+}
+
+async function toolProposeAction(
+  ctx: ToolContext,
+  toolName: ActionToolName,
+  input: Record<string, unknown>,
+): Promise<ToolResult> {
+  const missing = validateActionInput(toolName, input);
+  if (missing.length > 0) {
+    return {
+      is_error: true,
+      content: `Missing required fields for ${toolName}: ${missing.join(', ')}`,
+      audit: { tool: toolName, error: 'missing_fields', missing },
+    };
+  }
+
+  const preview = buildActionPreview(toolName, input);
+  const res = await proposeAction(ctx.supabase, {
+    organizationId: ctx.organizationId,
+    userId: ctx.userId,
+    conversationId: ctx.conversationId ?? null,
+    toolName,
+    payload: input,
+    preview,
+  });
+  if (!res.ok) {
+    return {
+      is_error: true,
+      content: `Could not queue action: ${res.error}`,
+      audit: { tool: toolName, error: res.error },
+    };
+  }
+  return {
+    is_error: false,
+    content: JSON.stringify({
+      proposed: true,
+      pending_action_id: res.id,
+      preview,
+      note: 'Tell the user what you are about to do and wait for them to click Confirm. Do not claim the action is done.',
+    }),
+    audit: { tool: toolName, pending_action_id: res.id, preview },
+  };
+}
+
+function validateActionInput(toolName: ActionToolName, input: Record<string, unknown>): string[] {
+  const required: Record<ActionToolName, string[]> = {
+    propose_log_utility_entry: ['facility_id', 'utility_type', 'quantity', 'unit', 'reporting_period_start', 'reporting_period_end'],
+    propose_set_target: ['metric_key', 'baseline_value', 'baseline_date', 'target_value', 'target_date'],
+    propose_add_supplier: ['name'],
+  };
+  const missing: string[] = [];
+  for (const f of required[toolName]) {
+    const v = input?.[f];
+    if (v === undefined || v === null || v === '') missing.push(f);
+  }
+  return missing;
 }

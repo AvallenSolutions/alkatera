@@ -27,8 +27,10 @@
 import { NextRequest } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
-import { executeTool, ROSA_TOOLS, type ToolContext } from '@/lib/rosa/tools';
+import { executeTool, ROSA_TOOLS, ACTION_TOOL_NAMES, type ToolContext } from '@/lib/rosa/tools';
 import { buildMemoryBlock } from '@/lib/rosa/memory';
+
+const ACTION_TOOLS_SET = new Set<string>(ACTION_TOOL_NAMES as readonly string[]);
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -126,6 +128,7 @@ export async function POST(request: NextRequest) {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
+  // conversation id filled in below once resolved
   const toolCtx: ToolContext = {
     supabase: serviceSupabase,
     organizationId,
@@ -140,6 +143,7 @@ export async function POST(request: NextRequest) {
     user.id,
     userMessage,
   );
+  toolCtx.conversationId = conversationId;
 
   // Load prior turns (last 20) for context continuity.
   const { data: history } = await serviceSupabase
@@ -231,6 +235,23 @@ export async function POST(request: NextRequest) {
               is_error: res.is_error,
               preview: res.content.slice(0, 240),
             });
+
+            // Action tools queue a pending action; surface it to the UI as a
+            // confirmation card the user can click.
+            if (!res.is_error && ACTION_TOOLS_SET.has(tu.name)) {
+              try {
+                const parsed = JSON.parse(res.content);
+                if (parsed?.pending_action_id) {
+                  emit('action_proposal', {
+                    id: parsed.pending_action_id,
+                    tool_name: tu.name,
+                    preview: parsed.preview ?? '',
+                  });
+                }
+              } catch {
+                // non-JSON content, skip
+              }
+            }
           }
           messages.push({ role: 'user', content: toolResultBlocks });
         }

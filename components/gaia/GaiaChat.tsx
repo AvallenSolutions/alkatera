@@ -38,6 +38,7 @@ import {
   X,
 } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
+import { ActionProposalCard } from '@/components/gaia/ActionProposalCard';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useOnboarding } from '@/lib/onboarding';
@@ -50,7 +51,7 @@ import {
   archiveConversation,
   unarchiveConversation,
   searchConversations,
-  sendRosaQueryStream,
+  sendRosaQueryStreamV2,
   submitFeedback,
   hasSubmittedFeedback,
   exportConversationAsMarkdown,
@@ -231,6 +232,7 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
   const [streamingChartData, setStreamingChartData] = useState<RosaChartData | null>(null);
+  const [streamingActionProposals, setStreamingActionProposals] = useState<Array<{ id: string; tool_name?: string; preview: string }>>([]);
   const [error, setError] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(true);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState<Record<string, boolean>>({});
@@ -463,6 +465,7 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
     setError(null);
     setStreamingContent('');
     setStreamingChartData(null);
+    setStreamingActionProposals([]);
 
     // Optimistically add user message
     const tempUserMessage: RosaMessage = {
@@ -492,7 +495,7 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
       setIsStreaming(true);
       setIsSending(false);
 
-      for await (const event of sendRosaQueryStream({
+      for await (const event of sendRosaQueryStreamV2({
         message: userMessage,
         conversation_id: activeConversation?.id,
         organization_id: currentOrganization.id,
@@ -511,6 +514,22 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
             if (event.chart_data) {
               setStreamingChartData(event.chart_data as RosaChartData);
             }
+            break;
+          case 'action_proposal':
+            if (event.action_id) {
+              setStreamingActionProposals(prev => [
+                ...prev,
+                {
+                  id: event.action_id!,
+                  tool_name: event.tool_name,
+                  preview: event.action_preview ?? '',
+                },
+              ]);
+            }
+            break;
+          case 'tool_use':
+          case 'tool_result':
+            // Reserved for future inline tool-call chips; no-op for now.
             break;
           case 'error':
             throw new Error(event.error || 'Stream error');
@@ -1177,6 +1196,23 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
                       )}
                     </CardContent>
                   </Card>
+                  {streamingActionProposals.map(p => (
+                    <ActionProposalCard key={p.id} proposal={p} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Pending action proposals — persist past streaming until the next send */}
+            {!isStreaming && streamingActionProposals.length > 0 && (
+              <div className="flex gap-3">
+                <div className="flex-shrink-0 h-8 w-8 rounded-full bg-neon-lime flex items-center justify-center">
+                  <Dog className="h-4 w-4 text-black" />
+                </div>
+                <div className="max-w-[80%] w-full space-y-1">
+                  {streamingActionProposals.map(p => (
+                    <ActionProposalCard key={p.id} proposal={p} />
+                  ))}
                 </div>
               </div>
             )}

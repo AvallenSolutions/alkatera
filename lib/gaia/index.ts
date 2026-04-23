@@ -466,7 +466,7 @@ export const sendGaiaQuery = sendRosaQuery;
  * Stream chunk type for Rosa streaming responses
  */
 export interface RosaStreamEvent {
-  type: 'start' | 'text' | 'chart' | 'sources' | 'done' | 'error';
+  type: 'start' | 'text' | 'chart' | 'sources' | 'done' | 'error' | 'tool_use' | 'tool_result' | 'action_proposal';
   content?: string;
   conversation_id?: string;
   is_new_conversation?: boolean;
@@ -475,6 +475,14 @@ export interface RosaStreamEvent {
   message_id?: string;
   processing_time_ms?: number;
   error?: string;
+  // Tool-use events
+  tool_name?: string;
+  tool_input?: unknown;
+  tool_is_error?: boolean;
+  tool_preview?: string;
+  // Action proposal
+  action_id?: string;
+  action_preview?: string;
 }
 
 // Backwards compatibility
@@ -565,6 +573,127 @@ export async function* sendRosaQueryStream(
 // Backwards compatibility
 /** @deprecated Use sendRosaQueryStream instead */
 export const sendGaiaQueryStream = sendRosaQueryStream;
+
+/**
+ * Phase-2 streamer that hits the Next.js /api/rosa/chat route (named-event SSE).
+ * Translates the named events (text/tool_use/tool_result/action_proposal/done)
+ * into the same RosaStreamEvent shape GaiaChat already consumes, plus two new
+ * event types: 'tool_use' / 'tool_result' / 'action_proposal'.
+ */
+export async function* sendRosaQueryStreamV2(
+  request: RosaQueryRequest,
+): AsyncGenerator<RosaStreamEvent> {
+  const response = await fetch('/api/rosa/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message: request.message,
+      conversation_id: request.conversation_id,
+    }),
+  });
+
+  if (!response.ok) {
+    const errJson = await response.json().catch(() => ({}));
+    throw new Error(errJson.error || `Rosa request failed: ${response.status}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('No response body');
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let emittedStart = false;
+  let finalText = '';
+
+  const parseBlock = (block: string): { event?: string; data?: string } => {
+    const out: { event?: string; data?: string } = {};
+    for (const line of block.split('\n')) {
+      if (line.startsWith('event: ')) out.event = line.slice(7).trim();
+      else if (line.startsWith('data: ')) out.data = line.slice(6);
+    }
+    return out;
+  };
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const blocks = buffer.split('\n\n');
+      buffer = blocks.pop() || '';
+
+      for (const block of blocks) {
+        if (!block.trim()) continue;
+        const { event, data } = parseBlock(block);
+        if (!data) continue;
+        let payload: any = null;
+        try { payload = JSON.parse(data); } catch { continue; }
+
+        switch (event) {
+          case 'text': {
+            if (!emittedStart) {
+              emittedStart = true;
+              yield { type: 'start', conversation_id: request.conversation_id };
+            }
+            if (payload?.delta) {
+              finalText += payload.delta;
+              yield { type: 'text', content: payload.delta };
+            }
+            break;
+          }
+          case 'tool_use':
+            yield { type: 'tool_use', tool_name: payload?.name, tool_input: payload?.input };
+            break;
+          case 'tool_result':
+            yield {
+              type: 'tool_result',
+              tool_name: payload?.name,
+              tool_is_error: payload?.is_error,
+              tool_preview: payload?.preview,
+            };
+            break;
+          case 'action_proposal':
+            yield {
+              type: 'action_proposal',
+              action_id: payload?.id,
+              tool_name: payload?.tool_name,
+              action_preview: payload?.preview,
+            };
+            break;
+          case 'done':
+            yield {
+              type: 'done',
+              conversation_id: payload?.conversation_id,
+              message_id: payload?.message_id,
+              is_new_conversation: !request.conversation_id,
+            };
+            break;
+          case 'error':
+            yield { type: 'error', error: payload?.message ?? 'Unknown error' };
+            break;
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  // If the stream closed without a final 'done', nothing else to do.
+  void finalText;
+}
+
+export async function confirmRosaAction(actionId: string): Promise<{ ok: boolean; result?: any; error?: string }> {
+  const res = await fetch(`/api/rosa/actions/${actionId}/confirm`, { method: 'POST' });
+  const json = await res.json().catch(() => ({}));
+  return json;
+}
+
+export async function cancelRosaAction(actionId: string): Promise<{ ok: boolean; error?: string }> {
+  const res = await fetch(`/api/rosa/actions/${actionId}/cancel`, { method: 'POST' });
+  const json = await res.json().catch(() => ({}));
+  return json;
+}
 
 // ============================================================================
 // Feedback Operations
