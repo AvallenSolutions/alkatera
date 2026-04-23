@@ -23,6 +23,7 @@ import { DataQualityConfidenceCard } from "@/components/facilities/DataQualityCo
 import { ProductionRunDataEntry } from "@/components/facilities/ProductionRunDataEntry";
 import { Sparkles, ExternalLink, Settings2, HelpCircle } from "lucide-react";
 import { FacilityDataSourcingDialog } from "@/components/facilities/FacilityDataSourcingDialog";
+import { UpgradeFacilityDataButton } from "@/components/facilities/UpgradeFacilityDataButton";
 import { UTILITY_TYPES } from "@/lib/constants/utility-types";
 
 interface Facility {
@@ -46,6 +47,16 @@ interface FacilityArchetypeSummary {
   display_name: string;
   source_citation: string;
   source_url: string | null;
+}
+
+interface ProxyAllocation {
+  id: string;
+  data_collection_mode: 'archetype_proxy' | 'hybrid';
+  reporting_period_start: string;
+  reporting_period_end: string;
+  product_id: string;
+  product_name?: string | null;
+  archetype_display_name?: string | null;
 }
 
 interface DataContract {
@@ -111,6 +122,7 @@ export default function FacilityDetailPage() {
   } | null>(null);
   const [editSaving, setEditSaving] = useState(false);
   const [sourcingDialogOpen, setSourcingDialogOpen] = useState(false);
+  const [proxyAllocations, setProxyAllocations] = useState<ProxyAllocation[]>([]);
 
   const loadFacilityData = useCallback(async () => {
     try {
@@ -168,6 +180,24 @@ export default function FacilityDetailPage() {
       } else {
         setArchetype(null);
       }
+
+      const { data: allocRows } = await supabase
+        .from('contract_manufacturer_allocations')
+        .select('id, data_collection_mode, reporting_period_start, reporting_period_end, product_id, archetype_id, superseded_at, products(name), facility_archetypes(display_name)')
+        .eq('facility_id', facilityId)
+        .is('superseded_at', null)
+        .in('data_collection_mode', ['archetype_proxy', 'hybrid']);
+
+      const rows = (allocRows || []).map((r: any) => ({
+        id: r.id,
+        data_collection_mode: r.data_collection_mode,
+        reporting_period_start: r.reporting_period_start,
+        reporting_period_end: r.reporting_period_end,
+        product_id: r.product_id,
+        product_name: r.products?.name ?? null,
+        archetype_display_name: r.facility_archetypes?.display_name ?? null,
+      })) as ProxyAllocation[];
+      setProxyAllocations(rows);
     } catch (error: any) {
       console.error('Error loading facility data:', error);
       toast.error(error.message || 'Failed to load facility data');
@@ -378,6 +408,58 @@ export default function FacilityDetailPage() {
             </div>
           </AlertDescription>
         </Alert>
+      )}
+
+      {proxyAllocations.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-base">Got real data for this facility?</CardTitle>
+            <CardDescription>
+              These product LCAs are currently using an industry average for this facility. If the facility has now shared real numbers with you, switch them over here. Your old reports will still add up because we keep the proxy version for audit.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Product</TableHead>
+                  <TableHead>Reporting period</TableHead>
+                  <TableHead>Mode</TableHead>
+                  <TableHead>Industry average used</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {proxyAllocations.map((a) => (
+                  <TableRow key={a.id}>
+                    <TableCell className="font-medium">{a.product_name || '(unknown product)'}</TableCell>
+                    <TableCell className="text-xs">
+                      {new Date(a.reporting_period_start).toLocaleDateString()}
+                      {' → '}
+                      {new Date(a.reporting_period_end).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs">
+                        {a.data_collection_mode === 'hybrid' ? 'Partial' : 'Industry average'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {a.archetype_display_name || '-'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <UpgradeFacilityDataButton
+                        allocationId={a.id}
+                        facilityName={facility.name}
+                        archetypeName={a.archetype_display_name ?? undefined}
+                        onUpgraded={loadFacilityData}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       )}
 
       {facility.operational_control === 'third_party' && (
