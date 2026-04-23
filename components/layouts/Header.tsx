@@ -16,7 +16,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { LogOut, User, Menu, X, Building2, Check, ChevronsUpDown, Sparkles, MessageSquare, Upload, CornerDownLeft } from 'lucide-react'
+import { LogOut, User, Menu, X, Building2, Check, ChevronsUpDown, Dog, MessageSquare, Upload, CornerDownLeft } from 'lucide-react'
 import { CommandPalette } from '@/components/dashboard/CommandPalette'
 import { UniversalDropzone } from '@/components/layouts/UniversalDropzone'
 import {
@@ -148,7 +148,7 @@ export function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
             className="hidden sm:flex items-center gap-2 relative"
           >
             <div className="relative">
-              <Sparkles className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#ccff00] pointer-events-none" />
+              <Dog className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-400 pointer-events-none" />
               <Input
                 value={rosaPrompt}
                 onChange={(e) => setRosaPrompt(e.target.value)}
