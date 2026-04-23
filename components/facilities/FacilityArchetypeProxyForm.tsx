@@ -88,20 +88,23 @@ export function FacilityArchetypeProxyForm({
         <Sparkles className="h-4 w-4 text-amber-600 mt-0.5" />
         <div className="text-xs text-muted-foreground">
           {mode === 'archetype_proxy'
-            ? 'Emissions will be estimated from an industry-typical archetype. This is Secondary data per ISO 14044 §4.2.3.6 and will be clearly labelled in your report.'
-            : 'Enter the values you know; unchecked fields will be backfilled from the selected archetype.'}
+            ? "We'll estimate this facility's footprint using a published industry average for the facility type you pick below. Your report will clearly show this is an estimate, not measured data."
+            : "Type in the numbers you have; we'll fill the blanks with the industry average for this kind of facility."}
         </div>
       </div>
 
       <div className="space-y-1">
-        <Label className="text-xs">Facility archetype</Label>
+        <Label className="text-xs">What kind of facility is this?</Label>
+        <p className="text-[11px] text-muted-foreground mb-1">
+          Pick the one that best describes what this facility does for you. If a few fit, pick the one closest to the main job (for example, a place that both fills and cans your drinks is usually a canning line).
+        </p>
         <Select
           value={selectedArchetypeId ?? ''}
           onValueChange={onArchetypeChange}
           disabled={loading}
         >
           <SelectTrigger className="h-9 text-sm">
-            <SelectValue placeholder={loading ? 'Loading archetypes\u2026' : 'Select the best match'} />
+            <SelectValue placeholder={loading ? 'Loading options\u2026' : 'Choose a facility type'} />
           </SelectTrigger>
           <SelectContent>
             {archetypes.map((a) => (
@@ -167,8 +170,8 @@ export function FacilityArchetypeProxyForm({
                 </a>
               )}
             </span>
-            <span className="tabular-nums">
-              Predicted DQI: <strong>{predictedDqi}%</strong> · &plusmn;{selected.uncertaintyPct}%
+            <span className="tabular-nums" title="How confident we are in this estimate. Real facility data would score 90-95%.">
+              Confidence: <strong>{predictedDqi}%</strong> · &plusmn;{selected.uncertaintyPct}%
             </span>
           </div>
         </div>
@@ -177,18 +180,18 @@ export function FacilityArchetypeProxyForm({
       {mode === 'archetype_proxy' && (
         <div className="space-y-1">
           <Label className="text-xs">
-            Why primary data could not be obtained
+            Why can&apos;t this facility share their data?
             <span className="text-red-500 ml-0.5">*</span>
           </Label>
           <Textarea
             rows={2}
             value={justification}
             onChange={(e) => onJustificationChange(e.target.value)}
-            placeholder="e.g. 3rd-party canning facility runs multiple SKUs on shared lines and does not track per-run energy; allocation methodology unavailable."
+            placeholder="For example: they run lots of brands on shared lines and can't separate our production from the rest."
             className="text-sm"
           />
           <p className="text-[11px] text-muted-foreground">
-            Required for ISO 14044 §4.2.3.6 audit trail. Will appear in the Data Quality Declaration of your report.
+            We include this short note in your report so auditors and customers can see why an estimate was used.
           </p>
         </div>
       )}
@@ -196,7 +199,7 @@ export function FacilityArchetypeProxyForm({
       <Alert className="bg-amber-500/10 border-amber-500/30">
         <AlertTriangle className="h-4 w-4 text-amber-600" />
         <AlertDescription className="text-xs">
-          This facility will be reported as <strong>Secondary data – Archetype Proxy</strong>. The overall DQI score of your assessment will be downgraded accordingly.
+          Heads up: because we&apos;re using an industry average instead of real data, this facility&apos;s numbers are less precise. Your report will say so clearly. If the facility can give you real data later, you can upgrade and the footprint will update.
         </AlertDescription>
       </Alert>
     </div>

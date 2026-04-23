@@ -21,6 +21,7 @@ import { DirectDataEntry } from "@/components/facilities/DirectDataEntry";
 import { ProductionVolumeManager } from "@/components/facilities/ProductionVolumeManager";
 import { DataQualityConfidenceCard } from "@/components/facilities/DataQualityConfidenceCard";
 import { ProductionRunDataEntry } from "@/components/facilities/ProductionRunDataEntry";
+import { Sparkles, ExternalLink } from "lucide-react";
 import { UTILITY_TYPES } from "@/lib/constants/utility-types";
 
 interface Facility {
@@ -33,6 +34,17 @@ interface Facility {
   address_country: string;
   address_postcode: string;
   organization_id: string;
+  default_data_collection_mode?: 'primary' | 'archetype_proxy' | 'hybrid' | null;
+  default_archetype_id?: string | null;
+  default_proxy_justification?: string | null;
+}
+
+interface FacilityArchetypeSummary {
+  id: string;
+  slug: string;
+  display_name: string;
+  source_citation: string;
+  source_url: string | null;
 }
 
 interface DataContract {
@@ -81,6 +93,7 @@ export default function FacilityDetailPage() {
   const facilityId = params.id as string;
 
   const [facility, setFacility] = useState<Facility | null>(null);
+  const [archetype, setArchetype] = useState<FacilityArchetypeSummary | null>(null);
   const [dataContracts, setDataContracts] = useState<DataContract[]>([]);
   const [utilityData, setUtilityData] = useState<UtilityDataEntry[]>([]);
   const [waterData, setWaterData] = useState<FacilityActivityEntry[]>([]);
@@ -141,6 +154,18 @@ export default function FacilityDetailPage() {
       setUtilityData(utilityResult.data || []);
       setWaterData(waterResult.data || []);
       setWasteData(wasteResult.data || []);
+
+      const archetypeId = (facilityResult.data as any)?.default_archetype_id;
+      if (archetypeId) {
+        const { data: arch } = await supabase
+          .from('facility_archetypes')
+          .select('id, slug, display_name, source_citation, source_url')
+          .eq('id', archetypeId)
+          .maybeSingle();
+        setArchetype((arch as FacilityArchetypeSummary | null) ?? null);
+      } else {
+        setArchetype(null);
+      }
     } catch (error: any) {
       console.error('Error loading facility data:', error);
       toast.error(error.message || 'Failed to load facility data');
@@ -287,6 +312,43 @@ export default function FacilityDetailPage() {
           <FacilityBrewwLinkBadge facilityId={facility.id} />
         </div>
       </div>
+
+      {facility.default_data_collection_mode && facility.default_data_collection_mode !== 'primary' && (
+        <Alert className="mb-6 border-amber-400/60 bg-amber-500/10">
+          <Sparkles className="h-4 w-4 text-amber-500" />
+          <AlertDescription>
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 space-y-2">
+                <p className="font-semibold">
+                  {facility.default_data_collection_mode === 'archetype_proxy'
+                    ? 'Using an industry average for this facility'
+                    : 'Using industry average to fill data gaps'}
+                  {archetype ? ` — ${archetype.display_name}` : ''}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  You told us this facility can&apos;t share its real energy and water data, so LCAs for products made here use a published industry average instead. Reports will clearly say this number is an estimate. You don&apos;t need to enter data on this page. If the facility starts sharing real data later, you can switch over and the footprint will update.
+                </p>
+                {facility.default_proxy_justification && (
+                  <p className="text-xs italic text-muted-foreground">
+                    Your reason: {facility.default_proxy_justification}
+                  </p>
+                )}
+                {archetype?.source_url && (
+                  <a
+                    href={archetype.source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary inline-flex items-center gap-1 hover:underline"
+                  >
+                    Where this average comes from: {archetype.source_citation}
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                )}
+              </div>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>

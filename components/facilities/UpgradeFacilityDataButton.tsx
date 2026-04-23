@@ -97,25 +97,23 @@ export function UpgradeFacilityDataButton({
       <DialogTrigger asChild>
         <Button variant={variant} size={size} disabled={disabled}>
           <ArrowUpCircle className="h-4 w-4 mr-2" />
-          Upgrade to primary data
+          Switch to real facility data
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Upgrade facility data to primary</DialogTitle>
+          <DialogTitle>Switch to real facility data</DialogTitle>
           <DialogDescription>
             {facilityName ? `${facilityName}. ` : ''}
-            {archetypeName ? `Currently using the ${archetypeName} archetype proxy. ` : ''}
-            Enter the primary figures supplied by the facility. The existing proxy record will be
-            preserved for audit; a new primary record will supersede it and a fresh LCA version
-            will reflect the updated footprint.
+            {archetypeName ? `Currently using the industry average for ${archetypeName}. ` : ''}
+            Enter the real figures the facility shared with you. Your old estimate stays saved so older reports still add up, and your next LCA will use the real numbers.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label htmlFor="total">Total facility CO2e (kg)</Label>
+              <Label htmlFor="total">Total CO2e from the facility (kg)</Label>
               <Input
                 id="total"
                 type="number"

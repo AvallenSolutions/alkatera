@@ -24,7 +24,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { Building2, Users, FileCheck, ArrowRight, ArrowLeft, Check, Lock } from "lucide-react";
+import { Building2, Users, FileCheck, ArrowRight, ArrowLeft, Check, Lock, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { FacilityArchetypeProxyForm } from "@/components/facilities/FacilityArchetypeProxyForm";
+import type { DataCollectionMode, HybridOverrides } from "@/lib/facility-archetypes";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 import { COUNTRIES } from "@/lib/countries";
@@ -84,6 +88,15 @@ export function AddFacilityWizard({
   const [dataContracts, setDataContracts] = useState<DataContract[]>([]);
   const [selectedUtilityTypes, setSelectedUtilityTypes] = useState<Set<string>>(new Set());
 
+  // Data sourcing mode for third-party facilities. Owned facilities always
+  // capture primary data. For third-party: user declares up-front whether the
+  // facility can supply primary data; if not, they pick an industry archetype
+  // whose intensities will auto-seed every LCA allocation for this facility.
+  const [defaultDataMode, setDefaultDataMode] = useState<DataCollectionMode>('primary');
+  const [defaultArchetypeId, setDefaultArchetypeId] = useState<string | null>(null);
+  const [defaultProxyJustification, setDefaultProxyJustification] = useState('');
+  const [defaultHybridOverrides, setDefaultHybridOverrides] = useState<HybridOverrides>({});
+
   const handleNext = () => {
     if (step === 1 && !operationalControl) {
       toast.error('Please select who operates this facility');
@@ -105,9 +118,22 @@ export function AddFacilityWizard({
       }
     }
 
-    if (step === 3 && dataContracts.length === 0) {
-      toast.error('Please select at least one data source');
-      return;
+    if (step === 3) {
+      // Third-party + archetype_proxy/hybrid: require archetype + justification,
+      // skip data-contracts requirement entirely.
+      if (operationalControl === 'third_party' && defaultDataMode !== 'primary') {
+        if (!defaultArchetypeId) {
+          toast.error('Please choose an industry archetype');
+          return;
+        }
+        if (defaultDataMode === 'archetype_proxy' && !defaultProxyJustification.trim()) {
+          toast.error('Please explain why primary data cannot be obtained');
+          return;
+        }
+      } else if (dataContracts.length === 0) {
+        toast.error('Please select at least one data source');
+        return;
+      }
     }
 
     setStep(step + 1);
@@ -195,13 +221,26 @@ export function AddFacilityWizard({
           location_address: addressLine1,
           latitude: addressLat,
           longitude: addressLng,
+          default_data_collection_mode:
+            operationalControl === 'third_party' ? defaultDataMode : 'primary',
+          default_archetype_id:
+            operationalControl === 'third_party' && defaultDataMode !== 'primary'
+              ? defaultArchetypeId
+              : null,
+          default_proxy_justification:
+            operationalControl === 'third_party' && defaultDataMode !== 'primary'
+              ? defaultProxyJustification || null
+              : null,
         })
         .select()
         .single();
 
       if (facilityError) throw facilityError;
 
-      if (dataContracts.length > 0) {
+      const usingArchetype =
+        operationalControl === 'third_party' && defaultDataMode !== 'primary';
+
+      if (!usingArchetype && dataContracts.length > 0) {
         const contracts = dataContracts.map(dc => ({
           facility_id: facility.id,
           utility_type: dc.utilityType,
@@ -338,16 +377,104 @@ export function AddFacilityWizard({
           </div>
         );
 
-      case 3:
+      case 3: {
+        const isThirdParty = operationalControl === 'third_party';
+        const usingArchetype = isThirdParty && defaultDataMode !== 'primary';
+
         return (
           <div className="space-y-6">
             <div className="text-center mb-6">
-              <h3 className="text-lg font-semibold mb-2">The Data Contract</h3>
+              <h3 className="text-lg font-semibold mb-2">
+                {isThirdParty ? 'Can this facility send you its energy and water data?' : 'What data will this facility track?'}
+              </h3>
               <p className="text-sm text-muted-foreground">
-                What data will this facility provide?
+                {isThirdParty
+                  ? 'Pick the option that best matches what your contract facility can actually share with you.'
+                  : 'Tick everything this facility has meter readings or bills for.'}
               </p>
             </div>
 
+            {isThirdParty && (
+              <RadioGroup
+                value={defaultDataMode}
+                onValueChange={(v) => setDefaultDataMode(v as DataCollectionMode)}
+                className="space-y-3"
+              >
+                <Card
+                  className={`cursor-pointer transition-all ${defaultDataMode === 'primary' ? 'ring-2 ring-primary' : ''}`}
+                  onClick={() => setDefaultDataMode('primary')}
+                >
+                  <CardContent className="p-4 flex items-start gap-3">
+                    <RadioGroupItem value="primary" id="mode-primary" className="mt-1" />
+                    <div className="flex-1">
+                      <Label htmlFor="mode-primary" className="font-medium cursor-pointer">
+                        Yes, they send me real energy and water data
+                      </Label>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Pick this if the facility shares monthly bills, meter readings, or a spreadsheet of their energy and water use. This gives you the most accurate footprint.
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1 italic">
+                        Example: your canning partner emails you their electricity kWh every month.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card
+                  className={`cursor-pointer transition-all ${defaultDataMode === 'archetype_proxy' ? 'ring-2 ring-primary' : ''}`}
+                  onClick={() => setDefaultDataMode('archetype_proxy')}
+                >
+                  <CardContent className="p-4 flex items-start gap-3">
+                    <RadioGroupItem value="archetype_proxy" id="mode-proxy" className="mt-1" />
+                    <div className="flex-1">
+                      <Label htmlFor="mode-proxy" className="font-medium cursor-pointer">
+                        No, use an industry average instead
+                      </Label>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Pick this if the facility can&apos;t or won&apos;t share data. We&apos;ll use a published industry average for this type of facility so you can still run an LCA. Your report will clearly label this as an estimate.
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1 italic">
+                        Example: a shared canning line that runs many brands and can&apos;t separate your production from everyone else&apos;s.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card
+                  className={`cursor-pointer transition-all ${defaultDataMode === 'hybrid' ? 'ring-2 ring-primary' : ''}`}
+                  onClick={() => setDefaultDataMode('hybrid')}
+                >
+                  <CardContent className="p-4 flex items-start gap-3">
+                    <RadioGroupItem value="hybrid" id="mode-hybrid" className="mt-1" />
+                    <div className="flex-1">
+                      <Label htmlFor="mode-hybrid" className="font-medium cursor-pointer">
+                        Partly — they share some data but not all of it
+                      </Label>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Pick this if you have a few real numbers (say, water use) but are missing others (like electricity). We&apos;ll use the industry average to fill the gaps.
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1 italic">
+                        Example: they send you a water meter total but no electricity breakdown.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </RadioGroup>
+            )}
+
+            {usingArchetype && (
+              <FacilityArchetypeProxyForm
+                mode={defaultDataMode as 'archetype_proxy' | 'hybrid'}
+                selectedArchetypeId={defaultArchetypeId}
+                onArchetypeChange={setDefaultArchetypeId}
+                justification={defaultProxyJustification}
+                onJustificationChange={setDefaultProxyJustification}
+                hybridOverrides={defaultHybridOverrides}
+                onHybridOverridesChange={setDefaultHybridOverrides}
+              />
+            )}
+
+            {!usingArchetype && (
             <div className="space-y-3 max-h-[400px] overflow-y-auto">
               {UTILITY_TYPES.map((utility) => (
                 <Card key={utility.value}>
@@ -407,8 +534,10 @@ export function AddFacilityWizard({
                 </Card>
               ))}
             </div>
+            )}
           </div>
         );
+      }
 
       case 4:
         return (
@@ -454,8 +583,17 @@ export function AddFacilityWizard({
               </div>
 
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Data Contract</p>
-                <p className="text-sm">{dataContracts.length} utility type(s) selected</p>
+                <p className="text-sm font-medium text-muted-foreground">How data will be collected</p>
+                {operationalControl === 'third_party' && defaultDataMode !== 'primary' ? (
+                  <p className="text-sm">
+                    {defaultDataMode === 'archetype_proxy'
+                      ? 'Industry average (no real data from facility)'
+                      : 'Some real data, industry average for the rest'}
+                    {defaultArchetypeId ? ', facility type selected' : ''}
+                  </p>
+                ) : (
+                  <p className="text-sm">{dataContracts.length} type(s) of data to track</p>
+                )}
               </div>
             </div>
           </div>

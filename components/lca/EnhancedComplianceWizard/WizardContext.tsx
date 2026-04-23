@@ -437,7 +437,7 @@ export function WizardProvider({
         sb.from('products').select('*').eq('id', productId).maybeSingle(),
         sb.from('product_materials').select('*').eq('product_id', productId),
         sb.from('facility_product_assignments')
-          .select('*, facilities (id, name, operational_control, address_city, address_country)')
+          .select('*, facilities (id, name, operational_control, address_city, address_country, default_data_collection_mode, default_archetype_id, default_proxy_justification)')
           .eq('product_id', productId)
           .eq('assignment_status', 'active'),
       ]);
@@ -585,6 +585,10 @@ export function WizardProvider({
             ? String(Math.round(annualVolume * allocationPct / 100))
             : '';
 
+          const defaultMode = (f.facility as any).default_data_collection_mode || 'primary';
+          const defaultArchetypeId = (f.facility as any).default_archetype_id || undefined;
+          const defaultJustification = (f.facility as any).default_proxy_justification || undefined;
+
           if (latestSession) {
             return {
               facilityId: f.facility_id,
@@ -598,6 +602,9 @@ export function WizardProvider({
                 latestSession.total_production_volume
               ),
               selectedSessionId: latestSession.id,
+              dataCollectionMode: defaultMode,
+              archetypeId: defaultArchetypeId,
+              proxyJustification: defaultJustification,
             };
           }
           return {
@@ -609,6 +616,9 @@ export function WizardProvider({
             productionVolume: prePopulatedVolume,
             productionVolumeUnit: annualVolume ? annualUnit : 'units',
             facilityTotalProduction: '',
+            dataCollectionMode: defaultMode,
+            archetypeId: defaultArchetypeId,
+            proxyJustification: defaultJustification,
           };
         });
       }

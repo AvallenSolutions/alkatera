@@ -239,7 +239,10 @@ export function FacilityAllocationStep() {
               {/* Data collection mode selector */}
               {allocation.operationalControl === 'third_party' && (
                 <div className="space-y-2">
-                  <Label className="text-xs">Data collection mode</Label>
+                  <Label className="text-xs">How is this facility sharing their data with you?</Label>
+                  <p className="text-[11px] text-muted-foreground">
+                    We&apos;ve pre-filled this from your facility setup. Change it if things are different for this specific product.
+                  </p>
                   <RadioGroup
                     value={allocation.dataCollectionMode ?? 'primary'}
                     onValueChange={(value) =>
@@ -252,27 +255,27 @@ export function FacilityAllocationStep() {
                     <label className="flex items-start gap-2 rounded border p-2 cursor-pointer hover:bg-muted/50">
                       <RadioGroupItem value="primary" className="mt-0.5" />
                       <div className="text-xs">
-                        <div className="font-medium">Primary data</div>
+                        <div className="font-medium">Real data</div>
                         <div className="text-muted-foreground">
-                          Facility supplies energy/water figures for the period.
+                          The facility sent me actual energy and water figures.
                         </div>
                       </div>
                     </label>
                     <label className="flex items-start gap-2 rounded border p-2 cursor-pointer hover:bg-muted/50">
                       <RadioGroupItem value="archetype_proxy" className="mt-0.5" />
                       <div className="text-xs">
-                        <div className="font-medium">Archetype proxy</div>
+                        <div className="font-medium">Industry average</div>
                         <div className="text-muted-foreground">
-                          Facility cannot supply data — use industry typical values.
+                          The facility can&apos;t share data, so use a typical value for this kind of facility.
                         </div>
                       </div>
                     </label>
                     <label className="flex items-start gap-2 rounded border p-2 cursor-pointer hover:bg-muted/50">
                       <RadioGroupItem value="hybrid" className="mt-0.5" />
                       <div className="text-xs">
-                        <div className="font-medium">Hybrid</div>
+                        <div className="font-medium">Some real, some average</div>
                         <div className="text-muted-foreground">
-                          Mix what you know with archetype defaults.
+                          I have a few numbers; use the industry average for the rest.
                         </div>
                       </div>
                     </label>
