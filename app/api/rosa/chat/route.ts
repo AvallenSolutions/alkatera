@@ -29,6 +29,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { executeTool, ROSA_TOOLS, ACTION_TOOL_NAMES, type ToolContext } from '@/lib/rosa/tools';
 import { buildMemoryBlock } from '@/lib/rosa/memory';
+import { loadAttachment, toAnthropicBlock } from '@/lib/rosa/document-extraction';
 
 const ACTION_TOOLS_SET = new Set<string>(ACTION_TOOL_NAMES as readonly string[]);
 
@@ -107,14 +108,19 @@ export async function POST(request: NextRequest) {
 
   const organizationId = membership.organization_id;
 
-  let body: { conversation_id?: string; message?: string; context?: unknown };
+  let body: { conversation_id?: string; message?: string; context?: unknown; attachments?: Array<{ file_id: string }> };
   try {
     body = await request.json();
   } catch {
     return errorResponse('Invalid JSON body', 400);
   }
   const userMessage = (body?.message ?? '').toString().trim();
-  if (!userMessage) return errorResponse('message is required', 400);
+  const attachmentIds = Array.isArray(body?.attachments)
+    ? body!.attachments!.map(a => a?.file_id).filter((x): x is string => typeof x === 'string' && x.length > 0)
+    : [];
+  if (!userMessage && attachmentIds.length === 0) {
+    return errorResponse('message or attachments required', 400);
+  }
 
   // Service-role client for tool execution + persistence (RLS is irrelevant
   // once we've verified org membership; tools enforce org scoping directly).
@@ -157,11 +163,25 @@ export async function POST(request: NextRequest) {
   const memoryBlock = await buildMemoryBlock(serviceSupabase, organizationId, user.id);
   const systemPrompt = buildSystemPrompt(memoryBlock);
 
+  // Load any attachments up front so we can abort cleanly if one is missing.
+  const loadedAttachments = [] as Array<Awaited<ReturnType<typeof loadAttachment>>>;
+  for (const fileId of attachmentIds) {
+    const att = await loadAttachment(serviceSupabase, fileId, organizationId, user.id);
+    if (att) loadedAttachments.push(att);
+  }
+
+  const persistedUserContent = userMessage.length > 0
+    ? userMessage
+    : `(attached ${loadedAttachments.length} document${loadedAttachments.length === 1 ? '' : 's'})`;
+  const attachmentNote = loadedAttachments.length > 0
+    ? `\n\nAttached: ${loadedAttachments.map(a => a!.filename).join(', ')}`
+    : '';
+
   // Persist the incoming user turn before we start streaming.
   await serviceSupabase.from('gaia_messages').insert({
     conversation_id: conversationId,
     role: 'user',
-    content: userMessage,
+    content: persistedUserContent + attachmentNote,
   });
 
   const stream = new ReadableStream({
@@ -184,7 +204,18 @@ export async function POST(request: NextRequest) {
             messages.push({ role: h.role as 'user' | 'assistant', content: h.content });
           }
         }
-        messages.push({ role: 'user', content: userMessage });
+        // Current turn. If attachments are present, pass them as document/image
+        // content blocks so Rosa can see them natively; include the text too.
+        if (loadedAttachments.length > 0) {
+          const turnContent: any[] = loadedAttachments.map(a => toAnthropicBlock(a!));
+          const textPart = userMessage.length > 0
+            ? userMessage
+            : 'Please take a look at the attached document.';
+          turnContent.push({ type: 'text', text: textPart });
+          messages.push({ role: 'user', content: turnContent });
+        } else {
+          messages.push({ role: 'user', content: userMessage });
+        }
 
         const toolAudit: unknown[] = [];
         let finalText = '';

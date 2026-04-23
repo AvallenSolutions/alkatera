@@ -20,6 +20,7 @@ import { runSafeSql, SAFE_SQL_ALLOWED_TABLES } from './safe-sql';
 import { ALL_METRIC_KEYS, METRIC_DEFINITIONS, type MetricKey } from '@/lib/pulse/metric-keys';
 import { listMemories, saveMemory, type MemoryScope } from './memory';
 import { proposeAction } from './actions';
+import { loadAttachment, extractStructured } from './document-extraction';
 import { getBenchmarkForProductType } from '@/lib/industry-benchmarks';
 
 export interface ToolContext {
@@ -361,6 +362,27 @@ export const ROSA_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: 'extract_from_document',
+    description:
+      "Extract structured fields from a document the user has attached (utility bill, supplier spec sheet, LCA report, invoice, meter reading photo). Pass the file_id the user uploaded and the list of field names you want. Returns a flat JSON object. Use this when the user says 'read this bill' or 'pull the numbers out of this PDF', then pair with a propose_* action to actually log what you extracted.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        file_id: { type: 'string', description: 'The file_id returned from the upload (e.g. "org/user/uuid-bill.pdf").' },
+        fields: {
+          type: 'array',
+          items: { type: 'string' },
+          description: "Field names to extract. For a utility bill: ['supplier_name','account_number','period_start','period_end','quantity_value','quantity_unit','utility_type','total_cost']. Empty array = let Rosa pick.",
+        },
+        document_kind: {
+          type: 'string',
+          description: "Human-readable hint for the extractor, e.g. 'utility bill', 'supplier spec sheet', 'LCA report'.",
+        },
+      },
+      required: ['file_id'],
+    },
+  },
+  {
     name: 'propose_add_supplier',
     description:
       "Propose adding a new supplier record. Writes to suppliers after user confirmation. Useful when the user mentions a partner by name that isn't on the list yet.",
@@ -448,6 +470,8 @@ export async function executeTool(
       case 'propose_set_target':
       case 'propose_add_supplier':
         return await toolProposeAction(ctx, name as ActionToolName, input as Record<string, unknown>);
+      case 'extract_from_document':
+        return await toolExtractFromDocument(ctx, input as { file_id: string; fields?: string[]; document_kind?: string });
       default:
         return {
           is_error: true,
@@ -1251,6 +1275,43 @@ async function toolProposeAction(
       note: 'Tell the user what you are about to do and wait for them to click Confirm. Do not claim the action is done.',
     }),
     audit: { tool: toolName, pending_action_id: res.id, preview },
+  };
+}
+
+// ─── Document intelligence ──────────────────────────────────────────────────
+
+async function toolExtractFromDocument(
+  ctx: ToolContext,
+  input: { file_id: string; fields?: string[]; document_kind?: string },
+): Promise<ToolResult> {
+  if (!input?.file_id) {
+    return { is_error: true, content: 'file_id is required', audit: { tool: 'extract_from_document', error: 'missing_file_id' } };
+  }
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  if (!apiKey) {
+    return { is_error: true, content: 'Anthropic API key not configured', audit: { tool: 'extract_from_document', error: 'no_api_key' } };
+  }
+  const attachment = await loadAttachment(ctx.supabase, input.file_id, ctx.organizationId, ctx.userId);
+  if (!attachment) {
+    return { is_error: true, content: 'File not found or not accessible', audit: { tool: 'extract_from_document', error: 'not_found', file_id: input.file_id } };
+  }
+  const res = await extractStructured(apiKey, attachment, input.fields ?? [], input.document_kind);
+  if (!res.ok) {
+    return { is_error: true, content: res.error, audit: { tool: 'extract_from_document', error: res.error, file_id: input.file_id } };
+  }
+  return {
+    is_error: false,
+    content: JSON.stringify({
+      file_id: input.file_id,
+      filename: attachment.filename,
+      media_type: attachment.media_type,
+      extracted: res.data,
+    }),
+    audit: {
+      tool: 'extract_from_document',
+      file_id: input.file_id,
+      field_count: Object.keys(res.data).length,
+    },
   };
 }
 

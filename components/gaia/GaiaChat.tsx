@@ -36,6 +36,8 @@ import {
   ArchiveRestore,
   Search,
   X,
+  Paperclip,
+  File as FileIcon,
 } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { ActionProposalCard } from '@/components/gaia/ActionProposalCard';
@@ -52,6 +54,8 @@ import {
   unarchiveConversation,
   searchConversations,
   sendRosaQueryStreamV2,
+  uploadRosaFile,
+  type RosaUpload,
   submitFeedback,
   hasSubmittedFeedback,
   exportConversationAsMarkdown,
@@ -233,6 +237,9 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
   const [streamingContent, setStreamingContent] = useState('');
   const [streamingChartData, setStreamingChartData] = useState<RosaChartData | null>(null);
   const [streamingActionProposals, setStreamingActionProposals] = useState<Array<{ id: string; tool_name?: string; preview: string }>>([]);
+  const [pendingAttachments, setPendingAttachments] = useState<RosaUpload[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(true);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState<Record<string, boolean>>({});
@@ -456,8 +463,26 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
     searchInputRef.current?.focus();
   }
 
+  async function handleAttachFile(file: File) {
+    if (uploading || isSending || isStreaming) return;
+    setUploading(true);
+    try {
+      const res = await uploadRosaFile(file);
+      setPendingAttachments(prev => [...prev, res]);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
+  function removeAttachment(fileId: string) {
+    setPendingAttachments(prev => prev.filter(a => a.file_id !== fileId));
+  }
+
   async function handleSend() {
-    if (!input.trim() || isSending || isStreaming || !currentOrganization?.id) return;
+    if ((!input.trim() && pendingAttachments.length === 0) || isSending || isStreaming || !currentOrganization?.id) return;
 
     const userMessage = input.trim();
     setInput('');
@@ -495,10 +520,13 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
       setIsStreaming(true);
       setIsSending(false);
 
+      const attachmentsForSend = pendingAttachments.map(a => ({ file_id: a.file_id }));
+      setPendingAttachments([]);
       for await (const event of sendRosaQueryStreamV2({
         message: userMessage,
         conversation_id: activeConversation?.id,
         organization_id: currentOrganization.id,
+        attachments: attachmentsForSend,
       })) {
         switch (event.type) {
           case 'start':
@@ -1262,35 +1290,83 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
 
         {/* Input */}
         <div className="p-4 border-t bg-background/80 backdrop-blur-sm">
-          <div className="flex gap-2 max-w-3xl mx-auto">
-            <div className="flex-1 relative">
-              <Input
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
+          <div className="max-w-3xl mx-auto space-y-2">
+            {pendingAttachments.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {pendingAttachments.map(a => (
+                  <div
+                    key={a.file_id}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-border bg-muted text-xs"
+                  >
+                    <FileIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="truncate max-w-[220px]">{a.filename}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(a.file_id)}
+                      className="text-muted-foreground hover:text-foreground"
+                      aria-label={`Remove ${a.filename}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/pdf,image/png,image/jpeg,image/webp,image/gif"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void handleAttachFile(f);
                 }}
-                placeholder="Ask Rosa anything..."
-                disabled={isSending || isStreaming}
-                className="pr-4 rounded-xl border-border/60 focus:border-neon-lime/50 focus:ring-neon-lime/20 transition-colors"
               />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="rounded-xl h-10 w-10"
+                disabled={uploading || isSending || isStreaming}
+                onClick={() => fileInputRef.current?.click()}
+                title="Attach a file for Rosa to read"
+              >
+                {uploading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Paperclip className="h-4 w-4" />
+                )}
+              </Button>
+              <div className="flex-1 relative">
+                <Input
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend();
+                    }
+                  }}
+                  placeholder={pendingAttachments.length > 0 ? 'Add a note or just press send...' : 'Ask Rosa anything...'}
+                  disabled={isSending || isStreaming}
+                  className="pr-4 rounded-xl border-border/60 focus:border-neon-lime/50 focus:ring-neon-lime/20 transition-colors"
+                />
+              </div>
+              <Button
+                onClick={handleSend}
+                disabled={(!input.trim() && pendingAttachments.length === 0) || isSending || isStreaming}
+                size="icon"
+                className="rounded-xl bg-neon-lime hover:bg-neon-lime/90 text-black shadow-md shadow-neon-lime/20 hover:shadow-neon-lime/30 transition-all h-10 w-10"
+              >
+                {isSending || isStreaming ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+              </Button>
             </div>
-            <Button
-              onClick={handleSend}
-              disabled={!input.trim() || isSending || isStreaming}
-              size="icon"
-              className="rounded-xl bg-neon-lime hover:bg-neon-lime/90 text-black shadow-md shadow-neon-lime/20 hover:shadow-neon-lime/30 transition-all h-10 w-10"
-            >
-              {isSending || isStreaming ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </Button>
           </div>
         </div>
       </div>

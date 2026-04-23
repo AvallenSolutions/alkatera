@@ -581,7 +581,7 @@ export const sendGaiaQueryStream = sendRosaQueryStream;
  * event types: 'tool_use' / 'tool_result' / 'action_proposal'.
  */
 export async function* sendRosaQueryStreamV2(
-  request: RosaQueryRequest,
+  request: RosaQueryRequest & { attachments?: Array<{ file_id: string }> },
 ): AsyncGenerator<RosaStreamEvent> {
   const response = await fetch('/api/rosa/chat', {
     method: 'POST',
@@ -589,6 +589,7 @@ export async function* sendRosaQueryStreamV2(
     body: JSON.stringify({
       message: request.message,
       conversation_id: request.conversation_id,
+      attachments: request.attachments ?? [],
     }),
   });
 
@@ -681,6 +682,24 @@ export async function* sendRosaQueryStreamV2(
 
   // If the stream closed without a final 'done', nothing else to do.
   void finalText;
+}
+
+export interface RosaUpload {
+  file_id: string;
+  filename: string;
+  media_type: string;
+  size_bytes: number;
+}
+
+export async function uploadRosaFile(file: File): Promise<RosaUpload> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch('/api/rosa/uploads', { method: 'POST', body: form });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(json.error || `Upload failed: ${res.status}`);
+  }
+  return json as RosaUpload;
 }
 
 export async function confirmRosaAction(actionId: string): Promise<{ ok: boolean; result?: any; error?: string }> {
