@@ -8,6 +8,7 @@
 [build.environment]
   NODE_VERSION = "18"
   NEXT_TELEMETRY_DISABLED = "1"
+  NODE_OPTIONS = "--max-old-space-size=4096"
 
 # Headers for security and performance
 [[headers]]
