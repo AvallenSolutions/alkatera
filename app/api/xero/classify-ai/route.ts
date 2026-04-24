@@ -3,6 +3,9 @@ import { getSupabaseServerClient } from '@/lib/supabase/server-client'
 import { getMemberRole } from '@/app/api/stripe/_helpers/get-member-role'
 import { classifyWithAI } from '@/lib/xero/ai-classifier'
 
+export const runtime = 'nodejs'
+export const maxDuration = 60
+
 interface ClassifyRequest {
   organizationId: string
   transactions: Array<{

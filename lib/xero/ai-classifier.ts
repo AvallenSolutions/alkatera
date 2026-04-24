@@ -1,5 +1,6 @@
 import 'server-only'
-import { CLAUDE_DEFAULT_MODEL } from '../claude/models'
+
+const CLASSIFIER_MODEL = 'claude-haiku-4-5-20251001'
 
 export interface AIClassifyResult {
   transactionId: string
@@ -83,12 +84,8 @@ export async function classifyWithAI(
     batches.push(transactions.slice(i, i + BATCH_SIZE))
   }
 
-  const allResults: AIClassifyResult[] = []
-
-  for (const batch of batches) {
-    const batchResults = await classifyBatch(client, batch)
-    allResults.push(...batchResults)
-  }
+  const batchResults = await Promise.all(batches.map(batch => classifyBatch(client, batch)))
+  const allResults: AIClassifyResult[] = batchResults.flat()
 
   return allResults.map(r => ({
     ...r,
@@ -108,7 +105,7 @@ async function classifyBatch(
   ).join('\n')
 
   const response = await client.messages.create({
-    model: CLAUDE_DEFAULT_MODEL,
+    model: CLASSIFIER_MODEL,
     max_tokens: 8000,
     system: SYSTEM_PROMPT,
     messages: [
