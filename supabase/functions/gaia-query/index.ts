@@ -639,14 +639,29 @@ async function fetchOrganizationContext(
       fetches.push({
         key: 'corporate_emissions',
         promise: (async () => {
-          const { data: corporateEmissions, error: emissionsError } = await supabase
-            .rpc('calculate_gaia_corporate_emissions', {
-              p_organization_id: organizationId,
-              p_year: currentYear,
+          // Replaces the legacy calculate_gaia_corporate_emissions RPC, which
+          // ignored upgrade_status, missed several Scope 3 categories, and did
+          // not honour the coverage-resolver / inventory-ledger suppression
+          // rules. The Next.js internal endpoint is the one source of truth.
+          const siteUrl = (Deno.env.get('SITE_URL') || 'https://alkatera.com').replace(/\/$/, '');
+          const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+          let corporateEmissions: any = null;
+          try {
+            const emRes = await fetch(`${siteUrl}/api/internal/authoritative-emissions`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-internal-key': serviceKey,
+              },
+              body: JSON.stringify({ organizationId, year: currentYear }),
             });
-
-          if (emissionsError) {
-            console.error('[Rosa] Error fetching corporate emissions:', emissionsError);
+            if (!emRes.ok) {
+              console.error('[Rosa] Authoritative emissions endpoint returned', emRes.status);
+              return;
+            }
+            corporateEmissions = await emRes.json();
+          } catch (err) {
+            console.error('[Rosa] Error fetching corporate emissions:', err);
             return;
           }
 
@@ -673,7 +688,7 @@ async function fetchOrganizationContext(
             }
             contextParts.push(`\n*Source: GHG Protocol calculation (${corporateEmissions.methodology})*`);
             contextParts.push(`*Calculated: ${new Date(corporateEmissions.calculation_date).toLocaleDateString()}*`);
-            dataSources.push({ table: 'calculate_gaia_corporate_emissions', description: 'Authoritative corporate emissions (GHG Protocol)', recordCount: 1 });
+            dataSources.push({ table: 'authoritative_emissions_api', description: 'Authoritative corporate emissions (GHG Protocol, resolver-aware)', recordCount: 1 });
           } else {
             contextParts.push(`- No corporate emissions calculated yet`);
             contextParts.push(`- To calculate emissions, add data in: Facility utility data (Scope 1 & 2), Fleet activities (Scope 1), Product LCAs (Scope 3), Corporate overheads (Scope 3)`);
