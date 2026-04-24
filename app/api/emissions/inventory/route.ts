@@ -49,7 +49,7 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ error: orgError || 'No organisation' }, { status: 400 })
     }
 
-    const [ingredientsRes, linksRes, xeroRes, receiptsRes] = await Promise.all([
+    const [ingredientsRes, linksRes, xeroRes, receiptsRes, consumptionsRes] = await Promise.all([
       client
         .from('ingredients')
         .select('id, name, unit')
@@ -74,6 +74,12 @@ export async function GET(_request: NextRequest) {
         .eq('organization_id', organizationId)
         .order('received_date', { ascending: false })
         .limit(500),
+      client
+        .from('material_consumptions')
+        .select('id, consumption_date, consumed_quantity, consumed_emission_kg, method, ingredients(name), production_logs(date, products(name))')
+        .eq('organization_id', organizationId)
+        .order('consumption_date', { ascending: false })
+        .limit(100),
     ])
 
     const linkedIds = new Set(
@@ -145,7 +151,33 @@ export async function GET(_request: NextRequest) {
       }
     })
 
-    return NextResponse.json({ ingredients, unlinkedXero, receipts })
+    const consumptions = (consumptionsRes.data || []).map((c) => {
+      const rec = c as {
+        id: string
+        consumption_date: string
+        consumed_quantity: number
+        consumed_emission_kg: number | null
+        method: string
+        ingredients: { name: string } | { name: string }[] | null
+        production_logs: { date: string; products: { name: string } | { name: string }[] | null } | { date: string; products: { name: string } | { name: string }[] | null }[] | null
+      }
+      const ingName = Array.isArray(rec.ingredients)
+        ? rec.ingredients[0]?.name ?? null
+        : rec.ingredients?.name ?? null
+      const pl = Array.isArray(rec.production_logs) ? rec.production_logs[0] : rec.production_logs
+      const prod = pl ? (Array.isArray(pl.products) ? pl.products[0] : pl.products) : null
+      return {
+        id: rec.id,
+        consumptionDate: rec.consumption_date,
+        consumedQuantity: Number(rec.consumed_quantity),
+        consumedEmissionKg: rec.consumed_emission_kg !== null ? Number(rec.consumed_emission_kg) : 0,
+        method: rec.method,
+        ingredientName: ingName,
+        productName: prod?.name ?? null,
+      }
+    })
+
+    return NextResponse.json({ ingredients, unlinkedXero, receipts, consumptions })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to load inventory'
     console.error('[inventory GET] Error:', message)

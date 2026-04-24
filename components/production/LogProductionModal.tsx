@@ -179,12 +179,42 @@ export function LogProductionModal({
         if (error) throw error;
         toast.success("Production log updated successfully");
       } else {
-        const { error } = await supabase
+        const { data: inserted, error } = await supabase
           .from("production_logs")
-          .insert([logData]);
+          .insert([logData])
+          .select("id")
+          .single();
 
         if (error) throw error;
         toast.success("Production logged successfully");
+
+        if (inserted?.id) {
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const res = await fetch("/api/emissions/reconcile-consumption", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${session?.access_token}`,
+              },
+              body: JSON.stringify({ productionLogId: inserted.id }),
+            });
+            const recData = await res.json().catch(() => ({}));
+            if (res.ok && recData.status === "reconciled") {
+              const drawn = (recData.lines || []).filter((l: any) => l.drawCount > 0).length;
+              const shortfallLines = (recData.lines || []).filter((l: any) => l.shortfall > 0);
+              if (drawn > 0) {
+                toast.success(
+                  shortfallLines.length > 0
+                    ? `Drew inventory for ${drawn} ingredient(s). ${shortfallLines.length} ran short — book emissions on purchase date for the gap.`
+                    : `Drew inventory for ${drawn} ingredient(s) via FIFO.`,
+                );
+              }
+            }
+          } catch (recErr) {
+            console.error("Reconciliation failed:", recErr);
+          }
+        }
       }
 
       onSuccess();

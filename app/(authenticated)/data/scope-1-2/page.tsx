@@ -225,6 +225,9 @@ export default function CompanyEmissionsPage() {
     totalScope3Kg: xeroScope3Kg,
     suppressedCount: xeroSuppressedCount,
     suppressedKg: xeroSuppressedKg,
+    suppressedByLcaCount: xeroSuppressedByLcaCount,
+    suppressedByInventoryCount: xeroSuppressedByInventoryCount,
+    inventoryLedgerKg: xeroInventoryLedgerKg,
   } = useXeroTransactions(currentOrganization?.id, selectedYearStart, selectedYearEnd);
 
   // Trend analytics state
@@ -1396,13 +1399,38 @@ export default function CompanyEmissionsPage() {
 
                     {xeroSuppressedCount > 0 && (
                       <Card className="border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30">
-                        <CardContent className="py-3 text-sm text-amber-900 dark:text-amber-200">
-                          <span className="font-medium">
-                            {xeroSuppressedCount} Xero transaction{xeroSuppressedCount === 1 ? '' : 's'} hidden
-                          </span>{' '}
-                          ({(xeroSuppressedKg / 1000).toFixed(2)} tCO₂e) because a higher-quality source
-                          (utility bill, corporate overhead entry) already covers the same month. This
-                          prevents double-counting per GHG Protocol.
+                        <CardContent className="py-3 text-sm text-amber-900 dark:text-amber-200 space-y-1.5">
+                          <div>
+                            <span className="font-medium">
+                              {xeroSuppressedCount} Xero transaction{xeroSuppressedCount === 1 ? '' : 's'} hidden
+                            </span>{' '}
+                            ({(xeroSuppressedKg / 1000).toFixed(2)} tCO&#8322;e) to prevent double-counting.
+                          </div>
+                          {(xeroSuppressedByLcaCount > 0 || xeroSuppressedByInventoryCount > 0) && (
+                            <ul className="text-xs list-disc pl-5 space-y-0.5 opacity-90">
+                              {xeroSuppressedByLcaCount > 0 && (
+                                <li>
+                                  <span className="font-medium">{xeroSuppressedByLcaCount}</span> covered by a completed product LCA (emissions already booked there).
+                                </li>
+                              )}
+                              {xeroSuppressedByInventoryCount > 0 && (
+                                <li>
+                                  <span className="font-medium">{xeroSuppressedByInventoryCount}</span> re-booked to the consumption period via the inventory ledger
+                                  {xeroInventoryLedgerKg > 0 && (
+                                    <> (+{(xeroInventoryLedgerKg / 1000).toFixed(2)} tCO&#8322;e on consumption dates)</>
+                                  )}.
+                                </li>
+                              )}
+                              {xeroSuppressedCount > xeroSuppressedByLcaCount + xeroSuppressedByInventoryCount && (
+                                <li>
+                                  <span className="font-medium">
+                                    {xeroSuppressedCount - xeroSuppressedByLcaCount - xeroSuppressedByInventoryCount}
+                                  </span>{' '}
+                                  superseded by a higher-quality source (utility bill, overhead entry) in the same month.
+                                </li>
+                              )}
+                            </ul>
+                          )}
                         </CardContent>
                       </Card>
                     )}

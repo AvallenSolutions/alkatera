@@ -29,6 +29,16 @@ interface UnlinkedXero {
   spendBasedEmissionsKg: number
 }
 
+interface ConsumptionRow {
+  id: string
+  consumptionDate: string
+  consumedQuantity: number
+  consumedEmissionKg: number
+  method: string
+  ingredientName: string | null
+  productName: string | null
+}
+
 interface ReceiptRow {
   id: string
   ingredientId: string | null
@@ -49,6 +59,7 @@ export default function InventoryLedgerPage() {
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [unlinked, setUnlinked] = useState<UnlinkedXero[]>([])
   const [receipts, setReceipts] = useState<ReceiptRow[]>([])
+  const [consumptions, setConsumptions] = useState<ConsumptionRow[]>([])
   const [linkingRow, setLinkingRow] = useState<UnlinkedXero | null>(null)
 
   const load = useCallback(async () => {
@@ -63,6 +74,7 @@ export default function InventoryLedgerPage() {
       setIngredients(data.ingredients)
       setUnlinked(data.unlinkedXero)
       setReceipts(data.receipts)
+      setConsumptions(data.consumptions || [])
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to load inventory')
     } finally {
@@ -87,6 +99,23 @@ export default function InventoryLedgerPage() {
           not the date the invoice was paid — fixing the bottles-bought-2025-
           used-2026 problem for cross-period accounting.
         </p>
+        <div className="mt-3 rounded-md border border-muted bg-muted/30 p-3 text-xs text-muted-foreground space-y-1">
+          <p className="font-medium text-foreground">How the resolver handles linked spend</p>
+          <p>
+            <span className="font-medium">Ingredient is in a completed product LCA:</span> the
+            Xero row is hidden from the corporate footprint — the LCA already books those
+            emissions, so counting the spend line too would double-count.
+          </p>
+          <p>
+            <span className="font-medium">No LCA yet:</span> the Xero row is hidden, and the
+            emission is re-booked at the consumption date via this ledger, giving you honest
+            period accounting until an LCA lands.
+          </p>
+          <p>
+            <span className="font-medium">Unlinked:</span> the Xero row keeps booking
+            spend-based emissions on the transaction date. Link it to upgrade it.
+          </p>
+        </div>
       </div>
 
       {loading ? (
@@ -218,6 +247,58 @@ export default function InventoryLedgerPage() {
                         </TableRow>
                       )
                     })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Recent consumptions</CardTitle>
+              <CardDescription>
+                Inventory drawn down by production logs via FIFO. Emissions book
+                to the consumption date, not the original purchase date.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {consumptions.length === 0 ? (
+                <div className="text-sm text-muted-foreground py-4 text-center">
+                  No consumptions yet. Log production against a product with a BOM to draw from linked inventory.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Product</TableHead>
+                      <TableHead>Ingredient</TableHead>
+                      <TableHead className="text-right">Drawn</TableHead>
+                      <TableHead className="text-right">kgCO&#8322;e</TableHead>
+                      <TableHead>Method</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {consumptions.map((c) => (
+                      <TableRow key={c.id}>
+                        <TableCell className="text-xs">
+                          {new Date(c.consumptionDate).toLocaleDateString('en-GB')}
+                        </TableCell>
+                        <TableCell className="text-sm">{c.productName || '—'}</TableCell>
+                        <TableCell className="text-sm">{c.ingredientName || '—'}</TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {c.consumedQuantity.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {c.consumedEmissionKg.toFixed(1)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-xs uppercase">
+                            {c.method}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               )}

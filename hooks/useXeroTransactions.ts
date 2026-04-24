@@ -25,6 +25,7 @@ import {
   scopeSliceForOverhead,
   scopeSliceForXero,
 } from '@/lib/emissions/slice-mapping'
+import { getLcaCoveredIngredientIds } from '@/lib/emissions/lca-coverage'
 import type { EmissionSource, ResolvedEmissionRow } from '@/lib/emissions/types'
 
 export type { XeroEntry }
@@ -46,6 +47,12 @@ interface UseXeroTransactionsResult {
   suppressedCount: number
   /** kgCO2e hidden by the resolver — useful to explain total changes to users. */
   suppressedKg: number
+  /** Xero rows suppressed because the linked ingredient is already in a completed product LCA. */
+  suppressedByLcaCount: number
+  /** Xero rows suppressed because the inventory ledger now books them at the consumption date. */
+  suppressedByInventoryCount: number
+  /** Consumption-date scope 3 emissions from the inventory ledger (products without an LCA). */
+  inventoryLedgerKg: number
   /** Whether data is still loading */
   isLoading: boolean
   /** Whether the org has an active Xero connection */
@@ -66,6 +73,9 @@ export function useXeroTransactions(
     totalScope3Kg: 0,
     suppressedCount: 0,
     suppressedKg: 0,
+    suppressedByLcaCount: 0,
+    suppressedByInventoryCount: 0,
+    inventoryLedgerKg: 0,
     isLoading: true,
     hasConnection: false,
   })
@@ -125,6 +135,9 @@ export function useXeroTransactions(
           totalScope3Kg: 0,
           suppressedCount: 0,
           suppressedKg: 0,
+          suppressedByLcaCount: 0,
+          suppressedByInventoryCount: 0,
+          inventoryLedgerKg: 0,
           isLoading: false,
           hasConnection: true,
         })
@@ -135,7 +148,7 @@ export function useXeroTransactions(
       const facilityIds = (facilitiesRes.data || []).map((f: { id: string }) => f.id)
       const reportIds = (reportsRes.data || []).map((r: { id: string }) => r.id)
 
-      const [utilityRes, overheadRes] = await Promise.all([
+      const [utilityRes, overheadRes, linksRes, consumptionsRes, lcaCoveredIds] = await Promise.all([
         facilityIds.length > 0
           ? supabase
               .from('utility_data_entries')
@@ -150,19 +163,67 @@ export function useXeroTransactions(
               .select('id, category, material_type, entry_date, computed_co2e')
               .in('report_id', reportIds)
           : Promise.resolve({ data: [] }),
+        supabase
+          .from('material_ingredient_links')
+          .select('xero_transaction_id, ingredient_id')
+          .eq('organization_id', organizationId),
+        supabase
+          .from('material_consumptions')
+          .select('id, ingredient_id, consumed_emission_kg, consumption_date')
+          .eq('organization_id', organizationId)
+          .gte('consumption_date', yearStart)
+          .lte('consumption_date', yearEnd),
+        getLcaCoveredIngredientIds(supabase, organizationId),
       ])
+
+      const linkedIngredientByTxId = new Map<string, string>()
+      for (const l of (linksRes.data || []) as Array<{ xero_transaction_id: string; ingredient_id: string }>) {
+        linkedIngredientByTxId.set(l.xero_transaction_id, l.ingredient_id)
+      }
 
       // Build candidate ResolvedEmissionRow[] for all three sources
       const rows: ResolvedEmissionRow[] = []
 
       for (const tx of xeroData) {
         if (!tx.emission_category || !tx.spend_based_emissions_kg) continue
+        const linkedIngredientId = linkedIngredientByTxId.get(tx.id) || null
+        let preSuppressed = false
+        let preSuppressedBy: EmissionSource | null = null
+        if (linkedIngredientId) {
+          if (lcaCoveredIds.has(linkedIngredientId)) {
+            preSuppressed = true
+            preSuppressedBy = 'product_lca'
+          } else {
+            preSuppressed = true
+            preSuppressedBy = 'inventory_ledger'
+          }
+        }
         rows.push({
           source: 'xero_transactions',
           sourceRowId: tx.id,
           scopeSlice: scopeSliceForXero(tx.emission_category),
           period: periodFromDate(tx.transaction_date),
           kgCO2e: Math.abs(Number(tx.spend_based_emissions_kg) || 0),
+          suppressed: preSuppressed,
+          suppressedBy: preSuppressedBy,
+        })
+      }
+
+      for (const c of (consumptionsRes.data || []) as Array<{
+        id: string
+        ingredient_id: string
+        consumed_emission_kg: number | null
+        consumption_date: string
+      }>) {
+        if (lcaCoveredIds.has(c.ingredient_id)) continue
+        const kg = Number(c.consumed_emission_kg) || 0
+        if (kg <= 0) continue
+        rows.push({
+          source: 'inventory_ledger',
+          sourceRowId: c.id,
+          scopeSlice: 'scope3.products',
+          period: periodFromDate(c.consumption_date),
+          kgCO2e: kg,
           suppressed: false,
           suppressedBy: null,
         })
@@ -212,14 +273,24 @@ export function useXeroTransactions(
 
       const resolved = resolveSuppressions(rows)
 
-      const suppressedXeroIds = new Set<string>(
-        resolved
-          .filter((r: ResolvedEmissionRow) => r.source === ('xero_transactions' as EmissionSource) && r.suppressed)
-          .map((r: ResolvedEmissionRow) => r.sourceRowId),
+      const suppressedXeroRows = resolved.filter(
+        (r: ResolvedEmissionRow) => r.source === ('xero_transactions' as EmissionSource) && r.suppressed,
       )
-
-      const suppressedKg = resolved
-        .filter((r: ResolvedEmissionRow) => r.source === ('xero_transactions' as EmissionSource) && r.suppressed)
+      const suppressedXeroIds = new Set<string>(
+        suppressedXeroRows.map((r: ResolvedEmissionRow) => r.sourceRowId),
+      )
+      const suppressedKg = suppressedXeroRows.reduce(
+        (s: number, r: ResolvedEmissionRow) => s + r.kgCO2e,
+        0,
+      )
+      const suppressedByLcaCount = suppressedXeroRows.filter(
+        (r: ResolvedEmissionRow) => r.suppressedBy === 'product_lca',
+      ).length
+      const suppressedByInventoryCount = suppressedXeroRows.filter(
+        (r: ResolvedEmissionRow) => r.suppressedBy === 'inventory_ledger',
+      ).length
+      const inventoryLedgerKg = resolved
+        .filter((r: ResolvedEmissionRow) => r.source === 'inventory_ledger' && !r.suppressed)
         .reduce((s: number, r: ResolvedEmissionRow) => s + r.kgCO2e, 0)
 
       const keptData = xeroData.filter(tx => !suppressedXeroIds.has(tx.id))
@@ -256,9 +327,12 @@ export function useXeroTransactions(
         scope2Entries: scope2,
         totalScope1Kg: totalScope1,
         totalScope2Kg: totalScope2,
-        totalScope3Kg: totalScope3,
+        totalScope3Kg: totalScope3 + inventoryLedgerKg,
         suppressedCount: suppressedXeroIds.size,
         suppressedKg,
+        suppressedByLcaCount,
+        suppressedByInventoryCount,
+        inventoryLedgerKg,
         isLoading: false,
         hasConnection: true,
       })
