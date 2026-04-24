@@ -43,6 +43,7 @@ import { toast } from 'sonner'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
 import { CATEGORY_LABELS, CLASSIFICATION_SOURCE_LABELS } from '@/lib/xero/category-labels'
+import { classifyTransactionsChunked } from '@/lib/xero/classify-ai-client'
 
 interface SupplierSummary {
   contactName: string
@@ -376,24 +377,16 @@ export function SupplierClassificationPanel({ onClassified }: SupplierClassifica
         return true
       })
 
-      const res = await fetch('/api/xero/classify-ai', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session?.access_token}`,
-        },
-        body: JSON.stringify({
-          organizationId: orgId,
-          transactions: representative.map(tx => ({
-            id: tx.id,
-            contactName: tx.xero_contact_name,
-            description: tx.description,
-            amount: tx.amount,
-          })),
-        }),
+      await classifyTransactionsChunked({
+        organizationId: orgId,
+        accessToken: session?.access_token,
+        transactions: representative.map(tx => ({
+          id: tx.id,
+          contactName: tx.xero_contact_name,
+          description: tx.description,
+          amount: tx.amount,
+        })),
       })
-      if (!res.ok) throw new Error('AI classification failed')
-      await res.json()
       await fetchSuppliers() // AI suggestions are persisted server-side
       toast.success('AI suggestions ready. Review them below.')
       setReviewMode(true)

@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
 import { CATEGORY_LABELS } from '@/lib/xero/category-labels'
+import { classifyTransactionsChunked } from '@/lib/xero/classify-ai-client'
 
 interface UnclassifiedTransaction {
   id: string
@@ -87,26 +88,15 @@ export function AIClassificationPanel() {
 
     setIsClassifying(true)
     try {
-      const response = await fetch('/api/xero/classify-ai', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          organizationId: currentOrganization.id,
-          transactions: unclassified.map(t => ({
-            id: t.id,
-            contactName: t.contactName,
-            description: t.description,
-            amount: t.amount,
-          })),
-        }),
-      })
-
-      if (!response.ok) {
-        const err = await response.json()
-        throw new Error(err.error || 'Classification failed')
-      }
-
-      const { results } = await response.json() as { results: AISuggestion[] }
+      const { results } = await classifyTransactionsChunked({
+        organizationId: currentOrganization.id,
+        transactions: unclassified.map(t => ({
+          id: t.id,
+          contactName: t.contactName,
+          description: t.description,
+          amount: t.amount,
+        })),
+      }) as { results: AISuggestion[] }
       const newSuggestions = new Map<string, AISuggestion>()
       for (const r of results) {
         if (r.suggestedCategory) {

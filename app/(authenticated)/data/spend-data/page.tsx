@@ -19,6 +19,7 @@ import { SyncHistoryPanel } from '@/components/xero/SyncHistoryPanel'
 import { TransactionBrowser } from '@/components/xero/TransactionBrowser'
 import { SupplierRulesManager } from '@/components/xero/SupplierRulesManager'
 import { DataQualityProgress } from '@/components/xero/DataQualityProgress'
+import { SyncDataButton } from '@/components/xero/SyncDataButton'
 import { useSpendInboxState } from '@/hooks/useSpendInboxState'
 import { CheckCircle2, Circle, Loader2, Plug, Tag, ArrowUpCircle, Settings2 } from 'lucide-react'
 
@@ -67,13 +68,18 @@ export default function SpendDataPage() {
   return (
     <FeatureGate feature="xero_integration_beta">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-            Spend Data
-          </h1>
-          <p className="text-sm text-muted-foreground mt-2">
-            Turn your Xero transactions into activity-based emissions data, step by step.
-          </p>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+              Spend Data
+            </h1>
+            <p className="text-sm text-muted-foreground mt-2">
+              Turn your Xero transactions into activity-based emissions data, step by step.
+            </p>
+          </div>
+          {state.connected && (
+            <SyncDataButton variant="outline" size="sm" onComplete={state.refetch} />
+          )}
         </div>
 
         <DataQualityProgress />
