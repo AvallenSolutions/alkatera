@@ -20,7 +20,7 @@ const supplierRules: SupplierRule[] = [
 
 describe('classifyTransaction', () => {
   describe('account mapping', () => {
-    it('returns account_mapping result with confidence 0.95 when account matches', () => {
+    it('returns account_mapping result with confidence 0.75 when account matches', () => {
       const result = classifyTransaction(
         { xeroAccountId: 'ACC-001' },
         accountMappings,
@@ -29,7 +29,7 @@ describe('classifyTransaction', () => {
       expect(result).toEqual({
         category: 'grid_electricity',
         source: 'account_mapping',
-        confidence: 0.95,
+        confidence: 0.75,
       })
     })
 

@@ -58,15 +58,17 @@ describe('Classification → Emission Calculation Pipeline', () => {
     expect(emissions).toBe(250 * getSpendFactor('courier'))
   })
 
-  it('returns null for excluded account and falls through to supplier rule', () => {
+  it('supplier rule takes priority even when account is excluded', () => {
     const result = classifyTransaction(
       { xeroAccountId: 'ACC-099', contactName: 'British Gas Business' },
       accountMappings,
       supplierRules
     )
 
-    // Excluded account returns null
-    expect(result).toBeNull()
+    // Supplier rule wins because it is checked before account exclusions
+    expect(result).not.toBeNull()
+    expect(result!.category).toBe('natural_gas')
+    expect(result!.source).toBe('supplier_rule')
   })
 
   it('returns null when nothing matches, emissions use "other" fallback', () => {

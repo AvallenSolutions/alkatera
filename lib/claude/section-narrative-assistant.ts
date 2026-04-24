@@ -1,3 +1,4 @@
+import { CLAUDE_DEFAULT_MODEL } from './models'
 /**
  * Section Narrative Assistant
  *
@@ -297,7 +298,7 @@ export async function generateSectionNarrative(
     const client = await getClient();
 
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: CLAUDE_DEFAULT_MODEL,
       max_tokens: 512,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: buildUserPrompt(context) }],

@@ -11,7 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { ArrowLeft, Loader2, Save, ArrowUpCircle, TrendingDown, Plane, Train } from 'lucide-react'
+import { ArrowLeft, Loader2, Save, ArrowUpCircle, TrendingDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
@@ -41,11 +41,11 @@ import {
   XERO_TX_SELECT_COLUMNS,
 } from '@/lib/xero/types'
 import { getOrCreateCorporateReport, deriveReportingYear } from '@/lib/xero/report-helper'
+import { UpgradeTransactionPicker } from './UpgradeTransactionPicker'
+import type { UpgradeFormCommonProps } from './upgrade-types'
 
-interface TravelUpgradeFormProps {
+interface TravelUpgradeFormProps extends UpgradeFormCommonProps {
   category: 'air_travel' | 'rail_travel'
-  onComplete: () => void
-  onCancel: () => void
 }
 
 export function TravelUpgradeForm({ category, onComplete, onCancel }: TravelUpgradeFormProps) {
@@ -80,6 +80,7 @@ export function TravelUpgradeForm({ category, onComplete, onCancel }: TravelUpgr
 
   // Save state
   const [isSaving, setIsSaving] = useState(false)
+  const [linkedTxIds, setLinkedTxIds] = useState<string[]>([])
 
   // Load data
   useEffect(() => {
@@ -262,24 +263,32 @@ export function TravelUpgradeForm({ category, onComplete, onCancel }: TravelUpgr
 
       if (insertError) throw insertError
 
-      // Mark Xero transactions as upgraded
-      const { error: updateError } = await supabase
-        .from('xero_transactions')
-        .update({
-          upgrade_status: 'upgraded',
-          data_quality_tier: 2,
-          upgraded_entry_id: newEntry.id,
-          upgraded_entry_table: 'corporate_overheads',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('organization_id', currentOrganization.id)
-        .eq('emission_category', category)
-        .eq('upgrade_status', 'pending')
+      // Mark only the selected Xero transactions as upgraded + linked
+      if (linkedTxIds.length > 0) {
+        const { error: updateError } = await supabase
+          .from('xero_transactions')
+          .update({
+            upgrade_status: 'upgraded',
+            data_quality_tier: 2,
+            upgraded_entry_id: newEntry.id,
+            upgraded_entry_table: 'corporate_overheads',
+            updated_at: new Date().toISOString(),
+          })
+          .in('id', linkedTxIds)
 
-      if (updateError) throw updateError
+        if (updateError) throw updateError
+      }
 
-      toast.success(`${isFlightMode ? 'Flight' : 'Rail'} data upgraded successfully`)
-      onComplete()
+      toast.success(
+        linkedTxIds.length > 0
+          ? `${isFlightMode ? 'Flight' : 'Rail'} data saved. Linked ${linkedTxIds.length} transaction${linkedTxIds.length === 1 ? '' : 's'}.`
+          : `${isFlightMode ? 'Flight' : 'Rail'} data saved. No Xero transactions linked.`
+      )
+      onComplete({
+        entryId: newEntry.id,
+        entryTable: 'corporate_overheads',
+        xeroTransactionIds: linkedTxIds,
+      })
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to save'
       toast.error(message)
@@ -297,8 +306,6 @@ export function TravelUpgradeForm({ category, onComplete, onCancel }: TravelUpgr
       </Card>
     )
   }
-
-  const Icon = isFlightMode ? Plane : Train
 
   return (
     <div className="space-y-4">
@@ -319,31 +326,21 @@ export function TravelUpgradeForm({ category, onComplete, onCancel }: TravelUpgr
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Transaction list */}
-          {transactions.length > 0 && (
+          {/* Transactions this entry covers */}
+          {currentOrganization && (
             <div className="space-y-2">
               <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                Transactions identified
+                Xero transactions this entry covers
               </Label>
-              <div className="max-h-40 overflow-y-auto space-y-1 rounded-lg border p-2">
-                {transactions.map(tx => (
-                  <div
-                    key={tx.id}
-                    className="flex items-center justify-between text-sm py-1.5 px-2 rounded hover:bg-slate-50 dark:hover:bg-slate-900"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      <span className="font-medium truncate">{tx.supplierName || 'Unknown'}</span>
-                      <span className="text-muted-foreground text-xs">
-                        {new Date(tx.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' })}
-                      </span>
-                    </div>
-                    <span className="font-medium shrink-0">
-                      {new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(tx.amount)}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              <p className="text-xs text-muted-foreground">
+                Only the transactions you select will be marked as upgraded.
+              </p>
+              <UpgradeTransactionPicker
+                organizationId={currentOrganization.id}
+                category={category}
+                selected={linkedTxIds}
+                onChange={setLinkedTxIds}
+              />
             </div>
           )}
 

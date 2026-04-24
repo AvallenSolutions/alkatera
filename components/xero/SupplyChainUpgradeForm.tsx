@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { ArrowLeft, Loader2, Save, ArrowUpCircle, TrendingDown, Package, Wheat } from 'lucide-react'
+import { ArrowLeft, Loader2, Save, ArrowUpCircle, TrendingDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
@@ -18,11 +18,11 @@ import {
   toTransactionView,
   XERO_TX_SELECT_COLUMNS,
 } from '@/lib/xero/types'
+import { UpgradeTransactionPicker } from './UpgradeTransactionPicker'
+import type { UpgradeFormCommonProps } from './upgrade-types'
 
-interface SupplyChainUpgradeFormProps {
+interface SupplyChainUpgradeFormProps extends UpgradeFormCommonProps {
   category: 'packaging' | 'raw_materials'
-  onComplete: () => void
-  onCancel: () => void
 }
 
 interface LinkedSupplier {
@@ -63,6 +63,7 @@ export function SupplyChainUpgradeForm({ category, onComplete, onCancel }: Suppl
 
   // Save state
   const [isSaving, setIsSaving] = useState(false)
+  const [linkedTxIds, setLinkedTxIds] = useState<string[]>([])
 
   useEffect(() => {
     async function loadData() {
@@ -170,8 +171,6 @@ export function SupplyChainUpgradeForm({ category, onComplete, onCancel }: Suppl
     return `${Math.round(kg)} kg CO2e`
   }, [])
 
-  const Icon = category === 'packaging' ? Package : Wheat
-
   async function handleSave() {
     if (!currentOrganization?.id) return
 
@@ -182,29 +181,32 @@ export function SupplyChainUpgradeForm({ category, onComplete, onCancel }: Suppl
 
     setIsSaving(true)
     try {
-      const transactionIds = transactions.map(t => t.id)
-      const supplierNames = linkedSuppliers.map(s => s.supplierName)
-      const autoDescription = description
-        || `${CATEGORY_LABELS[category]}: ${quantityNum} ${unit}${supplierNames.length ? ` from ${supplierNames.join(', ')}` : ''}`
-
-      // Mark transactions as upgraded with tier level based on data source
+      // Mark only the selected transactions as upgraded with tier based on data source
       const tier = selectedProduct?.carbonIntensity ? 1 : 2
 
-      const { error: updateError } = await supabase
-        .from('xero_transactions')
-        .update({
-          upgrade_status: 'upgraded',
-          data_quality_tier: tier,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('organization_id', currentOrganization.id)
-        .eq('emission_category', category)
-        .eq('upgrade_status', 'pending')
+      if (linkedTxIds.length > 0) {
+        const { error: updateError } = await supabase
+          .from('xero_transactions')
+          .update({
+            upgrade_status: 'upgraded',
+            data_quality_tier: tier,
+            updated_at: new Date().toISOString(),
+          })
+          .in('id', linkedTxIds)
 
-      if (updateError) throw updateError
+        if (updateError) throw updateError
+      }
 
-      toast.success(`${CATEGORY_LABELS[category]} data upgraded to Tier ${tier}`)
-      onComplete()
+      toast.success(
+        linkedTxIds.length > 0
+          ? `${CATEGORY_LABELS[category]} upgraded to Tier ${tier}. Linked ${linkedTxIds.length} transaction${linkedTxIds.length === 1 ? '' : 's'}.`
+          : `${CATEGORY_LABELS[category]} saved. No Xero transactions linked.`
+      )
+      onComplete({
+        entryId: null,
+        entryTable: null,
+        xeroTransactionIds: linkedTxIds,
+      })
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to save'
       toast.error(message)
@@ -244,31 +246,21 @@ export function SupplyChainUpgradeForm({ category, onComplete, onCancel }: Suppl
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Transaction list */}
-          {transactions.length > 0 && (
+          {/* Transaction picker */}
+          {currentOrganization && (
             <div className="space-y-2">
               <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                Transactions identified
+                Xero transactions this entry covers
               </Label>
-              <div className="max-h-40 overflow-y-auto space-y-1 rounded-lg border p-2">
-                {transactions.map(tx => (
-                  <div
-                    key={tx.id}
-                    className="flex items-center justify-between text-sm py-1.5 px-2 rounded hover:bg-slate-50 dark:hover:bg-slate-900"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      <span className="font-medium truncate">{tx.supplierName || 'Unknown'}</span>
-                      <span className="text-muted-foreground text-xs">
-                        {new Date(tx.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' })}
-                      </span>
-                    </div>
-                    <span className="font-medium shrink-0">
-                      {new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(tx.amount)}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              <p className="text-xs text-muted-foreground">
+                Only the transactions you select will be marked as upgraded.
+              </p>
+              <UpgradeTransactionPicker
+                organizationId={currentOrganization.id}
+                category={category}
+                selected={linkedTxIds}
+                onChange={setLinkedTxIds}
+              />
             </div>
           )}
 

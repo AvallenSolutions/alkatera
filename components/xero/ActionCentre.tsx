@@ -13,6 +13,8 @@ import { TravelUpgradeForm } from './TravelUpgradeForm'
 import { AccommodationUpgradeForm } from './AccommodationUpgradeForm'
 import { FreightUpgradeForm } from './FreightUpgradeForm'
 import { SupplyChainUpgradeForm } from './SupplyChainUpgradeForm'
+import { GenericUpgradeForm } from './GenericUpgradeForm'
+import { GENERIC_UPGRADE_CONFIG, type GenericUpgradeCategory } from '@/lib/xero/generic-upgrade-config'
 import { DuplicateWarningBanner } from './DuplicateWarningBanner'
 import { UnclassifiedAlertBanner } from './UnclassifiedAlertBanner'
 
@@ -33,7 +35,15 @@ const TRAVEL_CATEGORIES = ['air_travel', 'rail_travel']
 const ACCOMMODATION_CATEGORIES = ['accommodation']
 const FREIGHT_CATEGORIES = ['road_freight', 'sea_freight', 'air_freight']
 const SUPPLY_CHAIN_CATEGORIES = ['packaging', 'raw_materials']
-const UPGRADEABLE_CATEGORIES = [...ENERGY_CATEGORIES, ...TRAVEL_CATEGORIES, ...ACCOMMODATION_CATEGORIES, ...FREIGHT_CATEGORIES, ...SUPPLY_CHAIN_CATEGORIES]
+const GENERIC_CATEGORIES = Object.keys(GENERIC_UPGRADE_CONFIG) as GenericUpgradeCategory[]
+const UPGRADEABLE_CATEGORIES = [
+  ...ENERGY_CATEGORIES,
+  ...TRAVEL_CATEGORIES,
+  ...ACCOMMODATION_CATEGORIES,
+  ...FREIGHT_CATEGORIES,
+  ...SUPPLY_CHAIN_CATEGORIES,
+  ...GENERIC_CATEGORIES,
+]
 
 export function ActionCentre() {
   const { currentOrganization } = useOrganization()
@@ -163,17 +173,9 @@ export function ActionCentre() {
 
   // If showing an upgrade form, route to the correct one
   if (upgradeCategory) {
+    // Forms handle their own per-transaction linking; we just refresh on completion.
     const formProps = {
-      onComplete: async () => {
-        // Mark matching xero_transactions as upgraded
-        if (currentOrganization?.id) {
-          await supabase
-            .from('xero_transactions')
-            .update({ upgrade_status: 'upgraded', data_quality_tier: 2, updated_at: new Date().toISOString() })
-            .eq('organization_id', currentOrganization.id)
-            .eq('emission_category', upgradeCategory)
-            .eq('upgrade_status', 'pending')
-        }
+      onComplete: () => {
         setUpgradeCategory(null)
         fetchData()
       },
@@ -192,6 +194,8 @@ export function ActionCentre() {
       form = <FreightUpgradeForm category={upgradeCategory as 'road_freight' | 'sea_freight' | 'air_freight'} {...formProps} />
     } else if (SUPPLY_CHAIN_CATEGORIES.includes(upgradeCategory)) {
       form = <SupplyChainUpgradeForm category={upgradeCategory as 'packaging' | 'raw_materials'} {...formProps} />
+    } else if ((GENERIC_CATEGORIES as string[]).includes(upgradeCategory)) {
+      form = <GenericUpgradeForm category={upgradeCategory as GenericUpgradeCategory} {...formProps} />
     }
 
     return <div className="space-y-4">{form}</div>
@@ -240,6 +244,8 @@ export function ActionCentre() {
               totalSpend={category.total_amount}
               estimatedEmissionsKg={category.total_emissions_kg}
               transactionCount={category.pending_count}
+              upgradedCount={category.upgraded_count}
+              pendingCount={category.pending_count}
               earliestDate={category.earliest_date}
               latestDate={category.latest_date}
               canUpgrade={UPGRADEABLE_CATEGORIES.includes(category.emission_category)}

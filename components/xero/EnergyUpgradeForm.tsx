@@ -10,6 +10,8 @@ import { ArrowLeft, Loader2, Save, ArrowUpCircle, TrendingDown } from 'lucide-re
 import { toast } from 'sonner'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
+import { UpgradeTransactionPicker } from './UpgradeTransactionPicker'
+import type { UpgradeFormCommonProps } from './upgrade-types'
 
 // Maps our emission categories to utility_data_entries utility types
 const CATEGORY_TO_UTILITY_TYPE: Record<string, { utilityType: string; unit: string; label: string; altUnit?: string; altLabel?: string }> = {
@@ -38,10 +40,8 @@ interface Facility {
   name: string
 }
 
-interface EnergyUpgradeFormProps {
+interface EnergyUpgradeFormProps extends UpgradeFormCommonProps {
   category: string
-  onComplete: () => void
-  onCancel: () => void
 }
 
 export function EnergyUpgradeForm({ category, onComplete, onCancel }: EnergyUpgradeFormProps) {
@@ -56,6 +56,7 @@ export function EnergyUpgradeForm({ category, onComplete, onCancel }: EnergyUpgr
   const [periodEnd, setPeriodEnd] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [linkedTxIds, setLinkedTxIds] = useState<string[]>([])
 
   // Spend-based totals for comparison
   const [spendTotal, setSpendTotal] = useState(0)
@@ -142,24 +143,32 @@ export function EnergyUpgradeForm({ category, onComplete, onCancel }: EnergyUpgr
 
       if (insertError) throw insertError
 
-      // 2. Mark Xero transactions as upgraded
-      const { error: updateError } = await supabase
-        .from('xero_transactions')
-        .update({
-          upgrade_status: 'upgraded',
-          data_quality_tier: 2,
-          upgraded_entry_id: entry.id,
-          upgraded_entry_table: 'utility_data_entries',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('organization_id', currentOrganization.id)
-        .eq('emission_category', category)
-        .eq('upgrade_status', 'pending')
+      // 2. Mark only the selected Xero transactions as upgraded + linked
+      if (linkedTxIds.length > 0) {
+        const { error: updateError } = await supabase
+          .from('xero_transactions')
+          .update({
+            upgrade_status: 'upgraded',
+            data_quality_tier: 2,
+            upgraded_entry_id: entry.id,
+            upgraded_entry_table: 'utility_data_entries',
+            updated_at: new Date().toISOString(),
+          })
+          .in('id', linkedTxIds)
 
-      if (updateError) throw updateError
+        if (updateError) throw updateError
+      }
 
-      toast.success('Data upgraded successfully')
-      onComplete()
+      toast.success(
+        linkedTxIds.length > 0
+          ? `Upgraded ${linkedTxIds.length} transaction${linkedTxIds.length === 1 ? '' : 's'} to activity-based data.`
+          : 'Activity data saved. No Xero transactions linked.'
+      )
+      onComplete({
+        entryId: entry.id,
+        entryTable: 'utility_data_entries',
+        xeroTransactionIds: linkedTxIds,
+      })
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to save'
       toast.error(message)
@@ -278,6 +287,24 @@ export function EnergyUpgradeForm({ category, onComplete, onCancel }: EnergyUpgr
               />
             </div>
           </div>
+
+          {/* Transactions this entry covers */}
+          {currentOrganization && (
+            <div className="space-y-2">
+              <Label>Xero transactions this entry covers</Label>
+              <p className="text-xs text-muted-foreground">
+                Only the transactions you select will be marked as upgraded. Enter a period above and the matching months are pre-selected.
+              </p>
+              <UpgradeTransactionPicker
+                organizationId={currentOrganization.id}
+                category={category}
+                periodStart={periodStart}
+                periodEnd={periodEnd}
+                selected={linkedTxIds}
+                onChange={setLinkedTxIds}
+              />
+            </div>
+          )}
 
           {/* Before/After comparison */}
           {quantityNum > 0 && (

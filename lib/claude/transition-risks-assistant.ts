@@ -1,3 +1,4 @@
+import { CLAUDE_DEFAULT_MODEL } from './models'
 /**
  * Transition Risks and Opportunities Generator
  *
@@ -188,7 +189,7 @@ export async function generateRisksAndOpportunities(
     const client = await getClient();
 
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: CLAUDE_DEFAULT_MODEL,
       max_tokens: 2048,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: buildUserPrompt(context) }],

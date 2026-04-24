@@ -1,6 +1,5 @@
 import 'server-only'
-import { createClient } from '@supabase/supabase-js'
-import { classifyTransaction, type AccountMapping, type SupplierRule } from './classifier'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { calculateSpendBasedEmissions } from './spend-factors'
 
 function getServiceClient() {
@@ -12,13 +11,11 @@ function getServiceClient() {
 }
 
 /**
- * Learn from a manual classification by creating or updating an
- * org-specific supplier rule. Also reclassifies other unclassified
- * transactions from the same contact.
- *
- * Returns the number of additional transactions reclassified.
+ * Core upsert-rule + reclassify operation for a single supplier contact.
+ * Shared by the single-classification and batch-classification routes.
  */
-export async function learnFromManualClassification(
+async function applyOne(
+  db: SupabaseClient,
   organizationId: string,
   contactName: string,
   emissionCategory: string
@@ -27,12 +24,9 @@ export async function learnFromManualClassification(
     return { ruleCreated: false, additionalClassified: 0 }
   }
 
-  const db = getServiceClient()
-
-  // Check for existing org-specific rule for this exact contact name
   const { data: existingRules } = await db
     .from('xero_supplier_rules')
-    .select('id, emission_category, supplier_pattern')
+    .select('id, emission_category')
     .eq('organization_id', organizationId)
     .ilike('supplier_pattern', contactName)
     .limit(1)
@@ -40,7 +34,6 @@ export async function learnFromManualClassification(
   let ruleCreated = false
 
   if (existingRules && existingRules.length > 0) {
-    // Update existing rule if category changed
     if (existingRules[0].emission_category !== emissionCategory) {
       await db
         .from('xero_supplier_rules')
@@ -52,7 +45,6 @@ export async function learnFromManualClassification(
       ruleCreated = true
     }
   } else {
-    // Create new org-specific supplier rule
     const { error } = await db
       .from('xero_supplier_rules')
       .insert({
@@ -70,7 +62,6 @@ export async function learnFromManualClassification(
     }
   }
 
-  // Reclassify other unclassified transactions from the same contact
   const { data: unclassified } = await db
     .from('xero_transactions')
     .select('id, amount, currency')
@@ -105,4 +96,48 @@ export async function learnFromManualClassification(
   }
 
   return { ruleCreated, additionalClassified }
+}
+
+/**
+ * Learn from a manual classification by creating or updating an
+ * org-specific supplier rule. Also reclassifies other unclassified
+ * transactions from the same contact.
+ */
+export async function learnFromManualClassification(
+  organizationId: string,
+  contactName: string,
+  emissionCategory: string
+): Promise<{ ruleCreated: boolean; additionalClassified: number }> {
+  const db = getServiceClient()
+  return applyOne(db, organizationId, contactName, emissionCategory)
+}
+
+/**
+ * Batch variant: apply the same emissionCategory to multiple contact names
+ * in one go. Used by the bulk-classify UI.
+ */
+export async function learnFromManualClassificationBatch(
+  organizationId: string,
+  contactNames: string[],
+  emissionCategory: string
+): Promise<{
+  rulesCreated: number
+  additionalClassified: number
+  contacts: Array<{ contactName: string; ruleCreated: boolean; additionalClassified: number }>
+}> {
+  const db = getServiceClient()
+  const unique = Array.from(new Set(contactNames.filter(Boolean)))
+
+  const results = await Promise.all(
+    unique.map(async contactName => {
+      const r = await applyOne(db, organizationId, contactName, emissionCategory)
+      return { contactName, ...r }
+    })
+  )
+
+  return {
+    rulesCreated: results.filter(r => r.ruleCreated).length,
+    additionalClassified: results.reduce((sum, r) => sum + r.additionalClassified, 0),
+    contacts: results,
+  }
 }

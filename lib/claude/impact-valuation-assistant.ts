@@ -1,3 +1,4 @@
+import { CLAUDE_DEFAULT_MODEL } from './models'
 /**
  * Impact Valuation Narrative Generator
  *
@@ -156,13 +157,13 @@ export async function generateImpactValuationNarratives(
     // Run both narrative requests in parallel
     const [boardResponse, tenderResponse] = await Promise.all([
       client.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: CLAUDE_DEFAULT_MODEL,
         max_tokens: 512,
         system: BOARD_SUMMARY_SYSTEM,
         messages: [{ role: 'user', content: buildBoardSummaryUserPrompt(context) }],
       }),
       client.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: CLAUDE_DEFAULT_MODEL,
         max_tokens: 384,
         system: RETAIL_TENDER_SYSTEM,
         messages: [{ role: 'user', content: buildRetailTenderUserPrompt(context) }],

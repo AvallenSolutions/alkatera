@@ -1,3 +1,4 @@
+import { CLAUDE_DEFAULT_MODEL } from './models'
 /**
  * Claude LCA Assistant
  *
@@ -216,7 +217,7 @@ Focus on practical, actionable improvements.`,
 
   try {
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: CLAUDE_DEFAULT_MODEL,
       max_tokens: 1024,
       system: SUGGESTION_SYSTEM_PROMPT,
       messages: [
@@ -314,7 +315,7 @@ Respond with JSON in this exact format:
 
   try {
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514', // Using Sonnet for now, can upgrade to Opus when needed
+      model: CLAUDE_DEFAULT_MODEL, // Using Sonnet for now, can upgrade to Opus when needed
       max_tokens: 2048,
       system: NARRATIVE_SYSTEM_PROMPT,
       messages: [
@@ -365,7 +366,7 @@ export async function explainTerm(term: string): Promise<PlainEnglishExplanation
 
   try {
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: CLAUDE_DEFAULT_MODEL,
       max_tokens: 256,
       system: PLAIN_ENGLISH_SYSTEM_PROMPT,
       messages: [

@@ -3,6 +3,7 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
 import {
   Zap,
   Flame,
@@ -50,6 +51,10 @@ interface UpgradePromptCardProps {
   totalSpend: number
   estimatedEmissionsKg: number
   transactionCount: number
+  /** Number already upgraded to activity-based data */
+  upgradedCount?: number
+  /** Number still pending upgrade */
+  pendingCount?: number
   earliestDate?: string
   latestDate?: string
   canUpgrade: boolean
@@ -63,6 +68,8 @@ export function UpgradePromptCard({
   totalSpend,
   estimatedEmissionsKg,
   transactionCount,
+  upgradedCount,
+  pendingCount,
   earliestDate,
   latestDate,
   canUpgrade,
@@ -144,6 +151,17 @@ export function UpgradePromptCard({
               <span>{transactionCount} transaction{transactionCount !== 1 ? 's' : ''}</span>
               {dateRange && <span>{dateRange}</span>}
             </div>
+            {!isUpgraded && typeof upgradedCount === 'number' && typeof pendingCount === 'number' && (upgradedCount + pendingCount) > 0 && (
+              <div className="mt-2 space-y-1">
+                <Progress
+                  value={Math.round((upgradedCount / (upgradedCount + pendingCount)) * 100)}
+                  className="h-1.5"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {upgradedCount} of {upgradedCount + pendingCount} transactions upgraded
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Actions */}

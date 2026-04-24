@@ -10,7 +10,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
-import { Loader2, Search, ChevronLeft, ChevronRight, Filter, X, Download } from 'lucide-react'
+import { Loader2, Search, ChevronLeft, ChevronRight, Filter, X, Download, ArrowUpCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
@@ -21,6 +21,24 @@ import {
   UPGRADE_STATUS_LABELS,
   TIER_CONFIG,
 } from '@/lib/xero/category-labels'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { EnergyUpgradeForm } from './EnergyUpgradeForm'
+import { TravelUpgradeForm } from './TravelUpgradeForm'
+import { AccommodationUpgradeForm } from './AccommodationUpgradeForm'
+import { FreightUpgradeForm } from './FreightUpgradeForm'
+import { SupplyChainUpgradeForm } from './SupplyChainUpgradeForm'
+import { GenericUpgradeForm } from './GenericUpgradeForm'
+import { GENERIC_UPGRADE_CONFIG, type GenericUpgradeCategory } from '@/lib/xero/generic-upgrade-config'
+
+const ENERGY_CATS = ['grid_electricity', 'natural_gas', 'diesel_stationary', 'diesel_mobile', 'petrol_mobile', 'lpg', 'water']
+const TRAVEL_CATS = ['air_travel', 'rail_travel']
+const ACCOMMODATION_CATS = ['accommodation']
+const FREIGHT_CATS = ['road_freight', 'sea_freight', 'air_freight']
+const SUPPLY_CHAIN_CATS = ['packaging', 'raw_materials']
+const GENERIC_CATS = Object.keys(GENERIC_UPGRADE_CONFIG)
+const ALL_UPGRADEABLE = [
+  ...ENERGY_CATS, ...TRAVEL_CATS, ...ACCOMMODATION_CATS, ...FREIGHT_CATS, ...SUPPLY_CHAIN_CATS, ...GENERIC_CATS,
+]
 
 interface Transaction {
   id: string
@@ -56,6 +74,9 @@ export function TransactionBrowser() {
   // Inline editing
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editCategory, setEditCategory] = useState<string>('')
+
+  // Per-transaction upgrade dialog
+  const [upgradeTx, setUpgradeTx] = useState<Transaction | null>(null)
 
   const fetchTransactions = useCallback(async () => {
     if (!currentOrganization?.id) return
@@ -318,6 +339,7 @@ export function TransactionBrowser() {
                 <TableHead className="text-right">Conf.</TableHead>
                 <TableHead>Tier</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -413,6 +435,21 @@ export function TransactionBrowser() {
                         {UPGRADE_STATUS_LABELS[tx.upgrade_status] || tx.upgrade_status}
                       </Badge>
                     </TableCell>
+                    <TableCell>
+                      {tx.emission_category
+                        && ALL_UPGRADEABLE.includes(tx.emission_category)
+                        && tx.upgrade_status === 'pending' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-[11px] px-2"
+                          onClick={() => setUpgradeTx(tx)}
+                        >
+                          <ArrowUpCircle className="h-3 w-3 mr-1" />
+                          Upgrade
+                        </Button>
+                      )}
+                    </TableCell>
                   </TableRow>
                 )
               })}
@@ -420,6 +457,35 @@ export function TransactionBrowser() {
           </Table>
         </div>
       )}
+
+      {/* Per-transaction upgrade dialog */}
+      <Dialog open={!!upgradeTx} onOpenChange={open => !open && setUpgradeTx(null)}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Upgrade transaction</DialogTitle>
+          </DialogHeader>
+          {upgradeTx?.emission_category && (() => {
+            const cat = upgradeTx.emission_category
+            const formProps = {
+              onComplete: () => { setUpgradeTx(null); fetchTransactions() },
+              onCancel: () => setUpgradeTx(null),
+            }
+            if (ENERGY_CATS.includes(cat)) return <EnergyUpgradeForm category={cat} {...formProps} />
+            if (TRAVEL_CATS.includes(cat)) return <TravelUpgradeForm category={cat as 'air_travel' | 'rail_travel'} {...formProps} />
+            if (ACCOMMODATION_CATS.includes(cat)) return <AccommodationUpgradeForm {...formProps} />
+            if (FREIGHT_CATS.includes(cat)) return <FreightUpgradeForm category={cat as 'road_freight' | 'sea_freight' | 'air_freight'} {...formProps} />
+            if (SUPPLY_CHAIN_CATS.includes(cat)) return <SupplyChainUpgradeForm category={cat as 'packaging' | 'raw_materials'} {...formProps} />
+            if (GENERIC_CATS.includes(cat)) return (
+              <GenericUpgradeForm
+                category={cat as GenericUpgradeCategory}
+                preselectedTransactionId={upgradeTx.id}
+                {...formProps}
+              />
+            )
+            return <p className="text-sm text-muted-foreground">No upgrade form for this category yet.</p>
+          })()}
+        </DialogContent>
+      </Dialog>
 
       {/* Pagination */}
       {totalPages > 1 && (

@@ -26,7 +26,7 @@ export interface UnmatchedContact {
 /**
  * Strip common business suffixes and normalise for matching.
  */
-function normaliseName(name: string): string {
+export function normaliseName(name: string): string {
   return name
     .toLowerCase()
     .replace(/\b(ltd|limited|plc|inc|incorporated|llc|llp|corp|corporation|co|company|group|holdings)\b/gi, '')
@@ -40,7 +40,7 @@ function normaliseName(name: string): string {
  * Calculate token overlap score between two normalised names.
  * Returns 0-1 where 1 is perfect overlap.
  */
-function tokenOverlapScore(a: string, b: string): number {
+export function tokenOverlapScore(a: string, b: string): number {
   const tokensA = new Set(a.split(' ').filter(t => t.length > 1))
   const tokensB = new Set(b.split(' ').filter(t => t.length > 1))
 

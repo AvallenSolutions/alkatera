@@ -41,7 +41,7 @@ interface CacheEntry {
 
 // Cache configuration
 const CACHE_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days
-const CACHE_KEY = 'geocoding_cache';
+const CACHE_KEY = 'geocoding_cache_v2';
 const RECENT_SEARCHES_KEY = 'recent_location_searches';
 const MAX_RECENT = 10;
 
@@ -379,9 +379,10 @@ function filterAndRankLocations(locations: Location[], query: string): Location[
       }
     }
 
-    // Penalize non-city/airport results heavily
+    // Gently down-weight non-city/airport results, but don't eliminate them —
+    // some major cities come back as 'region' depending on Nominatim's shape.
     if (loc.type !== 'city' && loc.type !== 'airport') {
-      score -= 500;
+      score -= 150;
     }
 
     // Boost exact matches at word boundaries
@@ -432,6 +433,7 @@ function filterAndRankLocations(locations: Location[], query: string): Location[
 function classifyLocationType(result: NominatimResult): Location['type'] {
   const type = result.type?.toLowerCase() || '';
   const addresstype = result.addresstype?.toLowerCase() || '';
+  const klass = result.class?.toLowerCase() || '';
   const displayName = result.display_name.toLowerCase();
 
   if (
@@ -444,16 +446,28 @@ function classifyLocationType(result: NominatimResult): Location['type'] {
     return 'airport';
   }
 
+  // Nominatim returns cities in many shapes depending on country:
+  //   - class='place' type='city|town|village|municipality|suburb'
+  //   - class='boundary' type='administrative' addresstype='city|town|...'
+  // Treat all populated places and admin boundaries at city level as 'city'.
+  const citySynonyms = ['city', 'town', 'village', 'municipality', 'hamlet', 'borough', 'suburb'];
   if (
-    type === 'city' ||
-    addresstype === 'city' ||
-    result.class === 'place'
+    klass === 'place' ||
+    citySynonyms.includes(type) ||
+    citySynonyms.includes(addresstype)
   ) {
     return 'city';
   }
 
   if (type === 'country' || addresstype === 'country') {
     return 'country';
+  }
+
+  // Administrative boundaries without an addresstype hint are often capitals
+  // or metro areas (e.g. Medellín, Bogotá). Treat as city so they aren't
+  // penalised out of the ranked results.
+  if (klass === 'boundary' && type === 'administrative') {
+    return 'city';
   }
 
   return 'region';

@@ -42,8 +42,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Limit batch size
-    if (body.transactions.length > 50) {
-      return NextResponse.json({ error: 'Maximum 50 transactions per batch' }, { status: 400 })
+    if (body.transactions.length > 200) {
+      return NextResponse.json({ error: 'Maximum 200 transactions per batch' }, { status: 400 })
     }
 
     // Rate limiting
@@ -79,7 +79,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'AI classification unavailable' }, { status: 503 })
     }
 
-    return NextResponse.json({ results })
+    // Persist suggestions so the supplier panel can show them for review.
+    // We never auto-apply here — user goes through AI Review to accept/skip.
+    let persisted = 0
+    for (const r of results) {
+      if (!r.suggestedCategory) continue
+      const { error } = await supabase
+        .from('xero_transactions')
+        .update({
+          ai_suggested_category: r.suggestedCategory,
+          ai_suggested_confidence: r.confidence,
+          ai_suggested_reasoning: r.reasoning || null,
+        })
+        .eq('id', r.transactionId)
+      if (!error) persisted++
+    }
+
+    return NextResponse.json({ results, persisted })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Classification failed'
     console.error('[XeroClassifyAI] Error:', message)

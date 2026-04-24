@@ -1,4 +1,5 @@
 import 'server-only'
+import { CLAUDE_DEFAULT_MODEL } from '../claude/models'
 
 /**
  * AI-powered account mapping suggestions.
@@ -116,7 +117,7 @@ export async function suggestCategoryWithAI(
     ).join('\n')
 
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: CLAUDE_DEFAULT_MODEL,
       max_tokens: 4000,
       system: ACCOUNT_MAPPING_PROMPT,
       messages: [

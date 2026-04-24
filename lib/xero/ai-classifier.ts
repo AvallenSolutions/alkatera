@@ -1,4 +1,5 @@
 import 'server-only'
+import { CLAUDE_DEFAULT_MODEL } from '../claude/models'
 
 export interface AIClassifyResult {
   transactionId: string
@@ -55,76 +56,82 @@ Return ONLY the JSON array, no markdown fences.`
  * Classify transactions using AI (Claude). Returns empty array if
  * the Anthropic SDK is not installed or ANTHROPIC_API_KEY is not set.
  */
+const BATCH_SIZE = 25
+
 export async function classifyWithAI(
   transactions: Array<{ id: string; contactName: string | null; description: string | null; amount: number }>
 ): Promise<AIClassifyResult[]> {
-  try {
-    const apiKey = process.env.ANTHROPIC_API_KEY
-    if (!apiKey) {
-      console.warn('[AIClassifier] ANTHROPIC_API_KEY not set, skipping AI classification')
-      return []
-    }
-
-    // Dynamic import - SDK is an optional dependency
-    let Anthropic: any
-    try {
-      const mod = await import('@anthropic-ai/sdk')
-      Anthropic = mod.default
-    } catch {
-      console.warn('[AIClassifier] @anthropic-ai/sdk not installed, skipping AI classification')
-      return []
-    }
-
-    const client = new Anthropic({ apiKey })
-
-    const txList = transactions.map(tx =>
-      `ID: ${tx.id} | Supplier: ${tx.contactName || 'Unknown'} | Description: ${tx.description || 'N/A'} | Amount: £${Math.abs(tx.amount).toFixed(2)}`
-    ).join('\n')
-
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4000,
-      system: SYSTEM_PROMPT,
-      messages: [
-        {
-          role: 'user',
-          content: `Classify these ${transactions.length} transactions:\n\n${txList}`,
-        },
-      ],
-    })
-
-    // Parse response
-    const responseText = response.content
-      .filter((block: { type: string }) => block.type === 'text')
-      .map((block: { text: string }) => block.text)
-      .join('')
-
-    let results: AIClassifyResult[]
-    try {
-      results = JSON.parse(responseText)
-    } catch {
-      // Try to extract JSON from potential markdown wrapping
-      const jsonMatch = responseText.match(/\[[\s\S]*\]/)
-      if (jsonMatch) {
-        results = JSON.parse(jsonMatch[0])
-      } else {
-        console.error('[AIClassifier] Failed to parse AI response')
-        return []
-      }
-    }
-
-    // Validate categories and clamp confidence
-    results = results.map(r => ({
-      ...r,
-      suggestedCategory: r.suggestedCategory && EMISSION_CATEGORIES.includes(r.suggestedCategory)
-        ? r.suggestedCategory
-        : null,
-      confidence: Math.min(1, Math.max(0, r.confidence || 0)),
-    }))
-
-    return results
-  } catch (err) {
-    console.error('[AIClassifier] Error:', err instanceof Error ? err.message : err)
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) {
+    console.warn('[AIClassifier] ANTHROPIC_API_KEY not set, skipping AI classification')
     return []
+  }
+
+  let Anthropic: any
+  try {
+    const mod = await import('@anthropic-ai/sdk')
+    Anthropic = mod.default
+  } catch {
+    console.warn('[AIClassifier] @anthropic-ai/sdk not installed, skipping AI classification')
+    return []
+  }
+
+  const client = new Anthropic({ apiKey })
+
+  const batches: typeof transactions[] = []
+  for (let i = 0; i < transactions.length; i += BATCH_SIZE) {
+    batches.push(transactions.slice(i, i + BATCH_SIZE))
+  }
+
+  const allResults: AIClassifyResult[] = []
+
+  for (const batch of batches) {
+    const batchResults = await classifyBatch(client, batch)
+    allResults.push(...batchResults)
+  }
+
+  return allResults.map(r => ({
+    ...r,
+    suggestedCategory: r.suggestedCategory && EMISSION_CATEGORIES.includes(r.suggestedCategory)
+      ? r.suggestedCategory
+      : null,
+    confidence: Math.min(1, Math.max(0, r.confidence || 0)),
+  }))
+}
+
+async function classifyBatch(
+  client: any,
+  transactions: Array<{ id: string; contactName: string | null; description: string | null; amount: number }>
+): Promise<AIClassifyResult[]> {
+  const txList = transactions.map(tx =>
+    `ID: ${tx.id} | Supplier: ${tx.contactName || 'Unknown'} | Description: ${tx.description || 'N/A'} | Amount: £${Math.abs(tx.amount).toFixed(2)}`
+  ).join('\n')
+
+  const response = await client.messages.create({
+    model: CLAUDE_DEFAULT_MODEL,
+    max_tokens: 8000,
+    system: SYSTEM_PROMPT,
+    messages: [
+      {
+        role: 'user',
+        content: `Classify these ${transactions.length} transactions:\n\n${txList}`,
+      },
+    ],
+  })
+
+  const responseText = response.content
+    .filter((block: { type: string }) => block.type === 'text')
+    .map((block: { text: string }) => block.text)
+    .join('')
+
+  try {
+    return JSON.parse(responseText)
+  } catch {
+    const jsonMatch = responseText.match(/\[[\s\S]*\]/)
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0])
+    }
+    console.error('[AIClassifier] Failed to parse batch response. Raw:', responseText.slice(0, 500))
+    throw new Error('AI response was not valid JSON')
   }
 }

@@ -1,3 +1,4 @@
+import { CLAUDE_DEFAULT_MODEL } from './models'
 /**
  * Claude Proxy Advisor
  *
@@ -361,7 +362,7 @@ ${input.product_context ? `Product context: ${input.product_context}` : ''}
 What is this ingredient, what category does it belong to, and what would be the best LCA proxy from our available databases? Consider the production process, material composition, and agricultural/industrial context.`;
 
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: CLAUDE_DEFAULT_MODEL,
       max_tokens: 1024,
       system: PROXY_ADVISOR_SYSTEM_PROMPT,
       messages: [
