@@ -5,8 +5,8 @@ import type {
   EmissionsTrace,
   ResolvedEmissionRow,
   ScopeSlice,
-  SourceAttribution,
 } from '@/lib/emissions/types'
+import { resolveSuppressions, computeAttributions } from '@/lib/emissions/coverage-resolver'
 import { getXeroScopeMapping } from '@/lib/xero/scope-card-mapping'
 
 export const dynamic = 'force-dynamic'
@@ -308,36 +308,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // ── Aggregate per (scopeSlice, period) ──────────────────────────────────
-    const attributionMap = new Map<string, SourceAttribution>()
-    for (const row of rows) {
-      const key = `${row.scopeSlice}|${row.period}`
-      let att = attributionMap.get(key)
-      if (!att) {
-        att = {
-          scopeSlice: row.scopeSlice,
-          period: row.period,
-          winningSource: null,
-          kgCO2e: 0,
-          suppressedSources: [],
-        }
-        attributionMap.set(key, att)
-      }
-      if (!row.suppressed) {
-        att.kgCO2e += row.kgCO2e
-        att.winningSource = att.winningSource || row.source
-      } else {
-        const existing = att.suppressedSources.find((s) => s.source === row.source)
-        if (existing) {
-          existing.rowCount += 1
-          existing.kgCO2e += row.kgCO2e
-        } else {
-          att.suppressedSources.push({ source: row.source, rowCount: 1, kgCO2e: row.kgCO2e })
-        }
-      }
-    }
+    // ── Phase 1a: run the resolver to mark suppressions deterministically ───
+    const resolvedRows = resolveSuppressions(rows)
+    const attributions = computeAttributions(resolvedRows)
 
-    // ── Overlap warnings: same (scopeSlice, period) touched by >1 source ────
+    // ── Overlap warnings: pre-resolution, any (slice, period) with >1 raw
+    //    source is flagged so admins see what the resolver had to decide on.
     const warnings: EmissionsTrace['warnings'] = []
     const perKeySources = new Map<string, Set<EmissionSource>>()
     for (const row of rows) {
@@ -346,13 +322,13 @@ export async function GET(request: NextRequest) {
       if (!perKeySources.has(key)) perKeySources.set(key, new Set())
       perKeySources.get(key)!.add(row.source)
     }
-    for (const [key, sources] of perKeySources.entries()) {
+    for (const [key, sources] of Array.from(perKeySources.entries())) {
       if (sources.size < 2) continue
       const [scopeSlice, period] = key.split('|') as [ScopeSlice, string]
       warnings.push({
         scopeSlice,
         period,
-        message: `${sources.size} sources contributing simultaneously — likely double-count`,
+        message: `${sources.size} sources contributing to same slice+period`,
         sources: Array.from(sources),
       })
     }
@@ -361,12 +337,8 @@ export async function GET(request: NextRequest) {
       organizationId: orgId,
       year,
       generatedAt: new Date().toISOString(),
-      rows,
-      attributions: Array.from(attributionMap.values()).sort((a, b) =>
-        a.scopeSlice === b.scopeSlice
-          ? a.period.localeCompare(b.period)
-          : a.scopeSlice.localeCompare(b.scopeSlice),
-      ),
+      rows: resolvedRows,
+      attributions,
       warnings: warnings.sort((a, b) =>
         a.scopeSlice === b.scopeSlice ? a.period.localeCompare(b.period) : a.scopeSlice.localeCompare(b.scopeSlice),
       ),
