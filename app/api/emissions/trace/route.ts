@@ -7,72 +7,16 @@ import type {
   ScopeSlice,
 } from '@/lib/emissions/types'
 import { resolveSuppressions, computeAttributions } from '@/lib/emissions/coverage-resolver'
-import { getXeroScopeMapping } from '@/lib/xero/scope-card-mapping'
+import {
+  UTILITY_SLICE_FACTOR,
+  periodFromDate,
+  scopeSliceForFleet,
+  scopeSliceForOverhead,
+  scopeSliceForXero,
+} from '@/lib/emissions/slice-mapping'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Utility emission factors (mirrors lib/calculations/corporate-emissions.ts).
-// Kept local here so this diagnostic route never silently diverges from a
-// refactor of the main calculator — the Phase 1 resolver will consume them
-// from a single module.
-// ─────────────────────────────────────────────────────────────────────────────
-const UTILITY_FACTOR: Record<string, { factor: number; slice: ScopeSlice }> = {
-  natural_gas: { factor: 0.18293, slice: 'scope1.natural_gas' },
-  natural_gas_m3: { factor: 0.18293 * 10.55, slice: 'scope1.natural_gas' },
-  diesel_stationary: { factor: 2.68787, slice: 'scope1.diesel_stationary' },
-  diesel_mobile: { factor: 2.68787, slice: 'scope1.diesel_mobile' },
-  petrol_mobile: { factor: 2.31, slice: 'scope1.petrol_mobile' },
-  lpg: { factor: 1.55537, slice: 'scope1.lpg' },
-  heavy_fuel_oil: { factor: 3.17740, slice: 'scope1.heavy_fuel_oil' },
-  biomass_solid: { factor: 0.01551, slice: 'scope1.other' },
-  refrigerant_leakage: { factor: 1430, slice: 'scope1.refrigerant' },
-  electricity_grid: { factor: 0.207, slice: 'scope2.electricity' },
-  heat_steam_purchased: { factor: 0.1662, slice: 'scope2.heat_steam' },
-}
-
-const OVERHEAD_CATEGORY_TO_SLICE: Record<string, ScopeSlice> = {
-  business_travel: 'scope3.business_travel',
-  employee_commuting: 'scope3.employee_commuting',
-  capital_goods: 'scope3.capital_goods',
-  operational_waste: 'scope3.operational_waste',
-  downstream_logistics: 'scope3.downstream_logistics',
-  upstream_transport: 'scope3.upstream_transport',
-  downstream_transport: 'scope3.downstream_transport',
-  use_phase: 'scope3.use_phase',
-  purchased_services: 'scope3.purchased_services',
-  purchased_services_materials: 'scope3.marketing_materials',
-}
-
-function periodFromDate(iso: string | null | undefined): string {
-  if (!iso) return 'unknown'
-  return iso.slice(0, 7) // YYYY-MM
-}
-
-function scopeSliceForXero(category: string): ScopeSlice {
-  const mapping = getXeroScopeMapping(category)
-  if (mapping.scope === 1) {
-    if (category === 'natural_gas') return 'scope1.natural_gas'
-    if (category === 'diesel_stationary') return 'scope1.diesel_stationary'
-    if (category === 'diesel_mobile') return 'scope1.diesel_mobile'
-    if (category === 'petrol_mobile') return 'scope1.petrol_mobile'
-    if (category === 'lpg') return 'scope1.lpg'
-    return 'scope1.other'
-  }
-  if (mapping.scope === 2) return 'scope2.electricity'
-  if (mapping.overheadCategory && OVERHEAD_CATEGORY_TO_SLICE[mapping.overheadCategory]) {
-    return OVERHEAD_CATEGORY_TO_SLICE[mapping.overheadCategory]
-  }
-  return 'scope3.other'
-}
-
-function scopeSliceForFleet(scope: string | null): ScopeSlice {
-  if (!scope) return 'scope1.fleet'
-  if (scope.startsWith('Scope 1')) return 'scope1.fleet'
-  if (scope.startsWith('Scope 2')) return 'scope2.fleet'
-  return 'scope3.fleet'
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -164,11 +108,11 @@ export async function GET(request: NextRequest) {
           reporting_period_start: string
         }
         // Pick factor key (handle m³ natural gas variant)
-        let factorKey: keyof typeof UTILITY_FACTOR | null = null
+        let factorKey: keyof typeof UTILITY_SLICE_FACTOR | null = null
         if (rec.utility_type === 'natural_gas' && rec.unit === 'm3') factorKey = 'natural_gas_m3'
-        else if (rec.utility_type in UTILITY_FACTOR) factorKey = rec.utility_type as keyof typeof UTILITY_FACTOR
+        else if (rec.utility_type in UTILITY_SLICE_FACTOR) factorKey = rec.utility_type as keyof typeof UTILITY_SLICE_FACTOR
         if (!factorKey) continue
-        const { factor, slice } = UTILITY_FACTOR[factorKey]
+        const { factor, slice } = UTILITY_SLICE_FACTOR[factorKey]
         rows.push({
           source: 'utility_data_entries',
           sourceRowId: rec.id,
@@ -205,10 +149,7 @@ export async function GET(request: NextRequest) {
           computed_co2e: number | null
         }
         if (!rec.computed_co2e) continue
-        let slice: ScopeSlice = OVERHEAD_CATEGORY_TO_SLICE[rec.category] || 'scope3.other'
-        if (rec.category === 'purchased_services' && rec.material_type) {
-          slice = 'scope3.marketing_materials'
-        }
+        const slice = scopeSliceForOverhead(rec.category, rec.material_type)
         rows.push({
           source: 'corporate_overheads',
           sourceRowId: rec.id,

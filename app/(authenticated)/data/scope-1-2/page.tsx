@@ -223,6 +223,8 @@ export default function CompanyEmissionsPage() {
     totalScope1Kg: xeroScope1Kg,
     totalScope2Kg: xeroScope2Kg,
     totalScope3Kg: xeroScope3Kg,
+    suppressedCount: xeroSuppressedCount,
+    suppressedKg: xeroSuppressedKg,
   } = useXeroTransactions(currentOrganization?.id, selectedYearStart, selectedYearEnd);
 
   // Trend analytics state
@@ -1391,6 +1393,19 @@ export default function CompanyEmissionsPage() {
                         )}
                       </Button>
                     </div>
+
+                    {xeroSuppressedCount > 0 && (
+                      <Card className="border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30">
+                        <CardContent className="py-3 text-sm text-amber-900 dark:text-amber-200">
+                          <span className="font-medium">
+                            {xeroSuppressedCount} Xero transaction{xeroSuppressedCount === 1 ? '' : 's'} hidden
+                          </span>{' '}
+                          ({(xeroSuppressedKg / 1000).toFixed(2)} tCO₂e) because a higher-quality source
+                          (utility bill, corporate overhead entry) already covers the same month. This
+                          prevents double-counting per GHG Protocol.
+                        </CardContent>
+                      </Card>
+                    )}
 
                     <Card>
                       <CardContent className="pt-6">

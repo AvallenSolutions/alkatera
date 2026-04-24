@@ -3,8 +3,11 @@
 /**
  * Hook to fetch un-upgraded Xero transactions for the Company Emissions page.
  *
- * Groups transactions by scope and overhead category so they can be injected
- * into the correct scope tab and card alongside manually entered data.
+ * Phase 1b: runs the emissions coverage resolver against Xero + utility +
+ * overhead rows, so Xero lines that overlap a higher-priority source for
+ * the same (scope slice, month) are filtered out deterministically. This
+ * replaces the old behaviour where only user-driven upgrade_status stopped
+ * the sum.
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -15,11 +18,19 @@ import {
   groupXeroByOverheadCategory,
   type XeroEntry,
 } from '@/lib/xero/scope-card-mapping'
+import { resolveSuppressions } from '@/lib/emissions/coverage-resolver'
+import {
+  UTILITY_SLICE_FACTOR,
+  periodFromDate,
+  scopeSliceForOverhead,
+  scopeSliceForXero,
+} from '@/lib/emissions/slice-mapping'
+import type { EmissionSource, ResolvedEmissionRow } from '@/lib/emissions/types'
 
 export type { XeroEntry }
 
 interface UseXeroTransactionsResult {
-  /** All un-upgraded Xero entries grouped by overhead category key */
+  /** All un-upgraded, non-suppressed Xero entries grouped by overhead category key */
   xeroByCategory: Map<string, XeroEntry[]>
   /** Scope 1 energy entries (gas, diesel, etc.) */
   scope1Entries: XeroEntry[]
@@ -31,6 +42,10 @@ interface UseXeroTransactionsResult {
   totalScope2Kg: number
   /** Total spend-based emissions for Scope 3 (kg) */
   totalScope3Kg: number
+  /** Number of Xero rows hidden by the resolver (a higher-priority source covered the same period). */
+  suppressedCount: number
+  /** kgCO2e hidden by the resolver — useful to explain total changes to users. */
+  suppressedKg: number
   /** Whether data is still loading */
   isLoading: boolean
   /** Whether the org has an active Xero connection */
@@ -49,6 +64,8 @@ export function useXeroTransactions(
     totalScope1Kg: 0,
     totalScope2Kg: 0,
     totalScope3Kg: 0,
+    suppressedCount: 0,
+    suppressedKg: 0,
     isLoading: true,
     hasConnection: false,
   })
@@ -60,86 +77,191 @@ export function useXeroTransactions(
     }
 
     try {
-    const supabase = getSupabaseBrowserClient()
+      const supabase = getSupabaseBrowserClient()
 
-    // Check for Xero connection
-    const { count: connCount } = await supabase
-      .from('xero_connections')
-      .select('id', { count: 'exact', head: true })
-      .eq('organization_id', organizationId)
+      const { count: connCount } = await supabase
+        .from('xero_connections')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
 
-    if (!connCount || connCount === 0) {
-      setResult(prev => ({ ...prev, isLoading: false, hasConnection: false }))
-      return
-    }
+      if (!connCount || connCount === 0) {
+        setResult(prev => ({ ...prev, isLoading: false, hasConnection: false }))
+        return
+      }
 
-    // Fetch un-upgraded Xero transactions within date range
-    const { data } = await supabase
-      .from('xero_transactions')
-      .select('id, xero_contact_name, description, amount, currency, emission_category, spend_based_emissions_kg, transaction_date')
-      .eq('organization_id', organizationId)
-      .not('emission_category', 'is', null)
-      .neq('upgrade_status', 'upgraded')
-      .neq('upgrade_status', 'dismissed')
-      .gte('transaction_date', yearStart)
-      .lte('transaction_date', yearEnd)
+      // Derive year from yearStart (YYYY-MM-DD) for corporate_reports lookup
+      const year = Number(yearStart.slice(0, 4))
 
-    if (!data || data.length === 0) {
-      setResult(prev => ({
-        ...prev,
+      const [xeroRes, facilitiesRes, reportsRes] = await Promise.all([
+        supabase
+          .from('xero_transactions')
+          .select('id, xero_contact_name, description, amount, currency, emission_category, spend_based_emissions_kg, transaction_date, upgrade_status')
+          .eq('organization_id', organizationId)
+          .not('emission_category', 'is', null)
+          .neq('upgrade_status', 'upgraded')
+          .neq('upgrade_status', 'dismissed')
+          .gte('transaction_date', yearStart)
+          .lte('transaction_date', yearEnd),
+        supabase
+          .from('facilities')
+          .select('id')
+          .eq('organization_id', organizationId),
+        supabase
+          .from('corporate_reports')
+          .select('id')
+          .eq('organization_id', organizationId)
+          .eq('year', year),
+      ])
+
+      const xeroData = xeroRes.data || []
+
+      if (xeroData.length === 0) {
+        setResult({
+          xeroByCategory: new Map(),
+          scope1Entries: [],
+          scope2Entries: [],
+          totalScope1Kg: 0,
+          totalScope2Kg: 0,
+          totalScope3Kg: 0,
+          suppressedCount: 0,
+          suppressedKg: 0,
+          isLoading: false,
+          hasConnection: true,
+        })
+        return
+      }
+
+      // Load utility + overhead rows that could outrank a Xero row for the same slice+month
+      const facilityIds = (facilitiesRes.data || []).map((f: { id: string }) => f.id)
+      const reportIds = (reportsRes.data || []).map((r: { id: string }) => r.id)
+
+      const [utilityRes, overheadRes] = await Promise.all([
+        facilityIds.length > 0
+          ? supabase
+              .from('utility_data_entries')
+              .select('id, utility_type, quantity, unit, reporting_period_start')
+              .in('facility_id', facilityIds)
+              .gte('reporting_period_start', yearStart)
+              .lte('reporting_period_start', yearEnd)
+          : Promise.resolve({ data: [] }),
+        reportIds.length > 0
+          ? supabase
+              .from('corporate_overheads')
+              .select('id, category, material_type, entry_date, computed_co2e')
+              .in('report_id', reportIds)
+          : Promise.resolve({ data: [] }),
+      ])
+
+      // Build candidate ResolvedEmissionRow[] for all three sources
+      const rows: ResolvedEmissionRow[] = []
+
+      for (const tx of xeroData) {
+        if (!tx.emission_category || !tx.spend_based_emissions_kg) continue
+        rows.push({
+          source: 'xero_transactions',
+          sourceRowId: tx.id,
+          scopeSlice: scopeSliceForXero(tx.emission_category),
+          period: periodFromDate(tx.transaction_date),
+          kgCO2e: Math.abs(Number(tx.spend_based_emissions_kg) || 0),
+          suppressed: false,
+          suppressedBy: null,
+        })
+      }
+
+      for (const u of (utilityRes.data || []) as Array<{
+        id: string
+        utility_type: string
+        quantity: number
+        unit: string | null
+        reporting_period_start: string
+      }>) {
+        let factorKey: keyof typeof UTILITY_SLICE_FACTOR | null = null
+        if (u.utility_type === 'natural_gas' && u.unit === 'm3') factorKey = 'natural_gas_m3'
+        else if (u.utility_type in UTILITY_SLICE_FACTOR) factorKey = u.utility_type as keyof typeof UTILITY_SLICE_FACTOR
+        if (!factorKey) continue
+        const { factor, slice } = UTILITY_SLICE_FACTOR[factorKey]
+        rows.push({
+          source: 'utility_data_entries',
+          sourceRowId: u.id,
+          scopeSlice: slice,
+          period: periodFromDate(u.reporting_period_start),
+          kgCO2e: Number(u.quantity) * factor,
+          suppressed: false,
+          suppressedBy: null,
+        })
+      }
+
+      for (const o of (overheadRes.data || []) as Array<{
+        id: string
+        category: string
+        material_type: string | null
+        entry_date: string | null
+        computed_co2e: number | null
+      }>) {
+        if (!o.computed_co2e) continue
+        rows.push({
+          source: 'corporate_overheads',
+          sourceRowId: o.id,
+          scopeSlice: scopeSliceForOverhead(o.category, o.material_type),
+          period: periodFromDate(o.entry_date || yearStart),
+          kgCO2e: Number(o.computed_co2e),
+          suppressed: false,
+          suppressedBy: null,
+        })
+      }
+
+      const resolved = resolveSuppressions(rows)
+
+      const suppressedXeroIds = new Set<string>(
+        resolved
+          .filter((r: ResolvedEmissionRow) => r.source === ('xero_transactions' as EmissionSource) && r.suppressed)
+          .map((r: ResolvedEmissionRow) => r.sourceRowId),
+      )
+
+      const suppressedKg = resolved
+        .filter((r: ResolvedEmissionRow) => r.source === ('xero_transactions' as EmissionSource) && r.suppressed)
+        .reduce((s: number, r: ResolvedEmissionRow) => s + r.kgCO2e, 0)
+
+      const keptData = xeroData.filter(tx => !suppressedXeroIds.has(tx.id))
+
+      const entries: XeroEntry[] = keptData.map(tx => ({
+        id: tx.id,
+        supplierName: tx.xero_contact_name || 'Unknown supplier',
+        description: tx.description || '',
+        amount: Math.abs(tx.amount || 0),
+        currency: tx.currency || 'GBP',
+        emissionsKg: Math.abs(tx.spend_based_emissions_kg || 0),
+        date: tx.transaction_date || '',
+        emissionCategory: tx.emission_category!,
+        categoryLabel: CATEGORY_LABELS[tx.emission_category!] || tx.emission_category!,
+      }))
+
+      const grouped = groupXeroByOverheadCategory(entries)
+      const scope1 = grouped.get('scope1') || []
+      const scope2 = grouped.get('scope2') || []
+
+      let totalScope1 = 0
+      let totalScope2 = 0
+      let totalScope3 = 0
+      for (const entry of entries) {
+        const mapping = getXeroScopeMapping(entry.emissionCategory)
+        if (mapping.scope === 1) totalScope1 += entry.emissionsKg
+        else if (mapping.scope === 2) totalScope2 += entry.emissionsKg
+        else totalScope3 += entry.emissionsKg
+      }
+
+      setResult({
+        xeroByCategory: grouped,
+        scope1Entries: scope1,
+        scope2Entries: scope2,
+        totalScope1Kg: totalScope1,
+        totalScope2Kg: totalScope2,
+        totalScope3Kg: totalScope3,
+        suppressedCount: suppressedXeroIds.size,
+        suppressedKg,
         isLoading: false,
         hasConnection: true,
-        xeroByCategory: new Map(),
-        scope1Entries: [],
-        scope2Entries: [],
-        totalScope1Kg: 0,
-        totalScope2Kg: 0,
-        totalScope3Kg: 0,
-      }))
-      return
-    }
-
-    // Map to XeroEntry objects
-    const entries: XeroEntry[] = data.map(tx => ({
-      id: tx.id,
-      supplierName: tx.xero_contact_name || 'Unknown supplier',
-      description: tx.description || '',
-      amount: Math.abs(tx.amount || 0),
-      currency: tx.currency || 'GBP',
-      emissionsKg: Math.abs(tx.spend_based_emissions_kg || 0),
-      date: tx.transaction_date || '',
-      emissionCategory: tx.emission_category!,
-      categoryLabel: CATEGORY_LABELS[tx.emission_category!] || tx.emission_category!,
-    }))
-
-    // Group by overhead category
-    const grouped = groupXeroByOverheadCategory(entries)
-
-    // Extract scope 1/2 entries and calculate totals
-    const scope1 = grouped.get('scope1') || []
-    const scope2 = grouped.get('scope2') || []
-
-    let totalScope1 = 0
-    let totalScope2 = 0
-    let totalScope3 = 0
-
-    for (const entry of entries) {
-      const mapping = getXeroScopeMapping(entry.emissionCategory)
-      if (mapping.scope === 1) totalScope1 += entry.emissionsKg
-      else if (mapping.scope === 2) totalScope2 += entry.emissionsKg
-      else totalScope3 += entry.emissionsKg
-    }
-
-    setResult({
-      xeroByCategory: grouped,
-      scope1Entries: scope1,
-      scope2Entries: scope2,
-      totalScope1Kg: totalScope1,
-      totalScope2Kg: totalScope2,
-      totalScope3Kg: totalScope3,
-      isLoading: false,
-      hasConnection: true,
-    })
+      })
     } catch (err) {
       console.error('Error loading Xero transactions:', err)
       setResult(prev => ({ ...prev, isLoading: false }))
