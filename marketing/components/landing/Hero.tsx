@@ -37,7 +37,7 @@ export const LandingHero = ({ onOpenGuardian }: HeroProps) => {
             <span className="italic text-[#ccff00]">Distilled.</span>
           </h1>
           <p className="font-mono text-sm md:text-lg max-w-xl text-gray-300 leading-relaxed border-l border-[#ccff00] pl-6 mb-10">
-            Carbon is just the start. alkatera is the only sustainability platform built from the ground up for the drinks industry — measuring water, waste, land use, biodiversity, and more, so you can prove your impact, pass any audit, and turn your environmental data into a genuine competitive edge.
+            Sustainability is your next competitive advantage. alka<strong>tera</strong> is the sustainability operating system built for the drinks industry, measuring environmental, social and governance impact, then turning it into audit-ready reports, retailer-ready claims, and the strategy that grows your brand. More than reporting. A strategy engine.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 pl-6">
             <a
