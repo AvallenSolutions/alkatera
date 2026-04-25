@@ -29,7 +29,7 @@ const tiers = [
     annual: { original: 1990, founder: 990, saving: 1000 },
     tagline: "For boutique brands establishing their sustainability foundations.",
     icon: SeedIcon,
-    limits: ["5 Products", "5 LCA Calculations", "1 Team Member", "1 Facility", "5 Suppliers", "10 Reports/mo"],
+    limits: ["10 Products", "10 LCA Calculations", "2 Team Members", "2 Facilities", "10 Suppliers", "10 Reports/mo"],
     features: [
       "Carbon Footprint (GHG) per product",
       "Product Passport",
@@ -49,7 +49,7 @@ const tiers = [
     annual: { original: 3990, founder: 2490, saving: 1500 },
     tagline: "For scaling brands ready to turn impact into a strategic advantage.",
     icon: Flower2,
-    limits: ["20 Products", "20 LCA Calculations", "5 Team Members", "3 Facilities", "25 Suppliers", "50 Reports/mo"],
+    limits: ["30 Products", "30 LCA Calculations", "5 Team Members", "3 Facilities", "50 Suppliers", "50 Reports/mo"],
     features: [
       "Everything in Seed, plus:",
       "Full Scope 3 Categories",
@@ -70,7 +70,7 @@ const tiers = [
     annual: { original: 8990, founder: 5990, saving: 3000 },
     tagline: "Comprehensive ecosystem management for established organisations.",
     icon: TreeDeciduous,
-    limits: ["50 Products", "50 LCA Calculations", "10 Team Members", "8 Facilities", "100 Suppliers", "200 Reports/mo"],
+    limits: ["100 Products", "100 LCA Calculations", "10 Team Members", "10 Facilities", "200 Suppliers", "200 Reports/mo"],
     features: [
       "Everything in Blossom, plus:",
       "Impact Valuation: Monetise Your Sustainability Impact",

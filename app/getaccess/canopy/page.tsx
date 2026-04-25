@@ -27,9 +27,9 @@ type Step = 'account' | 'organization' | 'payment'
 type BillingInterval = 'monthly' | 'annual'
 
 const CANOPY_FEATURES = [
-  '50 Products & 50 LCA Calculations',
-  '10 Team Members & 8 Facilities',
-  '100 Suppliers & 200 Reports/mo',
+  '100 Products & 100 LCA Calculations',
+  '10 Team Members & 10 Facilities',
+  '200 Suppliers & 200 Reports/mo',
   'Full Scope 1, 2 & 3 Emissions',
   'All ESG modules incl. Governance & Ethics',
   'CSRD, GRI, ISO & SBTi Certifications',
