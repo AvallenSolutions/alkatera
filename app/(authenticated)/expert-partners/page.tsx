@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
-  Handshake,
   ExternalLink,
   Mail,
   Leaf,
@@ -189,16 +188,20 @@ export default function ExpertPartnersPage() {
       {/* Impact Focus Hero Card */}
       <Card className="border-2 border-emerald-200 dark:border-emerald-800/50 bg-gradient-to-br from-white to-emerald-50/30 dark:from-slate-900 dark:to-emerald-950/20">
         <CardHeader>
-          <div className="flex items-start justify-between">
-            <div className="space-y-2">
-              <CardTitle className="text-2xl flex items-center gap-2">
-                <Handshake className="h-6 w-6 text-emerald-600" />
-                Impact Focus
-              </CardTitle>
-              <CardDescription className="text-base max-w-xl">
-                Specialist sustainability consultancy with deep roots in the food and drink industry.
-                Combining genuine strategic expertise with best-in-class sustainability communications.
-              </CardDescription>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-4 min-w-0">
+              <img
+                src="/images/partners/impact-focus/logo.png"
+                alt="Impact Focus"
+                className="h-16 w-auto shrink-0 rounded-md bg-white p-2 dark:bg-white/90"
+              />
+              <div className="space-y-2">
+                <CardTitle className="text-2xl">Impact Focus</CardTitle>
+                <CardDescription className="text-base max-w-xl">
+                  Specialist sustainability consultancy with deep roots in the food and drink industry.
+                  Combining genuine strategic expertise with best-in-class sustainability communications.
+                </CardDescription>
+              </div>
             </div>
             {isCanopyWithCredit && (creditStatus === 'available' || creditStatus === 'pending') && (
               <Badge variant="neon-lime" className="text-sm px-3 py-1 shrink-0">
