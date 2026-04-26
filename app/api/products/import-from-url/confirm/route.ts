@@ -117,10 +117,20 @@ export async function POST(request: NextRequest) {
       .insert(rows)
       .select('id');
 
-    if (error) throw error;
+    if (error) {
+      console.error('[import-from-url/confirm] products insert failed:', error);
+      return NextResponse.json(
+        { error: `Could not create products: ${error.message}`, details: error.details ?? null, code: error.code ?? null },
+        { status: 500 }
+      );
+    }
 
     const createdIds: string[] = (data ?? []).map((p: any) => String(p.id));
 
+    // From here on, products are already created. Post-insert work
+    // (multipacks, packaging, ingredients, count tracking) is best-effort —
+    // log failures but don't fail the request.
+    try {
     // Wire up multipack components now that every product has a real ID.
     const multipackRows: Array<{
       multipack_product_id: string;
@@ -261,6 +271,10 @@ export async function POST(request: NextRequest) {
           .eq('id', organizationId);
       }
     }
+    } catch (postInsertErr: any) {
+      // Products were created successfully; this is non-fatal enrichment work.
+      console.error('[import-from-url/confirm] post-insert enrichment failed (non-fatal):', postInsertErr);
+    }
 
     return NextResponse.json({
       created: createdIds.length,
@@ -268,6 +282,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('[import-from-url/confirm] Error:', error);
-    return NextResponse.json({ error: 'Failed to create products' }, { status: 500 });
+    return NextResponse.json(
+      { error: error?.message || 'Failed to create products', code: error?.code ?? null },
+      { status: 500 }
+    );
   }
 }

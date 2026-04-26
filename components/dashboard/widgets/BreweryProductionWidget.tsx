@@ -32,9 +32,12 @@ export function BreweryProductionWidget() {
   const [brewwConnected, setBrewwConnected] = useState(false)
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null)
 
+  // Breww is a brewery management system — only relevant to beer/cider orgs.
+  const isBreweryOrg = currentOrganization?.product_type === 'Beer & Cider'
+
   useEffect(() => {
     async function load() {
-      if (!currentOrganization?.id) {
+      if (!currentOrganization?.id || !isBreweryOrg) {
         setLoading(false)
         return
       }
@@ -113,7 +116,13 @@ export function BreweryProductionWidget() {
       }
     }
     load()
-  }, [currentOrganization?.id])
+  }, [currentOrganization?.id, isBreweryOrg])
+
+  // Hide widget entirely for non-brewery orgs (spirits, wine, etc.). Breww is a
+  // brewery-only integration and should only surface on the dashboard for breweries.
+  if (!isBreweryOrg) {
+    return null
+  }
 
   if (loading) {
     return (
