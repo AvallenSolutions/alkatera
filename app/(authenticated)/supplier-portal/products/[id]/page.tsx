@@ -260,8 +260,23 @@ export default function SupplierProductDetailPage() {
       return;
     }
 
-    // Validate percentage fields are within 0-100
+    // Packaging products must declare weight and recycled content. Buyers
+    // rely on these for LCA calculations and EPR reporting — defaults
+    // (0g, blank %) misrepresent the packaging.
     const pctRecycled = parseNum(recycledContentPct);
+    if (productType === 'packaging') {
+      const w = parseNum(weightG);
+      if (w === null || w <= 0) {
+        setError('Weight per unit (g) is required for packaging products and must be greater than 0');
+        return;
+      }
+      if (pctRecycled === null) {
+        setError('Recycled content (%) is required for packaging products. Enter 0 if the packaging contains no recycled material.');
+        return;
+      }
+    }
+
+    // Validate percentage fields are within 0-100
     const pctRecyclability = parseNum(recyclabilityPct);
     if (pctRecycled !== null && (pctRecycled < 0 || pctRecycled > 100)) {
       setError('Recycled content must be between 0% and 100%');
@@ -821,7 +836,9 @@ export default function SupplierProductDetailPage() {
                     <p className="text-xs text-muted-foreground">How this packaging is counted or measured</p>
                   </div>
                   <div className="space-y-2">
-                    <Label>Weight per Unit (g)</Label>
+                    <Label>
+                      Weight per Unit (g) <span className="text-destructive">*</span>
+                    </Label>
                     <Input
                       type="number"
                       step="any"
@@ -829,8 +846,11 @@ export default function SupplierProductDetailPage() {
                       value={weightG}
                       onChange={(e) => setWeightG(e.target.value)}
                       placeholder="e.g., 83"
+                      required
                     />
-                    <p className="text-xs text-muted-foreground">Weight of a single unit in grams</p>
+                    <p className="text-xs text-muted-foreground">
+                      Weight of a single unit in grams. Required for packaging — buyers use this for LCA and EPR reporting.
+                    </p>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -947,7 +967,10 @@ export default function SupplierProductDetailPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Recycled Content (%)</Label>
+                <Label>
+                  Recycled Content (%)
+                  {productType === 'packaging' && <span className="text-destructive"> *</span>}
+                </Label>
                 <Input
                   type="number"
                   step="any"
@@ -956,8 +979,13 @@ export default function SupplierProductDetailPage() {
                   value={recycledContentPct}
                   onChange={(e) => setRecycledContentPct(e.target.value)}
                   placeholder="e.g., 30"
+                  required={productType === 'packaging'}
                 />
-                <p className="text-xs text-muted-foreground">Percentage of recycled material in this product</p>
+                <p className="text-xs text-muted-foreground">
+                  {productType === 'packaging'
+                    ? 'Required for packaging. Enter 0 if the packaging contains no recycled material.'
+                    : 'Percentage of recycled material in this product'}
+                </p>
               </div>
               <div className="space-y-2">
                 <Label>Recyclability (%)</Label>
