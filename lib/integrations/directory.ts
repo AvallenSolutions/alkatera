@@ -275,3 +275,35 @@ export function integrationsByCategory(): Record<IntegrationCategory, Integratio
 export function getProvider(slug: string): IntegrationProvider | undefined {
   return INTEGRATIONS.find((p) => p.slug === slug)
 }
+
+/**
+ * Resolve the per-org feature flag that gates this integration. Defaults to
+ * `${slug}_integration_beta` so we don't have to duplicate the convention on
+ * every row, but a provider can override via `featureFlag` if needed.
+ *
+ * Every integration is gated this way — Tim flips the flag in
+ * /admin/beta-access and the integration becomes visible/connectable to that
+ * org. Until then the user sees a ComingSoonCard with a "private beta" note.
+ */
+export function getIntegrationFeatureFlag(p: IntegrationProvider): `${string}_integration_beta` {
+  return (p.featureFlag ?? `${p.slug}_integration_beta`) as `${string}_integration_beta`
+}
+
+export interface IntegrationBetaFeature {
+  code: string
+  label: string
+  description: string
+  providerSlug: string
+}
+
+/**
+ * Single source of truth for the admin beta-access UI and the backend
+ * whitelist on PATCH /api/admin/beta-access. Adding a new provider to
+ * INTEGRATIONS automatically registers its flag here.
+ */
+export const INTEGRATION_BETA_FEATURES: IntegrationBetaFeature[] = INTEGRATIONS.map((p) => ({
+  code: getIntegrationFeatureFlag(p),
+  label: p.name,
+  description: p.description,
+  providerSlug: p.slug,
+}))

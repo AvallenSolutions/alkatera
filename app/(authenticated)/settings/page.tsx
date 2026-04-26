@@ -1102,9 +1102,7 @@ export default function SettingsPage() {
         </TabsContent>}
 
         {isOrgAdmin && <TabsContent value="integrations" className="space-y-4">
-          <FeatureGate feature="xero_integration_beta">
-            <IntegrationsSettings showHeader={false} />
-          </FeatureGate>
+          <IntegrationsSettings showHeader={false} />
         </TabsContent>}
 
         {isOrgAdmin && <TabsContent value="lca-templates" className="space-y-4">

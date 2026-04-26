@@ -110,8 +110,12 @@ export type FeatureCode =
   | "arable_beta"
   // Pulse (beta)
   | "pulse_beta"
-  // Breww brewery-management integration (beta)
-  | "breww_integration_beta";
+  // Per-integration beta flags. Each integration in
+  // lib/integrations/directory.ts gates on `${slug}_integration_beta`; we
+  // accept any slug here so adding a provider doesn't require touching
+  // this union. The admin whitelist in /api/admin/beta-access keeps the
+  // server-side guard tight.
+  | `${string}_integration_beta`;
 
 export type TierName = "seed" | "blossom" | "canopy";
 export type TierLevel = 1 | 2 | 3;
@@ -424,9 +428,21 @@ export function useSubscription() {
 
   const hasFeature = useCallback(
     (featureCode: FeatureCode): boolean => {
-      // Beta features require explicit admin grant via feature_flags — tier fallback is intentionally skipped
-      const betaOnlyFeatures: FeatureCode[] = ['impact_valuation_beta', 'epr_beta', 'xero_integration_beta', 'viticulture_beta', 'orchard_beta', 'arable_beta', 'pulse_beta', 'breww_integration_beta'];
-      if (betaOnlyFeatures.includes(featureCode)) {
+      // Beta features require explicit admin grant via feature_flags — tier
+      // fallback is intentionally skipped. Product betas are enumerated
+      // explicitly; integration betas use the `*_integration_beta` suffix so
+      // we don't have to maintain a parallel list as the directory grows.
+      const productBetas: FeatureCode[] = [
+        'impact_valuation_beta',
+        'epr_beta',
+        'viticulture_beta',
+        'orchard_beta',
+        'arable_beta',
+        'pulse_beta',
+      ];
+      const isIntegrationBeta =
+        typeof featureCode === 'string' && featureCode.endsWith('_integration_beta');
+      if (productBetas.includes(featureCode) || isIntegrationBeta) {
         return state.usage?.features?.includes(featureCode) ?? false;
       }
       // Check the DB features list first

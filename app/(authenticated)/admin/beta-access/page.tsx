@@ -17,8 +17,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { FlaskConical, Search, Shield } from 'lucide-react';
+import { FlaskConical, Plug, Search, Shield } from 'lucide-react';
 import { toast } from 'sonner';
+import { INTEGRATION_BETA_FEATURES, type IntegrationBetaFeature } from '@/lib/integrations/directory';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -214,9 +215,13 @@ export default function AdminBetaAccessPage() {
       )
     : organizations;
 
-  // Count orgs with any beta access
-  const betaCount = organizations.filter(
-    (org) => BETA_FEATURES.some((f) => org.feature_flags?.[f.code] === true)
+  // Count orgs with any beta access (product or integration).
+  const allFeatureCodes = [
+    ...BETA_FEATURES.map((f) => f.code),
+    ...INTEGRATION_BETA_FEATURES.map((f) => f.code),
+  ];
+  const betaCount = organizations.filter((org) =>
+    allFeatureCodes.some((code) => org.feature_flags?.[code] === true)
   ).length;
 
   // ── Auth guard ──────────────────────────────────────────────────────────
@@ -279,9 +284,9 @@ export default function AdminBetaAccessPage() {
         </Card>
       </div>
 
-      {/* Search + Table */}
+      {/* Search */}
       <Card>
-        <CardHeader>
+        <CardContent className="py-4">
           <div className="flex items-center gap-3">
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -293,37 +298,115 @@ export default function AdminBetaAccessPage() {
               />
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="space-y-3">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : (
+        </CardContent>
+      </Card>
+
+      {/* Product betas */}
+      <FeatureToggleTable
+        title="Product betas"
+        icon={<FlaskConical className="h-4 w-4 text-neon-lime" />}
+        features={BETA_FEATURES.map((f) => ({ code: f.code, label: f.label, description: f.description }))}
+        organizations={filtered}
+        loading={loading}
+        search={search}
+        togglingIds={togglingIds}
+        onToggle={handleToggle}
+      />
+
+      {/* Integration betas — derived from lib/integrations/directory.ts so a
+          new provider entry automatically gets a column here without touching
+          this file. */}
+      <FeatureToggleTable
+        title="Integration betas"
+        icon={<Plug className="h-4 w-4 text-neon-lime" />}
+        subtitle="Granting an integration flag makes that provider's card visible to the org. For providers without a built connect flow yet, the card stays as 'Coming soon' until we build it — the flag still records the org as queued."
+        features={INTEGRATION_BETA_FEATURES.map((f) => ({ code: f.code, label: f.label, description: f.description }))}
+        organizations={filtered}
+        loading={loading}
+        search={search}
+        togglingIds={togglingIds}
+        onToggle={handleToggle}
+      />
+    </div>
+  );
+}
+
+// ─── Feature toggle table ──────────────────────────────────────────────────
+//
+// Renders a table of orgs (rows) × features (columns) with one Switch per
+// cell. Used twice on this page: once for product betas, once for
+// integrations. Splitting the two into separate tables keeps the column
+// count manageable as the integration directory grows.
+
+interface FeatureColumn {
+  code: string;
+  label: string;
+  description: string;
+}
+
+interface FeatureToggleTableProps {
+  title: string;
+  icon: React.ReactNode;
+  subtitle?: string;
+  features: FeatureColumn[];
+  organizations: Organization[];
+  loading: boolean;
+  search: string;
+  togglingIds: Set<string>;
+  onToggle: (orgId: string, featureCode: string, enabled: boolean) => Promise<void>;
+}
+
+function FeatureToggleTable({
+  title,
+  icon,
+  subtitle,
+  features,
+  organizations,
+  loading,
+  search,
+  togglingIds,
+  onToggle,
+}: FeatureToggleTableProps) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          {icon}
+          {title}
+        </CardTitle>
+        {subtitle && <CardDescription>{subtitle}</CardDescription>}
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full" />
+            ))}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[40%]">Organisation</TableHead>
+                  <TableHead className="min-w-[240px]">Organisation</TableHead>
                   <TableHead>Tier</TableHead>
                   <TableHead>Status</TableHead>
-                  {BETA_FEATURES.map((feature) => (
-                    <TableHead key={feature.code} className="text-center">
+                  {features.map((feature) => (
+                    <TableHead key={feature.code} className="text-center min-w-[100px]" title={feature.description}>
                       {feature.label}
                     </TableHead>
                   ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.length === 0 ? (
+                {organizations.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={3 + BETA_FEATURES.length} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={3 + features.length} className="text-center py-8 text-muted-foreground">
                       {search ? 'No organisations match your search' : 'No organisations found'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((org) => (
+                  organizations.map((org) => (
                     <TableRow key={org.id}>
                       <TableCell>
                         <div>
@@ -341,7 +424,7 @@ export default function AdminBetaAccessPage() {
                           {org.subscription_status || 'unknown'}
                         </span>
                       </TableCell>
-                      {BETA_FEATURES.map((feature) => {
+                      {features.map((feature) => {
                         const isEnabled = org.feature_flags?.[feature.code] === true;
                         const toggleKey = `${org.id}-${feature.code}`;
                         const isToggling = togglingIds.has(toggleKey);
@@ -351,9 +434,7 @@ export default function AdminBetaAccessPage() {
                             <Switch
                               checked={isEnabled}
                               disabled={isToggling}
-                              onCheckedChange={(checked) =>
-                                handleToggle(org.id, feature.code, checked)
-                              }
+                              onCheckedChange={(checked) => onToggle(org.id, feature.code, checked)}
                             />
                           </TableCell>
                         );
@@ -363,9 +444,9 @@ export default function AdminBetaAccessPage() {
                 )}
               </TableBody>
             </Table>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

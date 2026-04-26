@@ -1,10 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { INTEGRATION_BETA_FEATURES } from '@/lib/integrations/directory';
 
 export const dynamic = 'force-dynamic';
 
-/** Whitelist of feature codes that admins can toggle per organisation */
-const ALLOWED_FEATURE_CODES = ['impact_valuation_beta', 'epr_beta', 'xero_integration_beta', 'viticulture_beta', 'arable_beta', 'orchard_beta', 'pulse_beta', 'breww_integration_beta'] as const;
+/**
+ * Whitelist of feature codes that admins can toggle per organisation.
+ *
+ * Product betas are hand-curated below. Integration betas are derived from
+ * the registry in lib/integrations/directory.ts so adding a provider there
+ * automatically makes its flag settable here — no need to touch this list
+ * when we register a new integration.
+ */
+const PRODUCT_BETA_CODES = [
+  'impact_valuation_beta',
+  'epr_beta',
+  'viticulture_beta',
+  'arable_beta',
+  'orchard_beta',
+  'pulse_beta',
+] as const;
+
+const ALLOWED_FEATURE_CODES = new Set<string>([
+  ...PRODUCT_BETA_CODES,
+  ...INTEGRATION_BETA_FEATURES.map((f) => f.code),
+]);
 
 /**
  * GET /api/admin/beta-access
@@ -100,7 +120,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Validate feature code is in the whitelist
-    if (!ALLOWED_FEATURE_CODES.includes(feature_code as typeof ALLOWED_FEATURE_CODES[number])) {
+    if (!ALLOWED_FEATURE_CODES.has(feature_code)) {
       return NextResponse.json(
         { error: `Feature code "${feature_code}" is not a valid beta feature` },
         { status: 400 }

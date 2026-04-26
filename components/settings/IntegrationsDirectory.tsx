@@ -14,6 +14,7 @@ import {
   INTEGRATIONS,
   CATEGORY_LABEL,
   CATEGORY_ORDER,
+  getIntegrationFeatureFlag,
   type IntegrationProvider,
   type IntegrationCategory,
 } from '@/lib/integrations/directory'
@@ -123,7 +124,17 @@ function ProviderCard({
   hasFeature: ReturnType<typeof useSubscription>['hasFeature']
   onRefreshConnections: () => void
 }) {
-  // Xero: preserve existing connect card verbatim. Its own hook handles state.
+  // Uniform gate: every integration is gated by its feature flag. Until the
+  // org has the flag, render the ComingSoonCard with the "private beta" note
+  // — the same UX Breww has had all along.
+  const betaGranted = hasFeature(getIntegrationFeatureFlag(provider))
+  if (!betaGranted) {
+    return <ComingSoonCard provider={provider} note="In private beta — request access to enable." />
+  }
+
+  // Beta granted: providers with bespoke connect cards render those; the rest
+  // stay on ComingSoonCard until we build their connect flow (the flag still
+  // signals "this org is in the queue" even when no live card exists yet).
   if (provider.slug === 'xero') {
     return (
       <div className="sm:col-span-2 lg:col-span-3">
@@ -131,21 +142,13 @@ function ProviderCard({
       </div>
     )
   }
-
-  // Breww: render its connect card inline so users connect/disconnect in place.
   if (provider.slug === 'breww') {
-    const betaGranted = hasFeature('breww_integration_beta')
-    if (!betaGranted) {
-      return <ComingSoonCard provider={provider} note="In private beta — request access to enable." />
-    }
     return (
       <div className="sm:col-span-2 lg:col-span-3">
         <BrewwConnectionCard connection={connection} onChanged={onRefreshConnections} />
       </div>
     )
   }
-
-  // All other providers: coming soon with request-access CTA.
   return <ComingSoonCard provider={provider} />
 }
 
