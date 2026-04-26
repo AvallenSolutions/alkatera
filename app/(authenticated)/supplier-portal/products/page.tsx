@@ -92,7 +92,10 @@ export default function SupplierProductsPage() {
   const [previewProduct, setPreviewProduct] = useState<SupplierProduct | null>(null);
 
   // Simple "Add Product" form state
-  const [productType, setProductType] = useState<SupplierProductType>('ingredient');
+  // No default — supplier must actively pick Ingredient or Packaging.
+  // Otherwise packaging suppliers (e.g. Frugalpac) silently inherit
+  // 'ingredient' and their products end up in the wrong spec section.
+  const [productType, setProductType] = useState<SupplierProductType | null>(null);
   const [productName, setProductName] = useState('');
   const [unit, setUnit] = useState('');
   const [category, setCategory] = useState('');
@@ -136,7 +139,7 @@ export default function SupplierProductsPage() {
   }
 
   const resetForm = () => {
-    setProductType('ingredient');
+    setProductType(null);
     setProductName('');
     setUnit('');
     setCategory('');
@@ -148,6 +151,11 @@ export default function SupplierProductsPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supplier) return;
+
+    if (!productType) {
+      setError('Please choose Ingredient or Packaging');
+      return;
+    }
 
     const effectiveUnit = productType === 'packaging' ? (unit.trim() || 'unit') : unit.trim();
 

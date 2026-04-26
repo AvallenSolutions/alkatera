@@ -6,13 +6,26 @@ import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, ArrowRight, Package, SkipForward, Loader2, CheckCircle2 } from 'lucide-react'
+import {
+  ArrowLeft,
+  ArrowRight,
+  Package,
+  SkipForward,
+  Loader2,
+  CheckCircle2,
+  Wheat,
+  Box,
+} from 'lucide-react'
 import { toast } from 'sonner'
+import {
+  PACKAGING_CATEGORY_LABELS,
+  type PackagingCategoryType,
+  type SupplierProductType,
+} from '@/lib/types/supplier-product'
 
-const PRODUCT_CATEGORIES = [
+const INGREDIENT_CATEGORIES = [
   'Raw Material',
   'Ingredient',
-  'Packaging',
   'Finished Product',
   'Chemical',
   'Energy',
@@ -23,14 +36,19 @@ const PRODUCT_CATEGORIES = [
 export function SupplierAddProduct() {
   const { completeStep, previousStep, skipStep } = useSupplierOnboarding()
 
+  // Required up-front choice — no default. Must pick Ingredient or Packaging
+  // before the rest of the form unlocks. This is what stops packaging
+  // suppliers from accidentally registering products as ingredients.
+  const [productType, setProductType] = useState<SupplierProductType | null>(null)
   const [productName, setProductName] = useState('')
   const [category, setCategory] = useState('')
   const [unit, setUnit] = useState('kg')
+  const [packagingCategory, setPackagingCategory] = useState<PackagingCategoryType | ''>('')
+  const [weightG, setWeightG] = useState('')
   const [supplierId, setSupplierId] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [productAdded, setProductAdded] = useState(false)
 
-  // Get the supplier ID
   useEffect(() => {
     async function loadSupplier() {
       const supabase = getSupabaseBrowserClient()
@@ -51,23 +69,41 @@ export function SupplierAddProduct() {
   }, [])
 
   const handleAddProduct = async () => {
-    if (!supplierId || !productName.trim()) {
+    if (!supplierId) return
+    if (!productType) {
+      toast.error('Please choose Ingredient or Packaging')
+      return
+    }
+    if (!productName.trim()) {
       toast.error('Please enter a product name')
+      return
+    }
+    if (productType === 'packaging' && !packagingCategory) {
+      toast.error('Please choose a packaging category')
       return
     }
 
     setIsSaving(true)
     try {
       const supabase = getSupabaseBrowserClient()
-      const { error } = await supabase
-        .from('supplier_products')
-        .insert({
-          supplier_id: supplierId,
-          name: productName.trim(),
-          category: category || null,
-          unit: unit || 'kg',
-          is_active: true,
-        })
+
+      const insertData: Record<string, any> = {
+        supplier_id: supplierId,
+        name: productName.trim(),
+        product_type: productType,
+        is_active: true,
+      }
+
+      if (productType === 'ingredient') {
+        insertData.category = category || null
+        insertData.unit = unit || 'kg'
+      } else {
+        insertData.unit = 'unit'
+        insertData.packaging_category = packagingCategory
+        insertData.weight_g = weightG ? parseFloat(weightG) : null
+      }
+
+      const { error } = await supabase.from('supplier_products').insert(insertData)
 
       if (error) throw error
 
@@ -80,6 +116,11 @@ export function SupplierAddProduct() {
       setIsSaving(false)
     }
   }
+
+  const canSubmit =
+    !!productType &&
+    productName.trim().length > 0 &&
+    (productType === 'ingredient' || !!packagingCategory)
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 animate-in fade-in duration-300">
@@ -106,60 +147,154 @@ export function SupplierAddProduct() {
           </div>
         ) : (
           <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 space-y-4">
+            {/* Product type — required choice. No default so packaging
+                suppliers (e.g. bottle, label, closure makers) actively pick
+                Packaging instead of inheriting the ingredient default. */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-white/70">
+                Product Type <span className="text-red-400">*</span>
+              </Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setProductType('ingredient')}
+                  disabled={isSaving}
+                  className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg border text-sm font-medium transition-all ${
+                    productType === 'ingredient'
+                      ? 'border-[#ccff00]/50 bg-[#ccff00]/10 text-white'
+                      : 'border-white/10 bg-white/5 text-white/50 hover:border-white/20'
+                  }`}
+                >
+                  <Wheat className="h-4 w-4" />
+                  Ingredient
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProductType('packaging')}
+                  disabled={isSaving}
+                  className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg border text-sm font-medium transition-all ${
+                    productType === 'packaging'
+                      ? 'border-purple-400/60 bg-purple-400/10 text-white'
+                      : 'border-white/10 bg-white/5 text-white/50 hover:border-white/20'
+                  }`}
+                >
+                  <Box className="h-4 w-4" />
+                  Packaging
+                </button>
+              </div>
+              {productType === 'packaging' && (
+                <p className="text-xs text-white/50">
+                  Choose Packaging for bottles, cans, labels, closures, cases, or other physical packaging components.
+                </p>
+              )}
+              {productType === 'ingredient' && (
+                <p className="text-xs text-white/50">
+                  Choose Ingredient for raw materials, ferments, flavours, or anything that goes inside the product.
+                </p>
+              )}
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="sup-prod-name" className="text-sm font-medium text-white/70">
                 Product Name <span className="text-red-400">*</span>
               </Label>
               <Input
                 id="sup-prod-name"
-                placeholder="e.g., Organic Pale Malt"
+                placeholder={
+                  productType === 'packaging'
+                    ? 'e.g., Frugal Bottle 750ml'
+                    : productType === 'ingredient'
+                    ? 'e.g., Organic Pale Malt'
+                    : 'Pick Ingredient or Packaging first'
+                }
                 value={productName}
                 onChange={e => setProductName(e.target.value)}
-                disabled={isSaving}
+                disabled={isSaving || !productType}
                 className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="sup-prod-category" className="text-sm font-medium text-white/70">
-                  Category
-                </Label>
-                <select
-                  id="sup-prod-category"
-                  value={category}
-                  onChange={e => setCategory(e.target.value)}
-                  disabled={isSaving}
-                  className="flex h-10 w-full rounded-md border bg-white/5 border-white/10 px-3 py-2 text-sm text-white focus:ring-[#ccff00]/50 focus:ring-2 focus:outline-none"
-                >
-                  <option value="" className="bg-zinc-900">Select...</option>
-                  {PRODUCT_CATEGORIES.map(cat => (
-                    <option key={cat} value={cat} className="bg-zinc-900">{cat}</option>
-                  ))}
-                </select>
+            {productType === 'ingredient' && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="sup-prod-category" className="text-sm font-medium text-white/70">
+                    Category
+                  </Label>
+                  <select
+                    id="sup-prod-category"
+                    value={category}
+                    onChange={e => setCategory(e.target.value)}
+                    disabled={isSaving}
+                    className="flex h-10 w-full rounded-md border bg-white/5 border-white/10 px-3 py-2 text-sm text-white focus:ring-[#ccff00]/50 focus:ring-2 focus:outline-none"
+                  >
+                    <option value="" className="bg-zinc-900">Select...</option>
+                    {INGREDIENT_CATEGORIES.map(cat => (
+                      <option key={cat} value={cat} className="bg-zinc-900">{cat}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sup-prod-unit" className="text-sm font-medium text-white/70">
+                    Unit
+                  </Label>
+                  <select
+                    id="sup-prod-unit"
+                    value={unit}
+                    onChange={e => setUnit(e.target.value)}
+                    disabled={isSaving}
+                    className="flex h-10 w-full rounded-md border bg-white/5 border-white/10 px-3 py-2 text-sm text-white focus:ring-[#ccff00]/50 focus:ring-2 focus:outline-none"
+                  >
+                    <option value="kg" className="bg-zinc-900">kg</option>
+                    <option value="litre" className="bg-zinc-900">litre</option>
+                    <option value="unit" className="bg-zinc-900">unit</option>
+                    <option value="tonne" className="bg-zinc-900">tonne</option>
+                  </select>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="sup-prod-unit" className="text-sm font-medium text-white/70">
-                  Unit
-                </Label>
-                <select
-                  id="sup-prod-unit"
-                  value={unit}
-                  onChange={e => setUnit(e.target.value)}
-                  disabled={isSaving}
-                  className="flex h-10 w-full rounded-md border bg-white/5 border-white/10 px-3 py-2 text-sm text-white focus:ring-[#ccff00]/50 focus:ring-2 focus:outline-none"
-                >
-                  <option value="kg" className="bg-zinc-900">kg</option>
-                  <option value="litre" className="bg-zinc-900">litre</option>
-                  <option value="unit" className="bg-zinc-900">unit</option>
-                  <option value="tonne" className="bg-zinc-900">tonne</option>
-                </select>
+            )}
+
+            {productType === 'packaging' && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="sup-pkg-category" className="text-sm font-medium text-white/70">
+                    Packaging Category <span className="text-red-400">*</span>
+                  </Label>
+                  <select
+                    id="sup-pkg-category"
+                    value={packagingCategory}
+                    onChange={e => setPackagingCategory(e.target.value as PackagingCategoryType | '')}
+                    disabled={isSaving}
+                    className="flex h-10 w-full rounded-md border bg-white/5 border-white/10 px-3 py-2 text-sm text-white focus:ring-[#ccff00]/50 focus:ring-2 focus:outline-none"
+                  >
+                    <option value="" className="bg-zinc-900">Select...</option>
+                    {Object.entries(PACKAGING_CATEGORY_LABELS).map(([value, label]) => (
+                      <option key={value} value={value} className="bg-zinc-900">{label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sup-pkg-weight" className="text-sm font-medium text-white/70">
+                    Weight (g)
+                  </Label>
+                  <Input
+                    id="sup-pkg-weight"
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step="0.01"
+                    placeholder="e.g., 92"
+                    value={weightG}
+                    onChange={e => setWeightG(e.target.value)}
+                    disabled={isSaving}
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             <Button
               onClick={handleAddProduct}
-              disabled={isSaving || !productName.trim()}
+              disabled={isSaving || !canSubmit}
               className="w-full bg-white/10 border border-white/20 text-white hover:bg-white/15 font-medium rounded-xl"
             >
               {isSaving ? (
