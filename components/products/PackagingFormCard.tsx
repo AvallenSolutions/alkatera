@@ -658,7 +658,8 @@ export function PackagingFormCard({
       !!p.packaging_category ||
       p.weight_g != null ||
       !!p.primary_material ||
-      !!p.epr_material_code;
+      !!p.epr_material_code ||
+      (typeof p.category === 'string' && p.category.toLowerCase().startsWith('packaging'));
     if (!isPackaging) return false;
     // Further filter by packaging category if set
     if (packaging.packaging_category && p.packaging_category) {

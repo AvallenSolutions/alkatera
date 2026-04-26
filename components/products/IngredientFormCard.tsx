@@ -714,7 +714,11 @@ export function IngredientFormCard({
   // weight_g, primary_material or epr_material_code — disqualifies a row from
   // the ingredient list.
   const looksLikePackaging = (p: any) =>
-    !!p.packaging_category || p.weight_g != null || !!p.primary_material || !!p.epr_material_code;
+    !!p.packaging_category ||
+    p.weight_g != null ||
+    !!p.primary_material ||
+    !!p.epr_material_code ||
+    (typeof p.category === 'string' && p.category.toLowerCase().startsWith('packaging'));
   const ingredientSupplierProducts = (linkedSupplierProducts || []).filter(
     (p: any) => p.product_type === 'ingredient' && !looksLikePackaging(p)
   );
