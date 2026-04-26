@@ -32,6 +32,7 @@ import {
   Wheat,
   Box,
   Eye,
+  Sparkles,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -42,6 +43,7 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet';
 import ProductPreviewPanel from '@/components/suppliers/ProductPreviewPanel';
+import { SmartImportFlow } from '@/components/supplier-portal/SmartImportFlow';
 import {
   Select,
   SelectContent,
@@ -87,6 +89,7 @@ export default function SupplierProductsPage() {
   const [supplier, setSupplier] = useState<SupplierInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [smartImportOpen, setSmartImportOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewProduct, setPreviewProduct] = useState<SupplierProduct | null>(null);
@@ -254,11 +257,33 @@ export default function SupplierProductsPage() {
             Manage your product catalog with environmental data, evidence, and certifications.
           </p>
         </div>
-        <Button onClick={() => { resetForm(); setModalOpen(true); }} disabled={!supplier}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Product
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setSmartImportOpen(true)}
+            disabled={!supplier}
+          >
+            <Sparkles className="mr-2 h-4 w-4" />
+            Smart Import
+          </Button>
+          <Button onClick={() => { resetForm(); setModalOpen(true); }} disabled={!supplier}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Product
+          </Button>
+        </div>
       </div>
+
+      {supplier && (
+        <SmartImportFlow
+          open={smartImportOpen}
+          onClose={() => setSmartImportOpen(false)}
+          supplierId={supplier.id}
+          onSuccess={() => {
+            setSmartImportOpen(false);
+            loadData();
+          }}
+        />
+      )}
 
       {!supplier ? (
         <div className="py-16 text-center">
