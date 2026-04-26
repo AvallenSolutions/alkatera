@@ -277,16 +277,21 @@ export function getProvider(slug: string): IntegrationProvider | undefined {
 }
 
 /**
- * Resolve the per-org feature flag that gates this integration. Defaults to
- * `${slug}_integration_beta` so we don't have to duplicate the convention on
- * every row, but a provider can override via `featureFlag` if needed.
+ * Returns the per-org feature flag for a provider that's actively in private
+ * beta. Returns undefined for providers that are still "Coming soon" — those
+ * render the plain ComingSoonCard (no yellow private-beta note) and have no
+ * row in /admin/beta-access.
  *
- * Every integration is gated this way — Tim flips the flag in
- * /admin/beta-access and the integration becomes visible/connectable to that
- * org. Until then the user sees a ComingSoonCard with a "private beta" note.
+ * To put a new integration into beta: add `featureFlag: 'something_integration_beta'`
+ * to its directory entry. That flips:
+ *   - the user-facing card to the yellow "In private beta — request access"
+ *   - a column in /admin/beta-access so you can grant/revoke per org
+ *   - the whitelist on PATCH /api/admin/beta-access
  */
-export function getIntegrationFeatureFlag(p: IntegrationProvider): `${string}_integration_beta` {
-  return (p.featureFlag ?? `${p.slug}_integration_beta`) as `${string}_integration_beta`
+export function getIntegrationFeatureFlag(
+  p: IntegrationProvider,
+): `${string}_integration_beta` | undefined {
+  return p.featureFlag as `${string}_integration_beta` | undefined
 }
 
 export interface IntegrationBetaFeature {
@@ -298,12 +303,16 @@ export interface IntegrationBetaFeature {
 
 /**
  * Single source of truth for the admin beta-access UI and the backend
- * whitelist on PATCH /api/admin/beta-access. Adding a new provider to
- * INTEGRATIONS automatically registers its flag here.
+ * whitelist on PATCH /api/admin/beta-access. Only providers with an
+ * explicit `featureFlag` (i.e. actively in beta) appear here.
  */
-export const INTEGRATION_BETA_FEATURES: IntegrationBetaFeature[] = INTEGRATIONS.map((p) => ({
-  code: getIntegrationFeatureFlag(p),
-  label: p.name,
-  description: p.description,
-  providerSlug: p.slug,
-}))
+export const INTEGRATION_BETA_FEATURES: IntegrationBetaFeature[] = INTEGRATIONS.flatMap((p) => {
+  const flag = getIntegrationFeatureFlag(p)
+  if (!flag) return []
+  return [{
+    code: flag,
+    label: p.name,
+    description: p.description,
+    providerSlug: p.slug,
+  }]
+})

@@ -124,17 +124,17 @@ function ProviderCard({
   hasFeature: ReturnType<typeof useSubscription>['hasFeature']
   onRefreshConnections: () => void
 }) {
-  // Uniform gate: every integration is gated by its feature flag. Until the
-  // org has the flag, render the ComingSoonCard with the "private beta" note
-  // — the same UX Breww has had all along.
-  const betaGranted = hasFeature(getIntegrationFeatureFlag(provider))
-  if (!betaGranted) {
+  // Providers with an explicit featureFlag are actively in private beta.
+  // Show the yellow "private beta — request access" note unless the org has
+  // been granted access. Everything else falls through to a plain ComingSoonCard.
+  const flag = getIntegrationFeatureFlag(provider)
+  if (flag && !hasFeature(flag)) {
     return <ComingSoonCard provider={provider} note="In private beta — request access to enable." />
   }
 
-  // Beta granted: providers with bespoke connect cards render those; the rest
-  // stay on ComingSoonCard until we build their connect flow (the flag still
-  // signals "this org is in the queue" even when no live card exists yet).
+  // Beta granted (or no flag at all): providers with bespoke connect cards
+  // render those; the rest stay on ComingSoonCard until we build their
+  // connect flow.
   if (provider.slug === 'xero') {
     return (
       <div className="sm:col-span-2 lg:col-span-3">
