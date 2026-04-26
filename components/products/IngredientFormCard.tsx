@@ -709,10 +709,14 @@ export function IngredientFormCard({
   };
 
   // Filter linked supplier products for ingredient context.
-  // Anything carrying a packaging_category is packaging regardless of the
-  // product_type column (which defaults to 'ingredient' on legacy rows).
+  // product_type defaults to 'ingredient' on legacy rows even for packaging
+  // suppliers (e.g. Frugalpac), so any packaging signal — packaging_category,
+  // weight_g, primary_material or epr_material_code — disqualifies a row from
+  // the ingredient list.
+  const looksLikePackaging = (p: any) =>
+    !!p.packaging_category || p.weight_g != null || !!p.primary_material || !!p.epr_material_code;
   const ingredientSupplierProducts = (linkedSupplierProducts || []).filter(
-    (p: any) => p.product_type === 'ingredient' && !p.packaging_category
+    (p: any) => p.product_type === 'ingredient' && !looksLikePackaging(p)
   );
 
   const handleSupplierProductSelect = (product: any) => {
