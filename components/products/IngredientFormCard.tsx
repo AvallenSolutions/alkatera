@@ -708,9 +708,11 @@ export function IngredientFormCard({
     onUpdate(ingredient.tempId, updates);
   };
 
-  // Filter linked supplier products for ingredient context
+  // Filter linked supplier products for ingredient context.
+  // Anything carrying a packaging_category is packaging regardless of the
+  // product_type column (which defaults to 'ingredient' on legacy rows).
   const ingredientSupplierProducts = (linkedSupplierProducts || []).filter(
-    (p: any) => p.product_type === 'ingredient' || !p.product_type
+    (p: any) => p.product_type === 'ingredient' && !p.packaging_category
   );
 
   const handleSupplierProductSelect = (product: any) => {

@@ -648,9 +648,13 @@ export function PackagingFormCard({
     onUpdate(packaging.tempId, updates);
   };
 
-  // Filter linked supplier products for packaging context
+  // Filter linked supplier products for packaging context.
+  // Treat any product with a packaging_category as packaging — older supplier
+  // products may still default to product_type='ingredient' but carry the
+  // packaging_category that proves their real nature.
   const packagingSupplierProducts = (linkedSupplierProducts || []).filter((p: any) => {
-    if (p.product_type !== 'packaging') return false;
+    const isPackaging = p.product_type === 'packaging' || !!p.packaging_category;
+    if (!isPackaging) return false;
     // Further filter by packaging category if set
     if (packaging.packaging_category && p.packaging_category) {
       return p.packaging_category === packaging.packaging_category;
