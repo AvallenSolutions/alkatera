@@ -24,12 +24,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { usePartnerCredits } from '@/hooks/data/usePartnerCredits'
-import { useOrganization } from '@/lib/organizationContext'
-import { redirect } from 'next/navigation'
 import { cn } from '@/lib/utils'
-
-// Temporarily restrict to alkatera Demo org until Impact Focus contract is signed
-const EXPERT_PARTNERS_ALLOWED_ORGS = ['2d86de84-e24e-458b-84b9-fd4057998bda']
 
 interface Service {
   icon: LucideIcon
@@ -173,13 +168,7 @@ const ACCENT_STYLES = {
 
 export default function ExpertPartnersPage() {
   const { creditStatus, creditAmount, isCanopy, isBetaProgramme, monthsSubscribed, billingInterval } = usePartnerCredits()
-  const { currentOrganization } = useOrganization()
   const isCanopyWithCredit = isCanopy && !isBetaProgramme
-
-  // Restrict access until Impact Focus contract is signed
-  if (currentOrganization?.id && !EXPERT_PARTNERS_ALLOWED_ORGS.includes(currentOrganization.id)) {
-    redirect('/')
-  }
 
   return (
     <div className="space-y-10">

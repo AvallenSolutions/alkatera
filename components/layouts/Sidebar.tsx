@@ -268,7 +268,7 @@ const navigationStructure: NavItem[] = [
     children: [
       { name: 'Knowledge Bank',     href: '/knowledge-bank/',     icon: GraduationCap, minTier: 1 },
       { name: 'Greenwash Guardian', href: '/greenwash-guardian/', icon: Leaf,          minTier: 2 },
-      { name: 'Expert Partners',    href: '/expert-partners/',    icon: Handshake,     minTier: 1, allowedOrgs: ['2d86de84-e24e-458b-84b9-fd4057998bda'] },
+      { name: 'Expert Partners',    href: '/expert-partners/',    icon: Handshake,     minTier: 1 },
     ],
   },
   {
@@ -916,6 +916,9 @@ export function Sidebar({ className }: SidebarProps) {
                     { href: '/admin/factors/', icon: Database, label: 'Emission Factors' },
                     { href: '/admin/impact-proxy-values/', icon: TrendingUp, label: 'Impact Proxy Values' },
                     { href: '/admin/beta-access/', icon: FlaskConical, label: 'Beta Access' },
+                    { href: '/admin/emissions-trace/', icon: Eye, label: 'Emissions Trace' },
+                    { href: '/admin/reconciliation/', icon: Scale, label: 'Reconciliation' },
+                    { href: '/admin/demo-seed/', icon: Wheat, label: 'Demo Seed' },
                   ].map(({ href, icon: AdminIcon, label }) => (
                     isCollapsed ? (
                       <Tooltip key={href}>
