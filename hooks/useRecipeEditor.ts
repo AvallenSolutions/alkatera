@@ -8,6 +8,11 @@ import type { IngredientFormData } from "@/components/products/IngredientFormCar
 import type { PackagingFormData } from "@/components/products/PackagingFormCard";
 import type { PackagingCategory } from "@/lib/types/lca";
 import type { MaturationProfile } from "@/lib/types/maturation";
+import type {
+  ProductionStage,
+  StageType,
+  ProductionChainTemplate,
+} from "@/lib/types/products";
 
 interface Product {
   id: string;
@@ -18,6 +23,9 @@ interface Product {
   functional_unit: string | null;
   unit_size_value: number | null;
   unit_size_unit: string | null;
+  recipe_scale_mode?: 'per_unit' | 'per_batch' | null;
+  batch_yield_value?: number | null;
+  batch_yield_unit?: string | null;
   latest_lca_id?: string | null;
 }
 
@@ -108,6 +116,9 @@ export function useRecipeEditor(productId: string, organizationId: string) {
   const [maturationProfile, setMaturationProfile] = useState<MaturationProfile | null>(null);
   const savedMaturationSnapshot = useRef<string>('');
   const [maturationDirty, setMaturationDirty] = useState(false);
+
+  // Production stages (v2: multi-stage recipe chain)
+  const [productionStages, setProductionStages] = useState<ProductionStage[]>([]);
 
   // Autosave: refs for latest form state (avoids stale closures in debounced callback)
   const ingredientFormsRef = useRef(ingredientForms);
@@ -243,6 +254,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
           distance_km: item.distance_km || '',
           carbon_intensity: item.cached_co2_factor || undefined,
           openlca_database: item.openlca_database || undefined,
+          stage_id: item.stage_id || undefined,
         }));
         setIngredientForms(mappedIngredients);
         savedIngredientSnapshot.current = formFingerprint(mappedIngredients);
@@ -328,6 +340,14 @@ export function useRecipeEditor(productId: string, organizationId: string) {
       setMaturationProfile(matProfile as MaturationProfile | null);
       savedMaturationSnapshot.current = matProfile ? JSON.stringify(matProfile) : '';
       setMaturationDirty(false);
+
+      // Load production stages (v2)
+      const { data: stagesData } = await supabase
+        .from("production_stages")
+        .select("*")
+        .eq("product_id", productId)
+        .order("ordinal", { ascending: true });
+      setProductionStages((stagesData || []) as ProductionStage[]);
     } catch (error: any) {
       console.error("Error fetching product data:", error);
       toast.error("Failed to load product data");
@@ -480,6 +500,10 @@ export function useRecipeEditor(productId: string, organizationId: string) {
           materialData.origin_lng = form.origin_lng;
           materialData.origin_address = form.origin_address || null;
           materialData.origin_country_code = form.origin_country_code || null;
+        }
+
+        if (form.stage_id) {
+          materialData.stage_id = form.stage_id;
         }
 
         return materialData;
@@ -1085,6 +1109,197 @@ export function useRecipeEditor(productId: string, organizationId: string) {
     setIngredientForms(items);
   };
 
+  // -------- Production stages (v2) --------
+
+  const refreshStages = useCallback(async () => {
+    const { data } = await supabase
+      .from('production_stages')
+      .select('*')
+      .eq('product_id', productId)
+      .order('ordinal', { ascending: true });
+    setProductionStages((data || []) as ProductionStage[]);
+  }, [productId]);
+
+  const addProductionStage = useCallback(async (input: {
+    name: string;
+    stage_type: StageType;
+    input_volume_l?: number | null;
+    output_volume_l?: number | null;
+    input_abv_percent?: number | null;
+    output_abv_percent?: number | null;
+    notes?: string | null;
+  }) => {
+    const ordinal = productionStages.length;
+    const { error } = await supabase.from('production_stages').insert({
+      product_id: parseInt(productId),
+      ordinal,
+      ...input,
+    });
+    if (error) {
+      toast.error('Failed to add stage');
+      console.error(error);
+      return;
+    }
+    await refreshStages();
+  }, [productId, productionStages.length, refreshStages]);
+
+  const updateProductionStage = useCallback(async (
+    id: string,
+    updates: Partial<Omit<ProductionStage, 'id' | 'product_id' | 'created_at' | 'updated_at'>>,
+  ) => {
+    setProductionStages(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+    const { error } = await supabase
+      .from('production_stages')
+      .update(updates)
+      .eq('id', id);
+    if (error) {
+      toast.error('Failed to update stage');
+      console.error(error);
+      await refreshStages();
+    }
+  }, [refreshStages]);
+
+  const removeProductionStage = useCallback(async (id: string) => {
+    const removed = productionStages.find(s => s.id === id);
+    if (!removed) return;
+    const { error } = await supabase
+      .from('production_stages')
+      .delete()
+      .eq('id', id);
+    if (error) {
+      toast.error('Failed to remove stage');
+      console.error(error);
+      return;
+    }
+    // Re-pack ordinals so the chain stays gap-free
+    const remaining = productionStages
+      .filter(s => s.id !== id)
+      .map((s, idx) => ({ ...s, ordinal: idx }));
+    setProductionStages(remaining);
+    await Promise.all(
+      remaining.map(s =>
+        supabase.from('production_stages').update({ ordinal: s.ordinal }).eq('id', s.id),
+      ),
+    );
+    await refreshStages();
+  }, [productionStages, refreshStages]);
+
+  const reorderProductionStages = useCallback(async (orderedIds: string[]) => {
+    const next = orderedIds
+      .map((id, idx) => {
+        const s = productionStages.find(x => x.id === id);
+        return s ? { ...s, ordinal: idx } : null;
+      })
+      .filter((s): s is ProductionStage => s !== null);
+    setProductionStages(next);
+    await Promise.all(
+      next.map(s =>
+        supabase.from('production_stages').update({ ordinal: s.ordinal }).eq('id', s.id),
+      ),
+    );
+    await refreshStages();
+  }, [productionStages, refreshStages]);
+
+  /**
+   * Apply a chain template: replaces any existing stages with the template's
+   * stage definitions. Existing ingredient rows have their `stage_id` cleared
+   * so the user can re-attach them to the new chain.
+   */
+  const applyProductionTemplate = useCallback(async (template: ProductionChainTemplate) => {
+    // Detach materials from any existing stages
+    await supabase
+      .from('product_materials')
+      .update({ stage_id: null })
+      .eq('product_id', parseInt(productId));
+
+    // Drop existing stages for this product
+    await supabase
+      .from('production_stages')
+      .delete()
+      .eq('product_id', parseInt(productId));
+
+    // Insert template stages
+    const rows = template.stages
+      .sort((a, b) => a.ordinal - b.ordinal)
+      .map((s, idx) => ({
+        product_id: parseInt(productId),
+        ordinal: idx,
+        name: s.name,
+        stage_type: s.stage_type,
+        input_volume_l: s.default_input_volume_l ?? null,
+        output_volume_l: s.default_output_volume_l ?? null,
+        input_abv_percent: s.default_input_abv_percent ?? null,
+        output_abv_percent: s.default_output_abv_percent ?? null,
+      }));
+    const { error } = await supabase.from('production_stages').insert(rows);
+    if (error) {
+      toast.error('Failed to apply template');
+      console.error(error);
+      return;
+    }
+
+    // Link the template on the product for traceability
+    await supabase
+      .from('products')
+      .update({ production_chain_template_id: template.id })
+      .eq('id', productId);
+
+    await refreshStages();
+    toast.success(`Applied ${template.name} chain`);
+  }, [productId, refreshStages]);
+
+  const clearProductionChain = useCallback(async () => {
+    await supabase
+      .from('product_materials')
+      .update({ stage_id: null })
+      .eq('product_id', parseInt(productId));
+    await supabase
+      .from('production_stages')
+      .delete()
+      .eq('product_id', parseInt(productId));
+    await supabase
+      .from('products')
+      .update({ production_chain_template_id: null })
+      .eq('id', productId);
+    setProductionStages([]);
+    toast.success('Production chain cleared');
+  }, [productId]);
+
+  // Persist recipe scale (per_unit vs per_batch) plus batch yield. Optimistic
+  // local update keeps the live impact preview in sync with the toggle.
+  // The DB has a check constraint that requires batch_yield_value + _unit to be
+  // set whenever mode is per_batch, so we defer the DB write until those fields
+  // are filled. Local state updates immediately so the UI reflects the choice.
+  const saveRecipeScale = useCallback(async (input: {
+    recipe_scale_mode: 'per_unit' | 'per_batch';
+    batch_yield_value: number | null;
+    batch_yield_unit: string | null;
+  }) => {
+    if (!product) return;
+    setProduct({ ...product, ...input });
+
+    const isIncompleteBatch =
+      input.recipe_scale_mode === 'per_batch' &&
+      (!input.batch_yield_value || input.batch_yield_value <= 0 || !input.batch_yield_unit);
+    if (isIncompleteBatch) {
+      // Skip the DB write — wait for the user to provide a yield value first.
+      return;
+    }
+
+    const { error } = await supabase
+      .from('products')
+      .update({
+        recipe_scale_mode: input.recipe_scale_mode,
+        batch_yield_value: input.batch_yield_value,
+        batch_yield_unit: input.batch_yield_unit,
+      })
+      .eq('id', product.id);
+    if (error) {
+      toast.error('Failed to save recipe scale');
+      console.error('saveRecipeScale error', error);
+    }
+  }, [product]);
+
   // Dirty state: compare current forms against last-saved snapshot
   const isDirty = formFingerprint(ingredientForms) !== savedIngredientSnapshot.current ||
     formFingerprint(packagingForms) !== savedPackagingSnapshot.current ||
@@ -1122,5 +1337,13 @@ export function useRecipeEditor(productId: string, organizationId: string) {
     updateMaturationProfile,
     saveMaturation,
     removeMaturation,
+    saveRecipeScale,
+    productionStages,
+    addProductionStage,
+    updateProductionStage,
+    removeProductionStage,
+    reorderProductionStages,
+    applyProductionTemplate,
+    clearProductionChain,
   };
 }

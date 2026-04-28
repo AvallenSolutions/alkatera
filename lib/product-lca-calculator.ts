@@ -7,6 +7,7 @@ import { aggregateProductImpacts, type FacilityEmissionsData } from './product-l
 import { generateLcaInterpretation } from './lca-interpretation-engine';
 import { calculateDistance } from './utils/distance-calculator';
 import { boundaryToDbEnum } from './system-boundaries';
+import { computeBottlesPerBatch, type ProductionStage } from './types/products';
 import { calculateMaturationImpacts } from './maturation-calculator';
 import type { MaturationProfile } from './types/maturation';
 import { calculateViticultureImpacts } from './viticulture-calculator';
@@ -1116,6 +1117,45 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       }
     }
 
+    // Fetch production stages (v2). Empty array means v1 batch-mode applies.
+    const { data: stagesRows } = await supabase
+      .from('production_stages')
+      .select('*')
+      .eq('product_id', productId)
+      .order('ordinal', { ascending: true });
+    const productionStages: ProductionStage[] = (stagesRows || []) as ProductionStage[];
+
+    // Resolve the per-bottle allocation divisor. Production-chain mode uses the
+    // bottling stage's output volume as the source of truth for total bottles.
+    // If no chain is defined, fall back to v1 per_batch / per_unit semantics.
+    let chainDivisor: number;
+    if (productionStages.length > 0) {
+      const bottling = productionStages.find(s => s.stage_type === 'bottling');
+      const sizeUnit = (product.unit_size_unit || '').toString().toLowerCase();
+      const sizeFactor = sizeUnit === 'ml' ? 0.001 : sizeUnit === 'l' ? 1 : null;
+      if (
+        bottling?.output_volume_l &&
+        bottling.output_volume_l > 0 &&
+        product.unit_size_value &&
+        sizeFactor
+      ) {
+        const bottleLitres = Number(product.unit_size_value) * sizeFactor;
+        chainDivisor = bottling.output_volume_l / bottleLitres;
+      } else {
+        throw new Error(
+          'Production chain is configured but the bottling stage is missing output_volume_l ' +
+          'or the product has no unit_size_value/unit_size_unit. Allocation cannot proceed.',
+        );
+      }
+    } else {
+      chainDivisor = computeBottlesPerBatch(product);
+    }
+    const bottlesPerBatch = chainDivisor;
+    console.log(
+      `[calculateProductCarbonFootprint] Allocation divisor: ${chainDivisor} bottles ` +
+      `(${productionStages.length > 0 ? 'production-chain' : 'v1 batch-mode/per-unit'})`,
+    );
+
     // Pre-resolve all impact factors in parallel (OpenLCA calls are the slow part).
     // This turns N sequential API calls into concurrent ones, capped at 4 to avoid
     // overwhelming the OpenLCA server.
@@ -1130,7 +1170,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
 
       // Semaphore-based concurrency limiter
       const queue = materialsToResolve.map(m => async () => {
-        const quantityKg = normalizeToKg(m.quantity, m.unit);
+        const quantityKg = normalizeToKg(m.quantity, m.unit) / bottlesPerBatch;
         console.log(`[calculateProductCarbonFootprint] Processing material: ${m.material_name} (${quantityKg} kg)`);
         console.log(`[calculateProductCarbonFootprint] Material OpenLCA data:`, {
           data_source: m.data_source,
@@ -1159,8 +1199,8 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
 
     for (const material of materials) {
       try {
-        // Normalize quantity to kg
-        const quantityKg = normalizeToKg(material.quantity, material.unit);
+        // Normalize quantity to kg, allocating batch totals to the functional unit
+        const quantityKg = normalizeToKg(material.quantity, material.unit) / bottlesPerBatch;
 
         // Use pre-resolved factors (parallel) or pinned factors
         let resolved: WaterfallResult;
@@ -2639,7 +2679,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       calculationFingerprint = await generateCalculationFingerprint({
         materials: materials.map(m => ({
           name: m.material_name,
-          quantity_kg: normalizeToKg(m.quantity, m.unit),
+          quantity_kg: normalizeToKg(m.quantity, m.unit) / bottlesPerBatch,
           data_source_id: m.data_source_id,
         })),
         factorValues: materialResolutions.map((r: any) => ({

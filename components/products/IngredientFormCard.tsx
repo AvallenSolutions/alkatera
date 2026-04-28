@@ -84,6 +84,8 @@ export interface IngredientFormData {
   orchard_id?: string | null;
   // ISO 14067 §7: biogenic carbon classification
   is_biogenic_carbon?: boolean;
+  // v2: production stage this ingredient belongs to (optional)
+  stage_id?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -219,6 +221,18 @@ interface IngredientFormCardProps {
   onUpdate: (tempId: string, updates: Partial<IngredientFormData>) => void;
   onRemove: (tempId: string) => void;
   canRemove: boolean;
+  recipeScaleMode?: 'per_unit' | 'per_batch';
+  batchYieldValue?: number | null;
+  batchYieldUnit?: string | null;
+  productUnitSizeValue?: number | null;
+  productUnitSizeUnit?: string | null;
+  productionStages?: Array<{ id: string; ordinal: number; name: string; stage_type: string }>;
+  /**
+   * Render only one section (used by IngredientEditorTabs for the renovated
+   * sectioned-expand UI). Default 'all' renders the original full card so
+   * existing call sites keep working unchanged.
+   */
+  sectionFilter?: 'all' | 'basics' | 'source' | 'logistics' | 'stage';
 }
 
 /**
@@ -264,6 +278,44 @@ function convertAmount(
   return parseFloat(converted.toPrecision(6));
 }
 
+function formatPerBottle(batchQty: number, unit: string, bottles: number): string {
+  if (!batchQty || !bottles || bottles <= 0) return '–';
+  const perBottle = batchQty / bottles;
+  const u = (unit || '').toLowerCase();
+  if (u === 'kg' && perBottle < 1) return `${(perBottle * 1000).toFixed(1)} g`;
+  if (u === 'l' && perBottle < 1) return `${(perBottle * 1000).toFixed(1)} ml`;
+  if (perBottle < 0.01) return `${perBottle.toFixed(4)} ${unit}`;
+  return `${perBottle.toFixed(2)} ${unit}`;
+}
+
+/**
+ * Live-preview helper: silently returns 1 when batch fields are incomplete so
+ * the UI doesn't throw mid-typing. The authoritative calculator throws on the
+ * same inputs and surfaces a calculation error there.
+ */
+function computeIngredientBottlesPerBatch(input: {
+  recipeScaleMode: 'per_unit' | 'per_batch';
+  batchYieldValue: number | null;
+  batchYieldUnit: string | null;
+  productUnitSizeValue: number | null;
+  productUnitSizeUnit: string | null;
+}): number {
+  if (input.recipeScaleMode !== 'per_batch') return 1;
+  const yieldValue = input.batchYieldValue;
+  const yieldUnit = (input.batchYieldUnit || '').toLowerCase();
+  if (!yieldValue || yieldValue <= 0 || !yieldUnit) return 1;
+  if (yieldUnit === 'bottles' || yieldUnit === 'units') return yieldValue;
+  const yieldToL: Record<string, number> = { ml: 0.001, l: 1, hl: 100, kl: 1000 };
+  const sizeToL: Record<string, number> = { ml: 0.001, l: 1 };
+  const yFactor = yieldToL[yieldUnit];
+  const sFactor = sizeToL[(input.productUnitSizeUnit || '').toLowerCase()];
+  if (!yFactor || !sFactor || !input.productUnitSizeValue) return 1;
+  const batchLitres = yieldValue * yFactor;
+  const bottleLitres = input.productUnitSizeValue * sFactor;
+  if (bottleLitres <= 0) return 1;
+  return batchLitres / bottleLitres;
+}
+
 // Transport mode display labels (used in multi-leg UI)
 const TRANSPORT_MODES: { value: TransportMode; label: string }[] = [
   { value: 'truck', label: 'Road (HGV)' },
@@ -284,7 +336,28 @@ export function IngredientFormCard({
   onUpdate,
   onRemove,
   canRemove,
+  recipeScaleMode = 'per_unit',
+  batchYieldValue = null,
+  batchYieldUnit = null,
+  productUnitSizeValue = null,
+  productUnitSizeUnit = null,
+  productionStages = [],
+  sectionFilter = 'all',
 }: IngredientFormCardProps) {
+  const showAll = sectionFilter === 'all';
+  const showBasics = showAll || sectionFilter === 'basics';
+  const showSource = showAll || sectionFilter === 'source';
+  const showLogistics = showAll || sectionFilter === 'logistics';
+  const showStage = showAll || sectionFilter === 'stage';
+  const bottlesPerBatch = computeIngredientBottlesPerBatch({
+    recipeScaleMode,
+    batchYieldValue,
+    batchYieldUnit,
+    productUnitSizeValue,
+    productUnitSizeUnit,
+  });
+  const isBatchMode = recipeScaleMode === 'per_batch' && bottlesPerBatch > 1;
+
   const { hasFeature } = useSubscription();
   const { currentOrganization } = useOrganization();
   const { isAlkateraAdmin } = useIsAlkateraAdmin();
@@ -384,7 +457,7 @@ export function IngredientFormCard({
 
     if (!ef || !tare || !volume) return null;
 
-    const qty = Number(ingredient.amount);
+    const qty = Number(ingredient.amount) / bottlesPerBatch;
     const unit = (ingredient.unit || '').toLowerCase();
     let warning: string | undefined;
 
@@ -523,7 +596,7 @@ export function IngredientFormCard({
       return;
     }
 
-    const qty = Number(ingredient.amount) || 0;
+    const qty = (Number(ingredient.amount) || 0) / bottlesPerBatch;
     const unit = (ingredient.unit || 'kg').toLowerCase();
     let weightKg = qty;
     if (unit === 'ml') weightKg = qty / 1000;
@@ -545,7 +618,7 @@ export function IngredientFormCard({
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [ingredient.transport_legs, ingredient.transport_mode, ingredient.distance_km, ingredient.amount, ingredient.unit]);
+  }, [ingredient.transport_legs, ingredient.transport_mode, ingredient.distance_km, ingredient.amount, ingredient.unit, bottlesPerBatch]);
 
   // ---------------------------------------------------------------------------
 
@@ -751,36 +824,46 @@ export function IngredientFormCard({
     });
   };
 
-  return (
-    <Card className="border-l-4 border-l-orange-500 bg-amber-50/50 dark:bg-amber-950/20">
-      <div className="p-6 space-y-4">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded bg-orange-500 flex items-center justify-center text-white font-medium text-sm">
-              {index + 1}
+  const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) =>
+    showAll ? (
+      <Card className="border-l-4 border-l-orange-500 bg-amber-50/50 dark:bg-amber-950/20">
+        <div className="p-6 space-y-4">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded bg-orange-500 flex items-center justify-center text-white font-medium text-sm">
+                {index + 1}
+              </div>
+              <div>
+                <h3 className="font-semibold text-orange-800 dark:text-orange-300">
+                  Ingredient {index + 1}
+                </h3>
+                <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">
+                  Use smart search to find ingredients with environmental data
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-semibold text-orange-800 dark:text-orange-300">
-                Ingredient {index + 1}
-              </h3>
-              <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">
-                Use smart search to find ingredients with environmental data
-              </p>
-            </div>
+            {canRemove && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onRemove(ingredient.tempId)}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
           </div>
-          {canRemove && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onRemove(ingredient.tempId)}
-              className="text-destructive hover:text-destructive"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
+          {children}
         </div>
+      </Card>
+    ) : (
+      <div className="space-y-4">{children}</div>
+    );
 
+  return (
+    <Wrapper>
         <div className="space-y-4">
+          {showBasics && <>
           {/* Supplier product suggestions - shown above name when available */}
           {ingredientSupplierProducts.length > 0 && !ingredient.supplier_product_id && (
             <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20 p-3">
@@ -935,7 +1018,7 @@ export function IngredientFormCard({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor={`amount-${ingredient.tempId}`}>
-                Amount <span className="text-destructive">*</span>
+                {isBatchMode ? 'Quantity per batch' : 'Amount'} <span className="text-destructive">*</span>
               </Label>
               <Input
                 id={`amount-${ingredient.tempId}`}
@@ -947,8 +1030,15 @@ export function IngredientFormCard({
                 onChange={(e) => onUpdate(ingredient.tempId, { amount: e.target.value })}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Quantity used per product unit
+                {isBatchMode
+                  ? `Total used per batch — divided by ${bottlesPerBatch.toFixed(0)} bottles`
+                  : 'Quantity used per product unit'}
               </p>
+              {isBatchMode && Number(ingredient.amount) > 0 && (
+                <p className="text-xs text-green-700 dark:text-green-400 mt-1">
+                  ≈ {formatPerBottle(Number(ingredient.amount), ingredient.unit, bottlesPerBatch)} per bottle
+                </p>
+              )}
             </div>
 
             <div>
@@ -984,7 +1074,38 @@ export function IngredientFormCard({
               </Select>
             </div>
           </div>
+          </>}
 
+          {showStage && productionStages.length > 0 && (
+            <div>
+              <Label htmlFor={`stage-${ingredient.tempId}`}>Production stage</Label>
+              <Select
+                value={ingredient.stage_id ?? "__unassigned"}
+                onValueChange={(v) =>
+                  onUpdate(ingredient.tempId, {
+                    stage_id: v === "__unassigned" ? null : v,
+                  })
+                }
+              >
+                <SelectTrigger id={`stage-${ingredient.tempId}`}>
+                  <SelectValue placeholder="Pick a stage" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__unassigned">— Unassigned —</SelectItem>
+                  {productionStages.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.ordinal + 1}. {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Where in the production chain is this ingredient consumed?
+              </p>
+            </div>
+          )}
+
+          {showBasics && (
           <div className="flex items-center gap-6">
             <div className="flex items-center space-x-2">
               <Checkbox
@@ -1029,7 +1150,12 @@ export function IngredientFormCard({
               </TooltipProvider>
             </div>
             )}
+          </div>
+          )}
 
+          {showSource && (
+          <>
+          <div className="flex items-center gap-6 flex-wrap">
             {showViticultureToggle && (
             <div className="flex items-center space-x-2">
               <Checkbox
@@ -1313,8 +1439,10 @@ export function IngredientFormCard({
               )}
             </div>
           )}
+          </>
+          )}
 
-          {!ingredient.is_self_grown && (
+          {showLogistics && !ingredient.is_self_grown && (
           <>
           <div className="pt-2 border-t">
             <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
@@ -1900,6 +2028,7 @@ export function IngredientFormCard({
           </>
           )}
 
+          {showBasics && <>
           {ingredient.data_source && (
             <div className="flex items-center justify-between pt-2 border-t">
               <div className="flex-1">
@@ -1934,8 +2063,8 @@ export function IngredientFormCard({
               </AlertDescription>
             </Alert>
           )}
+          </>}
         </div>
-      </div>
-    </Card>
+    </Wrapper>
   );
 }

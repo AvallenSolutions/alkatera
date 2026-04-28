@@ -120,6 +120,11 @@ interface PackagingFormCardProps {
   onRemove: (tempId: string) => void;
   onAddNewWithType?: (category: PackagingCategory) => void;
   canRemove: boolean;
+  /**
+   * Render only one section (used by PackagingEditorTabs for the renovated
+   * sectioned-expand UI). Default 'all' renders the original full card.
+   */
+  sectionFilter?: 'all' | 'basics' | 'components' | 'logistics' | 'compliance';
 }
 
 // EPR Packaging Activity options
@@ -365,7 +370,13 @@ export function PackagingFormCard({
   onRemove,
   onAddNewWithType,
   canRemove,
+  sectionFilter = 'all',
 }: PackagingFormCardProps) {
+  const showAll = sectionFilter === 'all';
+  const showBasics = showAll || sectionFilter === 'basics';
+  const showComponents = showAll || sectionFilter === 'components';
+  const showLogistics = showAll || sectionFilter === 'logistics';
+  const showCompliance = showAll || sectionFilter === 'compliance';
   const [transportPreview, setTransportPreview] = useState<DistributionResult | null>(null);
   const [transportPreviewLoading, setTransportPreviewLoading] = useState(false);
 
@@ -727,36 +738,46 @@ export function PackagingFormCard({
     onUpdate(packaging.tempId, updates);
   };
 
-  return (
-    <Card className="border-l-4 border-l-orange-500 bg-amber-50/50 dark:bg-amber-950/20">
-      <div className="p-6 space-y-4">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded bg-orange-500 flex items-center justify-center text-white font-medium text-sm">
-              {index + 1}
+  const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) =>
+    showAll ? (
+      <Card className="border-l-4 border-l-orange-500 bg-amber-50/50 dark:bg-amber-950/20">
+        <div className="p-6 space-y-4">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded bg-orange-500 flex items-center justify-center text-white font-medium text-sm">
+                {index + 1}
+              </div>
+              <div>
+                <h3 className="font-semibold text-orange-800 dark:text-orange-300">
+                  Packaging {index + 1}
+                </h3>
+                <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">
+                  Use smart search to find packaging materials with environmental data
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-semibold text-orange-800 dark:text-orange-300">
-                Packaging {index + 1}
-              </h3>
-              <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">
-                Use smart search to find packaging materials with environmental data
-              </p>
-            </div>
+            {canRemove && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onRemove(packaging.tempId)}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
           </div>
-          {canRemove && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onRemove(packaging.tempId)}
-              className="text-destructive hover:text-destructive"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
+          {children}
         </div>
+      </Card>
+    ) : (
+      <div className="space-y-4">{children}</div>
+    );
 
+  return (
+    <Wrapper>
         <div className="space-y-4">
+          {showBasics && (
           <div>
             <Label className="mb-2 block">
               Type <span className="text-destructive">*</span>
@@ -840,9 +861,11 @@ export function PackagingFormCard({
               </div>
             </TooltipProvider>
           </div>
+          )}
 
           {packaging.packaging_category && (
             <>
+              {showBasics && <>
               {/* Supplier product suggestions - shown above name when available */}
               {packagingSupplierProducts.length > 0 && !packaging.supplier_product_id && (
                 <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20 p-3">
@@ -1129,7 +1152,10 @@ export function PackagingFormCard({
                 ['container', 'secondary', 'tertiary'].includes(packaging.packaging_category) && (
                 <CircularitySection packaging={packaging} onUpdate={onUpdate} />
               )}
+              </>}
 
+              {showComponents && (
+              <>
               {/* EPR Material Breakdown Section */}
               <PackagingComponentEditor
                 components={packaging.components || []}
@@ -1140,7 +1166,10 @@ export function PackagingFormCard({
                 })}
                 packagingCategory={packaging.packaging_category || undefined}
               />
+              </>
+              )}
 
+              {showLogistics && (
               <div className="pt-2 border-t">
                 <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
                   <MapPin className="h-4 w-4" />
@@ -1433,13 +1462,19 @@ export function PackagingFormCard({
                   </div>
                 </div>
               </div>
+              )}
 
+              {showCompliance && (
+              <>
               {/* EPR Compliance Section */}
               <EPRComplianceSection
                 packaging={packaging}
                 onUpdate={(updates) => onUpdate(packaging.tempId, updates)}
               />
+              </>
+              )}
 
+              {showBasics && <>
               {packaging.data_source && (
                 <div className="flex items-center justify-between pt-2 border-t">
                   <div className="flex-1">
@@ -1456,11 +1491,11 @@ export function PackagingFormCard({
                   </AlertDescription>
                 </Alert>
               )}
+              </>}
             </>
           )}
         </div>
-      </div>
-    </Card>
+    </Wrapper>
   );
 }
 

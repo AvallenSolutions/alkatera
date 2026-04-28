@@ -27,6 +27,12 @@ import { SearchGuidePanel } from "@/components/products/SearchGuidePanel";
 import { RecipeChecklist } from "@/components/products/RecipeChecklist";
 import { PackagingTemplateDialog } from "@/components/products/PackagingTemplateDialog";
 import { IngredientTemplateDialog } from "@/components/products/IngredientTemplateDialog";
+import { RecipeScaleToggle } from "@/components/products/RecipeScaleToggle";
+import { ProductionChainEditor } from "@/components/products/ProductionChainEditor";
+import { RecipeModePicker } from "@/components/products/RecipeModePicker";
+import { RecipeToolbar } from "@/components/products/RecipeToolbar";
+import { IngredientRow } from "@/components/products/IngredientRow";
+import { PackagingRow } from "@/components/products/PackagingRow";
 import { useRecipeEditor } from "@/hooks/useRecipeEditor";
 import { useIngestStash } from "@/hooks/useIngestStash";
 import { useLinkedSupplierProducts } from "@/hooks/data/useLinkedSupplierProducts";
@@ -63,6 +69,8 @@ export function RecipeEditorPanel({
   const { products: linkedSupplierProducts } = useLinkedSupplierProducts(organizationId);
   const [activeTab, setActiveTab] = useState(initialTab);
   const [showBOMImport, setShowBOMImport] = useState(false);
+  const [showChecklist, setShowChecklist] = useState<boolean>(false);
+  const [showPackagingChecklist, setShowPackagingChecklist] = useState<boolean>(false);
   const [initialBomFile, setInitialBomFile] = useState<File | null>(null);
 
   // Pick up BOM files stashed by the Universal Dropzone (header upload button).
@@ -106,7 +114,19 @@ export function RecipeEditorPanel({
     setIngredientsFromTemplate,
     saveMaturation,
     removeMaturation,
+    saveRecipeScale,
+    productionStages,
+    addProductionStage,
+    updateProductionStage,
+    removeProductionStage,
+    applyProductionTemplate,
+    clearProductionChain,
   } = useRecipeEditor(productId, organizationId);
+
+  const recipeScaleMode = (product?.recipe_scale_mode ?? 'per_unit') as 'per_unit' | 'per_batch';
+  const batchYieldValue = product?.batch_yield_value ?? null;
+  const batchYieldUnit = product?.batch_yield_unit ?? null;
+  const hasProductionChain = productionStages.length > 0;
 
   // Notify parent of dirty state changes
   useEffect(() => {
@@ -315,62 +335,58 @@ export function RecipeEditorPanel({
                   <CardDescription>
                     Build your product recipe with environmental impact data
                   </CardDescription>
-                  <div className="flex gap-2 mt-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setIngredientTemplateDialogMode("browse");
-                        setShowIngredientTemplateDialog(true);
-                      }}
-                    >
-                      <Copy className="h-3.5 w-3.5 mr-1.5" />
-                      Apply Liquid Template
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setIngredientTemplateDialogMode("save");
-                        setShowIngredientTemplateDialog(true);
-                      }}
-                      disabled={ingredientCount === 0}
-                    >
-                      <BookmarkPlus className="h-3.5 w-3.5 mr-1.5" />
-                      Save as Liquid Template
-                    </Button>
-                  </div>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {!compact && (
-                <Alert className="bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
-                  <Sparkles className="h-4 w-4 text-green-600" />
-                  <AlertDescription className="text-sm text-green-800 dark:text-green-200">
-                    <strong>How to Complete This Form</strong>
-                    <br />
-                    1. Use the smart search bar to find ingredients from your supplier network (primary data) or the global database (secondary data)
-                    <br />
-                    2. Enter the quantity used per product unit
-                    <br />
-                    3. Specify the distance from your ingredient source to your processing site for accurate transport calculations
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              <RecipeChecklist
-                productCategory={productCategory}
-                type="ingredient"
-                existingItems={ingredientForms}
-                onQuickAdd={(name, searchQuery) => {
-                  addIngredientWithDefaults(name, searchQuery);
-                }}
+              <RecipeModePicker
+                recipeScaleMode={recipeScaleMode}
+                batchYieldValue={batchYieldValue}
+                batchYieldUnit={batchYieldUnit}
+                productionStages={productionStages}
+                ingredientForms={ingredientForms}
+                productUnitSizeValue={product?.unit_size_value ?? null}
+                productUnitSizeUnit={product?.unit_size_unit ?? null}
+                onSaveScale={saveRecipeScale}
+                onAddStage={addProductionStage}
+                onUpdateStage={updateProductionStage}
+                onRemoveStage={removeProductionStage}
+                onApplyTemplate={applyProductionTemplate}
+                onClearChain={clearProductionChain}
               />
 
-              <div className="space-y-4">
+              <RecipeToolbar
+                itemCount={ingredientCount}
+                onAdd={addIngredient}
+                onApplyTemplate={() => {
+                  setIngredientTemplateDialogMode("browse");
+                  setShowIngredientTemplateDialog(true);
+                }}
+                onSaveAsTemplate={() => {
+                  setIngredientTemplateDialogMode("save");
+                  setShowIngredientTemplateDialog(true);
+                }}
+                onImportBom={() => setShowBOMImport(true)}
+                onToggleChecklist={() => setShowChecklist(s => !s)}
+                showChecklist={showChecklist}
+                primaryAddLabel="Add ingredient"
+                importBomLabel="Import BOM"
+              />
+
+              {showChecklist && (
+                <RecipeChecklist
+                  productCategory={productCategory}
+                  type="ingredient"
+                  existingItems={ingredientForms}
+                  onQuickAdd={(name, searchQuery) => {
+                    addIngredientWithDefaults(name, searchQuery);
+                  }}
+                />
+              )}
+
+              <div className="space-y-2">
                 {ingredientForms.map((ingredient, index) => (
-                  <IngredientFormCard
+                  <IngredientRow
                     key={ingredient.tempId}
                     ingredient={ingredient}
                     index={index}
@@ -382,20 +398,15 @@ export function RecipeEditorPanel({
                     onUpdate={updateIngredient}
                     onRemove={removeIngredient}
                     canRemove={ingredientForms.length > 1}
+                    recipeScaleMode={recipeScaleMode}
+                    batchYieldValue={batchYieldValue}
+                    batchYieldUnit={batchYieldUnit}
+                    productUnitSizeValue={product?.unit_size_value ?? null}
+                    productUnitSizeUnit={product?.unit_size_unit ?? null}
+                    productionStages={productionStages}
                   />
                 ))}
               </div>
-
-              <Button
-                type="button"
-                onClick={addIngredient}
-                variant="outline"
-                className="w-full border-dashed"
-                size={compact ? "default" : "lg"}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Another Ingredient ({ingredientCount}/{ingredientForms.length})
-              </Button>
 
               <div className="flex items-center gap-2 pt-4 border-t">
                 <Button
@@ -432,62 +443,42 @@ export function RecipeEditorPanel({
                   <CardDescription>
                     Define your packaging materials with environmental impact data
                   </CardDescription>
-                  <div className="flex gap-2 mt-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setTemplateDialogMode("browse");
-                        setShowTemplateDialog(true);
-                      }}
-                    >
-                      <Copy className="h-3.5 w-3.5 mr-1.5" />
-                      Apply Template
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setTemplateDialogMode("save");
-                        setShowTemplateDialog(true);
-                      }}
-                      disabled={packagingCount === 0}
-                    >
-                      <BookmarkPlus className="h-3.5 w-3.5 mr-1.5" />
-                      Save as Template
-                    </Button>
-                  </div>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {!compact && (
-                <Alert className="bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
-                  <Sparkles className="h-4 w-4 text-green-600" />
-                  <AlertDescription className="text-sm text-green-800 dark:text-green-200">
-                    <strong>How to Complete This Form</strong>
-                    <br />
-                    1. Select the packaging category (Container, Label, Closure, or Secondary)
-                    <br />
-                    2. Use the smart search bar to find materials from your supplier network or the global database
-                    <br />
-                    3. Enter the quantity and specify transport distance for accurate calculations
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              <RecipeChecklist
-                productCategory={productCategory}
-                type="packaging"
-                existingItems={packagingForms}
-                onQuickAdd={(name, searchQuery, packagingCategory) => {
-                  addPackagingWithDefaults(name, searchQuery, packagingCategory);
+              <RecipeToolbar
+                itemCount={packagingCount}
+                onAdd={addPackaging}
+                onApplyTemplate={() => {
+                  setTemplateDialogMode("browse");
+                  setShowTemplateDialog(true);
                 }}
+                onSaveAsTemplate={() => {
+                  setTemplateDialogMode("save");
+                  setShowTemplateDialog(true);
+                }}
+                onImportBom={() => setShowBOMImport(true)}
+                onToggleChecklist={() => setShowPackagingChecklist(s => !s)}
+                showChecklist={showPackagingChecklist}
+                primaryAddLabel="Add packaging"
+                importBomLabel="Import BOM"
               />
 
-              <div className="space-y-4">
+              {showPackagingChecklist && (
+                <RecipeChecklist
+                  productCategory={productCategory}
+                  type="packaging"
+                  existingItems={packagingForms}
+                  onQuickAdd={(name, searchQuery, packagingCategory) => {
+                    addPackagingWithDefaults(name, searchQuery, packagingCategory);
+                  }}
+                />
+              )}
+
+              <div className="space-y-2">
                 {packagingForms.map((packaging, index) => (
-                  <PackagingFormCard
+                  <PackagingRow
                     key={packaging.tempId}
                     packaging={packaging}
                     index={index}
@@ -503,17 +494,6 @@ export function RecipeEditorPanel({
                   />
                 ))}
               </div>
-
-              <Button
-                type="button"
-                onClick={addPackaging}
-                variant="outline"
-                className="w-full border-dashed"
-                size={compact ? "default" : "lg"}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Another Packaging ({packagingCount}/{packagingForms.length})
-              </Button>
 
               <div className="flex items-center gap-2 pt-4 border-t">
                 <Button
