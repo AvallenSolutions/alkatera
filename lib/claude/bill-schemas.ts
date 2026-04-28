@@ -1,11 +1,14 @@
-import 'server-only'
-
 // Shared Claude tool-use input schema for UK utility-bill extraction.
 // Lives here (rather than exported from a Next.js route file, which is
 // prohibited — route files can only export HTTP method handlers) so both
 // /api/utilities/import-from-pdf and /api/ingest/auto can reuse it verbatim.
 // Kept as plain objects (no `as const`) so TypeScript returns mutable types
 // that satisfy Anthropic's InputSchema contract.
+//
+// No `server-only` marker: this module contains only static schema data
+// (no secrets, no process.env reads), and the marker prevents the file
+// from being bundled into the Netlify background function, which is a
+// plain Node lambda and not a React Server Component runtime.
 
 export const UTILITY_TYPE_VALUES = [
   'electricity_grid',
