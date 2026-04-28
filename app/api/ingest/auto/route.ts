@@ -73,11 +73,11 @@ async function triggerBackground(
     // 4xx/5xx means the function didn't accept the trigger.
     return res.status >= 200 && res.status < 300
   } catch (err: any) {
-    // AbortError on timeout is expected when the function is slow to ack.
-    // We treat that as "trigger fired" — the function is running, we just
-    // didn't wait for the ack.
-    if (err?.name === 'AbortError') return true
-    console.error('[ingest/auto] trigger fetch failed:', err?.message)
+    // Treat timeout as failure: a healthy Netlify -background function
+    // returns 202 in well under a second. If we hit the timeout, the
+    // function is either broken or undeployed, and we want to surface
+    // that to the user rather than wait silently.
+    console.error('[ingest/auto] trigger fetch failed:', err?.name, err?.message)
     return false
   } finally {
     clearTimeout(timeout)
@@ -301,17 +301,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to start ingest' }, { status: 500 })
     }
 
+    // Strategy: classify inline whenever the file fits within the sync
+    // budget. The Netlify -background function has been failing to
+    // cold-start in production (jobs stuck at "Queued…"), and even when
+    // it works the inline path is faster for typical bills. We only fall
+    // back to the background trigger for large PDFs that wouldn't finish
+    // inside Netlify's 26s sync ceiling.
+    if (file.size <= INLINE_FALLBACK_MAX_BYTES) {
+      await runInlineClassifier(serviceClient, job.id, file)
+      return NextResponse.json({ jobId: job.id }, { status: 202 })
+    }
+
     const baseUrl =
       process.env.URL ||
       process.env.DEPLOY_URL ||
       `${request.nextUrl.protocol}//${request.headers.get('host')}`
     const target = `${baseUrl}/.netlify/functions/ingest-auto-background`
 
-    // Try to trigger the background function. Awaited (with a short timeout)
-    // so we can mark the job failed loudly instead of leaving the row stuck
-    // at "Queued…" if the function 404s, 401s, or never deploys. If the
-    // trigger fails and the file is small enough, we fall back to running
-    // the classifier inline on this request.
     const triggerOk = hmacSecret
       ? await triggerBackground(target, hmacSecret, job.id).catch((err) => {
           console.error('[ingest/auto] Background trigger error:', err)
@@ -320,28 +326,15 @@ export async function POST(request: NextRequest) {
       : false
 
     if (!triggerOk) {
-      console.warn('[ingest/auto] Background trigger failed, attempting inline fallback', {
-        jobId: job.id,
-        size: file.size,
-        hasHmac: !!hmacSecret,
-      })
-      if (file.size <= INLINE_FALLBACK_MAX_BYTES) {
-        // Awaited (not fire-and-forget): Netlify freezes the lambda after
-        // the response is sent, so a detached promise wouldn't complete.
-        // The client is already polling, but writing the row before we
-        // return means the next poll sees the result immediately.
-        await runInlineClassifier(serviceClient, job.id, file)
-      } else {
-        await (serviceClient as any)
-          .from('ingest_jobs')
-          .update({
-            status: 'failed',
-            error:
-              'Smart upload background processor is not responding. Please try again, or upload a smaller file (< 5MB) to use the synchronous fallback.',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', job.id)
-      }
+      await (serviceClient as any)
+        .from('ingest_jobs')
+        .update({
+          status: 'failed',
+          error:
+            'This file is too large for synchronous processing and the background processor is unavailable. Try uploading a smaller (< 5MB) version, or contact support.',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', job.id)
     }
 
     return NextResponse.json({ jobId: job.id }, { status: 202 })
