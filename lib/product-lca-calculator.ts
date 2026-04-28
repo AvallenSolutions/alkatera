@@ -345,18 +345,27 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       status: 'pending',
     };
 
-    let lca: any;
-    let lcaError: any;
+    let lca: any = null;
+    let lcaError: any = null;
     if (params.draftPcfId) {
       const { data, error } = await supabase
         .from('product_carbon_footprints')
         .update({ ...corePayload, updated_at: new Date().toISOString() })
         .eq('id', params.draftPcfId)
         .select()
-        .single();
+        .maybeSingle();
       lca = data;
       lcaError = error;
-    } else {
+      // Stale draftPcfId (row deleted, org switched, RLS blocked, etc.):
+      // UPDATE returned no row. Fall through to INSERT so the calculation
+      // can still proceed instead of failing the whole run.
+      if (!lcaError && !lca) {
+        console.warn(
+          `[calculateProductCarbonFootprint] draftPcfId ${params.draftPcfId} did not match any row; inserting a fresh PCF instead`
+        );
+      }
+    }
+    if (!lca) {
       const { data, error } = await supabase
         .from('product_carbon_footprints')
         .insert({ ...corePayload, created_at: new Date().toISOString() })
