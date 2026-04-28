@@ -78,6 +78,32 @@ export interface MaterialEoLResult {
 }
 
 /**
+ * Recycling-credit allocation method per ISO 14044 §4.3.4.3 / ISO 14067 §6.4.9.4.
+ *
+ *   - 'avoided-burden': full credit (negative recycling factor) is applied to the
+ *     producer of the material being recycled. Most generous; assumes recycled
+ *     material displaces virgin production 1:1. (Default — matches prior behaviour.)
+ *   - 'cut-off':        no credit applied. The recycler claims the benefit of using
+ *     recycled feedstock; the original producer carries no end-of-life burden or
+ *     credit. Often paired with applying the same cut-off rule to recycled inputs
+ *     (see `recycled_content_percentage`).
+ *   - '50:50':          credit is split equally between current product (avoided
+ *     virgin) and the next user (recycled input). Used in some PEF rulesets.
+ */
+export type EoLAllocationMethod = 'avoided-burden' | 'cut-off' | '50:50';
+
+/**
+ * Default truck transport factor for collection of waste from kerbside to a
+ * sorting / treatment facility — DEFRA 2024 HGV (>17t, average load), expressed
+ * in kg CO2e per tonne·km. 0.107 ≈ 0.0001 kg CO2e/kg/km, so a 50 km trip adds
+ * ~0.005 kg CO2e/kg. Independent of pathway (transport happens before sorting).
+ */
+export const EOL_TRANSPORT_KG_CO2E_PER_TKM = 0.107;
+
+/** Default collection distance assumed when no override is set. */
+export const DEFAULT_EOL_TRANSPORT_KM = 50;
+
+/**
  * User-configured EoL settings
  */
 export interface EoLConfig {
@@ -86,6 +112,17 @@ export interface EoLConfig {
     string,
     { recycling: number; landfill: number; incineration: number; composting: number; anaerobic_digestion?: number }
   >;
+  /**
+   * ISO 14044 §4.3.4.3 allocation method for recycling credits. Defaults to
+   * 'avoided-burden' so existing calculations are unchanged when this field
+   * is absent (back-compat with stored eol_config JSON).
+   */
+  allocationMethod?: EoLAllocationMethod;
+  /**
+   * One-way distance (km) from end-user to sorting/treatment facility.
+   * Defaults to DEFAULT_EOL_TRANSPORT_KM. Set to 0 to exclude EoL transport.
+   */
+  transportKm?: number;
 }
 
 // ============================================================================
@@ -399,7 +436,8 @@ export function calculateMaterialEoL(
   massKg: number,
   materialType: string,
   region: EoLRegion,
-  pathwayOverrides?: Partial<RegionalDefaults>
+  pathwayOverrides?: Partial<RegionalDefaults>,
+  options?: { allocationMethod?: EoLAllocationMethod; transportKm?: number }
 ): MaterialEoLResult {
   const factors = EOL_FACTORS[materialType] || EOL_FACTORS.other;
   const regionDefaults = REGIONAL_DEFAULTS[region]?.[materialType] || REGIONAL_DEFAULTS[region]?.other;
@@ -440,8 +478,21 @@ export function calculateMaterialEoL(
   const compostingEmissions = massKg * (pathways.composting / 100) * factors.composting;
   const adEmissions = massKg * (pathways.anaerobic_digestion / 100) * factors.anaerobic_digestion;
 
-  const avoided = recyclingEmissions; // Will be negative
-  const gross = landfillEmissions + incinerationEmissions + compostingEmissions + adEmissions;
+  // ISO 14044 §4.3.4.3: scale recycling credit by allocation method.
+  // 'avoided-burden' (default) keeps full credit; 'cut-off' zeroes it; '50:50' halves it.
+  const allocationMethod = options?.allocationMethod ?? 'avoided-burden';
+  const allocationFactor =
+    allocationMethod === 'cut-off' ? 0 : allocationMethod === '50:50' ? 0.5 : 1;
+  const avoided = recyclingEmissions * allocationFactor; // Negative when credit applies
+
+  // ISO 14067 §6.4.9.1: transport from end-user to treatment facility. Applied
+  // once per kg regardless of pathway split — collection happens before sorting.
+  const transportKm = options?.transportKm ?? DEFAULT_EOL_TRANSPORT_KM;
+  const transportEmissions =
+    transportKm > 0 ? massKg * (transportKm / 1000) * EOL_TRANSPORT_KG_CO2E_PER_TKM : 0;
+
+  const gross =
+    landfillEmissions + incinerationEmissions + compostingEmissions + adEmissions + transportEmissions;
   const net = gross + avoided;
 
   return {
@@ -450,11 +501,12 @@ export function calculateMaterialEoL(
     gross,
     net,
     breakdown: {
-      recycling: recyclingEmissions,
+      recycling: recyclingEmissions * allocationFactor,
       landfill: landfillEmissions,
       incineration: incinerationEmissions,
       composting: compostingEmissions,
       anaerobic_digestion: adEmissions,
+      transport: transportEmissions,
     },
   };
 }

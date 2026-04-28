@@ -16,12 +16,14 @@ import { useWizardContext } from '../WizardContext';
 import {
   type EoLRegion,
   type EoLConfig,
+  type EoLAllocationMethod,
   type RegionalDefaults,
   getRegionalDefaults,
   getMaterialFactorKey,
   MATERIAL_TYPE_LABELS,
   REGION_LABELS,
   calculateMaterialEoL,
+  DEFAULT_EOL_TRANSPORT_KM,
 } from '@/lib/end-of-life-factors';
 
 // ============================================================================
@@ -126,9 +128,15 @@ export function EndOfLifeStep() {
       const regional = getRegionalDefaults(config.region, factorKey);
       const storedPathway = (mat as any).end_of_life_pathway as string | null | undefined;
       const rawRecyclability = (mat as any).recyclability_percent;
-      const recyclabilityPct = Number.isFinite(Number(rawRecyclability))
-        ? Math.max(0, Math.min(100, Number(rawRecyclability)))
-        : null;
+      // Treat null/undefined/'' as "not set" — Number(null) is 0, which would
+      // otherwise force a real zero recyclability and silently zero out the
+      // user's recycling pathway when the field was simply never filled in.
+      const recyclabilityPct =
+        rawRecyclability === null || rawRecyclability === undefined || rawRecyclability === ''
+          ? null
+          : Number.isFinite(Number(rawRecyclability))
+          ? Math.max(0, Math.min(100, Number(rawRecyclability)))
+          : null;
       const fromCirc = circularityPathways(storedPathway, recyclabilityPct, regional);
 
       const circParts: string[] = [];
@@ -257,7 +265,11 @@ export function EndOfLifeStep() {
         row.quantity,
         row.factorKey,
         config.region,
-        pathwayOverrides
+        pathwayOverrides,
+        {
+          allocationMethod: config.allocationMethod,
+          transportKm: config.transportKm,
+        }
       );
       totalNet += result.net;
       totalAvoided += result.avoided;
@@ -278,28 +290,75 @@ export function EndOfLifeStep() {
       </div>
 
       {/* Region Selector */}
-      <div className="space-y-2">
-        <Label>Region</Label>
-        <Select
-          value={config.region}
-          onValueChange={(value) => updateRegion(value as EoLRegion)}
-        >
-          <SelectTrigger className="w-[260px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {(Object.entries(REGION_LABELS) as [EoLRegion, string][]).map(
-              ([value, label]) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              )
-            )}
-          </SelectContent>
-        </Select>
-        <p className="text-xs text-muted-foreground">
-          Determines default recycling, landfill, and incineration rates
-        </p>
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="space-y-2">
+          <Label>Region</Label>
+          <Select
+            value={config.region}
+            onValueChange={(value) => updateRegion(value as EoLRegion)}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.entries(REGION_LABELS) as [EoLRegion, string][]).map(
+                ([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                )
+              )}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Determines default recycling, landfill, and incineration rates
+          </p>
+        </div>
+
+        {/* Allocation Method — ISO 14044 §4.3.4.3 */}
+        <div className="space-y-2">
+          <Label>Recycling allocation</Label>
+          <Select
+            value={config.allocationMethod || 'avoided-burden'}
+            onValueChange={(value) =>
+              updateField('eolConfig', {
+                ...config,
+                allocationMethod: value as EoLAllocationMethod,
+              })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="avoided-burden">Avoided burden (full credit)</SelectItem>
+              <SelectItem value="cut-off">Cut-off (no credit)</SelectItem>
+              <SelectItem value="50:50">50:50 split</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            ISO 14044 §4.3.4.3 method for allocating recycling credits
+          </p>
+        </div>
+
+        {/* EoL transport distance — ISO 14067 §6.4.9.1 */}
+        <div className="space-y-2">
+          <Label>Collection distance (km)</Label>
+          <Input
+            type="number"
+            min={0}
+            value={config.transportKm ?? DEFAULT_EOL_TRANSPORT_KM}
+            onChange={(e) =>
+              updateField('eolConfig', {
+                ...config,
+                transportKm: Math.max(0, Number(e.target.value)),
+              })
+            }
+          />
+          <p className="text-xs text-muted-foreground">
+            One-way distance from end-user to treatment facility
+          </p>
+        </div>
       </div>
 
       {/* Material Pathways Table */}

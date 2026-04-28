@@ -92,9 +92,10 @@ describe('EoL Report Transparency Integration', () => {
       expect(result.breakdown.landfill).toBeGreaterThanOrEqual(0);
       expect(result.breakdown.incineration).toBeGreaterThanOrEqual(0);
 
-      // Gross = all non-recycling pathways
+      // Gross = all non-recycling pathways + collection transport
       const expectedGross = result.breakdown.landfill + result.breakdown.incineration +
-        result.breakdown.composting + result.breakdown.anaerobic_digestion;
+        result.breakdown.composting + result.breakdown.anaerobic_digestion +
+        (result.breakdown.transport || 0);
       expect(result.gross).toBeCloseTo(expectedGross, 10);
 
       // Avoided = recycling pathway
@@ -219,13 +220,17 @@ describe('EoL Report Transparency Integration', () => {
 
     it('user pathway overrides are respected', () => {
       const defaultResult = calculateMaterialEoL(0.5, 'glass', 'eu');
-      const overrideResult = calculateMaterialEoL(0.5, 'glass', 'eu', {
-        recycling: 100, landfill: 0, incineration: 0, composting: 0, anaerobic_digestion: 0,
-      });
+      const overrideResult = calculateMaterialEoL(
+        0.5,
+        'glass',
+        'eu',
+        { recycling: 100, landfill: 0, incineration: 0, composting: 0, anaerobic_digestion: 0 },
+        { transportKm: 0 }, // Disable collection transport so we can assert gross == 0
+      );
 
       // 100% recycling should give maximum avoided burden
       expect(Math.abs(overrideResult.avoided)).toBeGreaterThan(Math.abs(defaultResult.avoided));
-      expect(overrideResult.gross).toBe(0); // Nothing goes to landfill/incineration
+      expect(overrideResult.gross).toBe(0); // Nothing goes to landfill/incineration/transport
     });
 
     it('zero mass returns zero for all pathways', () => {

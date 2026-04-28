@@ -319,14 +319,15 @@ describe('calculateMaterialEoL — Zero mass', () => {
 
 describe('Pathway overrides', () => {
   it('user override replaces regional default for specific pathway', () => {
-    // Override aluminium to 100% recycling
-    const result = calculateMaterialEoL(1.0, 'aluminium', 'eu', {
-      recycling: 100,
-      landfill: 0,
-      incineration: 0,
-      composting: 0,
-      anaerobic_digestion: 0,
-    });
+    // Override aluminium to 100% recycling. Disable EoL transport so we can
+    // assert gross == 0 cleanly; transport is non-zero by default.
+    const result = calculateMaterialEoL(
+      1.0,
+      'aluminium',
+      'eu',
+      { recycling: 100, landfill: 0, incineration: 0, composting: 0, anaerobic_digestion: 0 },
+      { transportKm: 0 },
+    );
 
     // 100% recycled × -1.5 = -1.5
     expect(result.avoided).toBeCloseTo(-1.5, 4);
@@ -393,12 +394,13 @@ describe('Breakdown consistency', () => {
     expect(result.avoided).toBeCloseTo(result.breakdown.recycling, 6);
   });
 
-  it('gross = landfill + incineration + composting + anaerobic_digestion', () => {
+  it('gross = landfill + incineration + composting + anaerobic_digestion + transport', () => {
     const result = calculateMaterialEoL(1.0, 'paper', 'eu');
     const grossFromBreakdown = result.breakdown.landfill +
       result.breakdown.incineration +
       result.breakdown.composting +
-      result.breakdown.anaerobic_digestion;
+      result.breakdown.anaerobic_digestion +
+      (result.breakdown.transport || 0);
     expect(result.gross).toBeCloseTo(grossFromBreakdown, 6);
   });
 });

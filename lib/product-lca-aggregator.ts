@@ -16,6 +16,7 @@ import { calculateUsePhaseEmissions, type UsePhaseConfig } from './use-phase-fac
 import { calculateMaterialEoL, getMaterialFactorKey, getRegionalDefaults, EOL_DATA_YEAR, REGION_LABELS, type EoLRegion, type RegionalDefaults, type EoLConfig } from './end-of-life-factors';
 import { calculateDistributionEmissions, type DistributionConfig } from './distribution-factors';
 import { isStageIncluded, calculateLossMultiplier, type ProductLossConfig } from './system-boundaries';
+import { DEFAULT_RECYCLED_CONTENT_CREDIT } from './constants/packaging-defaults';
 import { IPCC_AR6_GWP } from './ghg-constants';
 import {
   assessMaterialDataQuality,
@@ -275,13 +276,38 @@ export async function aggregateProductImpacts(
 
   console.log('[aggregateProductImpacts] Processing materials...');
 
+  let recycledContentCredit = 0; // Total reduction from recycled-content credits (kg CO2e)
+
   for (const material of materials as Material[]) {
-    const climateImpact = Number(material.impact_climate || 0);
-    const climateFossil = Number(material.impact_climate_fossil || 0);
+    let climateImpact = Number(material.impact_climate || 0);
+    let climateFossil = Number(material.impact_climate_fossil || 0);
     const climateBiogenic = Number(material.impact_climate_biogenic || 0);
     const climateDluc = Number(material.impact_climate_dluc || 0);
     const transportImpact = Number(material.impact_transport || 0);
     const quantity = Number(material.quantity || 0);
+
+    // ISO 14067 §6.4.4 cut-off / substitution credit for recycled feedstock.
+    // The stored emission factor is treated as virgin material; recycled
+    // content displaces a portion of the virgin burden. Applied to PACKAGING
+    // only — primary ingredients don't carry a recycled-content concept.
+    // Reduction = climate × (rc/100) × (1 − DEFAULT_RECYCLED_CONTENT_CREDIT).
+    const materialTypeLower = (material.material_type || '').toLowerCase();
+    const isPackagingMat =
+      materialTypeLower === 'packaging' || materialTypeLower === 'packaging_material';
+    if (isPackagingMat && climateImpact > 0) {
+      const rcRaw = (material as any).recycled_content_percentage;
+      const rcPct = Number.isFinite(Number(rcRaw))
+        ? Math.max(0, Math.min(100, Number(rcRaw)))
+        : 0;
+      if (rcPct > 0) {
+        const reductionFactor = (rcPct / 100) * (1 - DEFAULT_RECYCLED_CONTENT_CREDIT);
+        const climateReduction = climateImpact * reductionFactor;
+        const fossilReduction = climateFossil * reductionFactor;
+        climateImpact -= climateReduction;
+        climateFossil -= fossilReduction;
+        recycledContentCredit += climateReduction;
+      }
+    }
 
     totalClimate += climateImpact;
     // NOTE: impact_climate already includes the correct transport and
@@ -603,9 +629,15 @@ export async function aggregateProductImpacts(
       // remainder into the regional landfill/incineration split. Prevents
       // overstated recycling credits.
       const rawRecyclability = (material as any).recyclability_percent;
-      const recyclabilityPct = Number.isFinite(Number(rawRecyclability))
-        ? Math.max(0, Math.min(100, Number(rawRecyclability)))
-        : null;
+      // Treat null/undefined/'' as "not set" — Number(null) is 0, which would
+      // otherwise cap the user's recycling pathway to 0% whenever the field
+      // was simply never filled in on the material row.
+      const recyclabilityPct =
+        rawRecyclability === null || rawRecyclability === undefined || rawRecyclability === ''
+          ? null
+          : Number.isFinite(Number(rawRecyclability))
+          ? Math.max(0, Math.min(100, Number(rawRecyclability)))
+          : null;
       if (recyclabilityPct != null && pathwayOverrides && pathwayOverrides.recycling > recyclabilityPct) {
         const regional = getRegionalDefaults(eolRegion, factorKey);
         const excess = pathwayOverrides.recycling - recyclabilityPct;
@@ -622,7 +654,10 @@ export async function aggregateProductImpacts(
         };
       }
 
-      const eolResult = calculateMaterialEoL(quantity, factorKey, eolRegion, pathwayOverrides);
+      const eolResult = calculateMaterialEoL(quantity, factorKey, eolRegion, pathwayOverrides, {
+        allocationMethod: eolConfig?.allocationMethod,
+        transportKm: eolConfig?.transportKm,
+      });
 
       endOfLifeEmissions += eolResult.net;
       scope3Emissions += eolResult.net;
@@ -633,6 +668,14 @@ export async function aggregateProductImpacts(
       // landfill or composting/AD. Fossil-origin materials (glass, aluminium, plastics,
       // steel) produce fossil CO₂. Recycling credits always reduce fossil CO₂
       // (avoiding virgin production of fossil-origin materials).
+      //
+      // KNOWN SIMPLIFICATION: ISO 14067 strictly treats methane (CH₄) from
+      // anaerobic decomposition of biogenic materials as fossil-equivalent for
+      // GWP because the radiative forcing is not part of the short-cycle carbon
+      // exchange. Our EOL_FACTORS table reports a single CO₂e value per pathway
+      // and we route the entire amount to the biogenic bucket below for
+      // biogenic materials. Splitting CH₄ vs CO₂ within the EoL factor would
+      // require separate factor entries — tracked as a follow-up.
       const isBiogenicMaterial = factorKey === 'paper' || factorKey === 'organic' || factorKey === 'cork';
       if (isBiogenicMaterial) {
         // Biogenic materials: landfill/composting/AD emissions are biogenic CO₂
