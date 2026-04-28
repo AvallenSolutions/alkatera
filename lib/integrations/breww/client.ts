@@ -1,10 +1,11 @@
 import 'server-only'
 
-// Breww REST client — stateless, all methods take apiKey explicitly.
-// Caller pulls + decrypts from integration_connections.encrypted_config.
+// Breww REST client — stateless, all methods take an OAuth access token.
+// Caller resolves it via lib/integrations/breww/get-access-token.ts which
+// transparently refreshes the cached token in integration_connections.
 //
 // Breww API: https://breww.com/api/schema/elements/
-// Auth: Bearer token (API key from Settings → Breww Apps & API)
+// Auth: OAuth2 Bearer token (public app, see lib/integrations/breww/oauth.ts)
 // Pagination: page_size up to 200, responses include { results, next, previous, count }
 // Rate limits: 60 req/min, 5000/day
 
@@ -174,8 +175,8 @@ export function extractSite(obj: any): { id: string; name: string | null } | nul
 }
 
 /** List Breww sites. */
-export async function listSites(apiKey: string): Promise<BrewwSite[]> {
-  return brewwGetAll<BrewwSite>('/sites', apiKey)
+export async function listSites(accessToken: string): Promise<BrewwSite[]> {
+  return brewwGetAll<BrewwSite>('/sites', accessToken)
 }
 
 // /drink-batch-actions — actual packaging executions + losses.
@@ -204,11 +205,11 @@ interface BrewwPage<T> {
   count?: number
 }
 
-async function brewwFetch<T>(url: string, apiKey: string): Promise<BrewwPage<T> | T[]> {
+async function brewwFetch<T>(url: string, accessToken: string): Promise<BrewwPage<T> | T[]> {
   const res = await fetch(url, {
     method: 'GET',
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${accessToken}`,
       Accept: 'application/json',
     },
     cache: 'no-store',
@@ -221,13 +222,13 @@ async function brewwFetch<T>(url: string, apiKey: string): Promise<BrewwPage<T> 
 }
 
 /** Fetches all pages for a list endpoint, returning a flat array. */
-async function brewwGetAll<T>(path: string, apiKey: string): Promise<T[]> {
+async function brewwGetAll<T>(path: string, accessToken: string): Promise<T[]> {
   const sep = path.includes('?') ? '&' : '?'
   let url: string | null = `${BREWW_API_BASE}${path}${sep}page_size=200`
   const all: T[] = []
 
   while (url) {
-    const data: BrewwPage<T> | T[] = await brewwFetch<T>(url, apiKey)
+    const data: BrewwPage<T> | T[] = await brewwFetch<T>(url, accessToken)
     if (Array.isArray(data)) {
       all.push(...data)
       break
@@ -241,14 +242,14 @@ async function brewwGetAll<T>(path: string, apiKey: string): Promise<T[]> {
 }
 
 /** Validates an API key. Returns site count on success. */
-export async function pingBreww(apiKey: string): Promise<{ facilitiesCount: number }> {
-  const sites = await brewwGetAll<BrewwSite>('/sites', apiKey)
+export async function pingBreww(accessToken: string): Promise<{ facilitiesCount: number }> {
+  const sites = await brewwGetAll<BrewwSite>('/sites', accessToken)
   return { facilitiesCount: sites.length }
 }
 
 /** All drinks (beer products) for the account. */
-export async function listDrinks(apiKey: string): Promise<BrewwDrink[]> {
-  return brewwGetAll<BrewwDrink>('/drinks', apiKey)
+export async function listDrinks(accessToken: string): Promise<BrewwDrink[]> {
+  return brewwGetAll<BrewwDrink>('/drinks', accessToken)
 }
 
 /** Pick the most useful date on a batch (started → completed → planned). */
@@ -267,8 +268,8 @@ export function batchVolumeHl(b: BrewwBatch): number {
 const ACTIVE_BATCH_STATUSES = new Set(['2', '3', 'In-progress', 'Complete'])
 
 /** Drink batches since the given ISO date, across all pages. */
-export async function listRecentBatches(apiKey: string, sinceISO: string): Promise<BrewwBatch[]> {
-  const batches = await brewwGetAll<BrewwBatch>('/drink-batches', apiKey)
+export async function listRecentBatches(accessToken: string, sinceISO: string): Promise<BrewwBatch[]> {
+  const batches = await brewwGetAll<BrewwBatch>('/drink-batches', accessToken)
   const since = new Date(sinceISO).getTime()
   return batches.filter((b) => {
     if (b.status != null && !ACTIVE_BATCH_STATUSES.has(String(b.status))) return false
@@ -279,48 +280,48 @@ export async function listRecentBatches(apiKey: string, sinceISO: string): Promi
 }
 
 /** All stock-item-used allocations. Top-level endpoint; filter by batch client-side. */
-export async function listAllStockItemsUsed(apiKey: string): Promise<BrewwStockItemUsed[]> {
-  return brewwGetAll<BrewwStockItemUsed>('/drink-batch-stock-items-used', apiKey)
+export async function listAllStockItemsUsed(accessToken: string): Promise<BrewwStockItemUsed[]> {
+  return brewwGetAll<BrewwStockItemUsed>('/drink-batch-stock-items-used', accessToken)
 }
 
 /** All container types defined in the account. */
-export async function listContainerTypes(apiKey: string): Promise<BrewwContainerType[]> {
-  return brewwGetAll<BrewwContainerType>('/container-types', apiKey)
+export async function listContainerTypes(accessToken: string): Promise<BrewwContainerType[]> {
+  return brewwGetAll<BrewwContainerType>('/container-types', accessToken)
 }
 
 /** Stock-item catalogue (malt, hops, yeast, packaging, etc.). */
-export async function listStockItems(apiKey: string): Promise<BrewwStockItem[]> {
-  return brewwGetAll<BrewwStockItem>('/stock-items', apiKey)
+export async function listStockItems(accessToken: string): Promise<BrewwStockItem[]> {
+  return brewwGetAll<BrewwStockItem>('/stock-items', accessToken)
 }
 
 /** Prepped ingredient batches (e.g. yeast propagation, dry-hop blends). */
-export async function listIngredientBatches(apiKey: string): Promise<BrewwIngredientBatch[]> {
-  return brewwGetAll<BrewwIngredientBatch>('/ingredient-batches', apiKey)
+export async function listIngredientBatches(accessToken: string): Promise<BrewwIngredientBatch[]> {
+  return brewwGetAll<BrewwIngredientBatch>('/ingredient-batches', accessToken)
 }
 
 /** Raw materials consumed by ingredient batches. */
 export async function listIngredientBatchStockItemsUsed(
-  apiKey: string,
+  accessToken: string,
 ): Promise<BrewwIngredientBatchStockItemUsed[]> {
   return brewwGetAll<BrewwIngredientBatchStockItemUsed>(
     '/ingredient-batch-stock-items-used',
-    apiKey,
+    accessToken,
   )
 }
 
 /** Finished-goods SKUs. */
-export async function listProducts(apiKey: string): Promise<BrewwProduct[]> {
-  return brewwGetAll<BrewwProduct>('/products', apiKey)
+export async function listProducts(accessToken: string): Promise<BrewwProduct[]> {
+  return brewwGetAll<BrewwProduct>('/products', accessToken)
 }
 
 /** Planned (and partly-executed) packaging runs — batch → SKU plan. */
-export async function listPlannedPackagings(apiKey: string): Promise<BrewwPlannedPackaging[]> {
-  return brewwGetAll<BrewwPlannedPackaging>('/planned-packagings', apiKey)
+export async function listPlannedPackagings(accessToken: string): Promise<BrewwPlannedPackaging[]> {
+  return brewwGetAll<BrewwPlannedPackaging>('/planned-packagings', accessToken)
 }
 
 /** Actual packaging actions with volume-successful / volume-lost. */
-export async function listDrinkBatchActions(apiKey: string): Promise<BrewwDrinkBatchAction[]> {
-  return brewwGetAll<BrewwDrinkBatchAction>('/drink-batch-actions', apiKey)
+export async function listDrinkBatchActions(accessToken: string): Promise<BrewwDrinkBatchAction[]> {
+  return brewwGetAll<BrewwDrinkBatchAction>('/drink-batch-actions', accessToken)
 }
 
 export { BrewwError }

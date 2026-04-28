@@ -1,20 +1,11 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useOrganization } from '@/lib/organizationContext'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,7 +25,15 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
 import {
-  Link2, Link2Off, Loader2, CheckCircle2, AlertTriangle, RefreshCcw, ExternalLink, MoreHorizontal,
+  Link2,
+  Link2Off,
+  Loader2,
+  CheckCircle2,
+  AlertTriangle,
+  RefreshCcw,
+  ExternalLink,
+  MoreHorizontal,
+  ShieldCheck,
 } from 'lucide-react'
 
 interface ConnectionRow {
@@ -53,13 +52,22 @@ interface BrewwConnectionCardProps {
   onChanged: () => void
 }
 
+const ERROR_COPY: Record<string, string> = {
+  breww_denied: 'You declined the Breww authorisation.',
+  breww_invalid_callback: "Breww's response was missing required parameters.",
+  breww_oauth_state: 'The Breww connection session expired. Please try again.',
+  breww_state_mismatch: "Couldn't verify the Breww response (state mismatch). Please try again.",
+  breww_access_denied: "You don't have permission to connect Breww for this organisation.",
+  breww_token_exchange_failed: 'Breww refused to issue a token. Please try again.',
+  breww_token_unusable: 'Connected, but the access token failed verification.',
+  breww_save_failed: "Couldn't save the Breww connection. Please retry.",
+}
+
 export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCardProps) {
   const { currentOrganization } = useOrganization()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const orgId = currentOrganization?.id
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [apiKey, setApiKey] = useState('')
-  const [connecting, setConnecting] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [syncPhase, setSyncPhase] = useState<{ label: string; index: number; total: number } | null>(null)
   const [rebuilding, setRebuilding] = useState(false)
@@ -70,29 +78,33 @@ export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCa
   const isConnected = connection?.status === 'active'
   const inError = connection?.status === 'error' || connection?.sync_status === 'error'
 
-  const handleConnect = async () => {
-    if (!orgId || !apiKey) return
-    setConnecting(true)
-    try {
-      const res = await fetch('/api/integrations/breww/connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ organizationId: orgId, apiKey }),
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error || 'Connection failed')
-      }
-      toast.success('Breww connected', { description: 'Running your first sync now...' })
-      setDialogOpen(false)
-      setApiKey('')
+  // Surface the result of the OAuth round-trip and clean the URL.
+  useEffect(() => {
+    const connected = searchParams.get('connected')
+    const error = searchParams.get('error')
+    const detail = searchParams.get('detail')
+    if (connected === 'breww') {
+      toast.success('Breww connected', { description: 'Running your first sync now…' })
+      const params = new URLSearchParams(Array.from(searchParams.entries()))
+      params.delete('connected')
+      router.replace(`/settings?${params.toString()}`, { scroll: false })
       onChanged()
+      // Trigger initial sync once connected.
       handleSync(true)
-    } catch (err: any) {
-      toast.error(err.message || 'Connection failed')
-    } finally {
-      setConnecting(false)
+    } else if (error && error.startsWith('breww_')) {
+      const message = ERROR_COPY[error] || 'Connection failed'
+      toast.error('Breww connection failed', { description: detail ? `${message} (${detail})` : message })
+      const params = new URLSearchParams(Array.from(searchParams.entries()))
+      params.delete('error')
+      params.delete('detail')
+      router.replace(`/settings?${params.toString()}`, { scroll: false })
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
+  const handleConnect = () => {
+    if (!orgId) return
+    window.location.href = `/api/integrations/breww/connect?organizationId=${encodeURIComponent(orgId)}`
   }
 
   const handleSync = async (quiet = false) => {
@@ -114,7 +126,14 @@ export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCa
     // Try SSE stream first for live progress; fall back to one-shot POST.
     try {
       const res = await fetch(`/api/integrations/breww/sync/stream?organizationId=${orgId}`)
-      if (!res.ok || !res.body) throw new Error('stream_unavailable')
+      if (!res.ok || !res.body) {
+        if (res.status === 401) {
+          toast.error('Breww connection expired', { description: 'Please reconnect to Breww.' })
+          onChanged()
+          return
+        }
+        throw new Error('stream_unavailable')
+      }
 
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
@@ -140,7 +159,9 @@ export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCa
             } else if (evt.type === 'error') {
               streamError = evt.message || 'Sync failed'
             }
-          } catch { /* ignore */ }
+          } catch {
+            /* ignore */
+          }
         }
       }
 
@@ -160,6 +181,11 @@ export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCa
           })
           if (!res.ok) {
             const body = await res.json().catch(() => ({}))
+            if (body?.code === 'reconnect_required' || res.status === 401) {
+              toast.error('Breww connection expired', { description: 'Please reconnect to Breww.' })
+              onChanged()
+              return
+            }
             throw new Error(body.error || 'Sync failed')
           }
           const body = await res.json()
@@ -240,9 +266,13 @@ export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCa
               >
                 {isConnected ? 'Connected' : inError ? 'Error' : 'Available'}
               </Badge>
+              <Badge variant="outline" className="text-[10px] gap-1">
+                <ShieldCheck className="h-2.5 w-2.5" />
+                OAuth
+              </Badge>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Syncs production volumes, batch ingredients and packaging types from your Breww account. Links to your alka<strong>tera</strong> products and facilities so recipes and footprints update automatically.
+              Syncs production volumes, batch ingredients and packaging types directly from your Breww account. Click connect, approve in Breww, and we&apos;ll keep your recipes and footprints up to date.
             </p>
             {isConnected && connection?.last_sync_at && (
               <div className="mt-2 flex items-center gap-3 flex-wrap">
@@ -264,7 +294,12 @@ export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCa
               <div className="mt-2">
                 <div className="text-[11px] text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
                   <AlertTriangle className="h-3 w-3 flex-shrink-0" />
-                  <span>Sync failed. </span>
+                  <span>
+                    {connection.sync_error.toLowerCase().includes('refresh') ||
+                    connection.sync_error.toLowerCase().includes('token')
+                      ? 'Connection expired. Please reconnect.'
+                      : 'Sync failed.'}{' '}
+                  </span>
                   <button
                     type="button"
                     onClick={() => setShowErrorDetails((v) => !v)}
@@ -297,8 +332,8 @@ export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCa
 
           <div className="flex items-center gap-2 flex-shrink-0">
             {!isConnected ? (
-              <Button size="sm" onClick={() => setDialogOpen(true)}>
-                Connect
+              <Button size="sm" onClick={handleConnect}>
+                Connect Breww
               </Button>
             ) : (
               <>
@@ -321,6 +356,10 @@ export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCa
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleConnect}>
+                      <RefreshCcw className="h-3.5 w-3.5 mr-2" />
+                      Reconnect
+                    </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={handleRebuildPackaging}
                       disabled={rebuilding}
@@ -347,46 +386,6 @@ export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCa
           </div>
         </CardContent>
       </Card>
-
-      {/* Connect dialog */}
-      <Dialog open={dialogOpen} onOpenChange={(next) => { if (!connecting) setDialogOpen(next) }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Connect Breww</DialogTitle>
-            <DialogDescription>
-              Generate an API key from your Breww account settings and paste it below. It&apos;ll be stored encrypted.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="breww-api-key">Breww API key</Label>
-              <Input
-                id="breww-api-key"
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="brw_..."
-                autoComplete="off"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleConnect()
-                }}
-              />
-              <p className="text-[11px] text-muted-foreground">
-                Breww → Settings → Breww Apps &amp; API → create a Private app → generate a read-only key.
-              </p>
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" size="sm" onClick={() => setDialogOpen(false)} disabled={connecting}>
-                Cancel
-              </Button>
-              <Button size="sm" onClick={handleConnect} disabled={connecting || !apiKey}>
-                {connecting ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : null}
-                Test &amp; save
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Disconnect confirmation */}
       <AlertDialog open={confirmDisconnect} onOpenChange={(next) => { if (!disconnecting) setConfirmDisconnect(next) }}>

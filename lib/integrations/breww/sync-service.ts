@@ -82,7 +82,7 @@ export interface SyncOptions {
 export async function syncBreww(
   serviceClient: SupabaseClient,
   organizationId: string,
-  apiKey: string,
+  accessToken: string,
   options: SyncOptions = {},
 ): Promise<SyncResult> {
   const phase = (p: SyncPhase, detail?: string) => {
@@ -106,30 +106,30 @@ export async function syncBreww(
     plannedPackagings,
     sites,
   ] = await Promise.all([
-    listDrinks(apiKey),
-    listRecentBatches(apiKey, sinceISO),
-    listContainerTypes(apiKey),
-    listAllStockItemsUsed(apiKey).catch((err) => {
+    listDrinks(accessToken),
+    listRecentBatches(accessToken, sinceISO),
+    listContainerTypes(accessToken),
+    listAllStockItemsUsed(accessToken).catch((err) => {
       console.warn('[breww/sync] stock-items-used fetch failed:', err?.message ?? err)
       return [] as BrewwStockItemUsed[]
     }),
-    listStockItems(apiKey).catch((err) => {
+    listStockItems(accessToken).catch((err) => {
       console.warn('[breww/sync] stock-items fetch failed:', err?.message ?? err)
       return [] as BrewwStockItem[]
     }),
-    listIngredientBatchStockItemsUsed(apiKey).catch((err) => {
+    listIngredientBatchStockItemsUsed(accessToken).catch((err) => {
       console.warn('[breww/sync] ingredient-batch-stock-items-used fetch failed:', err?.message ?? err)
       return [] as BrewwIngredientBatchStockItemUsed[]
     }),
-    listProducts(apiKey).catch((err) => {
+    listProducts(accessToken).catch((err) => {
       console.warn('[breww/sync] products fetch failed:', err?.message ?? err)
       return [] as BrewwProduct[]
     }),
-    listPlannedPackagings(apiKey).catch((err) => {
+    listPlannedPackagings(accessToken).catch((err) => {
       console.warn('[breww/sync] planned-packagings fetch failed:', err?.message ?? err)
       return [] as BrewwPlannedPackaging[]
     }),
-    listSites(apiKey).catch((err) => {
+    listSites(accessToken).catch((err) => {
       console.warn('[breww/sync] sites fetch failed:', err?.message ?? err)
       return [] as BrewwSite[]
     }),

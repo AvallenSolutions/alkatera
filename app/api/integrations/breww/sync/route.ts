@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
 import { createClient } from '@supabase/supabase-js'
-import { decryptConfig } from '@/lib/crypto/config-encryption'
 import { syncBreww } from '@/lib/integrations/breww/sync-service'
 import { BrewwError } from '@/lib/integrations/breww/client'
+import { getBrewwAccessToken } from '@/lib/integrations/breww/get-access-token'
 
 // POST /api/integrations/breww/sync
 // Body: { organizationId }
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
 
     const { data: conn, error: connErr } = await serviceClient
       .from('integration_connections')
-      .select('encrypted_config, status')
+      .select('status')
       .eq('organization_id', organizationId)
       .eq('provider_slug', 'breww')
       .maybeSingle()
@@ -62,10 +62,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Breww not connected for this org' }, { status: 404 })
     }
     if (conn.status !== 'active') {
-      return NextResponse.json({ error: 'Breww connection is not active' }, { status: 409 })
+      return NextResponse.json(
+        { error: 'Breww connection is not active — please reconnect', code: 'reconnect_required' },
+        { status: 409 },
+      )
     }
 
-    const { apiKey } = decryptConfig<{ apiKey: string }>(conn.encrypted_config)
+    let accessToken: string
+    try {
+      accessToken = await getBrewwAccessToken(serviceClient, organizationId)
+    } catch (err) {
+      return NextResponse.json(
+        { error: (err as Error).message, code: 'reconnect_required' },
+        { status: 401 },
+      )
+    }
 
     // Mark syncing.
     await serviceClient
@@ -75,7 +86,7 @@ export async function POST(request: NextRequest) {
       .eq('provider_slug', 'breww')
 
     try {
-      const result = await syncBreww(serviceClient, organizationId, apiKey)
+      const result = await syncBreww(serviceClient, organizationId, accessToken)
       await serviceClient
         .from('integration_connections')
         .update({

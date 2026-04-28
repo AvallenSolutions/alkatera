@@ -1,9 +1,9 @@
 import { NextRequest } from 'next/server'
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
 import { createClient } from '@supabase/supabase-js'
-import { decryptConfig } from '@/lib/crypto/config-encryption'
 import { syncBreww, type SyncPhase } from '@/lib/integrations/breww/sync-service'
 import { BrewwError } from '@/lib/integrations/breww/client'
+import { getBrewwAccessToken } from '@/lib/integrations/breww/get-access-token'
 
 // GET /api/integrations/breww/sync/stream?organizationId=X
 // Streams Server-Sent Events as the sync progresses. Falls back client-side
@@ -56,14 +56,19 @@ export async function GET(request: NextRequest) {
 
   const { data: conn } = await serviceClient
     .from('integration_connections')
-    .select('encrypted_config, status')
+    .select('status')
     .eq('organization_id', organizationId)
     .eq('provider_slug', 'breww')
     .maybeSingle()
   if (!conn) return new Response('Breww not connected', { status: 404 })
   if (conn.status !== 'active') return new Response('Breww not active', { status: 409 })
 
-  const { apiKey } = decryptConfig<{ apiKey: string }>(conn.encrypted_config)
+  let accessToken: string
+  try {
+    accessToken = await getBrewwAccessToken(serviceClient, organizationId)
+  } catch (err) {
+    return new Response((err as Error).message, { status: 401 })
+  }
 
   const encoder = new TextEncoder()
   const stream = new ReadableStream({
@@ -79,7 +84,7 @@ export async function GET(request: NextRequest) {
         .eq('provider_slug', 'breww')
 
       try {
-        const result = await syncBreww(serviceClient, organizationId, apiKey, {
+        const result = await syncBreww(serviceClient, organizationId, accessToken, {
           onPhase: (phase, detail) => {
             const index = PHASE_ORDER.indexOf(phase)
             const total = PHASE_ORDER.length
