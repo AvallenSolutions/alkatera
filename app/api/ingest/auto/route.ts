@@ -2,12 +2,25 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createHmac } from 'crypto'
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
 import { createClient } from '@supabase/supabase-js'
+import { classifyDocument, shapeIngestResult } from '@/lib/ingest/classify-document'
 import type { ExtractedBillData } from '@/app/api/utilities/import-from-pdf/route'
 import type {
   ExtractedFacilityBillData,
   ExtractedWaterEntry,
   ExtractedWasteEntry,
 } from '@/app/api/facilities/import-bill/route'
+
+// Files smaller than this can be classified inline if the background trigger
+// fails — Claude on a single PDF page typically completes in 5-12s, well
+// under Netlify's 26s sync ceiling.
+const INLINE_FALLBACK_MAX_BYTES = 5 * 1024 * 1024
+const TRIGGER_TIMEOUT_MS = 4000
+
+// On Netlify the lambda freezes the moment the HTTP response is sent, so the
+// inline fallback below MUST be awaited. Bumping maxDuration gives us
+// headroom for Claude to finish on a small bill before the platform kills
+// the request.
+export const maxDuration = 26
 
 // ───────────────────────────────────────────────────────────────────────────────
 // Smart Upload enqueue endpoint.
@@ -38,6 +51,80 @@ function checkRateLimit(orgId: string): { allowed: boolean; remaining: number } 
   }
   entry.count += 1
   return { allowed: true, remaining: RATE_LIMIT_MAX - entry.count }
+}
+
+async function triggerBackground(
+  target: string,
+  hmacSecret: string,
+  jobId: string,
+): Promise<boolean> {
+  const triggerPayload = JSON.stringify({ jobId })
+  const signature = createHmac('sha256', hmacSecret).update(triggerPayload).digest('hex')
+  const ctrl = new AbortController()
+  const timeout = setTimeout(() => ctrl.abort(), TRIGGER_TIMEOUT_MS)
+  try {
+    const res = await fetch(target, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-internal-hmac': signature },
+      body: triggerPayload,
+      signal: ctrl.signal,
+    })
+    // Netlify -background functions return 202 immediately. Any 2xx is fine;
+    // 4xx/5xx means the function didn't accept the trigger.
+    return res.status >= 200 && res.status < 300
+  } catch (err: any) {
+    // AbortError on timeout is expected when the function is slow to ack.
+    // We treat that as "trigger fired" — the function is running, we just
+    // didn't wait for the ack.
+    if (err?.name === 'AbortError') return true
+    console.error('[ingest/auto] trigger fetch failed:', err?.message)
+    return false
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+// Inline fallback path for when the background function trigger fails. Runs
+// the same classifier the background function would, then writes the result
+// (or failure) onto the ingest_jobs row exactly like the function does, so
+// the client polling loop sees no difference.
+async function runInlineClassifier(
+  serviceClient: any,
+  jobId: string,
+  file: File,
+): Promise<void> {
+  const updateJob = (patch: Record<string, any>) =>
+    serviceClient
+      .from('ingest_jobs')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', jobId)
+  try {
+    await updateJob({
+      status: 'extracting',
+      phase_message: 'Reading the document (inline fallback)…',
+    })
+    const fileBytes = new Uint8Array(await file.arrayBuffer())
+    const result = await classifyDocument({
+      fileBytes,
+      fileName: file.name,
+      fileMime: file.type || '',
+    })
+    // Best-effort stashId — we already stashed it above; the inline path
+    // doesn't need the path back, but the shaper expects it.
+    const shaped = shapeIngestResult(result.type, result.payload, '')
+    await updateJob({
+      status: 'completed',
+      phase_message: null,
+      result_type: shaped.result_type,
+      result_payload: shaped.result_payload,
+    })
+  } catch (err: any) {
+    console.error('[ingest/auto] Inline classifier failed:', err)
+    await updateJob({
+      status: 'failed',
+      error: err?.message?.slice(0, 500) || 'Inline classification failed',
+    })
+  }
 }
 
 async function stashFile(
@@ -164,15 +251,14 @@ export async function POST(request: NextRequest) {
     }
 
     const hmacSecret = process.env.INTERNAL_JOB_HMAC_SECRET
-    if (!hmacSecret) {
-      console.error('[ingest/auto] INTERNAL_JOB_HMAC_SECRET not set')
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error('[ingest/auto] Supabase service credentials not configured')
       return NextResponse.json({ error: 'Ingest service not configured' }, { status: 500 })
     }
 
-    const serviceClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    )
+    const serviceClient = createClient(supabaseUrl, serviceRoleKey)
     const { data: membership } = await serviceClient
       .from('organization_members')
       .select('id')
@@ -215,25 +301,48 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to start ingest' }, { status: 500 })
     }
 
-    const triggerPayload = JSON.stringify({ jobId: job.id })
-    const signature = createHmac('sha256', hmacSecret).update(triggerPayload).digest('hex')
-
     const baseUrl =
       process.env.URL ||
       process.env.DEPLOY_URL ||
       `${request.nextUrl.protocol}//${request.headers.get('host')}`
     const target = `${baseUrl}/.netlify/functions/ingest-auto-background`
 
-    void fetch(target, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-internal-hmac': signature,
-      },
-      body: triggerPayload,
-    }).catch((err) => {
-      console.error('[ingest/auto] Failed to trigger background function:', err)
-    })
+    // Try to trigger the background function. Awaited (with a short timeout)
+    // so we can mark the job failed loudly instead of leaving the row stuck
+    // at "Queued…" if the function 404s, 401s, or never deploys. If the
+    // trigger fails and the file is small enough, we fall back to running
+    // the classifier inline on this request.
+    const triggerOk = hmacSecret
+      ? await triggerBackground(target, hmacSecret, job.id).catch((err) => {
+          console.error('[ingest/auto] Background trigger error:', err)
+          return false
+        })
+      : false
+
+    if (!triggerOk) {
+      console.warn('[ingest/auto] Background trigger failed, attempting inline fallback', {
+        jobId: job.id,
+        size: file.size,
+        hasHmac: !!hmacSecret,
+      })
+      if (file.size <= INLINE_FALLBACK_MAX_BYTES) {
+        // Awaited (not fire-and-forget): Netlify freezes the lambda after
+        // the response is sent, so a detached promise wouldn't complete.
+        // The client is already polling, but writing the row before we
+        // return means the next poll sees the result immediately.
+        await runInlineClassifier(serviceClient, job.id, file)
+      } else {
+        await (serviceClient as any)
+          .from('ingest_jobs')
+          .update({
+            status: 'failed',
+            error:
+              'Smart upload background processor is not responding. Please try again, or upload a smaller file (< 5MB) to use the synchronous fallback.',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', job.id)
+      }
+    }
 
     return NextResponse.json({ jobId: job.id }, { status: 202 })
   } catch (err: any) {

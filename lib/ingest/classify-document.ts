@@ -1,7 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk';
 import * as XLSX from 'xlsx';
-import { BILL_TOOL_INPUT_SCHEMA } from '@/lib/claude/bill-schemas';
-import { parseImportXLSX } from '@/lib/bulk-import/xlsx-parser';
+// Relative imports (not `@/`) so this module bundles cleanly inside the
+// Netlify background function. esbuild's tsconfig-paths support inside
+// Netlify's lambda zipper is unreliable; one bad alias resolution makes the
+// whole function silently fail to cold-start, leaving ingest jobs stuck at
+// "Queued…" forever.
+import { BILL_TOOL_INPUT_SCHEMA } from '../claude/bill-schemas';
+import { parseImportXLSX } from '../bulk-import/xlsx-parser';
 
 /**
  * Shared Smart Upload classifier.
@@ -53,6 +58,56 @@ export interface ClassifierInput {
   fileBytes: Uint8Array;
   fileName: string;
   fileMime: string;
+}
+
+/**
+ * Map the classifier's discriminated `{ type, payload }` to the wire shape
+ * the existing client (UniversalDropzone, UtilityBillImportDialog, etc.)
+ * already understands — same field names as IngestResponse. Shared by the
+ * Netlify background function and the inline-fallback in /api/ingest/auto.
+ */
+export function shapeIngestResult(
+  type: string,
+  payload: Record<string, unknown>,
+  stashId: string,
+): { result_type: string; result_payload: Record<string, unknown> } {
+  switch (type) {
+    case 'utility_bill':
+      return { result_type: type, result_payload: { type, utilityBill: payload } };
+    case 'water_bill':
+      return { result_type: type, result_payload: { type, waterBill: payload } };
+    case 'waste_bill':
+      return { result_type: type, result_payload: { type, wasteBill: payload } };
+    case 'bulk_xlsx':
+      return { result_type: type, result_payload: { type, xlsx: payload } };
+    case 'spray_diary':
+      return { result_type: type, result_payload: { type, sprayDiary: { ...payload, stashId } } };
+    case 'bom':
+      return { result_type: type, result_payload: { type, bom: { ...payload, stashId } } };
+    case 'soil_carbon_evidence':
+      return {
+        result_type: type,
+        result_payload: { type, soilCarbonEvidence: { ...payload, stashId } },
+      };
+    case 'accounts_csv':
+      return { result_type: type, result_payload: { type, accountsCsv: payload } };
+    case 'historical_sustainability_report':
+      return {
+        result_type: type,
+        result_payload: { type, historicalSustainabilityReport: { ...payload, stashId } },
+      };
+    case 'historical_lca_report':
+      return {
+        result_type: type,
+        result_payload: { type, historicalLcaReport: { ...payload, stashId } },
+      };
+    case 'unsupported':
+    default:
+      return {
+        result_type: 'unsupported',
+        result_payload: { type: 'unsupported', reason: (payload as any)?.reason },
+      };
+  }
 }
 
 export async function classifyDocument(input: ClassifierInput): Promise<ClassifierResult> {

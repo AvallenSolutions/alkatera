@@ -1,6 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 import { createHmac, timingSafeEqual } from 'crypto';
-import { classifyDocument } from '@/lib/ingest/classify-document';
+// Relative path (not `@/`) — Netlify's lambda zipper bundles via esbuild
+// without honouring tsconfig paths reliably. An unresolved alias here makes
+// the function fail to cold-start, which is invisible to the caller because
+// the trigger is fire-and-forget; the symptom is jobs stuck at "Queued…".
+import { classifyDocument, shapeIngestResult } from '../../lib/ingest/classify-document';
 
 /**
  * Background runner for Smart Upload (the "Upload anything" dropzone and
@@ -27,64 +31,10 @@ function verifyHmac(body: string, signature: string | undefined, secret: string)
   }
 }
 
-// Map the classifier's discriminated `{ type, payload }` to the wire shape
-// the existing client (UniversalDropzone, UtilityBillImportDialog, etc.)
-// already understands — same field names as IngestResponse.
-function shapeResponse(
-  type: string,
-  payload: Record<string, unknown>,
-  stashId: string,
-): { result_type: string; result_payload: Record<string, unknown> } {
-  switch (type) {
-    case 'utility_bill':
-      return { result_type: type, result_payload: { type, utilityBill: payload } };
-    case 'water_bill':
-      return { result_type: type, result_payload: { type, waterBill: payload } };
-    case 'waste_bill':
-      return { result_type: type, result_payload: { type, wasteBill: payload } };
-    case 'bulk_xlsx':
-      return { result_type: type, result_payload: { type, xlsx: payload } };
-    case 'spray_diary':
-      return {
-        result_type: type,
-        result_payload: { type, sprayDiary: { ...payload, stashId } },
-      };
-    case 'bom':
-      return {
-        result_type: type,
-        result_payload: { type, bom: { ...payload, stashId } },
-      };
-    case 'soil_carbon_evidence':
-      return {
-        result_type: type,
-        result_payload: { type, soilCarbonEvidence: { ...payload, stashId } },
-      };
-    case 'accounts_csv':
-      return { result_type: type, result_payload: { type, accountsCsv: payload } };
-    case 'historical_sustainability_report':
-      return {
-        result_type: type,
-        result_payload: {
-          type,
-          historicalSustainabilityReport: { ...payload, stashId },
-        },
-      };
-    case 'historical_lca_report':
-      return {
-        result_type: type,
-        result_payload: {
-          type,
-          historicalLcaReport: { ...payload, stashId },
-        },
-      };
-    case 'unsupported':
-    default:
-      return {
-        result_type: 'unsupported',
-        result_payload: { type: 'unsupported', reason: (payload as any)?.reason },
-      };
-  }
-}
+// Logged once per cold-start so the Netlify function logs prove the bundle
+// loaded. If you grep the function logs and see no "boot" lines, the lambda
+// never cold-started — usually a bundling/import failure.
+console.log('[ingest-auto-background] boot', { node: process.version });
 
 export const handler = async (event: { body?: string | null; headers: Record<string, string | undefined> }) => {
   const secret = process.env.INTERNAL_JOB_HMAC_SECRET;
@@ -93,7 +43,12 @@ export const handler = async (event: { body?: string | null; headers: Record<str
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
 
   if (!secret || !supabaseUrl || !serviceKey || !anthropicKey) {
-    console.error('[ingest-auto-background] Missing required env vars');
+    console.error('[ingest-auto-background] Missing required env vars', {
+      hasSecret: !!secret,
+      hasSupabaseUrl: !!supabaseUrl,
+      hasServiceKey: !!serviceKey,
+      hasAnthropicKey: !!anthropicKey,
+    });
     return { statusCode: 500, body: 'misconfigured' };
   }
 
@@ -158,7 +113,7 @@ export const handler = async (event: { body?: string | null; headers: Record<str
       fileMime: job.file_mime || '',
     });
 
-    const shaped = shapeResponse(result.type, result.payload, job.stash_path);
+    const shaped = shapeIngestResult(result.type, result.payload, job.stash_path);
 
     await updateJob({
       status: 'completed',
