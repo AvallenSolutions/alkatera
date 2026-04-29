@@ -8,6 +8,7 @@ import {
   ChevronUp,
   Trash2,
   AlertCircle,
+  CheckCircle2,
   Package,
   Tag,
   Grip,
@@ -20,6 +21,10 @@ import {
 import { PackagingEditorTabs } from "@/components/products/PackagingEditorTabs";
 import type { PackagingFormData } from "@/components/products/PackagingFormCard";
 import type { PackagingCategory } from "@/lib/types/lca";
+import {
+  getPackagingSectionStatus,
+  summarisePackagingSections,
+} from "@/components/products/lib/section-completion";
 
 interface PackagingRowProps {
   packaging: PackagingFormData;
@@ -85,6 +90,10 @@ export function PackagingRow(props: PackagingRowProps) {
     ? `${packaging.carbon_intensity.toFixed(3)} kg CO₂e/kg`
     : null;
 
+  const sectionStatus = getPackagingSectionStatus(packaging);
+  const summary = summarisePackagingSections(sectionStatus);
+  const allComplete = summary.complete === summary.total && summary.total > 0;
+
   return (
     <Card>
       <button
@@ -104,7 +113,9 @@ export function PackagingRow(props: PackagingRowProps) {
                 </span>
               )}
             </span>
-            {!isRowComplete(packaging) && (
+            {allComplete ? (
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" aria-label="Complete" />
+            ) : (
               <AlertCircle className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" aria-label="Incomplete" />
             )}
           </div>
@@ -113,6 +124,9 @@ export function PackagingRow(props: PackagingRowProps) {
             {weight && <span>· {weight}</span>}
             {dataSourceBadge(packaging)}
             {carbonPreview && <span>· {carbonPreview}</span>}
+            {summary.total > 0 && (
+              <span>· {summary.complete} of {summary.total} sections complete</span>
+            )}
           </div>
         </div>
         <span className="text-muted-foreground flex-shrink-0" aria-hidden>

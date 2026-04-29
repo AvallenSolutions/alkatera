@@ -57,6 +57,8 @@ interface OnboardingContextType {
   dismissEmissionsGuide: () => void
   /** Re-open the emissions guide after dismissal */
   reopenEmissionsGuide: () => void
+  /** Mark the recipe sidebar first-run tour as completed (or skipped) */
+  markRecipeSidebarTourCompleted: () => void
   /** Switch to a different onboarding flow and reinitialise steps */
   setFlow: (flow: OnboardingFlow) => void
   /** Reset onboarding (for testing) */
@@ -312,6 +314,13 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     }))
   }, [updateState])
 
+  const markRecipeSidebarTourCompleted = useCallback(() => {
+    updateState(prev => ({
+      ...prev,
+      recipeSidebarTourCompleted: true,
+    }))
+  }, [updateState])
+
   const resetSearchGuide = useCallback(() => {
     updateState(prev => ({
       ...prev,
@@ -399,6 +408,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         resetSearchGuide,
         dismissEmissionsGuide,
         reopenEmissionsGuide,
+        markRecipeSidebarTourCompleted,
         setFlow,
         resetOnboarding,
       }}

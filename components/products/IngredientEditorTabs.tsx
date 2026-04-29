@@ -5,6 +5,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IngredientFormCard } from "@/components/products/IngredientFormCard";
 import type { IngredientFormData } from "@/components/products/IngredientFormCard";
 import type { ProductionStage } from "@/lib/types/products";
+import { SectionStatusDot } from "@/components/products/SectionStatusDot";
+import { getIngredientSectionStatus } from "@/components/products/lib/section-completion";
+
+type TabValue = 'basics' | 'source' | 'logistics' | 'stage';
 
 interface IngredientEditorTabsProps {
   ingredient: IngredientFormData;
@@ -23,6 +27,12 @@ interface IngredientEditorTabsProps {
   productUnitSizeValue?: number | null;
   productUnitSizeUnit?: string | null;
   productionStages?: ProductionStage[];
+  /** When true, render `data-tour-anchor` attributes on tab triggers. Set on
+   *  the first ingredient row only so the coachmark tour has stable anchors. */
+  enableTourAnchors?: boolean;
+  /** Controlled tab value. When provided, the tour drives which tab is active. */
+  controlledTab?: TabValue;
+  onTabChange?: (tab: TabValue) => void;
 }
 
 /**
@@ -30,26 +40,47 @@ interface IngredientEditorTabsProps {
  * is hidden entirely unless the product has a configured production chain.
  */
 export function IngredientEditorTabs(props: IngredientEditorTabsProps) {
+  const { enableTourAnchors, controlledTab, onTabChange } = props;
   const hasStages = (props.productionStages?.length ?? 0) > 0;
-  const showSourceTab = true; // Source tab always shown; sub-toggles are feature-gated inside.
-  const [tab, setTab] = useState<'basics' | 'source' | 'logistics' | 'stage'>('basics');
+  const [internalTab, setInternalTab] = useState<TabValue>('basics');
+  const tab = controlledTab ?? internalTab;
+  const setTab = (v: TabValue) => {
+    if (onTabChange) onTabChange(v);
+    if (controlledTab == null) setInternalTab(v);
+  };
+
+  const status = getIngredientSectionStatus(props.ingredient, hasStages);
+  const anchor = (key: 'basics' | 'source' | 'logistics') =>
+    enableTourAnchors ? { 'data-tour-anchor': key } : {};
 
   return (
-    <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
+    <Tabs value={tab} onValueChange={(v) => setTab(v as TabValue)}>
       <TabsList>
-        <TabsTrigger value="basics">Basics</TabsTrigger>
-        {showSourceTab && <TabsTrigger value="source">Source</TabsTrigger>}
-        <TabsTrigger value="logistics">Logistics</TabsTrigger>
-        {hasStages && <TabsTrigger value="stage">Stage</TabsTrigger>}
+        <TabsTrigger value="basics" className="gap-2" {...anchor('basics')}>
+          <span>Basics</span>
+          <SectionStatusDot status={status.basics} />
+        </TabsTrigger>
+        <TabsTrigger value="source" className="gap-2" {...anchor('source')}>
+          <span>Source</span>
+          <SectionStatusDot status={status.source} />
+        </TabsTrigger>
+        <TabsTrigger value="logistics" className="gap-2" {...anchor('logistics')}>
+          <span>Logistics</span>
+          <SectionStatusDot status={status.logistics} />
+        </TabsTrigger>
+        {hasStages && (
+          <TabsTrigger value="stage" className="gap-2">
+            <span>Stage</span>
+            <SectionStatusDot status={status.stage} />
+          </TabsTrigger>
+        )}
       </TabsList>
       <TabsContent value="basics" className="pt-3">
         <IngredientFormCard {...props} sectionFilter="basics" />
       </TabsContent>
-      {showSourceTab && (
-        <TabsContent value="source" className="pt-3">
-          <IngredientFormCard {...props} sectionFilter="source" />
-        </TabsContent>
-      )}
+      <TabsContent value="source" className="pt-3">
+        <IngredientFormCard {...props} sectionFilter="source" />
+      </TabsContent>
       <TabsContent value="logistics" className="pt-3">
         <IngredientFormCard {...props} sectionFilter="logistics" />
       </TabsContent>

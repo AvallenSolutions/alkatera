@@ -5,6 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PackagingFormCard } from "@/components/products/PackagingFormCard";
 import type { PackagingFormData } from "@/components/products/PackagingFormCard";
 import type { PackagingCategory } from "@/lib/types/lca";
+import { SectionStatusDot } from "@/components/products/SectionStatusDot";
+import { getPackagingSectionStatus } from "@/components/products/lib/section-completion";
 
 interface PackagingEditorTabsProps {
   packaging: PackagingFormData;
@@ -29,13 +31,29 @@ export function PackagingEditorTabs(props: PackagingEditorTabsProps) {
   const showComponentsTab = !!props.packaging.has_component_breakdown;
   const [tab, setTab] = useState<'basics' | 'components' | 'logistics' | 'compliance'>('basics');
 
+  const status = getPackagingSectionStatus(props.packaging);
+
   return (
     <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
       <TabsList>
-        <TabsTrigger value="basics">Basics</TabsTrigger>
-        {showComponentsTab && <TabsTrigger value="components">Components</TabsTrigger>}
-        <TabsTrigger value="logistics">Logistics</TabsTrigger>
-        <TabsTrigger value="compliance">Compliance</TabsTrigger>
+        <TabsTrigger value="basics" className="gap-2">
+          <span>Basics</span>
+          <SectionStatusDot status={status.basics} />
+        </TabsTrigger>
+        {showComponentsTab && (
+          <TabsTrigger value="components" className="gap-2">
+            <span>Components</span>
+            <SectionStatusDot status={status.components} />
+          </TabsTrigger>
+        )}
+        <TabsTrigger value="logistics" className="gap-2">
+          <span>Logistics</span>
+          <SectionStatusDot status={status.logistics} />
+        </TabsTrigger>
+        <TabsTrigger value="compliance" className="gap-2">
+          <span>Compliance</span>
+          <SectionStatusDot status={status.compliance} />
+        </TabsTrigger>
       </TabsList>
       <TabsContent value="basics" className="pt-3">
         <PackagingFormCard {...props} sectionFilter="basics" />

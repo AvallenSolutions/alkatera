@@ -12,10 +12,15 @@ import {
   Shield,
   Database,
   Leaf,
+  CheckCircle2,
 } from "lucide-react";
 import { IngredientEditorTabs } from "@/components/products/IngredientEditorTabs";
 import type { IngredientFormData } from "@/components/products/IngredientFormCard";
 import type { ProductionStage } from "@/lib/types/products";
+import {
+  getIngredientSectionStatus,
+  summariseIngredientSections,
+} from "@/components/products/lib/section-completion";
 
 interface IngredientRowProps {
   ingredient: IngredientFormData;
@@ -36,6 +41,13 @@ interface IngredientRowProps {
   productionStages?: ProductionStage[];
   /** Auto-expand new (empty) rows so the user can fill them immediately. */
   defaultExpanded?: boolean;
+  /** Force expanded externally (used by the first-run tour). */
+  forceExpanded?: boolean;
+  /** Render data-tour-anchor attributes on the inner tabs. */
+  enableTourAnchors?: boolean;
+  /** Controlled tab value (used by the tour to drive which tab is active). */
+  controlledTab?: 'basics' | 'source' | 'logistics' | 'stage';
+  onTabChange?: (tab: 'basics' | 'source' | 'logistics' | 'stage') => void;
 }
 
 function dataSourceBadge(ingredient: IngredientFormData) {
@@ -73,20 +85,38 @@ function isRowComplete(ingredient: IngredientFormData): boolean {
 }
 
 export function IngredientRow(props: IngredientRowProps) {
-  const { ingredient, index, onRemove, canRemove, defaultExpanded } = props;
+  const {
+    ingredient,
+    index,
+    onRemove,
+    canRemove,
+    defaultExpanded,
+    forceExpanded,
+    enableTourAnchors,
+    controlledTab,
+    onTabChange,
+    productionStages,
+  } = props;
   const [expanded, setExpanded] = useState<boolean>(defaultExpanded ?? !isRowComplete(ingredient));
+  const isExpanded = forceExpanded || expanded;
 
   const carbonPreview = ingredient.carbon_intensity != null
     ? `${ingredient.carbon_intensity.toFixed(3)} kg CO₂e/${ingredient.unit || 'kg'}`
     : null;
+
+  const hasChain = (productionStages?.length ?? 0) > 0;
+  const sectionStatus = getIngredientSectionStatus(ingredient, hasChain);
+  const summary = summariseIngredientSections(sectionStatus);
+  const allComplete = summary.complete === summary.total && summary.total > 0;
 
   return (
     <Card>
       {/* Compact summary row */}
       <button
         type="button"
-        onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-muted/40 rounded-t-md focus:outline-none focus:ring-2 focus:ring-ring"
+        onClick={() => !forceExpanded && setExpanded(!expanded)}
+        disabled={forceExpanded}
+        className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-muted/40 rounded-t-md focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-default disabled:hover:bg-transparent"
       >
         <div className="flex h-7 w-7 items-center justify-center rounded bg-orange-500 text-white font-medium text-xs flex-shrink-0">
           {index + 1}
@@ -96,7 +126,9 @@ export function IngredientRow(props: IngredientRowProps) {
             <span className="font-medium truncate">
               {ingredient.name || <span className="text-muted-foreground italic">New ingredient</span>}
             </span>
-            {!isRowComplete(ingredient) && (
+            {allComplete ? (
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" aria-label="Complete" />
+            ) : (
               <AlertCircle className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" aria-label="Incomplete" />
             )}
           </div>
@@ -106,10 +138,13 @@ export function IngredientRow(props: IngredientRowProps) {
             )}
             {dataSourceBadge(ingredient)}
             {carbonPreview && <span>· {carbonPreview}</span>}
+            {summary.total > 0 && (
+              <span>· {summary.complete} of {summary.total} sections complete</span>
+            )}
           </div>
         </div>
         <span className="text-muted-foreground flex-shrink-0" aria-hidden>
-          {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </span>
         {canRemove && (
           <span
@@ -135,9 +170,14 @@ export function IngredientRow(props: IngredientRowProps) {
       </button>
 
       {/* Sectioned editor when expanded */}
-      {expanded && (
+      {isExpanded && (
         <div className="border-t px-3 py-3">
-          <IngredientEditorTabs {...props} />
+          <IngredientEditorTabs
+            {...props}
+            enableTourAnchors={enableTourAnchors}
+            controlledTab={controlledTab}
+            onTabChange={onTabChange}
+          />
         </div>
       )}
     </Card>

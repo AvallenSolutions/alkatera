@@ -201,6 +201,8 @@ export interface OnboardingState {
   emissionsGuideCompleted?: boolean
   /** Whether the emissions guide has been dismissed by the user */
   emissionsGuideDismissed?: boolean
+  /** Whether the recipe sidebar first-run tour has been completed (or skipped) */
+  recipeSidebarTourCompleted?: boolean
 }
 
 export const INITIAL_ONBOARDING_STATE: OnboardingState = {
@@ -214,6 +216,7 @@ export const INITIAL_ONBOARDING_STATE: OnboardingState = {
   productGuideCompleted: false,
   emissionsGuideCompleted: false,
   emissionsGuideDismissed: false,
+  recipeSidebarTourCompleted: false,
 }
 
 export const INITIAL_MEMBER_ONBOARDING_STATE: OnboardingState = {
@@ -227,6 +230,7 @@ export const INITIAL_MEMBER_ONBOARDING_STATE: OnboardingState = {
   productGuideCompleted: false,
   emissionsGuideCompleted: false,
   emissionsGuideDismissed: false,
+  recipeSidebarTourCompleted: false,
 }
 
 export const INITIAL_FAST_TRACK_STATE: OnboardingState = {
@@ -240,6 +244,7 @@ export const INITIAL_FAST_TRACK_STATE: OnboardingState = {
   productGuideCompleted: false,
   emissionsGuideCompleted: false,
   emissionsGuideDismissed: false,
+  recipeSidebarTourCompleted: false,
 }
 
 // ---------------------------------------------------------------------------

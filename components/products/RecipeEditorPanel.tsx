@@ -33,6 +33,8 @@ import { RecipeModePicker } from "@/components/products/RecipeModePicker";
 import { RecipeToolbar } from "@/components/products/RecipeToolbar";
 import { IngredientRow } from "@/components/products/IngredientRow";
 import { PackagingRow } from "@/components/products/PackagingRow";
+import { RecipeSidebarTour, type TourStep } from "@/components/products/RecipeSidebarTour";
+import { useOnboarding } from "@/lib/onboarding/OnboardingContext";
 import { useRecipeEditor } from "@/hooks/useRecipeEditor";
 import { useIngestStash } from "@/hooks/useIngestStash";
 import { useLinkedSupplierProducts } from "@/hooks/data/useLinkedSupplierProducts";
@@ -71,6 +73,13 @@ export function RecipeEditorPanel({
   const [showBOMImport, setShowBOMImport] = useState(false);
   const [showChecklist, setShowChecklist] = useState<boolean>(false);
   const [showPackagingChecklist, setShowPackagingChecklist] = useState<boolean>(false);
+
+  // First-run tour: drives which tab the first ingredient row shows + anchors a
+  // sequence of popovers to Basics → Source → Logistics → Save.
+  const { state: onboardingState, isLoading: onboardingLoading } = useOnboarding();
+  const tourEligible =
+    !onboardingLoading && !onboardingState.recipeSidebarTourCompleted && activeTab === "ingredients";
+  const [tourStep, setTourStep] = useState<TourStep>("basics");
   const [initialBomFile, setInitialBomFile] = useState<File | null>(null);
 
   // Pick up BOM files stashed by the Universal Dropzone (header upload button).
@@ -385,28 +394,45 @@ export function RecipeEditorPanel({
               )}
 
               <div className="space-y-2">
-                {ingredientForms.map((ingredient, index) => (
-                  <IngredientRow
-                    key={ingredient.tempId}
-                    ingredient={ingredient}
-                    index={index}
-                    organizationId={organizationId}
-                    productionFacilities={productionFacilities}
-                    organizationLat={currentOrganization?.address_lat}
-                    organizationLng={currentOrganization?.address_lng}
-                    linkedSupplierProducts={linkedSupplierProducts}
-                    onUpdate={updateIngredient}
-                    onRemove={removeIngredient}
-                    canRemove={ingredientForms.length > 1}
-                    recipeScaleMode={recipeScaleMode}
-                    batchYieldValue={batchYieldValue}
-                    batchYieldUnit={batchYieldUnit}
-                    productUnitSizeValue={product?.unit_size_value ?? null}
-                    productUnitSizeUnit={product?.unit_size_unit ?? null}
-                    productionStages={productionStages}
-                  />
-                ))}
+                {ingredientForms.map((ingredient, index) => {
+                  const tourActiveOnRow =
+                    tourEligible && index === 0 && tourStep !== "save" && tourStep !== "done";
+                  const controlledTabForRow =
+                    tourActiveOnRow && (tourStep === "basics" || tourStep === "source" || tourStep === "logistics")
+                      ? tourStep
+                      : undefined;
+                  return (
+                    <IngredientRow
+                      key={ingredient.tempId}
+                      ingredient={ingredient}
+                      index={index}
+                      organizationId={organizationId}
+                      productionFacilities={productionFacilities}
+                      organizationLat={currentOrganization?.address_lat}
+                      organizationLng={currentOrganization?.address_lng}
+                      linkedSupplierProducts={linkedSupplierProducts}
+                      onUpdate={updateIngredient}
+                      onRemove={removeIngredient}
+                      canRemove={ingredientForms.length > 1}
+                      recipeScaleMode={recipeScaleMode}
+                      batchYieldValue={batchYieldValue}
+                      batchYieldUnit={batchYieldUnit}
+                      productUnitSizeValue={product?.unit_size_value ?? null}
+                      productUnitSizeUnit={product?.unit_size_unit ?? null}
+                      productionStages={productionStages}
+                      forceExpanded={tourEligible && index === 0}
+                      enableTourAnchors={tourEligible && index === 0}
+                      controlledTab={controlledTabForRow}
+                    />
+                  );
+                })}
               </div>
+
+              <RecipeSidebarTour
+                active={tourEligible}
+                step={tourStep}
+                onStepChange={setTourStep}
+              />
 
               <div className="flex items-center gap-2 pt-4 border-t">
                 <Button
@@ -414,6 +440,7 @@ export function RecipeEditorPanel({
                   onClick={handleSaveIngredients}
                   disabled={saving}
                   className="flex-1"
+                  data-tour-anchor="save"
                 >
                   {saving ? 'Saving...' : 'Save Ingredients'}
                 </Button>
