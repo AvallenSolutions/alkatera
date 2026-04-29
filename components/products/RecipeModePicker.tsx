@@ -168,6 +168,17 @@ export function RecipeModePicker(props: RecipeModePickerProps) {
             }}
           />
         )}
+
+        {/* Mounted in both branches so it stays open when the picker collapses
+            after the user picks "Multi-stage chain". */}
+        <ProductionTemplateDialog
+          open={templateDialogOpen}
+          onOpenChange={setTemplateDialogOpen}
+          onApply={async (t) => {
+            await onApplyTemplate(t);
+            setEditing(false);
+          }}
+        />
       </>
     );
   }
