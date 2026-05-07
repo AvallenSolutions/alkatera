@@ -738,7 +738,11 @@ export function PackagingFormCard({
     onUpdate(packaging.tempId, updates);
   };
 
-  const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) =>
+  // Inline render: defining Wrapper as a component inside render would change
+  // its function identity every render and force React to unmount/remount the
+  // entire subtree on every keystroke (which broke the Emission Factor search
+  // input's focus). Render conditionally with stable element types instead.
+  const renderWrapper = (children: React.ReactNode) =>
     showAll ? (
       <Card className="border-l-4 border-l-orange-500 bg-amber-50/50 dark:bg-amber-950/20">
         <div className="p-6 space-y-4">
@@ -774,8 +778,8 @@ export function PackagingFormCard({
       <div className="space-y-4">{children}</div>
     );
 
-  return (
-    <Wrapper>
+  return renderWrapper(
+    (
         <div className="space-y-4">
           {showBasics && (
           <div>
@@ -1495,7 +1499,7 @@ export function PackagingFormCard({
             </>
           )}
         </div>
-    </Wrapper>
+    )
   );
 }
 
