@@ -251,7 +251,7 @@ export default function ExpertPartnersPage() {
               </a>
             </Button>
             <Button variant="outline" asChild>
-              <a href="mailto:hello@impactfocus.co.uk?subject=Enquiry%20from%20alkatera%20user&body=Hi%20Impact%20Focus%2C%0A%0AI%27m%20an%20alkatera%20user%20and%20would%20like%20to%20discuss%20your%20consulting%20services.%0A%0AThanks">
+              <a href="mailto:hello@impactfocus.co?subject=Enquiry%20from%20alkatera%20user&body=Hi%20Impact%20Focus%2C%0A%0AI%27m%20an%20alkatera%20user%20and%20would%20like%20to%20discuss%20your%20consulting%20services.%0A%0AThanks">
                 <Mail className="mr-2 h-4 w-4" />
                 Send an Enquiry
               </a>
