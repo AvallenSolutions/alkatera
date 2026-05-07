@@ -59,6 +59,8 @@ interface OnboardingContextType {
   reopenEmissionsGuide: () => void
   /** Mark the recipe sidebar first-run tour as completed (or skipped) */
   markRecipeSidebarTourCompleted: () => void
+  /** Mark the factor-info hover hint coachmark as seen/dismissed */
+  markFactorInfoHintCompleted: () => void
   /** Switch to a different onboarding flow and reinitialise steps */
   setFlow: (flow: OnboardingFlow) => void
   /** Reset onboarding (for testing) */
@@ -321,6 +323,13 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     }))
   }, [updateState])
 
+  const markFactorInfoHintCompleted = useCallback(() => {
+    updateState(prev => ({
+      ...prev,
+      factorInfoHintCompleted: true,
+    }))
+  }, [updateState])
+
   const resetSearchGuide = useCallback(() => {
     updateState(prev => ({
       ...prev,
@@ -409,6 +418,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         dismissEmissionsGuide,
         reopenEmissionsGuide,
         markRecipeSidebarTourCompleted,
+        markFactorInfoHintCompleted,
         setFlow,
         resetOnboarding,
       }}

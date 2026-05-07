@@ -5,6 +5,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import {
   Droplets,
@@ -17,8 +23,16 @@ import {
   Truck,
   Zap,
   Factory,
+  Check,
+  X as XIcon,
+  HelpCircle,
+  ExternalLink,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react";
 import type { SearchResult } from "./InlineIngredientSearch";
+import { translateBoundary, lookupTerm, extractTerms } from "@/lib/lca-glossary";
+import { getMatchSuitability } from "@/lib/factor-suitability";
 
 // ── Mini Bar Chart ──────────────────────────────────────────────────────
 
@@ -155,14 +169,107 @@ function getQualityBadgeProps(grade: string): {
 
 // ── Main Component ──────────────────────────────────────────────────────
 
+// ── Glossary chip ───────────────────────────────────────────────────────
+
+function JargonChip({ term, children }: { term: string; children: React.ReactNode }) {
+  const entry = lookupTerm(term);
+  if (!entry) return <>{children}</>;
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex items-center gap-0.5 cursor-help underline decoration-dotted decoration-muted-foreground/60 underline-offset-2">
+            {children}
+            <HelpCircle className="h-2.5 w-2.5 text-muted-foreground/60" />
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-[260px] text-[10px] leading-snug">
+          <p className="font-medium mb-0.5">{entry.label}</p>
+          <p>{entry.plainEnglish}</p>
+          {entry.whenItMatters && (
+            <p className="mt-1 text-muted-foreground/80">{entry.whenItMatters}</p>
+          )}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+/**
+ * Render a free-text technical string with any recognised glossary terms
+ * wrapped in tooltipped JargonChips. Falls back to plain text if there are
+ * no matches.
+ */
+function withGlossary(text: string | undefined): React.ReactNode {
+  if (!text) return null;
+  const terms = extractTerms(text);
+  if (!terms.length) return text;
+
+  // Split text by each matching term (case-insensitive), preserving original casing.
+  const parts: React.ReactNode[] = [];
+  let cursor = 0;
+  const lower = text.toLowerCase();
+  // Build an array of all match positions across all terms.
+  type Match = { start: number; end: number; term: string };
+  const matches: Match[] = [];
+  for (const t of terms) {
+    let from = 0;
+    while (true) {
+      const idx = lower.indexOf(t.term, from);
+      if (idx < 0) break;
+      // Boundary-ish check for short codes
+      if (t.term.length <= 3) {
+        const before = lower[idx - 1];
+        const after = lower[idx + t.term.length];
+        const nonLetter = (c: string | undefined) => c == null || !/[a-z]/.test(c);
+        if (!nonLetter(before) || !nonLetter(after)) {
+          from = idx + t.term.length;
+          continue;
+        }
+      }
+      matches.push({ start: idx, end: idx + t.term.length, term: t.term });
+      from = idx + t.term.length;
+    }
+  }
+  matches.sort((a, b) => a.start - b.start);
+
+  // Drop overlapping matches (keep earlier).
+  const filtered: Match[] = [];
+  for (const m of matches) {
+    if (!filtered.length || m.start >= filtered[filtered.length - 1].end) {
+      filtered.push(m);
+    }
+  }
+
+  for (const m of filtered) {
+    if (m.start > cursor) parts.push(text.slice(cursor, m.start));
+    const original = text.slice(m.start, m.end);
+    parts.push(
+      <JargonChip key={`${m.start}-${m.end}`} term={m.term}>
+        {original}
+      </JargonChip>,
+    );
+    cursor = m.end;
+  }
+  if (cursor < text.length) parts.push(text.slice(cursor));
+  return <>{parts}</>;
+}
+
 interface EmissionFactorDetailPopoverProps {
   result: SearchResult;
   children: React.ReactNode;
+  materialType?: 'ingredient' | 'packaging';
+  /** Optional controlled open state. When provided, the consumer manages open/close. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function EmissionFactorDetailPopover({
   result,
   children,
+  materialType,
+  open,
+  onOpenChange,
 }: EmissionFactorDetailPopoverProps) {
   const co2 = result.co2_factor;
   const water = result.water_factor;
@@ -217,6 +324,15 @@ export function EmissionFactorDetailPopover({
   // Source citation
   const citation = result.source_citation || result.source;
 
+  // Plain-English layer
+  const boundaryTranslation = translateBoundary(systemBoundary as string | undefined);
+  const suitability = getMatchSuitability(result, { materialType });
+  const notes = result.metadata?.notes as string | undefined;
+  const valueRangeLow = result.metadata?.value_range_low as number | undefined;
+  const valueRangeHigh = result.metadata?.value_range_high as number | undefined;
+  const literatureUrl = result.metadata?.literature_source?.url as string | undefined;
+  const hasValueRange = valueRangeLow != null && valueRangeHigh != null;
+
   // Determine which sections to show
   const hasImpactData = co2 != null && co2 > 0;
   const hasMultiImpact =
@@ -231,13 +347,13 @@ export function EmissionFactorDetailPopover({
   const maxImpact = Math.max(co2 || 0, water || 0, land || 0, waste || 0, 0.001);
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
       <PopoverContent
         side="right"
         align="start"
         sideOffset={8}
-        className="w-80 p-0 text-[11px]"
+        className="w-[22rem] p-0 text-[11px] max-h-[80vh] overflow-y-auto"
         onClick={(e: React.MouseEvent) => e.stopPropagation()}
         onPointerDown={(e: React.PointerEvent) => e.stopPropagation()}
       >
@@ -247,16 +363,112 @@ export function EmissionFactorDetailPopover({
             {result.friendly_name || result.name}
           </p>
           {result.friendly_name && (
-            <p className="text-[10px] text-muted-foreground/70 mt-0.5 leading-snug truncate">
-              {result.name}
+            <p className="text-[10px] text-muted-foreground/70 mt-0.5 leading-snug">
+              {withGlossary(result.name)}
             </p>
           )}
           {citation && (
             <p className="text-[10px] text-muted-foreground/60 mt-1 leading-snug line-clamp-2">
               {citation}
+              {literatureUrl && (
+                <>
+                  {' '}
+                  <a
+                    href={literatureUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-0.5 text-primary hover:underline"
+                  >
+                    Source <ExternalLink className="h-2.5 w-2.5" />
+                  </a>
+                </>
+              )}
             </p>
           )}
         </div>
+
+        {/* Plain-English: What this covers */}
+        <div className="px-3 py-2 border-b space-y-1.5 bg-muted/30">
+          <p className="font-medium text-muted-foreground uppercase tracking-wider text-[9px]">
+            What this covers
+          </p>
+          <p className="text-[11px] leading-snug">{suitability.whatItCovers}</p>
+          {boundaryTranslation && boundaryTranslation.included.length > 0 && (
+            <div className="space-y-1 pt-1">
+              <div className="flex flex-wrap gap-1">
+                {boundaryTranslation.included.map((stage) => (
+                  <Badge
+                    key={`in-${stage}`}
+                    className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 text-[9px] px-1.5 py-0 gap-0.5"
+                  >
+                    <Check className="h-2.5 w-2.5" />
+                    {stage}
+                  </Badge>
+                ))}
+              </div>
+              {boundaryTranslation.excluded.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {boundaryTranslation.excluded.map((stage) => (
+                    <Badge
+                      key={`ex-${stage}`}
+                      variant="outline"
+                      className="text-muted-foreground/70 text-[9px] px-1.5 py-0 gap-0.5 border-dashed"
+                    >
+                      <XIcon className="h-2.5 w-2.5" />
+                      {stage}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {boundaryTranslation?.suffix && (
+            <p className="text-[10px] text-muted-foreground italic leading-snug">
+              {boundaryTranslation.suffix}
+            </p>
+          )}
+          {notes && (
+            <p className="text-[10px] text-muted-foreground italic leading-snug">
+              Note: {notes}
+            </p>
+          )}
+        </div>
+
+        {/* Plain-English: Good match if / Look elsewhere if */}
+        {(suitability.goodMatchIf.length > 0 || suitability.lookElsewhereIf.length > 0) && (
+          <div className="px-3 py-2 border-b grid grid-cols-1 gap-2">
+            {suitability.goodMatchIf.length > 0 && (
+              <div>
+                <p className="font-medium text-emerald-700 dark:text-emerald-300 uppercase tracking-wider text-[9px] mb-1 flex items-center gap-1">
+                  <ThumbsUp className="h-2.5 w-2.5" />
+                  Good match if…
+                </p>
+                <ul className="space-y-0.5 ml-3 list-disc marker:text-emerald-500/70">
+                  {suitability.goodMatchIf.map((bullet, i) => (
+                    <li key={`g-${i}`} className="text-[11px] leading-snug">
+                      {bullet}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {suitability.lookElsewhereIf.length > 0 && (
+              <div>
+                <p className="font-medium text-amber-700 dark:text-amber-300 uppercase tracking-wider text-[9px] mb-1 flex items-center gap-1">
+                  <ThumbsDown className="h-2.5 w-2.5" />
+                  Look elsewhere if…
+                </p>
+                <ul className="space-y-0.5 ml-3 list-disc marker:text-amber-500/70">
+                  {suitability.lookElsewhereIf.map((bullet, i) => (
+                    <li key={`b-${i}`} className="text-[11px] leading-snug">
+                      {bullet}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Impact Summary */}
         {hasImpactData && (
@@ -271,6 +483,11 @@ export function EmissionFactorDetailPopover({
               colour="bg-orange-500 dark:bg-orange-400"
               maxValue={maxImpact}
             />
+            {hasValueRange && (
+              <p className="text-[9px] text-muted-foreground/70 ml-14 leading-snug">
+                Plausible range: {valueRangeLow!.toFixed(2)} – {valueRangeHigh!.toFixed(2)} kg CO₂e/{unit}
+              </p>
+            )}
             {water != null && water > 0 && (
               <ImpactMiniBar
                 label="Water"
@@ -347,20 +564,20 @@ export function EmissionFactorDetailPopover({
                 <div className="flex items-center gap-2">
                   <MapPin className="h-2.5 w-2.5 text-muted-foreground shrink-0" />
                   <span className="text-muted-foreground w-[68px]">Geography</span>
-                  <span>{geoScope}</span>
+                  <span>{withGlossary(String(geoScope))}</span>
                 </div>
               )}
               {temporalCoverage && (
                 <div className="flex items-center gap-2">
                   <Calendar className="h-2.5 w-2.5 text-muted-foreground shrink-0" />
                   <span className="text-muted-foreground w-[68px]">Period</span>
-                  <span>{temporalCoverage}</span>
+                  <span>{String(temporalCoverage)}</span>
                 </div>
               )}
               {systemBoundary && (
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground w-20">Boundary</span>
-                  <span className="line-clamp-1">{systemBoundary}</span>
+                <div className="flex items-start gap-2">
+                  <span className="text-muted-foreground w-20 shrink-0">Boundary</span>
+                  <span className="leading-snug">{withGlossary(String(systemBoundary))}</span>
                 </div>
               )}
             </div>
@@ -378,21 +595,21 @@ export function EmissionFactorDetailPopover({
                 <div className="flex items-center gap-2">
                   <Layers className="h-2.5 w-2.5 text-muted-foreground shrink-0" />
                   <span className="text-muted-foreground w-[68px]">Model</span>
-                  <span>{systemModel}</span>
+                  <span>{withGlossary(String(systemModel))}</span>
                 </div>
               )}
               {lciaMethod && (
                 <div className="flex items-center gap-2">
                   <FlaskConical className="h-2.5 w-2.5 text-muted-foreground shrink-0" />
                   <span className="text-muted-foreground w-[68px]">LCIA</span>
-                  <span className="line-clamp-1">{lciaMethod}</span>
+                  <span className="line-clamp-1">{withGlossary(String(lciaMethod))}</span>
                 </div>
               )}
               {ecoinventProcessName && (
                 <div className="flex items-start gap-2 mt-1">
                   <span className="text-muted-foreground w-[68px] shrink-0">Process</span>
-                  <span className="text-[10px] text-muted-foreground/70 leading-snug line-clamp-2">
-                    {ecoinventProcessName}
+                  <span className="text-[10px] text-muted-foreground/70 leading-snug">
+                    {withGlossary(String(ecoinventProcessName))}
                   </span>
                 </div>
               )}
@@ -400,12 +617,6 @@ export function EmissionFactorDetailPopover({
           </div>
         )}
 
-        {/* Fallback: if no data at all */}
-        {!hasImpactData && !hasQuality && !hasMethodology && !hasGeoTemporal && (
-          <div className="px-3 py-3 text-muted-foreground/60 text-center">
-            No additional factor details available.
-          </div>
-        )}
       </PopoverContent>
     </Popover>
   );

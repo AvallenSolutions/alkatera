@@ -82,6 +82,33 @@ export const SEARCH_GUIDE_SECTIONS: SearchGuideSection[] = [
     ],
   },
   {
+    id: 'how-to-read-a-factor',
+    title: 'How to Read a Factor',
+    description: 'Decode the jargon you see on every result',
+    tips: [
+      {
+        id: 'read-region-codes',
+        title: 'Region codes in curly braces',
+        rosa: "Those codes like {GLO}, {RoW}, {RER}, {GB} or {FR} tell you where the data was collected. {GLO} is a global average — safe but generic. {RoW} means everywhere outside the regions with their own dedicated factor. {RER} or 'Europe without Switzerland' is a European average. Two-letter codes are countries (GB = Great Britain, FR = France, DE = Germany). Hover the ⓘ icon next to any factor and you'll see the same plain-English explanations inline.",
+      },
+      {
+        id: 'read-system-model',
+        title: 'Cut-off vs APOS vs consequential',
+        rosa: "These are different ways the database splits up shared emissions. Cut-off is the most common — recycled material enters your product carbon-free, and the original producer keeps the waste burden. APOS (Allocation at Point of Substitution) splits emissions between co-products by economic value. Consequential models the knock-on effects of a change in demand. For routine product footprinting, cut-off is the safe default.",
+      },
+      {
+        id: 'read-system-boundary',
+        title: 'What "cradle-to-gate" actually means',
+        rosa: "When a factor says 'cradle-to-gate', it covers raw materials through to the moment the product leaves the factory — so farming, processing and on-site packaging. It does NOT include shipping to your facility, the consumer use phase, or end-of-life. 'Cradle-to-shelf' adds distribution. 'Cradle-to-grave' adds use and disposal. Click any ⓘ icon and we'll show you a tick/cross list of exactly which lifecycle stages the factor includes.",
+      },
+      {
+        id: 'read-market-vs-production',
+        title: '"Market for" vs "production"',
+        rosa: "If a factor is called 'market for X', it already includes typical mixing of suppliers and average transport to a buyer in that region — pick this when you don't know your exact producer. If it's called 'X production' (without 'market for'), it's a single production route with no transport — pick this when you know your supplier and will model the transport leg yourself. Don't double-count: never use a 'market for' factor and then add transport on top.",
+      },
+    ],
+  },
+  {
     id: 'search-tips',
     title: 'Tips for Better Searches',
     description: 'Get more relevant results',

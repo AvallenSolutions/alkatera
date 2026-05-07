@@ -203,6 +203,8 @@ export interface OnboardingState {
   emissionsGuideDismissed?: boolean
   /** Whether the recipe sidebar first-run tour has been completed (or skipped) */
   recipeSidebarTourCompleted?: boolean
+  /** Whether the factor-info hover hint coachmark has been seen/dismissed */
+  factorInfoHintCompleted?: boolean
 }
 
 export const INITIAL_ONBOARDING_STATE: OnboardingState = {
@@ -217,6 +219,7 @@ export const INITIAL_ONBOARDING_STATE: OnboardingState = {
   emissionsGuideCompleted: false,
   emissionsGuideDismissed: false,
   recipeSidebarTourCompleted: false,
+  factorInfoHintCompleted: false,
 }
 
 export const INITIAL_MEMBER_ONBOARDING_STATE: OnboardingState = {
@@ -231,6 +234,7 @@ export const INITIAL_MEMBER_ONBOARDING_STATE: OnboardingState = {
   emissionsGuideCompleted: false,
   emissionsGuideDismissed: false,
   recipeSidebarTourCompleted: false,
+  factorInfoHintCompleted: false,
 }
 
 export const INITIAL_FAST_TRACK_STATE: OnboardingState = {
@@ -245,6 +249,7 @@ export const INITIAL_FAST_TRACK_STATE: OnboardingState = {
   emissionsGuideCompleted: false,
   emissionsGuideDismissed: false,
   recipeSidebarTourCompleted: false,
+  factorInfoHintCompleted: false,
 }
 
 // ---------------------------------------------------------------------------

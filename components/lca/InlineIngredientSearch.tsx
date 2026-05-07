@@ -9,7 +9,9 @@ import { Loader2, Building2, Database, Layers, CheckCircle2, AlertCircle, AlertT
 import { supabase } from "@/lib/supabaseClient";
 import { findBrandNameMatch } from "@/lib/openlca/drinks-aliases";
 import type { DataSource } from "@/lib/types/lca";
-import { EmissionFactorDetailPopover } from "./EmissionFactorDetailPopover";
+import { cleanFactorDisplayName } from "@/lib/factor-display-name";
+import { FactorInfoHint } from "./FactorInfoHint";
+import { FactorInfoTrigger } from "./FactorInfoTrigger";
 
 interface ProxySuggestion {
   proxy_name: string;
@@ -598,6 +600,7 @@ export function InlineIngredientSearch({
         </div>
       )}
 
+      <FactorInfoHint active={showResults && results.length > 0} />
       {showResults && results.length > 0 && (
         <Card className="absolute z-50 mt-1 w-full max-h-96 overflow-y-auto shadow-lg">
           <div className="p-2 space-y-1">
@@ -648,7 +651,7 @@ export function InlineIngredientSearch({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-sm truncate">
-                        {result.friendly_name || result.name}
+                        {result.friendly_name || cleanFactorDisplayName(result.name)}
                       </span>
                       {getSourceBadge(result)}
                       {result.is_user_favourite && (
@@ -660,21 +663,11 @@ export function InlineIngredientSearch({
                           Popular
                         </Badge>
                       )}
-                      <EmissionFactorDetailPopover result={result}>
-                        <button
-                          type="button"
-                          className="inline-flex items-center justify-center h-4 w-4 rounded-full hover:bg-accent shrink-0"
-                          onClick={(e) => e.stopPropagation()}
-                          onPointerDown={(e) => e.stopPropagation()}
-                          aria-label="View factor details"
-                        >
-                          <Info className="h-3 w-3 text-muted-foreground/40 hover:text-muted-foreground" />
-                        </button>
-                      </EmissionFactorDetailPopover>
+                      <FactorInfoTrigger result={result} materialType={materialType} />
                     </div>
                     {result.friendly_name && (
                       <p className="text-[11px] text-muted-foreground/70 truncate mt-0.5" title={result.name}>
-                        {result.name}
+                        {cleanFactorDisplayName(result.name)}
                       </p>
                     )}
                     <div className="flex flex-wrap items-center gap-2 mt-1">
