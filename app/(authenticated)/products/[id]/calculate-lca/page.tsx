@@ -23,6 +23,7 @@ import {
   MapPin,
   Calendar,
   Search,
+  FlaskConical,
 } from "lucide-react";
 import { OperationOverlay, type OperationStep } from "@/components/ui/operation-progress";
 import { Input } from "@/components/ui/input";
@@ -83,6 +84,17 @@ interface ReportingSession {
   data_source_type: string;
 }
 
+interface ProductionRunSummary {
+  facilityId: string;
+  runCount: number;
+  totalProductionVolume: number;
+  productionVolumeUnit: string;
+  electricityKwh: number;
+  waterM3: number;
+  earliestDate: string;
+  latestDate: string;
+}
+
 const PRODUCTION_UNITS = [
   { value: "units", label: "Units" },
   { value: "litres", label: "Litres" },
@@ -110,6 +122,7 @@ export default function CalculateLCAPage() {
   const [linkedFacilities, setLinkedFacilities] = useState<LinkedFacility[]>([]);
   const [facilityAllocations, setFacilityAllocations] = useState<FacilityAllocation[]>([]);
   const [reportingSessions, setReportingSessions] = useState<Record<string, ReportingSession[]>>({});
+  const [runDataByFacility, setRunDataByFacility] = useState<Record<string, ProductionRunSummary>>({});
   const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
   const [savingMaterialId, setSavingMaterialId] = useState<string | null>(null);
 
@@ -255,13 +268,74 @@ export default function CalculateLCAPage() {
           }
           setReportingSessions(sessionsByFacility);
 
-          // Initialize allocations - auto-select the most recent session if available
+          // Fetch production run resource data for this product across all linked facilities.
+          // Run Data is a first-class allocation source: when present, it pre-fills production
+          // volumes and the reporting period directly from the user's per-run measurements,
+          // so users no longer need a separate `facility_reporting_sessions` row to make their
+          // run data flow into the LCA. Reporting sessions remain useful for facility-wide
+          // attribution when the facility produces multiple products.
+          const { data: runRows } = await supabase
+            .from('production_run_resource_data')
+            .select('facility_id, production_date, production_volume, production_volume_unit, electricity_computed_kwh, water_intake_m3')
+            .eq('product_id', productId)
+            .in('facility_id', facilityIds);
+
+          const runByFacility: Record<string, ProductionRunSummary> = {};
+          for (const row of (runRows || [])) {
+            const fid = row.facility_id;
+            const unit = (row.production_volume_unit || 'units').toLowerCase();
+            const existing = runByFacility[fid];
+            if (existing) {
+              existing.runCount += 1;
+              existing.totalProductionVolume += Number(row.production_volume || 0);
+              existing.electricityKwh += Number(row.electricity_computed_kwh || 0);
+              existing.waterM3 += Number(row.water_intake_m3 || 0);
+              if (row.production_date < existing.earliestDate) existing.earliestDate = row.production_date;
+              if (row.production_date > existing.latestDate) existing.latestDate = row.production_date;
+            } else {
+              runByFacility[fid] = {
+                facilityId: fid,
+                runCount: 1,
+                totalProductionVolume: Number(row.production_volume || 0),
+                productionVolumeUnit: unit,
+                electricityKwh: Number(row.electricity_computed_kwh || 0),
+                waterM3: Number(row.water_intake_m3 || 0),
+                earliestDate: row.production_date,
+                latestDate: row.production_date,
+              };
+            }
+          }
+          setRunDataByFacility(runByFacility);
+
+          // Initialize allocations with priority: Run Data → Reporting Session → Defaults
           const defaultEndDate = new Date().toISOString().split('T')[0];
           const defaultStartDate = new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString().split('T')[0];
 
           setFacilityAllocations(facilities.map(f => {
             const facilitySessions = sessionsByFacility[f.facility_id] || [];
             const latestSession = facilitySessions[0]; // Already sorted by end date desc
+            const runSummary = runByFacility[f.facility_id];
+
+            if (runSummary) {
+              // Run Data path — derive everything from the user's per-run measurements.
+              // If a session also exists, prefer its facility-wide total (more accurate
+              // attribution when the facility produces multiple products); otherwise
+              // assume 100% attribution (run = product output for the period).
+              const productVolume = String(runSummary.totalProductionVolume);
+              return {
+                facilityId: f.facility_id,
+                facilityName: f.facility.name,
+                operationalControl: f.facility.operational_control,
+                reportingPeriodStart: latestSession?.reporting_period_start || runSummary.earliestDate,
+                reportingPeriodEnd: latestSession?.reporting_period_end || runSummary.latestDate,
+                productionVolume: productVolume,
+                productionVolumeUnit: latestSession?.volume_unit?.toLowerCase() || runSummary.productionVolumeUnit,
+                facilityTotalProduction: latestSession
+                  ? String(latestSession.total_production_volume)
+                  : productVolume,
+                selectedSessionId: latestSession?.id,
+              };
+            }
 
             if (latestSession) {
               return {
@@ -271,7 +345,7 @@ export default function CalculateLCAPage() {
                 reportingPeriodStart: latestSession.reporting_period_start,
                 reportingPeriodEnd: latestSession.reporting_period_end,
                 productionVolume: '',
-                productionVolumeUnit: latestSession.volume_unit || 'units',
+                productionVolumeUnit: latestSession.volume_unit?.toLowerCase() || 'units',
                 facilityTotalProduction: String(latestSession.total_production_volume),
                 selectedSessionId: latestSession.id,
               };
@@ -751,6 +825,27 @@ export default function CalculateLCAPage() {
                       </Badge>
                     </div>
                   </div>
+
+                  {runDataByFacility[allocation.facilityId] && (() => {
+                    const run = runDataByFacility[allocation.facilityId];
+                    const formatDate = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+                    return (
+                      <Alert className="border-lime-300 bg-lime-50 dark:bg-lime-950/30 dark:border-lime-800">
+                        <FlaskConical className="h-4 w-4 text-lime-700 dark:text-lime-300" />
+                        <AlertTitle className="text-lime-900 dark:text-lime-100">
+                          Pre-filled from Run Data
+                        </AlertTitle>
+                        <AlertDescription className="text-lime-800 dark:text-lime-200 text-xs">
+                          {run.runCount} {run.runCount === 1 ? 'run' : 'runs'} ·{' '}
+                          {run.totalProductionVolume.toLocaleString()} {run.productionVolumeUnit} ·{' '}
+                          {run.electricityKwh.toLocaleString()} kWh electricity ·{' '}
+                          {run.waterM3.toLocaleString()} m³ water ·{' '}
+                          {formatDate(run.earliestDate)}
+                          {run.earliestDate !== run.latestDate ? ` – ${formatDate(run.latestDate)}` : ''}
+                        </AlertDescription>
+                      </Alert>
+                    );
+                  })()}
 
                   {/* Reporting Session Cards */}
                   <div className="space-y-2">

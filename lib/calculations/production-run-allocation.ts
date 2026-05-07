@@ -178,16 +178,16 @@ export function calculateRunEmissions(
  * Normalise production volume to litres for consistent intensity calculations.
  */
 function normaliseToLitres(volume: number, unit: string): number {
-  switch (unit) {
-    case 'Hectolitres':
+  switch ((unit || '').toLowerCase()) {
+    case 'hectolitres':
       return volume * 100;
     case 'kg':
       // Assume 1 kg ≈ 1 litre for water-based beverages
       return volume;
-    case 'Units':
+    case 'units':
       // Cannot convert units to litres without product context
       return volume;
-    case 'Litres':
+    case 'litres':
     default:
       return volume;
   }
