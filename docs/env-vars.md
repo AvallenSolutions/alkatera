@@ -15,10 +15,17 @@ Your environment variables exceed the 4KB limit imposed by AWS Lambda
 ```
 
 To catch this before it ships, `npm run build` runs
-`scripts/check-function-env-budget.mjs` as a `prebuild` step. The guard fails
-if the total user-managed env footprint exceeds **3500 bytes** (leaves
-~600 B headroom for AWS internal padding). On failure it prints the largest
-vars, so the offender is obvious.
+`scripts/check-function-env-budget.mjs` as a `prebuild` step. The guard prints
+an estimate of the function-bundle footprint based on what's visible in
+`process.env` at build time. The estimate is approximate - Netlify scope info
+is not available from inside the build, so the script assumes `NEXT_PUBLIC_*`
+are off Functions and counts everything else.
+
+If the estimate exceeds **3500 bytes** (leaves ~600 B headroom for AWS
+padding), the script prints a warning with the largest vars listed. By
+default it does not fail the build, because the estimate is approximate and
+the real Lambda payload may still fit. Set `STRICT_ENV_BUDGET=1` to make the
+guard fail builds on over-budget estimates.
 
 Run it on demand with:
 

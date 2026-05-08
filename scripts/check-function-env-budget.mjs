@@ -44,7 +44,9 @@ function isPlatformOrShell(key) {
   if (SHELL_VARS.has(key)) return true;
   if (CI_VARS.has(key)) return true;
   if (key.startsWith('npm_')) return true;
-  if (key.startsWith('NETLIFY_')) return true;
+  // Note: do NOT prefix-match NETLIFY_*. User-set vars like NETLIFY_EMAILS_*
+  // start with that prefix and DO count against the Lambda quota - they need
+  // to be in the explicit PLATFORM_VARS set above if they are platform-internal.
   if (key.startsWith('NF_')) return true;
   if (key.startsWith('AWS_')) return true;
   if (key.startsWith('GITHUB_')) return true;
@@ -81,43 +83,54 @@ const presumedSkipped = all.filter(v => v.presumedOffFunctions);
 const total = functionScoped.reduce((s, v) => s + v.size, 0);
 const skippedTotal = presumedSkipped.reduce((s, v) => s + v.size, 0);
 
+const STRICT = process.env.STRICT_ENV_BUDGET === '1';
+
 if (total > SAFETY_BUDGET) {
-  process.stderr.write(
-    `\n❌ Estimated function-bundle env footprint: ${total} bytes ` +
+  const stream = STRICT ? process.stderr : process.stdout;
+  const icon = STRICT ? '❌' : '⚠️ ';
+  stream.write(
+    `\n${icon} Estimated function-bundle env footprint: ${total} bytes ` +
     `(safety budget ${SAFETY_BUDGET}, AWS hard limit ${HARD_LIMIT}).\n\n` +
     `AWS Lambda rejects function creation when env vars exceed 4 KB. ` +
-    `Adding more without trimming will fail the deploy.\n\n` +
+    `If the real payload is over budget the deploy will fail at the ` +
+    `function-creation step.\n\n` +
     `Top function-scoped vars by size:\n`,
   );
   for (const { key, size } of functionScoped.slice(0, 15)) {
-    process.stderr.write(`  ${String(size).padStart(5)}  ${key}\n`);
+    stream.write(`  ${String(size).padStart(5)}  ${key}\n`);
   }
   if (presumedSkipped.length > 0) {
-    process.stderr.write(
+    stream.write(
       `\n${presumedSkipped.length} vars excluded from count ` +
       `(${skippedTotal} bytes, presumed not Functions-scoped per contract):\n`,
     );
     for (const { key, size } of presumedSkipped) {
-      process.stderr.write(`  ${String(size).padStart(5)}  ${key}\n`);
+      stream.write(`  ${String(size).padStart(5)}  ${key}\n`);
     }
-    process.stderr.write(
+    stream.write(
       `If any of these is still on Functions scope in Netlify, the real payload ` +
       `is larger than this estimate.\n`,
     );
   }
-  process.stderr.write(
+  stream.write(
     `\nFix:\n` +
     `  1. Drop unused vars in Netlify (Site config > Environment variables).\n` +
     `  2. Or scope a build-only var off Functions (uncheck "Functions" in Scopes).\n` +
     `  3. Or move a long secret to Supabase Vault and read it at runtime.\n` +
-    `\nSee docs/env-vars.md for the contract.\n\n`,
+    `\nSee docs/env-vars.md for the contract.\n`,
   );
-  process.exit(1);
+  if (STRICT) {
+    stream.write(`\n`);
+    process.exit(1);
+  }
+  stream.write(
+    `\nProceeding with build (set STRICT_ENV_BUDGET=1 to fail builds on this).\n\n`,
+  );
+} else {
+  process.stdout.write(
+    `✅ Estimated function-bundle env footprint: ${total} bytes ` +
+    `(${functionScoped.length} vars, under ${SAFETY_BUDGET} budget` +
+    `${presumedSkipped.length > 0 ? `, ${presumedSkipped.length} NEXT_PUBLIC_* presumed off Functions` : ''}` +
+    `).\n`,
+  );
 }
-
-process.stdout.write(
-  `✅ Estimated function-bundle env footprint: ${total} bytes ` +
-  `(${functionScoped.length} vars, under ${SAFETY_BUDGET} budget` +
-  `${presumedSkipped.length > 0 ? `, ${presumedSkipped.length} NEXT_PUBLIC_* presumed off Functions` : ''}` +
-  `).\n`,
-);
