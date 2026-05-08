@@ -562,6 +562,16 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
           case 'error':
             throw new Error(event.error || 'Stream error');
           case 'done':
+            // Adopt the server-resolved conversation id (the synthetic 'start'
+            // event only carries the request input, which is undefined for a
+            // brand-new conversation). Without this, loadConversation never
+            // runs and the persisted assistant message never reaches the UI.
+            if (event.conversation_id && !conversationId) {
+              conversationId = event.conversation_id;
+            }
+            if (event.is_new_conversation) {
+              isNewConversation = true;
+            }
             // Parse actions from the complete response
             if (streamingContent) {
               const actions = parseActionsFromResponse(streamingContent, userContext);
