@@ -35,9 +35,12 @@ npm run check:env-budget
 | Netlify dashboard, scope = **Functions** | Runtime secrets read by `app/api/**/route.ts` or `netlify/functions/*.ts`. These count against the 4 KB budget. |
 | Supabase Vault / secrets table | Anything large, rarely used, or that would push the budget over. Functions read it on cold start using `SUPABASE_SERVICE_ROLE_KEY`. |
 
-`NEXT_PUBLIC_*` vars are inlined into the client bundle at build, but Next.js
-server code still reads them via `process.env` at runtime, so they need to
-stay on the Functions scope.
+`NEXT_PUBLIC_*` vars are **not** Functions-scoped. Next.js inlines every
+`process.env.NEXT_PUBLIC_*` reference into the JS bundle (both client and
+server code) at build time, so the Lambda never reads them from env. Set
+their scopes to **Builds** + **Runtime** + **Post processing** and uncheck
+**Functions**. The budget guard assumes this convention and excludes them
+from the function footprint count.
 
 ## When the guard fails
 
