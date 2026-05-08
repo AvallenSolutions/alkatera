@@ -7,13 +7,15 @@
   },
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/check-function-env-budget.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "check:env-budget": "node scripts/check-function-env-budget.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.74.0",
