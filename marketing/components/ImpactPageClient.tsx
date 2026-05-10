@@ -30,7 +30,7 @@ import { Footer } from '@/marketing/components/Footer';
    ═══════════════════════════════════════════ */
 
 const Hero = () => (
-  <section className="relative pt-40 pb-32 px-6 md:px-10 overflow-hidden">
+  <section className="relative pt-32 pb-20 px-6 md:px-10 overflow-hidden">
     <div className="max-w-5xl mx-auto text-center">
       <motion.div
         initial={{ opacity: 0, y: 30 }}
@@ -84,13 +84,13 @@ const challengeStats = [
 ];
 
 const ChallengeSection = () => (
-  <section className="py-32 px-6 md:px-10 relative">
+  <section className="py-20 px-6 md:px-10 relative">
     <div className="max-w-6xl mx-auto">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        className="mb-16"
+        className="mb-12"
       >
         <p className="font-mono text-[#ccff00] text-xs uppercase tracking-[0.3em] mb-4">The Challenge</p>
         <h2 className="font-serif text-4xl md:text-6xl leading-[1.05] max-w-3xl">
@@ -170,13 +170,13 @@ const measureCategories = [
 ];
 
 const MeasureSection = () => (
-  <section className="py-32 px-6 md:px-10 relative">
+  <section className="py-20 px-6 md:px-10 relative">
     <div className="max-w-6xl mx-auto">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        className="mb-16 text-center"
+        className="mb-12 text-center"
       >
         <p className="font-mono text-[#ccff00] text-xs uppercase tracking-[0.3em] mb-4">What We Measure</p>
         <h2 className="font-serif text-4xl md:text-6xl leading-[1.05] mb-6">
@@ -235,13 +235,13 @@ const steps = [
 ];
 
 const HowItWorksSection = () => (
-  <section className="py-32 px-6 md:px-10 relative">
+  <section className="py-20 px-6 md:px-10 relative">
     <div className="max-w-6xl mx-auto">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        className="mb-16"
+        className="mb-12"
       >
         <p className="font-mono text-[#ccff00] text-xs uppercase tracking-[0.3em] mb-4">How It Works</p>
         <h2 className="font-serif text-4xl md:text-6xl leading-[1.05] max-w-3xl">
@@ -279,13 +279,13 @@ const HowItWorksSection = () => (
    ═══════════════════════════════════════════ */
 
 const BeyondCarbonSection = () => (
-  <section className="py-32 px-6 md:px-10 relative">
+  <section className="py-20 px-6 md:px-10 relative">
     <div className="max-w-6xl mx-auto">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        className="mb-16 text-center"
+        className="mb-12 text-center"
       >
         <p className="font-mono text-[#ccff00] text-xs uppercase tracking-[0.3em] mb-4">Beyond Carbon</p>
         <h2 className="font-serif text-4xl md:text-6xl leading-[1.05] mb-6">
@@ -361,13 +361,13 @@ const frameworks = [
 ];
 
 const FrameworksSection = () => (
-  <section className="py-32 px-6 md:px-10 relative">
+  <section className="py-20 px-6 md:px-10 relative">
     <div className="max-w-6xl mx-auto">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        className="mb-16 text-center"
+        className="mb-12 text-center"
       >
         <p className="font-mono text-[#ccff00] text-xs uppercase tracking-[0.3em] mb-4">Standards &amp; Frameworks</p>
         <h2 className="font-serif text-4xl md:text-6xl leading-[1.05] mb-6">
@@ -399,11 +399,73 @@ const FrameworksSection = () => (
 );
 
 /* ═══════════════════════════════════════════
+   Partnership Section (Impact Focus)
+   ═══════════════════════════════════════════ */
+
+const PartnershipSection = () => (
+  <section className="py-20 px-6 md:px-10 relative">
+    <div className="max-w-5xl mx-auto">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        className="mb-12 text-center"
+      >
+        <p className="font-mono text-[#ccff00] text-xs uppercase tracking-[0.3em] mb-4">Beyond the Data</p>
+        <h2 className="font-serif text-4xl md:text-6xl leading-[1.05] mb-6">
+          When data needs a{' '}
+          <span className="text-[#ccff00] italic">human partner</span>
+        </h2>
+        <p className="text-gray-400 max-w-2xl mx-auto leading-relaxed">
+          Numbers tell you what is happening. Strategy tells you what to do about it. We have partnered exclusively with Impact Focus, who bring 25 years of specialist food and drink sustainability experience, to help alka<strong>tera</strong> users translate data into commercially grounded action.
+        </p>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        className="group relative overflow-hidden backdrop-blur-md bg-white/5 border border-white/10 rounded-2xl p-8 md:p-12 hover:border-[#ccff00]/25 transition-all duration-500"
+      >
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#ccff00]/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+
+        <div className="grid grid-cols-1 md:grid-cols-[auto,1fr] gap-8 md:gap-10 items-center">
+          <div className="bg-white rounded-xl px-8 py-6 flex items-center justify-center w-full md:w-56 h-28">
+            <img
+              src="/images/partners/impact-focus/logo.png"
+              alt="Impact Focus"
+              className="object-contain max-h-16 w-auto"
+            />
+          </div>
+
+          <div className="text-center md:text-left">
+            <p className="font-mono text-white/60 text-xs uppercase tracking-[0.2em] mb-3">
+              Exclusive Strategic Partner
+            </p>
+            <p className="text-gray-300 text-base md:text-lg leading-relaxed mb-6">
+              Strategic sustainability consulting, exclusively for alka<strong>tera</strong> customers. Canopy subscribers unlock consulting credits.
+            </p>
+            <a
+              href="https://www.impactfocus.co.uk"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-3 bg-[#ccff00] text-black font-mono text-xs font-medium uppercase tracking-widest px-8 py-4 rounded-full hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(204,255,0,0.3)] transition-all"
+            >
+              Visit Impact Focus <ArrowRight className="w-4 h-4" />
+            </a>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  </section>
+);
+
+/* ═══════════════════════════════════════════
    CTA Section (Neon Yellow)
    ═══════════════════════════════════════════ */
 
 const CTASection = () => (
-  <section className="py-40 px-6 md:px-20 bg-[#ccff00] text-black text-center relative overflow-hidden">
+  <section className="py-28 px-6 md:px-20 bg-[#ccff00] text-black text-center relative overflow-hidden">
     <div className="relative z-10">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -486,6 +548,7 @@ export function ImpactPageClient() {
         <HowItWorksSection />
         <BeyondCarbonSection />
         <FrameworksSection />
+        <PartnershipSection />
         <CTASection />
         <Footer />
       </div>
