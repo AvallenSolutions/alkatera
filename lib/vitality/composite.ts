@@ -15,6 +15,7 @@ import type {
   CircularityScoreBreakdown,
   NatureScoreBreakdown,
 } from './environmental'
+import type { SocialScoreBreakdown } from './social'
 
 export type ScoreBand =
   | 'EXCELLENT'
@@ -89,12 +90,22 @@ export interface EnvironmentalPillarScore
   nature_breakdown: NatureScoreBreakdown | null
 }
 
+/**
+ * Social pillar carries an extra `social_breakdown` field exposing the
+ * 4-axis blend (workforce / community / supplier / YoY) so the explainer
+ * popover can show users exactly how the social number was reached.
+ * Null when the legacy equal-weighted-average path was used.
+ */
+export interface SocialPillarScore extends PillarScore<SocialSubScores> {
+  social_breakdown: SocialScoreBreakdown | null
+}
+
 export interface VitalityComposite {
   composite: number | null
   band: ScoreBand
   weights: VitalityWeights
   e: EnvironmentalPillarScore
-  s: PillarScore<SocialSubScores>
+  s: SocialPillarScore
   g: PillarScore<GovernanceSubScores>
   generated_at: string
 }
@@ -242,17 +253,37 @@ export function computeEnvironmentalPillar(
 }
 
 export interface SocialInputs {
-  /** From /api/community-impact/score (current.overall_score). */
+  /** Preferred: precomputed social breakdown from `computeSocialScore`. */
+  social_breakdown?: SocialScoreBreakdown | null
+  /** Legacy: from /api/community-impact/score (current.overall_score). */
   community_score: number | null
-  /** From /api/people-culture/score (current.overall_score). */
+  /** Legacy: from /api/people-culture/score (current.overall_score). */
   people_culture_score: number | null
-  /** Derived: % of suppliers with submitted ESG, on a 0-100 scale. */
+  /** Legacy: % of suppliers with submitted ESG, on a 0-100 scale. */
   supplier_esg_pct: number | null
 }
 
 export function computeSocialPillar(
   data: SocialInputs,
-): PillarScore<SocialSubScores> {
+): SocialPillarScore {
+  // Preferred path: trust the precomputed breakdown when supplied.
+  if (data.social_breakdown !== undefined) {
+    const breakdown = data.social_breakdown
+    return {
+      score: breakdown?.score ?? null,
+      has_data: breakdown?.score !== null && breakdown !== null,
+      sub: {
+        // Map breakdown axes back to the legacy SocialSubScores shape
+        // for callers (PillarCards) that consume sub directly.
+        community: breakdown?.axes.community_sub ?? null,
+        people_culture: breakdown?.axes.workforce_sub ?? null,
+        supplier_esg: breakdown?.axes.supplier_sub ?? null,
+      },
+      social_breakdown: breakdown ?? null,
+    }
+  }
+
+  // Legacy path: equal-weighted average. Kept for unmigrated callers.
   const sub: SocialSubScores = {
     community: data.community_score,
     people_culture: data.people_culture_score,
@@ -261,9 +292,11 @@ export function computeSocialPillar(
   const valid = [sub.community, sub.people_culture, sub.supplier_esg].filter(
     (v): v is number => v !== null && Number.isFinite(v),
   )
-  if (valid.length === 0) return { score: null, has_data: false, sub }
+  if (valid.length === 0) {
+    return { score: null, has_data: false, sub, social_breakdown: null }
+  }
   const score = Math.round(valid.reduce((a, b) => a + b, 0) / valid.length)
-  return { score, has_data: true, sub }
+  return { score, has_data: true, sub, social_breakdown: null }
 }
 
 export interface GovernanceInputs {
@@ -293,7 +326,7 @@ export function computeGovernancePillar(
 
 export interface ComposeArgs {
   e: EnvironmentalPillarScore
-  s: PillarScore<SocialSubScores>
+  s: SocialPillarScore
   g: PillarScore<GovernanceSubScores>
   weights?: Partial<VitalityWeights> | null
 }

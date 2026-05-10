@@ -59,6 +59,7 @@ export function EsgPillarCards({ e, s, g, sparklines, compact = false }: Props) 
   }
   const socialInputs: CalculationInputs = {
     socialScores: s.sub,
+    socialBreakdown: 'social_breakdown' in s ? (s as any).social_breakdown : null,
   }
   const govInputs: CalculationInputs = {
     governanceScores: g.sub,
