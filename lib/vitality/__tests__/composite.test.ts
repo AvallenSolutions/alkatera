@@ -179,6 +179,72 @@ describe('computeEnvironmentalPillar', () => {
     expect(r.sub.water).toBeNull()
     expect(r.water_breakdown?.mode).toBe('no_data')
   })
+
+  it('prefers a precomputed circularity_breakdown over the legacy ladder', () => {
+    const emptyMix = {
+      reuse: 0,
+      composting: 0,
+      anaerobic_digestion: 0,
+      recycling: 0,
+      incineration_with_recovery: 0,
+      landfill: 0,
+      incineration_without_recovery: 0,
+      other: 0,
+    }
+    const r = computeEnvironmentalPillar({
+      // Legacy says circularityRate 90 → score 95; breakdown overrides with 70.
+      circularityRate: 90,
+      hasWasteData: true,
+      circularity_breakdown: {
+        score: 70,
+        practices_sub: 75,
+        intensity_yoy_sub: 65,
+        axes: {
+          recycled_content_sub: 75,
+          packaging_recyclability_sub: 75,
+          diversion_sub: 75,
+        },
+        mode: 'blended',
+        weights: { practices: 0.6, yoy: 0.4 },
+        treatment_mix: { ...emptyMix, reuse: 0.6, recycling: 0.4 },
+      },
+    })
+    expect(r.sub.circularity).toBe(70)
+    expect(r.circularity_breakdown?.score).toBe(70)
+    expect(r.circularity_breakdown?.practices_sub).toBe(75)
+  })
+
+  it('honours a no_data circularity_breakdown (no fallback to legacy ladder)', () => {
+    const emptyMix = {
+      reuse: 0,
+      composting: 0,
+      anaerobic_digestion: 0,
+      recycling: 0,
+      incineration_with_recovery: 0,
+      landfill: 0,
+      incineration_without_recovery: 0,
+      other: 0,
+    }
+    const r = computeEnvironmentalPillar({
+      circularityRate: 90,
+      hasWasteData: true,
+      circularity_breakdown: {
+        score: null,
+        practices_sub: null,
+        intensity_yoy_sub: null,
+        axes: {
+          recycled_content_sub: null,
+          packaging_recyclability_sub: null,
+          diversion_sub: null,
+        },
+        mode: 'no_data',
+        weights: { practices: 0, yoy: 0 },
+        treatment_mix: emptyMix,
+      },
+    })
+    expect(r.sub.circularity).toBeNull()
+    expect(r.circularity_breakdown?.mode).toBe('no_data')
+  })
 })
 
 describe('computeSocialPillar', () => {

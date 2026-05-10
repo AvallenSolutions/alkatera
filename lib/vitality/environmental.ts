@@ -807,6 +807,355 @@ function pickWaterBenchmark(
   return null
 }
 
+// -----------------------------------------------------------------------------
+// Circularity scoring
+// -----------------------------------------------------------------------------
+
+/**
+ * Blended Circularity sub-score.
+ *
+ * Circularity is intrinsically a *quality* metric — a brewery can't be
+ * "less circular" by generating more spent grain if all of it goes to
+ * animal feed. So we blend two axes:
+ *
+ *  - Circular practices (60%) — equal-weighted blend of three signals,
+ *    each a 0-100 ratio: recycled content of inputs, packaging
+ *    recyclability of outputs, and tier-weighted operational diversion.
+ *
+ *  - Waste-intensity YoY (40%) — % change in waste-per-unit-produced.
+ *    Volume reduction at portfolio scale is hard, so anchors are lenient.
+ *
+ * Tier-weighted diversion is the key insight: not all "diverted" tonnes
+ * are equal. Following the EU Waste Framework Directive 2008/98/EC
+ * waste hierarchy (reduce > reuse > recycle > energy recovery > dispose),
+ * we weight each treatment route by quality before computing the
+ * diversion sub-score. A brewery sending spent grain to animal-feed reuse
+ * earns more than one sending it to waste-to-energy.
+ */
+export type CircularityScoreMode =
+  | 'blended'
+  | 'practices_only'
+  | 'yoy_only'
+  | 'no_data'
+
+export interface CircularityScoreBreakdown {
+  /** 0-100 final blended score, or null when no inputs are available. */
+  score: number | null
+  /** Sub-scores by axis. Each may be null when its data isn't available. */
+  axes: {
+    recycled_content_sub: number | null
+    packaging_recyclability_sub: number | null
+    diversion_sub: number | null
+  }
+  /** 0-100 sub-score from the practices side (avg of available axes). */
+  practices_sub: number | null
+  /** 0-100 sub-score from year-on-year waste-intensity trend. */
+  intensity_yoy_sub: number | null
+  /** Mode that drove the score so the UI can explain transparently. */
+  mode: CircularityScoreMode
+  /** Blend weights applied. */
+  weights: { practices: number; yoy: number }
+  /**
+   * Treatment mix used for tier-weighted diversion. Each value is the
+   * proportion of *total* waste routed via that method (0-1). Useful for
+   * the explainer popover so users can see the breakdown.
+   */
+  treatment_mix: {
+    reuse: number
+    composting: number
+    anaerobic_digestion: number
+    recycling: number
+    incineration_with_recovery: number
+    landfill: number
+    incineration_without_recovery: number
+    other: number
+  }
+}
+
+const CIRCULARITY_PRACTICES_WEIGHT = 0.6
+const CIRCULARITY_YOY_WEIGHT = 0.4
+
+/**
+ * Tier weights from the EU Waste Framework Directive hierarchy. Reuse is
+ * the highest-quality route; landfill the lowest. Multiplied by the
+ * proportion of waste taking each route, then summed and × 100 to get a
+ * 0-100 quality-adjusted diversion score.
+ */
+const TREATMENT_TIER_WEIGHTS = {
+  reuse: 1.0,
+  composting: 0.85,
+  anaerobic_digestion: 0.85,
+  recycling: 0.7,
+  incineration_with_recovery: 0.4,
+  landfill: 0,
+  incineration_without_recovery: 0,
+  other: 0.2, // Unknown destination — give a token credit since it's not landfill
+} as const
+
+/**
+ * Anchors for each of the three practice axes (input ratio %).
+ * 100% earns 100 (cleanly), 0% earns 5 (so missing-but-known still gets a
+ * floor). Same shape for all three axes — keeps the explainer copy uniform.
+ */
+const CIRCULARITY_AXIS_ANCHORS: Array<[number, number]> = [
+  [0, 5],
+  [20, 25],
+  [40, 50],
+  [60, 75],
+  [80, 90],
+  [95, 98],
+  [100, 100],
+]
+
+/**
+ * Anchors for waste-intensity YoY (% change in kg waste per unit produced).
+ * Lenient — a 3% reduction earns 100 because absolute waste reduction at
+ * production scale is structurally hard. Increases are penalised but not
+ * cliff-edged so a single growth year doesn't tank the sub-score.
+ */
+const CIRCULARITY_YOY_ANCHORS: Array<[number, number]> = [
+  [-3, 100],
+  [-1, 90],
+  [0, 80],
+  [2, 60],
+  [5, 40],
+  [10, 20],
+  [20, 5],
+]
+
+export function circularityAxisSubScore(pct: number): number {
+  if (!Number.isFinite(pct)) return 0
+  return Math.round(interpolate(pct, CIRCULARITY_AXIS_ANCHORS))
+}
+
+export function circularityIntensityYoySubScore(deltaPct: number): number {
+  if (!Number.isFinite(deltaPct)) return 0
+  return Math.round(interpolate(deltaPct, CIRCULARITY_YOY_ANCHORS))
+}
+
+/**
+ * Compute the tier-weighted diversion percentage from a treatment mix.
+ * Each treatment route's proportion is multiplied by its quality weight
+ * (per the EU waste hierarchy) then summed × 100 to give a 0-100 score.
+ *
+ * Example: a brewery sending 80% to reuse + 20% to landfill scores
+ *   80×1.0 + 20×0 = 80
+ * vs. one sending 80% to incineration-with-recovery + 20% to landfill:
+ *   80×0.4 + 20×0 = 32
+ * Same diversion rate, very different circular quality.
+ */
+export function tierWeightedDiversionPct(
+  mix: CircularityScoreBreakdown['treatment_mix'],
+): number {
+  let weighted = 0
+  for (const key of Object.keys(TREATMENT_TIER_WEIGHTS) as Array<
+    keyof typeof TREATMENT_TIER_WEIGHTS
+  >) {
+    const proportion = mix[key] ?? 0
+    weighted += proportion * TREATMENT_TIER_WEIGHTS[key]
+  }
+  return weighted * 100
+}
+
+export function computeCircularityScore(args: {
+  recycled_content_pct: number | null
+  packaging_recyclability_pct: number | null
+  tier_weighted_diversion_pct: number | null
+  intensity_yoy_pct: number | null
+  treatment_mix: CircularityScoreBreakdown['treatment_mix']
+}): CircularityScoreBreakdown {
+  const recycledSub =
+    args.recycled_content_pct !== null && Number.isFinite(args.recycled_content_pct)
+      ? circularityAxisSubScore(args.recycled_content_pct)
+      : null
+  const packagingSub =
+    args.packaging_recyclability_pct !== null &&
+    Number.isFinite(args.packaging_recyclability_pct)
+      ? circularityAxisSubScore(args.packaging_recyclability_pct)
+      : null
+  const diversionSub =
+    args.tier_weighted_diversion_pct !== null &&
+    Number.isFinite(args.tier_weighted_diversion_pct)
+      ? circularityAxisSubScore(args.tier_weighted_diversion_pct)
+      : null
+  const yoySub =
+    args.intensity_yoy_pct !== null && Number.isFinite(args.intensity_yoy_pct)
+      ? circularityIntensityYoySubScore(args.intensity_yoy_pct)
+      : null
+
+  // Practices = average of available axes. Redistribute when some are missing.
+  const axes: Array<number> = []
+  if (recycledSub !== null) axes.push(recycledSub)
+  if (packagingSub !== null) axes.push(packagingSub)
+  if (diversionSub !== null) axes.push(diversionSub)
+  const practicesSub =
+    axes.length > 0
+      ? Math.round(axes.reduce((a, b) => a + b, 0) / axes.length)
+      : null
+
+  const breakdown: Pick<CircularityScoreBreakdown, 'axes' | 'treatment_mix'> = {
+    axes: {
+      recycled_content_sub: recycledSub,
+      packaging_recyclability_sub: packagingSub,
+      diversion_sub: diversionSub,
+    },
+    treatment_mix: args.treatment_mix,
+  }
+
+  if (practicesSub === null && yoySub === null) {
+    return {
+      ...breakdown,
+      score: null,
+      practices_sub: null,
+      intensity_yoy_sub: null,
+      mode: 'no_data',
+      weights: { practices: 0, yoy: 0 },
+    }
+  }
+
+  if (practicesSub !== null && yoySub !== null) {
+    const blended =
+      practicesSub * CIRCULARITY_PRACTICES_WEIGHT +
+      yoySub * CIRCULARITY_YOY_WEIGHT
+    return {
+      ...breakdown,
+      score: Math.round(blended),
+      practices_sub: practicesSub,
+      intensity_yoy_sub: yoySub,
+      mode: 'blended',
+      weights: { practices: CIRCULARITY_PRACTICES_WEIGHT, yoy: CIRCULARITY_YOY_WEIGHT },
+    }
+  }
+
+  if (practicesSub !== null) {
+    return {
+      ...breakdown,
+      score: practicesSub,
+      practices_sub: practicesSub,
+      intensity_yoy_sub: null,
+      mode: 'practices_only',
+      weights: { practices: 1, yoy: 0 },
+    }
+  }
+
+  return {
+    ...breakdown,
+    score: yoySub,
+    practices_sub: null,
+    intensity_yoy_sub: yoySub,
+    mode: 'yoy_only',
+    weights: { practices: 0, yoy: 1 },
+  }
+}
+
+/**
+ * One waste record from facility_activity_entries used to build the
+ * treatment mix. The route assembles these from the year's entries.
+ */
+export interface WasteEntry {
+  /** Mass of this waste record in kilograms. */
+  mass_kg: number
+  /** Treatment method as stored in `facility_activity_entries.waste_treatment_method`. */
+  treatment_method: string | null
+}
+
+/**
+ * Build the four circularity inputs from raw waste entries + the org-level
+ * recycled-content + recyclability averages + units produced.
+ *
+ * Pure — no DB calls. The route fetches and feeds in.
+ */
+export function buildCircularityInputs(args: {
+  /** All waste entries logged for the current year (any facility). */
+  current_waste: WasteEntry[]
+  /** All waste entries logged for the prior year, for YoY intensity. */
+  prior_waste: WasteEntry[]
+  /** Total units produced in the current year (for waste intensity). */
+  current_year_units: number
+  /** Total units produced in the prior year (for YoY waste intensity). */
+  prior_year_units: number
+  /** Org-level avg recycled content of inputs (0-100). Null if unknown. */
+  recycled_content_pct: number | null
+  /** Org-level avg packaging recyclability (0-100). Null if unknown. */
+  packaging_recyclability_pct: number | null
+}): {
+  recycled_content_pct: number | null
+  packaging_recyclability_pct: number | null
+  tier_weighted_diversion_pct: number | null
+  intensity_yoy_pct: number | null
+  treatment_mix: CircularityScoreBreakdown['treatment_mix']
+  diagnostics: {
+    current_year_waste_kg: number
+    prior_year_waste_kg: number
+    current_year_intensity: number | null
+    prior_year_intensity: number | null
+  }
+} {
+  const mix: CircularityScoreBreakdown['treatment_mix'] = {
+    reuse: 0,
+    composting: 0,
+    anaerobic_digestion: 0,
+    recycling: 0,
+    incineration_with_recovery: 0,
+    landfill: 0,
+    incineration_without_recovery: 0,
+    other: 0,
+  }
+
+  const validKeys = new Set(Object.keys(mix))
+  let totalCurrent_kg = 0
+  for (const e of args.current_waste) {
+    const kg = Number.isFinite(e.mass_kg) && e.mass_kg > 0 ? e.mass_kg : 0
+    if (kg <= 0) continue
+    const method = (e.treatment_method ?? '').toLowerCase().trim()
+    const key = validKeys.has(method) ? (method as keyof typeof mix) : 'other'
+    mix[key] += kg
+    totalCurrent_kg += kg
+  }
+  // Normalise to proportions of total.
+  if (totalCurrent_kg > 0) {
+    for (const key of Object.keys(mix) as Array<keyof typeof mix>) {
+      mix[key] = mix[key] / totalCurrent_kg
+    }
+  }
+
+  let totalPrior_kg = 0
+  for (const e of args.prior_waste) {
+    const kg = Number.isFinite(e.mass_kg) && e.mass_kg > 0 ? e.mass_kg : 0
+    if (kg > 0) totalPrior_kg += kg
+  }
+
+  const tier_weighted_diversion_pct =
+    totalCurrent_kg > 0 ? tierWeightedDiversionPct(mix) : null
+
+  const currentIntensity =
+    args.current_year_units > 0 && totalCurrent_kg > 0
+      ? totalCurrent_kg / args.current_year_units
+      : null
+  const priorIntensity =
+    args.prior_year_units > 0 && totalPrior_kg > 0
+      ? totalPrior_kg / args.prior_year_units
+      : null
+  const intensity_yoy_pct =
+    currentIntensity !== null && priorIntensity !== null && priorIntensity > 0
+      ? ((currentIntensity - priorIntensity) / priorIntensity) * 100
+      : null
+
+  return {
+    recycled_content_pct: args.recycled_content_pct,
+    packaging_recyclability_pct: args.packaging_recyclability_pct,
+    tier_weighted_diversion_pct,
+    intensity_yoy_pct,
+    treatment_mix: mix,
+    diagnostics: {
+      current_year_waste_kg: totalCurrent_kg,
+      prior_year_waste_kg: totalPrior_kg,
+      current_year_intensity: currentIntensity,
+      prior_year_intensity: priorIntensity,
+    },
+  }
+}
+
 /**
  * Convert a unit_size measurement (e.g. {value: 700, unit: 'ml'}) to litres.
  * Mirrors the SQL `bulk_volume_to_units` helper. Returns null for unparsable

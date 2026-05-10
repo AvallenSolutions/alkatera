@@ -47,7 +47,11 @@ import { calculateVitalityScores } from '@/components/vitality/VitalityScoreHero
 import { EsgVitalityScoreHero } from '@/components/vitality/EsgVitalityScoreHero';
 import { getBenchmarkForProductType } from '@/lib/industry-benchmarks';
 import { fetchProducts } from '@/lib/products';
-import type { ClimateScoreBreakdown, WaterScoreBreakdown } from '@/lib/vitality/environmental';
+import type {
+  ClimateScoreBreakdown,
+  WaterScoreBreakdown,
+  CircularityScoreBreakdown,
+} from '@/lib/vitality/environmental';
 import { PillarCard, PillarGrid, PerformanceSummary } from '@/components/vitality/PillarCard';
 import { CarbonDeepDive } from '@/components/vitality/CarbonDeepDive';
 import { WaterDeepDive } from '@/components/vitality/WaterDeepDive';
@@ -522,6 +526,7 @@ export default function PerformancePage() {
   // for full transparency to the user.
   const [climateBreakdown, setClimateBreakdown] = useState<ClimateScoreBreakdown | null>(null);
   const [waterBreakdown, setWaterBreakdown] = useState<WaterScoreBreakdown | null>(null);
+  const [circularityBreakdown, setCircularityBreakdown] = useState<CircularityScoreBreakdown | null>(null);
   useEffect(() => {
     if (!currentOrganization?.id) return;
     let cancelled = false;
@@ -531,6 +536,7 @@ export default function PerformancePage() {
         if (cancelled) return;
         setClimateBreakdown(json?.composite?.e?.climate_breakdown ?? null);
         setWaterBreakdown(json?.composite?.e?.water_breakdown ?? null);
+        setCircularityBreakdown(json?.composite?.e?.circularity_breakdown ?? null);
       })
       .catch(() => {});
     return () => {
@@ -545,13 +551,11 @@ export default function PerformancePage() {
     // Check if we have actual waste data
     const hasWasteData = wasteMetrics !== null && wasteMetrics !== undefined;
 
-    // Climate + water are intentionally NOT passed to the local calculator —
-    // they now come from /api/vitality/composite (blended intensity + YoY)
-    // so /rosa/ and /performance/ agree on the score. We override
-    // `.climate` and `.water` below.
+    // Climate + water + circularity are intentionally NOT passed to the
+    // local calculator — they now come from /api/vitality/composite
+    // (blended sub-scores) so /rosa/ and /performance/ agree on the score.
+    // We override `.climate`, `.water`, and `.circularity` below.
     const local = calculateVitalityScores({
-      recyclingRate: wasteMetrics?.circularity_rate,
-      circularityRate: circularityRate,
       landUseIntensity: landUse,
       biodiversityRisk: deriveBiodiversityRisk(natureMetrics),
       hasProductData,
@@ -561,8 +565,9 @@ export default function PerformancePage() {
       ...local,
       climate: climateBreakdown?.score ?? null,
       water: waterBreakdown?.score ?? null,
+      circularity: circularityBreakdown?.score ?? null,
     };
-  }, [metrics, wasteMetrics, circularityRate, landUse, natureMetrics, climateBreakdown, waterBreakdown]);
+  }, [metrics, wasteMetrics, landUse, natureMetrics, climateBreakdown, waterBreakdown, circularityBreakdown]);
 
   const scoreCalculationInputs = useMemo(() => ({
     climate: {
@@ -589,13 +594,17 @@ export default function PerformancePage() {
       waterBreakdown,
     },
     circularity: {
+      // Legacy field kept for unmigrated callers.
       circularityRate,
+      // Blended-circularity breakdown — drives the new explainer UI
+      // (3 axes + waste-intensity YoY + treatment mix).
+      circularityBreakdown,
     },
     nature: {
       biodiversityRisk: deriveBiodiversityRisk(natureMetrics),
       landUse,
     },
-  }), [totalCO2, climateBreakdown, waterBreakdown, metrics, waterConsumption, circularityRate, natureMetrics, landUse, industryBenchmarkData, dominantCategory]);
+  }), [totalCO2, climateBreakdown, waterBreakdown, circularityBreakdown, metrics, waterConsumption, circularityRate, natureMetrics, landUse, industryBenchmarkData, dominantCategory]);
 
   const { strengths, improvements } = useMemo(() => {
     return generateStrengthsAndImprovements(

@@ -15,9 +15,15 @@ import {
   waterIntensitySubScore,
   waterYoySubScore,
   buildWaterInputs,
+  computeCircularityScore,
+  circularityAxisSubScore,
+  circularityIntensityYoySubScore,
+  tierWeightedDiversionPct,
+  buildCircularityInputs,
   type ClimateProductRow,
   type PcfWithEol,
   type WaterProductRow,
+  type WasteEntry,
 } from '../environmental'
 
 const ZERO = {
@@ -488,6 +494,238 @@ describe('buildWaterInputs', () => {
       facility_scarcity_current_l: null,
     })
     expect(out.diagnostics.per_unit_benchmark_l).toBeCloseTo(18.325, 3)
+  })
+})
+
+describe('circularityAxisSubScore (1% interpolated)', () => {
+  it('hits anchor scores exactly', () => {
+    expect(circularityAxisSubScore(0)).toBe(5)
+    expect(circularityAxisSubScore(20)).toBe(25)
+    expect(circularityAxisSubScore(40)).toBe(50)
+    expect(circularityAxisSubScore(60)).toBe(75)
+    expect(circularityAxisSubScore(80)).toBe(90)
+    expect(circularityAxisSubScore(95)).toBe(98)
+    expect(circularityAxisSubScore(100)).toBe(100)
+  })
+
+  it('interpolates smoothly', () => {
+    // Halfway between (40, 50) and (60, 75) → 62.5 → 63
+    expect(circularityAxisSubScore(50)).toBe(63)
+  })
+})
+
+describe('circularityIntensityYoySubScore (lenient)', () => {
+  it('rewards a 3% reduction with the top score', () => {
+    expect(circularityIntensityYoySubScore(-3)).toBe(100)
+    expect(circularityIntensityYoySubScore(-10)).toBe(100)
+  })
+
+  it('hits anchor scores at calibrated deltas', () => {
+    expect(circularityIntensityYoySubScore(-1)).toBe(90)
+    expect(circularityIntensityYoySubScore(0)).toBe(80)
+    expect(circularityIntensityYoySubScore(2)).toBe(60)
+    expect(circularityIntensityYoySubScore(5)).toBe(40)
+    expect(circularityIntensityYoySubScore(10)).toBe(20)
+    expect(circularityIntensityYoySubScore(20)).toBe(5)
+  })
+})
+
+describe('tierWeightedDiversionPct (EU waste hierarchy)', () => {
+  it('returns 0 for all-landfill', () => {
+    expect(
+      tierWeightedDiversionPct({
+        reuse: 0,
+        composting: 0,
+        anaerobic_digestion: 0,
+        recycling: 0,
+        incineration_with_recovery: 0,
+        landfill: 1,
+        incineration_without_recovery: 0,
+        other: 0,
+      }),
+    ).toBe(0)
+  })
+
+  it('returns 100 for all-reuse (highest tier)', () => {
+    expect(
+      tierWeightedDiversionPct({
+        reuse: 1,
+        composting: 0,
+        anaerobic_digestion: 0,
+        recycling: 0,
+        incineration_with_recovery: 0,
+        landfill: 0,
+        incineration_without_recovery: 0,
+        other: 0,
+      }),
+    ).toBe(100)
+  })
+
+  it('rewards reuse over energy recovery at the same diversion rate', () => {
+    const reuseHeavy = tierWeightedDiversionPct({
+      reuse: 0.8,
+      composting: 0,
+      anaerobic_digestion: 0,
+      recycling: 0,
+      incineration_with_recovery: 0,
+      landfill: 0.2,
+      incineration_without_recovery: 0,
+      other: 0,
+    })
+    const energyHeavy = tierWeightedDiversionPct({
+      reuse: 0,
+      composting: 0,
+      anaerobic_digestion: 0,
+      recycling: 0,
+      incineration_with_recovery: 0.8,
+      landfill: 0.2,
+      incineration_without_recovery: 0,
+      other: 0,
+    })
+    expect(reuseHeavy).toBe(80) // 80×1.0
+    expect(energyHeavy).toBeCloseTo(32, 1) // 80×0.4
+    expect(reuseHeavy).toBeGreaterThan(energyHeavy)
+  })
+})
+
+describe('computeCircularityScore', () => {
+  const emptyMix = {
+    reuse: 0,
+    composting: 0,
+    anaerobic_digestion: 0,
+    recycling: 0,
+    incineration_with_recovery: 0,
+    landfill: 0,
+    incineration_without_recovery: 0,
+    other: 0,
+  } as const
+
+  it('returns no_data when nothing is provided', () => {
+    const out = computeCircularityScore({
+      recycled_content_pct: null,
+      packaging_recyclability_pct: null,
+      tier_weighted_diversion_pct: null,
+      intensity_yoy_pct: null,
+      treatment_mix: { ...emptyMix },
+    })
+    expect(out.score).toBeNull()
+    expect(out.mode).toBe('no_data')
+  })
+
+  it('blends practices (60%) and YoY (40%) when both sides present', () => {
+    // 3 axes all 60 → axisSub all 75; practices avg = 75
+    // YoY 0% → 80
+    // blend = 0.6×75 + 0.4×80 = 45 + 32 = 77
+    const out = computeCircularityScore({
+      recycled_content_pct: 60,
+      packaging_recyclability_pct: 60,
+      tier_weighted_diversion_pct: 60,
+      intensity_yoy_pct: 0,
+      treatment_mix: { ...emptyMix, reuse: 0.5, recycling: 0.5 },
+    })
+    expect(out.practices_sub).toBe(75)
+    expect(out.intensity_yoy_sub).toBe(80)
+    expect(out.score).toBe(77)
+    expect(out.mode).toBe('blended')
+  })
+
+  it('redistributes practices across available axes', () => {
+    // Only one axis present → practices = that single sub
+    const out = computeCircularityScore({
+      recycled_content_pct: 80,
+      packaging_recyclability_pct: null,
+      tier_weighted_diversion_pct: null,
+      intensity_yoy_pct: null,
+      treatment_mix: { ...emptyMix },
+    })
+    expect(out.practices_sub).toBe(90) // 80% → 90
+    expect(out.score).toBe(90)
+    expect(out.mode).toBe('practices_only')
+  })
+
+  it('falls back to yoy_only when no practice axes are known', () => {
+    const out = computeCircularityScore({
+      recycled_content_pct: null,
+      packaging_recyclability_pct: null,
+      tier_weighted_diversion_pct: null,
+      intensity_yoy_pct: -3,
+      treatment_mix: { ...emptyMix },
+    })
+    expect(out.score).toBe(100)
+    expect(out.mode).toBe('yoy_only')
+  })
+})
+
+describe('buildCircularityInputs', () => {
+  function entry(mass_kg: number, treatment_method: string | null): WasteEntry {
+    return { mass_kg, treatment_method }
+  }
+
+  it('returns nulls for empty waste', () => {
+    const out = buildCircularityInputs({
+      current_waste: [],
+      prior_waste: [],
+      current_year_units: 0,
+      prior_year_units: 0,
+      recycled_content_pct: null,
+      packaging_recyclability_pct: null,
+    })
+    expect(out.tier_weighted_diversion_pct).toBeNull()
+    expect(out.intensity_yoy_pct).toBeNull()
+  })
+
+  it('computes treatment_mix proportions and tier-weighted diversion', () => {
+    // 80 kg reuse + 20 kg landfill = 100 kg total
+    // Mix: reuse 0.8, landfill 0.2 → diversion = 80×1.0 + 20×0 = 80
+    const out = buildCircularityInputs({
+      current_waste: [
+        entry(80, 'reuse'),
+        entry(20, 'landfill'),
+      ],
+      prior_waste: [],
+      current_year_units: 1000,
+      prior_year_units: 0,
+      recycled_content_pct: null,
+      packaging_recyclability_pct: null,
+    })
+    expect(out.treatment_mix.reuse).toBeCloseTo(0.8, 4)
+    expect(out.treatment_mix.landfill).toBeCloseTo(0.2, 4)
+    expect(out.tier_weighted_diversion_pct).toBe(80)
+  })
+
+  it('computes waste-intensity YoY from per-unit ratios', () => {
+    // Current: 1000 kg / 10000 units = 0.1 kg/unit
+    // Prior:   1500 kg / 10000 units = 0.15 kg/unit
+    // YoY = (0.1 - 0.15) / 0.15 × 100 = -33.33% (improvement!)
+    const out = buildCircularityInputs({
+      current_waste: [entry(1000, 'recycling')],
+      prior_waste: [entry(1500, 'recycling')],
+      current_year_units: 10000,
+      prior_year_units: 10000,
+      recycled_content_pct: null,
+      packaging_recyclability_pct: null,
+    })
+    expect(out.intensity_yoy_pct).toBeCloseTo(-33.33, 1)
+    expect(out.diagnostics.current_year_intensity).toBeCloseTo(0.1, 4)
+    expect(out.diagnostics.prior_year_intensity).toBeCloseTo(0.15, 4)
+  })
+
+  it('routes unknown treatment methods to "other"', () => {
+    const out = buildCircularityInputs({
+      current_waste: [
+        entry(50, 'mystery_method'),
+        entry(50, 'reuse'),
+      ],
+      prior_waste: [],
+      current_year_units: 100,
+      prior_year_units: 0,
+      recycled_content_pct: null,
+      packaging_recyclability_pct: null,
+    })
+    expect(out.treatment_mix.other).toBeCloseTo(0.5, 4)
+    expect(out.treatment_mix.reuse).toBeCloseTo(0.5, 4)
+    // Reuse 1.0 + other 0.2 → 50×1.0 + 50×0.2 = 60
+    expect(out.tier_weighted_diversion_pct).toBeCloseTo(60, 1)
   })
 })
 

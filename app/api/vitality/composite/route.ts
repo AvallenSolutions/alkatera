@@ -42,17 +42,21 @@ import {
 } from '@/lib/vitality/read-prompt'
 import { isOverDailyBudget, logRosaTelemetry } from '@/lib/rosa/budget'
 import {
+  buildCircularityInputs,
   buildClimateInputs,
   buildEnvironmentalSignals,
   buildWaterInputs,
+  computeCircularityScore,
   computeClimateScore,
   computeWaterScore,
   toEnvironmentalInputs,
   unitSizeToLitres,
   type ClimateProductRow,
   type PcfWithEol,
+  type WasteEntry,
   type WaterProductRow,
 } from '@/lib/vitality/environmental'
+import { destinationToTreatmentMethod } from '@/lib/byproducts/destination-types'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
@@ -131,7 +135,18 @@ async function buildEnvironmentalInputs(
   // Facility water comes from `facility_water_data` per-month rows; we
   // sum across facilities for current and prior years to feed the blended
   // water score (preferred when present; LCA water is the fallback).
-  const [pcfRows, productRows, orgRow, facilityWaterCurrent, facilityWaterPrior] = await Promise.allSettled([
+  const [
+    pcfRows,
+    productRows,
+    orgRow,
+    facilityWaterCurrent,
+    facilityWaterPrior,
+    wasteCurrent,
+    wastePrior,
+    circularitySummary,
+    byproductFlowsCurrent,
+    byproductFlowsPrior,
+  ] = await Promise.allSettled([
     service
       .from('product_carbon_footprints')
       .select('id, product_id, product_name, status, aggregated_impacts, csrd_compliant, updated_at')
@@ -159,6 +174,43 @@ async function buildEnvironmentalInputs(
       .select('total_consumption_m3, scarcity_weighted_consumption_m3')
       .eq('organization_id', organizationId)
       .eq('reporting_year', yearNow - 1),
+    service
+      .from('facility_activity_entries')
+      .select('quantity, waste_treatment_method')
+      .eq('organization_id', organizationId)
+      .in('activity_category', ['waste_general', 'waste_hazardous', 'waste_recycling'])
+      .gte('activity_date', yearStart)
+      .lte('activity_date', yearEnd),
+    service
+      .from('facility_activity_entries')
+      .select('quantity, waste_treatment_method')
+      .eq('organization_id', organizationId)
+      .in('activity_category', ['waste_general', 'waste_hazardous', 'waste_recycling'])
+      .gte('activity_date', priorStart)
+      .lte('activity_date', priorEnd),
+    service
+      .from('circularity_metrics_summary')
+      .select('avg_recycled_content, avg_recyclability')
+      .eq('organization_id', organizationId)
+      .maybeSingle(),
+    // Byproduct flows merge into the circularity score's waste totals so
+    // a partnership routing 12 t/month spent grain to animal feed lifts
+    // the score by the same multiplier that a waste-entry with
+    // treatment_method='reuse' would. Excludes flows from byproducts that
+    // are already in 'ended' status so the score reflects current activity.
+    service
+      .from('byproduct_flows')
+      .select('mass_kg, byproducts!inner(destination_type, status)')
+      .eq('organization_id', organizationId)
+      .gte('reporting_period_end', yearStart)
+      .lte('reporting_period_end', yearEnd)
+      .neq('byproducts.status', 'ended'),
+    service
+      .from('byproduct_flows')
+      .select('mass_kg, byproducts!inner(destination_type, status)')
+      .eq('organization_id', organizationId)
+      .gte('reporting_period_end', priorStart)
+      .lte('reporting_period_end', priorEnd),
   ])
 
   const valOrNull = <T>(r: PromiseSettledResult<T>): T | null =>
@@ -390,6 +442,76 @@ async function buildEnvironmentalInputs(
     source: waterInputs.source,
   })
 
+  // ---- Circularity ----
+  // Tier-weighted diversion + 3-axis practices blend + waste-intensity YoY.
+  // Reuses the per-product current/prior units already computed above so we
+  // don't double-fetch production_logs.
+  let totalCurrentUnits = 0
+  let totalPriorUnits = 0
+  for (const v of Array.from(productionByProduct.values())) totalCurrentUnits += v
+  for (const v of Array.from(priorProductionByProduct.values())) totalPriorUnits += v
+
+  const wasteCurrentRows = ((valOrNull(wasteCurrent) as any)?.data ?? []) as Array<{
+    quantity: number | null
+    waste_treatment_method: string | null
+  }>
+  const wastePriorRows = ((valOrNull(wastePrior) as any)?.data ?? []) as Array<{
+    quantity: number | null
+    waste_treatment_method: string | null
+  }>
+  const toWasteEntries = (rows: typeof wasteCurrentRows): WasteEntry[] =>
+    rows.map(r => ({
+      mass_kg: Number(r.quantity ?? 0) || 0,
+      treatment_method: r.waste_treatment_method,
+    }))
+
+  // Byproduct flows: merge into the waste totals so circular partnerships
+  // lift the score. Each flow becomes a synthetic waste entry whose
+  // treatment_method maps to the byproduct's destination_type tier.
+  type ByproductFlowRow = {
+    mass_kg: number | null
+    byproducts: { destination_type: string | null } | { destination_type: string | null }[] | null
+  }
+  const flowsToWasteEntries = (rows: ByproductFlowRow[]): WasteEntry[] =>
+    rows.map(r => {
+      const bp = Array.isArray(r.byproducts) ? r.byproducts[0] : r.byproducts
+      const treatment = destinationToTreatmentMethod(bp?.destination_type ?? null)
+      return {
+        mass_kg: Number(r.mass_kg ?? 0) || 0,
+        treatment_method: treatment,
+      }
+    })
+  const byproductCurrentRows = ((valOrNull(byproductFlowsCurrent) as any)?.data ?? []) as ByproductFlowRow[]
+  const byproductPriorRows = ((valOrNull(byproductFlowsPrior) as any)?.data ?? []) as ByproductFlowRow[]
+
+  const circularityRow = ((valOrNull(circularitySummary) as any)?.data ?? null) as
+    | { avg_recycled_content: number | null; avg_recyclability: number | null }
+    | null
+  const recycledContentPct = numOrNull(circularityRow?.avg_recycled_content)
+  const packagingRecyclabilityPct = numOrNull(circularityRow?.avg_recyclability)
+
+  const circularityInputs = buildCircularityInputs({
+    current_waste: [
+      ...toWasteEntries(wasteCurrentRows),
+      ...flowsToWasteEntries(byproductCurrentRows),
+    ],
+    prior_waste: [
+      ...toWasteEntries(wastePriorRows),
+      ...flowsToWasteEntries(byproductPriorRows),
+    ],
+    current_year_units: totalCurrentUnits,
+    prior_year_units: totalPriorUnits,
+    recycled_content_pct: recycledContentPct,
+    packaging_recyclability_pct: packagingRecyclabilityPct,
+  })
+  const circularityBreakdown = computeCircularityScore({
+    recycled_content_pct: circularityInputs.recycled_content_pct,
+    packaging_recyclability_pct: circularityInputs.packaging_recyclability_pct,
+    tier_weighted_diversion_pct: circularityInputs.tier_weighted_diversion_pct,
+    intensity_yoy_pct: circularityInputs.intensity_yoy_pct,
+    treatment_mix: circularityInputs.treatment_mix,
+  })
+
   // Org-level fallback inputs for the legacy water/circularity aggregator.
   const productType =
     ((valOrNull(orgRow) as any)?.data?.product_type as string | null) ??
@@ -407,6 +529,7 @@ async function buildEnvironmentalInputs(
     ...inputs,
     climate_breakdown: climateBreakdown,
     water_breakdown: waterBreakdown,
+    circularity_breakdown: circularityBreakdown,
   }
 }
 
