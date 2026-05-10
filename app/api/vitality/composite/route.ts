@@ -23,6 +23,7 @@ import {
   computeEnvironmentalPillar,
   computeGovernancePillar,
   computeSocialPillar,
+  type SocialPillarScore,
   normaliseWeights,
   BAND_DESCRIPTIONS,
   type VitalityComposite,
@@ -62,6 +63,14 @@ import {
   type WaterProductRow,
 } from '@/lib/vitality/environmental'
 import { destinationToTreatmentMethod } from '@/lib/byproducts/destination-types'
+import {
+  computeSocialScore,
+  type SupplierResponsibilityInputs,
+} from '@/lib/vitality/social'
+import {
+  computeAttestationsScore,
+  type SupplierAttestationType,
+} from '@/lib/supplier-responsibility/attestation-types'
 import {
   actionTypeValuePerHectare,
   SCORING_STATUSES,
@@ -756,21 +765,32 @@ async function buildSocialInputs(
   service: SupabaseClient,
   organizationId: string,
 ): Promise<Parameters<typeof computeSocialPillar>[0]> {
-  const [communityRow, peopleRow, supplierTotals, supplierSubmitted] = await Promise.allSettled([
+  // Pull the latest two snapshots for community + people-culture so we
+  // can compute YoY. Plus supplier mapping, certifications, attestations,
+  // and ESG form submission counts.
+  const [
+    communityRows,
+    peopleRows,
+    supplierTotals,
+    supplierSubmitted,
+    materialsTotal,
+    materialsWithSupplier,
+    supplierProductsTotal,
+    supplierProductsWithCerts,
+    attestationRows,
+  ] = await Promise.allSettled([
     service
       .from('community_impact_scores')
-      .select('overall_score')
+      .select('overall_score, calculated_at')
       .eq('organization_id', organizationId)
       .order('calculated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .limit(2),
     service
       .from('people_culture_scores')
-      .select('overall_score')
+      .select('overall_score, calculated_at')
       .eq('organization_id', organizationId)
       .order('calculated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .limit(2),
     service
       .from('suppliers')
       .select('id', { count: 'exact', head: true })
@@ -780,19 +800,124 @@ async function buildSocialInputs(
       .select('id, suppliers!inner(organization_id)', { count: 'exact', head: true })
       .eq('suppliers.organization_id', organizationId)
       .not('submitted_at', 'is', null),
+    // Mapping coverage: total materials across the org's completed PCFs.
+    service
+      .from('product_carbon_footprint_materials')
+      .select(
+        'id, product_carbon_footprints!inner(organization_id, status)',
+        { count: 'exact', head: true },
+      )
+      .eq('product_carbon_footprints.organization_id', organizationId)
+      .eq('product_carbon_footprints.status', 'completed'),
+    service
+      .from('product_carbon_footprint_materials')
+      .select(
+        'id, product_carbon_footprints!inner(organization_id, status)',
+        { count: 'exact', head: true },
+      )
+      .eq('product_carbon_footprints.organization_id', organizationId)
+      .eq('product_carbon_footprints.status', 'completed')
+      .not('supplier_id', 'is', null),
+    // Certifications coverage: supplier-products owned by this org's suppliers.
+    service
+      .from('supplier_products')
+      .select('id, suppliers!inner(organization_id)', { count: 'exact', head: true })
+      .eq('suppliers.organization_id', organizationId),
+    service
+      .from('supplier_products')
+      .select(
+        'id, certifications, suppliers!inner(organization_id)',
+        { count: 'exact', head: true },
+      )
+      .eq('suppliers.organization_id', organizationId)
+      .not('certifications', 'eq', '{}'),
+    service
+      .from('supplier_responsibility_attestations')
+      .select('attestation_type, is_attested')
+      .eq('organization_id', organizationId)
+      .eq('is_attested', true),
   ])
 
   const valOrNull = <T>(r: PromiseSettledResult<T>): T | null =>
     r.status === 'fulfilled' ? r.value : null
 
-  const community_score = numOrNull((valOrNull(communityRow) as any)?.data?.overall_score)
-  const people_culture_score = numOrNull((valOrNull(peopleRow) as any)?.data?.overall_score)
+  // --- Workforce + Community ---
+  const communityList = ((valOrNull(communityRows) as any)?.data ?? []) as Array<{
+    overall_score: number | null
+  }>
+  const peopleList = ((valOrNull(peopleRows) as any)?.data ?? []) as Array<{
+    overall_score: number | null
+  }>
+  const community_score = numOrNull(communityList[0]?.overall_score)
+  const people_culture_score = numOrNull(peopleList[0]?.overall_score)
+  const community_score_prior = numOrNull(communityList[1]?.overall_score)
+  const people_culture_score_prior = numOrNull(peopleList[1]?.overall_score)
+
+  // --- Supplier responsibility sub-axes ---
   const supplierTotal = ((valOrNull(supplierTotals) as any)?.count ?? 0) as number
   const supplierSubmittedCount = ((valOrNull(supplierSubmitted) as any)?.count ?? 0) as number
   const supplier_esg_pct =
     supplierTotal > 0 ? Math.round((supplierSubmittedCount / supplierTotal) * 100) : null
 
-  return { community_score, people_culture_score, supplier_esg_pct }
+  const materialsTotalCount = ((valOrNull(materialsTotal) as any)?.count ?? 0) as number
+  const materialsWithSupplierCount = ((valOrNull(materialsWithSupplier) as any)?.count ?? 0) as number
+  const mapping_coverage_pct =
+    materialsTotalCount > 0
+      ? Math.round((materialsWithSupplierCount / materialsTotalCount) * 100)
+      : null
+
+  const supplierProductsTotalCount = ((valOrNull(supplierProductsTotal) as any)?.count ?? 0) as number
+  const supplierProductsWithCertsCount = ((valOrNull(supplierProductsWithCerts) as any)?.count ?? 0) as number
+  const certifications_coverage_pct =
+    supplierProductsTotalCount > 0
+      ? Math.round((supplierProductsWithCertsCount / supplierProductsTotalCount) * 100)
+      : null
+
+  const attestationDataRaw = ((valOrNull(attestationRows) as any)?.data ?? []) as Array<{
+    attestation_type: SupplierAttestationType
+  }>
+  const attestations_pct = computeAttestationsScore(
+    attestationDataRaw.map(a => a.attestation_type),
+  )
+
+  const supplier_inputs: SupplierResponsibilityInputs = {
+    mapping_coverage_pct,
+    certifications_coverage_pct,
+    attestations_pct,
+    suppliers_with_esg_form: supplierSubmittedCount,
+    suppliers_total: supplierTotal,
+  }
+
+  // --- YoY: change in blended workforce + community + supplier ---
+  // Computed on workforce + community only (supplier YoY would require
+  // attestation history we don't track yet — v2). When prior data is
+  // available, blends them with the same weights.
+  let yoy_total_pct: number | null = null
+  if (people_culture_score_prior !== null || community_score_prior !== null) {
+    const currentBlend =
+      (people_culture_score ?? 0) * 0.5 + (community_score ?? 0) * 0.25
+    const priorBlend =
+      (people_culture_score_prior ?? 0) * 0.5 + (community_score_prior ?? 0) * 0.25
+    if (priorBlend > 0) {
+      // Social YoY semantics: positive delta = score went UP = good.
+      yoy_total_pct = ((currentBlend - priorBlend) / priorBlend) * 100
+    }
+  }
+
+  // --- Compute the breakdown ---
+  const social_breakdown = computeSocialScore({
+    workforce_score: people_culture_score,
+    community_score,
+    supplier_inputs,
+    yoy_total_pct,
+  })
+
+  return {
+    social_breakdown,
+    community_score,
+    people_culture_score,
+    supplier_esg_pct,
+  }
 }
 
 async function buildGovernanceInputs(

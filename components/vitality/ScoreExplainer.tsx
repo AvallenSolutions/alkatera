@@ -161,6 +161,31 @@ export interface CalculationInputs {
     people_culture: number | null;
     supplier_esg: number | null;
   };
+  /**
+   * Blended social breakdown (workforce 50% / community 25% / supplier 15%
+   * / YoY 10%). When present, the social explainer shows the new transparent
+   * breakdown including the supplier sub-axis composition (mapping coverage
+   * + certifications coverage + due-diligence attestations).
+   */
+  socialBreakdown?: {
+    score: number | null;
+    axes: {
+      workforce_sub: number | null;
+      community_sub: number | null;
+      supplier_sub: number | null;
+      yoy_sub: number | null;
+    };
+    supplier_breakdown: {
+      mapping_coverage_pct: number | null;
+      certifications_coverage_pct: number | null;
+      attestations_pct: number | null;
+      suppliers_with_esg_form: number;
+      suppliers_total: number;
+    } | null;
+    mode: 'blended' | 'partial' | 'no_data';
+    weights: { workforce: number; community: number; supplier: number; yoy: number };
+    source: { name: string };
+  } | null;
   // Governance sub-pillars
   governanceScores?: {
     governance: number | null;
@@ -1090,27 +1115,125 @@ function CalculationBreakdown({ scoreType, inputs }: { scoreType: ScoreType; inp
     );
   }
 
-  if (scoreType === 'social' && inputs.socialScores) {
-    const ss = inputs.socialScores;
-    const subs = [
-      { name: 'Community impact', score: ss.community },
-      { name: 'People & culture', score: ss.people_culture },
-      { name: 'Supplier ESG', score: ss.supplier_esg },
-    ];
-    return (
-      <div className="space-y-1.5">
-        {subs.map(s => (
-          <div key={s.name} className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">{s.name}</span>
-            {s.score !== null ? (
-              <span className="font-medium tabular-nums">{s.score}</span>
-            ) : (
-              <span className="text-muted-foreground italic">No data</span>
-            )}
+  if (scoreType === 'social') {
+    const sb = inputs.socialBreakdown;
+    if (sb) {
+      const modeLabel: Record<typeof sb.mode, string> = {
+        blended: 'Blended (workforce + community + supplier + year-on-year)',
+        partial: 'Partial (some axes missing — treated as 0)',
+        no_data: 'Awaiting data',
+      };
+      return (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">How it&apos;s scored</span>
+            <span className="font-medium text-right">{modeLabel[sb.mode]}</span>
           </div>
-        ))}
-      </div>
-    );
+          {sb.axes.workforce_sub !== null && (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">
+                Workforce ({Math.round(sb.weights.workforce * 100)}% weight)
+              </span>
+              <span className="font-medium tabular-nums">{sb.axes.workforce_sub} / 100</span>
+            </div>
+          )}
+          {sb.axes.community_sub !== null && (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">
+                Community ({Math.round(sb.weights.community * 100)}% weight)
+              </span>
+              <span className="font-medium tabular-nums">{sb.axes.community_sub} / 100</span>
+            </div>
+          )}
+          {sb.axes.supplier_sub !== null && (
+            <>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">
+                  Supplier responsibility ({Math.round(sb.weights.supplier * 100)}% weight)
+                </span>
+                <span className="font-medium tabular-nums">{sb.axes.supplier_sub} / 100</span>
+              </div>
+              {sb.supplier_breakdown && (
+                <>
+                  {sb.supplier_breakdown.mapping_coverage_pct !== null && (
+                    <div className="flex items-center justify-between text-[11px] pl-3">
+                      <span className="text-muted-foreground">↳ Supplier mapping (40%)</span>
+                      <span className="tabular-nums">
+                        {sb.supplier_breakdown.mapping_coverage_pct}% of materials
+                      </span>
+                    </div>
+                  )}
+                  {sb.supplier_breakdown.certifications_coverage_pct !== null && (
+                    <div className="flex items-center justify-between text-[11px] pl-3">
+                      <span className="text-muted-foreground">↳ Certifications (30%)</span>
+                      <span className="tabular-nums">
+                        {sb.supplier_breakdown.certifications_coverage_pct}% of supplier-products
+                      </span>
+                    </div>
+                  )}
+                  {sb.supplier_breakdown.attestations_pct !== null && (
+                    <div className="flex items-center justify-between text-[11px] pl-3">
+                      <span className="text-muted-foreground">↳ Due-diligence attestations (30%)</span>
+                      <span className="tabular-nums">{sb.supplier_breakdown.attestations_pct}%</span>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
+          {sb.axes.yoy_sub !== null && (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">
+                Year-on-year improvement ({Math.round(sb.weights.yoy * 100)}% weight)
+              </span>
+              <span className="font-medium tabular-nums">{sb.axes.yoy_sub} / 100</span>
+            </div>
+          )}
+          {sb.score !== null && (
+            <div className="flex items-center justify-between text-xs border-t pt-1.5 mt-1.5">
+              <span className="text-muted-foreground">Final score</span>
+              <span className="font-semibold tabular-nums">{sb.score} / 100</span>
+            </div>
+          )}
+          <div className="flex items-center justify-between text-xs border-t pt-1.5 mt-1.5">
+            <span className="text-muted-foreground">Methodology</span>
+            <span className="text-[10px] text-right">{sb.source.name}</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-1.5">
+            Workforce dominates the social score because CSRD ESRS S1 and SASB FB-AB both treat
+            workforce wellbeing as the most material social topic for drinks producers. The supplier
+            sub-score is built entirely from data the producer controls — mapping coverage,
+            certifications you record, and your own due-diligence attestations — so it scores
+            without requiring suppliers to engage with the platform.
+          </p>
+        </div>
+      );
+    }
+
+    // Legacy path (kept for unmigrated callers).
+    if (inputs.socialScores) {
+      const ss = inputs.socialScores;
+      const subs = [
+        { name: 'Community impact', score: ss.community },
+        { name: 'People & culture', score: ss.people_culture },
+        { name: 'Supplier ESG', score: ss.supplier_esg },
+      ];
+      return (
+        <div className="space-y-1.5">
+          {subs.map(s => (
+            <div key={s.name} className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">{s.name}</span>
+              {s.score !== null ? (
+                <span className="font-medium tabular-nums">{s.score}</span>
+              ) : (
+                <span className="text-muted-foreground italic">No data</span>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return null;
   }
 
   if (scoreType === 'governance' && inputs.governanceScores) {
