@@ -658,6 +658,8 @@ export function buildWaterInputs(args: {
    * compute the scarcity context. Optional.
    */
   facility_scarcity_current_l: number | null
+  /** Org-level product_type fallback when the per-product fields are null. */
+  orgProductType?: string | null
 }): WaterInputsResult {
   const diagnostics: WaterInputsResult['diagnostics'] = {
     current_year_intake_l: null,
@@ -687,9 +689,11 @@ export function buildWaterInputs(args: {
     currentUnits += cur
     priorUnits += pri
 
-    // Benchmark contribution: needs both a per-product water benchmark and a unit size.
-    const benchmark = pickWaterBenchmark(r.product_category, r.product_type)
-    if (benchmark && r.unit_size_l && r.unit_size_l > 0 && cur > 0) {
+    // Benchmark contribution: pickWaterBenchmark always returns something
+    // (cascades to org-level type and finally to BIER industry default),
+    // so any product with units_current and a unit_size contributes.
+    const benchmark = pickWaterBenchmark(r.product_category, r.product_type, args.orgProductType)
+    if (r.unit_size_l && r.unit_size_l > 0 && cur > 0) {
       benchmarkNumerator += benchmark.litresPerLitre * r.unit_size_l * cur
       benchmarkDenominator += cur
       benchmarkProducts += 1
@@ -791,11 +795,16 @@ export function buildWaterInputs(args: {
   return { intensity_ratio, yoy_delta_pct, avg_scarcity_factor, source, diagnostics }
 }
 
-/** Resolve a per-product water benchmark, preferring category over group. */
+/**
+ * Resolve a per-product water benchmark with the same fallback chain as
+ * carbon (product category → product type → org type → default 4 L/L).
+ * Always returns a benchmark — never null.
+ */
 function pickWaterBenchmark(
   category: string | null,
   productType: string | null,
-): WaterBenchmark | null {
+  orgProductType?: string | null,
+): WaterBenchmark {
   if (category) {
     const b = getWaterBenchmarkForCategory(category)
     if (b) return b
@@ -804,7 +813,11 @@ function pickWaterBenchmark(
     const result = getWaterBenchmarkForProductType(productType, [])
     if (result?.benchmark) return result.benchmark
   }
-  return null
+  if (orgProductType) {
+    const result = getWaterBenchmarkForProductType(orgProductType, [])
+    if (result?.benchmark) return result.benchmark
+  }
+  return getWaterBenchmarkForCategory(null)
 }
 
 // -----------------------------------------------------------------------------
@@ -1825,6 +1838,7 @@ export interface ClimateInputsResult {
  */
 export function buildClimateInputs(
   rows: ClimateProductRow[],
+  orgProductType?: string | null,
 ): ClimateInputsResult {
   const diagnostics: ClimateInputsResult['diagnostics'] = {
     current_year_emissions_kgco2e: null,
@@ -1868,9 +1882,11 @@ export function buildClimateInputs(
       priorEmissions += (perUnit as number) * pri
     }
 
-    // Benchmark contribution: needs both a per-product benchmark and a unit size.
-    const benchmark = pickBenchmark(r.product_category, r.product_type)
-    if (benchmark && r.unit_size_l && r.unit_size_l > 0 && cur > 0) {
+    // Benchmark contribution: pickBenchmark always returns something now
+    // (cascades to org-level type and finally to BIER industry default),
+    // so any product with units_current and a unit_size contributes.
+    const benchmark = pickBenchmark(r.product_category, r.product_type, orgProductType)
+    if (r.unit_size_l && r.unit_size_l > 0 && cur > 0) {
       benchmarkNumerator += benchmark.kgCO2ePerLitre * r.unit_size_l * cur
       benchmarkDenominator += cur
       benchmarkProducts += 1
@@ -1913,11 +1929,24 @@ export function buildClimateInputs(
   return { intensity_ratio, yoy_delta_pct, diagnostics }
 }
 
-/** Resolve a per-product benchmark, preferring category over group. */
+/**
+ * Resolve a per-product carbon benchmark.
+ *
+ * Order of precedence:
+ *   1. product-level category (most specific)
+ *   2. product-level product_type
+ *   3. org-level product_type (passed from the route)
+ *   4. DEFAULT_BENCHMARK (1.0 kgCO2e/L generic beverage industry avg)
+ *
+ * Always returns a benchmark — never null. This guarantees the climate
+ * score has something to compare against even when product categorisation
+ * is missing on legacy / lightly-populated data.
+ */
 function pickBenchmark(
   category: string | null,
   productType: string | null,
-): IndustryBenchmark | null {
+  orgProductType?: string | null,
+): IndustryBenchmark {
   if (category) {
     const b = getBenchmarkForCategory(category)
     if (b) return b
@@ -1926,7 +1955,13 @@ function pickBenchmark(
     const result = getBenchmarkForProductType(productType, [])
     if (result?.benchmark) return result.benchmark
   }
-  return null
+  if (orgProductType) {
+    const result = getBenchmarkForProductType(orgProductType, [])
+    if (result?.benchmark) return result.benchmark
+  }
+  // Final fallback — DEFAULT_BENCHMARK (1.0 kgCO2e/L from BIER industry avg).
+  // Surfaced via getBenchmarkForCategory(null) which returns DEFAULT.
+  return getBenchmarkForCategory(null)
 }
 
 /**

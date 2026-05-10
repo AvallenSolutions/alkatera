@@ -378,15 +378,33 @@ async function buildEnvironmentalInputs(
     }
 
     // Stamp production_volume on each PCF (used by the water/circularity
-    // aggregators). Climate uses the per-product map directly below.
+    // aggregators). The same join-chain fallback (logs → sites → cm → 1)
+    // is also folded back into productionByProduct below so that the
+    // per-product builders (climate/water/nature) get meaningful unit
+    // counts even when an org tracks production via pcf_production_sites
+    // or contract_manufacturer_allocations rather than production_logs.
     lcas = lcas.map(lca => {
-      const fromLogs = productionByProduct.get(String(lca.product_id ?? '')) ?? 0
+      const productKey = String(lca.product_id ?? '')
+      const fromLogs = productionByProduct.get(productKey) ?? 0
       if (fromLogs > 0) return { ...lca, production_volume: fromLogs }
       const fromSites = sitesByLca.get(lca.id) ?? 0
       if (fromSites > 0) return { ...lca, production_volume: fromSites }
-      const fromCm = cmByProduct.get(String(lca.product_id ?? '')) ?? 0
+      const fromCm = cmByProduct.get(productKey) ?? 0
       return { ...lca, production_volume: fromCm > 0 ? fromCm : 1 }
     })
+
+    // Backfill productionByProduct with the same join-chain fallback so
+    // the climate/water/nature builders see units. Prior-year stays
+    // logs-only (sites/cm aren't time-stamped, so YoY would be a lie).
+    for (const lca of lcas) {
+      const productKey = String(lca.product_id ?? '')
+      if (!productKey) continue
+      if ((productionByProduct.get(productKey) ?? 0) > 0) continue
+      const v = Number(lca.production_volume ?? 0)
+      if (Number.isFinite(v) && v > 0) {
+        productionByProduct.set(productKey, v)
+      }
+    }
   }
 
   // Build per-product climate signal rows and run the blended score. The
@@ -409,14 +427,33 @@ async function buildEnvironmentalInputs(
       product_id: productKey,
       product_category: product?.product_category ?? null,
       product_type: product?.product_type ?? null,
-      unit_size_l: unitSizeToLitres(product?.unit_size_value, product?.unit_size_unit),
+      // Fall back to 1.0 L when unit_size isn't declared on the product.
+      // Without this the benchmark denominator is 0 and the climate/water
+      // score is null even when the org has perfectly good LCAs and unit
+      // counts. The fallback is dimensionally a "product = 1 litre"
+      // assumption — accurate enough to give producers a usable score
+      // until they fill in proper unit sizes.
+      unit_size_l:
+        unitSizeToLitres(product?.unit_size_value, product?.unit_size_unit) ?? 1.0,
       units_produced_current: cur,
       units_produced_prior: pri,
       per_unit_emissions_kgco2e:
         perUnit !== null && Number.isFinite(perUnit) ? Number(perUnit) : null,
     })
   }
-  const climateInputs = buildClimateInputs(Array.from(climateRowsByProduct.values()))
+  // Org-level product_type fallback — used by the climate/water benchmark
+  // pickers when products lack their own product_category / product_type.
+  // Sourced from organizations.product_type, falling back to the first
+  // product's product_type if the org-level field isn't set.
+  const orgProductType =
+    ((valOrNull(orgRow) as any)?.data?.product_type as string | null) ??
+    productRowsData[0]?.product_type ??
+    null
+
+  const climateInputs = buildClimateInputs(
+    Array.from(climateRowsByProduct.values()),
+    orgProductType,
+  )
   const climateBreakdown = computeClimateScore({
     intensity_ratio: climateInputs.intensity_ratio,
     yoy_delta_pct: climateInputs.yoy_delta_pct,
@@ -440,7 +477,14 @@ async function buildEnvironmentalInputs(
       product_id: productKey,
       product_category: product?.product_category ?? null,
       product_type: product?.product_type ?? null,
-      unit_size_l: unitSizeToLitres(product?.unit_size_value, product?.unit_size_unit),
+      // Fall back to 1.0 L when unit_size isn't declared on the product.
+      // Without this the benchmark denominator is 0 and the climate/water
+      // score is null even when the org has perfectly good LCAs and unit
+      // counts. The fallback is dimensionally a "product = 1 litre"
+      // assumption — accurate enough to give producers a usable score
+      // until they fill in proper unit sizes.
+      unit_size_l:
+        unitSizeToLitres(product?.unit_size_value, product?.unit_size_unit) ?? 1.0,
       units_produced_current: cur,
       units_produced_prior: pri,
       per_unit_water_m3:
@@ -491,6 +535,7 @@ async function buildEnvironmentalInputs(
       facilityIntakePrior_m3 !== null ? facilityIntakePrior_m3 * 1000 : null,
     facility_scarcity_current_l:
       facilityScarcityCurrent_m3 !== null ? facilityScarcityCurrent_m3 * 1000 : null,
+    orgProductType,
   })
   const waterBreakdown = computeWaterScore({
     intensity_ratio: waterInputs.intensity_ratio,
