@@ -69,6 +69,35 @@ export interface CalculationInputs {
   } | null;
   // Circularity
   circularityRate?: number;
+  /**
+   * Blended circularity breakdown (3 axes — recycled content in, packaging
+   * recyclability out, tier-weighted diversion — plus waste-intensity YoY).
+   * The treatment_mix is shown so users can see which routes their waste
+   * takes. Tier weighting follows the EU Waste Framework Directive
+   * 2008/98/EC hierarchy.
+   */
+  circularityBreakdown?: {
+    score: number | null;
+    axes: {
+      recycled_content_sub: number | null;
+      packaging_recyclability_sub: number | null;
+      diversion_sub: number | null;
+    };
+    practices_sub: number | null;
+    intensity_yoy_sub: number | null;
+    mode: 'blended' | 'practices_only' | 'yoy_only' | 'no_data';
+    weights: { practices: number; yoy: number };
+    treatment_mix: {
+      reuse: number;
+      composting: number;
+      anaerobic_digestion: number;
+      recycling: number;
+      incineration_with_recovery: number;
+      landfill: number;
+      incineration_without_recovery: number;
+      other: number;
+    };
+  } | null;
   // Nature
   biodiversityRisk?: 'high' | 'medium' | 'low';
   landUse?: number;
@@ -661,6 +690,92 @@ function CalculationBreakdown({ scoreType, inputs }: { scoreType: ScoreType; inp
   }
 
   if (scoreType === 'circularity') {
+    const cb = inputs.circularityBreakdown;
+    if (cb) {
+      const modeLabel: Record<typeof cb.mode, string> = {
+        blended: 'Blended (circular practices + waste-intensity trend)',
+        practices_only: 'Circular practices only (no prior-year waste data yet)',
+        yoy_only: 'Trend only (no input/output ratios available)',
+        no_data: 'Awaiting data',
+      };
+      const formatPct = (v: number) => `${Math.round(v * 100)}%`;
+      // Show the top routes (proportions ≥ 1%) for the treatment mix.
+      const mixOrder: Array<[keyof typeof cb.treatment_mix, string]> = [
+        ['reuse', 'Reuse'],
+        ['composting', 'Composting'],
+        ['anaerobic_digestion', 'Anaerobic digestion'],
+        ['recycling', 'Recycling'],
+        ['incineration_with_recovery', 'Energy recovery'],
+        ['landfill', 'Landfill'],
+        ['incineration_without_recovery', 'Incineration (no recovery)'],
+        ['other', 'Other'],
+      ];
+      const topRoutes = mixOrder.filter(([key]) => cb.treatment_mix[key] >= 0.01);
+      return (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">How it&apos;s scored</span>
+            <span className="font-medium text-right">{modeLabel[cb.mode]}</span>
+          </div>
+          {cb.practices_sub !== null && (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">
+                Circular practices{cb.mode === 'blended' ? ` (${Math.round(cb.weights.practices * 100)}% weight)` : ''}
+              </span>
+              <span className="font-medium tabular-nums">{cb.practices_sub} / 100</span>
+            </div>
+          )}
+          {cb.axes.recycled_content_sub !== null && (
+            <div className="flex items-center justify-between text-[11px] pl-3">
+              <span className="text-muted-foreground">↳ Recycled content (inputs)</span>
+              <span className="tabular-nums">{cb.axes.recycled_content_sub} / 100</span>
+            </div>
+          )}
+          {cb.axes.packaging_recyclability_sub !== null && (
+            <div className="flex items-center justify-between text-[11px] pl-3">
+              <span className="text-muted-foreground">↳ Packaging recyclability (outputs)</span>
+              <span className="tabular-nums">{cb.axes.packaging_recyclability_sub} / 100</span>
+            </div>
+          )}
+          {cb.axes.diversion_sub !== null && (
+            <div className="flex items-center justify-between text-[11px] pl-3">
+              <span className="text-muted-foreground">↳ Tier-weighted diversion</span>
+              <span className="tabular-nums">{cb.axes.diversion_sub} / 100</span>
+            </div>
+          )}
+          {cb.intensity_yoy_sub !== null && (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">
+                Waste-intensity year-on-year{cb.mode === 'blended' ? ` (${Math.round(cb.weights.yoy * 100)}% weight)` : ''}
+              </span>
+              <span className="font-medium tabular-nums">{cb.intensity_yoy_sub} / 100</span>
+            </div>
+          )}
+          {cb.score !== null && cb.mode === 'blended' && (
+            <div className="flex items-center justify-between text-xs border-t pt-1.5 mt-1.5">
+              <span className="text-muted-foreground">Blended score</span>
+              <span className="font-semibold tabular-nums">{cb.score} / 100</span>
+            </div>
+          )}
+          {topRoutes.length > 0 && (
+            <div className="border-t pt-1.5 mt-1.5">
+              <p className="text-[10px] text-muted-foreground mb-1">Where your waste goes</p>
+              {topRoutes.map(([key, label]) => (
+                <div key={key} className="flex items-center justify-between text-[11px]">
+                  <span className="text-muted-foreground">{label}</span>
+                  <span className="tabular-nums">{formatPct(cb.treatment_mix[key])}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-[10px] text-muted-foreground mt-1.5">
+            Circularity blends the quality of your practices (% recycled content in, % packaging recyclable out, and how high up the EU waste hierarchy your operational waste goes — reuse beats energy recovery beats landfill) with the year-on-year change in waste per unit produced. Reductions in waste intensity are rewarded; better disposal routes lift the score even at the same diversion rate.
+          </p>
+        </div>
+      );
+    }
+
+    // Legacy path (kept until all callers migrate).
     return (
       <div className="space-y-1.5">
         {inputs.circularityRate !== undefined && (

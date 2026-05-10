@@ -9,7 +9,11 @@
  * this layer is *composition*, not novel scoring.
  */
 
-import type { ClimateScoreBreakdown, WaterScoreBreakdown } from './environmental'
+import type {
+  ClimateScoreBreakdown,
+  WaterScoreBreakdown,
+  CircularityScoreBreakdown,
+} from './environmental'
 
 export type ScoreBand =
   | 'EXCELLENT'
@@ -80,6 +84,7 @@ export interface EnvironmentalPillarScore
   extends PillarScore<EnvironmentalSubScores> {
   climate_breakdown: ClimateScoreBreakdown | null
   water_breakdown: WaterScoreBreakdown | null
+  circularity_breakdown: CircularityScoreBreakdown | null
 }
 
 export interface VitalityComposite {
@@ -112,6 +117,8 @@ export interface EnvironmentalInputs {
   climate_breakdown?: ClimateScoreBreakdown | null
   /** Preferred: precomputed water breakdown from `computeWaterScore`. */
   water_breakdown?: WaterScoreBreakdown | null
+  /** Preferred: precomputed circularity breakdown from `computeCircularityScore`. */
+  circularity_breakdown?: CircularityScoreBreakdown | null
   /** Legacy climate fields, used when no climate_breakdown is provided. */
   totalEmissions?: number
   emissionsIntensity?: number
@@ -171,18 +178,26 @@ export function computeEnvironmentalPillar(
     else if (data.waterRiskLevel === 'high') water = 35
   }
 
-  // Circularity
+  // Circularity — preferred path: trust the precomputed breakdown when the
+  // caller provided one (even `no_data`). Legacy ladder only fires when no
+  // breakdown is supplied at all (e.g. unmigrated callers).
   let circularity: number | null = null
-  const hasCircularityData =
-    data.circularityRate !== undefined &&
-    data.circularityRate > 0 &&
-    data.hasWasteData !== false
-  if (hasCircularityData) {
-    if (data.circularityRate! >= 80) circularity = 95
-    else if (data.circularityRate! >= 60) circularity = 80
-    else if (data.circularityRate! >= 40) circularity = 60
-    else if (data.circularityRate! >= 20) circularity = 40
-    else circularity = 20
+  let circularity_breakdown: CircularityScoreBreakdown | null = null
+  if (data.circularity_breakdown !== undefined) {
+    circularity = data.circularity_breakdown?.score ?? null
+    circularity_breakdown = data.circularity_breakdown ?? null
+  } else {
+    const hasCircularityData =
+      data.circularityRate !== undefined &&
+      data.circularityRate > 0 &&
+      data.hasWasteData !== false
+    if (hasCircularityData) {
+      if (data.circularityRate! >= 80) circularity = 95
+      else if (data.circularityRate! >= 60) circularity = 80
+      else if (data.circularityRate! >= 40) circularity = 60
+      else if (data.circularityRate! >= 20) circularity = 40
+      else circularity = 20
+    }
   }
 
   // Nature
@@ -203,7 +218,14 @@ export function computeEnvironmentalPillar(
     const totalW = valid.reduce((a, b) => a + b.w, 0)
     score = Math.round(valid.reduce((a, b) => a + b.v * (b.w / totalW), 0))
   }
-  return { score, has_data: valid.length > 0, sub, climate_breakdown, water_breakdown }
+  return {
+    score,
+    has_data: valid.length > 0,
+    sub,
+    climate_breakdown,
+    water_breakdown,
+    circularity_breakdown,
+  }
 }
 
 export interface SocialInputs {

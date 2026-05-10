@@ -7,6 +7,7 @@ import { ProgressTracker } from './ProgressTracker'
 import { ProductSpotlight } from './ProductSpotlight'
 import { RecentlyFromRosa } from './RecentlyFromRosa'
 import { RecentConversations } from './RecentConversations'
+import { CircularPartnerships } from './CircularPartnerships'
 import { QuickActions } from './QuickActions'
 import { QuickPrompts } from './QuickPrompts'
 import { ForwardTimeline } from './ForwardTimeline'
@@ -126,6 +127,8 @@ export function ForYouToday({ onOpenQueue, onSubmit }: Props) {
           )}
         </div>
       )}
+
+      {isVisible('circular_partnerships') && <CircularPartnerships />}
     </div>
   )
 }
