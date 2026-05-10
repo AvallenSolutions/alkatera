@@ -191,6 +191,38 @@ export interface CalculationInputs {
     governance: number | null;
     certifications: number | null;
   };
+  /**
+   * Blended governance breakdown (practices 60% / certifications 30% /
+   * YoY 10%). When present, the governance explainer shows the new
+   * transparent breakdown including the 5-axis practices internals
+   * (Policy / Stakeholder / Board / Ethics / Transparency) and the
+   * certifications achieved-vs-in-progress split.
+   */
+  governanceBreakdown?: {
+    score: number | null;
+    axes: {
+      practices_sub: number | null;
+      certifications_sub: number | null;
+      yoy_sub: number | null;
+    };
+    practices_breakdown: {
+      policy: number | null;
+      stakeholder: number | null;
+      board: number | null;
+      ethics: number | null;
+      transparency: number | null;
+    } | null;
+    certifications_breakdown: {
+      achieved_pct: number | null;
+      in_progress_avg_pct: number | null;
+      achieved_count: number;
+      in_progress_count: number;
+      pursued_count: number;
+    } | null;
+    mode: 'blended' | 'partial' | 'no_data';
+    weights: { practices: number; certifications: number; yoy: number };
+    source: { name: string };
+  } | null;
 }
 
 interface ScoreExplainerProps {
@@ -1236,26 +1268,131 @@ function CalculationBreakdown({ scoreType, inputs }: { scoreType: ScoreType; inp
     return null;
   }
 
-  if (scoreType === 'governance' && inputs.governanceScores) {
-    const gs = inputs.governanceScores;
-    const subs = [
-      { name: 'Governance practices (85%)', score: gs.governance },
-      { name: 'Certifications progress (15%)', score: gs.certifications },
-    ];
-    return (
-      <div className="space-y-1.5">
-        {subs.map(s => (
-          <div key={s.name} className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">{s.name}</span>
-            {s.score !== null ? (
-              <span className="font-medium tabular-nums">{s.score}</span>
-            ) : (
-              <span className="text-muted-foreground italic">No data</span>
-            )}
+  if (scoreType === 'governance') {
+    const gb = inputs.governanceBreakdown;
+    if (gb) {
+      const modeLabel: Record<typeof gb.mode, string> = {
+        blended: 'Blended (practices + certifications + year-on-year)',
+        partial: 'Partial (some axes missing — treated as 0)',
+        no_data: 'Awaiting data',
+      };
+      const practiceRows: Array<[string, number | null]> = [
+        ['Policy', gb.practices_breakdown?.policy ?? null],
+        ['Stakeholder engagement', gb.practices_breakdown?.stakeholder ?? null],
+        ['Board oversight', gb.practices_breakdown?.board ?? null],
+        ['Ethics', gb.practices_breakdown?.ethics ?? null],
+        ['Transparency', gb.practices_breakdown?.transparency ?? null],
+      ];
+      return (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">How it&apos;s scored</span>
+            <span className="font-medium text-right">{modeLabel[gb.mode]}</span>
           </div>
-        ))}
-      </div>
-    );
+          {gb.axes.practices_sub !== null && (
+            <>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">
+                  Governance practices ({Math.round(gb.weights.practices * 100)}% weight)
+                </span>
+                <span className="font-medium tabular-nums">{gb.axes.practices_sub} / 100</span>
+              </div>
+              {practiceRows.map(([label, score]) =>
+                score === null ? null : (
+                  <div key={label} className="flex items-center justify-between text-[11px] pl-3">
+                    <span className="text-muted-foreground">↳ {label}</span>
+                    <span className="tabular-nums">{Math.round(score)} / 100</span>
+                  </div>
+                ),
+              )}
+            </>
+          )}
+          {gb.axes.certifications_sub !== null && (
+            <>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">
+                  Certifications ({Math.round(gb.weights.certifications * 100)}% weight)
+                </span>
+                <span className="font-medium tabular-nums">{gb.axes.certifications_sub} / 100</span>
+              </div>
+              {gb.certifications_breakdown && (
+                <>
+                  <div className="flex items-center justify-between text-[11px] pl-3">
+                    <span className="text-muted-foreground">↳ Achieved (80%)</span>
+                    <span className="tabular-nums">
+                      {gb.certifications_breakdown.achieved_count} of {gb.certifications_breakdown.pursued_count}
+                      {gb.certifications_breakdown.achieved_pct !== null && (
+                        <span className="text-muted-foreground/60 ml-1.5">
+                          ({gb.certifications_breakdown.achieved_pct}%)
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] pl-3">
+                    <span className="text-muted-foreground">↳ In-progress avg readiness (20%)</span>
+                    <span className="tabular-nums">
+                      {gb.certifications_breakdown.in_progress_avg_pct ?? 0}%
+                      <span className="text-muted-foreground/60 ml-1.5">
+                        ({gb.certifications_breakdown.in_progress_count} active)
+                      </span>
+                    </span>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+          {gb.axes.yoy_sub !== null && (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">
+                Year-on-year improvement ({Math.round(gb.weights.yoy * 100)}% weight)
+              </span>
+              <span className="font-medium tabular-nums">{gb.axes.yoy_sub} / 100</span>
+            </div>
+          )}
+          {gb.score !== null && (
+            <div className="flex items-center justify-between text-xs border-t pt-1.5 mt-1.5">
+              <span className="text-muted-foreground">Final score</span>
+              <span className="font-semibold tabular-nums">{gb.score} / 100</span>
+            </div>
+          )}
+          <div className="flex items-center justify-between text-xs border-t pt-1.5 mt-1.5">
+            <span className="text-muted-foreground">Methodology</span>
+            <span className="text-[10px] text-right">{gb.source.name}</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-1.5">
+            Practices dominates because that&apos;s where day-to-day governance lives — written
+            policies, board oversight, ethics, transparency. Certifications weight earned credentials
+            (80%) over in-progress work (20%) because finishing a certification is materially
+            harder than starting one. Year-on-year improvement is a small but real signal that
+            governance is being maintained, not just declared.
+          </p>
+        </div>
+      );
+    }
+
+    // Legacy path (kept for unmigrated callers).
+    if (inputs.governanceScores) {
+      const gs = inputs.governanceScores;
+      const subs = [
+        { name: 'Governance practices (85%)', score: gs.governance },
+        { name: 'Certifications progress (15%)', score: gs.certifications },
+      ];
+      return (
+        <div className="space-y-1.5">
+          {subs.map(s => (
+            <div key={s.name} className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">{s.name}</span>
+              {s.score !== null ? (
+                <span className="font-medium tabular-nums">{s.score}</span>
+              ) : (
+                <span className="text-muted-foreground italic">No data</span>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return null;
   }
 
   return null;
