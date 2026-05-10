@@ -12,7 +12,16 @@ import {
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
-type ScoreType = 'overall' | 'climate' | 'water' | 'circularity' | 'nature';
+type ScoreType =
+  | 'overall'
+  | 'climate'
+  | 'water'
+  | 'circularity'
+  | 'nature'
+  | 'composite'
+  | 'environmental'
+  | 'social'
+  | 'governance';
 
 export interface CalculationInputs {
   // Climate
@@ -20,6 +29,20 @@ export interface CalculationInputs {
   emissionsIntensity?: number;
   industryBenchmark?: number;
   intensityRatio?: number;
+  /**
+   * Blended climate breakdown (intensity vs benchmark + YoY trend). When
+   * present, the climate explainer shows the per-unit math with the two
+   * sub-scores so users see exactly how the score was reached. The
+   * legacy intensity/ratio fields above remain for callers that haven't
+   * migrated yet.
+   */
+  climateBreakdown?: {
+    score: number | null;
+    intensity_sub: number | null;
+    yoy_sub: number | null;
+    mode: 'blended' | 'intensity_only' | 'yoy_only' | 'no_data';
+    weights: { intensity: number; yoy: number };
+  } | null;
   benchmarkSource?: {
     name: string;
     url: string;
@@ -29,17 +52,51 @@ export interface CalculationInputs {
   // Water
   waterRiskLevel?: 'high' | 'medium' | 'low';
   waterConsumption?: number;
+  /**
+   * Blended water breakdown (intensity vs benchmark + YoY trend, plus
+   * scarcity context shown but not scored). When present, the water
+   * explainer renders the per-unit math with both sub-scores and the
+   * AWARE scarcity factor.
+   */
+  waterBreakdown?: {
+    score: number | null;
+    intensity_sub: number | null;
+    yoy_sub: number | null;
+    mode: 'blended' | 'intensity_only' | 'yoy_only' | 'no_data';
+    weights: { intensity: number; yoy: number };
+    avg_scarcity_factor: number | null;
+    source: 'facility' | 'lca' | null;
+  } | null;
   // Circularity
   circularityRate?: number;
   // Nature
   biodiversityRisk?: 'high' | 'medium' | 'low';
   landUse?: number;
-  // Overall
+  // Overall (legacy 4-pillar environmental)
   pillarScores?: {
     climate: number | null;
     water: number | null;
     circularity: number | null;
     nature: number | null;
+  };
+  // ESG composite (new)
+  esgScores?: {
+    e: number | null;
+    s: number | null;
+    g: number | null;
+  };
+  esgWeights?: { e: number; s: number; g: number };
+  // Environmental ESG sub-pillar (re-uses pillarScores above)
+  // Social sub-pillars
+  socialScores?: {
+    community: number | null;
+    people_culture: number | null;
+    supplier_esg: number | null;
+  };
+  // Governance sub-pillars
+  governanceScores?: {
+    governance: number | null;
+    certifications: number | null;
   };
 }
 
@@ -125,6 +182,57 @@ const scoreTypeConfig: Record<ScoreType, {
       { min: 0, label: 'Critical Impact', color: 'red', description: 'Major biodiversity concerns' },
     ],
   },
+  composite: {
+    title: 'Company Vitality Score (ESG)',
+    description: 'A holistic ESG measure of your sustainability performance across environmental, social, and governance pillars.',
+    methodology: 'Weighted average of E, S, G pillar scores. Default weighting is E 50% / S 25% / G 25%; org admins can adjust.',
+    bands: [
+      { min: 85, label: 'Excellent', color: 'green', description: 'Sustainability leader across the board.' },
+      { min: 70, label: 'Healthy', color: 'emerald', description: 'Strong performance across most pillars.' },
+      { min: 50, label: 'Developing', color: 'amber', description: 'Good progress with clear room to push.' },
+      { min: 30, label: 'Emerging', color: 'orange', description: 'Early stage. Focused action moves things fast.' },
+      { min: 0, label: 'Needs Attention', color: 'red', description: 'Significant opportunities to improve.' },
+    ],
+  },
+  environmental: {
+    title: 'Environmental Score',
+    description: 'Composite of climate, water, circularity, and nature pillar scores.',
+    methodology: 'Weighted average: Climate 30%, Water 25%, Circularity 25%, Nature 20%. Missing pillars are dropped and the others re-normalised.',
+    weight: '50% of ESG (default)',
+    bands: [
+      { min: 85, label: 'Excellent', color: 'green', description: 'Industry-leading environmental footprint.' },
+      { min: 70, label: 'Healthy', color: 'emerald', description: 'Solid performance across most env pillars.' },
+      { min: 50, label: 'Developing', color: 'amber', description: 'Good progress with room to improve.' },
+      { min: 30, label: 'Emerging', color: 'orange', description: 'Early stage on environmental measurement.' },
+      { min: 0, label: 'Needs Attention', color: 'red', description: 'Significant environmental gaps.' },
+    ],
+  },
+  social: {
+    title: 'Social Score',
+    description: 'Composite of community impact, people & culture, and supplier ESG signals.',
+    methodology: 'Equal-weight average of available sub-scores: Community Impact, People & Culture, Supplier ESG submission rate. Missing inputs are dropped.',
+    weight: '25% of ESG (default)',
+    bands: [
+      { min: 85, label: 'Excellent', color: 'green', description: 'Strong social performance across the board.' },
+      { min: 70, label: 'Healthy', color: 'emerald', description: 'Solid social engagement signals.' },
+      { min: 50, label: 'Developing', color: 'amber', description: 'Good progress, more to do.' },
+      { min: 30, label: 'Emerging', color: 'orange', description: 'Early-stage social programmes.' },
+      { min: 0, label: 'Needs Attention', color: 'red', description: 'Material social gaps to address.' },
+    ],
+  },
+  governance: {
+    title: 'Governance Score',
+    description: 'Composite of governance practices and certifications progress.',
+    methodology: 'Weighted: Governance practices (policies, board, ethics, transparency) 85%, certification progress 15%.',
+    weight: '25% of ESG (default)',
+    bands: [
+      { min: 85, label: 'Excellent', color: 'green', description: 'Governance practices in great shape.' },
+      { min: 70, label: 'Healthy', color: 'emerald', description: 'Solid governance foundations.' },
+      { min: 50, label: 'Developing', color: 'amber', description: 'Several controls in place, gaps remain.' },
+      { min: 30, label: 'Emerging', color: 'orange', description: 'Limited governance visibility.' },
+      { min: 0, label: 'Needs Attention', color: 'red', description: 'Significant governance work needed.' },
+    ],
+  },
 };
 
 function getImprovementGuidance(scoreType: ScoreType, currentScore: number | null, inputs?: CalculationInputs): string | null {
@@ -183,6 +291,81 @@ function getImprovementGuidance(scoreType: ScoreType, currentScore: number | nul
       }
       return `Improve your weakest pillar to increase your overall score to ${nextBand.min}+ ("${nextBand.label}").`;
     }
+    case 'composite': {
+      if (inputs?.esgScores) {
+        const pillars = [
+          { name: 'Environmental', score: inputs.esgScores.e },
+          { name: 'Social', score: inputs.esgScores.s },
+          { name: 'Governance', score: inputs.esgScores.g },
+        ];
+        const nullPillars = pillars.filter(p => p.score === null);
+        if (nullPillars.length > 0) {
+          return `Add ${nullPillars.map(p => p.name).join(' / ')} data to firm up the composite. Missing pillars get their weight redistributed.`;
+        }
+        const weakest = pillars
+          .filter(p => p.score !== null)
+          .sort((a, b) => (a.score || 0) - (b.score || 0))[0];
+        if (weakest) {
+          return `Your weakest pillar is ${weakest.name} at ${weakest.score}. Lifting that has the biggest pull on the composite.`;
+        }
+      }
+      return `Improve your weakest ESG pillar to push the composite to "${nextBand.label}" (${nextBand.min}+).`;
+    }
+    case 'environmental': {
+      if (inputs?.pillarScores) {
+        const subs = [
+          { name: 'Climate', score: inputs.pillarScores.climate },
+          { name: 'Water', score: inputs.pillarScores.water },
+          { name: 'Circularity', score: inputs.pillarScores.circularity },
+          { name: 'Nature', score: inputs.pillarScores.nature },
+        ];
+        const nullSubs = subs.filter(p => p.score === null);
+        if (nullSubs.length > 0) {
+          return `Add ${nullSubs.map(s => s.name).join(', ')} data to make Environmental more complete.`;
+        }
+        const weakest = subs
+          .filter(p => p.score !== null)
+          .sort((a, b) => (a.score || 0) - (b.score || 0))[0];
+        if (weakest) {
+          return `Within Environmental, ${weakest.name} (${weakest.score}) is the lowest. That's where the upside is.`;
+        }
+      }
+      return `Reach "${nextBand.label}" by improving your weakest environmental sub-pillar.`;
+    }
+    case 'social': {
+      if (inputs?.socialScores) {
+        const subs = [
+          { name: 'Community impact', score: inputs.socialScores.community },
+          { name: 'People & culture', score: inputs.socialScores.people_culture },
+          { name: 'Supplier ESG', score: inputs.socialScores.supplier_esg },
+        ];
+        const nullSubs = subs.filter(p => p.score === null);
+        if (nullSubs.length > 0) {
+          return `Add data for ${nullSubs.map(s => s.name).join(', ')} to lift the Social pillar.`;
+        }
+        const weakest = subs
+          .filter(p => p.score !== null)
+          .sort((a, b) => (a.score || 0) - (b.score || 0))[0];
+        if (weakest) {
+          return `Within Social, ${weakest.name} (${weakest.score}) is the lowest. That's where the upside is.`;
+        }
+      }
+      return `Lift Social to "${nextBand.label}" by working your weakest sub-pillar (community / people / suppliers).`;
+    }
+    case 'governance': {
+      if (inputs?.governanceScores) {
+        const g = inputs.governanceScores.governance;
+        const c = inputs.governanceScores.certifications;
+        if (g === null && c === null) {
+          return 'Add governance policies, board records, or certifications progress to unlock the Governance pillar.';
+        }
+        if (g !== null && (c === null || c < (g ?? 0))) {
+          return `Make progress on certifications (B Corp, SBTi, ISO) to round out Governance — currently ${c ?? 'no'} cert progress data.`;
+        }
+        return `Tighten governance practices (policies, board independence, ethics records) to push Governance to "${nextBand.label}".`;
+      }
+      return `Reach "${nextBand.label}" by tightening governance practices and progressing your certifications.`;
+    }
     default:
       return null;
   }
@@ -211,6 +394,26 @@ function buildRosaPrompt(scoreType: ScoreType, currentScore: number | null, inpu
     parts.push(`Explain my Nature Score of ${currentScore ?? 'N/A'}.`);
     if (inputs?.biodiversityRisk) parts.push(`My biodiversity risk level is ${inputs.biodiversityRisk}.`);
     if (inputs?.landUse) parts.push(`My land use is ${inputs.landUse.toFixed(0)} m2 crop eq.`);
+  } else if (scoreType === 'composite' && inputs?.esgScores) {
+    parts.push(`Explain my ESG composite vitality score of ${currentScore ?? 'N/A'}.`);
+    parts.push(`My pillar scores are: Environmental ${inputs.esgScores.e ?? 'no data'}, Social ${inputs.esgScores.s ?? 'no data'}, Governance ${inputs.esgScores.g ?? 'no data'}.`);
+    if (inputs.esgWeights) {
+      parts.push(
+        `Weights: E ${Math.round(inputs.esgWeights.e * 100)}% / S ${Math.round(inputs.esgWeights.s * 100)}% / G ${Math.round(inputs.esgWeights.g * 100)}%.`,
+      );
+    }
+  } else if (scoreType === 'environmental' && inputs?.pillarScores) {
+    parts.push(`Explain my Environmental score of ${currentScore ?? 'N/A'}.`);
+    const ps = inputs.pillarScores;
+    parts.push(`Sub-pillars: Climate ${ps.climate ?? 'no data'}, Water ${ps.water ?? 'no data'}, Circularity ${ps.circularity ?? 'no data'}, Nature ${ps.nature ?? 'no data'}.`);
+  } else if (scoreType === 'social' && inputs?.socialScores) {
+    parts.push(`Explain my Social score of ${currentScore ?? 'N/A'}.`);
+    const ss = inputs.socialScores;
+    parts.push(`Sub-pillars: Community impact ${ss.community ?? 'no data'}, People & culture ${ss.people_culture ?? 'no data'}, Supplier ESG ${ss.supplier_esg ?? 'no data'}.`);
+  } else if (scoreType === 'governance' && inputs?.governanceScores) {
+    parts.push(`Explain my Governance score of ${currentScore ?? 'N/A'}.`);
+    const gs = inputs.governanceScores;
+    parts.push(`Governance practices ${gs.governance ?? 'no data'}, certifications progress ${gs.certifications ?? 'no data'}.`);
   }
 
   parts.push('What does this score mean, and what specific actions should I take to improve it?');
@@ -257,6 +460,68 @@ function CalculationBreakdown({ scoreType, inputs }: { scoreType: ScoreType; inp
   }
 
   if (scoreType === 'climate') {
+    // New blended breakdown path: shows users the exact sub-scores and how
+    // the blend was reached. Renders when the breakdown is provided.
+    const cb = inputs.climateBreakdown;
+    if (cb) {
+      const modeLabel: Record<typeof cb.mode, string> = {
+        blended: 'Blended (intensity + year-on-year)',
+        intensity_only: 'Intensity only (no prior-year data yet)',
+        yoy_only: 'Year-on-year only (no benchmark coverage)',
+        no_data: 'Awaiting data',
+      };
+      return (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">How it&apos;s scored</span>
+            <span className="font-medium text-right">{modeLabel[cb.mode]}</span>
+          </div>
+          {cb.intensity_sub !== null && (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">
+                Intensity vs benchmark{cb.mode === 'blended' ? ` (${Math.round(cb.weights.intensity * 100)}% weight)` : ''}
+              </span>
+              <span className="font-medium tabular-nums">{cb.intensity_sub} / 100</span>
+            </div>
+          )}
+          {cb.yoy_sub !== null && (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">
+                Year-on-year emissions{cb.mode === 'blended' ? ` (${Math.round(cb.weights.yoy * 100)}% weight)` : ''}
+              </span>
+              <span className="font-medium tabular-nums">{cb.yoy_sub} / 100</span>
+            </div>
+          )}
+          {cb.score !== null && cb.mode === 'blended' && (
+            <div className="flex items-center justify-between text-xs border-t pt-1.5 mt-1.5">
+              <span className="text-muted-foreground">Blended score</span>
+              <span className="font-semibold tabular-nums">{cb.score} / 100</span>
+            </div>
+          )}
+          {inputs.benchmarkSource && (
+            <div className="flex items-center justify-between text-xs border-t pt-1.5 mt-1.5">
+              <span className="text-muted-foreground">
+                {inputs.benchmarkSource.category ? `Benchmark source (${inputs.benchmarkSource.category})` : 'Benchmark source'}
+              </span>
+              <a
+                href={inputs.benchmarkSource.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 max-w-[180px] truncate"
+              >
+                {inputs.benchmarkSource.name} ({inputs.benchmarkSource.year})
+                <ExternalLink className="h-3 w-3 flex-shrink-0" />
+              </a>
+            </div>
+          )}
+          <p className="text-[10px] text-muted-foreground mt-1.5">
+            Climate is scored per unit (whole product, packaging included), benchmarked against industry data weighted by your product mix and units produced. The year-on-year line rewards absolute reductions: a 10% drop earns full marks because it beats Paris-aligned trajectories.
+          </p>
+        </div>
+      );
+    }
+
+    // Legacy path (kept until all callers migrate to climateBreakdown).
     return (
       <div className="space-y-1.5">
         {inputs.totalEmissions !== undefined && (
@@ -304,6 +569,75 @@ function CalculationBreakdown({ scoreType, inputs }: { scoreType: ScoreType; inp
   }
 
   if (scoreType === 'water') {
+    // New blended breakdown path. Renders when the breakdown is provided.
+    const wb = inputs.waterBreakdown;
+    if (wb) {
+      const modeLabel: Record<typeof wb.mode, string> = {
+        blended: 'Blended (intensity + year-on-year)',
+        intensity_only: 'Intensity only (no prior-year data yet)',
+        yoy_only: 'Year-on-year only (no benchmark coverage)',
+        no_data: 'Awaiting data',
+      };
+      const scarcityBand =
+        wb.avg_scarcity_factor === null
+          ? null
+          : wb.avg_scarcity_factor > 40
+            ? 'highly stressed'
+            : wb.avg_scarcity_factor > 20
+              ? 'moderately stressed'
+              : 'low-stress';
+      return (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">How it&apos;s scored</span>
+            <span className="font-medium text-right">{modeLabel[wb.mode]}</span>
+          </div>
+          {wb.intensity_sub !== null && (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">
+                Intensity vs benchmark{wb.mode === 'blended' ? ` (${Math.round(wb.weights.intensity * 100)}% weight)` : ''}
+              </span>
+              <span className="font-medium tabular-nums">{wb.intensity_sub} / 100</span>
+            </div>
+          )}
+          {wb.yoy_sub !== null && (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">
+                Year-on-year withdrawal{wb.mode === 'blended' ? ` (${Math.round(wb.weights.yoy * 100)}% weight)` : ''}
+              </span>
+              <span className="font-medium tabular-nums">{wb.yoy_sub} / 100</span>
+            </div>
+          )}
+          {wb.score !== null && wb.mode === 'blended' && (
+            <div className="flex items-center justify-between text-xs border-t pt-1.5 mt-1.5">
+              <span className="text-muted-foreground">Blended score</span>
+              <span className="font-semibold tabular-nums">{wb.score} / 100</span>
+            </div>
+          )}
+          {scarcityBand && (
+            <div className="flex items-center justify-between text-xs border-t pt-1.5 mt-1.5">
+              <span className="text-muted-foreground">Local scarcity context</span>
+              <Badge variant="outline" className="text-[10px] h-5 capitalize">
+                {scarcityBand} (AWARE {wb.avg_scarcity_factor!.toFixed(0)})
+              </Badge>
+            </div>
+          )}
+          {wb.source && (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Data source</span>
+              <span className="font-medium">
+                {wb.source === 'facility' ? 'Facility-tracked withdrawal' : 'LCA water (proxy)'}
+              </span>
+            </div>
+          )}
+          <p className="text-[10px] text-muted-foreground mt-1.5">
+            Water is scored per unit (whole product, packaging included), benchmarked against BIER industry data and weighted by your product mix and units produced. Year-on-year reductions are rewarded heavily because cutting water use is structurally hard. Local scarcity is shown as context only — the score doesn&apos;t penalise where you operate, but reductions in stressed watersheds are extra valuable.
+          </p>
+        </div>
+      );
+    }
+
+    // Legacy path (kept until all callers migrate to waterBreakdown).
     return (
       <div className="space-y-1.5">
         {inputs.waterRiskLevel && (
@@ -358,6 +692,119 @@ function CalculationBreakdown({ scoreType, inputs }: { scoreType: ScoreType; inp
     );
   }
 
+  if (scoreType === 'composite' && inputs.esgScores && inputs.esgWeights) {
+    const w = inputs.esgWeights;
+    const pillars = [
+      { name: 'Environmental', score: inputs.esgScores.e, weight: w.e },
+      { name: 'Social', score: inputs.esgScores.s, weight: w.s },
+      { name: 'Governance', score: inputs.esgScores.g, weight: w.g },
+    ];
+    const available = pillars.filter(p => p.score !== null);
+    const totalWeight = available.reduce((sum, p) => sum + p.weight, 0);
+    return (
+      <div className="space-y-1.5">
+        {pillars.map(p => {
+          const adjustedPct =
+            p.score !== null && totalWeight > 0
+              ? ((p.weight / totalWeight) * 100).toFixed(0)
+              : null;
+          const contribution =
+            p.score !== null && totalWeight > 0
+              ? ((p.score * p.weight) / totalWeight).toFixed(1)
+              : null;
+          return (
+            <div key={p.name} className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">
+                {p.name} ({(p.weight * 100).toFixed(0)}%)
+              </span>
+              {p.score !== null ? (
+                <span className="font-medium tabular-nums">
+                  {p.score} x {adjustedPct}% = <span className="text-foreground">{contribution} pts</span>
+                </span>
+              ) : (
+                <span className="text-muted-foreground italic">No data</span>
+              )}
+            </div>
+          );
+        })}
+        {available.length < 3 && (
+          <p className="text-[10px] text-muted-foreground mt-1">
+            Weights redistributed across {available.length} available pillar{available.length !== 1 ? 's' : ''}.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  if (scoreType === 'environmental' && inputs.pillarScores) {
+    const ps = inputs.pillarScores;
+    const subs = [
+      { name: 'Climate', score: ps.climate, weight: 0.30 },
+      { name: 'Water', score: ps.water, weight: 0.25 },
+      { name: 'Circularity', score: ps.circularity, weight: 0.25 },
+      { name: 'Nature', score: ps.nature, weight: 0.20 },
+    ];
+    return (
+      <div className="space-y-1.5">
+        {subs.map(s => (
+          <div key={s.name} className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">{s.name} ({(s.weight * 100).toFixed(0)}%)</span>
+            {s.score !== null ? (
+              <span className="font-medium tabular-nums">{s.score}</span>
+            ) : (
+              <span className="text-muted-foreground italic">No data</span>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (scoreType === 'social' && inputs.socialScores) {
+    const ss = inputs.socialScores;
+    const subs = [
+      { name: 'Community impact', score: ss.community },
+      { name: 'People & culture', score: ss.people_culture },
+      { name: 'Supplier ESG', score: ss.supplier_esg },
+    ];
+    return (
+      <div className="space-y-1.5">
+        {subs.map(s => (
+          <div key={s.name} className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">{s.name}</span>
+            {s.score !== null ? (
+              <span className="font-medium tabular-nums">{s.score}</span>
+            ) : (
+              <span className="text-muted-foreground italic">No data</span>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (scoreType === 'governance' && inputs.governanceScores) {
+    const gs = inputs.governanceScores;
+    const subs = [
+      { name: 'Governance practices (85%)', score: gs.governance },
+      { name: 'Certifications progress (15%)', score: gs.certifications },
+    ];
+    return (
+      <div className="space-y-1.5">
+        {subs.map(s => (
+          <div key={s.name} className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">{s.name}</span>
+            {s.score !== null ? (
+              <span className="font-medium tabular-nums">{s.score}</span>
+            ) : (
+              <span className="text-muted-foreground italic">No data</span>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return null;
 }
 
@@ -388,13 +835,19 @@ export function ScoreExplainer({
         <Button
           variant="ghost"
           size="sm"
-          className={cn("h-6 w-6 p-0 hover:bg-white/10", className)}
+          className={cn("h-6 w-6 p-0 hover:bg-muted", className)}
         >
-          <Info className="h-4 w-4 text-white/60 hover:text-white/90" />
+          <Info className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="sr-only">Score information</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-96 p-0 max-h-[80vh] overflow-y-auto" align="start" side="bottom">
+      <PopoverContent
+        className="w-96 p-0 overflow-y-auto max-h-[min(80vh,var(--radix-popover-content-available-height))]"
+        align="start"
+        side="bottom"
+        sideOffset={4}
+        collisionPadding={16}
+      >
         <div className="p-4 space-y-4">
           <div>
             <div className="flex items-center justify-between mb-2">

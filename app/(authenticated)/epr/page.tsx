@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider';
 import Link from 'next/link';
 import { useOrganization } from '@/lib/organizationContext';
 import { supabase } from '@/lib/supabaseClient';
@@ -153,6 +154,24 @@ export default function EPRDashboardPage() {
   const [settingsExist, setSettingsExist] = useState<boolean>(false);
   const [wizardCompleted, setWizardCompleted] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Tell Rosa about EPR readiness so questions like "what's missing for
+  // my submission?" or "how big is the fee?" can be answered with the
+  // user's actual numbers in context.
+  const rosaSlice = useMemo(() => ({
+    id: 'epr-dashboard',
+    label: 'EPR dashboard',
+    priority: 8,
+    data: {
+      page: 'epr',
+      settings_configured: settingsExist,
+      wizard_completed: wizardCompleted,
+      obligation_status: (obligationData as any)?.status ?? null,
+      completeness_pct: (completeness as any)?.percentage ?? null,
+      fee_estimate: (feeData as any)?.total_fee ?? null,
+    },
+  }), [settingsExist, wizardCompleted, obligationData, completeness, feeData]);
+  useRosaPageContext(rosaSlice);
 
   const fetchData = useCallback(async () => {
     if (!orgId) return;

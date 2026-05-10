@@ -1,28 +1,19 @@
-'use client';
+'use client'
 
-import { useSearchParams } from 'next/navigation';
-import { Suspense } from 'react';
-import { RosaChat } from '@/components/gaia';
-import { RosaBriefing } from '@/components/rosa/RosaBriefing';
+import { useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
+import { RosaCanvas } from '@/components/rosa/RosaCanvas'
 
 function RosaPageContent() {
-  const searchParams = useSearchParams();
-  const initialPrompt = searchParams.get('prompt') || undefined;
-
-  return (
-    <div className="-mx-4 -my-6 sm:-mx-6 lg:-mx-8 h-[calc(100vh-4rem)] overflow-hidden flex flex-col">
-      <RosaBriefing />
-      <div className="flex-1 min-h-0">
-        <RosaChat fullPage initialPrompt={initialPrompt} />
-      </div>
-    </div>
-  );
+  const searchParams = useSearchParams()
+  const initialPrompt = searchParams.get('prompt') || undefined
+  return <RosaCanvas initialPrompt={initialPrompt} />
 }
 
 export default function RosaPage() {
   return (
-    <Suspense fallback={<div className="h-full" />}>
+    <Suspense fallback={<div className="h-[calc(100vh-4rem)]" />}>
       <RosaPageContent />
     </Suspense>
-  );
+  )
 }

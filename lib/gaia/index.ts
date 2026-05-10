@@ -581,7 +581,20 @@ export const sendGaiaQueryStream = sendRosaQueryStream;
  * event types: 'tool_use' / 'tool_result' / 'action_proposal'.
  */
 export async function* sendRosaQueryStreamV2(
-  request: RosaQueryRequest & { attachments?: Array<{ file_id: string }> },
+  request: RosaQueryRequest & {
+    attachments?: Array<{ file_id: string }>
+    /**
+     * Page-level structured context contributed by the current screen.
+     * Forwarded to Rosa's system prompt so she can answer questions
+     * specific to what the user is looking at.
+     */
+    page_context?: Array<{
+      id: string
+      label: string
+      priority: number
+      data: Record<string, unknown>
+    }>
+  },
 ): AsyncGenerator<RosaStreamEvent> {
   const response = await fetch('/api/rosa/chat', {
     method: 'POST',
@@ -590,6 +603,7 @@ export async function* sendRosaQueryStreamV2(
       message: request.message,
       conversation_id: request.conversation_id,
       attachments: request.attachments ?? [],
+      page_context: request.page_context,
     }),
   });
 

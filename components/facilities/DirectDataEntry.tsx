@@ -23,6 +23,7 @@ import {
   DATA_QUALITY_OPTIONS,
 } from "@/lib/constants/utility-types";
 import type { Cadence, Period } from "@/lib/log-data/period-utils";
+import { AgentBanner } from "@/components/agents/AgentBanner";
 import { UtilityBillImportDialog } from "./UtilityBillImportDialog";
 import { UtilityRolloverDialog } from "./UtilityRolloverDialog";
 import { WaterBillImportDialog } from "./WaterBillImportDialog";
@@ -355,6 +356,8 @@ export function DirectDataEntry({
   // =========================================================================
 
   return (
+    <>
+    <AgentBanner kinds={['utility_bill', 'water_bill', 'waste_bill']} formName="energy, water and waste data" />
     <Card>
       <CardHeader>
         <CardTitle>Enter Facility Data</CardTitle>
@@ -726,5 +729,6 @@ export function DirectDataEntry({
         }}
       />
     </Card>
+    </>
   );
 }

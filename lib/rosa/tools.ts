@@ -36,6 +36,13 @@ export const ACTION_TOOL_NAMES = [
   'propose_log_utility_entry',
   'propose_set_target',
   'propose_add_supplier',
+  'propose_approve_exception',
+  'propose_reject_exception',
+  'propose_match_emission_factor',
+  'propose_apply_proxy',
+  'propose_create_lca_draft',
+  'propose_dismiss_anomaly',
+  'propose_set_progress_tracker',
 ] as const;
 export type ActionToolName = typeof ACTION_TOOL_NAMES[number];
 
@@ -343,6 +350,40 @@ export const ROSA_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: 'propose_set_progress_tracker',
+    description:
+      "Propose changing the single number the user watches over time on their /rosa/ hub. Use when the user asks 'what should I track?' or 'change my progress chart'. Stages a pending action; the user clicks Confirm to actually save it. Pick the tracker_id that matches what they care about most given their persona, focus areas, and the org's data foundation.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        tracker_id: {
+          type: 'string',
+          enum: [
+            'total_emissions',
+            'water_use',
+            'lca_coverage',
+            'supplier_esg_signal',
+            'target_progress',
+            'custom_rosa',
+          ],
+          description:
+            "The tracker to set. total_emissions = absolute scope 1+2 trend. water_use = water intake trend. lca_coverage = % of products with completed LCAs. supplier_esg_signal = % of suppliers with submitted ESG. target_progress = actual vs linear path against a chosen target. custom_rosa = let Rosa pick the most-feasible tracker each refresh.",
+        },
+        target_id: {
+          type: 'string',
+          description:
+            "Optional. Required only when tracker_id='target_progress'. The sustainability_targets.id to track against. If omitted, the route picks the earliest-due target.",
+        },
+        reason: {
+          type: 'string',
+          description:
+            'Short Rosa-voiced explanation of why this tracker fits the user, shown on the confirm card. Plain English.',
+        },
+      },
+      required: ['tracker_id'],
+    },
+  },
+  {
     name: 'propose_set_target',
     description:
       "Propose creating a new sustainability target (e.g. 'cut Scope 1+2 by 30% by 2030'). Writes to sustainability_targets after user confirmation. Pair baseline with target so progress is measurable.",
@@ -399,6 +440,139 @@ export const ROSA_TOOLS: ToolDefinition[] = [
         notes: { type: 'string', description: 'Optional notes.' },
       },
       required: ['name'],
+    },
+  },
+  {
+    name: 'propose_approve_exception',
+    description:
+      "Propose approving an item from the agent queue (a parsed bill, supplier impact, etc. waiting the user's sign-off). Stages a pending action; the user clicks Confirm to actually write the underlying entries. Use after `list_recent_anomalies` or when the user says things like 'approve those bills' or 'sign off on the queue'.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        exception_id: {
+          type: 'string',
+          description: 'The agent_exceptions.id to approve.',
+        },
+        facility_id: {
+          type: 'string',
+          description: 'For utility/water/waste bills: the facility the entries belong to. Use the suggested_facility_id from the exception if there is one.',
+        },
+      },
+      required: ['exception_id'],
+    },
+  },
+  {
+    name: 'propose_reject_exception',
+    description:
+      'Propose rejecting an item from the agent queue. Stages a pending action; the user must click Confirm to actually mark it rejected. Use when the user says "reject", "not relevant", "wrong facility", etc.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        exception_id: { type: 'string', description: 'The agent_exceptions.id to reject.' },
+        reason: { type: 'string', description: 'Optional one-line reason recorded on the row.' },
+      },
+      required: ['exception_id'],
+    },
+  },
+  {
+    name: 'propose_match_emission_factor',
+    description:
+      "Propose applying a confirmed emission factor to a recipe ingredient. Use after the user picks (or you've recommended) a specific factor by name and source for a single ingredient. Stages a pending action; the user clicks Confirm to write it.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        ingredient_id: { type: 'string', description: 'The recipe_ingredients.id to update.' },
+        factor_name: {
+          type: 'string',
+          description: "The matched factor's name as recorded by the source (e.g. 'sugar, refined' from Agribalyse).",
+        },
+        factor_source: {
+          type: 'string',
+          enum: ['ecoinvent', 'agribalyse', 'defra', 'platform'],
+          description: 'Which library the factor comes from.',
+        },
+        justification: {
+          type: 'string',
+          description: 'One short sentence the user will see, explaining why this factor.',
+        },
+      },
+      required: ['ingredient_id', 'factor_name', 'factor_source', 'justification'],
+    },
+  },
+  {
+    name: 'propose_apply_proxy',
+    description:
+      "Propose applying a proxy emission factor (closest reasonable match) to an ingredient that has no direct factor. Stages a pending action; the user clicks Confirm. Use when there is no exact match and you've identified a reasonable proxy with a confidence level.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        ingredient_id: { type: 'string', description: 'The recipe_ingredients.id to update.' },
+        proxy_factor_name: {
+          type: 'string',
+          description: "Name of the proxy factor (e.g. 'sugar, refined' as a proxy for maple syrup).",
+        },
+        proxy_factor_source: {
+          type: 'string',
+          enum: ['ecoinvent', 'agribalyse', 'defra', 'platform'],
+          description: 'Which library the proxy factor comes from.',
+        },
+        confidence_pct: {
+          type: 'number',
+          description: 'Estimated confidence (0-100) that this proxy is reasonable for this ingredient.',
+        },
+        justification: {
+          type: 'string',
+          description: 'One short sentence explaining why this proxy is appropriate.',
+        },
+      },
+      required: ['ingredient_id', 'proxy_factor_name', 'proxy_factor_source', 'confidence_pct', 'justification'],
+    },
+  },
+  {
+    name: 'propose_create_lca_draft',
+    description:
+      "Propose creating a draft LCA for a product so the user has somewhere to start the wizard. Stages a pending action; the user clicks Confirm to actually create the draft.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        product_id: { type: 'string', description: 'The products.id to create an LCA for.' },
+        system_boundary: {
+          type: 'string',
+          enum: ['cradle-to-gate', 'cradle-to-grave', 'gate-to-gate'],
+          description: 'Default system boundary; the user can change it in the wizard.',
+        },
+      },
+      required: ['product_id'],
+    },
+  },
+  {
+    name: 'propose_dismiss_anomaly',
+    description:
+      "Propose dismissing a flagged anomaly when it's an explainable one-off rather than a real problem. Stages a pending action; the user clicks Confirm to mark it dismissed.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        anomaly_id: { type: 'string', description: 'The dashboard_anomalies.id to dismiss.' },
+        reason: { type: 'string', description: 'One short sentence recorded on the row.' },
+      },
+      required: ['anomaly_id', 'reason'],
+    },
+  },
+  {
+    name: 'generate_export',
+    description:
+      "Generates a CSV the user can download from inside the chat. Use when they ask for a list, a CSV, a download, or to send something to a colleague. Read-only, no side effects: returns a download URL the chat renders as a clickable chip. Pick the kind that fits the user's question.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        kind: {
+          type: 'string',
+          enum: ['products_without_lca', 'unmatched_ingredients', 'recent_approvals'],
+          description:
+            "What to export. 'products_without_lca' = list of products lacking a completed LCA. 'unmatched_ingredients' = recipe ingredients without an emission factor matched. 'recent_approvals' = items approved in the agent queue in the last 30 days.",
+        },
+      },
+      required: ['kind'],
     },
   },
 ];
@@ -469,9 +643,18 @@ export async function executeTool(
       case 'propose_log_utility_entry':
       case 'propose_set_target':
       case 'propose_add_supplier':
+      case 'propose_approve_exception':
+      case 'propose_reject_exception':
+      case 'propose_match_emission_factor':
+      case 'propose_apply_proxy':
+      case 'propose_create_lca_draft':
+      case 'propose_dismiss_anomaly':
+      case 'propose_set_progress_tracker':
         return await toolProposeAction(ctx, name as ActionToolName, input as Record<string, unknown>);
       case 'extract_from_document':
         return await toolExtractFromDocument(ctx, input as { file_id: string; fields?: string[]; document_kind?: string });
+      case 'generate_export':
+        return await toolGenerateExport(ctx, input as { kind: 'products_without_lca' | 'unmatched_ingredients' | 'recent_approvals' });
       default:
         return {
           is_error: true,
@@ -1261,6 +1444,29 @@ function buildActionPreview(toolName: ActionToolName, p: Record<string, unknown>
     case 'propose_add_supplier': {
       return `Add supplier "${p.name}"${p.country ? ` (${p.country})` : ''}${p.contact_email ? `, contact ${p.contact_email}` : ''}.`;
     }
+    case 'propose_approve_exception': {
+      return `Approve queue item ${String(p.exception_id).slice(0, 8)} and write the underlying entries${p.facility_id ? ` to facility ${String(p.facility_id).slice(0, 8)}` : ''}.`;
+    }
+    case 'propose_reject_exception': {
+      return `Reject queue item ${String(p.exception_id).slice(0, 8)}${p.reason ? ` (reason: ${String(p.reason)})` : ''}.`;
+    }
+    case 'propose_match_emission_factor': {
+      return `Apply factor "${p.factor_name}" (${p.factor_source}) to this ingredient. ${p.justification}`;
+    }
+    case 'propose_apply_proxy': {
+      return `Use "${p.proxy_factor_name}" (${p.proxy_factor_source}) as a proxy for this ingredient at ${p.confidence_pct}% confidence. ${p.justification}`;
+    }
+    case 'propose_create_lca_draft': {
+      return `Start a draft LCA for this product${p.system_boundary ? ` with boundary ${p.system_boundary}` : ''}.`;
+    }
+    case 'propose_dismiss_anomaly': {
+      return `Dismiss anomaly ${String(p.anomaly_id).slice(0, 8)} (reason: ${p.reason}).`;
+    }
+    case 'propose_set_progress_tracker': {
+      const id = String(p.tracker_id);
+      const reason = p.reason ? ` Reason: ${p.reason}` : '';
+      return `Set the user's hub progress tracker to "${id}".${reason}`;
+    }
     default:
       return `Perform action: ${toolName}`;
   }
@@ -1345,11 +1551,65 @@ async function toolExtractFromDocument(
   };
 }
 
+// ─── Exports (read-only deliverables) ────────────────────────────────────────
+
+const EXPORT_KIND_LABELS: Record<string, string> = {
+  products_without_lca: 'Products without a completed LCA',
+  unmatched_ingredients: 'Recipe ingredients without an emission factor',
+  recent_approvals: 'Items I approved in the last 30 days',
+};
+
+/**
+ * Wraps the `/api/rosa/exports` endpoint and returns a tool_preview the
+ * client renders as an inline download chip. No side effects: the actual
+ * data is fetched lazily by the user's browser when they click the chip,
+ * scoped to the same auth + org as the rest of their session.
+ */
+async function toolGenerateExport(
+  ctx: ToolContext,
+  input: { kind: 'products_without_lca' | 'unmatched_ingredients' | 'recent_approvals' },
+): Promise<ToolResult> {
+  const kind = input?.kind;
+  if (!kind || !(kind in EXPORT_KIND_LABELS)) {
+    return {
+      is_error: true,
+      content: `Unknown export kind. Valid: ${Object.keys(EXPORT_KIND_LABELS).join(', ')}`,
+      audit: { tool: 'generate_export', error: 'unknown_kind' },
+    };
+  }
+  const url = `/api/rosa/exports?kind=${encodeURIComponent(kind)}&format=csv`;
+  const filename = `${kind.replace(/_/g, '-')}-${new Date().toISOString().slice(0, 10)}.csv`;
+  // The SSE pipeline emits tool_preview on tool_result events; the
+  // useRosaConversation hook picks up download_url and renders an
+  // attachment chip under the assistant turn.
+  const preview = {
+    download_url: url,
+    filename,
+    expires_at: null,
+    label: EXPORT_KIND_LABELS[kind],
+  };
+  return {
+    is_error: false,
+    content: JSON.stringify({
+      preview,
+      message: `Prepared a CSV: ${EXPORT_KIND_LABELS[kind]}.`,
+    }),
+    audit: { tool: 'generate_export', kind, url },
+  };
+}
+
 function validateActionInput(toolName: ActionToolName, input: Record<string, unknown>): string[] {
   const required: Record<ActionToolName, string[]> = {
     propose_log_utility_entry: ['facility_id', 'utility_type', 'quantity', 'unit', 'reporting_period_start', 'reporting_period_end'],
     propose_set_target: ['metric_key', 'baseline_value', 'baseline_date', 'target_value', 'target_date'],
     propose_add_supplier: ['name'],
+    propose_approve_exception: ['exception_id'],
+    propose_reject_exception: ['exception_id'],
+    propose_match_emission_factor: ['ingredient_id', 'factor_name', 'factor_source', 'justification'],
+    propose_apply_proxy: ['ingredient_id', 'proxy_factor_name', 'proxy_factor_source', 'confidence_pct', 'justification'],
+    propose_create_lca_draft: ['product_id'],
+    propose_dismiss_anomaly: ['anomaly_id', 'reason'],
+    propose_set_progress_tracker: ['tracker_id'],
   };
   const missing: string[] = [];
   for (const f of required[toolName]) {

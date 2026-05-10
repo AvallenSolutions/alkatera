@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Loader2, Target as TargetIcon, Trash2 } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
+import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -107,6 +108,29 @@ export default function TargetsPage() {
       setTargetValue(String(newTarget));
     }
   }
+
+  const rosaSlice = useMemo(
+    () => ({
+      id: 'sustainability-targets',
+      label: 'Sustainability targets',
+      priority: 8,
+      data: {
+        targetCount: targets.length,
+        targets: targets.map(t => ({
+          id: t.id,
+          metricKey: t.metric_key,
+          baselineValue: t.baseline_value,
+          baselineDate: t.baseline_date,
+          targetValue: t.target_value,
+          targetDate: t.target_date,
+        })),
+        availablePresets: PRESETS.map(p => p.label),
+        formMetricKey: metricKey,
+      },
+    }),
+    [targets, metricKey],
+  );
+  useRosaPageContext(rosaSlice);
 
   return (
     <div className="space-y-6">

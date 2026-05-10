@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { useRosaPageContext } from "@/lib/rosa/RosaContextProvider";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -123,6 +124,45 @@ export default function FacilityDetailPage() {
   const [editSaving, setEditSaving] = useState(false);
   const [sourcingDialogOpen, setSourcingDialogOpen] = useState(false);
   const [proxyAllocations, setProxyAllocations] = useState<ProxyAllocation[]>([]);
+
+  // Tell Rosa about this facility so questions like "is the data quality
+  // good enough for CSRD?" or "what's missing for this site?" can be
+  // answered without the user having to copy-paste anything.
+  const rosaSlice = useMemo(() => {
+    if (!facility) return null;
+    return {
+      id: 'facility-detail',
+      label: `Facility: ${facility.name}`,
+      priority: 9,
+      data: {
+        facility: {
+          id: facility.id,
+          name: facility.name,
+          functions: facility.functions,
+          operational_control: facility.operational_control,
+          location: [facility.address_city, facility.address_country].filter(Boolean).join(', '),
+          country: facility.address_country,
+          data_collection_mode: facility.default_data_collection_mode ?? null,
+          archetype: archetype ? { display_name: archetype.display_name, source_citation: archetype.source_citation } : null,
+        },
+        active_tab: activeTab,
+        data_contracts: dataContracts.map(c => ({
+          utility_type: c.utility_type,
+          frequency: c.frequency,
+          data_quality: c.data_quality,
+        })),
+        utility_entry_count: utilityData.length,
+        water_entry_count: waterData.length,
+        waste_entry_count: wasteData.length,
+        proxy_allocations_count: proxyAllocations.length,
+        notes: facility.default_data_collection_mode === 'archetype_proxy'
+          ? 'This facility uses an archetype proxy for emissions data; consider when accuracy matters.'
+          : 'This facility records primary data.',
+      },
+    };
+  }, [facility, archetype, activeTab, dataContracts, utilityData, waterData, wasteData, proxyAllocations]);
+
+  useRosaPageContext(rosaSlice);
 
   const loadFacilityData = useCallback(async () => {
     try {

@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Droplets, Info, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
+import { AgentBanner } from "@/components/agents/AgentBanner";
 
 interface WaterDataEntryProps {
   facilityId: string;
@@ -225,6 +226,8 @@ export function WaterDataEntry({
   };
 
   return (
+    <>
+    <AgentBanner kinds={['water_bill']} formName="water bills" />
     <Card>
       <CardHeader>
         <div className="flex items-center gap-2">
@@ -546,5 +549,6 @@ export function WaterDataEntry({
         </form>
       </CardContent>
     </Card>
+    </>
   );
 }

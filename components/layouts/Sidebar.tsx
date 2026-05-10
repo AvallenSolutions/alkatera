@@ -101,9 +101,9 @@ const navigationStructure: NavItem[] = [
   // ─── WORK ───────────────────────────────────────────────────────────────
   { type: 'divider', name: 'WORK', href: '' },
   {
-    name: 'Dashboard',
-    href: '/dashboard/',
-    icon: LayoutDashboard,
+    name: 'Rosa',
+    href: '/rosa/',
+    icon: Dog,
     minTier: 1,
   },
   {
@@ -254,12 +254,6 @@ const navigationStructure: NavItem[] = [
 
   // ─── WORKSPACE ──────────────────────────────────────────────────────────
   { type: 'divider', name: 'WORKSPACE', href: '' },
-  {
-    name: 'Rosa',
-    href: '/rosa/',
-    icon: Dog,
-    minTier: 2,
-  },
   {
     name: 'Resources',
     href: '/knowledge-bank/',

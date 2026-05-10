@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider'
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -142,6 +143,53 @@ export default function SupplierEsgAssessmentPage() {
   const answeredQuestions = ESG_QUESTIONS.filter((q) => answers[q.id] != null).length
   const completionPercent = totalQuestions > 0 ? Math.round((answeredQuestions / totalQuestions) * 100) : 0
   const totalEvidenceFiles = Object.values(evidenceByQuestion).reduce((sum, items) => sum + items.length, 0)
+
+  const pendingSections = useMemo(
+    () =>
+      ESG_SECTIONS.filter((s) => {
+        const qs = getQuestionsBySection(s.key)
+        return qs.some((q) => answers[q.id] == null)
+      }).map((s) => s.key),
+    [answers],
+  )
+
+  const rosaSlice = useMemo(
+    () =>
+      supplierId
+        ? {
+            id: 'supplier-esg-assessment',
+            label: 'Supplier portal — ESG self-assessment',
+            priority: 8,
+            data: {
+              supplierId,
+              assessmentId: assessment?.id ?? null,
+              completionPercent,
+              answeredQuestions,
+              totalQuestions,
+              completedSections,
+              pendingSections,
+              evidenceFiles: totalEvidenceFiles,
+              submitted: isSubmitted,
+              verified: isVerified,
+              hasCommodityProducts,
+            },
+          }
+        : null,
+    [
+      supplierId,
+      assessment?.id,
+      completionPercent,
+      answeredQuestions,
+      totalQuestions,
+      completedSections,
+      pendingSections,
+      totalEvidenceFiles,
+      isSubmitted,
+      isVerified,
+      hasCommodityProducts,
+    ],
+  )
+  useRosaPageContext(rosaSlice)
 
   if (loadingSupplier || loading) {
     return <PageLoader message="Loading ESG assessment..." />

@@ -20,6 +20,27 @@ export interface IndustryBenchmark {
 }
 
 /**
+ * Water-use benchmarks expressed as litres of water per litre of product.
+ * BIER 2023 reports operational water-use ratios for spirits, beer, wine, RTD
+ * and non-alc; we use those mid-range figures and override for sub-categories
+ * where stronger data exists (e.g. Scotch whisky's higher distillation ratio).
+ *
+ * "Water" here means withdrawal — what comes out of the tap to make the
+ * product. The score uses these as the per-litre denominator when scaled by
+ * `unit_size_l` to reach a per-unit benchmark, mirroring the carbon path.
+ */
+export interface WaterBenchmark {
+  /** Litres of water withdrawn per litre of product (operational + embedded). */
+  litresPerLitre: number;
+  /** Human-readable source name */
+  sourceName: string;
+  /** Clickable URL to the source document */
+  sourceUrl: string;
+  /** Year the data was published */
+  sourceYear: number;
+}
+
+/**
  * Maps product category groups (from product-categories.ts) to benchmark data.
  * Individual categories within a group share the same benchmark unless overridden.
  */
@@ -120,6 +141,74 @@ const DEFAULT_BENCHMARK: IndustryBenchmark = {
   sourceYear: 2023,
 };
 
+/**
+ * Water-use benchmarks per category group. Mid-range withdrawal ratios from
+ * the BIER 2023 benchmarking study, with category overrides where the
+ * literature publishes a tighter figure (e.g. Scotch whisky distilleries).
+ */
+const WATER_GROUP_BENCHMARKS: Record<string, WaterBenchmark> = {
+  Spirits: {
+    litresPerLitre: 30,
+    sourceName: 'BIER 2023 Benchmarking Study',
+    sourceUrl: 'https://www.bieroundtable.com/news/bier-issues-results-2023-water-energy-ghg-benchmarking-study/',
+    sourceYear: 2023,
+  },
+  'Beer & Cider': {
+    litresPerLitre: 5,
+    sourceName: 'BIER 2023 Benchmarking Study',
+    sourceUrl: 'https://www.bieroundtable.com/news/bier-issues-results-2023-water-energy-ghg-benchmarking-study/',
+    sourceYear: 2023,
+  },
+  Wine: {
+    litresPerLitre: 5,
+    sourceName: 'BIER 2023 Benchmarking Study',
+    sourceUrl: 'https://www.bieroundtable.com/news/bier-issues-results-2023-water-energy-ghg-benchmarking-study/',
+    sourceYear: 2023,
+  },
+  'Ready-to-Drink & Cocktails': {
+    litresPerLitre: 3,
+    sourceName: 'BIER 2023 Benchmarking Study',
+    sourceUrl: 'https://www.bieroundtable.com/news/bier-issues-results-2023-water-energy-ghg-benchmarking-study/',
+    sourceYear: 2023,
+  },
+  'Non-Alcoholic': {
+    litresPerLitre: 2.5,
+    sourceName: 'BIER 2023 Benchmarking Study',
+    sourceUrl: 'https://www.bieroundtable.com/news/bier-issues-results-2023-water-energy-ghg-benchmarking-study/',
+    sourceYear: 2023,
+  },
+};
+
+/** Category-level water overrides where category-specific data is stronger. */
+const WATER_CATEGORY_OVERRIDES: Record<string, WaterBenchmark> = {
+  Whisky: {
+    litresPerLitre: 50,
+    sourceName: 'Scotch Whisky Association / BIER',
+    sourceUrl: 'https://www.scotch-whisky.org.uk/insights/topics/sustainability/',
+    sourceYear: 2023,
+  },
+  Bourbon: {
+    litresPerLitre: 50,
+    sourceName: 'Scotch Whisky Association / BIER',
+    sourceUrl: 'https://www.scotch-whisky.org.uk/insights/topics/sustainability/',
+    sourceYear: 2023,
+  },
+  'Rye Whiskey': {
+    litresPerLitre: 50,
+    sourceName: 'Scotch Whisky Association / BIER',
+    sourceUrl: 'https://www.scotch-whisky.org.uk/insights/topics/sustainability/',
+    sourceYear: 2023,
+  },
+};
+
+/** Default water benchmark used when no category is available. */
+const DEFAULT_WATER_BENCHMARK: WaterBenchmark = {
+  litresPerLitre: 4,
+  sourceName: 'BIER Beverage Industry Average',
+  sourceUrl: 'https://www.bieroundtable.com/work/benchmarking/',
+  sourceYear: 2023,
+};
+
 // Import-free mapping: maps category values to their group name.
 // This mirrors the groups defined in product-categories.ts.
 const CATEGORY_TO_GROUP: Record<string, string> = {
@@ -173,6 +262,55 @@ export function getBenchmarkForCategory(category: string | null | undefined): In
   if (group && GROUP_BENCHMARKS[group]) return GROUP_BENCHMARKS[group];
 
   return DEFAULT_BENCHMARK;
+}
+
+/**
+ * Water benchmark lookup for a given product category. Mirrors the carbon
+ * lookup: category override → group benchmark → default. Uses BIER 2023
+ * mid-range water-use ratios.
+ */
+export function getWaterBenchmarkForCategory(
+  category: string | null | undefined,
+): WaterBenchmark {
+  if (!category) return DEFAULT_WATER_BENCHMARK;
+  if (WATER_CATEGORY_OVERRIDES[category]) return WATER_CATEGORY_OVERRIDES[category];
+  const group = CATEGORY_TO_GROUP[category];
+  if (group && WATER_GROUP_BENCHMARKS[group]) return WATER_GROUP_BENCHMARKS[group];
+  return DEFAULT_WATER_BENCHMARK;
+}
+
+/**
+ * Water benchmark lookup by org product type (with category fallback to
+ * pick the dominant). Same shape as `getBenchmarkForProductType` for carbon.
+ */
+export function getWaterBenchmarkForProductType(
+  productType: string | null | undefined,
+  productCategories?: (string | null | undefined)[],
+): { benchmark: WaterBenchmark; dominantCategory: string | null } {
+  if (productType && WATER_GROUP_BENCHMARKS[productType]) {
+    return { benchmark: WATER_GROUP_BENCHMARKS[productType], dominantCategory: productType };
+  }
+  if (productCategories && productCategories.length > 0) {
+    const filtered = productCategories.filter((c): c is string => !!c);
+    if (filtered.length === 0) {
+      return { benchmark: DEFAULT_WATER_BENCHMARK, dominantCategory: null };
+    }
+    const counts: Record<string, number> = {};
+    for (const cat of filtered) counts[cat] = (counts[cat] || 0) + 1;
+    let dominant = filtered[0];
+    let maxCount = 0;
+    for (const [cat, count] of Object.entries(counts)) {
+      if (count > maxCount) {
+        maxCount = count;
+        dominant = cat;
+      }
+    }
+    return {
+      benchmark: getWaterBenchmarkForCategory(dominant),
+      dominantCategory: dominant,
+    };
+  }
+  return { benchmark: DEFAULT_WATER_BENCHMARK, dominantCategory: null };
 }
 
 /**

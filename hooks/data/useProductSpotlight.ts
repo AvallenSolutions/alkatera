@@ -118,5 +118,5 @@ export function useProductSpotlight() {
     fetchProducts();
   }, [fetchProducts]);
 
-  return { products, loading, error };
+  return { products, loading, error, refetch: fetchProducts };
 }

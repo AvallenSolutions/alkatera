@@ -43,9 +43,11 @@ import type {
   WasteDetail,
 } from '@/hooks/data/useScope3GranularData';
 
-import { VitalityScoreHero, calculateVitalityScores } from '@/components/vitality/VitalityScoreHero';
+import { calculateVitalityScores } from '@/components/vitality/VitalityScoreHero';
+import { EsgVitalityScoreHero } from '@/components/vitality/EsgVitalityScoreHero';
 import { getBenchmarkForProductType } from '@/lib/industry-benchmarks';
 import { fetchProducts } from '@/lib/products';
+import type { ClimateScoreBreakdown, WaterScoreBreakdown } from '@/lib/vitality/environmental';
 import { PillarCard, PillarGrid, PerformanceSummary } from '@/components/vitality/PillarCard';
 import { CarbonDeepDive } from '@/components/vitality/CarbonDeepDive';
 import { WaterDeepDive } from '@/components/vitality/WaterDeepDive';
@@ -513,24 +515,41 @@ export default function PerformancePage() {
     [currentOrganization?.product_type, productCategories]
   );
 
-  const estimatedLitresPerProduct = 50000;
-  const industryBenchmarkTotal = industryBenchmarkData.kgCO2ePerLitre * estimatedLitresPerProduct
-    * (metrics?.total_products_assessed || 1);
+  // Climate + water scores now come from the same /api/vitality/composite
+  // endpoint that /rosa/ uses, so the two surfaces always agree. Each
+  // breakdown carries intensity / YoY sub-scores + blend weights and (for
+  // water) the AWARE scarcity context — fed into the score explainer below
+  // for full transparency to the user.
+  const [climateBreakdown, setClimateBreakdown] = useState<ClimateScoreBreakdown | null>(null);
+  const [waterBreakdown, setWaterBreakdown] = useState<WaterScoreBreakdown | null>(null);
+  useEffect(() => {
+    if (!currentOrganization?.id) return;
+    let cancelled = false;
+    fetch('/api/vitality/composite', { credentials: 'include' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(json => {
+        if (cancelled) return;
+        setClimateBreakdown(json?.composite?.e?.climate_breakdown ?? null);
+        setWaterBreakdown(json?.composite?.e?.water_breakdown ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [currentOrganization?.id]);
 
   const vitalityScores = useMemo(() => {
-    const numProducts = metrics?.total_products_assessed || 1;
     // Check if we have actual product data (not just zeros)
     const hasProductData = metrics?.total_products_assessed !== undefined &&
                            metrics.total_products_assessed > 0;
     // Check if we have actual waste data
     const hasWasteData = wasteMetrics !== null && wasteMetrics !== undefined;
 
-    return calculateVitalityScores({
-      totalEmissions: totalCO2,
-      emissionsIntensity: totalCO2 / numProducts,
-      industryBenchmark: industryBenchmarkTotal / numProducts,
-      waterConsumption,
-      waterRiskLevel: metrics?.water_risk_level as 'high' | 'medium' | 'low' | undefined,
+    // Climate + water are intentionally NOT passed to the local calculator —
+    // they now come from /api/vitality/composite (blended intensity + YoY)
+    // so /rosa/ and /performance/ agree on the score. We override
+    // `.climate` and `.water` below.
+    const local = calculateVitalityScores({
       recyclingRate: wasteMetrics?.circularity_rate,
       circularityRate: circularityRate,
       landUseIntensity: landUse,
@@ -538,18 +557,21 @@ export default function PerformancePage() {
       hasProductData,
       hasWasteData,
     });
-  }, [totalCO2, waterConsumption, metrics, wasteMetrics, circularityRate, landUse, natureMetrics, industryBenchmarkTotal]);
-
-  const emissionsIntensity = totalCO2 / (metrics?.total_products_assessed || 1);
-  const industryBenchmarkPerProduct = industryBenchmarkTotal / (metrics?.total_products_assessed || 1);
-  const intensityRatio = industryBenchmarkPerProduct > 0 ? emissionsIntensity / industryBenchmarkPerProduct : 0;
+    return {
+      ...local,
+      climate: climateBreakdown?.score ?? null,
+      water: waterBreakdown?.score ?? null,
+    };
+  }, [metrics, wasteMetrics, circularityRate, landUse, natureMetrics, climateBreakdown, waterBreakdown]);
 
   const scoreCalculationInputs = useMemo(() => ({
     climate: {
+      // Old per-LCA-count fields kept for the explainer's existing layout
+      // until the climate explainer UI is refreshed for the breakdown.
       totalEmissions: totalCO2,
-      emissionsIntensity,
-      industryBenchmark: industryBenchmarkPerProduct,
-      intensityRatio,
+      // Blended-climate fields. The ScoreExplainer climate section renders
+      // these when present (intensity sub, YoY sub, blend mode + weights).
+      climateBreakdown,
       benchmarkSource: {
         name: industryBenchmarkData.sourceName,
         url: industryBenchmarkData.sourceUrl,
@@ -558,8 +580,13 @@ export default function PerformancePage() {
       },
     },
     water: {
+      // Legacy fields kept for any caller still on the old explainer path.
       waterRiskLevel: metrics?.water_risk_level as 'high' | 'medium' | 'low' | undefined,
       waterConsumption,
+      // Blended-water breakdown. The ScoreExplainer water section renders
+      // these when present (intensity sub, YoY sub, blend mode + weights,
+      // scarcity context).
+      waterBreakdown,
     },
     circularity: {
       circularityRate,
@@ -568,7 +595,7 @@ export default function PerformancePage() {
       biodiversityRisk: deriveBiodiversityRisk(natureMetrics),
       landUse,
     },
-  }), [totalCO2, emissionsIntensity, industryBenchmarkPerProduct, intensityRatio, metrics, waterConsumption, circularityRate, natureMetrics, landUse, industryBenchmarkData, dominantCategory]);
+  }), [totalCO2, climateBreakdown, waterBreakdown, metrics, waterConsumption, circularityRate, natureMetrics, landUse, industryBenchmarkData, dominantCategory]);
 
   const { strengths, improvements } = useMemo(() => {
     return generateStrengthsAndImprovements(
@@ -655,23 +682,11 @@ export default function PerformancePage() {
 
   return (
     <div className="space-y-6 animate-fade-in-up">
-      {/* Hero Section - Vitality Score */}
-      <VitalityScoreHero
-        overallScore={vitalityScores.overall}
-        climateScore={vitalityScores.climate}
-        waterScore={vitalityScores.water}
-        circularityScore={vitalityScores.circularity}
-        natureScore={vitalityScores.nature}
-        hasData={vitalityScores.hasData}
-        benchmarkData={getBenchmarkForPillar('overall')}
-        lastUpdated={metrics?.last_updated
-          ? new Date(metrics.last_updated).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-          : undefined
-        }
-        onRefresh={refetch}
-        loading={loading}
-        calculationInputs={scoreCalculationInputs}
-      />
+      {/* ESG composite hero — composes E + S + G with configurable weights.
+          Replaces the legacy environmental-only VitalityScoreHero. The
+          deep environmental pillar deep-dives still live further down the
+          page (Carbon / Water / Circularity / Nature DeepDive sections). */}
+      <EsgVitalityScoreHero />
 
       {/* Action Bar */}
       <div className="flex items-center justify-between">
