@@ -1048,6 +1048,595 @@ export function computeCircularityScore(args: {
   }
 }
 
+// -----------------------------------------------------------------------------
+// Nature scoring
+// -----------------------------------------------------------------------------
+
+/**
+ * Blended Nature sub-score using EU Environmental Footprint 3.1 methodology.
+ *
+ * Weights and normalisation factors come from the JRC Technical Report
+ * (Sala et al., 2021, DOI 10.2760/14875) — the EU's official PEF
+ * methodology, recognised by TNFD as a quantitative pressure framework.
+ *
+ * Four axes, each scored 0-100 against the calibrated thresholds in
+ * NATURE_PERFORMANCE_THRESHOLDS, then weighted-averaged using EF 3.1
+ * weights re-normalised to sum to 1.0 within the nature pillar:
+ *
+ *   Land Use:                 7.94% / 18.82% = 42.2%
+ *   Terrestrial Acidification: 6.21% / 18.82% = 33.0%
+ *   Freshwater Eutrophication: 2.80% / 18.82% = 14.9%
+ *   Terrestrial Ecotoxicity:   1.87% / 18.82% =  9.9%
+ *
+ * Acidification weighting under EF 3.1 captures non-biodiversity damage
+ * (forest dieback, soil chemistry, building corrosion, respiratory health
+ * via SO₂/NOx precursors) — that's why it scores higher than pure
+ * biodiversity-loss framing would suggest.
+ *
+ * YoY is optional with weight redistribution — nature LCA impacts shift
+ * slowly (tied to ingredient sourcing) so a flat year shouldn't penalise.
+ */
+export type NatureScoreMode =
+  | 'blended'
+  | 'practices_only'
+  | 'yoy_only'
+  | 'positive_only'
+  | 'no_data'
+
+export interface NatureScoreBreakdown {
+  /** 0-100 final blended score, or null when no inputs are available. */
+  score: number | null
+  /** Per-axis sub-scores (each 0-100). Null when the axis has no data. */
+  axes: {
+    land_use_sub: number | null
+    terrestrial_acidification_sub: number | null
+    freshwater_eutrophication_sub: number | null
+    terrestrial_ecotoxicity_sub: number | null
+  }
+  /** Per-axis raw per-unit values (kept for the explainer popover). */
+  per_unit: {
+    land_use: number | null
+    terrestrial_acidification: number | null
+    freshwater_eutrophication: number | null
+    terrestrial_ecotoxicity: number | null
+  }
+  /** EF 3.1 weighted practices sub-score (0-100). */
+  practices_sub: number | null
+  /** YoY sub-score (0-100). Null when prior-year data is absent. */
+  yoy_sub: number | null
+  /**
+   * Nature-positive sub-score (0-100) from declared restoration / habitat
+   * creation hectares per unit produced, type-weighted. Null when no
+   * nature_actions data is available. When non-null, takes 20% of the
+   * blend (practices 50%, yoy 30%, positive 20%); redistributes when any
+   * axis is missing.
+   */
+  nature_positive_sub: number | null
+  /** Total effective hectares (hectares × type weight) backing the positive sub-score. */
+  effective_hectares: number | null
+  /**
+   * V2-b — country biodiversity context applied to the land_use sub-score.
+   * The multiplier is a mass-weighted average across material origins,
+   * sourced from the country_biodiversity_factors table (Conservation
+   * International hotspots). 1.0 means no penalty/bonus; >1 means a
+   * biodiversity-hotspot-heavy supply chain. The land_use per-unit value
+   * is multiplied by this *before* banding against EF 3.1 thresholds.
+   * Null when no material origin data is available.
+   */
+  country_biodiversity_multiplier: number | null
+  /** Country breakdown for the explainer popover. */
+  country_mix: Array<{
+    country_code: string
+    country_name: string
+    share_pct: number
+    multiplier: number
+    hotspot_names: string[] | null
+  }> | null
+  /**
+   * V2-c — TNFD/ENCORE dependency disclosure score (0-100). Rewards
+   * coverage of drinks-material ecosystem services (freshwater, soil,
+   * climate, pollination, etc.) plus depth of analysis for high/critical
+   * dependencies. Null when no dependencies declared.
+   *
+   * Applied as a small modifier on the core score: final = 0.9 × core + 0.1 × deps_sub.
+   * (Scored disclosure quality, not volume — declaring 'low' on every
+   * box doesn't game it because the score weights *coverage of material
+   * dependencies*.)
+   */
+  dependencies_sub: number | null
+  /** Number of declared dependencies for the explainer chip. */
+  dependencies_declared_count: number | null
+  /** Mode that drove the score. */
+  mode: NatureScoreMode
+  /** Blend weights applied to whichever axes were present. */
+  weights: { practices: number; yoy: number; positive: number; dependencies: number }
+  /** EF 3.1 source citation surfaced in the UI for transparency. */
+  source: { name: string; doi: string }
+}
+
+const NATURE_PRACTICES_WEIGHT = 0.6
+const NATURE_YOY_WEIGHT = 0.4
+
+/**
+ * EF 3.1 nature category weights (Sala et al., 2021). These four sum to
+ * 18.82% of the full EF 3.1 single score; we re-normalise within the
+ * nature pillar so they sum to 1.0.
+ */
+const EF31_NATURE_WEIGHTS = {
+  land_use: 0.0794,
+  terrestrial_acidification: 0.0621,
+  freshwater_eutrophication: 0.028,
+  terrestrial_ecotoxicity: 0.0187,
+} as const
+const EF31_NATURE_WEIGHT_TOTAL =
+  EF31_NATURE_WEIGHTS.land_use +
+  EF31_NATURE_WEIGHTS.terrestrial_acidification +
+  EF31_NATURE_WEIGHTS.freshwater_eutrophication +
+  EF31_NATURE_WEIGHTS.terrestrial_ecotoxicity
+
+const NATURE_SOURCE = {
+  name: 'EU EF 3.1 (Sala et al., 2021)',
+  doi: 'https://doi.org/10.2760/14875',
+} as const
+
+/** Per-unit thresholds (excellent / good) per axis. Values copy the existing
+ * NATURE_PERFORMANCE_THRESHOLDS in lib/calculations/nature-biodiversity.ts
+ * to keep this file dependency-free for the test boundary. */
+const NATURE_AXIS_THRESHOLDS = {
+  land_use: { excellent: 500, good: 2000 }, // m²a/unit
+  terrestrial_acidification: { excellent: 1.5, good: 3.0 }, // kg SO₂/unit
+  freshwater_eutrophication: { excellent: 0.3, good: 0.7 }, // kg P eq/unit
+  terrestrial_ecotoxicity: { excellent: 5, good: 15 }, // kg 1,4-DCB/unit
+} as const
+
+/**
+ * YoY anchors for nature: lenient like water, since shifting an LCA
+ * footprint year-on-year is structurally hard.
+ */
+const NATURE_YOY_ANCHORS: Array<[number, number]> = [
+  [-3, 100],
+  [-1, 90],
+  [0, 80],
+  [2, 60],
+  [5, 40],
+  [10, 20],
+  [20, 5],
+]
+
+/**
+ * Nature-positive sub-score anchors. Input is *effective square metres of
+ * restoration per unit produced* (hectares × type weight × 10,000 / units).
+ * Calibration:
+ *   0 m²/unit → 0  (no declared action)
+ *   1 m²/unit → 30 (token contribution)
+ *   5 m²/unit → 60 (meaningful contribution)
+ *   10 m²/unit → 80 (substantial — leading practice)
+ *   25 m²/unit → 95
+ *   50+ m²/unit → 100 (extraordinary — likely large multi-year restoration partnership)
+ *
+ * For context: a 700ml whisky with 5 m² of regen-ag per bottle implies
+ * the producer is sourcing from 5,000 m² (0.5 ha) per 1,000 bottles
+ * across the year. That's serious commitment.
+ *
+ * The conservative bottom anchor (0 → 0, not 5) means orgs without
+ * declared actions don't get a free baseline boost — the axis genuinely
+ * rewards declared, type-weighted restoration only.
+ */
+const NATURE_POSITIVE_ANCHORS: Array<[number, number]> = [
+  [0, 0],
+  [1, 30],
+  [5, 60],
+  [10, 80],
+  [25, 95],
+  [50, 100],
+]
+
+const NATURE_POSITIVE_BLEND_WEIGHT = 0.2 // 20% when present
+const NATURE_PRACTICES_WEIGHT_WITH_POSITIVE = 0.5
+const NATURE_YOY_WEIGHT_WITH_POSITIVE = 0.3
+
+/**
+ * Score one nature axis against its excellent/good thresholds.
+ * 0 → 100 (no impact), excellent → 90, good → 70, 2× good → 25, 4× good → 10.
+ */
+export function natureAxisSubScore(
+  perUnitValue: number,
+  thresholds: { excellent: number; good: number },
+): number {
+  if (!Number.isFinite(perUnitValue) || perUnitValue < 0) return 0
+  return Math.round(
+    interpolate(perUnitValue, [
+      [0, 100],
+      [thresholds.excellent, 90],
+      [thresholds.good, 70],
+      [thresholds.good * 2, 25],
+      [thresholds.good * 4, 10],
+    ]),
+  )
+}
+
+export function natureYoySubScore(deltaPct: number): number {
+  if (!Number.isFinite(deltaPct)) return 0
+  return Math.round(interpolate(deltaPct, NATURE_YOY_ANCHORS))
+}
+
+/**
+ * Score nature-positive contribution from effective m² per unit produced.
+ * Effective m² = hectares × type weight × 10,000.
+ */
+export function naturePositiveSubScore(effectiveSquareMetresPerUnit: number): number {
+  if (!Number.isFinite(effectiveSquareMetresPerUnit) || effectiveSquareMetresPerUnit < 0) {
+    return 0
+  }
+  return Math.round(interpolate(effectiveSquareMetresPerUnit, NATURE_POSITIVE_ANCHORS))
+}
+
+export function computeNatureScore(args: {
+  per_unit_impacts: {
+    land_use: number | null
+    terrestrial_acidification: number | null
+    freshwater_eutrophication: number | null
+    terrestrial_ecotoxicity: number | null
+  }
+  yoy_total_pct: number | null
+  /** Effective m² of restoration per unit produced (type-weighted). Null when no nature_actions data. */
+  effective_sq_m_per_unit?: number | null
+  /** Total effective hectares for transparency in the breakdown. Null when no actions. */
+  effective_hectares?: number | null
+  /**
+   * V2-b — mass-weighted country biodiversity multiplier applied to the
+   * land_use axis BEFORE banding. Default 1.0 (no adjustment). Pass null
+   * if no material origin data is available — the breakdown will reflect
+   * the absence transparently.
+   */
+  country_biodiversity_multiplier?: number | null
+  /** Country mix for the explainer popover. */
+  country_mix?: NatureScoreBreakdown['country_mix']
+  /**
+   * V2-c — precomputed dependencies sub-score (0-100) from
+   * `computeDependenciesSubScore`. Null when no declarations. Applied as
+   * a 10% modifier to the core blended score: final = 0.9 × core + 0.1 × deps.
+   */
+  dependencies_sub?: number | null
+  /** Number of dependency declarations for the breakdown chip. */
+  dependencies_declared_count?: number | null
+}): NatureScoreBreakdown {
+  const land = args.per_unit_impacts.land_use
+  const acid = args.per_unit_impacts.terrestrial_acidification
+  const eutr = args.per_unit_impacts.freshwater_eutrophication
+  const ecot = args.per_unit_impacts.terrestrial_ecotoxicity
+
+  // Apply country biodiversity multiplier to land_use only. Multiplier > 1
+  // makes the effective land use larger, lowering the sub-score against
+  // unchanged EF 3.1 thresholds. v3 will replace this country-level
+  // approximation with sub-country spatial lookup.
+  const countryMultiplier =
+    args.country_biodiversity_multiplier !== null &&
+    args.country_biodiversity_multiplier !== undefined &&
+    Number.isFinite(args.country_biodiversity_multiplier) &&
+    args.country_biodiversity_multiplier > 0
+      ? (args.country_biodiversity_multiplier as number)
+      : null
+  const effectiveLand =
+    land !== null && Number.isFinite(land) && countryMultiplier !== null
+      ? land * countryMultiplier
+      : land
+
+  const landSub =
+    effectiveLand !== null && Number.isFinite(effectiveLand)
+      ? natureAxisSubScore(effectiveLand, NATURE_AXIS_THRESHOLDS.land_use)
+      : null
+  const acidSub =
+    acid !== null && Number.isFinite(acid)
+      ? natureAxisSubScore(acid, NATURE_AXIS_THRESHOLDS.terrestrial_acidification)
+      : null
+  const eutrSub =
+    eutr !== null && Number.isFinite(eutr)
+      ? natureAxisSubScore(eutr, NATURE_AXIS_THRESHOLDS.freshwater_eutrophication)
+      : null
+  const ecotSub =
+    ecot !== null && Number.isFinite(ecot)
+      ? natureAxisSubScore(ecot, NATURE_AXIS_THRESHOLDS.terrestrial_ecotoxicity)
+      : null
+
+  // EF 3.1 weighted blend, redistributing weights across available axes.
+  let weightedSum = 0
+  let weightTotal = 0
+  if (landSub !== null) {
+    weightedSum += landSub * EF31_NATURE_WEIGHTS.land_use
+    weightTotal += EF31_NATURE_WEIGHTS.land_use
+  }
+  if (acidSub !== null) {
+    weightedSum += acidSub * EF31_NATURE_WEIGHTS.terrestrial_acidification
+    weightTotal += EF31_NATURE_WEIGHTS.terrestrial_acidification
+  }
+  if (eutrSub !== null) {
+    weightedSum += eutrSub * EF31_NATURE_WEIGHTS.freshwater_eutrophication
+    weightTotal += EF31_NATURE_WEIGHTS.freshwater_eutrophication
+  }
+  if (ecotSub !== null) {
+    weightedSum += ecotSub * EF31_NATURE_WEIGHTS.terrestrial_ecotoxicity
+    weightTotal += EF31_NATURE_WEIGHTS.terrestrial_ecotoxicity
+  }
+  const practicesSub =
+    weightTotal > 0 ? Math.round(weightedSum / weightTotal) : null
+
+  const yoySub =
+    args.yoy_total_pct !== null && Number.isFinite(args.yoy_total_pct)
+      ? natureYoySubScore(args.yoy_total_pct as number)
+      : null
+
+  const positiveSub =
+    args.effective_sq_m_per_unit !== null &&
+    args.effective_sq_m_per_unit !== undefined &&
+    Number.isFinite(args.effective_sq_m_per_unit)
+      ? naturePositiveSubScore(args.effective_sq_m_per_unit as number)
+      : null
+
+  const breakdown: Pick<
+    NatureScoreBreakdown,
+    'axes' | 'per_unit' | 'source' | 'effective_hectares' | 'country_biodiversity_multiplier' | 'country_mix'
+  > = {
+    axes: {
+      land_use_sub: landSub,
+      terrestrial_acidification_sub: acidSub,
+      freshwater_eutrophication_sub: eutrSub,
+      terrestrial_ecotoxicity_sub: ecotSub,
+    },
+    per_unit: {
+      land_use: land !== null && Number.isFinite(land) ? land : null,
+      terrestrial_acidification: acid !== null && Number.isFinite(acid) ? acid : null,
+      freshwater_eutrophication: eutr !== null && Number.isFinite(eutr) ? eutr : null,
+      terrestrial_ecotoxicity: ecot !== null && Number.isFinite(ecot) ? ecot : null,
+    },
+    source: NATURE_SOURCE,
+    effective_hectares:
+      args.effective_hectares !== null &&
+      args.effective_hectares !== undefined &&
+      Number.isFinite(args.effective_hectares)
+        ? (args.effective_hectares as number)
+        : null,
+    country_biodiversity_multiplier: countryMultiplier,
+    country_mix: args.country_mix ?? null,
+  }
+
+  // Generic weighted blend across whichever axes are present. Each axis
+  // declares a "presence weight" based on its base weight; we sum and
+  // normalise so the final score is on 0-100.
+  type AxisEntry = { sub: number; weight: number }
+  const entries: AxisEntry[] = []
+  const hasPositive = positiveSub !== null
+
+  // Practices base weight depends on whether positive is present.
+  const practicesBaseWeight = hasPositive
+    ? NATURE_PRACTICES_WEIGHT_WITH_POSITIVE
+    : NATURE_PRACTICES_WEIGHT
+  const yoyBaseWeight = hasPositive
+    ? NATURE_YOY_WEIGHT_WITH_POSITIVE
+    : NATURE_YOY_WEIGHT
+
+  if (practicesSub !== null) entries.push({ sub: practicesSub, weight: practicesBaseWeight })
+  if (yoySub !== null) entries.push({ sub: yoySub, weight: yoyBaseWeight })
+  if (positiveSub !== null) entries.push({ sub: positiveSub, weight: NATURE_POSITIVE_BLEND_WEIGHT })
+
+  // V2-c — dependency disclosure modifier. Applied AFTER the core blend
+  // because dependencies are a metadata signal, not an impact axis.
+  const depsSub =
+    args.dependencies_sub !== null &&
+    args.dependencies_sub !== undefined &&
+    Number.isFinite(args.dependencies_sub)
+      ? (args.dependencies_sub as number)
+      : null
+  const depsDeclaredCount =
+    args.dependencies_declared_count !== null &&
+    args.dependencies_declared_count !== undefined &&
+    Number.isFinite(args.dependencies_declared_count)
+      ? (args.dependencies_declared_count as number)
+      : null
+
+  if (entries.length === 0) {
+    // Edge case: only dependencies are declared (no LCAs, no actions, no YoY).
+    // Score the org on disclosure alone — better than 'no data'.
+    if (depsSub !== null) {
+      return {
+        ...breakdown,
+        score: Math.round(depsSub),
+        practices_sub: null,
+        yoy_sub: null,
+        nature_positive_sub: null,
+        dependencies_sub: depsSub,
+        dependencies_declared_count: depsDeclaredCount,
+        mode: 'positive_only', // re-use positive_only as the "non-LCA" label
+        weights: { practices: 0, yoy: 0, positive: 0, dependencies: 1 },
+      }
+    }
+    return {
+      ...breakdown,
+      score: null,
+      practices_sub: null,
+      yoy_sub: null,
+      nature_positive_sub: null,
+      dependencies_sub: null,
+      dependencies_declared_count: null,
+      mode: 'no_data',
+      weights: { practices: 0, yoy: 0, positive: 0, dependencies: 0 },
+    }
+  }
+
+  const totalWeight = entries.reduce((a, e) => a + e.weight, 0)
+  const coreBlended = entries.reduce((a, e) => a + e.sub * (e.weight / totalWeight), 0)
+
+  // Apply dependencies as a 10% modifier on top of the core blend.
+  const finalBlended =
+    depsSub !== null ? 0.9 * coreBlended + 0.1 * depsSub : coreBlended
+
+  // Mode label — describes what's *missing* so the explainer can be honest
+  // about what the score is built from.
+  let mode: NatureScoreMode
+  if (practicesSub !== null && yoySub !== null) mode = 'blended'
+  else if (practicesSub !== null && positiveSub !== null && yoySub === null) mode = 'blended'
+  else if (yoySub !== null && positiveSub !== null && practicesSub === null) mode = 'blended'
+  else if (practicesSub !== null) mode = 'practices_only'
+  else if (yoySub !== null) mode = 'yoy_only'
+  else mode = 'positive_only'
+
+  // Weights to expose. The core axes' weights are scaled by 0.9 if deps
+  // are present (since they only get 90% of the final). Deps takes 0.1
+  // when present, 0 when absent.
+  const coreScale = depsSub !== null ? 0.9 : 1.0
+  const exposedWeights = {
+    practices:
+      practicesSub !== null
+        ? (practicesBaseWeight / totalWeight) * coreScale
+        : 0,
+    yoy: yoySub !== null ? (yoyBaseWeight / totalWeight) * coreScale : 0,
+    positive:
+      positiveSub !== null
+        ? (NATURE_POSITIVE_BLEND_WEIGHT / totalWeight) * coreScale
+        : 0,
+    dependencies: depsSub !== null ? 0.1 : 0,
+  }
+
+  return {
+    ...breakdown,
+    score: Math.round(finalBlended),
+    practices_sub: practicesSub,
+    yoy_sub: yoySub,
+    nature_positive_sub: positiveSub,
+    dependencies_sub: depsSub,
+    dependencies_declared_count: depsDeclaredCount,
+    mode,
+    weights: exposedWeights,
+  }
+}
+
+/**
+ * One nature-positive action with its current period hectares and type.
+ * The route assembles these from `nature_actions` joined with their most
+ * recent `nature_action_flows` row (or, when no flow is logged, the
+ * action's own `hectares` declaration).
+ */
+export interface NatureActionInput {
+  /** Hectares actively delivering ecological value during the period. */
+  hectares_active: number
+  /** Action type — maps to a 0-1 restoration value weight. */
+  action_type: string
+  /** Status: only 'in_progress' or 'established' contribute to the score. */
+  status: string
+}
+
+/**
+ * Compute the nature-positive sub-score inputs from a list of active
+ * actions and units produced. Type-weights each action's hectares,
+ * sums to total effective hectares, divides by units to get effective
+ * m² per unit (×10,000 for ha→m²).
+ */
+export function buildNaturePositiveInputs(args: {
+  actions: NatureActionInput[]
+  /** Restoration value weight lookup, keyed by action_type. */
+  type_value_per_hectare: (action_type: string) => number
+  /** Statuses that score (others are excluded). */
+  scoring_statuses: Set<string>
+  current_year_units: number
+}): {
+  effective_hectares: number | null
+  effective_sq_m_per_unit: number | null
+} {
+  let totalEffectiveHa = 0
+  let any = false
+  for (const a of args.actions) {
+    if (!args.scoring_statuses.has(a.status)) continue
+    const ha = Number.isFinite(a.hectares_active) ? Math.max(0, a.hectares_active) : 0
+    if (ha <= 0) continue
+    const weight = args.type_value_per_hectare(a.action_type)
+    totalEffectiveHa += ha * weight
+    any = true
+  }
+  if (!any) return { effective_hectares: null, effective_sq_m_per_unit: null }
+  const effective_sq_m_per_unit =
+    args.current_year_units > 0
+      ? (totalEffectiveHa * 10000) / args.current_year_units
+      : null
+  return {
+    effective_hectares: totalEffectiveHa,
+    effective_sq_m_per_unit,
+  }
+}
+
+/**
+ * EF 3.1 normalised + weighted nature footprint (in weighted person-
+ * equivalent units). Used to compute the YoY sub-score on a single
+ * combined nature footprint number rather than per-axis trends, which
+ * matches how PEF reports a "single score" for nature categories.
+ */
+export function natureWeightedFootprint(impacts: {
+  land_use: number
+  terrestrial_acidification: number
+  freshwater_eutrophication: number
+  terrestrial_ecotoxicity: number
+}): number {
+  // Normalisation: divide each absolute impact by EF 3.1 per-capita
+  // factors to get person-equivalents.
+  const land_pe = impacts.land_use / 819000
+  const acid_pe = impacts.terrestrial_acidification / 55.6
+  const eutr_pe = impacts.freshwater_eutrophication / 1.61
+  const ecot_pe = impacts.terrestrial_ecotoxicity / 28700
+  // Weight by EF 3.1 contribution-to-single-score factors.
+  return (
+    land_pe * EF31_NATURE_WEIGHTS.land_use +
+    acid_pe * EF31_NATURE_WEIGHTS.terrestrial_acidification +
+    eutr_pe * EF31_NATURE_WEIGHTS.freshwater_eutrophication +
+    ecot_pe * EF31_NATURE_WEIGHTS.terrestrial_ecotoxicity
+  )
+}
+
+/**
+ * Build the nature inputs from current + prior year aggregated impacts
+ * and unit counts. Returns per-unit impacts (current year) for the
+ * practices sub-score, and a YoY % change in the EF 3.1 weighted nature
+ * footprint.
+ */
+export function buildNatureInputs(args: {
+  current_year_impacts: AggregatedImpacts
+  prior_year_impacts: AggregatedImpacts | null
+  current_year_units: number
+  prior_year_units: number
+}): {
+  per_unit_impacts: NatureScoreBreakdown['per_unit']
+  yoy_total_pct: number | null
+} {
+  const cur = args.current_year_impacts
+  const cu = args.current_year_units
+  const per_unit_impacts: NatureScoreBreakdown['per_unit'] = {
+    land_use: cu > 0 ? cur.land_use / cu : null,
+    terrestrial_acidification: cu > 0 ? cur.terrestrial_acidification / cu : null,
+    freshwater_eutrophication:
+      cu > 0 ? cur.freshwater_eutrophication / cu : null,
+    terrestrial_ecotoxicity: cu > 0 ? cur.terrestrial_ecotoxicity / cu : null,
+  }
+
+  let yoy_total_pct: number | null = null
+  if (args.prior_year_impacts && args.prior_year_units > 0 && cu > 0) {
+    const currentFp = natureWeightedFootprint({
+      land_use: cur.land_use,
+      terrestrial_acidification: cur.terrestrial_acidification,
+      freshwater_eutrophication: cur.freshwater_eutrophication,
+      terrestrial_ecotoxicity: cur.terrestrial_ecotoxicity,
+    })
+    const priorFp = natureWeightedFootprint({
+      land_use: args.prior_year_impacts.land_use,
+      terrestrial_acidification: args.prior_year_impacts.terrestrial_acidification,
+      freshwater_eutrophication: args.prior_year_impacts.freshwater_eutrophication,
+      terrestrial_ecotoxicity: args.prior_year_impacts.terrestrial_ecotoxicity,
+    })
+    if (priorFp > 0) {
+      yoy_total_pct = ((currentFp - priorFp) / priorFp) * 100
+    }
+  }
+
+  return { per_unit_impacts, yoy_total_pct }
+}
+
 /**
  * One waste record from facility_activity_entries used to build the
  * treatment mix. The route assembles these from the year's entries.

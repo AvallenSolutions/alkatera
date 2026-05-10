@@ -13,6 +13,7 @@ import type {
   ClimateScoreBreakdown,
   WaterScoreBreakdown,
   CircularityScoreBreakdown,
+  NatureScoreBreakdown,
 } from './environmental'
 
 export type ScoreBand =
@@ -85,6 +86,7 @@ export interface EnvironmentalPillarScore
   climate_breakdown: ClimateScoreBreakdown | null
   water_breakdown: WaterScoreBreakdown | null
   circularity_breakdown: CircularityScoreBreakdown | null
+  nature_breakdown: NatureScoreBreakdown | null
 }
 
 export interface VitalityComposite {
@@ -119,6 +121,8 @@ export interface EnvironmentalInputs {
   water_breakdown?: WaterScoreBreakdown | null
   /** Preferred: precomputed circularity breakdown from `computeCircularityScore`. */
   circularity_breakdown?: CircularityScoreBreakdown | null
+  /** Preferred: precomputed nature breakdown from `computeNatureScore`. */
+  nature_breakdown?: NatureScoreBreakdown | null
   /** Legacy climate fields, used when no climate_breakdown is provided. */
   totalEmissions?: number
   emissionsIntensity?: number
@@ -200,11 +204,19 @@ export function computeEnvironmentalPillar(
     }
   }
 
-  // Nature
+  // Nature — preferred path: trust the precomputed breakdown when the
+  // caller provided one (even `no_data`). Legacy biodiversityRisk ladder
+  // only fires when no breakdown is supplied at all.
   let nature: number | null = null
-  if (data.biodiversityRisk === 'low') nature = 80
-  else if (data.biodiversityRisk === 'medium') nature = 55
-  else if (data.biodiversityRisk === 'high') nature = 30
+  let nature_breakdown: NatureScoreBreakdown | null = null
+  if (data.nature_breakdown !== undefined) {
+    nature = data.nature_breakdown?.score ?? null
+    nature_breakdown = data.nature_breakdown ?? null
+  } else {
+    if (data.biodiversityRisk === 'low') nature = 80
+    else if (data.biodiversityRisk === 'medium') nature = 55
+    else if (data.biodiversityRisk === 'high') nature = 30
+  }
 
   const sub: EnvironmentalSubScores = { climate, water, circularity, nature }
   const valid = [
@@ -225,6 +237,7 @@ export function computeEnvironmentalPillar(
     climate_breakdown,
     water_breakdown,
     circularity_breakdown,
+    nature_breakdown,
   }
 }
 

@@ -101,6 +101,45 @@ export interface CalculationInputs {
   // Nature
   biodiversityRisk?: 'high' | 'medium' | 'low';
   landUse?: number;
+  /**
+   * Blended nature breakdown using EU EF 3.1 weighting (Sala et al., 2021):
+   * land use 42.2%, terrestrial acidification 33.0%, freshwater
+   * eutrophication 14.9%, terrestrial ecotoxicity 9.9%. Each axis is scored
+   * against published thresholds (JRC/ReCiPe/EU WFD/DEFRA) then weighted-
+   * blended. YoY trend is on the EF 3.1 normalised+weighted footprint.
+   */
+  natureBreakdown?: {
+    score: number | null;
+    axes: {
+      land_use_sub: number | null;
+      terrestrial_acidification_sub: number | null;
+      freshwater_eutrophication_sub: number | null;
+      terrestrial_ecotoxicity_sub: number | null;
+    };
+    per_unit: {
+      land_use: number | null;
+      terrestrial_acidification: number | null;
+      freshwater_eutrophication: number | null;
+      terrestrial_ecotoxicity: number | null;
+    };
+    practices_sub: number | null;
+    yoy_sub: number | null;
+    nature_positive_sub: number | null;
+    effective_hectares: number | null;
+    country_biodiversity_multiplier: number | null;
+    country_mix: Array<{
+      country_code: string;
+      country_name: string;
+      share_pct: number;
+      multiplier: number;
+      hotspot_names: string[] | null;
+    }> | null;
+    dependencies_sub: number | null;
+    dependencies_declared_count: number | null;
+    mode: 'blended' | 'practices_only' | 'yoy_only' | 'positive_only' | 'no_data';
+    weights: { practices: number; yoy: number; positive: number; dependencies: number };
+    source: { name: string; doi: string };
+  } | null;
   // Overall (legacy 4-pillar environmental)
   pillarScores?: {
     climate: number | null;
@@ -449,6 +488,14 @@ function buildRosaPrompt(scoreType: ScoreType, currentScore: number | null, inpu
   return parts.join(' ');
 }
 
+function formatNatureValue(value: number): string {
+  if (value === 0) return '0';
+  if (Math.abs(value) >= 1000) return value.toFixed(0);
+  if (Math.abs(value) >= 1) return value.toFixed(1);
+  if (Math.abs(value) >= 0.01) return value.toFixed(2);
+  return value.toExponential(1);
+}
+
 function CalculationBreakdown({ scoreType, inputs }: { scoreType: ScoreType; inputs: CalculationInputs }) {
   if (scoreType === 'overall' && inputs.pillarScores) {
     const ps = inputs.pillarScores;
@@ -789,6 +836,174 @@ function CalculationBreakdown({ scoreType, inputs }: { scoreType: ScoreType; inp
   }
 
   if (scoreType === 'nature') {
+    const nb = inputs.natureBreakdown;
+    if (nb) {
+      const modeLabel: Record<typeof nb.mode, string> = {
+        blended: nb.nature_positive_sub !== null
+          ? 'Blended (impacts + year-on-year + nature-positive)'
+          : 'Blended (impacts + year-on-year)',
+        practices_only: 'Per-unit impacts only (no prior-year data yet)',
+        yoy_only: 'Year-on-year only (no per-unit data)',
+        positive_only: 'Nature-positive actions only (no LCA data yet)',
+        no_data: 'Awaiting data',
+      };
+      // EF 3.1 weights re-normalised to nature pillar (sum to 1.0).
+      const axisWeights = {
+        land_use: 42,
+        terrestrial_acidification: 33,
+        freshwater_eutrophication: 15,
+        terrestrial_ecotoxicity: 10,
+      };
+      const axisRows: Array<[
+        string,
+        number | null,
+        number | null,
+        string,
+        number,
+      ]> = [
+        ['Land use', nb.axes.land_use_sub, nb.per_unit.land_use, 'm²a/unit', axisWeights.land_use],
+        [
+          'Terrestrial acidification',
+          nb.axes.terrestrial_acidification_sub,
+          nb.per_unit.terrestrial_acidification,
+          'kg SO₂/unit',
+          axisWeights.terrestrial_acidification,
+        ],
+        [
+          'Freshwater eutrophication',
+          nb.axes.freshwater_eutrophication_sub,
+          nb.per_unit.freshwater_eutrophication,
+          'kg P eq/unit',
+          axisWeights.freshwater_eutrophication,
+        ],
+        [
+          'Terrestrial ecotoxicity',
+          nb.axes.terrestrial_ecotoxicity_sub,
+          nb.per_unit.terrestrial_ecotoxicity,
+          'kg DCB eq/unit',
+          axisWeights.terrestrial_ecotoxicity,
+        ],
+      ];
+      return (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">How it&apos;s scored</span>
+            <span className="font-medium text-right">{modeLabel[nb.mode]}</span>
+          </div>
+          {nb.practices_sub !== null && (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">
+                EF 3.1 weighted impacts{nb.mode === 'blended' ? ` (${Math.round(nb.weights.practices * 100)}% weight)` : ''}
+              </span>
+              <span className="font-medium tabular-nums">{nb.practices_sub} / 100</span>
+            </div>
+          )}
+          {axisRows.map(([label, sub, perUnit, unit, weight]) =>
+            sub === null ? null : (
+              <div key={label} className="flex items-center justify-between text-[11px] pl-3">
+                <span className="text-muted-foreground">
+                  ↳ {label} <span className="text-muted-foreground/60">({weight}%)</span>
+                </span>
+                <span className="tabular-nums">
+                  {sub} / 100
+                  {perUnit !== null && (
+                    <span className="text-muted-foreground/60 ml-1.5">
+                      ({formatNatureValue(perUnit)} {unit})
+                    </span>
+                  )}
+                </span>
+              </div>
+            ),
+          )}
+          {nb.yoy_sub !== null && (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">
+                Year-on-year footprint ({Math.round(nb.weights.yoy * 100)}% weight)
+              </span>
+              <span className="font-medium tabular-nums">{nb.yoy_sub} / 100</span>
+            </div>
+          )}
+          {nb.nature_positive_sub !== null && (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">
+                Nature-positive actions ({Math.round(nb.weights.positive * 100)}% weight)
+              </span>
+              <span className="font-medium tabular-nums">
+                {nb.nature_positive_sub} / 100
+                {nb.effective_hectares !== null && (
+                  <span className="text-muted-foreground/60 ml-1.5">
+                    ({nb.effective_hectares.toFixed(1)} effective ha)
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
+          {nb.dependencies_sub !== null && (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">
+                Dependency disclosure (10% weight)
+              </span>
+              <span className="font-medium tabular-nums">
+                {nb.dependencies_sub} / 100
+                {nb.dependencies_declared_count !== null && (
+                  <span className="text-muted-foreground/60 ml-1.5">
+                    ({nb.dependencies_declared_count} declared)
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
+          {nb.score !== null && nb.mode === 'blended' && (
+            <div className="flex items-center justify-between text-xs border-t pt-1.5 mt-1.5">
+              <span className="text-muted-foreground">Final score</span>
+              <span className="font-semibold tabular-nums">{nb.score} / 100</span>
+            </div>
+          )}
+          {nb.country_biodiversity_multiplier !== null && nb.country_mix && nb.country_mix.length > 0 && (
+            <div className="border-t pt-1.5 mt-1.5">
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span className="text-muted-foreground">
+                  Country biodiversity multiplier (applied to land use)
+                </span>
+                <span className="font-medium tabular-nums">
+                  {nb.country_biodiversity_multiplier.toFixed(2)}×
+                </span>
+              </div>
+              {nb.country_mix.slice(0, 5).map(c => (
+                <div key={c.country_code} className="flex items-center justify-between text-[11px] pl-3">
+                  <span className="text-muted-foreground truncate">
+                    {c.country_name}
+                    {c.hotspot_names && c.hotspot_names.length > 0 && (
+                      <span className="text-emerald-300/70 ml-1">(hotspot)</span>
+                    )}
+                  </span>
+                  <span className="tabular-nums">
+                    {c.share_pct.toFixed(0)}% · {c.multiplier.toFixed(2)}×
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex items-center justify-between text-xs border-t pt-1.5 mt-1.5">
+            <span className="text-muted-foreground">Methodology</span>
+            <a
+              href={nb.source.doi}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
+            >
+              {nb.source.name}
+              <ExternalLink className="h-3 w-3 flex-shrink-0" />
+            </a>
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-1.5">
+            Nature is scored against the EU&apos;s EF 3.1 framework — the methodology behind PEF and recognised by TNFD. Each axis (land use, acidification, eutrophication, ecotoxicity) is rated against published thresholds, then weighted by EF 3.1&apos;s contribution-to-single-score factors. Acidification weighs higher than pure biodiversity framing alone would suggest because EF 3.1 also captures soil chemistry, forest dieback, and respiratory-health effects from precursor emissions.
+          </p>
+        </div>
+      );
+    }
+
+    // Legacy path (kept until all callers migrate).
     return (
       <div className="space-y-1.5">
         {inputs.biodiversityRisk && (

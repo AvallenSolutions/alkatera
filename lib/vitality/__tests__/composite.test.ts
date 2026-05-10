@@ -245,6 +245,64 @@ describe('computeEnvironmentalPillar', () => {
     expect(r.sub.circularity).toBeNull()
     expect(r.circularity_breakdown?.mode).toBe('no_data')
   })
+
+  it('prefers a precomputed nature_breakdown over the legacy biodiversityRisk ladder', () => {
+    const r = computeEnvironmentalPillar({
+      // Legacy says biodiversityRisk 'low' → 80; breakdown overrides with 65.
+      biodiversityRisk: 'low',
+      nature_breakdown: {
+        score: 65,
+        practices_sub: 70,
+        yoy_sub: 60,
+        axes: {
+          land_use_sub: 70,
+          terrestrial_acidification_sub: 70,
+          freshwater_eutrophication_sub: 70,
+          terrestrial_ecotoxicity_sub: 70,
+        },
+        per_unit: {
+          land_use: 2000,
+          terrestrial_acidification: 3,
+          freshwater_eutrophication: 0.7,
+          terrestrial_ecotoxicity: 15,
+        },
+        mode: 'blended',
+        weights: { practices: 0.6, yoy: 0.4 },
+        source: { name: 'EU EF 3.1 (Sala et al., 2021)', doi: 'https://doi.org/10.2760/14875' },
+      },
+    })
+    expect(r.sub.nature).toBe(65)
+    expect(r.nature_breakdown?.score).toBe(65)
+    expect(r.nature_breakdown?.source.name).toContain('EF 3.1')
+  })
+
+  it('honours a no_data nature_breakdown (no fallback to legacy ladder)', () => {
+    const r = computeEnvironmentalPillar({
+      biodiversityRisk: 'low',
+      nature_breakdown: {
+        score: null,
+        practices_sub: null,
+        yoy_sub: null,
+        axes: {
+          land_use_sub: null,
+          terrestrial_acidification_sub: null,
+          freshwater_eutrophication_sub: null,
+          terrestrial_ecotoxicity_sub: null,
+        },
+        per_unit: {
+          land_use: null,
+          terrestrial_acidification: null,
+          freshwater_eutrophication: null,
+          terrestrial_ecotoxicity: null,
+        },
+        mode: 'no_data',
+        weights: { practices: 0, yoy: 0 },
+        source: { name: 'EU EF 3.1 (Sala et al., 2021)', doi: 'https://doi.org/10.2760/14875' },
+      },
+    })
+    expect(r.sub.nature).toBeNull()
+    expect(r.nature_breakdown?.mode).toBe('no_data')
+  })
 })
 
 describe('computeSocialPillar', () => {
