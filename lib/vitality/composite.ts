@@ -16,6 +16,7 @@ import type {
   NatureScoreBreakdown,
 } from './environmental'
 import type { SocialScoreBreakdown } from './social'
+import type { GovernanceScoreBreakdown } from './governance'
 
 export type ScoreBand =
   | 'EXCELLENT'
@@ -100,13 +101,24 @@ export interface SocialPillarScore extends PillarScore<SocialSubScores> {
   social_breakdown: SocialScoreBreakdown | null
 }
 
+/**
+ * Governance pillar carries an extra `governance_breakdown` field
+ * exposing the 3-axis blend (practices / certifications / YoY) plus the
+ * internal 5-axis governance practices breakdown and cert achieved-vs-
+ * in-progress split. Null when the legacy 85/15 path was used.
+ */
+export interface GovernancePillarScore
+  extends PillarScore<GovernanceSubScores> {
+  governance_breakdown: GovernanceScoreBreakdown | null
+}
+
 export interface VitalityComposite {
   composite: number | null
   band: ScoreBand
   weights: VitalityWeights
   e: EnvironmentalPillarScore
   s: SocialPillarScore
-  g: PillarScore<GovernanceSubScores>
+  g: GovernancePillarScore
   generated_at: string
 }
 
@@ -300,34 +312,61 @@ export function computeSocialPillar(
 }
 
 export interface GovernanceInputs {
-  /** From /api/governance/score (current.overall_score). */
+  /** Preferred: precomputed governance breakdown from `computeGovernanceScore`. */
+  governance_breakdown?: GovernanceScoreBreakdown | null
+  /** Legacy: from /api/governance/score (current.overall_score). */
   governance_score: number | null
-  /** Avg progress across active certification frameworks (0-100), or null. */
+  /** Legacy: avg progress across active certification frameworks (0-100), or null. */
   cert_progress_pct: number | null
 }
 
 export function computeGovernancePillar(
   data: GovernanceInputs,
-): PillarScore<GovernanceSubScores> {
+): GovernancePillarScore {
+  // Preferred path: trust the precomputed breakdown when supplied.
+  if (data.governance_breakdown !== undefined) {
+    const breakdown = data.governance_breakdown
+    return {
+      score: breakdown?.score ?? null,
+      has_data: breakdown?.score !== null && breakdown !== null,
+      sub: {
+        // Map breakdown axes back to the legacy GovernanceSubScores shape
+        // so PillarCards consuming sub directly still get values.
+        governance: breakdown?.axes.practices_sub ?? null,
+        certifications: breakdown?.axes.certifications_sub ?? null,
+      },
+      governance_breakdown: breakdown ?? null,
+    }
+  }
+
+  // Legacy path: 85/15 blend. Kept for unmigrated callers.
   const sub: GovernanceSubScores = {
     governance: data.governance_score,
     certifications: data.cert_progress_pct,
   }
-  // Governance overall is the dominant weight; cert is a 15% top-up.
   const g = data.governance_score
   const c = data.cert_progress_pct
-  if (g === null && c === null) return { score: null, has_data: false, sub }
-  if (g !== null && c !== null) {
-    return { score: Math.round(g * 0.85 + c * 0.15), has_data: true, sub }
+  if (g === null && c === null) {
+    return { score: null, has_data: false, sub, governance_breakdown: null }
   }
-  if (g !== null) return { score: Math.round(g), has_data: true, sub }
-  return { score: Math.round(c!), has_data: true, sub }
+  if (g !== null && c !== null) {
+    return {
+      score: Math.round(g * 0.85 + c * 0.15),
+      has_data: true,
+      sub,
+      governance_breakdown: null,
+    }
+  }
+  if (g !== null) {
+    return { score: Math.round(g), has_data: true, sub, governance_breakdown: null }
+  }
+  return { score: Math.round(c!), has_data: true, sub, governance_breakdown: null }
 }
 
 export interface ComposeArgs {
   e: EnvironmentalPillarScore
   s: SocialPillarScore
-  g: PillarScore<GovernanceSubScores>
+  g: GovernancePillarScore
   weights?: Partial<VitalityWeights> | null
 }
 

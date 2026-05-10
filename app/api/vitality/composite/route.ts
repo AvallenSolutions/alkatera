@@ -68,6 +68,10 @@ import {
   type SupplierResponsibilityInputs,
 } from '@/lib/vitality/social'
 import {
+  computeGovernanceScore,
+  type CertificationsInputs,
+} from '@/lib/vitality/governance'
+import {
   computeAttestationsScore,
   type SupplierAttestationType,
 } from '@/lib/supplier-responsibility/attestation-types'
@@ -986,17 +990,21 @@ async function buildGovernanceInputs(
   service: SupabaseClient,
   organizationId: string,
 ): Promise<Parameters<typeof computeGovernancePillar>[0]> {
-  const [governanceRow, certsRow] = await Promise.allSettled([
+  // Pull the latest two governance score snapshots for YoY, plus the
+  // 5-axis sub-scores for transparent breakdown. Certifications come
+  // from organization_certifications with status + readiness_score.
+  const [governanceRows, certsRow] = await Promise.allSettled([
     service
       .from('governance_scores')
-      .select('overall_score')
+      .select(
+        'overall_score, policy_score, stakeholder_score, board_score, ethics_score, transparency_score, calculated_at',
+      )
       .eq('organization_id', organizationId)
       .order('calculated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .limit(2),
     service
       .from('organization_certifications')
-      .select('progress_percentage, status')
+      .select('status, readiness_score')
       .eq('organization_id', organizationId)
       .neq('status', 'expired'),
   ])
@@ -1004,18 +1012,88 @@ async function buildGovernanceInputs(
   const valOrNull = <T>(r: PromiseSettledResult<T>): T | null =>
     r.status === 'fulfilled' ? r.value : null
 
-  const governance_score = numOrNull((valOrNull(governanceRow) as any)?.data?.overall_score)
-
-  const certRows = ((valOrNull(certsRow) as any)?.data ?? []) as Array<{
-    progress_percentage: number | null
+  // --- Governance practices (current + prior year for YoY) ---
+  const govList = ((valOrNull(governanceRows) as any)?.data ?? []) as Array<{
+    overall_score: number | null
+    policy_score: number | null
+    stakeholder_score: number | null
+    board_score: number | null
+    ethics_score: number | null
+    transparency_score: number | null
   }>
-  const certVals = certRows
-    .map(r => Number(r.progress_percentage))
-    .filter(n => Number.isFinite(n))
-  const cert_progress_pct =
-    certVals.length > 0 ? Math.round(certVals.reduce((a, b) => a + b, 0) / certVals.length) : null
+  const governance_score = numOrNull(govList[0]?.overall_score)
+  const governance_score_prior = numOrNull(govList[1]?.overall_score)
+  const practices_breakdown = govList[0]
+    ? {
+        policy: numOrNull(govList[0].policy_score),
+        stakeholder: numOrNull(govList[0].stakeholder_score),
+        board: numOrNull(govList[0].board_score),
+        ethics: numOrNull(govList[0].ethics_score),
+        transparency: numOrNull(govList[0].transparency_score),
+      }
+    : null
 
-  return { governance_score, cert_progress_pct }
+  // --- Certifications (achieved vs in-progress split) ---
+  const certRows = ((valOrNull(certsRow) as any)?.data ?? []) as Array<{
+    status: string | null
+    readiness_score: number | null
+  }>
+  let achieved_count = 0
+  let in_progress_count = 0
+  const inProgressReadiness: number[] = []
+  for (const c of certRows) {
+    if (c.status === 'certified') {
+      achieved_count++
+    } else if (c.status === 'in_progress' || c.status === 'ready') {
+      in_progress_count++
+      const r = Number(c.readiness_score ?? 0)
+      if (Number.isFinite(r)) inProgressReadiness.push(r)
+    }
+  }
+  const in_progress_avg_pct =
+    inProgressReadiness.length > 0
+      ? inProgressReadiness.reduce((a, b) => a + b, 0) / inProgressReadiness.length
+      : null
+
+  const certifications_inputs: CertificationsInputs | null =
+    achieved_count + in_progress_count > 0
+      ? {
+          achieved_count,
+          in_progress_count,
+          in_progress_avg_pct,
+        }
+      : null
+
+  // --- YoY ---
+  let yoy_total_pct: number | null = null
+  if (
+    governance_score !== null &&
+    governance_score_prior !== null &&
+    governance_score_prior > 0
+  ) {
+    yoy_total_pct =
+      ((governance_score - governance_score_prior) / governance_score_prior) * 100
+  }
+
+  // --- Compute the breakdown ---
+  const governance_breakdown = computeGovernanceScore({
+    practices_score: governance_score,
+    practices_breakdown,
+    certifications_inputs,
+    yoy_total_pct,
+  })
+
+  // Legacy fields kept for unmigrated callers / fallback.
+  const cert_progress_pct =
+    certifications_inputs && certifications_inputs.in_progress_avg_pct !== null
+      ? Math.round(certifications_inputs.in_progress_avg_pct)
+      : null
+
+  return {
+    governance_breakdown,
+    governance_score,
+    cert_progress_pct,
+  }
 }
 
 async function loadOrgWeights(
