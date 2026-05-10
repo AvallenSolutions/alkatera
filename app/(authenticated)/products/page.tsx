@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useRosaPageContext } from "@/lib/rosa/RosaContextProvider";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { FlagThresholdBanner } from '@/components/flag/FlagThresholdBanner';
@@ -70,6 +71,41 @@ export default function ProductsPage() {
       setLoading(false);
     }
   }, [currentOrganization?.id]);
+
+  // Tell Rosa what's on this list so she can answer questions like
+  // "which of my products don't have an LCA yet?" or "what's my newest
+  // product?" without making a separate query.
+  const rosaSlice = useMemo(() => {
+    if (!currentOrganization?.id) return null;
+    const productSummaries = products.map(p => {
+      const hasLca = (p.product_carbon_footprints || []).length > 0;
+      const boundaryLabels = (p.product_carbon_footprints || [])
+        .map(f => f.system_boundary)
+        .filter(Boolean);
+      return {
+        name: p.name,
+        functional_unit: p.functional_unit,
+        boundary: boundaryLabels.length > 0 ? boundaryLabels.join(', ') : null,
+        has_lca: hasLca,
+      };
+    });
+    const without = productSummaries.filter(p => !p.has_lca);
+    return {
+      id: 'products-list',
+      label: `Products list (${products.length})`,
+      priority: 6,
+      data: {
+        product_count: products.length,
+        products_without_lca: without.length,
+        products: productSummaries,
+        notes: without.length > 0
+          ? `${without.length} of ${products.length} products don't have an LCA yet.`
+          : 'All products have an LCA.',
+      },
+    };
+  }, [products, currentOrganization?.id]);
+
+  useRosaPageContext(rosaSlice);
 
   const fetchProducts = async () => {
     try {

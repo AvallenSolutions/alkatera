@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -186,6 +187,24 @@ export default function CompanyEmissionsPage() {
   const [activeTab, setActiveTab] = useState('footprint');
 
   const [selectedYear, setSelectedYear] = useState(currentLabelYear);
+
+  // Tell Rosa where the user is in the company emissions surface so she
+  // can answer "what's missing for scope 2 this year?" or "is this enough
+  // for CSRD?" without the user having to spell out the period or scope.
+  const rosaSlice = useMemo(() => {
+    return {
+      id: 'scope-1-2',
+      label: `Company emissions · ${selectedYear}`,
+      priority: 8,
+      data: {
+        page: 'scope-1-2',
+        active_tab: activeTab,
+        reporting_year: selectedYear,
+        facility_count: facilities.length,
+      },
+    }
+  }, [activeTab, selectedYear, facilities.length])
+  useRosaPageContext(rosaSlice)
 
   // Derive date range from the selected year (FY-aware)
   const { yearStart: selectedYearStart, yearEnd: selectedYearEnd } = getYearRange(selectedYear);

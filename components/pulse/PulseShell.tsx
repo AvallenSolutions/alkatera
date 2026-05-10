@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Activity, MessageSquare, PoundSterling, RefreshCw, Sparkles } from 'lucide-react';
+import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +12,7 @@ import {
   PulseRealtimeProvider,
   usePulseRealtimeContext,
 } from '@/lib/pulse/PulseRealtimeContext';
-import { MetricDrillProvider } from '@/lib/pulse/MetricDrillContext';
+import { MetricDrillProvider, useWidgetDrill } from '@/lib/pulse/MetricDrillContext';
 import { WidgetDrillOverlay } from '@/components/pulse/WidgetDrillOverlay';
 import { WaterfallSlotMount } from '@/components/pulse/drill-slots/WaterfallSlot';
 import { FinancialFootprintExpandedSlot } from '@/components/pulse/widgets/financial-footprint/expanded';
@@ -63,6 +64,22 @@ export function PulseShell() {
 function PulseShellBody() {
   // Two-way sync between ?drill= query param and drill context.
   usePulseDrillUrl();
+
+  const { activeTarget, open: drillOpen } = useWidgetDrill();
+  const rosaSlice = useMemo(
+    () => ({
+      id: 'pulse-insights',
+      label: 'Pulse — main dashboard',
+      priority: 6,
+      data: {
+        activeDrill: drillOpen && activeTarget ? activeTarget : null,
+        view: 'main',
+      },
+    }),
+    [activeTarget, drillOpen],
+  );
+  useRosaPageContext(rosaSlice);
+
   return (
     <>
       <div className="space-y-6 pb-12">

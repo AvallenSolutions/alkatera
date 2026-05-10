@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { IngredientEditorTabs } from "@/components/products/IngredientEditorTabs";
 import type { IngredientFormData } from "@/components/products/IngredientFormCard";
+import { AskRosaButton } from "@/components/rosa/AskRosaButton";
 import type { ProductionStage } from "@/lib/types/products";
 import {
   getIngredientSectionStatus,
@@ -143,6 +144,33 @@ export function IngredientRow(props: IngredientRowProps) {
             )}
           </div>
         </div>
+        {/* "Ask Rosa about this ingredient" — only shown when there's no
+            matched factor yet, so the user gets help right when they need
+            it. Pins this specific ingredient as Rosa's selectedEntity so
+            she can answer "which factor for maple syrup?" with full
+            context. */}
+        {!ingredient.matched_source_name && ingredient.name && (
+          <span
+            onClick={e => e.stopPropagation()}
+            className="flex-shrink-0"
+          >
+            <AskRosaButton
+              entity={{
+                type: 'ingredient',
+                id: ingredient.tempId,
+                label: `Ingredient: ${ingredient.name}`,
+                data: {
+                  name: ingredient.name,
+                  amount: ingredient.amount,
+                  unit: ingredient.unit,
+                  origin_country: ingredient.origin_country || null,
+                  is_organic: ingredient.is_organic_certified,
+                },
+              }}
+              prompt={`Help me pick the right emission factor for "${ingredient.name}". Walk me through the most likely matches and what you'd recommend.`}
+            />
+          </span>
+        )}
         <span className="text-muted-foreground flex-shrink-0" aria-hidden>
           {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </span>

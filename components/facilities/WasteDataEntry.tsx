@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Trash2, Info, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
+import { AgentBanner } from "@/components/agents/AgentBanner";
 
 interface WasteDataEntryProps {
   facilityId: string;
@@ -178,6 +179,8 @@ export function WasteDataEntry({
   };
 
   return (
+    <>
+    <AgentBanner kinds={['waste_bill']} formName="waste invoices" />
     <Card>
       <CardHeader>
         <div className="flex items-center gap-2">
@@ -467,5 +470,6 @@ export function WasteDataEntry({
         </form>
       </CardContent>
     </Card>
+    </>
   );
 }

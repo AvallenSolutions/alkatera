@@ -1,0 +1,655 @@
+/**
+ * GET /api/vitality/composite — ESG composite for the Rosa hub + /performance/ page.
+ *
+ * Composes:
+ *   E = environmental sub-pillars (climate proxy from lca_completeness_pct + water/waste snapshots)
+ *   S = community-impact + people-culture + supplier-ESG signals
+ *   G = governance + certifications progress
+ *
+ * Reads org weighting from organizations.vitality_weights (defaults to
+ * { e: 0.5, s: 0.25, g: 0.25 }). Snapshots the result idempotently per
+ * (org, day) into esg_score_snapshots so the 12-week trend fills out
+ * lazily on user visits — no cron needed.
+ *
+ * The narrative read is curated by Claude via tool_use; falls back to a
+ * deterministic summary on error.
+ */
+
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { getSupabaseServerClient } from '@/lib/supabase/server-client'
+import {
+  composeVitality,
+  computeEnvironmentalPillar,
+  computeGovernancePillar,
+  computeSocialPillar,
+  normaliseWeights,
+  BAND_DESCRIPTIONS,
+  type VitalityComposite,
+  type VitalityWeights,
+} from '@/lib/vitality/composite'
+import {
+  loadTrend,
+  trendDelta,
+  upsertSnapshot,
+  type TrendPoint,
+} from '@/lib/vitality/snapshot'
+import {
+  VITALITY_READ_TOOL,
+  buildVitalityReadSystemPrompt,
+  formatVitalityForPrompt,
+  type VitalityRead,
+} from '@/lib/vitality/read-prompt'
+import { isOverDailyBudget, logRosaTelemetry } from '@/lib/rosa/budget'
+import {
+  buildClimateInputs,
+  buildEnvironmentalSignals,
+  buildWaterInputs,
+  computeClimateScore,
+  computeWaterScore,
+  toEnvironmentalInputs,
+  unitSizeToLitres,
+  type ClimateProductRow,
+  type PcfWithEol,
+  type WaterProductRow,
+} from '@/lib/vitality/environmental'
+
+export const runtime = 'nodejs'
+export const maxDuration = 30
+
+const MODEL = 'claude-sonnet-4-6'
+const MAX_OUTPUT_TOKENS = 800
+
+interface ResponsePayload {
+  composite: VitalityComposite
+  trend: TrendPoint[]
+  trend_delta: { first: number | null; last: number | null; delta_points: number | null }
+  band_description: string
+  read: VitalityRead | null
+  source: 'curator' | 'fallback'
+  generated_at: string
+}
+
+async function resolveContext(req: NextRequest) {
+  const userSupabase = getSupabaseServerClient()
+  const {
+    data: { user },
+    error: userErr,
+  } = await userSupabase.auth.getUser()
+  if (userErr || !user) {
+    return { error: NextResponse.json({ error: 'Unauthenticated' }, { status: 401 }) }
+  }
+  const { data: membership } = await userSupabase
+    .from('organization_members')
+    .select('organization_id')
+    .eq('user_id', user.id)
+    .limit(1)
+    .maybeSingle()
+  if (!membership) {
+    return { error: NextResponse.json({ error: 'No organisation' }, { status: 403 }) }
+  }
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
+  if (!supabaseUrl || !serviceKey) {
+    return { error: NextResponse.json({ error: 'Service role missing' }, { status: 500 }) }
+  }
+  const service = createClient(supabaseUrl, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+  return {
+    userId: user.id,
+    organizationId: (membership as any).organization_id as string,
+    service,
+  }
+}
+
+/**
+ * Server-side environmental inputs. Reads completed PCFs (with their
+ * aggregated_impacts blob) and uses the shared aggregator in
+ * lib/vitality/environmental.ts so the score on /rosa/ matches what
+ * /performance/ computes client-side via useCompanyMetrics. Same band,
+ * same intuition.
+ *
+ * Climate is now scored via the blended `computeClimateScore` (60%
+ * intensity vs benchmark + 40% YoY emissions trend), not the legacy
+ * per-LCA-count ratio. We pass the breakdown verbatim so the explainer
+ * popover can show users the exact sub-scores, weights, and inputs.
+ */
+async function buildEnvironmentalInputs(
+  service: SupabaseClient,
+  organizationId: string,
+): Promise<Parameters<typeof computeEnvironmentalPillar>[0]> {
+  const yearNow = new Date().getFullYear()
+  const yearStart = `${yearNow}-01-01`
+  const yearEnd = `${yearNow}-12-31`
+  const priorStart = `${yearNow - 1}-01-01`
+  const priorEnd = `${yearNow - 1}-12-31`
+
+  // Query the same fields useCompanyMetrics queries on the client.
+  // production_volume is NOT a column on product_carbon_footprints — it's
+  // joined from production_logs / pcf_production_sites / cm_allocations.
+  // Facility water comes from `facility_water_data` per-month rows; we
+  // sum across facilities for current and prior years to feed the blended
+  // water score (preferred when present; LCA water is the fallback).
+  const [pcfRows, productRows, orgRow, facilityWaterCurrent, facilityWaterPrior] = await Promise.allSettled([
+    service
+      .from('product_carbon_footprints')
+      .select('id, product_id, product_name, status, aggregated_impacts, csrd_compliant, updated_at')
+      .eq('organization_id', organizationId)
+      .eq('status', 'completed')
+      .not('aggregated_impacts', 'is', null)
+      .limit(500),
+    service
+      .from('products')
+      .select('id, product_type, product_category, unit_size_value, unit_size_unit')
+      .eq('organization_id', organizationId)
+      .limit(500),
+    service
+      .from('organizations')
+      .select('product_type')
+      .eq('id', organizationId)
+      .maybeSingle(),
+    service
+      .from('facility_water_data')
+      .select('total_consumption_m3, scarcity_weighted_consumption_m3')
+      .eq('organization_id', organizationId)
+      .eq('reporting_year', yearNow),
+    service
+      .from('facility_water_data')
+      .select('total_consumption_m3, scarcity_weighted_consumption_m3')
+      .eq('organization_id', organizationId)
+      .eq('reporting_year', yearNow - 1),
+  ])
+
+  const valOrNull = <T>(r: PromiseSettledResult<T>): T | null =>
+    r.status === 'fulfilled' ? r.value : null
+
+  let lcas = (((valOrNull(pcfRows) as any)?.data ?? []) as PcfWithEol[]).filter(
+    (l): l is PcfWithEol => Boolean(l && l.id),
+  )
+
+  const productRowsData = ((valOrNull(productRows) as any)?.data ?? []) as Array<{
+    id: string | number | null
+    product_type: string | null
+    product_category: string | null
+    unit_size_value: number | null
+    unit_size_unit: string | null
+  }>
+
+  // Production-volume join chain — mirrors useCompanyMetrics priority:
+  //   1. Sum of production_logs.units_produced (current year)
+  //   2. Max of product_carbon_footprint_production_sites.production_volume
+  //   3. Max of contract_manufacturer_allocations.client_production_volume
+  //   4. 1-unit fallback so per-unit impacts still contribute
+  // We also pull *prior-year* production_logs so the YoY emissions trend
+  // can be computed for the climate score.
+  let productionByProduct = new Map<string, number>()
+  let priorProductionByProduct = new Map<string, number>()
+  if (lcas.length > 0) {
+    const productIds = Array.from(new Set(lcas.map(l => l.product_id).filter(Boolean) as Array<string | number>))
+    const lcaIds = lcas.map(l => l.id)
+
+    const [logsRes, priorLogsRes, sitesRes, cmRes] = await Promise.allSettled([
+      productIds.length > 0
+        ? service
+            .from('production_logs')
+            .select('product_id, units_produced')
+            .eq('organization_id', organizationId)
+            .gte('date', yearStart)
+            .lte('date', yearEnd)
+            .in('product_id', productIds as any)
+        : Promise.resolve({ data: [] as Array<{ product_id: any; units_produced: number | null }>, error: null }),
+      productIds.length > 0
+        ? service
+            .from('production_logs')
+            .select('product_id, units_produced')
+            .eq('organization_id', organizationId)
+            .gte('date', priorStart)
+            .lte('date', priorEnd)
+            .in('product_id', productIds as any)
+        : Promise.resolve({ data: [] as Array<{ product_id: any; units_produced: number | null }>, error: null }),
+      lcaIds.length > 0
+        ? service
+            .from('product_carbon_footprint_production_sites')
+            .select('product_carbon_footprint_id, production_volume')
+            .in('product_carbon_footprint_id', lcaIds)
+        : Promise.resolve({ data: [] as Array<{ product_carbon_footprint_id: string; production_volume: number | null }>, error: null }),
+      productIds.length > 0
+        ? service
+            .from('contract_manufacturer_allocations')
+            .select('product_id, client_production_volume')
+            .eq('organization_id', organizationId)
+            .in('product_id', productIds as any)
+        : Promise.resolve({ data: [] as Array<{ product_id: any; client_production_volume: number | null }>, error: null }),
+    ])
+
+    const sitesByLca = new Map<string, number>()
+    const cmByProduct = new Map<string, number>()
+
+    const logRows = ((valOrNull(logsRes) as any)?.data ?? []) as Array<{
+      product_id: string | number
+      units_produced: number | null
+    }>
+    for (const r of logRows) {
+      const key = String(r.product_id)
+      const u = Number(r.units_produced ?? 0)
+      if (!Number.isFinite(u) || u <= 0) continue
+      productionByProduct.set(key, (productionByProduct.get(key) ?? 0) + u)
+    }
+    const priorLogRows = ((valOrNull(priorLogsRes) as any)?.data ?? []) as Array<{
+      product_id: string | number
+      units_produced: number | null
+    }>
+    for (const r of priorLogRows) {
+      const key = String(r.product_id)
+      const u = Number(r.units_produced ?? 0)
+      if (!Number.isFinite(u) || u <= 0) continue
+      priorProductionByProduct.set(key, (priorProductionByProduct.get(key) ?? 0) + u)
+    }
+    const siteRows = ((valOrNull(sitesRes) as any)?.data ?? []) as Array<{
+      product_carbon_footprint_id: string
+      production_volume: number | null
+    }>
+    for (const r of siteRows) {
+      const v = Number(r.production_volume ?? 0)
+      if (!Number.isFinite(v) || v <= 0) continue
+      const cur = sitesByLca.get(r.product_carbon_footprint_id) ?? 0
+      if (v > cur) sitesByLca.set(r.product_carbon_footprint_id, v)
+    }
+    const cmRows = ((valOrNull(cmRes) as any)?.data ?? []) as Array<{
+      product_id: string | number
+      client_production_volume: number | null
+    }>
+    for (const r of cmRows) {
+      const v = Number(r.client_production_volume ?? 0)
+      if (!Number.isFinite(v) || v <= 0) continue
+      const key = String(r.product_id)
+      const cur = cmByProduct.get(key) ?? 0
+      if (v > cur) cmByProduct.set(key, v)
+    }
+
+    // Stamp production_volume on each PCF (used by the water/circularity
+    // aggregators). Climate uses the per-product map directly below.
+    lcas = lcas.map(lca => {
+      const fromLogs = productionByProduct.get(String(lca.product_id ?? '')) ?? 0
+      if (fromLogs > 0) return { ...lca, production_volume: fromLogs }
+      const fromSites = sitesByLca.get(lca.id) ?? 0
+      if (fromSites > 0) return { ...lca, production_volume: fromSites }
+      const fromCm = cmByProduct.get(String(lca.product_id ?? '')) ?? 0
+      return { ...lca, production_volume: fromCm > 0 ? fromCm : 1 }
+    })
+  }
+
+  // Build per-product climate signal rows and run the blended score. The
+  // breakdown is what powers the explainer popover and the main score.
+  const productById = new Map<string, (typeof productRowsData)[number]>()
+  for (const p of productRowsData) {
+    if (p.id !== null && p.id !== undefined) productById.set(String(p.id), p)
+  }
+  const completedLcas = lcas.filter(l => l.status === 'completed')
+  const climateRowsByProduct = new Map<string, ClimateProductRow>()
+  for (const lca of completedLcas) {
+    const productKey = String(lca.product_id ?? '')
+    if (!productKey) continue
+    if (climateRowsByProduct.has(productKey)) continue
+    const product = productById.get(productKey) ?? null
+    const perUnit = lca.aggregated_impacts?.climate_change_gwp100 ?? null
+    const cur = productionByProduct.get(productKey) ?? 0
+    const pri = priorProductionByProduct.get(productKey) ?? 0
+    climateRowsByProduct.set(productKey, {
+      product_id: productKey,
+      product_category: product?.product_category ?? null,
+      product_type: product?.product_type ?? null,
+      unit_size_l: unitSizeToLitres(product?.unit_size_value, product?.unit_size_unit),
+      units_produced_current: cur,
+      units_produced_prior: pri,
+      per_unit_emissions_kgco2e:
+        perUnit !== null && Number.isFinite(perUnit) ? Number(perUnit) : null,
+    })
+  }
+  const climateInputs = buildClimateInputs(Array.from(climateRowsByProduct.values()))
+  const climateBreakdown = computeClimateScore({
+    intensity_ratio: climateInputs.intensity_ratio,
+    yoy_delta_pct: climateInputs.yoy_delta_pct,
+  })
+
+  // Build per-product water signal rows (LCA fallback) and the org-level
+  // facility intake totals (preferred). Same simple-and-robust dedup rule:
+  // if facility data exists for the current year, it wins outright; LCA
+  // water is otherwise used as the proxy.
+  const waterRowsByProduct = new Map<string, WaterProductRow>()
+  for (const lca of completedLcas) {
+    const productKey = String(lca.product_id ?? '')
+    if (!productKey) continue
+    if (waterRowsByProduct.has(productKey)) continue
+    const product = productById.get(productKey) ?? null
+    const perUnitWater = lca.aggregated_impacts?.water_consumption ?? null
+    const perUnitScarcity = lca.aggregated_impacts?.water_scarcity_aware ?? null
+    const cur = productionByProduct.get(productKey) ?? 0
+    const pri = priorProductionByProduct.get(productKey) ?? 0
+    waterRowsByProduct.set(productKey, {
+      product_id: productKey,
+      product_category: product?.product_category ?? null,
+      product_type: product?.product_type ?? null,
+      unit_size_l: unitSizeToLitres(product?.unit_size_value, product?.unit_size_unit),
+      units_produced_current: cur,
+      units_produced_prior: pri,
+      per_unit_water_m3:
+        perUnitWater !== null && Number.isFinite(perUnitWater) ? Number(perUnitWater) : null,
+      per_unit_scarcity_m3:
+        perUnitScarcity !== null && Number.isFinite(perUnitScarcity)
+          ? Number(perUnitScarcity)
+          : null,
+    })
+  }
+
+  const facilityCurrentRows = ((valOrNull(facilityWaterCurrent) as any)?.data ?? []) as Array<{
+    total_consumption_m3: number | null
+    scarcity_weighted_consumption_m3: number | null
+  }>
+  const facilityPriorRows = ((valOrNull(facilityWaterPrior) as any)?.data ?? []) as Array<{
+    total_consumption_m3: number | null
+    scarcity_weighted_consumption_m3: number | null
+  }>
+  const sumOrNull = (rows: typeof facilityCurrentRows, key: keyof (typeof facilityCurrentRows)[number]): number | null => {
+    if (!rows.length) return null
+    let total = 0
+    let any = false
+    for (const r of rows) {
+      const v = Number(r[key] ?? 0)
+      if (Number.isFinite(v) && v > 0) {
+        total += v
+        any = true
+      }
+    }
+    return any ? total : null
+  }
+  // Schema names the column "total_consumption_m3" but the column is
+  // actually total *intake* (m³ of water withdrawn from sources before
+  // discharge) — the legacy naming predates the operational/embedded split.
+  // Litres = m³ × 1000.
+  const facilityIntakeCurrent_m3 = sumOrNull(facilityCurrentRows, 'total_consumption_m3')
+  const facilityIntakePrior_m3 = sumOrNull(facilityPriorRows, 'total_consumption_m3')
+  const facilityScarcityCurrent_m3 = sumOrNull(
+    facilityCurrentRows,
+    'scarcity_weighted_consumption_m3',
+  )
+  const waterInputs = buildWaterInputs({
+    products: Array.from(waterRowsByProduct.values()),
+    facility_intake_current_l:
+      facilityIntakeCurrent_m3 !== null ? facilityIntakeCurrent_m3 * 1000 : null,
+    facility_intake_prior_l:
+      facilityIntakePrior_m3 !== null ? facilityIntakePrior_m3 * 1000 : null,
+    facility_scarcity_current_l:
+      facilityScarcityCurrent_m3 !== null ? facilityScarcityCurrent_m3 * 1000 : null,
+  })
+  const waterBreakdown = computeWaterScore({
+    intensity_ratio: waterInputs.intensity_ratio,
+    yoy_delta_pct: waterInputs.yoy_delta_pct,
+    avg_scarcity_factor: waterInputs.avg_scarcity_factor,
+    source: waterInputs.source,
+  })
+
+  // Org-level fallback inputs for the legacy water/circularity aggregator.
+  const productType =
+    ((valOrNull(orgRow) as any)?.data?.product_type as string | null) ??
+    productRowsData[0]?.product_type ??
+    null
+  const productCategories = productRowsData.map(p => p.product_category ?? null)
+
+  const signals = buildEnvironmentalSignals({
+    lcas,
+    productType,
+    productCategories,
+  })
+  const inputs = toEnvironmentalInputs(signals)
+  return {
+    ...inputs,
+    climate_breakdown: climateBreakdown,
+    water_breakdown: waterBreakdown,
+  }
+}
+
+async function buildSocialInputs(
+  service: SupabaseClient,
+  organizationId: string,
+): Promise<Parameters<typeof computeSocialPillar>[0]> {
+  const [communityRow, peopleRow, supplierTotals, supplierSubmitted] = await Promise.allSettled([
+    service
+      .from('community_impact_scores')
+      .select('overall_score')
+      .eq('organization_id', organizationId)
+      .order('calculated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    service
+      .from('people_culture_scores')
+      .select('overall_score')
+      .eq('organization_id', organizationId)
+      .order('calculated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    service
+      .from('suppliers')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', organizationId),
+    service
+      .from('supplier_esg_assessments')
+      .select('id, suppliers!inner(organization_id)', { count: 'exact', head: true })
+      .eq('suppliers.organization_id', organizationId)
+      .not('submitted_at', 'is', null),
+  ])
+
+  const valOrNull = <T>(r: PromiseSettledResult<T>): T | null =>
+    r.status === 'fulfilled' ? r.value : null
+
+  const community_score = numOrNull((valOrNull(communityRow) as any)?.data?.overall_score)
+  const people_culture_score = numOrNull((valOrNull(peopleRow) as any)?.data?.overall_score)
+  const supplierTotal = ((valOrNull(supplierTotals) as any)?.count ?? 0) as number
+  const supplierSubmittedCount = ((valOrNull(supplierSubmitted) as any)?.count ?? 0) as number
+  const supplier_esg_pct =
+    supplierTotal > 0 ? Math.round((supplierSubmittedCount / supplierTotal) * 100) : null
+
+  return { community_score, people_culture_score, supplier_esg_pct }
+}
+
+async function buildGovernanceInputs(
+  service: SupabaseClient,
+  organizationId: string,
+): Promise<Parameters<typeof computeGovernancePillar>[0]> {
+  const [governanceRow, certsRow] = await Promise.allSettled([
+    service
+      .from('governance_scores')
+      .select('overall_score')
+      .eq('organization_id', organizationId)
+      .order('calculated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    service
+      .from('organization_certifications')
+      .select('progress_percentage, status')
+      .eq('organization_id', organizationId)
+      .neq('status', 'expired'),
+  ])
+
+  const valOrNull = <T>(r: PromiseSettledResult<T>): T | null =>
+    r.status === 'fulfilled' ? r.value : null
+
+  const governance_score = numOrNull((valOrNull(governanceRow) as any)?.data?.overall_score)
+
+  const certRows = ((valOrNull(certsRow) as any)?.data ?? []) as Array<{
+    progress_percentage: number | null
+  }>
+  const certVals = certRows
+    .map(r => Number(r.progress_percentage))
+    .filter(n => Number.isFinite(n))
+  const cert_progress_pct =
+    certVals.length > 0 ? Math.round(certVals.reduce((a, b) => a + b, 0) / certVals.length) : null
+
+  return { governance_score, cert_progress_pct }
+}
+
+async function loadOrgWeights(
+  service: SupabaseClient,
+  organizationId: string,
+): Promise<VitalityWeights> {
+  try {
+    const { data } = await service
+      .from('organizations')
+      .select('vitality_weights')
+      .eq('id', organizationId)
+      .maybeSingle()
+    return normaliseWeights((data as any)?.vitality_weights ?? null)
+  } catch {
+    return normaliseWeights(null)
+  }
+}
+
+async function curateRead(
+  composite: VitalityComposite,
+  trend: TrendPoint[],
+): Promise<VitalityRead | null> {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) return null
+  const Anthropic = (await import('@anthropic-ai/sdk')).default
+  const client = new Anthropic({ apiKey })
+  try {
+    const response = await client.messages.create({
+      model: MODEL,
+      max_tokens: MAX_OUTPUT_TOKENS,
+      system: buildVitalityReadSystemPrompt(),
+      tools: [VITALITY_READ_TOOL],
+      tool_choice: { type: 'tool', name: VITALITY_READ_TOOL.name },
+      messages: [
+        { role: 'user', content: formatVitalityForPrompt(composite, trend) },
+      ],
+    })
+    const toolUse = response.content.find(c => c.type === 'tool_use')
+    if (!toolUse || toolUse.type !== 'tool_use') return null
+    const raw = toolUse.input as VitalityRead
+    return {
+      headline: clamp(raw.headline, 100),
+      detail: clamp(raw.detail, 360),
+      next_move: raw.next_move ? clamp(raw.next_move, 200) : null,
+      confidence: ['high', 'medium', 'low'].includes(raw.confidence) ? raw.confidence : 'medium',
+    }
+  } catch (err) {
+    console.error('[vitality read] curator failed:', err)
+    return null
+  }
+}
+
+function fallbackRead(composite: VitalityComposite, trend: TrendPoint[]): VitalityRead {
+  const delta = trendDelta(trend)
+  const band = composite.band
+  const directionLine =
+    delta.delta_points === null
+      ? 'Trend will fill out as you keep visiting; come back next week for movement.'
+      : delta.delta_points > 0
+        ? `Up ${delta.delta_points} points across the snapshot window.`
+        : delta.delta_points < 0
+          ? `Down ${Math.abs(delta.delta_points)} points across the snapshot window.`
+          : 'Flat across the snapshot window.'
+  return {
+    headline:
+      composite.composite === null
+        ? 'Awaiting more data to call a score.'
+        : `Your vitality is ${band.toLowerCase()}.`,
+    detail:
+      composite.composite === null
+        ? 'Add LCAs, social impact data, or governance policies to unlock a composite score.'
+        : `${BAND_DESCRIPTIONS[band]} ${directionLine}`,
+    next_move:
+      composite.composite === null
+        ? 'Start with a single product LCA — that unlocks the environmental pillar fastest.'
+        : null,
+    confidence: 'medium',
+  }
+}
+
+function numOrNull(v: unknown): number | null {
+  if (v === null || v === undefined) return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
+function clamp(s: string, max: number): string {
+  return String(s ?? '').trim().slice(0, max)
+}
+
+export async function GET(req: NextRequest) {
+  const ctx = await resolveContext(req)
+  if ('error' in ctx) return ctx.error
+  const { organizationId, service } = ctx
+
+  // ?read=1 — opt in to the Claude-curated narrative. Default skips it so
+  // the Rosa hub hero loads in ~DB-time (a few hundred ms). The breakdown
+  // modal opts in once the user clicks through to view the deeper read.
+  const url = new URL(req.url)
+  const wantsAiRead = url.searchParams.get('read') === '1'
+
+  const [envInputs, socialInputs, govInputs, weights] = await Promise.all([
+    buildEnvironmentalInputs(service, organizationId),
+    buildSocialInputs(service, organizationId),
+    buildGovernanceInputs(service, organizationId),
+    loadOrgWeights(service, organizationId),
+  ])
+
+  const composite = composeVitality({
+    e: computeEnvironmentalPillar(envInputs),
+    s: computeSocialPillar(socialInputs),
+    g: computeGovernancePillar(govInputs),
+    weights,
+  })
+
+  // Run the snapshot write and the trend read in parallel — the trend
+  // read can include yesterday's row even before today's write commits,
+  // so this is safe and shaves a round-trip.
+  const [, trend] = await Promise.all([
+    upsertSnapshot(service, organizationId, composite),
+    loadTrend(service, organizationId),
+  ])
+  const delta = trendDelta(trend)
+
+  // Curate via Claude only when requested AND the user is under their
+  // daily budget; otherwise the deterministic fallback gives a usable
+  // headline instantly.
+  let read: VitalityRead
+  let source: ResponsePayload['source'] = 'fallback'
+  if (wantsAiRead) {
+    const overBudget = await isOverDailyBudget(
+      service,
+      organizationId,
+      ctx.userId,
+      'vitality.read.curated',
+    )
+    if (overBudget) {
+      read = fallbackRead(composite, trend)
+      await logRosaTelemetry(service, organizationId, ctx.userId, 'vitality.read.budget_blocked', {})
+    } else {
+      const ai = await curateRead(composite, trend)
+      if (ai) {
+        read = ai
+        source = 'curator'
+        await logRosaTelemetry(service, organizationId, ctx.userId, 'vitality.read.curated', {})
+      } else {
+        read = fallbackRead(composite, trend)
+      }
+    }
+  } else {
+    read = fallbackRead(composite, trend)
+  }
+
+  const payload: ResponsePayload = {
+    composite,
+    trend,
+    trend_delta: delta,
+    band_description: BAND_DESCRIPTIONS[composite.band],
+    read,
+    source,
+    generated_at: new Date().toISOString(),
+  }
+  return NextResponse.json(payload, {
+    headers: { 'Cache-Control': 'no-store' },
+  })
+}

@@ -7,10 +7,11 @@
  * Supporting: horizontal stacked bar showing each regime's share.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Scale } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { useWidgetDrill } from '@/lib/pulse/MetricDrillContext';
+import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider';
 import { PulseCard } from '@/components/pulse/PulseCard';
 
 interface RegLine {
@@ -62,6 +63,29 @@ export function RegulatoryExposureCard() {
   const status = needsData > 0
     ? ({ tone: 'warn' as const, label: `${needsData} needs data` })
     : null;
+
+  const rosaSlice = useMemo(
+    () =>
+      data
+        ? {
+            id: 'regulatory-exposure',
+            label: 'Regulatory exposure',
+            priority: 7,
+            data: {
+              totalAnnualGbp: data.total_annual_gbp,
+              regimes: data.lines.map(l => ({
+                id: l.id,
+                label: l.label,
+                annualGbp: l.annual_cost_gbp,
+                assumed: l.assumed,
+              })),
+              assumptionGapsCount: needsData,
+            },
+          }
+        : null,
+    [data, needsData],
+  );
+  useRosaPageContext(rosaSlice);
 
   return (
     <PulseCard

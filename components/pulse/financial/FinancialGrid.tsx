@@ -18,9 +18,11 @@ import Link from 'next/link';
 import { ArrowLeft, PoundSterling } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
-import { MetricDrillProvider } from '@/lib/pulse/MetricDrillContext';
+import { MetricDrillProvider, useWidgetDrill } from '@/lib/pulse/MetricDrillContext';
 import { WidgetDrillOverlay } from '@/components/pulse/WidgetDrillOverlay';
 import { usePulseDrillUrl } from '@/hooks/usePulseDrillUrl';
+import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider';
+import { useMemo } from 'react';
 
 // Compact cards -- shared with /pulse.
 import { FinancialFootprintCard } from '@/components/pulse/widgets/financial-footprint/FinancialFootprintCard';
@@ -60,6 +62,34 @@ export function PulseFinancialShell() {
 function PulseFinancialShellBody() {
   // Two-way sync between ?drill= query param and drill context.
   usePulseDrillUrl();
+
+  const { activeTarget, open: drillOpen } = useWidgetDrill();
+  const rosaSlice = useMemo(
+    () => ({
+      id: 'pulse-financial',
+      label: 'Pulse — Financial (CFO view)',
+      priority: 7,
+      data: {
+        activeDrill: drillOpen && activeTarget ? activeTarget : null,
+        availableExports: ['board_pack_pdf', 'issb_csv'],
+        cardIds: [
+          'financial-footprint',
+          'scenario-sensitivity',
+          'macc',
+          'carbon-budgets',
+          'regulatory-exposure',
+          'product-env-cost',
+          'cost-intensity',
+          'top-cost-drivers',
+          'issb-disclosure',
+          'impact-valuation',
+        ],
+      },
+    }),
+    [activeTarget, drillOpen],
+  );
+  useRosaPageContext(rosaSlice);
+
   return (
     <>
       <div className="space-y-6 pb-12">

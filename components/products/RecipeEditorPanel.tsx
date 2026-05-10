@@ -38,6 +38,8 @@ import { useOnboarding } from "@/lib/onboarding/OnboardingContext";
 import { useRecipeEditor } from "@/hooks/useRecipeEditor";
 import { useIngestStash } from "@/hooks/useIngestStash";
 import { useLinkedSupplierProducts } from "@/hooks/data/useLinkedSupplierProducts";
+import { useRosaPageContext } from "@/lib/rosa/RosaContextProvider";
+import { useMemo } from "react";
 import type { IngredientFormData } from "@/components/products/IngredientFormCard";
 import type { PackagingFormData } from "@/components/products/PackagingFormCard";
 import type { MaturationFormData } from "@/components/products/MaturationProfileCard";
@@ -141,6 +143,55 @@ export function RecipeEditorPanel({
   useEffect(() => {
     onDirtyChange?.(isDirty);
   }, [isDirty, onDirtyChange]);
+
+  // Tell Rosa what the user is looking at on the recipe editor. The ID is
+  // stable per product so the slice updates as the user picks ingredients,
+  // adds new ones, or matches factors. Rosa uses this to answer questions
+  // like "which factor should I pick for maple syrup?" without the user
+  // having to copy-paste the ingredient name.
+  const rosaSlice = useMemo(() => {
+    if (!product) return null;
+    const ingredients = ingredientForms.map(i => ({
+      name: i.name || '(unnamed)',
+      amount: i.amount,
+      unit: i.unit,
+      origin_country: i.origin_country || null,
+      is_organic: i.is_organic_certified,
+      data_source: i.data_source,
+      matched_factor: i.matched_source_name || null,
+      factor_source: i.ef_source || null,
+      factor_quality_grade: i.ef_data_quality_grade || null,
+      has_emission_factor: !!i.matched_source_name,
+    }));
+    const unmatched = ingredients.filter(i => !i.has_emission_factor && i.name !== '(unnamed)');
+    return {
+      id: 'recipe-editor',
+      label: `Recipe: ${product.name || 'product'}${product.product_category ? ` (${product.product_category})` : ''}`,
+      priority: 9,
+      data: {
+        product: {
+          id: product.id,
+          name: product.name,
+          category: product.product_category ?? null,
+          abv_percent: product.abv_percent ?? null,
+          bottle_size_ml: product.bottle_size_ml ?? null,
+          functional_unit: product.functional_unit ?? null,
+        },
+        active_tab: activeTab,
+        recipe_scale_mode: recipeScaleMode,
+        batch_yield: recipeScaleMode === 'per_batch' ? { value: batchYieldValue, unit: batchYieldUnit } : null,
+        ingredient_count: ingredientCount,
+        packaging_count: packagingCount,
+        ingredients,
+        ingredients_missing_factors: unmatched.map(i => i.name),
+        notes: unmatched.length > 0
+          ? `${unmatched.length} ingredient(s) don't have an emission factor matched yet. The user may ask which factor to pick.`
+          : 'All ingredients have an emission factor matched.',
+      },
+    };
+  }, [product, ingredientForms, activeTab, recipeScaleMode, batchYieldValue, batchYieldUnit, ingredientCount, packagingCount]);
+
+  useRosaPageContext(rosaSlice);
 
   const handleSaveIngredients = async () => {
     await saveIngredients();

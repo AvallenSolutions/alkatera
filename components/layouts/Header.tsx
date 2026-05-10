@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Input } from '@/components/ui/input'
 import { useOrganization } from '@/lib/organizationContext'
 import { useAuth } from '@/hooks/useAuth'
 import {
@@ -16,9 +15,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { LogOut, User, Menu, X, Building2, Check, ChevronsUpDown, Dog, MessageSquare, Upload, CornerDownLeft } from 'lucide-react'
+import { LogOut, User, Menu, X, Building2, Check, ChevronsUpDown, MessageSquare } from 'lucide-react'
 import { CommandPalette } from '@/components/dashboard/CommandPalette'
-import { UniversalDropzone } from '@/components/layouts/UniversalDropzone'
 import {
   Command,
   CommandEmpty,
@@ -47,15 +45,6 @@ export function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
   const { user, signOut } = useAuth()
   const [signingOut, setSigningOut] = useState(false)
   const [orgPopoverOpen, setOrgPopoverOpen] = useState(false)
-  const [rosaPrompt, setRosaPrompt] = useState('')
-
-  const submitRosaPrompt = (e?: React.FormEvent) => {
-    e?.preventDefault()
-    const q = rosaPrompt.trim()
-    if (!q) return
-    router.push(`/rosa?prompt=${encodeURIComponent(q)}`)
-    setRosaPrompt('')
-  }
 
   const handleSignOut = async () => {
     setSigningOut(true)
@@ -143,24 +132,9 @@ export function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
         </div>
 
         <div className="flex items-center gap-2">
-          <form
-            onSubmit={submitRosaPrompt}
-            className="hidden sm:flex items-center gap-2 relative"
-          >
-            <div className="relative">
-              <Dog className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-400 pointer-events-none" />
-              <Input
-                value={rosaPrompt}
-                onChange={(e) => setRosaPrompt(e.target.value)}
-                placeholder="Ask Rosa anything..."
-                aria-label="Ask Rosa"
-                className="h-9 w-[280px] lg:w-[360px] pl-8 pr-14"
-              />
-              <kbd className="hidden lg:inline-flex absolute right-2 top-1/2 -translate-y-1/2 h-5 items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground pointer-events-none">
-                <CornerDownLeft className="h-3 w-3" />
-              </kbd>
-            </div>
-          </form>
+          {/* Header search ('Ask Rosa anything…') and Upload button removed —
+              Rosa is now reachable via the floating drawer trigger and the
+              hub, and uploads happen through the agent queue. */}
           <CommandPalette />
           <FeedbackDialog
             trigger={
@@ -171,19 +145,6 @@ export function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
             }
           />
           <NotificationBell />
-          <UniversalDropzone
-            trigger={
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2 h-9 border-[#ccff00]/40 hover:bg-[#ccff00]/10"
-                title="Upload anything — we'll figure out what it is"
-              >
-                <Upload className="h-4 w-4" />
-                <span className="hidden sm:inline">Upload</span>
-              </Button>
-            }
-          />
           <ThemeToggle />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
