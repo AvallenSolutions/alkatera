@@ -13,6 +13,7 @@ export const HUB_CARD_IDS = [
   'recently_from_rosa',
   'recent_conversations',
   'circular_partnerships',
+  'nature_positive_actions',
 ] as const
 
 export type HubCardId = (typeof HUB_CARD_IDS)[number]
@@ -188,4 +189,5 @@ export const HUB_CARD_LABELS: Record<HubCardId, string> = {
   recently_from_rosa: 'Recently from Rosa',
   recent_conversations: 'Recent conversations',
   circular_partnerships: 'Circular partnerships',
+  nature_positive_actions: 'Nature-positive actions',
 }

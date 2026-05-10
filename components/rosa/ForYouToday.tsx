@@ -8,6 +8,7 @@ import { ProductSpotlight } from './ProductSpotlight'
 import { RecentlyFromRosa } from './RecentlyFromRosa'
 import { RecentConversations } from './RecentConversations'
 import { CircularPartnerships } from './CircularPartnerships'
+import { NaturePositiveActions } from './NaturePositiveActions'
 import { QuickActions } from './QuickActions'
 import { QuickPrompts } from './QuickPrompts'
 import { ForwardTimeline } from './ForwardTimeline'
@@ -129,6 +130,7 @@ export function ForYouToday({ onOpenQueue, onSubmit }: Props) {
       )}
 
       {isVisible('circular_partnerships') && <CircularPartnerships />}
+      {isVisible('nature_positive_actions') && <NaturePositiveActions />}
     </div>
   )
 }

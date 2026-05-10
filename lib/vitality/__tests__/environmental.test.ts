@@ -20,6 +20,13 @@ import {
   circularityIntensityYoySubScore,
   tierWeightedDiversionPct,
   buildCircularityInputs,
+  computeNatureScore,
+  natureAxisSubScore,
+  natureYoySubScore,
+  natureWeightedFootprint,
+  naturePositiveSubScore,
+  buildNatureInputs,
+  buildNaturePositiveInputs,
   type ClimateProductRow,
   type PcfWithEol,
   type WaterProductRow,
@@ -726,6 +733,387 @@ describe('buildCircularityInputs', () => {
     expect(out.treatment_mix.reuse).toBeCloseTo(0.5, 4)
     // Reuse 1.0 + other 0.2 → 50×1.0 + 50×0.2 = 60
     expect(out.tier_weighted_diversion_pct).toBeCloseTo(60, 1)
+  })
+})
+
+describe('natureAxisSubScore (1% interpolated against thresholds)', () => {
+  const landThresh = { excellent: 500, good: 2000 }
+
+  it('returns 100 at zero impact', () => {
+    expect(natureAxisSubScore(0, landThresh)).toBe(100)
+  })
+
+  it('hits anchor scores at calibrated thresholds', () => {
+    expect(natureAxisSubScore(500, landThresh)).toBe(90) // excellent
+    expect(natureAxisSubScore(2000, landThresh)).toBe(70) // good
+    expect(natureAxisSubScore(4000, landThresh)).toBe(25) // 2× good
+    expect(natureAxisSubScore(8000, landThresh)).toBe(10) // 4× good
+  })
+
+  it('clamps to 10 above 4× good', () => {
+    expect(natureAxisSubScore(20000, landThresh)).toBe(10)
+  })
+
+  it('returns 0 for invalid input', () => {
+    expect(natureAxisSubScore(NaN, landThresh)).toBe(0)
+    expect(natureAxisSubScore(-100, landThresh)).toBe(0)
+  })
+})
+
+describe('natureYoySubScore (lenient ladder, mirrors water/circularity)', () => {
+  it('rewards a 3% reduction with the top score', () => {
+    expect(natureYoySubScore(-3)).toBe(100)
+    expect(natureYoySubScore(-10)).toBe(100)
+  })
+  it('hits anchor scores', () => {
+    expect(natureYoySubScore(0)).toBe(80)
+    expect(natureYoySubScore(5)).toBe(40)
+    expect(natureYoySubScore(20)).toBe(5)
+  })
+})
+
+describe('natureWeightedFootprint (EF 3.1 normalisation + weighting)', () => {
+  it('returns 0 for zero impacts', () => {
+    expect(
+      natureWeightedFootprint({
+        land_use: 0,
+        terrestrial_acidification: 0,
+        freshwater_eutrophication: 0,
+        terrestrial_ecotoxicity: 0,
+      }),
+    ).toBe(0)
+  })
+
+  it('normalises each impact to person-equivalents and weights by EF 3.1 factors', () => {
+    // 819,000 m²a (1 PE land) × 0.0794 weight = 0.0794
+    const out = natureWeightedFootprint({
+      land_use: 819000,
+      terrestrial_acidification: 0,
+      freshwater_eutrophication: 0,
+      terrestrial_ecotoxicity: 0,
+    })
+    expect(out).toBeCloseTo(0.0794, 4)
+  })
+
+  it('combines all four axes correctly', () => {
+    // Each at 1 person-equivalent → sum of EF 3.1 weights = 0.1882
+    const out = natureWeightedFootprint({
+      land_use: 819000,
+      terrestrial_acidification: 55.6,
+      freshwater_eutrophication: 1.61,
+      terrestrial_ecotoxicity: 28700,
+    })
+    expect(out).toBeCloseTo(0.1882, 4)
+  })
+})
+
+describe('computeNatureScore (EF 3.1 weighted blend)', () => {
+  const ZERO_PER_UNIT = {
+    land_use: null,
+    terrestrial_acidification: null,
+    freshwater_eutrophication: null,
+    terrestrial_ecotoxicity: null,
+  }
+
+  it('returns no_data when nothing is provided', () => {
+    const out = computeNatureScore({
+      per_unit_impacts: ZERO_PER_UNIT,
+      yoy_total_pct: null,
+    })
+    expect(out.score).toBeNull()
+    expect(out.mode).toBe('no_data')
+  })
+
+  it('weights axes via EF 3.1 (land use dominates over ecotoxicity)', () => {
+    // Land-use axis at "good" (70/100), all others zero impact → 100/100.
+    // EF 3.1 weights: land 0.0794, acid 0.0621, eut 0.028, ecot 0.0187
+    // Practices = (70×0.0794 + 100×0.0621 + 100×0.028 + 100×0.0187) / 0.1882
+    //          = (5.558 + 6.21 + 2.8 + 1.87) / 0.1882 = 16.438 / 0.1882 ≈ 87
+    const out = computeNatureScore({
+      per_unit_impacts: {
+        land_use: 2000, // good → 70
+        terrestrial_acidification: 0, // 100
+        freshwater_eutrophication: 0, // 100
+        terrestrial_ecotoxicity: 0, // 100
+      },
+      yoy_total_pct: null,
+    })
+    expect(out.axes.land_use_sub).toBe(70)
+    expect(out.practices_sub).toBe(87)
+    expect(out.mode).toBe('practices_only')
+    expect(out.weights).toEqual({ practices: 1, yoy: 0, positive: 0, dependencies: 0 })
+  })
+
+  it('blends 60/40 with YoY when both sides present', () => {
+    // All axes at "good" → all 70; weighted avg = 70.
+    // YoY 0% → 80. Blend = 0.6×70 + 0.4×80 = 74.
+    const out = computeNatureScore({
+      per_unit_impacts: {
+        land_use: 2000,
+        terrestrial_acidification: 3.0,
+        freshwater_eutrophication: 0.7,
+        terrestrial_ecotoxicity: 15,
+      },
+      yoy_total_pct: 0,
+    })
+    expect(out.practices_sub).toBe(70)
+    expect(out.yoy_sub).toBe(80)
+    expect(out.score).toBe(74)
+    expect(out.mode).toBe('blended')
+  })
+
+  it('redistributes weights when some axes are absent', () => {
+    // Only land_use present → practices = land_use sub alone
+    const out = computeNatureScore({
+      per_unit_impacts: {
+        land_use: 500, // excellent → 90
+        terrestrial_acidification: null,
+        freshwater_eutrophication: null,
+        terrestrial_ecotoxicity: null,
+      },
+      yoy_total_pct: null,
+    })
+    expect(out.practices_sub).toBe(90)
+    expect(out.score).toBe(90)
+  })
+
+  it('redistributes weights to 50/30/20 when nature-positive actions are present', () => {
+    // All axes "good" → practices 70; YoY 0% → 80; positive 5 m²/unit → 60
+    // Blend = 0.5×70 + 0.3×80 + 0.2×60 = 35 + 24 + 12 = 71
+    const out = computeNatureScore({
+      per_unit_impacts: {
+        land_use: 2000,
+        terrestrial_acidification: 3.0,
+        freshwater_eutrophication: 0.7,
+        terrestrial_ecotoxicity: 15,
+      },
+      yoy_total_pct: 0,
+      effective_sq_m_per_unit: 5,
+      effective_hectares: 1.5,
+    })
+    expect(out.nature_positive_sub).toBe(60)
+    expect(out.score).toBe(71)
+    expect(out.weights.practices).toBeCloseTo(0.5, 4)
+    expect(out.weights.yoy).toBeCloseTo(0.3, 4)
+    expect(out.weights.positive).toBeCloseTo(0.2, 4)
+    expect(out.effective_hectares).toBe(1.5)
+  })
+
+  it('keeps 60/40 practices/yoy when no nature-positive data', () => {
+    const out = computeNatureScore({
+      per_unit_impacts: {
+        land_use: 2000,
+        terrestrial_acidification: 3.0,
+        freshwater_eutrophication: 0.7,
+        terrestrial_ecotoxicity: 15,
+      },
+      yoy_total_pct: 0,
+    })
+    expect(out.weights.practices).toBeCloseTo(0.6, 4)
+    expect(out.weights.yoy).toBeCloseTo(0.4, 4)
+    expect(out.weights.positive).toBe(0)
+  })
+
+  it('falls back to positive_only when only nature-positive data is present', () => {
+    const out = computeNatureScore({
+      per_unit_impacts: {
+        land_use: null,
+        terrestrial_acidification: null,
+        freshwater_eutrophication: null,
+        terrestrial_ecotoxicity: null,
+      },
+      yoy_total_pct: null,
+      effective_sq_m_per_unit: 10,
+      effective_hectares: 2,
+    })
+    expect(out.score).toBe(80) // 10 m²/unit anchor
+    expect(out.mode).toBe('positive_only')
+  })
+
+  it('applies country biodiversity multiplier to land use BEFORE banding', () => {
+    // Land use 1500 m²a/unit, multiplier 1.4 → effective 2100, just above
+    // "good" 2000 → score drops from ~74 (interpolated) to ~67
+    const noMultiplier = computeNatureScore({
+      per_unit_impacts: {
+        land_use: 1500,
+        terrestrial_acidification: null,
+        freshwater_eutrophication: null,
+        terrestrial_ecotoxicity: null,
+      },
+      yoy_total_pct: null,
+    })
+    const withMultiplier = computeNatureScore({
+      per_unit_impacts: {
+        land_use: 1500,
+        terrestrial_acidification: null,
+        freshwater_eutrophication: null,
+        terrestrial_ecotoxicity: null,
+      },
+      yoy_total_pct: null,
+      country_biodiversity_multiplier: 1.4,
+    })
+    expect(withMultiplier.score).toBeLessThan(noMultiplier.score!)
+    expect(withMultiplier.country_biodiversity_multiplier).toBe(1.4)
+  })
+
+  it('applies dependencies sub as a 10% modifier on the core blend', () => {
+    // Core blend: all axes at "good" → 70. Deps 100 → final = 0.9×70 + 0.1×100 = 73
+    const out = computeNatureScore({
+      per_unit_impacts: {
+        land_use: 2000,
+        terrestrial_acidification: 3.0,
+        freshwater_eutrophication: 0.7,
+        terrestrial_ecotoxicity: 15,
+      },
+      yoy_total_pct: null,
+      dependencies_sub: 100,
+      dependencies_declared_count: 7,
+    })
+    expect(out.score).toBe(73)
+    expect(out.dependencies_sub).toBe(100)
+    expect(out.dependencies_declared_count).toBe(7)
+    expect(out.weights.dependencies).toBe(0.1)
+  })
+
+  it('falls back to dependencies-only when no LCA/positive data but deps are declared', () => {
+    const out = computeNatureScore({
+      per_unit_impacts: {
+        land_use: null,
+        terrestrial_acidification: null,
+        freshwater_eutrophication: null,
+        terrestrial_ecotoxicity: null,
+      },
+      yoy_total_pct: null,
+      dependencies_sub: 60,
+      dependencies_declared_count: 4,
+    })
+    expect(out.score).toBe(60)
+    expect(out.weights.dependencies).toBe(1)
+  })
+
+  it('exposes EF 3.1 source citation in the breakdown', () => {
+    const out = computeNatureScore({
+      per_unit_impacts: { land_use: 0, terrestrial_acidification: null, freshwater_eutrophication: null, terrestrial_ecotoxicity: null },
+      yoy_total_pct: null,
+    })
+    expect(out.source.name).toContain('EF 3.1')
+    expect(out.source.doi).toContain('10.2760/14875')
+  })
+})
+
+describe('naturePositiveSubScore', () => {
+  it('returns 0 for no contribution', () => {
+    expect(naturePositiveSubScore(0)).toBe(0)
+  })
+  it('hits anchor scores', () => {
+    expect(naturePositiveSubScore(1)).toBe(30)
+    expect(naturePositiveSubScore(5)).toBe(60)
+    expect(naturePositiveSubScore(10)).toBe(80)
+    expect(naturePositiveSubScore(25)).toBe(95)
+    expect(naturePositiveSubScore(50)).toBe(100)
+  })
+  it('clamps at 100 for very large contributions', () => {
+    expect(naturePositiveSubScore(500)).toBe(100)
+  })
+})
+
+describe('buildNaturePositiveInputs', () => {
+  const scoringStatuses = new Set(['in_progress', 'established'])
+  const valueLookup = (type: string) => {
+    if (type === 'peatland_restoration') return 1.0
+    if (type === 'regenerative_agriculture') return 0.6
+    return 0
+  }
+
+  it('returns null when no actions are scoring', () => {
+    const out = buildNaturePositiveInputs({
+      actions: [
+        { hectares_active: 5, action_type: 'peatland_restoration', status: 'planned' },
+      ],
+      type_value_per_hectare: valueLookup,
+      scoring_statuses: scoringStatuses,
+      current_year_units: 1000,
+    })
+    expect(out.effective_hectares).toBeNull()
+    expect(out.effective_sq_m_per_unit).toBeNull()
+  })
+
+  it('type-weights hectares and computes m² per unit', () => {
+    // 2 ha peatland (×1.0) + 5 ha regen ag (×0.6) = 2 + 3 = 5 effective ha
+    // 5 ha × 10000 m²/ha / 10000 units = 5 m²/unit
+    const out = buildNaturePositiveInputs({
+      actions: [
+        { hectares_active: 2, action_type: 'peatland_restoration', status: 'established' },
+        { hectares_active: 5, action_type: 'regenerative_agriculture', status: 'in_progress' },
+      ],
+      type_value_per_hectare: valueLookup,
+      scoring_statuses: scoringStatuses,
+      current_year_units: 10000,
+    })
+    expect(out.effective_hectares).toBeCloseTo(5, 4)
+    expect(out.effective_sq_m_per_unit).toBeCloseTo(5, 4)
+  })
+
+  it('excludes planned and ended actions', () => {
+    const out = buildNaturePositiveInputs({
+      actions: [
+        { hectares_active: 2, action_type: 'peatland_restoration', status: 'planned' },
+        { hectares_active: 3, action_type: 'peatland_restoration', status: 'established' },
+        { hectares_active: 100, action_type: 'peatland_restoration', status: 'ended' },
+      ],
+      type_value_per_hectare: valueLookup,
+      scoring_statuses: scoringStatuses,
+      current_year_units: 1000,
+    })
+    // Only the established 3 ha counts → 3 effective hectares
+    expect(out.effective_hectares).toBeCloseTo(3, 4)
+  })
+})
+
+describe('buildNatureInputs', () => {
+  const zeroImpacts = {
+    climate_change_gwp100: 0,
+    water_consumption: 0,
+    water_scarcity_aware: 0,
+    land_use: 0,
+    terrestrial_ecotoxicity: 0,
+    freshwater_eutrophication: 0,
+    terrestrial_acidification: 0,
+    fossil_resource_scarcity: 0,
+  }
+
+  it('computes per-unit impacts from current-year totals + units', () => {
+    const out = buildNatureInputs({
+      current_year_impacts: { ...zeroImpacts, land_use: 100000 },
+      prior_year_impacts: null,
+      current_year_units: 1000,
+      prior_year_units: 0,
+    })
+    expect(out.per_unit_impacts.land_use).toBe(100) // 100000 / 1000
+    expect(out.yoy_total_pct).toBeNull()
+  })
+
+  it('computes YoY on the EF 3.1 weighted footprint', () => {
+    // Current: 1 PE land = 0.0794 weighted
+    // Prior:   2 PE land = 0.1588 weighted
+    // YoY = (0.0794 - 0.1588) / 0.1588 × 100 = -50%
+    const out = buildNatureInputs({
+      current_year_impacts: { ...zeroImpacts, land_use: 819000 },
+      prior_year_impacts: { ...zeroImpacts, land_use: 1638000 },
+      current_year_units: 1000,
+      prior_year_units: 1000,
+    })
+    expect(out.yoy_total_pct).toBeCloseTo(-50, 1)
+  })
+
+  it('returns null per-unit when current units = 0', () => {
+    const out = buildNatureInputs({
+      current_year_impacts: { ...zeroImpacts, land_use: 100 },
+      prior_year_impacts: null,
+      current_year_units: 0,
+      prior_year_units: 0,
+    })
+    expect(out.per_unit_impacts.land_use).toBeNull()
   })
 })
 

@@ -51,6 +51,7 @@ import type {
   ClimateScoreBreakdown,
   WaterScoreBreakdown,
   CircularityScoreBreakdown,
+  NatureScoreBreakdown,
 } from '@/lib/vitality/environmental';
 import { PillarCard, PillarGrid, PerformanceSummary } from '@/components/vitality/PillarCard';
 import { CarbonDeepDive } from '@/components/vitality/CarbonDeepDive';
@@ -527,6 +528,7 @@ export default function PerformancePage() {
   const [climateBreakdown, setClimateBreakdown] = useState<ClimateScoreBreakdown | null>(null);
   const [waterBreakdown, setWaterBreakdown] = useState<WaterScoreBreakdown | null>(null);
   const [circularityBreakdown, setCircularityBreakdown] = useState<CircularityScoreBreakdown | null>(null);
+  const [natureBreakdown, setNatureBreakdown] = useState<NatureScoreBreakdown | null>(null);
   useEffect(() => {
     if (!currentOrganization?.id) return;
     let cancelled = false;
@@ -537,6 +539,7 @@ export default function PerformancePage() {
         setClimateBreakdown(json?.composite?.e?.climate_breakdown ?? null);
         setWaterBreakdown(json?.composite?.e?.water_breakdown ?? null);
         setCircularityBreakdown(json?.composite?.e?.circularity_breakdown ?? null);
+        setNatureBreakdown(json?.composite?.e?.nature_breakdown ?? null);
       })
       .catch(() => {});
     return () => {
@@ -551,13 +554,11 @@ export default function PerformancePage() {
     // Check if we have actual waste data
     const hasWasteData = wasteMetrics !== null && wasteMetrics !== undefined;
 
-    // Climate + water + circularity are intentionally NOT passed to the
-    // local calculator — they now come from /api/vitality/composite
-    // (blended sub-scores) so /rosa/ and /performance/ agree on the score.
-    // We override `.climate`, `.water`, and `.circularity` below.
+    // All four environmental sub-scores now come from /api/vitality/composite
+    // so /rosa/ and /performance/ agree. We pass nothing to the local
+    // calculator (it would otherwise re-derive nature client-side, which is
+    // exactly the parity bug the redesign kills).
     const local = calculateVitalityScores({
-      landUseIntensity: landUse,
-      biodiversityRisk: deriveBiodiversityRisk(natureMetrics),
       hasProductData,
       hasWasteData,
     });
@@ -566,8 +567,9 @@ export default function PerformancePage() {
       climate: climateBreakdown?.score ?? null,
       water: waterBreakdown?.score ?? null,
       circularity: circularityBreakdown?.score ?? null,
+      nature: natureBreakdown?.score ?? null,
     };
-  }, [metrics, wasteMetrics, landUse, natureMetrics, climateBreakdown, waterBreakdown, circularityBreakdown]);
+  }, [metrics, wasteMetrics, climateBreakdown, waterBreakdown, circularityBreakdown, natureBreakdown]);
 
   const scoreCalculationInputs = useMemo(() => ({
     climate: {
@@ -601,10 +603,13 @@ export default function PerformancePage() {
       circularityBreakdown,
     },
     nature: {
+      // Legacy fields kept for unmigrated callers.
       biodiversityRisk: deriveBiodiversityRisk(natureMetrics),
       landUse,
+      // Blended-nature breakdown (4 axes weighted by EU EF 3.1).
+      natureBreakdown,
     },
-  }), [totalCO2, climateBreakdown, waterBreakdown, circularityBreakdown, metrics, waterConsumption, circularityRate, natureMetrics, landUse, industryBenchmarkData, dominantCategory]);
+  }), [totalCO2, climateBreakdown, waterBreakdown, circularityBreakdown, natureBreakdown, metrics, waterConsumption, circularityRate, natureMetrics, landUse, industryBenchmarkData, dominantCategory]);
 
   const { strengths, improvements } = useMemo(() => {
     return generateStrengthsAndImprovements(

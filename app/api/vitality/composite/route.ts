@@ -42,21 +42,39 @@ import {
 } from '@/lib/vitality/read-prompt'
 import { isOverDailyBudget, logRosaTelemetry } from '@/lib/rosa/budget'
 import {
+  aggregateImpacts,
   buildCircularityInputs,
   buildClimateInputs,
   buildEnvironmentalSignals,
+  buildNatureInputs,
+  buildNaturePositiveInputs,
   buildWaterInputs,
   computeCircularityScore,
   computeClimateScore,
+  computeNatureScore,
   computeWaterScore,
   toEnvironmentalInputs,
   unitSizeToLitres,
   type ClimateProductRow,
+  type NatureActionInput,
   type PcfWithEol,
   type WasteEntry,
   type WaterProductRow,
 } from '@/lib/vitality/environmental'
 import { destinationToTreatmentMethod } from '@/lib/byproducts/destination-types'
+import {
+  actionTypeValuePerHectare,
+  SCORING_STATUSES,
+} from '@/lib/nature-actions/action-types'
+import {
+  computeCountryMix,
+  type CountryBiodiversityFactor,
+  type MaterialOrigin,
+} from '@/lib/nature-context/country-biodiversity'
+import {
+  computeDependenciesSubScore,
+  type Materiality,
+} from '@/lib/nature-context/dependency-types'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
@@ -146,6 +164,11 @@ async function buildEnvironmentalInputs(
     circularitySummary,
     byproductFlowsCurrent,
     byproductFlowsPrior,
+    natureActions,
+    natureActionFlowsCurrent,
+    materialOrigins,
+    countryFactors,
+    natureDependencies,
   ] = await Promise.allSettled([
     service
       .from('product_carbon_footprints')
@@ -211,6 +234,40 @@ async function buildEnvironmentalInputs(
       .eq('organization_id', organizationId)
       .gte('reporting_period_end', priorStart)
       .lte('reporting_period_end', priorEnd),
+    // Nature-positive actions — feeds the nature_positive_sub axis. We
+    // pull all non-ended actions and their most-recent flow inside the
+    // current year (if any). When no flow exists, the action's declared
+    // hectares is used as a fallback for in_progress / established work.
+    service
+      .from('nature_actions')
+      .select('id, action_type, hectares, status')
+      .eq('organization_id', organizationId)
+      .neq('status', 'ended'),
+    service
+      .from('nature_action_flows')
+      .select('nature_action_id, reporting_period_end, hectares_active')
+      .eq('organization_id', organizationId)
+      .gte('reporting_period_end', yearStart)
+      .lte('reporting_period_end', yearEnd)
+      .order('reporting_period_end', { ascending: false }),
+    // V2-b — material origins for country biodiversity multiplier.
+    // Joined with the org's PCFs so we only count active products.
+    service
+      .from('product_carbon_footprint_materials')
+      .select(
+        'mass_kg, origin_country_code, product_carbon_footprints!inner(organization_id, status)',
+      )
+      .eq('product_carbon_footprints.organization_id', organizationId)
+      .eq('product_carbon_footprints.status', 'completed')
+      .not('origin_country_code', 'is', null),
+    service
+      .from('country_biodiversity_factors')
+      .select('country_code, country_name, land_use_multiplier, hotspot_names'),
+    // V2-c — dependency declarations.
+    service
+      .from('nature_dependencies')
+      .select('dependency_type, materiality, notes')
+      .eq('organization_id', organizationId),
   ])
 
   const valOrNull = <T>(r: PromiseSettledResult<T>): T | null =>
@@ -512,6 +569,122 @@ async function buildEnvironmentalInputs(
     treatment_mix: circularityInputs.treatment_mix,
   })
 
+  // ---- Nature ----
+  // Current-year aggregated impacts already use current-year production_volume
+  // stamped on the lcas earlier in the function. For prior year we re-aggregate
+  // with prior-year volumes swapped in, so the YoY trend reflects the same
+  // per-product LCA × different annual production. This kills the /rosa/ vs
+  // /performance/ parity bug — both surfaces now read this single breakdown.
+  const completedForNature = lcas.filter(l => l.status === 'completed')
+  const currentYearImpacts = aggregateImpacts(completedForNature)
+  const priorLcas = completedForNature.map(l => {
+    const priorVolume = priorProductionByProduct.get(String(l.product_id ?? '')) ?? 0
+    return { ...l, production_volume: priorVolume }
+  })
+  const priorYearImpacts = priorLcas.some(l => (l.production_volume ?? 0) > 0)
+    ? aggregateImpacts(priorLcas)
+    : null
+  const natureInputs = buildNatureInputs({
+    current_year_impacts: currentYearImpacts,
+    prior_year_impacts: priorYearImpacts,
+    current_year_units: totalCurrentUnits,
+    prior_year_units: totalPriorUnits,
+  })
+
+  // Nature-positive actions: type-weight hectares-actively-delivering and
+  // divide by units to feed the nature_positive_sub axis. The route prefers
+  // the most-recent in-year flow for each action; falls back to the action's
+  // declared hectares when no flow has been logged but status is in_progress
+  // or established.
+  type ActionRow = {
+    id: string
+    action_type: string
+    hectares: number | null
+    status: string
+  }
+  type FlowRow = {
+    nature_action_id: string
+    reporting_period_end: string
+    hectares_active: number | null
+  }
+  const actionRows = ((valOrNull(natureActions) as any)?.data ?? []) as ActionRow[]
+  const flowRows = ((valOrNull(natureActionFlowsCurrent) as any)?.data ?? []) as FlowRow[]
+  const latestFlowByAction = new Map<string, number>()
+  for (const f of flowRows) {
+    // Rows arrived ordered by reporting_period_end DESC, so the first hit per
+    // action wins.
+    if (latestFlowByAction.has(f.nature_action_id)) continue
+    const v = Number(f.hectares_active ?? 0)
+    if (Number.isFinite(v) && v >= 0) latestFlowByAction.set(f.nature_action_id, v)
+  }
+  const actionInputs: NatureActionInput[] = actionRows.map(a => ({
+    hectares_active:
+      latestFlowByAction.get(a.id) ?? Number(a.hectares ?? 0),
+    action_type: a.action_type,
+    status: a.status,
+  }))
+  const positiveInputs = buildNaturePositiveInputs({
+    actions: actionInputs,
+    type_value_per_hectare: actionTypeValuePerHectare,
+    scoring_statuses: SCORING_STATUSES,
+    current_year_units: totalCurrentUnits,
+  })
+
+  // V2-b — country biodiversity multiplier from material origins.
+  type MaterialOriginRow = {
+    mass_kg: number | null
+    origin_country_code: string | null
+  }
+  const materialOriginRows = ((valOrNull(materialOrigins) as any)?.data ??
+    []) as MaterialOriginRow[]
+  const factorRows = ((valOrNull(countryFactors) as any)?.data ?? []) as Array<{
+    country_code: string
+    country_name: string
+    land_use_multiplier: number
+    hotspot_names: string[] | null
+  }>
+  const factorByCountry = new Map<string, CountryBiodiversityFactor>()
+  for (const f of factorRows) {
+    factorByCountry.set(f.country_code.toUpperCase(), {
+      country_code: f.country_code.toUpperCase(),
+      country_name: f.country_name,
+      land_use_multiplier: Number(f.land_use_multiplier),
+      hotspot_names: f.hotspot_names,
+    })
+  }
+  const origins: MaterialOrigin[] = materialOriginRows.map(r => ({
+    country_code: r.origin_country_code,
+    mass_weight: Number(r.mass_kg ?? 0),
+  }))
+  const countryMix =
+    origins.length > 0 ? computeCountryMix(origins, factorByCountry) : null
+
+  // V2-c — dependency declarations sub-score.
+  type DepRow = {
+    dependency_type: string
+    materiality: Materiality
+    notes: string | null
+  }
+  const depRows = ((valOrNull(natureDependencies) as any)?.data ?? []) as DepRow[]
+  const depsSub = computeDependenciesSubScore(
+    depRows.map(d => ({
+      dependency_type: d.dependency_type,
+      materiality: d.materiality,
+      has_notes: typeof d.notes === 'string' && d.notes.trim().length > 0,
+    })),
+  )
+
+  const natureBreakdown = computeNatureScore({
+    per_unit_impacts: natureInputs.per_unit_impacts,
+    yoy_total_pct: natureInputs.yoy_total_pct,
+    effective_sq_m_per_unit: positiveInputs.effective_sq_m_per_unit,
+    effective_hectares: positiveInputs.effective_hectares,
+    country_biodiversity_multiplier: countryMix?.weighted_multiplier ?? null,
+    country_mix: countryMix?.country_breakdown ?? null,
+    dependencies_sub: depsSub,
+    dependencies_declared_count: depRows.length,
+  })
+
   // Org-level fallback inputs for the legacy water/circularity aggregator.
   const productType =
     ((valOrNull(orgRow) as any)?.data?.product_type as string | null) ??
@@ -530,6 +703,7 @@ async function buildEnvironmentalInputs(
     climate_breakdown: climateBreakdown,
     water_breakdown: waterBreakdown,
     circularity_breakdown: circularityBreakdown,
+    nature_breakdown: natureBreakdown,
   }
 }
 
