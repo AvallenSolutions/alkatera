@@ -71,6 +71,7 @@ import {
   computeAttestationsScore,
   type SupplierAttestationType,
 } from '@/lib/supplier-responsibility/attestation-types'
+import { calculateCommunityImpactScore } from '@/lib/community-impact/score'
 import {
   actionTypeValuePerHectare,
   SCORING_STATUSES,
@@ -765,9 +766,17 @@ async function buildSocialInputs(
   service: SupabaseClient,
   organizationId: string,
 ): Promise<Parameters<typeof computeSocialPillar>[0]> {
-  // Pull the latest two snapshots for community + people-culture so we
-  // can compute YoY. Plus supplier mapping, certifications, attestations,
-  // and ESG form submission counts.
+  // Community impact: compute LIVE from raw tables. Snapshot-based reads
+  // went stale whenever an org added donations/volunteering after the
+  // initial auto-calc on the community-impact page. Raw-data computation
+  // mirrors the API route's POST-handler logic via the shared
+  // calculateCommunityImpactScore helper.
+  //
+  // People-culture stays on the snapshot for now (the auto-recalc gap is
+  // real for it too, but the calculation requires multi-table summary
+  // building that's harder to extract). YoY for both still uses the
+  // historical snapshots.
+  const currentYearForSocial = new Date().getFullYear()
   const [
     communityRows,
     peopleRows,
@@ -778,6 +787,11 @@ async function buildSocialInputs(
     supplierProductsTotal,
     supplierProductsWithCerts,
     attestationRows,
+    rawDonations,
+    rawVolunteering,
+    rawLocalImpact,
+    rawEngagements,
+    rawStories,
   ] = await Promise.allSettled([
     service
       .from('community_impact_scores')
@@ -786,10 +800,12 @@ async function buildSocialInputs(
       .order('calculated_at', { ascending: false })
       .limit(2),
     service
+      // NB: this table uses `calculation_date` while community_impact_scores
+      // uses `calculated_at` — different historic conventions per migration.
       .from('people_culture_scores')
-      .select('overall_score, calculated_at')
+      .select('overall_score, calculation_date')
       .eq('organization_id', organizationId)
-      .order('calculated_at', { ascending: false })
+      .order('calculation_date', { ascending: false })
       .limit(2),
     service
       .from('suppliers')
@@ -836,6 +852,28 @@ async function buildSocialInputs(
       .select('attestation_type, is_attested')
       .eq('organization_id', organizationId)
       .eq('is_attested', true),
+    // Raw community-impact data for live scoring (kills stale-snapshot bug).
+    service
+      .from('community_donations')
+      .select('*')
+      .eq('organization_id', organizationId),
+    service
+      .from('community_volunteer_activities')
+      .select('*')
+      .eq('organization_id', organizationId),
+    service
+      .from('community_local_impact')
+      .select('*')
+      .eq('organization_id', organizationId)
+      .eq('reporting_year', currentYearForSocial),
+    service
+      .from('community_engagements')
+      .select('*')
+      .eq('organization_id', organizationId),
+    service
+      .from('community_impact_stories')
+      .select('*')
+      .eq('organization_id', organizationId),
   ])
 
   const valOrNull = <T>(r: PromiseSettledResult<T>): T | null =>
@@ -848,7 +886,31 @@ async function buildSocialInputs(
   const peopleList = ((valOrNull(peopleRows) as any)?.data ?? []) as Array<{
     overall_score: number | null
   }>
-  const community_score = numOrNull(communityList[0]?.overall_score)
+
+  // Community impact: compute LIVE from raw tables instead of trusting the
+  // potentially-stale snapshot. Falls back to the snapshot if raw queries
+  // failed for any reason.
+  const donationsData = ((valOrNull(rawDonations) as any)?.data ?? []) as any[]
+  const volunteeringData = ((valOrNull(rawVolunteering) as any)?.data ?? []) as any[]
+  const localImpactRows = ((valOrNull(rawLocalImpact) as any)?.data ?? []) as any[]
+  const engagementsData = ((valOrNull(rawEngagements) as any)?.data ?? []) as any[]
+  const storiesData = ((valOrNull(rawStories) as any)?.data ?? []) as any[]
+  const liveCommunity = calculateCommunityImpactScore({
+    donations: donationsData,
+    volunteering: volunteeringData,
+    localImpact: localImpactRows[0] ?? null,
+    engagements: engagementsData,
+    stories: storiesData,
+  })
+  const hasAnyRawCommunityData =
+    donationsData.length > 0 ||
+    volunteeringData.length > 0 ||
+    localImpactRows.length > 0 ||
+    engagementsData.length > 0 ||
+    storiesData.length > 0
+  const community_score = hasAnyRawCommunityData
+    ? liveCommunity.overall_score
+    : numOrNull(communityList[0]?.overall_score)
   const people_culture_score = numOrNull(peopleList[0]?.overall_score)
   const community_score_prior = numOrNull(communityList[1]?.overall_score)
   const people_culture_score_prior = numOrNull(peopleList[1]?.overall_score)
