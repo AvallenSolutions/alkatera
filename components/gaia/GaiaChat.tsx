@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { ActionProposalCard } from '@/components/gaia/ActionProposalCard';
+import { DocumentReviewModal, type ExtractResult } from '@/components/rosa/DocumentReviewModal';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useOnboarding } from '@/lib/onboarding';
@@ -239,6 +240,11 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
   const [streamingActionProposals, setStreamingActionProposals] = useState<Array<{ id: string; tool_name?: string; preview: string }>>([]);
   const [pendingAttachments, setPendingAttachments] = useState<RosaUpload[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewFile, setReviewFile] = useState<RosaUpload | null>(null);
+  const [extractResult, setExtractResult] = useState<ExtractResult | null>(null);
+  const [extractError, setExtractError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(true);
@@ -466,15 +472,63 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
   async function handleAttachFile(file: File) {
     if (uploading || isSending || isStreaming) return;
     setUploading(true);
+    let uploaded: RosaUpload | null = null;
     try {
-      const res = await uploadRosaFile(file);
-      setPendingAttachments(prev => [...prev, res]);
+      uploaded = await uploadRosaFile(file);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Upload failed');
-    } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
     }
+    setUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+
+    // Open the review modal immediately and start extraction in the background.
+    setReviewFile(uploaded);
+    setExtractResult(null);
+    setExtractError(null);
+    setExtracting(true);
+    setReviewModalOpen(true);
+
+    try {
+      const res = await fetch('/api/rosa/uploads/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file_id: uploaded.file_id }),
+      });
+      const json: ExtractResult = await res.json().catch(() => ({ ok: false, error: 'Could not parse response', document_type: 'other', utility_type: '', supplier_name: null, account_number: null, period_start: null, period_end: null, quantity_value: null, quantity_unit: null, total_cost: null, currency: null, notes: null, facilities: [] }));
+      if (!res.ok) {
+        setExtractError(json.error ?? `Extraction failed (${res.status})`);
+      } else {
+        setExtractResult(json);
+      }
+    } catch {
+      setExtractError('Network error during extraction.');
+    } finally {
+      setExtracting(false);
+    }
+  }
+
+  function handleReviewImported(entryId: string) {
+    // File was imported — no need to keep it as a pending attachment.
+    if (reviewFile) {
+      setPendingAttachments(prev => prev.filter(a => a.file_id !== reviewFile.file_id));
+    }
+    setReviewModalOpen(false);
+    setReviewFile(null);
+  }
+
+  function handleSendToRosa() {
+    // User wants to discuss the file in chat — add it as a pending attachment instead.
+    if (reviewFile) {
+      setPendingAttachments(prev => {
+        if (prev.some(a => a.file_id === reviewFile.file_id)) return prev;
+        return [...prev, reviewFile];
+      });
+    }
+    setReviewModalOpen(false);
+    setReviewFile(null);
   }
 
   function removeAttachment(fileId: string) {
@@ -680,6 +734,18 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
   };
 
   return (
+    <>
+    <DocumentReviewModal
+      open={reviewModalOpen}
+      onOpenChange={setReviewModalOpen}
+      filename={reviewFile?.filename ?? ''}
+      fileId={reviewFile?.file_id ?? ''}
+      extracting={extracting}
+      extractResult={extractResult}
+      extractError={extractError}
+      onImport={handleReviewImported}
+      onSendToRosa={handleSendToRosa}
+    />
     <div className={cn(
       'flex bg-background',
       fullPage ? 'h-full' : 'h-[600px] rounded-lg border'
@@ -1381,6 +1447,7 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
         </div>
       </div>
     </div>
+    </>
   );
 }
 
