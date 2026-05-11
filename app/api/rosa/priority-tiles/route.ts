@@ -33,11 +33,19 @@ const MAX_OUTPUT_TOKENS = 1500
 const CACHE_TTL_MS = 60 * 60 * 1000 // 1 hour
 const DAILY_BUDGET_PER_USER = 50
 
+interface ReadinessSummary {
+  next_layer: 'foundation' | 'recipes' | 'lcas' | 'targets'
+  facility_data: string
+  recipes_status: string
+  why: string
+}
+
 interface ResponsePayload {
   tiles: CuratedTile[]
   source: 'cache' | 'curator' | 'fallback'
   generated_at: string
   signals_hash: string
+  readiness?: ReadinessSummary
   drops?: Array<{ index: number; reason: string }>
 }
 
@@ -463,6 +471,12 @@ export async function GET(req: NextRequest) {
             source: 'cache',
             generated_at: cached.generated_at,
             signals_hash: cached.signals_hash,
+            readiness: {
+              next_layer: pack.readiness.next_layer_to_address,
+              facility_data: pack.readiness.foundation.facility_data,
+              recipes_status: pack.readiness.recipes.status,
+              why: pack.readiness.why_this_layer,
+            },
           }
           return NextResponse.json(payload, {
             headers: { 'Cache-Control': 'no-store' },
@@ -511,12 +525,15 @@ export async function GET(req: NextRequest) {
   }
 
   // If validation left us with nothing, fall back deterministically.
+  const nextLayer = pack.readiness.next_layer_to_address
+
   if (tiles.length === 0) {
     tiles = fallbackTiles(pack, organizationId, userId)
     source = 'fallback'
     await logTelemetry(service, organizationId, userId, 'tile.fallback', {
       reason: rawCurated ? 'validation_empty' : 'curator_unavailable',
       drops,
+      next_layer_to_address: nextLayer,
     })
   } else {
     await logTelemetry(service, organizationId, userId, 'tile.curated', {
@@ -524,6 +541,7 @@ export async function GET(req: NextRequest) {
       drops,
       source: fresh ? 'manual_refresh' : 'auto',
       kinds: tiles.map(t => t.kind),
+      next_layer_to_address: nextLayer,
     })
   }
 
@@ -550,6 +568,12 @@ export async function GET(req: NextRequest) {
     source,
     generated_at: new Date().toISOString(),
     signals_hash: signalsHash,
+    readiness: {
+      next_layer: pack.readiness.next_layer_to_address,
+      facility_data: pack.readiness.foundation.facility_data,
+      recipes_status: pack.readiness.recipes.status,
+      why: pack.readiness.why_this_layer,
+    },
     drops: drops.length > 0 ? drops : undefined,
   }
   return NextResponse.json(payload, {
