@@ -147,7 +147,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ entry_id: (data as any).id, table: 'facility_activity_entries', ok: true });
+    const entryId = (data as any).id as string;
+    await recordAuditTrail(userSupabase, {
+      organizationId,
+      userId: user.id,
+      facilityId: String(facility_id),
+      sourceFileId: source_file_id as string | undefined,
+      kind: 'water_bill',
+      title: buildTitle('water_bill', body),
+      appliedTo: { table: 'facility_activity_entries', entry_id: entryId },
+      payload: body,
+    });
+
+    return NextResponse.json({
+      entry_id: entryId,
+      table: 'facility_activity_entries',
+      ok: true,
+    });
   }
 
   // ───────────── Utility route → utility_data_entries ─────────────
@@ -175,5 +191,71 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ entry_id: (data as any).id, table: 'utility_data_entries', ok: true });
+  const entryId = (data as any).id as string;
+  await recordAuditTrail(userSupabase, {
+    organizationId,
+    userId: user.id,
+    facilityId: String(facility_id),
+    sourceFileId: source_file_id as string | undefined,
+    kind: 'utility_bill',
+    title: buildTitle('utility_bill', body),
+    appliedTo: { table: 'utility_data_entries', entry_id: entryId },
+    payload: body,
+  });
+
+  return NextResponse.json({
+    entry_id: entryId,
+    table: 'utility_data_entries',
+    ok: true,
+  });
+}
+
+/**
+ * Write an `agent_exceptions` row marked as already approved so the
+ * import appears in "Recently from Rosa" with an audit trail. We don't
+ * fail the request if this write errors out — the underlying data entry
+ * has already been saved successfully.
+ */
+async function recordAuditTrail(
+  supabase: ReturnType<typeof getSupabaseServerClient>,
+  args: {
+    organizationId: string;
+    userId: string;
+    facilityId: string;
+    sourceFileId?: string;
+    kind: 'water_bill' | 'utility_bill';
+    title: string;
+    appliedTo: { table: string; entry_id: string };
+    payload: Record<string, unknown>;
+  },
+): Promise<void> {
+  const nowIso = new Date().toISOString();
+  const row = {
+    organization_id: args.organizationId,
+    kind: args.kind,
+    source: 'upload',
+    source_ref: args.sourceFileId ? { file_id: args.sourceFileId } : {},
+    payload: args.payload,
+    suggested_facility_id: args.facilityId,
+    title: args.title,
+    status: 'approved',
+    reviewed_by: args.userId,
+    reviewed_at: nowIso,
+    applied_to: args.appliedTo,
+  };
+  const { error } = await supabase.from('agent_exceptions').insert(row);
+  if (error) {
+    console.error('[uploads/import] audit trail write failed:', error);
+  }
+}
+
+function buildTitle(kind: 'water_bill' | 'utility_bill', body: Record<string, unknown>): string {
+  const qty = body.quantity != null ? String(body.quantity) : '';
+  const unit = typeof body.unit === 'string' ? body.unit : '';
+  const start = typeof body.reporting_period_start === 'string' ? body.reporting_period_start : '';
+  const end = typeof body.reporting_period_end === 'string' ? body.reporting_period_end : '';
+  const period = start && end ? ` (${start} to ${end})` : '';
+  const label = kind === 'water_bill' ? 'Water bill' : 'Utility bill';
+  const qtyText = qty ? `${qty} ${unit}` : '';
+  return [label, qtyText, period].filter(Boolean).join(' · ').replace(' · (', ' (');
 }

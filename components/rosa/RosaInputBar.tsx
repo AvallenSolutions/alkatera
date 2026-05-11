@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
 import { toast } from 'sonner'
-import { DocumentReviewModal, type ExtractResult } from '@/components/rosa/DocumentReviewModal'
+import { DocumentReviewModal, type ExtractResult, type ImportSummary } from '@/components/rosa/DocumentReviewModal'
 
 interface Props {
   /** Called when user submits text. Caller decides what to do (chat takeover). */
@@ -207,9 +207,18 @@ export function RosaInputBar({ onSubmit, placeholder, defaultValue }: Props) {
         extracting={extracting}
         extractResult={extractResult}
         extractError={extractError}
-        onImport={() => {
+        onImport={(summary: ImportSummary) => {
           setReviewOpen(false)
-          toast.success('Entry imported successfully.')
+          toast.success(`Saved to ${summary.facilityName}.`)
+          // Surface the action in the Rosa drawer so the user has a
+          // record of what they just did. Phrased as a notification to
+          // Rosa so she can acknowledge and answer follow-ups about it.
+          onSubmit(
+            `I just imported ${summary.utilityLabel.toLowerCase()} data ` +
+              `(${summary.quantity} ${summary.unit}) from ${reviewFilename} ` +
+              `for ${summary.facilityName}, covering ${summary.periodStart} to ${summary.periodEnd}. ` +
+              `Can you confirm it's saved and tell me anything I should know about it?`,
+          )
         }}
         onSendToRosa={() => {
           setReviewOpen(false)
