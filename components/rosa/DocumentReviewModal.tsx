@@ -42,6 +42,16 @@ export interface ExtractResult {
   }>;
 }
 
+export interface ImportSummary {
+  entryId: string;
+  facilityName: string;
+  utilityLabel: string;
+  quantity: string;
+  unit: string;
+  periodStart: string;
+  periodEnd: string;
+}
+
 interface DocumentReviewModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -49,7 +59,7 @@ interface DocumentReviewModalProps {
   extracting: boolean;
   extractResult: ExtractResult | null;
   extractError: string | null;
-  onImport: (entryId: string) => void;
+  onImport: (summary: ImportSummary) => void;
   onSendToRosa: () => void;
   fileId: string;
 }
@@ -155,8 +165,18 @@ export function DocumentReviewModal({
         return;
       }
       setImportSuccess(true);
+      const facility = extractResult?.facilities.find(f => f.id === facilityId);
+      const utility = UTILITY_TYPES.find(t => t.value === utilityType);
       setTimeout(() => {
-        onImport(json.entry_id);
+        onImport({
+          entryId: json.entry_id,
+          facilityName: facility?.name ?? 'the selected facility',
+          utilityLabel: utility?.label ?? utilityType,
+          quantity: quantity,
+          unit: unit,
+          periodStart: periodStart,
+          periodEnd: periodEnd,
+        });
         onOpenChange(false);
       }, 1200);
     } catch {
