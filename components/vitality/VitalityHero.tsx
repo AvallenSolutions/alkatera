@@ -167,20 +167,26 @@ export function VitalityHero() {
   // Live updates: any of these tables changing should refresh the score.
   useRealtimeRefresh(
     [
+      // Environmental
+      'facility_activity_entries',  // water intake, waste — primary live source
+      'utility_data_entries',       // electricity, gas, fuel
+      'facility_water_data',        // legacy water aggregate
+      'product_carbon_footprints',
+      'sustainability_targets',
+      // Social
       'community_donations',
       'community_volunteer_activities',
       'community_engagements',
       'people_workforce_demographics',
       'people_dei_actions',
-      'governance_policies',
-      'governance_board_members',
-      'product_carbon_footprints',
-      'sustainability_targets',
-      'organization_certifications',
       'supplier_esg_assessments',
       'community_impact_scores',
       'people_culture_scores',
+      // Governance
+      'governance_policies',
+      'governance_board_members',
       'governance_scores',
+      'organization_certifications',
       'organizations',
     ],
     () => {
