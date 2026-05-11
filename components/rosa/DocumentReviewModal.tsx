@@ -38,7 +38,6 @@ export interface ExtractResult {
   facilities: Array<{
     id: string;
     name: string;
-    facility_type: string | null;
     address_country: string | null;
   }>;
 }
