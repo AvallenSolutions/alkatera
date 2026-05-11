@@ -155,6 +155,43 @@ export interface OrgSignalPack {
     days_to_target: number
   }>
 
+  /**
+   * Layered data-readiness summary. The platform's data has a strict
+   * dependency order: foundation (facility + agricultural) → recipes
+   * (ingredient + packaging matching) → LCAs → targets/decarbonisation.
+   * Rosa uses this to enforce the waterfall in her recommendations,
+   * never pushing higher-layer work when a lower layer is incomplete.
+   */
+  readiness: {
+    foundation: {
+      facility_data: 'ready' | 'partial' | 'stale' | 'missing'
+      facility_detail: {
+        total: number
+        with_recent_entry_60d: number
+        stale_60d: number
+        never_entered: number
+      }
+      agricultural_data: 'ready' | 'partial' | 'missing' | 'not_applicable'
+      agricultural_detail: {
+        self_grown_materials: number
+        linked_to_profile: number
+      }
+    }
+    recipes: {
+      status: 'ready' | 'partial' | 'missing'
+      ingredients_matched_pct: number
+      products_with_complete_recipe: number
+      products_with_unmatched_materials: number
+    }
+    lcas: {
+      status: 'computable' | 'blocked' | 'in_progress' | 'complete'
+      computable_now_count: number
+      blocked_reasons: string[]
+    }
+    next_layer_to_address: 'foundation' | 'recipes' | 'lcas' | 'targets'
+    why_this_layer: string
+  }
+
   /** Compliance: applicability is *evidence-based*, not flag-based. */
   compliance: {
     has_uk_packaging: boolean
@@ -755,6 +792,176 @@ export async function buildOrgSignalPack(
       ? Math.min(100, (completedLcasCountResolved / productCountResolved) * 100)
       : 0
 
+  // === Readiness waterfall ===
+  // Computed from values already resolved above plus two small extra reads.
+  // Layers: foundation (facility + agricultural) → recipes (matched
+  // ingredients) → LCAs → targets/decarbonisation. Rosa uses this to
+  // refuse to push higher-layer work when a lower layer isn't ready.
+  const facilityCountResolved = countOf(facilityCount)
+  const neverEnteredFacilityCount = facilityRows.filter(f => {
+    const entries = Array.isArray(f.utility_data_entries) ? f.utility_data_entries : []
+    return entries.length === 0
+  }).length
+  const withRecentEntryCount = Math.max(0, facilityCountResolved - staleCount)
+  const staleWithDataCount = Math.max(0, staleCount - neverEnteredFacilityCount)
+
+  let facilityDataStatus: 'ready' | 'partial' | 'stale' | 'missing'
+  if (facilityCountResolved === 0 || staleCount === facilityCountResolved) {
+    facilityDataStatus = 'missing'
+  } else if (staleCount > 0) {
+    facilityDataStatus = 'stale'
+  } else {
+    facilityDataStatus = 'ready'
+  }
+
+  // Agricultural data: only relevant when the org grows its own ingredients.
+  // We resolve "linked_to_profile" as: a self-grown row that points at a
+  // vineyard / orchard / arable_field FK. The growing profile is created
+  // alongside the farm in the wizard, so the FK is a strong proxy for
+  // "profile exists" in v1.
+  const agriRowsResult = await (async () => {
+    try {
+      const { data } = await service
+        .from('product_materials')
+        .select('id, is_self_grown, vineyard_id, orchard_id, arable_field_id')
+        .eq('organization_id', organizationId)
+        .or(
+          'is_self_grown.eq.true,vineyard_id.not.is.null,orchard_id.not.is.null,arable_field_id.not.is.null',
+        )
+        .limit(500)
+      return data ?? []
+    } catch {
+      return [] as Array<{
+        is_self_grown: boolean | null
+        vineyard_id: string | null
+        orchard_id: string | null
+        arable_field_id: string | null
+      }>
+    }
+  })()
+  const selfGrownCount = agriRowsResult.length
+  const linkedToProfileCount = agriRowsResult.filter(
+    r => r.vineyard_id || r.orchard_id || r.arable_field_id,
+  ).length
+  let agriStatus: 'ready' | 'partial' | 'missing' | 'not_applicable'
+  if (selfGrownCount === 0) {
+    agriStatus = 'not_applicable'
+  } else if (linkedToProfileCount === selfGrownCount) {
+    agriStatus = 'ready'
+  } else if (linkedToProfileCount > 0) {
+    agriStatus = 'partial'
+  } else {
+    agriStatus = 'missing'
+  }
+
+  // Recipes: count products that have at least one unmatched material.
+  const unmatchedByProductResult = await (async () => {
+    try {
+      const { data } = await service
+        .from('product_materials')
+        .select('product_id')
+        .eq('organization_id', organizationId)
+        .is('matched_source_name', null)
+        .limit(2000)
+      return data ?? []
+    } catch {
+      return [] as Array<{ product_id: string | null }>
+    }
+  })()
+  const productsWithUnmatchedSet = new Set<string>()
+  for (const r of unmatchedByProductResult) {
+    if (r.product_id) productsWithUnmatchedSet.add(r.product_id)
+  }
+  const productsWithUnmatchedCount = productsWithUnmatchedSet.size
+  const productsWithCompleteRecipe = Math.max(
+    0,
+    productCountResolved - productsWithUnmatchedCount,
+  )
+  let recipesStatus: 'ready' | 'partial' | 'missing'
+  if (totalMaterialsCount === 0 || unmatchedRatioPct >= 100) {
+    recipesStatus = 'missing'
+  } else if (unmatchedRatioPct > 0) {
+    recipesStatus = 'partial'
+  } else {
+    recipesStatus = 'ready'
+  }
+  const ingredientsMatchedPct = Math.round(Math.max(0, 100 - unmatchedRatioPct) * 10) / 10
+
+  // LCA readiness: blocked if foundation or recipes aren't ready.
+  const blockedReasons: string[] = []
+  if (facilityDataStatus === 'missing') {
+    if (facilityCountResolved === 0) {
+      blockedReasons.push('No facilities recorded yet')
+    } else if (neverEnteredFacilityCount === facilityCountResolved) {
+      blockedReasons.push('No facilities have any utility data yet')
+    } else {
+      blockedReasons.push(`All ${facilityCountResolved} facilities are missing recent data`)
+    }
+  } else if (facilityDataStatus === 'stale') {
+    blockedReasons.push(
+      `${staleCount} ${staleCount === 1 ? 'facility hasn\'t' : 'facilities haven\'t'} had a utility entry in 60+ days`,
+    )
+  }
+  if (agriStatus === 'missing' || agriStatus === 'partial') {
+    const missing = selfGrownCount - linkedToProfileCount
+    blockedReasons.push(
+      `${missing} self-grown ${missing === 1 ? 'ingredient is' : 'ingredients are'} not yet linked to a vineyard, orchard, or arable field`,
+    )
+  }
+  if (productsWithUnmatchedCount > 0) {
+    blockedReasons.push(
+      `${productsWithUnmatchedCount} ${productsWithUnmatchedCount === 1 ? 'product has' : 'products have'} unmatched ingredients`,
+    )
+  }
+  let lcasStatus: 'computable' | 'blocked' | 'in_progress' | 'complete'
+  if (blockedReasons.length > 0) {
+    lcasStatus = 'blocked'
+  } else if (
+    productCountResolved > 0 &&
+    completedLcasCountResolved >= productCountResolved
+  ) {
+    lcasStatus = 'complete'
+  } else if (countOf(draftLcasCount) > 0) {
+    lcasStatus = 'in_progress'
+  } else {
+    lcasStatus = 'computable'
+  }
+  const lcaComputableNowCount = Math.max(
+    0,
+    productCountResolved - productsWithUnmatchedCount,
+  )
+
+  // Next layer to address. Strict waterfall — the first layer that isn't
+  // 'ready' takes precedence regardless of what's downstream.
+  let nextLayer: 'foundation' | 'recipes' | 'lcas' | 'targets'
+  let whyThisLayer: string
+  if (facilityDataStatus !== 'ready') {
+    nextLayer = 'foundation'
+    if (facilityDataStatus === 'missing' && facilityCountResolved === 0) {
+      whyThisLayer = 'No facilities yet. Add at least one to start measuring Scope 1 and 2.'
+    } else if (facilityDataStatus === 'missing') {
+      whyThisLayer = 'No facilities have utility data yet. LCAs can\'t allocate Scope 1 and 2 without it.'
+    } else {
+      whyThisLayer = `${staleCount} ${staleCount === 1 ? 'facility is' : 'facilities are'} more than 60 days out of date. An LCA built on stale facility data is misleading.`
+    }
+  } else if (agriStatus === 'missing' || agriStatus === 'partial') {
+    nextLayer = 'foundation'
+    whyThisLayer = 'Self-grown ingredients need a linked vineyard, orchard, or arable field to feed the LCA correctly.'
+  } else if (recipesStatus !== 'ready') {
+    nextLayer = 'recipes'
+    whyThisLayer = `${productsWithUnmatchedCount} ${productsWithUnmatchedCount === 1 ? 'product has' : 'products have'} ingredients without an emission factor. LCAs can\'t be calculated until those are matched.`
+  } else if (lcasStatus !== 'complete' && productCountResolved > 0) {
+    nextLayer = 'lcas'
+    const missingLcas = productCountResolved - completedLcasCountResolved
+    whyThisLayer = `${missingLcas} ${missingLcas === 1 ? 'product is' : 'products are'} missing a completed LCA. The data foundation is in place, so they can be calculated now.`
+  } else if (targetsOut.length === 0) {
+    nextLayer = 'targets'
+    whyThisLayer = 'Your data foundation and LCAs are in place. Set a reduction target so progress has a line to measure against.'
+  } else {
+    nextLayer = 'targets'
+    whyThisLayer = 'All foundational layers are ready. Focus on hitting targets and surfacing abatement opportunities.'
+  }
+
   return {
     org: {
       id: organizationId,
@@ -825,6 +1032,35 @@ export async function buildOrgSignalPack(
       esg_low_score: countOf(esgLowScore),
     },
     targets: targetsOut,
+    readiness: {
+      foundation: {
+        facility_data: facilityDataStatus,
+        facility_detail: {
+          total: facilityCountResolved,
+          with_recent_entry_60d: withRecentEntryCount,
+          stale_60d: staleWithDataCount,
+          never_entered: neverEnteredFacilityCount,
+        },
+        agricultural_data: agriStatus,
+        agricultural_detail: {
+          self_grown_materials: selfGrownCount,
+          linked_to_profile: linkedToProfileCount,
+        },
+      },
+      recipes: {
+        status: recipesStatus,
+        ingredients_matched_pct: ingredientsMatchedPct,
+        products_with_complete_recipe: productsWithCompleteRecipe,
+        products_with_unmatched_materials: productsWithUnmatchedCount,
+      },
+      lcas: {
+        status: lcasStatus,
+        computable_now_count: lcaComputableNowCount,
+        blocked_reasons: blockedReasons,
+      },
+      next_layer_to_address: nextLayer,
+      why_this_layer: whyThisLayer,
+    },
     compliance: {
       has_uk_packaging: hasUkPackaging,
       feature_flags: evidenceFlags,
