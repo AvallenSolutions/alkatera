@@ -16,12 +16,13 @@
  * The review modal is the confirmation step, so this route writes directly
  * to the appropriate data table without staging a pending action.
  *
- * Routing:
- *   - utility_type === 'water_intake' → facility_water_data table
- *   - everything else → utility_data_entries table
+ * Mirrors the table routing used by lib/rosa/actions.ts execApproveException:
+ *   - Water (water_intake)             → facility_activity_entries
+ *   - Scope 1/2 utilities (electricity,
+ *     gas, fuel, etc.)                 → utility_data_entries
  *
- * Note: utility_data_entries links to facility (no organization_id column);
- * facility_water_data has both facility_id and organization_id.
+ * facility_activity_entries has organization_id; utility_data_entries does
+ * not (it joins through facility).
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
@@ -119,39 +120,37 @@ export async function POST(request: NextRequest) {
   if (source_file_id && typeof source_file_id === 'string') notesParts.push('Imported from uploaded document.');
   const finalNotes = notesParts.length > 0 ? notesParts.join(' ') : null;
 
-  // ───────────── Water route ─────────────
+  // ───────────── Water route → facility_activity_entries ─────────────
   if (utility_type === WATER_TYPE) {
-    const periodStart = String(reporting_period_start);
-    const totalM3 = Number(quantity);
-    const reportingYear = parseInt(periodStart.slice(0, 4), 10);
-
     const row = {
       organization_id: organizationId,
       facility_id: String(facility_id),
-      reporting_year: reportingYear,
-      reporting_period_start: periodStart,
+      activity_category: 'water_intake',
+      activity_date: String(reporting_period_start),
+      reporting_period_start: String(reporting_period_start),
       reporting_period_end: String(reporting_period_end),
-      total_consumption_m3: totalM3,
-      municipal_consumption_m3: totalM3,
-      data_quality: 'estimated',
-      data_source: 'rosa_document_import',
-      notes: finalNotes,
+      quantity: Number(quantity),
+      unit: String(unit) || 'm3',
+      data_provenance: 'primary_measured_onsite',
+      allocation_basis: 'none',
+      created_by: user.id,
     };
 
     const { data, error } = await userSupabase
-      .from('facility_water_data')
+      .from('facility_activity_entries')
       .insert(row)
       .select('id')
       .single();
 
     if (error) {
+      console.error('[uploads/import] water insert failed:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ entry_id: (data as any).id, table: 'facility_water_data', ok: true });
+    return NextResponse.json({ entry_id: (data as any).id, table: 'facility_activity_entries', ok: true });
   }
 
-  // ───────────── Utility route (electricity, gas, fuel, etc.) ─────────────
+  // ───────────── Utility route → utility_data_entries ─────────────
   const row = {
     facility_id: String(facility_id),
     utility_type: String(utility_type),
@@ -172,6 +171,7 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (error) {
+    console.error('[uploads/import] utility insert failed:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
