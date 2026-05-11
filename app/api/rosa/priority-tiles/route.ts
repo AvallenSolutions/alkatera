@@ -100,8 +100,99 @@ function fallbackTiles(
     `${organizationId.slice(0, 8)}:${userId.slice(0, 8)}:fallback_${kind}`
 
   const tiles: CuratedTile[] = []
+  const foundationReady =
+    pack.readiness.foundation.facility_data === 'ready' &&
+    pack.readiness.foundation.agricultural_data !== 'missing' &&
+    pack.readiness.foundation.agricultural_data !== 'partial'
+  const recipesReady = pack.readiness.recipes.status === 'ready'
 
-  // Queue items
+  // ───── Foundation layer (top of the waterfall) ─────
+  // Stale / missing facility data. Always leads when foundation is broken.
+  if (pack.facilities.stale_count > 0) {
+    const n = pack.facilities.stale_count
+    tiles.push({
+      id: baseId('stale_facility'),
+      kind: 'stale_facility',
+      value: String(n),
+      unit: n === 1 ? 'facility' : 'facilities',
+      title: 'Facility data is out of date',
+      hint: `${n === 1 ? 'A facility hasn\'t' : `${n} facilities haven\'t`} had a utility entry in 60+ days. LCAs built on this would be misleading.`,
+      recommendation: 'Drop in a recent bill or reading and I\'ll classify it. This unblocks every LCA downstream.',
+      icon: 'Factory',
+      href: '/company/facilities',
+      tone: 'urgent',
+      signal_basis: ['facilities.stale_count', 'readiness.foundation.facility_data'],
+    })
+  }
+
+  // Agricultural data: self-grown ingredients without a linked farm.
+  const agriDetail = pack.readiness.foundation.agricultural_detail
+  if (
+    (pack.readiness.foundation.agricultural_data === 'missing' ||
+      pack.readiness.foundation.agricultural_data === 'partial') &&
+    agriDetail.self_grown_materials > 0
+  ) {
+    const missing = agriDetail.self_grown_materials - agriDetail.linked_to_profile
+    tiles.push({
+      id: baseId('agricultural_gap'),
+      kind: 'agricultural_gap',
+      value: String(missing),
+      unit: missing === 1 ? 'ingredient' : 'ingredients',
+      title: 'Self-grown ingredients need a farm linked',
+      hint: `${missing} ${missing === 1 ? 'ingredient is' : 'ingredients are'} flagged as self-grown but not yet linked to a vineyard, orchard, or arable field.`,
+      recommendation: 'Open the recipe and link each one. The growing profile feeds the LCA correctly.',
+      icon: 'Leaf',
+      href: '/products',
+      tone: 'warn',
+      signal_basis: [
+        'readiness.foundation.agricultural_data',
+        'readiness.foundation.agricultural_detail',
+      ],
+    })
+  }
+
+  // ───── Recipes layer ─────
+  // Unmatched ingredients block LCA calculation. Always surface when present.
+  if (pack.unmatched.product_materials_count > 0) {
+    const n = pack.unmatched.product_materials_count
+    const productsAffected = pack.readiness.recipes.products_with_unmatched_materials
+    tiles.push({
+      id: baseId('unmatched'),
+      kind: 'unmatched_factor',
+      value: String(n),
+      unit: n === 1 ? 'ingredient' : 'ingredients',
+      title: 'No emission factor matched',
+      hint: `${n} ${n === 1 ? 'ingredient' : 'ingredients'} across ${productsAffected} ${productsAffected === 1 ? 'product' : 'products'} can\'t be costed without a factor.`,
+      recommendation: 'Open the product recipe and pick a proxy where the exact match isn\'t there.',
+      icon: 'Beaker',
+      href: '/products',
+      tone: 'warn',
+      signal_basis: [
+        'unmatched.product_materials_count',
+        'readiness.recipes.status',
+      ],
+    })
+  }
+
+  // ───── Anomalies + Queue (urgent operational, surface alongside) ─────
+  if (pack.anomalies.open_count > 0) {
+    const n = pack.anomalies.open_count
+    tiles.push({
+      id: baseId('anomalies'),
+      kind: 'anomaly',
+      value: String(n),
+      unit: n === 1 ? 'anomaly' : 'anomalies',
+      title: 'Flagged for review',
+      hint: 'Unusual values I noticed in your latest data.',
+      recommendation:
+        'I\'d look at the highest-severity one first. Often a metering glitch, sometimes a real spike.',
+      icon: 'AlertCircle',
+      href: '/pulse/',
+      tone: pack.anomalies.top_severity === 'high' ? 'urgent' : 'warn',
+      signal_basis: ['anomalies.open_count', 'anomalies.top_severity'],
+    })
+  }
+
   if (pack.queue.open_count > 0) {
     const n = pack.queue.open_count
     tiles.push({
@@ -122,95 +213,44 @@ function fallbackTiles(
     })
   }
 
-  // High-severity anomalies
-  if (pack.anomalies.open_count > 0) {
-    const n = pack.anomalies.open_count
-    tiles.push({
-      id: baseId('anomalies'),
-      kind: 'anomaly',
-      value: String(n),
-      unit: n === 1 ? 'anomaly' : 'anomalies',
-      title: 'Flagged for review',
-      hint: 'Unusual values I noticed in your latest data.',
-      recommendation:
-        'I\'d look at the highest-severity one first. Often a metering glitch, sometimes a real spike.',
-      icon: 'AlertCircle',
-      href: '/pulse/',
-      tone: pack.anomalies.top_severity === 'high' ? 'urgent' : 'warn',
-      signal_basis: ['anomalies.open_count', 'anomalies.top_severity'],
-    })
-  }
-
-  // Oldest draft LCA
-  if (pack.lcas.oldest_draft) {
-    const d = pack.lcas.oldest_draft
-    tiles.push({
-      id: baseId('lca_draft'),
-      kind: 'lca_draft',
-      value: '1',
-      unit: 'next step',
-      title: `Finish the LCA for ${d.product_name}`,
-      hint: `Untouched for ${d.days_untouched} ${d.days_untouched === 1 ? 'day' : 'days'}. Best move to make progress this week.`,
-      recommendation: 'Don\'t over-think it; this unblocks the next thing.',
-      icon: 'ArrowUpRight',
-      href: '/products',
-      tone: 'good',
-      signal_basis: ['lcas.oldest_draft'],
-    })
-  } else if (pack.lcas.no_lca_count > 0) {
-    const n = pack.lcas.no_lca_count
-    tiles.push({
-      id: baseId('lcas_missing'),
-      kind: 'lcas',
-      value: String(n),
-      unit: n === 1 ? 'product' : 'products',
-      title: n === 1 ? 'Needs an LCA' : 'Need an LCA',
-      hint: 'Cradle-to-grave footprints unlock claims and reporting.',
-      recommendation:
-        n >= 5
-          ? 'Pick the highest-volume product first; it\'ll move the headline number most.'
-          : 'Start with the one you talk about most in marketing.',
-      icon: 'Package',
-      href: '/products/?filter=no-lca',
-      tone: 'info',
-      signal_basis: ['lcas.no_lca_count'],
-    })
-  }
-
-  // Unmatched ingredients
-  if (pack.unmatched.product_materials_count > 0 && tiles.length < 3) {
-    const n = pack.unmatched.product_materials_count
-    tiles.push({
-      id: baseId('unmatched'),
-      kind: 'unmatched_factor',
-      value: String(n),
-      unit: n === 1 ? 'ingredient' : 'ingredients',
-      title: 'No emission factor matched',
-      hint: 'Ingredients without a factor don\'t count toward the footprint.',
-      recommendation: 'Open the product recipe and pick a proxy where the exact match isn\'t there.',
-      icon: 'Beaker',
-      href: '/products',
-      tone: 'warn',
-      signal_basis: ['unmatched.product_materials_count'],
-    })
-  }
-
-  // Stale facilities
-  if (pack.facilities.stale_count > 0 && tiles.length < 3) {
-    const n = pack.facilities.stale_count
-    tiles.push({
-      id: baseId('stale_facility'),
-      kind: 'stale_facility',
-      value: String(n),
-      unit: n === 1 ? 'facility' : 'facilities',
-      title: 'Stale facility data',
-      hint: `${n === 1 ? 'A facility hasn\'t' : `${n} facilities haven\'t`} had a utility entry in 60+ days.`,
-      recommendation: 'Drop in a recent bill or reading and I\'ll classify it.',
-      icon: 'Factory',
-      href: '/company/facilities',
-      tone: 'warn',
-      signal_basis: ['facilities.stale_count'],
-    })
+  // ───── LCAs layer ─────
+  // Only surface LCA work when foundation + recipes are ready.
+  // Otherwise pushing LCAs would put the cart before the horse.
+  if (foundationReady && recipesReady) {
+    if (pack.lcas.oldest_draft) {
+      const d = pack.lcas.oldest_draft
+      tiles.push({
+        id: baseId('lca_draft'),
+        kind: 'lca_draft',
+        value: '1',
+        unit: 'next step',
+        title: `Finish the LCA for ${d.product_name}`,
+        hint: `Untouched for ${d.days_untouched} ${d.days_untouched === 1 ? 'day' : 'days'}. Best move to make progress this week.`,
+        recommendation: 'Don\'t over-think it; this unblocks the next thing.',
+        icon: 'ArrowUpRight',
+        href: '/products',
+        tone: 'good',
+        signal_basis: ['lcas.oldest_draft', 'readiness.lcas.status'],
+      })
+    } else if (pack.lcas.no_lca_count > 0) {
+      const n = pack.lcas.no_lca_count
+      tiles.push({
+        id: baseId('lcas_missing'),
+        kind: 'lcas',
+        value: String(n),
+        unit: n === 1 ? 'product' : 'products',
+        title: n === 1 ? 'Needs an LCA' : 'Need an LCA',
+        hint: 'Your data foundation is ready, so these can be calculated now.',
+        recommendation:
+          n >= 5
+            ? 'Pick the highest-volume product first; it\'ll move the headline number most.'
+            : 'Start with the one you talk about most in marketing.',
+        icon: 'Package',
+        href: '/products/?filter=no-lca',
+        tone: 'info',
+        signal_basis: ['lcas.no_lca_count', 'readiness.lcas.status'],
+      })
+    }
   }
 
   // Compliance: only fire deadlines that are likely applicable.
@@ -250,8 +290,11 @@ function fallbackTiles(
     })
   }
 
-  // No targets set yet
-  if (!pack.org.has_targets && tiles.length < 3) {
+  // No targets set yet — only recommend when there's an LCA baseline to
+  // measure against. Setting a target without a footprint is premature.
+  const lcasUsable =
+    pack.readiness.lcas.status === 'complete' || pack.readiness.lcas.status === 'in_progress'
+  if (!pack.org.has_targets && lcasUsable && tiles.length < 3) {
     tiles.push({
       id: baseId('no_targets'),
       kind: 'no_targets',
@@ -264,7 +307,7 @@ function fallbackTiles(
       icon: 'Target',
       href: '/pulse/targets/',
       tone: 'info',
-      signal_basis: ['org.has_targets', 'data_quality.lca_coverage_pct'],
+      signal_basis: ['org.has_targets', 'data_quality.lca_coverage_pct', 'readiness.lcas.status'],
     })
   }
 

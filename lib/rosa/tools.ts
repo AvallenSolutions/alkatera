@@ -21,6 +21,7 @@ import { ALL_METRIC_KEYS, METRIC_DEFINITIONS, type MetricKey } from '@/lib/pulse
 import { listMemories, saveMemory, type MemoryScope } from './memory';
 import { proposeAction } from './actions';
 import { loadAttachment, extractStructured } from './document-extraction';
+import { buildOrgSignalPack } from './priority-signals';
 import { getBenchmarkForProductType } from '@/lib/industry-benchmarks';
 
 export interface ToolContext {
@@ -61,6 +62,12 @@ export const ROSA_TOOLS: ToolDefinition[] = [
     name: 'get_org_context',
     description:
       "Returns a compact snapshot of the caller's organisation: name, industry segment, facility count, product count, active targets, and report-defaults (fiscal year, timezone, currency). Call this first when a question needs org-level context.",
+    input_schema: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'get_data_readiness',
+    description:
+      "Returns the organisation's layered data readiness: foundation (facility utility data + agricultural farm linkage), recipes (ingredient and packaging matching), and LCAs. Also returns next_layer_to_address (foundation / recipes / lcas / targets) and a one-sentence why_this_layer reason. ALWAYS call this BEFORE recommending any next step. The platform's data waterfall is foundation → recipes → LCAs → targets / decarbonisation. Never recommend higher-layer work when a lower layer is incomplete. An LCA built on stale facility data is not trustworthy; say so plainly.",
     input_schema: { type: 'object', properties: {}, required: [] },
   },
   {
@@ -595,6 +602,8 @@ export async function executeTool(
     switch (name) {
       case 'get_org_context':
         return await toolGetOrgContext(ctx);
+      case 'get_data_readiness':
+        return await toolGetDataReadiness(ctx);
       case 'list_facilities':
         return await toolListFacilities(ctx);
       case 'list_products':
@@ -718,6 +727,45 @@ async function toolGetOrgContext(ctx: ToolContext): Promise<ToolResult> {
       targets: payload.active_targets.length,
     } },
   };
+}
+
+async function toolGetDataReadiness(ctx: ToolContext): Promise<ToolResult> {
+  try {
+    const pack = await buildOrgSignalPack(ctx.supabase, {
+      organizationId: ctx.organizationId,
+      userId: ctx.userId,
+      snoozedKinds: [],
+    });
+    const payload = {
+      readiness: pack.readiness,
+      // Useful raw numbers Rosa often wants alongside the structured view.
+      raw: {
+        facility_count: pack.org.facility_count,
+        product_count: pack.org.product_count,
+        completed_lcas: pack.lcas.completed_count,
+        unmatched_materials: pack.unmatched.product_materials_count,
+        stale_facilities: pack.facilities.stale_count,
+      },
+    };
+    return {
+      is_error: false,
+      content: JSON.stringify(payload),
+      audit: {
+        tool: 'get_data_readiness',
+        next_layer: pack.readiness.next_layer_to_address,
+        facility_status: pack.readiness.foundation.facility_data,
+        recipes_status: pack.readiness.recipes.status,
+        lcas_status: pack.readiness.lcas.status,
+      },
+    };
+  } catch (err: any) {
+    const message = err?.message ?? 'Failed to build readiness pack';
+    return {
+      is_error: true,
+      content: message,
+      audit: { tool: 'get_data_readiness', error: message },
+    };
+  }
 }
 
 async function toolListFacilities(ctx: ToolContext): Promise<ToolResult> {
