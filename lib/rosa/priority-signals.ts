@@ -877,11 +877,16 @@ export async function buildOrgSignalPack(
     0,
     productCountResolved - productsWithUnmatchedCount,
   )
+  // Recipe readiness: 'partial' if any product has unmatched materials;
+  // 'missing' only when there are no materials AND no completed LCAs (a
+  // truly empty org). If LCAs were already calculated, ingredients must
+  // have been matched at some point even if the v1 product_materials
+  // table is empty (older orgs, imported LCAs). Treat that as ready.
   let recipesStatus: 'ready' | 'partial' | 'missing'
-  if (totalMaterialsCount === 0 || unmatchedRatioPct >= 100) {
-    recipesStatus = 'missing'
-  } else if (unmatchedRatioPct > 0) {
+  if (productsWithUnmatchedCount > 0) {
     recipesStatus = 'partial'
+  } else if (totalMaterialsCount === 0 && completedLcasCountResolved === 0) {
+    recipesStatus = 'missing'
   } else {
     recipesStatus = 'ready'
   }
@@ -926,10 +931,13 @@ export async function buildOrgSignalPack(
   } else {
     lcasStatus = 'computable'
   }
-  const lcaComputableNowCount = Math.max(
-    0,
-    productCountResolved - productsWithUnmatchedCount,
-  )
+  // Genuinely computable = materials matched AND facility foundation is
+  // ready. A product with matched ingredients but stale facility data
+  // can't produce a trustworthy LCA.
+  const lcaComputableNowCount =
+    facilityDataStatus === 'ready'
+      ? Math.max(0, productCountResolved - productsWithUnmatchedCount)
+      : 0
 
   // Next layer to address. Strict waterfall — the first layer that isn't
   // 'ready' takes precedence regardless of what's downstream.
