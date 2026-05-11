@@ -25,6 +25,7 @@
  * not (it joins through facility).
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 
 export const runtime = 'nodejs';
@@ -148,7 +149,7 @@ export async function POST(request: NextRequest) {
     }
 
     const entryId = (data as any).id as string;
-    await recordAuditTrail(userSupabase, {
+    await recordAuditTrail({
       organizationId,
       userId: user.id,
       facilityId: String(facility_id),
@@ -192,7 +193,7 @@ export async function POST(request: NextRequest) {
   }
 
   const entryId = (data as any).id as string;
-  await recordAuditTrail(userSupabase, {
+  await recordAuditTrail({
     organizationId,
     userId: user.id,
     facilityId: String(facility_id),
@@ -212,23 +213,33 @@ export async function POST(request: NextRequest) {
 
 /**
  * Write an `agent_exceptions` row marked as already approved so the
- * import appears in "Recently from Rosa" with an audit trail. We don't
- * fail the request if this write errors out — the underlying data entry
- * has already been saved successfully.
+ * import appears in "Recently from Rosa" with an audit trail. Uses the
+ * service-role client because the table's RLS only lets the agent
+ * itself write — end users insert via the queue's approve endpoint.
+ *
+ * We don't fail the request if this write errors out — the underlying
+ * data entry has already been saved successfully.
  */
-async function recordAuditTrail(
-  supabase: ReturnType<typeof getSupabaseServerClient>,
-  args: {
-    organizationId: string;
-    userId: string;
-    facilityId: string;
-    sourceFileId?: string;
-    kind: 'water_bill' | 'utility_bill';
-    title: string;
-    appliedTo: { table: string; entry_id: string };
-    payload: Record<string, unknown>;
-  },
-): Promise<void> {
+async function recordAuditTrail(args: {
+  organizationId: string;
+  userId: string;
+  facilityId: string;
+  sourceFileId?: string;
+  kind: 'water_bill' | 'utility_bill';
+  title: string;
+  appliedTo: { table: string; entry_id: string };
+  payload: Record<string, unknown>;
+}): Promise<void> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+  if (!supabaseUrl || !supabaseKey) {
+    console.error('[uploads/import] audit trail skipped: service role not configured');
+    return;
+  }
+  const service = createClient(supabaseUrl, supabaseKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
   const nowIso = new Date().toISOString();
   const row = {
     organization_id: args.organizationId,
@@ -243,7 +254,7 @@ async function recordAuditTrail(
     reviewed_at: nowIso,
     applied_to: args.appliedTo,
   };
-  const { error } = await supabase.from('agent_exceptions').insert(row);
+  const { error } = await service.from('agent_exceptions').insert(row);
   if (error) {
     console.error('[uploads/import] audit trail write failed:', error);
   }
