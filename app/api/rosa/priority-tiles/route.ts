@@ -250,21 +250,55 @@ function fallbackTiles(
     })
   }
 
-  // All clear
-  if (tiles.length === 0) {
+  // No targets set yet
+  if (!pack.org.has_targets && tiles.length < 3) {
     tiles.push({
-      id: baseId('all_clear'),
-      kind: 'all_clear',
-      value: '✓',
-      unit: 'all clear',
-      title: 'Nothing urgent today',
-      hint: 'Your queue is empty, no anomalies flagged, no deadlines this week.',
+      id: baseId('no_targets'),
+      kind: 'no_targets',
+      value: '0',
+      unit: 'targets set',
+      title: 'No reduction targets defined',
+      hint: 'Without a target, there\'s no line to measure progress against — or to report to stakeholders.',
       recommendation:
-        'Good moment for a deeper task. Want me to suggest the highest-leverage next move?',
-      icon: 'Sparkles',
-      href: null,
-      tone: 'good',
-      signal_basis: ['queue.open_count', 'anomalies.open_count', 'compliance.upcoming_deadlines'],
+        `With ${Math.round(pack.data_quality.lca_coverage_pct)}% LCA coverage, you have enough data to set a credible baseline. Head to Pulse Targets.`,
+      icon: 'Target',
+      href: '/pulse/targets/',
+      tone: 'info',
+      signal_basis: ['org.has_targets', 'data_quality.lca_coverage_pct'],
+    })
+  }
+
+  // Low supplier ESG coverage
+  if (pack.supplier_hotspots.coverage_pct < 50 && pack.org.supplier_count > 0 && tiles.length < 3) {
+    tiles.push({
+      id: baseId('supplier_esg'),
+      kind: 'supplier_esg',
+      value: `${Math.round(pack.supplier_hotspots.coverage_pct)}%`,
+      unit: 'suppliers with ESG data',
+      title: 'Supplier footprint is a blind spot',
+      hint: 'Scope 3 from your supply chain is estimated, not measured. Getting suppliers to submit real data closes the gap.',
+      recommendation: 'Send the ESG questionnaire to your top suppliers — it takes them under 10 minutes.',
+      icon: 'Truck',
+      href: '/suppliers/',
+      tone: 'warn',
+      signal_basis: ['supplier_hotspots.coverage_pct', 'org.supplier_count'],
+    })
+  }
+
+  // Explore Pulse — last-resort filler so there are always 3 tiles
+  if (tiles.length < 3) {
+    tiles.push({
+      id: baseId('explore_pulse'),
+      kind: 'explore_pulse',
+      value: `${Math.round(pack.data_quality.lca_coverage_pct)}%`,
+      unit: 'LCA coverage',
+      title: 'Review your emissions breakdown',
+      hint: 'Your Pulse dashboard shows hotspots, anomalies, and the levers with the most abatement potential.',
+      recommendation: 'Open Pulse and look at the top emission categories — that\'s where the reduction opportunities sit.',
+      icon: 'TrendingDown',
+      href: '/pulse/',
+      tone: 'info',
+      signal_basis: ['data_quality.lca_coverage_pct'],
     })
   }
 

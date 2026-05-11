@@ -100,14 +100,14 @@ export const TILE_HREF_PREFIXES = [
 export const SET_PRIORITY_TILES_TOOL = {
   name: 'set_priority_tiles' as const,
   description:
-    'Return the 1-3 priority tiles to surface at the top of the /rosa/ hub for this user, based on the signal pack provided.',
+    'Return exactly 3 priority tiles to surface at the top of the /rosa/ hub for this user, based on the signal pack provided.',
   input_schema: {
     type: 'object' as const,
     properties: {
       tiles: {
         type: 'array',
-        description: 'Between 1 and 3 tiles, ordered by importance (most important first).',
-        minItems: 1,
+        description: 'Exactly 3 tiles, ordered by importance (most important first).',
+        minItems: 3,
         maxItems: 3,
         items: {
           type: 'object',
@@ -254,9 +254,11 @@ A valuable tile is one that:
 - Tells the user something they don't already know from looking at the page.
 - Points at a specific lever, hotspot, risk, or trajectory issue with a concrete number.
 
-If the only honest thing to say is "you don't have enough data yet to make a strong call", say that — one tile, info tone, with a clear next step. Don't pad with three weak tiles to fill the row.
+If the org has thin data, use the third tile to suggest the most valuable next data action — what a consultant would say to unblock the picture. Frame it as insight ("You can't benchmark improvement without a footprint baseline; the fastest route for a drinks producer is completing the LCAs"), not a to-do. Even sparse data has a most important next move.
 
-Now read the signal pack carefully and call the set_priority_tiles tool with your picks. You have permission to be direct and to skip a tile slot if there isn't a third thing genuinely worth saying.`
+Always return exactly 3 tiles. Never fewer.
+
+Now read the signal pack carefully and call the set_priority_tiles tool with your three picks.`
 }
 
 /**
@@ -272,6 +274,6 @@ export function formatSignalPackForPrompt(pack: OrgSignalPack): string {
     JSON.stringify(pack, null, 2),
     '```',
     '',
-    'Pick up to three priority tiles for this user. Call the set_priority_tiles tool. Order them by importance.',
+    'Pick exactly three priority tiles for this user. Call the set_priority_tiles tool. Order them by importance.',
   ].join('\n')
 }
