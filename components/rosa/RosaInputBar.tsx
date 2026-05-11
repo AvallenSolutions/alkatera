@@ -209,16 +209,14 @@ export function RosaInputBar({ onSubmit, placeholder, defaultValue }: Props) {
         extractError={extractError}
         onImport={(summary: ImportSummary) => {
           setReviewOpen(false)
-          toast.success(`Saved to ${summary.facilityName}.`)
-          // Surface the action in the Rosa drawer so the user has a
-          // record of what they just did. Phrased as a notification to
-          // Rosa so she can acknowledge and answer follow-ups about it.
-          onSubmit(
-            `I just imported ${summary.utilityLabel.toLowerCase()} data ` +
-              `(${summary.quantity} ${summary.unit}) from ${reviewFilename} ` +
-              `for ${summary.facilityName}, covering ${summary.periodStart} to ${summary.periodEnd}. ` +
-              `Can you confirm it's saved and tell me anything I should know about it?`,
-          )
+          // The toast plus the "Recently from Rosa" card on the hub are
+          // the audit trail. Don't post into the conversation: it would
+          // look like Rosa was talking to herself, and asking her to
+          // verify her own action erodes trust when she can't query
+          // the entry back deterministically.
+          toast.success(`Saved to ${summary.facilityName}`, {
+            description: `${summary.utilityLabel} · ${summary.quantity} ${summary.unit} · ${summary.periodStart} to ${summary.periodEnd}`,
+          })
         }}
         onSendToRosa={() => {
           setReviewOpen(false)
