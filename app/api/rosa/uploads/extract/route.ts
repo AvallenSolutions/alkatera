@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     loadAttachment(service, fileId, organizationId, user.id),
     service
       .from('facilities')
-      .select('id, name, facility_type, address_country')
+      .select('id, name, address_country')
       .eq('organization_id', organizationId)
       .order('name'),
   ]);
@@ -76,7 +76,6 @@ export async function POST(request: NextRequest) {
   const facilities = (facilitiesResult.data ?? []) as Array<{
     id: string;
     name: string;
-    facility_type: string | null;
     address_country: string | null;
   }>;
 
