@@ -164,13 +164,17 @@ async function buildEnvironmentalInputs(
   // Query the same fields useCompanyMetrics queries on the client.
   // production_volume is NOT a column on product_carbon_footprints — it's
   // joined from production_logs / pcf_production_sites / cm_allocations.
-  // Facility water comes from `facility_water_data` per-month rows; we
-  // sum across facilities for current and prior years to feed the blended
-  // water score (preferred when present; LCA water is the fallback).
+  // Facility water: primary source is facility_activity_entries (water_intake
+  // rows — the live single-entry table written by document imports and manual
+  // entry). facility_water_data is kept as a legacy fallback for orgs that
+  // entered water data via the old per-facility analytics form before the
+  // activity-entries migration; if activity entries exist they take priority.
   const [
     pcfRows,
     productRows,
     orgRow,
+    waterActivityCurrent,
+    waterActivityPrior,
     facilityWaterCurrent,
     facilityWaterPrior,
     wasteCurrent,
@@ -201,6 +205,23 @@ async function buildEnvironmentalInputs(
       .select('product_type')
       .eq('id', organizationId)
       .maybeSingle(),
+    // Live water intake from facility_activity_entries (primary source).
+    service
+      .from('facility_activity_entries')
+      .select('quantity, quantity_unit, activity_date')
+      .eq('organization_id', organizationId)
+      .eq('activity_category', 'water_intake')
+      .gte('activity_date', yearStart)
+      .lte('activity_date', yearEnd),
+    service
+      .from('facility_activity_entries')
+      .select('quantity, quantity_unit, activity_date')
+      .eq('organization_id', organizationId)
+      .eq('activity_category', 'water_intake')
+      .gte('activity_date', priorStart)
+      .lte('activity_date', priorEnd),
+    // Legacy fallback: facility_water_data (pre-aggregated; used only when
+    // no activity entries exist for the year).
     service
       .from('facility_water_data')
       .select('total_consumption_m3, scarcity_weighted_consumption_m3')
@@ -510,6 +531,43 @@ async function buildEnvironmentalInputs(
     })
   }
 
+  // Aggregate water intake from facility_activity_entries (primary source).
+  // Units may be 'm3', 'm³', 'L', 'litre', 'litres' — normalise to m³.
+  const activityWaterCurrentRows = ((valOrNull(waterActivityCurrent) as any)?.data ?? []) as Array<{
+    quantity: number | null
+    quantity_unit: string | null
+    activity_date: string | null
+  }>
+  const activityWaterPriorRows = ((valOrNull(waterActivityPrior) as any)?.data ?? []) as Array<{
+    quantity: number | null
+    quantity_unit: string | null
+    activity_date: string | null
+  }>
+
+  function toM3(qty: number | null, unit: string | null): number {
+    if (qty === null || !Number.isFinite(qty) || qty <= 0) return 0
+    const u = (unit ?? '').toLowerCase().trim()
+    if (u === 'l' || u === 'litre' || u === 'litres' || u === 'liter' || u === 'liters') {
+      return qty / 1000
+    }
+    return qty // assume m³ for everything else (m3, m³, cubic metres, etc.)
+  }
+
+  function sumActivityWater(rows: typeof activityWaterCurrentRows): number | null {
+    if (!rows.length) return null
+    let total = 0
+    let any = false
+    for (const r of rows) {
+      const m3 = toM3(r.quantity, r.quantity_unit)
+      if (m3 > 0) { total += m3; any = true }
+    }
+    return any ? total : null
+  }
+
+  const activityIntakeCurrent_m3 = sumActivityWater(activityWaterCurrentRows)
+  const activityIntakePrior_m3 = sumActivityWater(activityWaterPriorRows)
+
+  // Legacy facility_water_data fallback (used only when no activity entries exist).
   const facilityCurrentRows = ((valOrNull(facilityWaterCurrent) as any)?.data ?? []) as Array<{
     total_consumption_m3: number | null
     scarcity_weighted_consumption_m3: number | null
@@ -531,16 +589,20 @@ async function buildEnvironmentalInputs(
     }
     return any ? total : null
   }
-  // Schema names the column "total_consumption_m3" but the column is
-  // actually total *intake* (m³ of water withdrawn from sources before
-  // discharge) — the legacy naming predates the operational/embedded split.
+  const legacyIntakeCurrent_m3 = sumOrNull(facilityCurrentRows, 'total_consumption_m3')
+  const legacyIntakePrior_m3 = sumOrNull(facilityPriorRows, 'total_consumption_m3')
+  const legacyScarcityCurrent_m3 = sumOrNull(facilityCurrentRows, 'scarcity_weighted_consumption_m3')
+
+  // Prefer activity entries; fall back to legacy table.
+  // Schema names the column "total_consumption_m3" but it is actually total
+  // *intake* — the legacy naming predates the operational/embedded split.
   // Litres = m³ × 1000.
-  const facilityIntakeCurrent_m3 = sumOrNull(facilityCurrentRows, 'total_consumption_m3')
-  const facilityIntakePrior_m3 = sumOrNull(facilityPriorRows, 'total_consumption_m3')
-  const facilityScarcityCurrent_m3 = sumOrNull(
-    facilityCurrentRows,
-    'scarcity_weighted_consumption_m3',
-  )
+  const facilityIntakeCurrent_m3 = activityIntakeCurrent_m3 ?? legacyIntakeCurrent_m3
+  const facilityIntakePrior_m3 = activityIntakePrior_m3 ?? legacyIntakePrior_m3
+  // Scarcity weighting is only in the legacy table for now; activity entries
+  // don't carry a scarcity factor yet so we keep the legacy value when available.
+  const facilityScarcityCurrent_m3 = legacyScarcityCurrent_m3
+
   const waterInputs = buildWaterInputs({
     products: Array.from(waterRowsByProduct.values()),
     facility_intake_current_l:
