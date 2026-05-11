@@ -510,7 +510,7 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
     }
   }
 
-  function handleReviewImported(entryId: string) {
+  function handleReviewImported(_summary: import('@/components/rosa/DocumentReviewModal').ImportSummary) {
     // File was imported — no need to keep it as a pending attachment.
     if (reviewFile) {
       setPendingAttachments(prev => prev.filter(a => a.file_id !== reviewFile.file_id));

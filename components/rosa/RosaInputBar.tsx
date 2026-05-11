@@ -209,14 +209,11 @@ export function RosaInputBar({ onSubmit, placeholder, defaultValue }: Props) {
         extractError={extractError}
         onImport={(summary: ImportSummary) => {
           setReviewOpen(false)
-          // The toast plus the "Recently from Rosa" card on the hub are
-          // the audit trail. Don't post into the conversation: it would
-          // look like Rosa was talking to herself, and asking her to
-          // verify her own action erodes trust when she can't query
-          // the entry back deterministically.
           toast.success(`Saved to ${summary.facilityName}`, {
             description: `${summary.utilityLabel} · ${summary.quantity} ${summary.unit} · ${summary.periodStart} to ${summary.periodEnd}`,
           })
+          // Signal that org data has changed so PriorityTiles re-curates.
+          window.dispatchEvent(new CustomEvent('rosa:data-updated', { detail: { source: 'document-import' } }))
         }}
         onSendToRosa={() => {
           setReviewOpen(false)

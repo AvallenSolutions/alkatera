@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
+  AlertTriangle,
+  CheckCircle2,
   Inbox,
   CalendarClock,
   Package,
@@ -67,11 +69,19 @@ interface CuratedTile {
   signal_basis: string[]
 }
 
+interface ReadinessSummary {
+  next_layer: 'foundation' | 'recipes' | 'lcas' | 'targets'
+  facility_data: string
+  recipes_status: string
+  why: string
+}
+
 interface CuratorResponse {
   tiles: CuratedTile[]
   source: 'cache' | 'curator' | 'fallback'
   generated_at: string
   signals_hash: string
+  readiness?: ReadinessSummary
 }
 
 const SNOOZE_HOURS = 24
@@ -176,6 +186,14 @@ export function PriorityTiles({ onOpenQueue }: Props) {
     void load()
   }, [orgId, load])
 
+  // After a document import (or any other client-side data change), force
+  // a fresh curation so the tiles reflect the new state immediately.
+  useEffect(() => {
+    const handler = () => void load({ fresh: true })
+    window.addEventListener('rosa:data-updated', handler)
+    return () => window.removeEventListener('rosa:data-updated', handler)
+  }, [load])
+
   // Live updates: when any signal-relevant table changes, force a
   // regeneration so the user sees Rosa react to their action.
   useRealtimeRefresh(
@@ -250,6 +268,7 @@ export function PriorityTiles({ onOpenQueue }: Props) {
           />
         ))}
       </div>
+      {data?.readiness && <ReadinessBadge readiness={data.readiness} />}
     </div>
   )
 }
@@ -399,4 +418,49 @@ const TONE_STYLES: Record<CuratedTile['tone'], {
     value: 'text-emerald-200',
     recommendation: 'text-emerald-200/85',
   },
+}
+
+function ReadinessBadge({ readiness }: { readiness: ReadinessSummary }) {
+  const broken =
+    readiness.facility_data === 'missing' ||
+    readiness.facility_data === 'stale' ||
+    readiness.recipes_status === 'partial' ||
+    readiness.recipes_status === 'missing'
+
+  if (!broken) return null
+
+  const href =
+    readiness.next_layer === 'foundation'
+      ? '/company/facilities/'
+      : readiness.next_layer === 'recipes'
+        ? '/products'
+        : null
+
+  const label =
+    readiness.facility_data === 'missing' || readiness.facility_data === 'stale'
+      ? `Foundation: facility data ${readiness.facility_data}`
+      : readiness.recipes_status !== 'ready'
+        ? `Recipes: ${readiness.recipes_status} ingredient matching`
+        : readiness.why
+
+  const inner = (
+    <div className="flex items-center gap-2 text-xs text-amber-300/70">
+      <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+      <span>{label}</span>
+    </div>
+  )
+
+  if (href) {
+    return (
+      <Link href={href} className="block rounded-lg px-3 py-1.5 border border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10 transition-colors">
+        {inner}
+      </Link>
+    )
+  }
+
+  return (
+    <div className="rounded-lg px-3 py-1.5 border border-amber-500/20 bg-amber-500/5">
+      {inner}
+    </div>
+  )
 }

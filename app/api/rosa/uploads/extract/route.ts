@@ -13,15 +13,26 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { loadAttachment, extractStructured } from '@/lib/rosa/document-extraction';
+import { checkRateLimit } from '@/lib/rosa/rate-limiter';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
+
+const EXTRACT_RATE_LIMIT = 5; // per minute — Claude vision is the most expensive call on the platform
 
 export async function POST(request: NextRequest) {
   const userSupabase = getSupabaseServerClient();
   const { data: { user }, error: userErr } = await userSupabase.auth.getUser();
   if (userErr || !user) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+  }
+
+  const rl = checkRateLimit(`extract:${user.id}`, EXTRACT_RATE_LIMIT);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: `Too many extraction requests. Please wait ${Math.ceil(rl.retryAfterMs / 1000)} seconds.` },
+      { status: 429 },
+    );
   }
 
   const { data: membership } = await userSupabase

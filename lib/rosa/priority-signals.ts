@@ -222,6 +222,173 @@ interface BuilderInputs {
   snoozedKinds?: string[]
 }
 
+// Module-level TTL cache. Avoids rebuilding the pack on every "what next?"
+// chat turn. Key = org:user:sorted-snoozed, value = { pack, expiresAt }.
+// 90s keeps packs warm within a cache window; stale data evicts automatically.
+const PACK_CACHE_TTL_MS = 90_000
+const _packCache = new Map<string, { pack: OrgSignalPack; expiresAt: number }>()
+
+function packCacheKey(orgId: string, userId: string, snoozedKinds: string[]): string {
+  return `${orgId}:${userId}:${[...snoozedKinds].sort().join(',')}`
+}
+
+export interface ReadinessInputs {
+  facilityCount: number
+  staleCount: number
+  neverEnteredCount: number
+  selfGrownCount: number
+  linkedToProfileCount: number
+  productsWithUnmatchedCount: number
+  totalMaterialsCount: number
+  completedLcasCount: number
+  productCount: number
+  draftLcasCount: number
+  unmatchedRatioPct: number
+  hasTargets: boolean
+}
+
+export type ReadinessBlock = OrgSignalPack['readiness']
+
+/**
+ * Pure function: derive the layered readiness block from resolved counts.
+ * Extracted so it can be unit-tested without a live Supabase client.
+ */
+export function computeReadiness(i: ReadinessInputs): ReadinessBlock {
+  const withRecentEntryCount = Math.max(0, i.facilityCount - i.staleCount)
+  const staleWithDataCount = Math.max(0, i.staleCount - i.neverEnteredCount)
+
+  let facilityDataStatus: ReadinessBlock['foundation']['facility_data']
+  if (i.facilityCount === 0 || i.staleCount === i.facilityCount) {
+    facilityDataStatus = 'missing'
+  } else if (i.staleCount > 0) {
+    facilityDataStatus = 'stale'
+  } else {
+    facilityDataStatus = 'ready'
+  }
+
+  let agriStatus: ReadinessBlock['foundation']['agricultural_data']
+  if (i.selfGrownCount === 0) {
+    agriStatus = 'not_applicable'
+  } else if (i.linkedToProfileCount === i.selfGrownCount) {
+    agriStatus = 'ready'
+  } else if (i.linkedToProfileCount > 0) {
+    agriStatus = 'partial'
+  } else {
+    agriStatus = 'missing'
+  }
+
+  let recipesStatus: ReadinessBlock['recipes']['status']
+  if (i.productsWithUnmatchedCount > 0) {
+    recipesStatus = 'partial'
+  } else if (i.totalMaterialsCount === 0 && i.completedLcasCount === 0) {
+    recipesStatus = 'missing'
+  } else {
+    recipesStatus = 'ready'
+  }
+
+  const ingredientsMatchedPct = Math.round(Math.max(0, 100 - i.unmatchedRatioPct) * 10) / 10
+  const productsWithCompleteRecipe = Math.max(0, i.productCount - i.productsWithUnmatchedCount)
+
+  const blockedReasons: string[] = []
+  if (facilityDataStatus === 'missing') {
+    if (i.facilityCount === 0) {
+      blockedReasons.push('No facilities recorded yet')
+    } else if (i.neverEnteredCount === i.facilityCount) {
+      blockedReasons.push('No facilities have any utility data yet')
+    } else {
+      blockedReasons.push(`All ${i.facilityCount} facilities are missing recent data`)
+    }
+  } else if (facilityDataStatus === 'stale') {
+    blockedReasons.push(
+      `${i.staleCount} ${i.staleCount === 1 ? "facility hasn't" : "facilities haven't"} had a utility entry in 60+ days`,
+    )
+  }
+  if (agriStatus === 'missing' || agriStatus === 'partial') {
+    const missing = i.selfGrownCount - i.linkedToProfileCount
+    blockedReasons.push(
+      `${missing} self-grown ${missing === 1 ? 'ingredient is' : 'ingredients are'} not yet linked to a vineyard, orchard, or arable field`,
+    )
+  }
+  if (i.productsWithUnmatchedCount > 0) {
+    blockedReasons.push(
+      `${i.productsWithUnmatchedCount} ${i.productsWithUnmatchedCount === 1 ? 'product has' : 'products have'} unmatched ingredients`,
+    )
+  }
+
+  let lcasStatus: ReadinessBlock['lcas']['status']
+  if (blockedReasons.length > 0) {
+    lcasStatus = 'blocked'
+  } else if (i.productCount > 0 && i.completedLcasCount >= i.productCount) {
+    lcasStatus = 'complete'
+  } else if (i.draftLcasCount > 0) {
+    lcasStatus = 'in_progress'
+  } else {
+    lcasStatus = 'computable'
+  }
+
+  const lcaComputableNowCount =
+    facilityDataStatus === 'ready' ? Math.max(0, i.productCount - i.productsWithUnmatchedCount) : 0
+
+  let nextLayer: ReadinessBlock['next_layer_to_address']
+  let whyThisLayer: string
+  if (facilityDataStatus !== 'ready') {
+    nextLayer = 'foundation'
+    if (facilityDataStatus === 'missing' && i.facilityCount === 0) {
+      whyThisLayer = 'No facilities yet. Add at least one to start measuring Scope 1 and 2.'
+    } else if (facilityDataStatus === 'missing') {
+      whyThisLayer = "No facilities have utility data yet. LCAs can't allocate Scope 1 and 2 without it."
+    } else {
+      whyThisLayer = `${i.staleCount} ${i.staleCount === 1 ? 'facility is' : 'facilities are'} more than 60 days out of date. An LCA built on stale facility data is misleading.`
+    }
+  } else if (agriStatus === 'missing' || agriStatus === 'partial') {
+    nextLayer = 'foundation'
+    whyThisLayer = 'Self-grown ingredients need a linked vineyard, orchard, or arable field to feed the LCA correctly.'
+  } else if (recipesStatus !== 'ready') {
+    nextLayer = 'recipes'
+    whyThisLayer = `${i.productsWithUnmatchedCount} ${i.productsWithUnmatchedCount === 1 ? 'product has' : 'products have'} ingredients without an emission factor. LCAs can't be calculated until those are matched.`
+  } else if (lcasStatus !== 'complete' && i.productCount > 0) {
+    nextLayer = 'lcas'
+    const missingLcas = i.productCount - i.completedLcasCount
+    whyThisLayer = `${missingLcas} ${missingLcas === 1 ? 'product is' : 'products are'} missing a completed LCA. The data foundation is in place, so they can be calculated now.`
+  } else if (!i.hasTargets) {
+    nextLayer = 'targets'
+    whyThisLayer = 'Your data foundation and LCAs are in place. Set a reduction target so progress has a line to measure against.'
+  } else {
+    nextLayer = 'targets'
+    whyThisLayer = 'All foundational layers are ready. Focus on hitting targets and surfacing abatement opportunities.'
+  }
+
+  return {
+    foundation: {
+      facility_data: facilityDataStatus,
+      facility_detail: {
+        total: i.facilityCount,
+        with_recent_entry_60d: withRecentEntryCount,
+        stale_60d: staleWithDataCount,
+        never_entered: i.neverEnteredCount,
+      },
+      agricultural_data: agriStatus,
+      agricultural_detail: {
+        self_grown_materials: i.selfGrownCount,
+        linked_to_profile: i.linkedToProfileCount,
+      },
+    },
+    recipes: {
+      status: recipesStatus,
+      ingredients_matched_pct: ingredientsMatchedPct,
+      products_with_complete_recipe: productsWithCompleteRecipe,
+      products_with_unmatched_materials: i.productsWithUnmatchedCount,
+    },
+    lcas: {
+      status: lcasStatus,
+      computable_now_count: lcaComputableNowCount,
+      blocked_reasons: blockedReasons,
+    },
+    next_layer_to_address: nextLayer,
+    why_this_layer: whyThisLayer,
+  }
+}
+
 /**
  * Build the full signal pack for an org/user pair. Uses the service-role
  * client because we read from cross-table aggregates that RLS would block.
@@ -232,6 +399,11 @@ export async function buildOrgSignalPack(
   inputs: BuilderInputs,
 ): Promise<OrgSignalPack> {
   const { organizationId, userId, snoozedKinds = [] } = inputs
+
+  // Cache hit?
+  const cacheKey = packCacheKey(organizationId, userId, snoozedKinds)
+  const cached = _packCache.get(cacheKey)
+  if (cached && cached.expiresAt > Date.now()) return cached.pack
 
   // Fan out every query in parallel; allSettled so one bad table never
   // breaks the pack.
@@ -793,32 +965,13 @@ export async function buildOrgSignalPack(
       : 0
 
   // === Readiness waterfall ===
-  // Computed from values already resolved above plus two small extra reads.
-  // Layers: foundation (facility + agricultural) → recipes (matched
-  // ingredients) → LCAs → targets/decarbonisation. Rosa uses this to
-  // refuse to push higher-layer work when a lower layer isn't ready.
   const facilityCountResolved = countOf(facilityCount)
   const neverEnteredFacilityCount = facilityRows.filter(f => {
     const entries = Array.isArray(f.utility_data_entries) ? f.utility_data_entries : []
     return entries.length === 0
   }).length
-  const withRecentEntryCount = Math.max(0, facilityCountResolved - staleCount)
-  const staleWithDataCount = Math.max(0, staleCount - neverEnteredFacilityCount)
 
-  let facilityDataStatus: 'ready' | 'partial' | 'stale' | 'missing'
-  if (facilityCountResolved === 0 || staleCount === facilityCountResolved) {
-    facilityDataStatus = 'missing'
-  } else if (staleCount > 0) {
-    facilityDataStatus = 'stale'
-  } else {
-    facilityDataStatus = 'ready'
-  }
-
-  // Agricultural data: only relevant when the org grows its own ingredients.
-  // We resolve "linked_to_profile" as: a self-grown row that points at a
-  // vineyard / orchard / arable_field FK. The growing profile is created
-  // alongside the farm in the wizard, so the FK is a strong proxy for
-  // "profile exists" in v1.
+  // Agricultural data: self-grown ingredients that need a linked farm profile.
   const agriRowsResult = await (async () => {
     try {
       const { data } = await service
@@ -843,16 +996,6 @@ export async function buildOrgSignalPack(
   const linkedToProfileCount = agriRowsResult.filter(
     r => r.vineyard_id || r.orchard_id || r.arable_field_id,
   ).length
-  let agriStatus: 'ready' | 'partial' | 'missing' | 'not_applicable'
-  if (selfGrownCount === 0) {
-    agriStatus = 'not_applicable'
-  } else if (linkedToProfileCount === selfGrownCount) {
-    agriStatus = 'ready'
-  } else if (linkedToProfileCount > 0) {
-    agriStatus = 'partial'
-  } else {
-    agriStatus = 'missing'
-  }
 
   // Recipes: count products that have at least one unmatched material.
   const unmatchedByProductResult = await (async () => {
@@ -873,104 +1016,23 @@ export async function buildOrgSignalPack(
     if (r.product_id) productsWithUnmatchedSet.add(r.product_id)
   }
   const productsWithUnmatchedCount = productsWithUnmatchedSet.size
-  const productsWithCompleteRecipe = Math.max(
-    0,
-    productCountResolved - productsWithUnmatchedCount,
-  )
-  // Recipe readiness: 'partial' if any product has unmatched materials;
-  // 'missing' only when there are no materials AND no completed LCAs (a
-  // truly empty org). If LCAs were already calculated, ingredients must
-  // have been matched at some point even if the v1 product_materials
-  // table is empty (older orgs, imported LCAs). Treat that as ready.
-  let recipesStatus: 'ready' | 'partial' | 'missing'
-  if (productsWithUnmatchedCount > 0) {
-    recipesStatus = 'partial'
-  } else if (totalMaterialsCount === 0 && completedLcasCountResolved === 0) {
-    recipesStatus = 'missing'
-  } else {
-    recipesStatus = 'ready'
-  }
-  const ingredientsMatchedPct = Math.round(Math.max(0, 100 - unmatchedRatioPct) * 10) / 10
 
-  // LCA readiness: blocked if foundation or recipes aren't ready.
-  const blockedReasons: string[] = []
-  if (facilityDataStatus === 'missing') {
-    if (facilityCountResolved === 0) {
-      blockedReasons.push('No facilities recorded yet')
-    } else if (neverEnteredFacilityCount === facilityCountResolved) {
-      blockedReasons.push('No facilities have any utility data yet')
-    } else {
-      blockedReasons.push(`All ${facilityCountResolved} facilities are missing recent data`)
-    }
-  } else if (facilityDataStatus === 'stale') {
-    blockedReasons.push(
-      `${staleCount} ${staleCount === 1 ? 'facility hasn\'t' : 'facilities haven\'t'} had a utility entry in 60+ days`,
-    )
-  }
-  if (agriStatus === 'missing' || agriStatus === 'partial') {
-    const missing = selfGrownCount - linkedToProfileCount
-    blockedReasons.push(
-      `${missing} self-grown ${missing === 1 ? 'ingredient is' : 'ingredients are'} not yet linked to a vineyard, orchard, or arable field`,
-    )
-  }
-  if (productsWithUnmatchedCount > 0) {
-    blockedReasons.push(
-      `${productsWithUnmatchedCount} ${productsWithUnmatchedCount === 1 ? 'product has' : 'products have'} unmatched ingredients`,
-    )
-  }
-  let lcasStatus: 'computable' | 'blocked' | 'in_progress' | 'complete'
-  if (blockedReasons.length > 0) {
-    lcasStatus = 'blocked'
-  } else if (
-    productCountResolved > 0 &&
-    completedLcasCountResolved >= productCountResolved
-  ) {
-    lcasStatus = 'complete'
-  } else if (countOf(draftLcasCount) > 0) {
-    lcasStatus = 'in_progress'
-  } else {
-    lcasStatus = 'computable'
-  }
-  // Genuinely computable = materials matched AND facility foundation is
-  // ready. A product with matched ingredients but stale facility data
-  // can't produce a trustworthy LCA.
-  const lcaComputableNowCount =
-    facilityDataStatus === 'ready'
-      ? Math.max(0, productCountResolved - productsWithUnmatchedCount)
-      : 0
+  const readiness = computeReadiness({
+    facilityCount: facilityCountResolved,
+    staleCount,
+    neverEnteredCount: neverEnteredFacilityCount,
+    selfGrownCount,
+    linkedToProfileCount,
+    productsWithUnmatchedCount,
+    totalMaterialsCount,
+    completedLcasCount: completedLcasCountResolved,
+    productCount: productCountResolved,
+    draftLcasCount: countOf(draftLcasCount),
+    unmatchedRatioPct,
+    hasTargets: targetsOut.length > 0,
+  })
 
-  // Next layer to address. Strict waterfall — the first layer that isn't
-  // 'ready' takes precedence regardless of what's downstream.
-  let nextLayer: 'foundation' | 'recipes' | 'lcas' | 'targets'
-  let whyThisLayer: string
-  if (facilityDataStatus !== 'ready') {
-    nextLayer = 'foundation'
-    if (facilityDataStatus === 'missing' && facilityCountResolved === 0) {
-      whyThisLayer = 'No facilities yet. Add at least one to start measuring Scope 1 and 2.'
-    } else if (facilityDataStatus === 'missing') {
-      whyThisLayer = 'No facilities have utility data yet. LCAs can\'t allocate Scope 1 and 2 without it.'
-    } else {
-      whyThisLayer = `${staleCount} ${staleCount === 1 ? 'facility is' : 'facilities are'} more than 60 days out of date. An LCA built on stale facility data is misleading.`
-    }
-  } else if (agriStatus === 'missing' || agriStatus === 'partial') {
-    nextLayer = 'foundation'
-    whyThisLayer = 'Self-grown ingredients need a linked vineyard, orchard, or arable field to feed the LCA correctly.'
-  } else if (recipesStatus !== 'ready') {
-    nextLayer = 'recipes'
-    whyThisLayer = `${productsWithUnmatchedCount} ${productsWithUnmatchedCount === 1 ? 'product has' : 'products have'} ingredients without an emission factor. LCAs can\'t be calculated until those are matched.`
-  } else if (lcasStatus !== 'complete' && productCountResolved > 0) {
-    nextLayer = 'lcas'
-    const missingLcas = productCountResolved - completedLcasCountResolved
-    whyThisLayer = `${missingLcas} ${missingLcas === 1 ? 'product is' : 'products are'} missing a completed LCA. The data foundation is in place, so they can be calculated now.`
-  } else if (targetsOut.length === 0) {
-    nextLayer = 'targets'
-    whyThisLayer = 'Your data foundation and LCAs are in place. Set a reduction target so progress has a line to measure against.'
-  } else {
-    nextLayer = 'targets'
-    whyThisLayer = 'All foundational layers are ready. Focus on hitting targets and surfacing abatement opportunities.'
-  }
-
-  return {
+  const pack: OrgSignalPack = {
     org: {
       id: organizationId,
       name: orgData?.name ?? null,
@@ -1040,35 +1102,7 @@ export async function buildOrgSignalPack(
       esg_low_score: countOf(esgLowScore),
     },
     targets: targetsOut,
-    readiness: {
-      foundation: {
-        facility_data: facilityDataStatus,
-        facility_detail: {
-          total: facilityCountResolved,
-          with_recent_entry_60d: withRecentEntryCount,
-          stale_60d: staleWithDataCount,
-          never_entered: neverEnteredFacilityCount,
-        },
-        agricultural_data: agriStatus,
-        agricultural_detail: {
-          self_grown_materials: selfGrownCount,
-          linked_to_profile: linkedToProfileCount,
-        },
-      },
-      recipes: {
-        status: recipesStatus,
-        ingredients_matched_pct: ingredientsMatchedPct,
-        products_with_complete_recipe: productsWithCompleteRecipe,
-        products_with_unmatched_materials: productsWithUnmatchedCount,
-      },
-      lcas: {
-        status: lcasStatus,
-        computable_now_count: lcaComputableNowCount,
-        blocked_reasons: blockedReasons,
-      },
-      next_layer_to_address: nextLayer,
-      why_this_layer: whyThisLayer,
-    },
+    readiness,
     compliance: {
       has_uk_packaging: hasUkPackaging,
       feature_flags: evidenceFlags,
@@ -1076,6 +1110,18 @@ export async function buildOrgSignalPack(
     },
     generated_at: new Date().toISOString(),
   }
+
+  _packCache.set(cacheKey, { pack, expiresAt: Date.now() + PACK_CACHE_TTL_MS })
+  return pack
+}
+
+/**
+ * Evict a specific org's cached packs (call after a data-changing action).
+ */
+export function evictSignalPackCache(organizationId: string): void {
+  Array.from(_packCache.keys())
+    .filter(k => k.startsWith(`${organizationId}:`))
+    .forEach(k => _packCache.delete(k))
 }
 
 /**

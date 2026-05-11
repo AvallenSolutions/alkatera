@@ -66,12 +66,16 @@ interface DocumentReviewModalProps {
 
 const UTILITY_TYPES = [
   { value: 'electricity_grid', label: 'Electricity (grid)' },
-  { value: 'natural_gas', label: 'Natural gas' },
+  { value: 'natural_gas', label: 'Natural gas (kWh)' },
+  { value: 'natural_gas_m3', label: 'Natural gas (m³)' },
   { value: 'lpg', label: 'LPG' },
   { value: 'heat_steam_purchased', label: 'Purchased heat / steam' },
   { value: 'diesel_stationary', label: 'Diesel (generator/stationary)' },
   { value: 'diesel_mobile', label: 'Diesel (fleet)' },
   { value: 'petrol_mobile', label: 'Petrol (fleet)' },
+  { value: 'heavy_fuel_oil', label: 'Heavy fuel oil' },
+  { value: 'biomass_solid', label: 'Biomass (solid)' },
+  { value: 'refrigerant_leakage', label: 'Refrigerant leakage' },
   { value: 'water_intake', label: 'Water' },
 ];
 
