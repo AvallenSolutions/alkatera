@@ -140,11 +140,13 @@ function normaliseDocumentType(raw: string): string {
 
 function normaliseUtilityType(raw: string): string {
   const lower = raw.toLowerCase();
-  if (lower.includes('electric')) return 'electricity';
+  if (lower.includes('electric')) return 'electricity_grid';
   if (lower.includes('gas') && !lower.includes('lpg')) return 'natural_gas';
   if (lower.includes('lpg') || lower.includes('propane')) return 'lpg';
+  if (lower.includes('heat') || lower.includes('steam')) return 'heat_steam_purchased';
   if (lower.includes('water')) return 'water_intake';
-  if (lower.includes('diesel')) return 'fuel_diesel';
-  if (lower.includes('petrol') || lower.includes('gasoline')) return 'fuel_petrol';
+  if (lower.includes('diesel') && (lower.includes('fleet') || lower.includes('vehicle') || lower.includes('mobile'))) return 'diesel_mobile';
+  if (lower.includes('diesel')) return 'diesel_stationary';
+  if (lower.includes('petrol') || lower.includes('gasoline')) return 'petrol_mobile';
   return '';
 }

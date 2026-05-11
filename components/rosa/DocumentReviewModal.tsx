@@ -55,13 +55,14 @@ interface DocumentReviewModalProps {
 }
 
 const UTILITY_TYPES = [
-  { value: 'electricity', label: 'Electricity' },
+  { value: 'electricity_grid', label: 'Electricity (grid)' },
   { value: 'natural_gas', label: 'Natural gas' },
-  { value: 'water_intake', label: 'Water' },
-  { value: 'fuel_diesel', label: 'Diesel' },
-  { value: 'fuel_petrol', label: 'Petrol' },
   { value: 'lpg', label: 'LPG' },
-  { value: 'other', label: 'Other' },
+  { value: 'heat_steam_purchased', label: 'Purchased heat / steam' },
+  { value: 'diesel_stationary', label: 'Diesel (generator/stationary)' },
+  { value: 'diesel_mobile', label: 'Diesel (fleet)' },
+  { value: 'petrol_mobile', label: 'Petrol (fleet)' },
+  { value: 'water_intake', label: 'Water' },
 ];
 
 const IMPORTABLE_TYPES = ['utility_bill', 'meter_reading'];
