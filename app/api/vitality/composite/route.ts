@@ -161,6 +161,17 @@ async function buildEnvironmentalInputs(
   const priorStart = `${yearNow - 1}-01-01`
   const priorEnd = `${yearNow - 1}-12-31`
 
+  // Water billing periods rarely align with calendar years. Use rolling
+  // 12-month windows (matching the facility_water_summary view) so that
+  // a January-uploaded Dec-2025 bill is included in "current" even when
+  // yearNow is 2026. priorWater covers the preceding 12 months.
+  const today = new Date()
+  const waterCurrentStart = new Date(today); waterCurrentStart.setFullYear(today.getFullYear() - 1)
+  const waterPriorStart   = new Date(today); waterPriorStart.setFullYear(today.getFullYear() - 2)
+  const waterCurrentStartStr = waterCurrentStart.toISOString().split('T')[0]
+  const waterPriorStartStr   = waterPriorStart.toISOString().split('T')[0]
+  const waterTodayStr        = today.toISOString().split('T')[0]
+
   // Query the same fields useCompanyMetrics queries on the client.
   // production_volume is NOT a column on product_carbon_footprints — it's
   // joined from production_logs / pcf_production_sites / cm_allocations.
@@ -206,20 +217,23 @@ async function buildEnvironmentalInputs(
       .eq('id', organizationId)
       .maybeSingle(),
     // Live water intake from facility_activity_entries (primary source).
+    // Filter by reporting_period_start (always set; activity_date can be null
+    // for manually-entered records). Use rolling 12-month windows to match
+    // facility_water_summary view — billing periods rarely align with Jan-Dec.
     service
       .from('facility_activity_entries')
-      .select('quantity, quantity_unit, activity_date')
+      .select('quantity, unit, reporting_period_start')
       .eq('organization_id', organizationId)
       .eq('activity_category', 'water_intake')
-      .gte('activity_date', yearStart)
-      .lte('activity_date', yearEnd),
+      .gte('reporting_period_start', waterCurrentStartStr)
+      .lte('reporting_period_start', waterTodayStr),
     service
       .from('facility_activity_entries')
-      .select('quantity, quantity_unit, activity_date')
+      .select('quantity, unit, reporting_period_start')
       .eq('organization_id', organizationId)
       .eq('activity_category', 'water_intake')
-      .gte('activity_date', priorStart)
-      .lte('activity_date', priorEnd),
+      .gte('reporting_period_start', waterPriorStartStr)
+      .lt('reporting_period_start', waterCurrentStartStr),
     // Legacy fallback: facility_water_data (pre-aggregated; used only when
     // no activity entries exist for the year).
     service
@@ -535,13 +549,13 @@ async function buildEnvironmentalInputs(
   // Units may be 'm3', 'm³', 'L', 'litre', 'litres' — normalise to m³.
   const activityWaterCurrentRows = ((valOrNull(waterActivityCurrent) as any)?.data ?? []) as Array<{
     quantity: number | null
-    quantity_unit: string | null
-    activity_date: string | null
+    unit: string | null
+    reporting_period_start: string | null
   }>
   const activityWaterPriorRows = ((valOrNull(waterActivityPrior) as any)?.data ?? []) as Array<{
     quantity: number | null
-    quantity_unit: string | null
-    activity_date: string | null
+    unit: string | null
+    reporting_period_start: string | null
   }>
 
   function toM3(qty: number | null, unit: string | null): number {
@@ -558,7 +572,7 @@ async function buildEnvironmentalInputs(
     let total = 0
     let any = false
     for (const r of rows) {
-      const m3 = toM3(r.quantity, r.quantity_unit)
+      const m3 = toM3(r.quantity, r.unit)
       if (m3 > 0) { total += m3; any = true }
     }
     return any ? total : null
