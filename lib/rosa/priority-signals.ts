@@ -528,7 +528,15 @@ export async function buildOrgSignalPack(
       .eq('data_source', 'spend_based'),
     service
       .from('facilities')
-      .select('id, utility_data_entries!left(reporting_period_end)')
+      .select(
+        'id, ' +
+          'utility_data_entries!left(reporting_period_end), ' +
+          // Disambiguate the FK: facility_activity_entries has both
+          // facility_id (the entry's owning facility) and source_facility_id
+          // (an upstream reference), and PostgREST cannot pick a default.
+          'facility_activity_entries!facility_id!left(reporting_period_start, activity_date), ' +
+          'facility_water_data!left(reporting_year)',
+      )
       .eq('organization_id', organizationId)
       .limit(200),
     service
@@ -688,18 +696,56 @@ export async function buildOrgSignalPack(
       }
     : null
 
-  // Stale facilities
+  // Stale facilities. A facility is "stale" when none of its data
+  // sources has an entry inside the last STALE_FACILITY_DAYS window. We
+  // check three sources because facility data lives in three places:
+  //   - utility_data_entries (electricity, gas, fuel)
+  //   - facility_activity_entries (water, waste, etc.)
+  //   - facility_water_data (legacy aggregated water)
+  // Without this, a facility with recent water entries but no recent
+  // utility entries gets miscounted as stale, falsely triggering the
+  // "Foundation: facility data missing" banner.
   const facilityRows = ((valOrNull(staleFacilities) as any)?.data ?? []) as Array<{
     id: string
     utility_data_entries: Array<{ reporting_period_end: string | null }> | null
+    facility_activity_entries: Array<{
+      reporting_period_start: string | null
+      activity_date: string | null
+    }> | null
+    facility_water_data: Array<{ reporting_year: number | null }> | null
   }>
   const cutoff = Date.now() - STALE_FACILITY_DAYS * 86_400_000
+  const currentYear = new Date().getFullYear()
+  function latestMs(f: (typeof facilityRows)[number]): number {
+    let latest = 0
+    const utility = Array.isArray(f.utility_data_entries) ? f.utility_data_entries : []
+    for (const e of utility) {
+      if (e?.reporting_period_end) {
+        latest = Math.max(latest, new Date(e.reporting_period_end).getTime())
+      }
+    }
+    const activity = Array.isArray(f.facility_activity_entries)
+      ? f.facility_activity_entries
+      : []
+    for (const e of activity) {
+      // reporting_period_start is always set; activity_date can be null
+      // for manually-entered records. Prefer reporting_period_start.
+      const date = e?.reporting_period_start ?? e?.activity_date
+      if (date) latest = Math.max(latest, new Date(date).getTime())
+    }
+    const water = Array.isArray(f.facility_water_data) ? f.facility_water_data : []
+    for (const e of water) {
+      // Legacy table only stores reporting_year. Treat a row for the
+      // current reporting year as "fresh enough" to keep the facility
+      // out of the stale bucket.
+      if (e?.reporting_year && Number(e.reporting_year) >= currentYear) {
+        latest = Math.max(latest, Date.now())
+      }
+    }
+    return latest
+  }
   const staleCount = facilityRows.filter(f => {
-    const entries = Array.isArray(f.utility_data_entries) ? f.utility_data_entries : []
-    if (entries.length === 0) return true
-    const latest = entries
-      .map(e => (e?.reporting_period_end ? new Date(e.reporting_period_end).getTime() : 0))
-      .reduce((a, b) => Math.max(a, b), 0)
+    const latest = latestMs(f)
     return latest < cutoff
   }).length
 
@@ -966,9 +1012,16 @@ export async function buildOrgSignalPack(
 
   // === Readiness waterfall ===
   const facilityCountResolved = countOf(facilityCount)
+  // "Never entered" = no rows in ANY of the three facility data tables.
+  // Mirrors the staleness check so a facility with only water-data
+  // history isn't counted as "never entered".
   const neverEnteredFacilityCount = facilityRows.filter(f => {
-    const entries = Array.isArray(f.utility_data_entries) ? f.utility_data_entries : []
-    return entries.length === 0
+    const utility = Array.isArray(f.utility_data_entries) ? f.utility_data_entries : []
+    const activity = Array.isArray(f.facility_activity_entries)
+      ? f.facility_activity_entries
+      : []
+    const water = Array.isArray(f.facility_water_data) ? f.facility_water_data : []
+    return utility.length === 0 && activity.length === 0 && water.length === 0
   }).length
 
   // Agricultural data: self-grown ingredients that need a linked farm profile.

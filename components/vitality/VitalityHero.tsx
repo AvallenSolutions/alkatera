@@ -275,18 +275,14 @@ export function VitalityHero() {
               {data?.read?.headline ?? data?.band_description ?? 'Loading your vitality picture…'}
             </p>
 
-            {trendValues.length > 0 && trendValues.some(v => v !== null) ? (
-              <div className="mt-4 max-w-md" aria-label="12-week composite trend">
-                <CompositeSparkline values={trendValues} colour={visuals.spark} />
-                <p className="mt-1 text-[10px] text-muted-foreground">
-                  12 weeks · click for the full breakdown
-                </p>
-              </div>
-            ) : (
-              <p className="mt-4 text-xs text-muted-foreground/80 italic">
-                Trend builds up as you keep visiting; one snapshot per day.
-              </p>
-            )}
+            <TrendStrip
+              values={trendValues}
+              colour={visuals.spark}
+              delta={delta}
+            />
+            <p className="mt-1 text-[10px] text-muted-foreground/70">
+              Click for the full breakdown
+            </p>
           </div>
 
           <div className="sm:col-span-2 flex flex-col items-center gap-3">
@@ -368,40 +364,108 @@ function PillarMini({ label, score }: { label: string; score: number | null }) {
   )
 }
 
-function CompositeSparkline({
+/**
+ * 12-week trend visual rendered as a row of weekly bars. Each bar
+ * encodes that week's composite score (taller = higher). Missing weeks
+ * show as low-opacity placeholders so the data density is visible at a
+ * glance. The latest bar uses full opacity so the eye lands on "now".
+ *
+ * Bars chosen over a line chart because:
+ *   - Sparse data (1-2 snapshots) doesn't look like a cliff or a mystery
+ *     line; instead the user sees most slots empty with one or two
+ *     filled, which is honest and legible.
+ *   - Bar height encodes absolute score (0-100), so visual height maps
+ *     directly to the number rather than being stretched by the data
+ *     range.
+ *   - The pattern is familiar from activity/contribution charts.
+ *
+ * When fewer than one snapshot exists, the strip degrades to a helpful
+ * line of copy rather than rendering an empty chart.
+ */
+function TrendStrip({
   values,
   colour,
+  delta,
 }: {
   values: Array<number | null>
   colour: string
+  delta: number | null
 }) {
-  const w = 240
-  const h = 28
-  const padX = 2
-  const padY = 2
-  const nonNull = values.filter((v): v is number => v !== null && Number.isFinite(v))
-  if (nonNull.length === 0) return null
-  const min = Math.min(...nonNull, 0)
-  const max = Math.max(...nonNull, 100)
-  const range = max - min || 1
-  const stepX = values.length > 1 ? (w - 2 * padX) / (values.length - 1) : 0
-  const seg: string[] = []
-  let inSeg = false
-  for (let i = 0; i < values.length; i += 1) {
-    const v = values[i]
-    if (v === null) {
-      inSeg = false
-      continue
-    }
-    const x = padX + i * stepX
-    const y = padY + (h - 2 * padY) * (1 - (v - min) / range)
-    seg.push(`${inSeg ? 'L' : 'M'} ${x.toFixed(1)} ${y.toFixed(1)}`)
-    inSeg = true
+  const nonNullCount = values.filter(v => v !== null && Number.isFinite(v)).length
+
+  if (nonNullCount < 1) {
+    return (
+      <div className="mt-4 text-xs text-muted-foreground/80 italic max-w-md">
+        12-week trend is still building. One snapshot lands per day; come back tomorrow to start seeing movement.
+      </div>
+    )
   }
+
+  const deltaLabel =
+    delta === null
+      ? null
+      : delta > 0
+        ? `+${delta} pt${delta === 1 ? '' : 's'}`
+        : delta < 0
+          ? `${delta} pt${delta === -1 ? '' : 's'}`
+          : 'Flat'
+  const deltaTone =
+    delta === null || delta === 0
+      ? 'text-muted-foreground'
+      : delta > 0
+        ? 'text-emerald-300'
+        : 'text-amber-300'
+
+  // Find the latest non-null bucket so we can highlight it without
+  // depending on array order semantics elsewhere.
+  let lastNonNullIdx = -1
+  for (let i = values.length - 1; i >= 0; i -= 1) {
+    if (values[i] !== null && Number.isFinite(values[i] as number)) {
+      lastNonNullIdx = i
+      break
+    }
+  }
+
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="w-full h-7">
-      <path d={seg.join(' ')} stroke={colour} strokeWidth="2" fill="none" strokeLinecap="round" />
-    </svg>
+    <div className="mt-4 max-w-md" aria-label="12-week composite trend">
+      <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
+        <span>12-week trend</span>
+        {deltaLabel ? (
+          <span className={cn('tabular-nums font-medium', deltaTone)}>{deltaLabel}</span>
+        ) : null}
+      </div>
+      <div className="flex items-end gap-1 h-10">
+        {values.map((v, i) => {
+          const filled = v !== null && Number.isFinite(v)
+          // Always reserve a 12% minimum height so empty slots remain
+          // visible as a faint track without dominating the visual.
+          const heightPct = filled ? Math.max(8, Math.min(100, v as number)) : 6
+          const isLast = i === lastNonNullIdx
+          return (
+            <div
+              key={i}
+              className="flex-1 flex items-end h-full"
+              aria-hidden="true"
+            >
+              <div
+                className={cn(
+                  'w-full rounded-sm transition-colors',
+                  filled
+                    ? isLast
+                      ? 'opacity-100'
+                      : 'opacity-70'
+                    : 'opacity-15',
+                )}
+                style={{
+                  height: `${heightPct}%`,
+                  backgroundColor: colour,
+                }}
+              />
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 

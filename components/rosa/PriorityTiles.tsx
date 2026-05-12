@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
-  AlertTriangle,
   CheckCircle2,
   Inbox,
   CalendarClock,
@@ -421,46 +420,49 @@ const TONE_STYLES: Record<CuratedTile['tone'], {
 }
 
 function ReadinessBadge({ readiness }: { readiness: ReadinessSummary }) {
-  const broken =
-    readiness.facility_data === 'missing' ||
-    readiness.facility_data === 'stale' ||
-    readiness.recipes_status === 'partial' ||
-    readiness.recipes_status === 'missing'
+  // Only treat the org-level foundation as broken when ALL facilities are
+  // stale (i.e. readiness === 'missing'). When some facilities are fresh
+  // and some are stale, the user is clearly maintaining data; individual
+  // stale facilities show up as their own priority tiles, so an alarming
+  // banner here is redundant and noisy.
+  const foundationBroken = readiness.facility_data === 'missing'
+  const recipesBroken =
+    readiness.recipes_status === 'partial' || readiness.recipes_status === 'missing'
 
-  if (!broken) return null
+  if (!foundationBroken && !recipesBroken) return null
 
-  const href =
-    readiness.next_layer === 'foundation'
-      ? '/company/facilities/'
-      : readiness.next_layer === 'recipes'
-        ? '/products'
-        : null
-
-  const label =
-    readiness.facility_data === 'missing' || readiness.facility_data === 'stale'
-      ? `Foundation: facility data ${readiness.facility_data}`
-      : readiness.recipes_status !== 'ready'
-        ? `Recipes: ${readiness.recipes_status} ingredient matching`
-        : readiness.why
-
-  const inner = (
-    <div className="flex items-center gap-2 text-xs text-amber-300/70">
-      <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-      <span>{label}</span>
-    </div>
-  )
-
-  if (href) {
-    return (
-      <Link href={href} className="block rounded-lg px-3 py-1.5 border border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10 transition-colors">
-        {inner}
-      </Link>
-    )
-  }
+  const { title, body, cta, href } = foundationBroken
+    ? {
+        title: 'Get your facility data flowing',
+        body: 'No facility has had a utility, water, or waste entry in the last 60 days. Adding even one recent entry unlocks the LCA pipeline.',
+        cta: 'Open facilities',
+        href: '/company/facilities/',
+      }
+    : {
+        title: 'Finish matching product ingredients',
+        body: 'Some ingredients still need an emission factor. Until they\'re matched the LCAs stay in draft.',
+        cta: 'Open products',
+        href: '/products',
+      }
 
   return (
-    <div className="rounded-lg px-3 py-1.5 border border-amber-500/20 bg-amber-500/5">
-      {inner}
-    </div>
+    <Link
+      href={href}
+      className="group block rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-500/[0.08] via-card to-card px-4 py-3 hover:border-amber-500/50 hover:from-amber-500/[0.12] transition-colors"
+    >
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-amber-500/15 text-amber-300">
+          <Sparkles className="h-3.5 w-3.5" />
+        </span>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-amber-100 leading-snug">{title}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">{body}</p>
+        </div>
+        <span className="self-center shrink-0 inline-flex items-center gap-1 text-xs font-medium text-amber-200 group-hover:text-amber-100">
+          {cta}
+          <ArrowUpRight className="h-3.5 w-3.5" />
+        </span>
+      </div>
+    </Link>
   )
 }

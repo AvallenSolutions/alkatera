@@ -37,9 +37,15 @@ import {
 } from '@/lib/vitality/snapshot'
 import {
   VITALITY_READ_TOOL,
+  VITALITY_DETAIL_MAX,
+  VITALITY_HEADLINE_MAX,
+  VITALITY_NEXT_MOVE_MAX,
   buildVitalityReadSystemPrompt,
+  clampSentence,
   formatVitalityForPrompt,
   listMissingSubScores,
+  listStrongSubScores,
+  listWeakSubScores,
   type VitalityRead,
 } from '@/lib/vitality/read-prompt'
 import { isOverDailyBudget, logRosaTelemetry } from '@/lib/rosa/budget'
@@ -1244,9 +1250,11 @@ async function curateRead(
     if (!toolUse || toolUse.type !== 'tool_use') return null
     const raw = toolUse.input as VitalityRead
     return {
-      headline: clamp(raw.headline, 100),
-      detail: clamp(raw.detail, 360),
-      next_move: raw.next_move ? clamp(raw.next_move, 200) : null,
+      headline: clampSentence(raw.headline, VITALITY_HEADLINE_MAX),
+      detail: clampSentence(raw.detail, VITALITY_DETAIL_MAX),
+      next_move: raw.next_move
+        ? clampSentence(raw.next_move, VITALITY_NEXT_MOVE_MAX)
+        : null,
       confidence: ['high', 'medium', 'low'].includes(raw.confidence) ? raw.confidence : 'medium',
     }
   } catch (err) {
@@ -1260,45 +1268,56 @@ function fallbackRead(composite: VitalityComposite, trend: TrendPoint[]): Vitali
   const band = composite.band
   const directionLine =
     delta.delta_points === null
-      ? 'Trend will fill out as you keep visiting; come back next week for movement.'
+      ? null
       : delta.delta_points > 0
-        ? `Up ${delta.delta_points} points across the snapshot window.`
+        ? `Composite is up ${delta.delta_points} points across the snapshot window.`
         : delta.delta_points < 0
-          ? `Down ${Math.abs(delta.delta_points)} points across the snapshot window.`
-          : 'Flat across the snapshot window.'
+          ? `Composite is down ${Math.abs(delta.delta_points)} points across the snapshot window.`
+          : 'Composite is flat across the snapshot window.'
 
-  // Use the same per-sub-score guidance as the AI curator so the fallback
-  // is just as actionable. The first missing item is the highest priority
-  // (waterfall order: environmental, then social, then governance).
+  // Balanced strength + weakness summary, mirroring the AI curator. Lead
+  // weakness is MISSING_DATA[0] (most urgent: waterfall order E, then S,
+  // then G), or WEAK_AREAS[0] (worst non-null score) when nothing is
+  // null. Lead strength is the top STRONG_AREAS entry.
   const missing = listMissingSubScores(composite)
-  const lead = missing[0] ?? null
+  const weak = listWeakSubScores(composite)
+  const strong = listStrongSubScores(composite)
+  const weakness = missing[0] ?? weak[0] ?? null
+  const strength = strong[0] ?? null
 
   if (composite.composite === null) {
     return {
       headline: 'Awaiting more data to call a score.',
-      detail: lead
-        ? `${missing.length} sub-pillar${missing.length === 1 ? ' is' : 's are'} blank. Start with ${lead.label}: ${lead.action}`
-        : 'Add LCAs, social impact data, or governance policies to unlock a composite score.',
+      detail: weakness
+        ? `${missing.length} sub-pillar${missing.length === 1 ? ' is' : 's are'} blank, starting with ${weakness.label}. The composite won't compute until at least one pillar has data.`
+        : 'No pillar has enough data to compute a composite score yet.',
       next_move:
-        lead?.action ??
+        weakness?.action ??
         'Start with a single product LCA, that unlocks the environmental pillar fastest.',
       confidence: 'low',
     }
   }
 
-  if (lead) {
-    return {
-      headline: `Your vitality is ${band.toLowerCase()}.`,
-      detail: `${BAND_DESCRIPTIONS[band]} ${directionLine} ${lead.label} is still showing no data: ${lead.action}`,
-      next_move: lead.action,
-      confidence: 'medium',
-    }
+  const sentences: string[] = []
+  if (strength) {
+    sentences.push(
+      `${strength.label} at ${Math.round(strength.score!)} is the strongest signal.`,
+    )
   }
+  if (weakness) {
+    const scoreFragment =
+      weakness.score === null
+        ? 'is showing no data yet'
+        : `is at ${Math.round(weakness.score)}, in the Needs Attention band`
+    sentences.push(`${weakness.label} ${scoreFragment}, dragging the composite.`)
+  }
+  if (directionLine) sentences.push(directionLine)
+  if (sentences.length === 0) sentences.push(BAND_DESCRIPTIONS[band])
 
   return {
     headline: `Your vitality is ${band.toLowerCase()}.`,
-    detail: `${BAND_DESCRIPTIONS[band]} ${directionLine}`,
-    next_move: null,
+    detail: sentences.join(' '),
+    next_move: weakness?.action ?? null,
     confidence: 'medium',
   }
 }
@@ -1309,9 +1328,6 @@ function numOrNull(v: unknown): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-function clamp(s: string, max: number): string {
-  return String(s ?? '').trim().slice(0, max)
-}
 
 export async function GET(req: NextRequest) {
   const ctx = await resolveContext(req)
