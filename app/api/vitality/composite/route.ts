@@ -563,7 +563,7 @@ async function buildEnvironmentalInputs(
   // intensity ratio can be computed from the facility total alone.
   // Falls back to 1 unit of production when no production logs exist,
   // mirroring the same 1-unit assumption used for the climate calculation.
-  for (const [productKey, product] of productById.entries()) {
+  for (const [productKey, product] of Array.from(productById.entries())) {
     if (waterRowsByProduct.has(productKey)) continue
     const cur = productionByProduct.get(productKey) ?? 1
     const pri = priorProductionByProduct.get(productKey) ?? 0
