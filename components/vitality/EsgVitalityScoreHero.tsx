@@ -94,16 +94,26 @@ export function EsgVitalityScoreHero() {
 
   useRealtimeRefresh(
     [
-      'community_donations',
-      'people_workforce_demographics',
-      'governance_policies',
+      // Environmental
+      'facility_activity_entries',
+      'utility_data_entries',
+      'facility_water_data',
       'product_carbon_footprints',
       'sustainability_targets',
-      'organization_certifications',
+      // Social
+      'community_donations',
+      'community_volunteer_activities',
+      'community_engagements',
+      'people_workforce_demographics',
+      'people_dei_actions',
       'supplier_esg_assessments',
       'community_impact_scores',
       'people_culture_scores',
+      // Governance
+      'governance_policies',
+      'governance_board_members',
       'governance_scores',
+      'organization_certifications',
     ],
     () => {
       void load()

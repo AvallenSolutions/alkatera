@@ -39,6 +39,7 @@ import {
   VITALITY_READ_TOOL,
   buildVitalityReadSystemPrompt,
   formatVitalityForPrompt,
+  listMissingSubScores,
   type VitalityRead,
 } from '@/lib/vitality/read-prompt'
 import { isOverDailyBudget, logRosaTelemetry } from '@/lib/rosa/budget'
@@ -208,7 +209,7 @@ async function buildEnvironmentalInputs(
       .limit(500),
     service
       .from('products')
-      .select('id, product_type, product_category, unit_size_value, unit_size_unit')
+      .select('id, product_category, unit_size_value, unit_size_unit')
       .eq('organization_id', organizationId)
       .limit(500),
     service
@@ -301,10 +302,16 @@ async function buildEnvironmentalInputs(
       .order('reporting_period_end', { ascending: false }),
     // V2-b — material origins for country biodiversity multiplier.
     // Joined with the org's PCFs so we only count active products.
+    // The relationship is disambiguated via the FK column name because
+    // product_carbon_footprint_materials has more than one FK pointing at
+    // product_carbon_footprints (the bill-of-materials parent and the
+    // supplier-LCA reference). mass_kg doesn't exist on this table —
+    // origins are weighted equally per material-row (count-based) so the
+    // country mix still reflects diversity even without normalised mass.
     service
       .from('product_carbon_footprint_materials')
       .select(
-        'mass_kg, origin_country_code, product_carbon_footprints!inner(organization_id, status)',
+        'origin_country_code, product_carbon_footprints!product_carbon_footprint_id!inner(organization_id, status)',
       )
       .eq('product_carbon_footprints.organization_id', organizationId)
       .eq('product_carbon_footprints.status', 'completed')
@@ -328,7 +335,6 @@ async function buildEnvironmentalInputs(
 
   const productRowsData = ((valOrNull(productRows) as any)?.data ?? []) as Array<{
     id: string | number | null
-    product_type: string | null
     product_category: string | null
     unit_size_value: number | null
     unit_size_unit: string | null
@@ -475,7 +481,7 @@ async function buildEnvironmentalInputs(
     climateRowsByProduct.set(productKey, {
       product_id: productKey,
       product_category: product?.product_category ?? null,
-      product_type: product?.product_type ?? null,
+      product_type: null,
       // Fall back to 1.0 L when unit_size isn't declared on the product.
       // Without this the benchmark denominator is 0 and the climate/water
       // score is null even when the org has perfectly good LCAs and unit
@@ -492,12 +498,11 @@ async function buildEnvironmentalInputs(
   }
   // Org-level product_type fallback — used by the climate/water benchmark
   // pickers when products lack their own product_category / product_type.
-  // Sourced from organizations.product_type, falling back to the first
-  // product's product_type if the org-level field isn't set.
+  // Sourced from organizations.product_type. (The products table no
+  // longer carries a product_type column, so there's no per-product
+  // fallback.)
   const orgProductType =
-    ((valOrNull(orgRow) as any)?.data?.product_type as string | null) ??
-    productRowsData[0]?.product_type ??
-    null
+    ((valOrNull(orgRow) as any)?.data?.product_type as string | null) ?? null
 
   const climateInputs = buildClimateInputs(
     Array.from(climateRowsByProduct.values()),
@@ -525,7 +530,7 @@ async function buildEnvironmentalInputs(
     waterRowsByProduct.set(productKey, {
       product_id: productKey,
       product_category: product?.product_category ?? null,
-      product_type: product?.product_type ?? null,
+      product_type: null,
       // Fall back to 1.0 L when unit_size isn't declared on the product.
       // Without this the benchmark denominator is 0 and the climate/water
       // score is null even when the org has perfectly good LCAs and unit
@@ -542,6 +547,30 @@ async function buildEnvironmentalInputs(
         perUnitScarcity !== null && Number.isFinite(perUnitScarcity)
           ? Number(perUnitScarcity)
           : null,
+    })
+  }
+
+  // When facility-level intake exists, ensure every org product appears in
+  // waterRowsByProduct — even those without a completed LCA. Products added
+  // here carry no per-unit LCA water figure (null), so the source stays
+  // 'facility'. They do contribute to benchmarkDenominator so the
+  // intensity ratio can be computed from the facility total alone.
+  // Falls back to 1 unit of production when no production logs exist,
+  // mirroring the same 1-unit assumption used for the climate calculation.
+  for (const [productKey, product] of productById.entries()) {
+    if (waterRowsByProduct.has(productKey)) continue
+    const cur = productionByProduct.get(productKey) ?? 1
+    const pri = priorProductionByProduct.get(productKey) ?? 0
+    waterRowsByProduct.set(productKey, {
+      product_id: productKey,
+      product_category: product?.product_category ?? null,
+      product_type: null,
+      unit_size_l:
+        unitSizeToLitres(product?.unit_size_value, product?.unit_size_unit) ?? 1.0,
+      units_produced_current: cur,
+      units_produced_prior: pri,
+      per_unit_water_m3: null,
+      per_unit_scarcity_m3: null,
     })
   }
 
@@ -766,8 +795,12 @@ async function buildEnvironmentalInputs(
   })
 
   // V2-b — country biodiversity multiplier from material origins.
+  // No mass column exists on product_carbon_footprint_materials, so each
+  // material-row contributes equal weight (1). This produces a count-based
+  // country mix: a product sourcing 4 materials from France and 1 from
+  // Brazil weights France 4x. Less precise than mass-weighting but still
+  // reflects supply-chain country diversity.
   type MaterialOriginRow = {
-    mass_kg: number | null
     origin_country_code: string | null
   }
   const materialOriginRows = ((valOrNull(materialOrigins) as any)?.data ??
@@ -789,7 +822,7 @@ async function buildEnvironmentalInputs(
   }
   const origins: MaterialOrigin[] = materialOriginRows.map(r => ({
     country_code: r.origin_country_code,
-    mass_weight: Number(r.mass_kg ?? 0),
+    mass_weight: 1,
   }))
   const countryMix =
     origins.length > 0 ? computeCountryMix(origins, factorByCountry) : null
@@ -821,10 +854,10 @@ async function buildEnvironmentalInputs(
   })
 
   // Org-level fallback inputs for the legacy water/circularity aggregator.
+  // product_type lives on the organizations table only — there is no
+  // matching column on products, so we rely on the org-level fallback.
   const productType =
-    ((valOrNull(orgRow) as any)?.data?.product_type as string | null) ??
-    productRowsData[0]?.product_type ??
-    null
+    ((valOrNull(orgRow) as any)?.data?.product_type as string | null) ?? null
   const productCategories = productRowsData.map(p => p.product_category ?? null)
 
   const signals = buildEnvironmentalSignals({
@@ -1233,19 +1266,39 @@ function fallbackRead(composite: VitalityComposite, trend: TrendPoint[]): Vitali
         : delta.delta_points < 0
           ? `Down ${Math.abs(delta.delta_points)} points across the snapshot window.`
           : 'Flat across the snapshot window.'
+
+  // Use the same per-sub-score guidance as the AI curator so the fallback
+  // is just as actionable. The first missing item is the highest priority
+  // (waterfall order: environmental, then social, then governance).
+  const missing = listMissingSubScores(composite)
+  const lead = missing[0] ?? null
+
+  if (composite.composite === null) {
+    return {
+      headline: 'Awaiting more data to call a score.',
+      detail: lead
+        ? `${missing.length} sub-pillar${missing.length === 1 ? ' is' : 's are'} blank. Start with ${lead.label}: ${lead.action}`
+        : 'Add LCAs, social impact data, or governance policies to unlock a composite score.',
+      next_move:
+        lead?.action ??
+        'Start with a single product LCA, that unlocks the environmental pillar fastest.',
+      confidence: 'low',
+    }
+  }
+
+  if (lead) {
+    return {
+      headline: `Your vitality is ${band.toLowerCase()}.`,
+      detail: `${BAND_DESCRIPTIONS[band]} ${directionLine} ${lead.label} is still showing no data: ${lead.action}`,
+      next_move: lead.action,
+      confidence: 'medium',
+    }
+  }
+
   return {
-    headline:
-      composite.composite === null
-        ? 'Awaiting more data to call a score.'
-        : `Your vitality is ${band.toLowerCase()}.`,
-    detail:
-      composite.composite === null
-        ? 'Add LCAs, social impact data, or governance policies to unlock a composite score.'
-        : `${BAND_DESCRIPTIONS[band]} ${directionLine}`,
-    next_move:
-      composite.composite === null
-        ? 'Start with a single product LCA — that unlocks the environmental pillar fastest.'
-        : null,
+    headline: `Your vitality is ${band.toLowerCase()}.`,
+    detail: `${BAND_DESCRIPTIONS[band]} ${directionLine}`,
+    next_move: null,
     confidence: 'medium',
   }
 }
