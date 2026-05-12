@@ -17,6 +17,13 @@ export interface IndustryBenchmark {
   sourceUrl: string;
   /** Year the data was published */
   sourceYear: number;
+  /**
+   * Optional human-friendly category label (e.g. "Spirits", "Wine").
+   * Consumers such as priority-signals and environmental.ts read this
+   * to surface a label in the UI; leave undefined when the benchmark
+   * has no category-level label.
+   */
+  label?: string | null;
 }
 
 /**

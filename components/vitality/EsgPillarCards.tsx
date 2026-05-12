@@ -108,7 +108,7 @@ export function EsgPillarCards({ e, s, g, sparklines, compact = false }: Props) 
   )
 }
 
-interface CellProps<T extends Record<string, number | null>> {
+interface CellProps<T extends object> {
   title: string
   Icon: React.ComponentType<{ className?: string }>
   toneClass: string
@@ -121,7 +121,7 @@ interface CellProps<T extends Record<string, number | null>> {
   explainerInputs?: CalculationInputs
 }
 
-function PillarCardCell<T extends Record<string, number | null>>({
+function PillarCardCell<T extends object>({
   title,
   Icon,
   toneClass,

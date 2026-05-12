@@ -166,15 +166,15 @@ export function RecipeEditorPanel({
     const unmatched = ingredients.filter(i => !i.has_emission_factor && i.name !== '(unnamed)');
     return {
       id: 'recipe-editor',
-      label: `Recipe: ${product.name || 'product'}${product.product_category ? ` (${product.product_category})` : ''}`,
+      label: `Recipe: ${product.name || 'product'}${productCategory ? ` (${productCategory})` : ''}`,
       priority: 9,
       data: {
         product: {
           id: product.id,
           name: product.name,
-          category: product.product_category ?? null,
-          abv_percent: product.abv_percent ?? null,
-          bottle_size_ml: product.bottle_size_ml ?? null,
+          category: productCategory ?? null,
+          abv_percent: productAbvPercent ?? null,
+          bottle_size_ml: productBottleSizeMl ?? null,
           functional_unit: product.functional_unit ?? null,
         },
         active_tab: activeTab,

@@ -218,6 +218,7 @@ function AssistantBody({ content, streaming }: { content: string; streaming?: bo
             </ol>
           )
         }
+        if (block.kind !== 'p') return null
         return (
           <p key={i}>
             {renderInline(block.text)}

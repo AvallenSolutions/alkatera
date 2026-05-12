@@ -63,13 +63,13 @@ function getServerSnapshot(): HubCardLayout[] {
 
 function setSnapshot(next: HubCardLayout[]) {
   snapshot = next
-  for (const fn of subscribers) fn()
+  for (const fn of Array.from(subscribers)) fn()
 }
 
 function setLoadingSnapshot(next: boolean) {
   if (isLoadingSnapshot === next) return
   isLoadingSnapshot = next
-  for (const fn of subscribers) fn()
+  for (const fn of Array.from(subscribers)) fn()
 }
 
 function subscribe(cb: () => void): () => void {

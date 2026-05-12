@@ -196,7 +196,11 @@ async function cumulativeShareSeries(opts: {
     q = filterFn ? filterFn(q) : q
     const { data, error } = await q
     if (error || !Array.isArray(data)) return weeks
-    const timestamps = (data as Array<Record<string, string | null>>)
+    // Step through unknown first so TS lets us treat the row payload as
+    // a plain string-keyed map. supabase-js types the data as a union
+    // that includes a generic error variant when relationships aren't
+    // resolved, which doesn't overlap with the row shape cleanly.
+    const timestamps = (data as unknown as Array<Record<string, string | null>>)
       .map(r => r[whenColumn])
       .filter((t): t is string => typeof t === 'string')
       .map(t => new Date(t).getTime())

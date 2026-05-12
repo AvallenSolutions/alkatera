@@ -134,7 +134,7 @@ export function HubSetupWizard({ compact = false, onDone }: Props) {
       return HUB_CARD_IDS.map(id => ({ id, visible: true }))
     }
     const visibleSet = new Set<HubCardId>(ALWAYS_ON)
-    for (const optId of picked) {
+    for (const optId of Array.from(picked)) {
       const opt = FOCUS_OPTIONS.find(o => o.id === optId)
       if (!opt) continue
       for (const c of opt.cards) visibleSet.add(c)
