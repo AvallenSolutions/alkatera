@@ -293,37 +293,67 @@ export function EsgVitalityScoreHero() {
   )
 }
 
+/**
+ * 12-week trend visual: a row of weekly bars. Each bar's height encodes
+ * the composite score (0-100), latest week at full opacity, earlier
+ * weeks soft, empty slots faint. Mirrors the same pattern used on the
+ * Rosa-hub `TrendStrip` so the language is consistent across surfaces.
+ *
+ * Sized up here because the Performance card gives the chart roughly
+ * 60% of the card width and the user is looking at it intentionally
+ * (rather than glancing at the Rosa hub).
+ */
 function CompositeChart({ trend }: { trend: TrendPoint[] }) {
-  const w = 480
-  const h = 80
-  const padX = 4
-  const padY = 6
   const vals = trend.map(p => p.composite)
-  const nonNull = vals.filter((v): v is number => v !== null && Number.isFinite(v))
-  if (nonNull.length === 0) return null
-  const min = Math.min(...nonNull, 0)
-  const max = Math.max(...nonNull, 100)
-  const range = max - min || 1
-  const stepX = trend.length > 1 ? (w - 2 * padX) / (trend.length - 1) : 0
-  const seg: string[] = []
-  let inSeg = false
-  for (let i = 0; i < trend.length; i += 1) {
-    const v = vals[i]
-    if (v === null) {
-      inSeg = false
-      continue
+  if (!vals.some(v => v !== null && Number.isFinite(v))) return null
+
+  // Latest non-null bucket so the "now" bar is clearly identifiable
+  // even when later weeks have no snapshot yet.
+  let lastNonNullIdx = -1
+  for (let i = vals.length - 1; i >= 0; i -= 1) {
+    if (vals[i] !== null && Number.isFinite(vals[i] as number)) {
+      lastNonNullIdx = i
+      break
     }
-    const x = padX + i * stepX
-    const y = padY + (h - 2 * padY) * (1 - (v - min) / range)
-    seg.push(`${inSeg ? 'L' : 'M'} ${x.toFixed(1)} ${y.toFixed(1)}`)
-    inSeg = true
   }
+
   return (
-    <div>
-      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="w-full h-20">
-        <path d={seg.join(' ')} stroke="#ccff00" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-      </svg>
-      <p className="mt-1 text-[10px] text-muted-foreground text-right">12 weeks</p>
+    <div aria-label="12-week composite trend">
+      <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+        12-week trend
+      </p>
+      <div className="flex items-end gap-1.5 h-20">
+        {vals.map((v, i) => {
+          const filled = v !== null && Number.isFinite(v)
+          // Reserve a small minimum visible height so empty slots remain
+          // a faint track and the user can see at-a-glance how much data
+          // has been captured so far.
+          const heightPct = filled ? Math.max(8, Math.min(100, v as number)) : 5
+          const isLast = i === lastNonNullIdx
+          return (
+            <div key={i} className="flex-1 flex items-end h-full" aria-hidden="true">
+              <div
+                className={cn(
+                  'w-full rounded-sm transition-colors',
+                  filled
+                    ? isLast
+                      ? 'opacity-100'
+                      : 'opacity-65'
+                    : 'opacity-15',
+                )}
+                style={{
+                  height: `${heightPct}%`,
+                  backgroundColor: '#ccff00',
+                }}
+              />
+            </div>
+          )
+        })}
+      </div>
+      <div className="mt-2 flex items-center justify-between text-[10px] text-muted-foreground">
+        <span>12 weeks ago</span>
+        <span>Today</span>
+      </div>
     </div>
   )
 }

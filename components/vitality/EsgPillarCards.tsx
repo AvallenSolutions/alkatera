@@ -159,7 +159,7 @@ function PillarCardCell<T extends Record<string, number | null>>({
         )}
       </div>
       {sparkline && sparkline.some(p => p !== null) ? (
-        <MiniSparkline values={sparkline} className="mb-3 h-6" />
+        <MiniTrendBars values={sparkline} className="mb-3" />
       ) : null}
       <ul className="space-y-1">
         {subEntries.map(([key, val]) => (
@@ -175,39 +175,47 @@ function PillarCardCell<T extends Record<string, number | null>>({
   )
 }
 
-function MiniSparkline({
+/**
+ * Compact 12-week trend bars used inside each pillar card. Mirrors the
+ * same bar-chart pattern as the main hero `TrendStrip` for visual
+ * consistency, just shorter: each bar's height encodes that week's
+ * sub-pillar score (0-100), latest week is full opacity, earlier weeks
+ * soft, empty slots are a faint placeholder track so the data density
+ * is visible at a glance.
+ */
+function MiniTrendBars({
   values,
   className,
 }: {
   values: Array<number | null>
   className?: string
 }) {
-  const w = 120
-  const h = 24
-  const padX = 2
-  const nonNull = values.filter((v): v is number => v !== null && Number.isFinite(v))
-  if (nonNull.length === 0) return null
-  const min = Math.min(...nonNull)
-  const max = Math.max(...nonNull)
-  const range = max - min || 1
-  const stepX = values.length > 1 ? (w - 2 * padX) / (values.length - 1) : 0
-
-  const segments: string[] = []
-  let inSeg = false
-  for (let i = 0; i < values.length; i += 1) {
-    const v = values[i]
-    if (v === null) {
-      inSeg = false
-      continue
+  if (!values.some(v => v !== null && Number.isFinite(v))) return null
+  let lastNonNullIdx = -1
+  for (let i = values.length - 1; i >= 0; i -= 1) {
+    if (values[i] !== null && Number.isFinite(values[i] as number)) {
+      lastNonNullIdx = i
+      break
     }
-    const x = padX + i * stepX
-    const y = (h - 4) * (1 - (v - min) / range) + 2
-    segments.push(`${inSeg ? 'L' : 'M'} ${x.toFixed(1)} ${y.toFixed(1)}`)
-    inSeg = true
   }
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className={className}>
-      <path d={segments.join(' ')} stroke="#ccff00" strokeWidth="1.5" fill="none" />
-    </svg>
+    <div className={cn('flex items-end gap-0.5 h-5', className)} aria-hidden="true">
+      {values.map((v, i) => {
+        const filled = v !== null && Number.isFinite(v)
+        const heightPct = filled ? Math.max(10, Math.min(100, v as number)) : 6
+        const isLast = i === lastNonNullIdx
+        return (
+          <div key={i} className="flex-1 flex items-end h-full">
+            <div
+              className={cn(
+                'w-full rounded-sm transition-colors',
+                filled ? (isLast ? 'opacity-100' : 'opacity-65') : 'opacity-15',
+              )}
+              style={{ height: `${heightPct}%`, backgroundColor: '#ccff00' }}
+            />
+          </div>
+        )
+      })}
+    </div>
   )
 }

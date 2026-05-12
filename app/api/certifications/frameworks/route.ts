@@ -116,9 +116,22 @@ export async function GET(request: NextRequest) {
     // Transform frameworks to expected format
     const transformedFrameworks = (frameworks || []).map(transformFramework);
 
-    // If organization_id provided, also get their certification status
+    // If organization_id provided, also get their certification status.
+    // We only return certs whose framework is still active — without this
+    // filter, orphan rows pointing at deactivated frameworks (e.g. the
+    // legacy "bcorp_21" B Corp standard that was superseded by "bcorp_2026")
+    // show up in counts and progress widgets without appearing in the
+    // framework picker, which made the page report "4 in progress" while
+    // only rendering 3 cards.
     let certifications = null;
     if (organizationId) {
+      // Resolve the set of active framework IDs from the frameworks we
+      // already loaded above. activeFrameworkIds is null when the caller
+      // didn't pass active_only=true, in which case we return everything.
+      const activeFrameworkIds = activeOnly
+        ? new Set((rawFrameworks || []).map((f: any) => f.id))
+        : null;
+
       const { data: orgCertifications, error: certError } = await supabase
         .from('organization_certifications')
         .select('*')
@@ -127,8 +140,11 @@ export async function GET(request: NextRequest) {
       if (certError) {
         console.error('Error fetching org certifications:', certError);
       } else {
+        const filtered = activeFrameworkIds
+          ? (orgCertifications || []).filter((c: any) => activeFrameworkIds.has(c.framework_id))
+          : (orgCertifications || []);
         // Transform certifications to expected format
-        certifications = (orgCertifications || []).map((cert: any) => ({
+        certifications = filtered.map((cert: any) => ({
           id: cert.id,
           organization_id: cert.organization_id,
           framework_id: cert.framework_id,
