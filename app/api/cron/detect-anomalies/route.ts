@@ -3,7 +3,9 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { safeCompare } from '@/lib/utils/safe-compare';
 import { detectAnomaliesForOrg, persistAnomalies } from '@/lib/pulse/anomaly';
-import { METRIC_DEFINITIONS } from '@/lib/pulse/metric-keys';
+import { renderAnomalyAlertEmail } from '@/lib/pulse/anomaly-alert-email';
+
+const NOTIFY_THROTTLE_DAYS = 7;
 
 /**
  * Cron: Pulse — anomaly detection.
@@ -73,6 +75,24 @@ async function sendAlertEmail(
   const resendApiKey = process.env.RESEND_API_KEY;
   if (!resendApiKey) return;
 
+  // Throttle: skip any metric we've already emailed about in the last 7 days
+  // for this org. Source of truth is dashboard_anomalies.notified_at.
+  const throttleSince = new Date(
+    Date.now() - NOTIFY_THROTTLE_DAYS * 86400_000,
+  ).toISOString();
+  const { data: recent } = await supabase
+    .from('dashboard_anomalies')
+    .select('metric_key')
+    .eq('organization_id', org.id)
+    .not('notified_at', 'is', null)
+    .gte('notified_at', throttleSince);
+
+  const recentlyNotified = new Set(
+    (recent ?? []).map((r: { metric_key: string }) => r.metric_key),
+  );
+  const toSend = anomalies.filter(a => !recentlyNotified.has(a.metric_key));
+  if (toSend.length === 0) return;
+
   // Find admin/owner emails for this org.
   const { data: members } = await supabase
     .from('organization_members')
@@ -89,27 +109,44 @@ async function sendAlertEmail(
     .map(u => u.email!) as string[];
   if (emails.length === 0) return;
 
-  const lines = anomalies
-    .map(a => {
-      const def = METRIC_DEFINITIONS[a.metric_key as keyof typeof METRIC_DEFINITIONS];
-      const label = def?.label ?? a.metric_key;
-      return `• ${label}: observed ${formatNumber(a.observed)} vs expected ~${formatNumber(a.expected)} (z = ${a.z_score.toFixed(1)})`;
-    })
-    .join('\n');
+  const { subject, html, text } = renderAnomalyAlertEmail({
+    orgName: org.name,
+    anomalies: toSend,
+    appUrl: process.env.URL ?? 'https://app.alkatera.com',
+  });
 
   const resend = new Resend(resendApiKey);
   try {
     await resend.emails.send({
       from: 'alkatera Pulse <alerts@mail.alkatera.com>',
       to: emails,
-      subject: `Pulse alert: ${anomalies.length} high-severity anomal${anomalies.length === 1 ? 'y' : 'ies'} for ${org.name}`,
-      text: `Pulse has detected unusual movement in your sustainability metrics:\n\n${lines}\n\nReview and acknowledge in Pulse: ${process.env.URL ?? 'https://app.alkatera.com'}/pulse\n\n— alkatera Pulse`,
+      subject,
+      html,
+      text,
     });
   } catch (err) {
     console.error('[detect-anomalies] Resend email failed:', err);
+    return; // don't stamp notified_at if delivery failed
   }
-}
 
-function formatNumber(n: number): string {
-  return n.toLocaleString('en-GB', { maximumFractionDigits: 1 });
+  // Stamp notified_at on the most recent open row per (org, metric_key) we
+  // just emailed about. The latest row is the one the user will see in the
+  // Pulse inbox, so that's the row we mark as "notified".
+  const stampAt = new Date().toISOString();
+  for (const a of toSend) {
+    const { data: latest } = await supabase
+      .from('dashboard_anomalies')
+      .select('id')
+      .eq('organization_id', org.id)
+      .eq('metric_key', a.metric_key)
+      .order('detected_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (latest?.id) {
+      await supabase
+        .from('dashboard_anomalies')
+        .update({ notified_at: stampAt })
+        .eq('id', latest.id);
+    }
+  }
 }
