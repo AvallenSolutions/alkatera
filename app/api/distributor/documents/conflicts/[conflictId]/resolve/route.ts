@@ -13,7 +13,9 @@ import { recalculateCompleteness } from '@/lib/distributor/scoring/recalculate';
  *   - use_new      → mark the previously-active scraped row as superseded
  *     by the brand-uploaded row
  *
- * Owner / data_manager only — viewers can read but not resolve.
+ * Owner / data_manager only — viewers can read but not resolve. The
+ * caller's distributor org must have at least one listing of the
+ * conflict's directory entry.
  */
 export async function POST(request: Request, { params }: { params: { conflictId: string } }) {
   const auth = await requireDistributor();
@@ -35,26 +37,27 @@ export async function POST(request: Request, { params }: { params: { conflictId:
   }
   const resolution = body.resolution;
 
-  // Look up the conflict and confirm it belongs to a brand the caller
-  // has access to. We grab brand_profile_id + field_key + values so we
-  // can rewire scraped_brand_data deterministically.
+  // Look up the conflict (Phase 3: keyed by brand_directory_id).
   const { data: conflict } = await auth.supabase
     .from('brand_data_conflicts')
-    .select('id, brand_profile_id, field_key, existing_value, new_value, resolution')
+    .select('id, brand_directory_id, field_key, existing_value, new_value, resolution')
     .eq('id', params.conflictId)
     .maybeSingle();
   if (!conflict) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
-  // RLS read policy covers org scoping for the SELECT, but we still
-  // re-check because we're about to update other rows.
-  const { data: brand } = await auth.supabase
+  const directoryId = (conflict as { brand_directory_id: string }).brand_directory_id;
+
+  // Verify the caller's org has a listing of this directory entry.
+  // RLS read covered SELECT; we re-check before writes.
+  const { data: listing } = await auth.supabase
     .from('brand_profiles')
     .select('id')
-    .eq('id', (conflict as { brand_profile_id: string }).brand_profile_id)
+    .eq('brand_directory_id', directoryId)
     .eq('distributor_org_id', auth.organization.id)
+    .limit(1)
     .maybeSingle();
-  if (!brand) {
+  if (!listing) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
   if ((conflict as { resolution: string | null }).resolution) {
@@ -65,7 +68,7 @@ export async function POST(request: Request, { params }: { params: { conflictId:
   const { data: activeRows } = await auth.supabase
     .from('scraped_brand_data')
     .select('id, source_name, field_value, confidence, created_at')
-    .eq('brand_profile_id', (conflict as { brand_profile_id: string }).brand_profile_id)
+    .eq('brand_directory_id', directoryId)
     .eq('field_key', (conflict as { field_key: string }).field_key)
     .is('superseded_by', null);
 
@@ -100,13 +103,10 @@ export async function POST(request: Request, { params }: { params: { conflictId:
     })
     .eq('id', params.conflictId);
 
-  // The "active" set of scraped_brand_data rows for this brand has
+  // The "active" set of scraped_brand_data rows for this directory has
   // changed — refresh the completeness score.
   try {
-    await recalculateCompleteness(
-      auth.supabase,
-      (conflict as { brand_profile_id: string }).brand_profile_id,
-    );
+    await recalculateCompleteness(auth.supabase, directoryId);
   } catch {
     // best-effort
   }

@@ -9,6 +9,12 @@ const DELAY_BETWEEN_SOURCES_MS = 2_000;
 
 export interface RunBrandAgentArgs {
   supabase: SupabaseClient;
+  /**
+   * Listing the scraping job belongs to (one job per listing in
+   * scraping_jobs, even though findings now hang off the directory).
+   * Used to read the brand snapshot + outreach_email auto-fill, and to
+   * resolve the directory entry that findings attach to.
+   */
   brandProfileId: string;
   jobId: string;
 }
@@ -24,10 +30,12 @@ export interface RunBrandAgentResult {
 }
 
 /**
- * Run every source for a single brand and persist findings.
+ * Run every source for a single brand and persist findings. Findings
+ * attach to the canonical brand_directory entry (Phase 3) so any other
+ * distributor that lists the same brand benefits immediately.
  *
  * Flow:
- *   1. Load the brand snapshot.
+ *   1. Load the brand snapshot (listing-level: name, website, etc).
  *   2. For each source: call run(brand), wait DELAY_BETWEEN_SOURCES_MS.
  *   3. For each finding: coerce → score confidence → soft-supersede any
  *      previous winner → insert a fresh scraped_brand_data row.
@@ -40,7 +48,7 @@ export async function runBrandAgent(args: RunBrandAgentArgs): Promise<RunBrandAg
 
   const { data: brand, error } = await supabase
     .from('brand_profiles')
-    .select('id, name, normalized_name, website, country_of_origin, category, outreach_email')
+    .select('id, brand_directory_id, name, normalized_name, website, country_of_origin, category, outreach_email')
     .eq('id', brandProfileId)
     .maybeSingle();
   if (error || !brand) {
@@ -53,6 +61,7 @@ export async function runBrandAgent(args: RunBrandAgentArgs): Promise<RunBrandAg
       skip_reasons: [],
     };
   }
+  const brandDirectoryId = (brand as { brand_directory_id: string }).brand_directory_id;
 
   const snapshot: BrandSnapshot = {
     id: brand.id,
@@ -87,7 +96,7 @@ export async function runBrandAgent(args: RunBrandAgentArgs): Promise<RunBrandAg
       } else {
         succeeded += 1;
         const newCount = await persistFindings(supabase, {
-          brandProfileId,
+          brandDirectoryId,
           jobId,
           sourceName: source.name,
           sourceType: source.source_type,
@@ -113,7 +122,7 @@ export async function runBrandAgent(args: RunBrandAgentArgs): Promise<RunBrandAg
     const { data: emailFinding } = await supabase
       .from('scraped_brand_data')
       .select('field_value, confidence')
-      .eq('brand_profile_id', brandProfileId)
+      .eq('brand_directory_id', brandDirectoryId)
       .eq('field_key', 'contact_email')
       .is('superseded_by', null)
       .order('confidence', { ascending: false })
@@ -132,7 +141,7 @@ export async function runBrandAgent(args: RunBrandAgentArgs): Promise<RunBrandAg
   // rows. Best-effort — if the Phase 5 migration is not yet applied,
   // the call no-ops because the snapshot insert fails silently.
   try {
-    await recalculateCompleteness(supabase, brandProfileId);
+    await recalculateCompleteness(supabase, brandDirectoryId);
   } catch {
     // swallow — score recalculation is a follow-on, not load-bearing.
   }
@@ -154,7 +163,7 @@ function isEmail(value: string): boolean {
 async function persistFindings(
   supabase: SupabaseClient,
   args: {
-    brandProfileId: string;
+    brandDirectoryId: string;
     jobId: string;
     sourceName: string;
     sourceType: 'certification_db' | 'brand_website' | 'regulatory_body' | 'company_registry' | 'other';
@@ -197,7 +206,7 @@ async function persistFindings(
     const { data: priors } = await supabase
       .from('scraped_brand_data')
       .select('id')
-      .eq('brand_profile_id', args.brandProfileId)
+      .eq('brand_directory_id', args.brandDirectoryId)
       .eq('field_key', fieldKey)
       .eq('source_name', args.sourceName)
       .is('superseded_by', null);
@@ -205,7 +214,7 @@ async function persistFindings(
     const { data: inserted, error: insertError } = await supabase
       .from('scraped_brand_data')
       .insert({
-        brand_profile_id: args.brandProfileId,
+        brand_directory_id: args.brandDirectoryId,
         scraping_job_id: args.jobId,
         field_key: fieldKey,
         field_value: coerced.text,

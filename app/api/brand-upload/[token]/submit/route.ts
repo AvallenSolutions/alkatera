@@ -201,7 +201,7 @@ export async function POST(request: Request, { params }: { params: { token: stri
     const { data: inserted, error: insertError } = await supabase
       .from('brand_document_submissions')
       .insert({
-        brand_profile_id: brand.id,
+        brand_directory_id: brand.brand_directory_id,
         distributor_org_id: brand.distributor_org_id,
         file_name: file.name,
         file_path: storagePath,

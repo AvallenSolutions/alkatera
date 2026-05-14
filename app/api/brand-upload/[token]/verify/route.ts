@@ -45,7 +45,10 @@ interface VerificationResult {
 
 interface ProcessContext {
   supabase: SupabaseClient;
-  brandId: string;
+  /** Listing id (brand_profiles.id) — for the document_processing_jobs queue. */
+  brandProfileId: string;
+  /** Canonical brand id — what verifications + submissions write against (Phase 3). */
+  brandDirectoryId: string;
   distributorOrgId: string;
   validSkuIds: Set<string>;
   verifiedByName: string;
@@ -118,7 +121,8 @@ export async function POST(request: Request, { params }: { params: { token: stri
   const validSkuIds = await loadValidSkuIds(supabase, brand.id);
   const ctx: ProcessContext = {
     supabase,
-    brandId: brand.id,
+    brandProfileId: brand.id,
+    brandDirectoryId: brand.brand_directory_id,
     distributorOrgId: brand.distributor_org_id,
     validSkuIds,
     verifiedByName,
@@ -153,7 +157,7 @@ export async function POST(request: Request, { params }: { params: { token: stri
   const successCount = results.filter((r) => r.ok).length;
   if (successCount > 0) {
     try {
-      await recalculateCompleteness(supabase, brand.id);
+      await recalculateCompleteness(supabase, brand.brand_directory_id);
     } catch {
       // Recalc is best-effort.
     }
@@ -244,7 +248,7 @@ async function applyVerification(
   const priorQuery = ctx.supabase
     .from('scraped_brand_data')
     .select('id')
-    .eq('brand_profile_id', ctx.brandId)
+    .eq('brand_directory_id', ctx.brandDirectoryId)
     .eq('field_key', fieldKey)
     .eq('source_name', 'brand_verified')
     .is('superseded_by', null);
@@ -258,7 +262,7 @@ async function applyVerification(
   const { data: inserted, error: insertError } = await ctx.supabase
     .from('scraped_brand_data')
     .insert({
-      brand_profile_id: ctx.brandId,
+      brand_directory_id: ctx.brandDirectoryId,
       brand_sku_id: skuId,
       scraping_job_id: null,
       field_key: fieldKey,
@@ -312,7 +316,7 @@ async function attachEvidence(
   }
 
   const sanitised = sanitiseFileName(file.name);
-  const storagePath = `${ctx.brandId}/evidence/${Date.now()}_${verification.field_key}_${sanitised}`;
+  const storagePath = `${ctx.brandDirectoryId}/evidence/${Date.now()}_${verification.field_key}_${sanitised}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
   const { error: uploadError } = await ctx.supabase.storage
@@ -324,7 +328,7 @@ async function attachEvidence(
   const { data: submission, error: submissionError } = await ctx.supabase
     .from('brand_document_submissions')
     .insert({
-      brand_profile_id: ctx.brandId,
+      brand_directory_id: ctx.brandDirectoryId,
       distributor_org_id: ctx.distributorOrgId,
       file_name: file.name,
       file_path: storagePath,
@@ -352,7 +356,7 @@ async function attachEvidence(
   try {
     await ctx.supabase.from('document_processing_jobs').insert({
       submission_id: submissionId,
-      brand_profile_id: ctx.brandId,
+      brand_profile_id: ctx.brandProfileId,
       status: 'queued',
     });
   } catch {

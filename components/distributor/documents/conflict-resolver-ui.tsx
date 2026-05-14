@@ -9,7 +9,7 @@ import { FIELD_DEFINITIONS } from '@/lib/distributor/scraping/field-definitions'
 
 export interface ConflictRow {
   id: string;
-  brand_profile_id: string;
+  brand_directory_id: string;
   brand_name?: string | null;
   field_key: string;
   existing_value: string | null;

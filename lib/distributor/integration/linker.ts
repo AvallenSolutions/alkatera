@@ -49,11 +49,11 @@ export async function createBrandDistributorLink(
     return { ok: true, link_id: (existing as { id: string }).id };
   }
 
-  // Need distributor_org_id and a few fields off brand_profiles to write
-  // the link + recompute tier.
+  // Need distributor_org_id, brand_directory_id and a few fields off
+  // brand_profiles to write the link + recompute tier + sync alkatera.
   const { data: brand } = await supabase
     .from('brand_profiles')
-    .select('id, name, distributor_org_id, first_submission_at')
+    .select('id, brand_directory_id, name, distributor_org_id, first_submission_at')
     .eq('id', brandProfileId)
     .maybeSingle();
   if (!brand) return { ok: false, error: 'brand_not_found' };
@@ -97,7 +97,10 @@ export async function createBrandDistributorLink(
   // sync runs when the brand confirms (see /api/brand/distributors).
   if (confirmedNow) {
     try {
-      await syncAlkateraDataForBrand(supabase, brandProfileId);
+      await syncAlkateraDataForBrand(
+        supabase,
+        (brand as { brand_directory_id: string }).brand_directory_id,
+      );
     } catch {
       // best-effort — daily cron will retry
     }

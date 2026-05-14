@@ -42,22 +42,50 @@ export default async function DistributorBrandsPage() {
   let rows: BrandTableRow[] = [];
   if (brands && brands.length > 0) {
     const brandIds = brands.map((b) => b.id);
-    const [{ data: skuRows }, { data: sourceRows }, { data: jobRows }] = await Promise.all([
+    const directoryIds = Array.from(new Set(brands.map((b) => b.brand_directory_id)));
+    const [
+      { data: skuRows },
+      { data: sourceRows },
+      { data: jobRows },
+      { data: directoryScoresRaw },
+    ] = await Promise.all([
       supabase
         .from('brand_skus')
         .select('brand_profile_id, updated_at')
         .in('brand_profile_id', brandIds),
+      // Source-name summary per directory entry — Phase 3 keys findings
+      // by directory id, so a brand surfaced on two distributor lists
+      // shares its source mix across both views.
       supabase
         .from('scraped_brand_data')
-        .select('brand_profile_id, source_name')
-        .in('brand_profile_id', brandIds)
+        .select('brand_directory_id, source_name')
+        .in('brand_directory_id', directoryIds)
         .is('superseded_by', null),
       supabase
         .from('scraping_jobs')
         .select('brand_profile_id, status, completed_at, created_at')
         .in('brand_profile_id', brandIds)
         .order('created_at', { ascending: false }),
+      // Canonical scores live on brand_directory after Phase 3.
+      supabase
+        .from('brand_directory')
+        .select('id, sustainability_score, score_tier, completeness_score')
+        .in('id', directoryIds),
     ]);
+
+    type DirectoryScores = {
+      sustainability_score: number | null;
+      score_tier: 'leader' | 'progressing' | 'developing' | 'insufficient' | null;
+      completeness_score: number | null;
+    };
+    const directoryScoresById = new Map<string, DirectoryScores>();
+    for (const row of (directoryScoresRaw ?? []) as Array<{ id: string } & DirectoryScores>) {
+      directoryScoresById.set(row.id, {
+        sustainability_score: row.sustainability_score,
+        score_tier: row.score_tier,
+        completeness_score: row.completeness_score,
+      });
+    }
 
     const counts = new Map<string, { count: number; lastActivity: string | null }>();
     (skuRows ?? []).forEach((sku: { brand_profile_id: string; updated_at: string }) => {
@@ -69,11 +97,11 @@ export default async function DistributorBrandsPage() {
       counts.set(sku.brand_profile_id, existing);
     });
 
-    const sources = new Map<string, Set<string>>();
-    (sourceRows ?? []).forEach((row: { brand_profile_id: string; source_name: string }) => {
-      const set = sources.get(row.brand_profile_id) ?? new Set<string>();
+    const sourcesByDirectory = new Map<string, Set<string>>();
+    (sourceRows ?? []).forEach((row: { brand_directory_id: string; source_name: string }) => {
+      const set = sourcesByDirectory.get(row.brand_directory_id) ?? new Set<string>();
       set.add(row.source_name);
-      sources.set(row.brand_profile_id, set);
+      sourcesByDirectory.set(row.brand_directory_id, set);
     });
 
     // jobRows is ordered DESC by created_at, so the first row we see
@@ -98,11 +126,15 @@ export default async function DistributorBrandsPage() {
     rows = brands.map((b) => {
       const stats = counts.get(b.id);
       const job = latestJobs.get(b.id);
+      const scores = directoryScoresById.get(b.brand_directory_id);
       return {
         ...b,
+        sustainability_score: scores?.sustainability_score ?? null,
+        score_tier: scores?.score_tier ?? null,
+        completeness_score: scores?.completeness_score ?? null,
         sku_count: stats?.count ?? 0,
         last_activity: stats?.lastActivity ?? null,
-        data_sources: Array.from(sources.get(b.id) ?? []),
+        data_sources: Array.from(sourcesByDirectory.get(b.brand_directory_id) ?? []),
         latest_finding_status: job?.status ?? null,
         latest_finding_at: job?.when ?? null,
       };

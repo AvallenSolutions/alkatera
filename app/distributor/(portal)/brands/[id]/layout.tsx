@@ -43,7 +43,7 @@ export default async function BrandDetailLayout({ params, children }: LayoutProp
 
   const { data: brand } = await supabase
     .from('brand_profiles')
-    .select('id, name, alkatera_tier, category, country_of_origin')
+    .select('id, brand_directory_id, name, alkatera_tier, category, country_of_origin')
     .eq('id', params.id)
     .eq('distributor_org_id', member.distributor_org_id)
     .maybeSingle();
@@ -66,7 +66,7 @@ export default async function BrandDetailLayout({ params, children }: LayoutProp
   const { count: conflicts } = await supabase
     .from('brand_data_conflicts')
     .select('id', { count: 'exact', head: true })
-    .eq('brand_profile_id', brand.id)
+    .eq('brand_directory_id', (brand as { brand_directory_id: string }).brand_directory_id)
     .is('resolution', null);
 
   return (

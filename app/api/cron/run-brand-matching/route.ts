@@ -64,25 +64,32 @@ export async function POST(request: NextRequest) {
     else if (outcome.action === 'suggested') suggested += 1;
   }
 
-  // Phase B — re-sync tiers + alkatera live data for every linked
-  // brand. Cheap (small set) and catches subscription upgrades + new
-  // LCAs / certifications / scope data added on the alkatera side
-  // since the last run.
+  // Phase B — re-sync tiers + alkatera live data.
+  //
+  // Tier is per-listing (one row per distributor's view of the brand)
+  // so iterate listings. Live-data sync is per-directory (Phase 3) so
+  // dedupe across listings to avoid syncing the same canonical brand
+  // multiple times when distributors share it.
   const { data: linkedBrands } = await supabase
     .from('brand_profiles')
-    .select('id')
+    .select('id, brand_directory_id')
     .not('alkatera_org_id', 'is', null);
   let tierUpdates = 0;
   let alkateraSynced = 0;
-  for (const row of (linkedBrands ?? []) as Array<{ id: string }>) {
+  const seenDirectories = new Set<string>();
+  for (const row of (linkedBrands ?? []) as Array<{ id: string; brand_directory_id: string }>) {
     try {
       await syncBrandTier(supabase, row.id);
       tierUpdates += 1;
     } catch {
       // best-effort
     }
+  }
+  for (const row of (linkedBrands ?? []) as Array<{ id: string; brand_directory_id: string }>) {
+    if (seenDirectories.has(row.brand_directory_id)) continue;
+    seenDirectories.add(row.brand_directory_id);
     try {
-      const result = await syncAlkateraDataForBrand(supabase, row.id);
+      const result = await syncAlkateraDataForBrand(supabase, row.brand_directory_id);
       if (result.ok) alkateraSynced += 1;
     } catch {
       // best-effort

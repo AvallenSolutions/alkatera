@@ -63,6 +63,8 @@ export interface DistributorSkuList {
 
 export interface BrandProfile {
   id: string;
+  /** Canonical brand identity (Phase 3). Sustainability data attaches here. */
+  brand_directory_id: string;
   distributor_org_id: string;
   alkatera_org_id: string | null;
   name: string;

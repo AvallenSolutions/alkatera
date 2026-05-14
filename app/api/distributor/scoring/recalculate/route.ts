@@ -30,14 +30,17 @@ export async function POST(request: Request) {
   if (typeof body.brand_profile_id === 'string' && body.brand_profile_id.length > 0) {
     const { data: brand } = await auth.supabase
       .from('brand_profiles')
-      .select('id')
+      .select('id, brand_directory_id')
       .eq('id', body.brand_profile_id)
       .eq('distributor_org_id', auth.organization.id)
       .maybeSingle();
     if (!brand) {
       return NextResponse.json({ error: 'brand_not_found' }, { status: 404 });
     }
-    const result = await recalculateCompleteness(auth.supabase, body.brand_profile_id);
+    const result = await recalculateCompleteness(
+      auth.supabase,
+      (brand as { brand_directory_id: string }).brand_directory_id,
+    );
     return NextResponse.json({ result });
   }
 

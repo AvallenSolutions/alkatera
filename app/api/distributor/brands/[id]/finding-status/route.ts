@@ -19,13 +19,14 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   // catch this; explicit eq() is defence in depth).
   const { data: brand } = await auth.supabase
     .from('brand_profiles')
-    .select('id')
+    .select('id, brand_directory_id')
     .eq('id', params.id)
     .eq('distributor_org_id', auth.organization.id)
     .maybeSingle();
   if (!brand) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
+  const brandDirectoryId = (brand as { brand_directory_id: string }).brand_directory_id;
 
   const { data: latestJob } = await auth.supabase
     .from('scraping_jobs')
@@ -38,7 +39,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   const { count: findings_total } = await auth.supabase
     .from('scraped_brand_data')
     .select('id', { count: 'exact', head: true })
-    .eq('brand_profile_id', params.id)
+    .eq('brand_directory_id', brandDirectoryId)
     .is('superseded_by', null);
 
   return NextResponse.json({

@@ -71,12 +71,22 @@ export async function PATCH(request: Request, { params }: { params: { linkId: st
   }
 
   // If the brand just confirmed the link (or re-activated sharing),
-  // sync their live alkatera data into the distributor's view straight
-  // away — they shouldn't have to wait for tomorrow's cron.
+  // sync their live alkatera data into the directory entry straight
+  // away — they shouldn't have to wait for tomorrow's cron. Findings
+  // attach to the canonical directory and naturally fan out to every
+  // distributor that lists the brand (Phase 3).
   const linkRow = data as { sharing_active: boolean; confirmed_by_brand: boolean; brand_profile_id: string };
   if (linkRow.confirmed_by_brand && linkRow.sharing_active) {
     try {
-      await syncAlkateraDataForBrand(auth.supabase, linkRow.brand_profile_id);
+      const { data: bp } = await auth.supabase
+        .from('brand_profiles')
+        .select('brand_directory_id')
+        .eq('id', linkRow.brand_profile_id)
+        .maybeSingle();
+      const directoryId = (bp as { brand_directory_id: string } | null)?.brand_directory_id;
+      if (directoryId) {
+        await syncAlkateraDataForBrand(auth.supabase, directoryId);
+      }
     } catch {
       // best-effort
     }

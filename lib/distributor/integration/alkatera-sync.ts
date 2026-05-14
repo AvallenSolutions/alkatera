@@ -3,14 +3,17 @@ import { coerceFieldValue, type FieldKey } from '../scraping/field-definitions';
 
 /**
  * Sync an alka**tera** brand's live sustainability data into the
- * distributor portal as scraped_brand_data rows tagged
- * source_name='alkatera_live'. The Phase 6 RPC already overlays these
- * onto each linked distributor's view of the brand, applying the
- * brand's per-field sharing preferences.
+ * canonical brand_directory entry as scraped_brand_data rows tagged
+ * source_name='alkatera_live'. Because Phase 3 keys findings by
+ * brand_directory_id, a single sync naturally fans out to every
+ * distributor that lists the brand. The Phase 6 RPC (now
+ * directory-scoped, see migration 20262606900000) overlays these onto
+ * each linked distributor's view, applying per-distributor sharing
+ * preferences.
  *
  * Triggers:
  *   - createBrandDistributorLink (Phase 6) after a confirmed link
- *   - Daily run-brand-matching cron, for every confirmed-linked brand
+ *   - Daily run-brand-matching cron, for every linked directory entry
  *   - /api/distributor/brands/[id]/refresh-alkatera (manual button)
  *
  * Defensive by design: the alka**tera** customer schema is large and
@@ -22,7 +25,7 @@ import { coerceFieldValue, type FieldKey } from '../scraping/field-definitions';
 
 export interface SyncResult {
   ok: boolean;
-  brand_profile_id: string;
+  brand_directory_id: string;
   alkatera_org_id: string;
   fields_written: number;
   fields_skipped: string[];
@@ -39,29 +42,39 @@ interface SyncedField {
 
 export async function syncAlkateraDataForBrand(
   supabase: SupabaseClient,
-  brandProfileId: string,
+  brandDirectoryId: string,
 ): Promise<SyncResult> {
-  // 1. Resolve the alkatera org ID via the link table. We only sync
-  //    when the link is confirmed by the brand AND sharing is active.
-  const { data: link } = await supabase
-    .from('brand_distributor_links')
-    .select('alkatera_org_id, confirmed_by_brand, sharing_active')
-    .eq('brand_profile_id', brandProfileId)
-    .eq('confirmed_by_brand', true)
-    .eq('sharing_active', true)
+  // 1. The directory entry tells us which alkatera org this brand is.
+  //    The per-distributor sharing gate lives in the RPC the merger
+  //    calls — sync writes unconditionally because the data belongs to
+  //    the brand, not to any one distributor.
+  const { data: directory } = await supabase
+    .from('brand_directory')
+    .select('id, alkatera_org_id')
+    .eq('id', brandDirectoryId)
     .maybeSingle();
 
-  if (!link) {
+  if (!directory) {
     return {
       ok: false,
-      brand_profile_id: brandProfileId,
+      brand_directory_id: brandDirectoryId,
       alkatera_org_id: '',
       fields_written: 0,
       fields_skipped: [],
-      error: 'no_confirmed_active_link',
+      error: 'directory_not_found',
     };
   }
-  const alkateraOrgId = (link as { alkatera_org_id: string }).alkatera_org_id;
+  const alkateraOrgId = (directory as { alkatera_org_id: string | null }).alkatera_org_id;
+  if (!alkateraOrgId) {
+    return {
+      ok: false,
+      brand_directory_id: brandDirectoryId,
+      alkatera_org_id: '',
+      fields_written: 0,
+      fields_skipped: [],
+      error: 'no_alkatera_org_linked',
+    };
+  }
 
   const findings: SyncedField[] = [];
   const skipped: string[] = [];
@@ -294,14 +307,14 @@ export async function syncAlkateraDataForBrand(
   }
 
   // 3. Persist. Supersede every existing alkatera_live row for this
-  //    brand in one pass, then insert the fresh batch. Cheaper than
+  //    directory in one pass, then insert the fresh batch. Cheaper than
   //    per-field supersede + insert; safe because the conflict
   //    resolver treats alkatera_live as authoritative anyway.
   if (findings.length > 0) {
     const { data: priors } = await supabase
       .from('scraped_brand_data')
       .select('id')
-      .eq('brand_profile_id', brandProfileId)
+      .eq('brand_directory_id', brandDirectoryId)
       .eq('source_name', SOURCE_NAME)
       .is('superseded_by', null);
 
@@ -310,7 +323,7 @@ export async function syncAlkateraDataForBrand(
         const coerced = coerceFieldValue(f.field_key, f.raw_value);
         if (!coerced) return null;
         return {
-          brand_profile_id: brandProfileId,
+          brand_directory_id: brandDirectoryId,
           field_key: f.field_key,
           field_value: coerced.text,
           field_value_numeric: coerced.numeric,
@@ -330,7 +343,7 @@ export async function syncAlkateraDataForBrand(
       if (insertError) {
         return {
           ok: false,
-          brand_profile_id: brandProfileId,
+          brand_directory_id: brandDirectoryId,
           alkatera_org_id: alkateraOrgId,
           fields_written: 0,
           fields_skipped: skipped,
@@ -352,7 +365,7 @@ export async function syncAlkateraDataForBrand(
 
   return {
     ok: true,
-    brand_profile_id: brandProfileId,
+    brand_directory_id: brandDirectoryId,
     alkatera_org_id: alkateraOrgId,
     fields_written: findings.length,
     fields_skipped: skipped,

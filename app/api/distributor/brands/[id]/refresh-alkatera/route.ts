@@ -25,7 +25,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
 
   const { data: brand } = await auth.supabase
     .from('brand_profiles')
-    .select('id, alkatera_org_id')
+    .select('id, brand_directory_id, alkatera_org_id')
     .eq('id', params.id)
     .eq('distributor_org_id', auth.organization.id)
     .maybeSingle();
@@ -39,11 +39,12 @@ export async function POST(_request: Request, { params }: { params: { id: string
     );
   }
 
-  const result = await syncAlkateraDataForBrand(auth.supabase, params.id);
+  const directoryId = (brand as { brand_directory_id: string }).brand_directory_id;
+  const result = await syncAlkateraDataForBrand(auth.supabase, directoryId);
 
   // Recompute completeness now that the active findings set has changed.
   try {
-    await recalculateCompleteness(auth.supabase, params.id);
+    await recalculateCompleteness(auth.supabase, directoryId);
   } catch {
     // best-effort
   }

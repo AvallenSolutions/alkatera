@@ -6,7 +6,10 @@ export type TokenValidationResult =
   | {
       ok: true;
       brand: {
+        /** brand_profiles row id (the listing) — kept for audit/provenance. */
         id: string;
+        /** Canonical brand identity — what data writes attach to (Phase 3). */
+        brand_directory_id: string;
         distributor_org_id: string;
         name: string;
         category: string | null;
@@ -22,6 +25,11 @@ export type TokenValidationResult =
  * exposed in the result, the caller fetches the distributor name
  * separately when it needs to display it.
  *
+ * The token resolves to a single brand_profiles listing — the one whose
+ * outreach campaign generated the token. Callers use that listing id
+ * for the audit trail (which distributor's outreach prompted this) and
+ * the brand_directory_id for canonical data writes.
+ *
  * Callers should always use a service-role client because the brand
  * uploader has no Supabase session.
  */
@@ -35,7 +43,7 @@ export async function validateUploadToken(
 
   const { data: brand } = await supabase
     .from('brand_profiles')
-    .select('id, distributor_org_id, name, category, country_of_origin, upload_token_expires_at')
+    .select('id, brand_directory_id, distributor_org_id, name, category, country_of_origin, upload_token_expires_at')
     .eq('upload_token', token)
     .maybeSingle();
 

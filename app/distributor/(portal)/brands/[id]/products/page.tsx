@@ -30,11 +30,12 @@ export default async function BrandProductsTabPage({ params }: PageProps) {
 
   const { data: brand } = await supabase
     .from('brand_profiles')
-    .select('id')
+    .select('id, brand_directory_id')
     .eq('id', params.id)
     .eq('distributor_org_id', member.distributor_org_id)
     .maybeSingle();
   if (!brand) return null;
+  const directoryId = (brand as { brand_directory_id: string }).brand_directory_id;
 
   const { data: skus } = await supabase
     .from('brand_skus')
@@ -69,7 +70,7 @@ export default async function BrandProductsTabPage({ params }: PageProps) {
       supabase
         .from('brand_document_submissions')
         .select('brand_sku_ids')
-        .eq('brand_profile_id', brand.id)
+        .eq('brand_directory_id', directoryId)
         .not('brand_sku_ids', 'is', null),
     ]);
     for (const row of (findingRows ?? []) as Array<{ brand_sku_id: string }>) {

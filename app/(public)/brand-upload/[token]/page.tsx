@@ -14,6 +14,8 @@ interface PageProps {
 interface BrandUploadDetails {
   brand: { name: string; category: string | null; country_of_origin: string | null };
   distributor: { name: string; logo_url: string | null };
+  /** How many distributors list this brand. Verifications flow to all of them. */
+  listing_count: number;
   skus: Array<{
     id: string;
     product_name: string;
@@ -95,6 +97,18 @@ export default async function BrandUploadPage({ params }: PageProps) {
           brandName={details.brand.name}
           skuCount={details.skus.length}
         />
+
+        {details.listing_count > 1 && (
+          <section className="rounded-xl border border-sky-500/30 bg-gradient-to-r from-sky-500/10 via-sky-500/5 to-transparent px-5 py-4 text-sm flex items-start gap-3">
+            <span className="inline-flex items-center justify-center h-6 px-2 rounded-full bg-sky-500/15 border border-sky-400/30 text-sky-300 text-[11px] font-semibold whitespace-nowrap shrink-0">
+              {details.listing_count} distributors
+            </span>
+            <span className="text-muted-foreground">
+              Your verified data is shared with the {details.listing_count} distributors that list
+              your products. Verify once and the answers reach every distributor automatically.
+            </span>
+          </section>
+        )}
 
         {details.skus.length > 0 && (
           <section className="rounded-xl border border-border/60 bg-gradient-to-br from-sky-500/5 via-card/40 to-card/40 p-5">

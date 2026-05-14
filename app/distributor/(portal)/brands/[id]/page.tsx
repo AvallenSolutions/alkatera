@@ -53,17 +53,20 @@ export default async function BrandOverviewPage({ params }: PageProps) {
     .eq('distributor_org_id', member.distributor_org_id)
     .maybeSingle()) as { data: BrandProfile | null };
   if (!brand) return null;
+  const directoryId = brand.brand_directory_id;
 
   const [
     { data: scrapedRows },
     { count: skuCount },
     { count: unresolvedConflicts },
     { data: descriptionRow },
+    { data: directoryScores },
+    { count: listingCount },
   ] = await Promise.all([
     supabase
       .from('scraped_brand_data')
       .select('field_key')
-      .eq('brand_profile_id', brand.id)
+      .eq('brand_directory_id', directoryId)
       .is('superseded_by', null),
     supabase
       .from('brand_skus')
@@ -73,12 +76,12 @@ export default async function BrandOverviewPage({ params }: PageProps) {
     supabase
       .from('brand_data_conflicts')
       .select('id', { count: 'exact', head: true })
-      .eq('brand_profile_id', brand.id)
+      .eq('brand_directory_id', directoryId)
       .is('resolution', null),
     supabase
       .from('scraped_brand_data')
       .select('field_value, source_name, source_url, scraped_at, confidence')
-      .eq('brand_profile_id', brand.id)
+      .eq('brand_directory_id', directoryId)
       .eq('field_key', 'company_description')
       .is('brand_sku_id', null)
       .is('superseded_by', null)
@@ -88,6 +91,15 @@ export default async function BrandOverviewPage({ params }: PageProps) {
       .order('scraped_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
+    supabase
+      .from('brand_directory')
+      .select('sustainability_score, score_tier, completeness_score')
+      .eq('id', directoryId)
+      .maybeSingle(),
+    supabase
+      .from('brand_profiles')
+      .select('id', { count: 'exact', head: true })
+      .eq('brand_directory_id', directoryId),
   ]);
 
   const description = (descriptionRow as {
@@ -96,6 +108,12 @@ export default async function BrandOverviewPage({ params }: PageProps) {
     source_url: string | null;
     scraped_at: string | null;
   } | null) ?? null;
+  const scores = (directoryScores as {
+    sustainability_score: number | null;
+    score_tier: 'leader' | 'progressing' | 'developing' | 'insufficient' | null;
+    completeness_score: number | null;
+  } | null) ?? null;
+  const otherListings = Math.max(0, (listingCount ?? 1) - 1);
 
   const populated = new Set(((scrapedRows ?? []) as Array<{ field_key: string }>).map((r) => r.field_key));
   const missingRequired = REQUIRED_FIELDS.filter((key) => !populated.has(key));
@@ -125,10 +143,22 @@ export default async function BrandOverviewPage({ params }: PageProps) {
       )}
 
       <VitalityCard
-        vitality={brand.sustainability_score}
-        tier={brand.score_tier}
-        completeness={brand.completeness_score}
+        vitality={scores?.sustainability_score ?? null}
+        tier={scores?.score_tier ?? null}
+        completeness={scores?.completeness_score ?? null}
       />
+
+      {otherListings > 0 && (
+        <div className="rounded-xl border border-sky-500/30 bg-gradient-to-r from-sky-500/10 via-sky-500/5 to-transparent px-4 py-3 text-sm flex items-center gap-3">
+          <span className="inline-flex items-center justify-center h-6 px-2 rounded-full bg-sky-500/15 border border-sky-400/30 text-sky-300 text-[11px] font-semibold">
+            Listed by {otherListings + 1} distributors
+          </span>
+          <span className="text-muted-foreground">
+            Verified data and scraped findings are shared across every distributor that lists this
+            brand.
+          </span>
+        </div>
+      )}
 
       <div className="rounded-xl border border-border/60 bg-gradient-to-br from-sky-500/5 via-card/40 to-card/40 overflow-hidden">
         <div className="flex items-center gap-2 px-5 pt-5 pb-3">

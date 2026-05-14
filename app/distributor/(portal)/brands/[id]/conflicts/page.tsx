@@ -26,18 +26,19 @@ export default async function BrandConflictsPage({ params }: PageProps) {
 
   const { data: brand } = await supabase
     .from('brand_profiles')
-    .select('id, name')
+    .select('id, brand_directory_id, name')
     .eq('id', params.id)
     .eq('distributor_org_id', member.distributor_org_id)
     .maybeSingle();
   if (!brand) return null;
+  const directoryId = (brand as { brand_directory_id: string }).brand_directory_id;
 
   const { data: conflicts } = (await supabase
     .from('brand_data_conflicts')
     .select(
-      'id, brand_profile_id, field_key, existing_value, existing_source, existing_confidence, new_value, new_source, new_confidence, submission_id, created_at',
+      'id, brand_directory_id, field_key, existing_value, existing_source, existing_confidence, new_value, new_source, new_confidence, submission_id, created_at',
     )
-    .eq('brand_profile_id', brand.id)
+    .eq('brand_directory_id', directoryId)
     .is('resolution', null)
     .order('created_at', { ascending: false })) as { data: ConflictRow[] | null };
 

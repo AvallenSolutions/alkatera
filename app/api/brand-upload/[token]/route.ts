@@ -96,10 +96,18 @@ export async function GET(request: Request, { params }: { params: { token: strin
     .select(
       'field_key, field_value, field_value_numeric, source_name, confidence, scraped_at, brand_sku_id, verified_by_name, verified_by_email, verification_method',
     )
-    .eq('brand_profile_id', brand.id)
+    .eq('brand_directory_id', brand.brand_directory_id)
     .is('superseded_by', null);
 
   const fieldStates = collapseFieldRows((rawRows ?? []) as RawScrapedRow[]);
+
+  // Phase 3: count every distributor that lists this brand. Verified
+  // data flows to all of them by default, so we surface this on the
+  // public review page as a transparency note.
+  const { count: listingCount } = await supabase
+    .from('brand_profiles')
+    .select('id', { count: 'exact', head: true })
+    .eq('brand_directory_id', brand.brand_directory_id);
 
   return NextResponse.json({
     brand: {
@@ -111,6 +119,7 @@ export async function GET(request: Request, { params }: { params: { token: strin
       name: distributor.name,
       logo_url: distributor.logo_url,
     },
+    listing_count: listingCount ?? 1,
     skus: skus ?? [],
     field_states: fieldStates,
     expires_at: brand.upload_token_expires_at,

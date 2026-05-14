@@ -56,6 +56,14 @@ export default async function SkuDetailPage({ params }: PageProps) {
     .maybeSingle();
   if (!sku) return null;
 
+  const { data: brandRow } = await supabase
+    .from('brand_profiles')
+    .select('brand_directory_id')
+    .eq('id', params.id)
+    .maybeSingle();
+  const directoryId = (brandRow as { brand_directory_id: string } | null)?.brand_directory_id;
+  if (!directoryId) return null;
+
   // Pull both SKU-specific and brand-level active findings in one round
   // trip, then collapse them into one row per field with SKU-specific
   // winning if both exist.
@@ -64,7 +72,7 @@ export default async function SkuDetailPage({ params }: PageProps) {
     .select(
       'field_key, field_value, field_value_numeric, source_name, confidence, scraped_at, brand_sku_id',
     )
-    .eq('brand_profile_id', params.id)
+    .eq('brand_directory_id', directoryId)
     .is('superseded_by', null)
     .or(`brand_sku_id.eq.${params.skuId},brand_sku_id.is.null`);
 
@@ -115,7 +123,7 @@ export default async function SkuDetailPage({ params }: PageProps) {
     .select(
       'id, file_name, document_type, file_size_bytes, vintage_year, batch_reference, submitter_name, processing_status, created_at, brand_sku_ids',
     )
-    .eq('brand_profile_id', params.id)
+    .eq('brand_directory_id', directoryId)
     .contains('brand_sku_ids', [params.skuId])
     .order('created_at', { ascending: false });
 

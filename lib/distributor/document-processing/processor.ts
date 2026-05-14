@@ -29,7 +29,7 @@ const KNOWN_FIELD_KEYS = new Set<FieldKey>(FIELD_DEFINITIONS.map((f) => f.key));
 
 interface SubmissionRow {
   id: string;
-  brand_profile_id: string;
+  brand_directory_id: string;
   distributor_org_id: string;
   file_path: string;
   file_type: string;
@@ -68,7 +68,7 @@ export async function processDocument(args: ProcessArgs): Promise<ProcessResult>
 
   const { data: submission, error: subError } = await supabase
     .from('brand_document_submissions')
-    .select('id, brand_profile_id, distributor_org_id, file_path, file_type, file_name, document_type, vintage_year, brand_sku_ids')
+    .select('id, brand_directory_id, distributor_org_id, file_path, file_type, file_name, document_type, vintage_year, brand_sku_ids')
     .eq('id', submissionId)
     .maybeSingle();
   if (subError || !submission) {
@@ -81,12 +81,12 @@ export async function processDocument(args: ProcessArgs): Promise<ProcessResult>
   }
   const sub = submission as SubmissionRow;
 
-  const { data: brand } = await supabase
-    .from('brand_profiles')
+  const { data: directoryBrand } = await supabase
+    .from('brand_directory')
     .select('name')
-    .eq('id', sub.brand_profile_id)
+    .eq('id', sub.brand_directory_id)
     .maybeSingle();
-  const brandName = (brand as { name?: string } | null)?.name ?? 'this brand';
+  const brandName = (directoryBrand as { name?: string } | null)?.name ?? 'this brand';
 
   const { data: download, error: downloadError } = await supabase.storage
     .from('brand-documents')
@@ -176,7 +176,7 @@ export async function processDocument(args: ProcessArgs): Promise<ProcessResult>
       const existingQuery = supabase
         .from('scraped_brand_data')
         .select('id, field_value, field_value_numeric, confidence, source_name')
-        .eq('brand_profile_id', sub.brand_profile_id)
+        .eq('brand_directory_id', sub.brand_directory_id)
         .eq('field_key', fieldKey)
         .is('superseded_by', null)
         .order('confidence', { ascending: false })
@@ -202,7 +202,7 @@ export async function processDocument(args: ProcessArgs): Promise<ProcessResult>
         if (decision.differs) {
           resolution = decision.resolution ?? 'flagged_for_review';
           await supabase.from('brand_data_conflicts').insert({
-            brand_profile_id: sub.brand_profile_id,
+            brand_directory_id: sub.brand_directory_id,
             field_key: fieldKey,
             existing_value: (existing as { field_value: string | null }).field_value,
             existing_source: (existing as { source_name: string }).source_name,
@@ -224,7 +224,7 @@ export async function processDocument(args: ProcessArgs): Promise<ProcessResult>
       const { data: inserted, error: insertError } = await supabase
         .from('scraped_brand_data')
         .insert({
-          brand_profile_id: sub.brand_profile_id,
+          brand_directory_id: sub.brand_directory_id,
           brand_sku_id: targetSkuId,
           scraping_job_id: null,
           field_key: fieldKey,
@@ -279,7 +279,7 @@ export async function processDocument(args: ProcessArgs): Promise<ProcessResult>
 
   // Refresh completeness now that scraped_brand_data has new rows.
   try {
-    await recalculateCompleteness(supabase, sub.brand_profile_id);
+    await recalculateCompleteness(supabase, sub.brand_directory_id);
   } catch {
     // best-effort — see brand-agent.ts comment.
   }

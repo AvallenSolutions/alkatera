@@ -13,7 +13,7 @@ const PILLAR_COLUMN: Record<Pillar, string> = {
 };
 
 export interface RecalcResult {
-  brand_profile_id: string;
+  brand_directory_id: string;
   completeness: number;
   vitality: number;
   vitality_tier: string;
@@ -22,40 +22,40 @@ export interface RecalcResult {
 }
 
 /**
- * Recompute completeness and vitality for a single brand, persist a
- * snapshot row, and mirror the headline scores onto brand_profiles for
- * cheap reads from the brand list / dashboard.
+ * Recompute completeness and vitality for a single canonical brand,
+ * persist a snapshot row, and mirror the headline scores onto
+ * brand_directory so the brand list / dashboard can read them without
+ * touching the snapshot table.
  *
  * Pipeline:
- *   1. Read every "active" scraped_brand_data row (superseded_by is null).
- *      For completeness we only need the field keys; for vitality we
- *      need the full value (to grade against benchmarks).
+ *   1. Read every "active" scraped_brand_data row (superseded_by is null)
+ *      for the directory. The findings already canonicalise across
+ *      every listing of the brand — that's the whole point of Phase 3.
  *   2. When multiple sources have the same field_key (e.g. alkatera_live
  *      overlaid on a Wikipedia finding), prefer the highest-confidence
  *      row — same precedence the data merger uses for display.
  *   3. Run both calculators.
  *   4. Insert one brand_completeness_snapshots row (now also carrying
  *      vitality_score + vitality_tier).
- *   5. Mirror brand_profiles.{completeness_score, sustainability_score,
- *      score_tier}.
+ *   5. Mirror brand_directory.{completeness_score, sustainability_score,
+ *      score_tier, score_updated_at}.
  */
 export async function recalculateCompleteness(
   supabase: SupabaseClient,
-  brandProfileId: string,
+  brandDirectoryId: string,
 ): Promise<RecalcResult | null> {
-  const { data: brand } = await supabase
-    .from('brand_profiles')
-    .select('id, distributor_org_id')
-    .eq('id', brandProfileId)
+  const { data: directory } = await supabase
+    .from('brand_directory')
+    .select('id')
+    .eq('id', brandDirectoryId)
     .maybeSingle();
-  if (!brand) return null;
-  const distributorOrgId = (brand as { distributor_org_id: string }).distributor_org_id;
+  if (!directory) return null;
 
   // Fetch the full active row set so we can grade values, not just count keys.
   const { data: rows } = await supabase
     .from('scraped_brand_data')
     .select('field_key, field_value, field_value_numeric, confidence')
-    .eq('brand_profile_id', brandProfileId)
+    .eq('brand_directory_id', brandDirectoryId)
     .is('superseded_by', null);
 
   type Row = {
@@ -90,8 +90,7 @@ export async function recalculateCompleteness(
   const vitality = calculateVitality(valuesForVitality);
 
   const snapshotRow: Record<string, unknown> = {
-    brand_profile_id: brandProfileId,
-    distributor_org_id: distributorOrgId,
+    brand_directory_id: brandDirectoryId,
     completeness_score: completeness.overall,
     fields_populated: completeness.fields_populated,
     fields_total: completeness.fields_total,
@@ -105,17 +104,17 @@ export async function recalculateCompleteness(
   await supabase.from('brand_completeness_snapshots').insert(snapshotRow);
 
   await supabase
-    .from('brand_profiles')
+    .from('brand_directory')
     .update({
       completeness_score: completeness.overall,
       sustainability_score: vitality.overall,
       score_tier: vitality.tier,
       score_updated_at: new Date().toISOString(),
     })
-    .eq('id', brandProfileId);
+    .eq('id', brandDirectoryId);
 
   return {
-    brand_profile_id: brandProfileId,
+    brand_directory_id: brandDirectoryId,
     completeness: completeness.overall,
     vitality: vitality.overall,
     vitality_tier: vitality.tier,
@@ -126,7 +125,9 @@ export async function recalculateCompleteness(
 
 /**
  * Recompute completeness + vitality for every brand in a distributor
- * org. Used by the manual recalculate route.
+ * org. Dedupes by brand_directory_id so we don't recompute the same
+ * canonical brand twice when two listings of the same directory entry
+ * exist within one org (rare but possible).
  */
 export async function recalculateOrg(
   supabase: SupabaseClient,
@@ -134,11 +135,17 @@ export async function recalculateOrg(
 ): Promise<{ updated: number }> {
   const { data: brands } = await supabase
     .from('brand_profiles')
-    .select('id')
+    .select('brand_directory_id')
     .eq('distributor_org_id', distributorOrgId);
+
+  const seen = new Set<string>();
+  for (const row of (brands ?? []) as Array<{ brand_directory_id: string }>) {
+    if (row.brand_directory_id) seen.add(row.brand_directory_id);
+  }
+
   let updated = 0;
-  for (const row of (brands ?? []) as Array<{ id: string }>) {
-    const result = await recalculateCompleteness(supabase, row.id);
+  for (const directoryId of Array.from(seen)) {
+    const result = await recalculateCompleteness(supabase, directoryId);
     if (result) updated += 1;
   }
   return { updated };

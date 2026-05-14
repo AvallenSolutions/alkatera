@@ -42,18 +42,19 @@ export default async function BrandDocumentsTabPage({ params }: PageProps) {
 
   const { data: brand } = await supabase
     .from('brand_profiles')
-    .select('id')
+    .select('id, brand_directory_id')
     .eq('id', params.id)
     .eq('distributor_org_id', member.distributor_org_id)
     .maybeSingle();
   if (!brand) return null;
+  const directoryId = (brand as { brand_directory_id: string }).brand_directory_id;
 
   const { data: documents } = (await supabase
     .from('brand_document_submissions')
     .select(
       'id, file_name, document_type, file_size_bytes, vintage_year, batch_reference, submitter_name, submitter_email, processing_status, extracted_data, created_at',
     )
-    .eq('brand_profile_id', brand.id)
+    .eq('brand_directory_id', directoryId)
     .order('created_at', { ascending: false })) as {
     data: Array<{
       id: string;

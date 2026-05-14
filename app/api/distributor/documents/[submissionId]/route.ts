@@ -18,7 +18,7 @@ export async function GET(_request: Request, { params }: { params: { submissionI
   const { data: submission, error } = await auth.supabase
     .from('brand_document_submissions')
     .select(
-      'id, brand_profile_id, file_name, file_type, file_size_bytes, document_type, vintage_year, batch_reference, submitter_name, submitter_email, submitter_job_title, notes, processing_status, extracted_data, created_at, updated_at',
+      'id, brand_directory_id, file_name, file_type, file_size_bytes, document_type, vintage_year, batch_reference, submitter_name, submitter_email, submitter_job_title, notes, processing_status, extracted_data, created_at, updated_at',
     )
     .eq('id', params.submissionId)
     .eq('distributor_org_id', auth.organization.id)

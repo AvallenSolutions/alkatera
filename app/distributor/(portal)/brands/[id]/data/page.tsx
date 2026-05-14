@@ -26,23 +26,24 @@ export default async function BrandDataTabPage({ params }: PageProps) {
 
   const { data: brand } = await supabase
     .from('brand_profiles')
-    .select('id')
+    .select('id, brand_directory_id')
     .eq('id', params.id)
     .eq('distributor_org_id', member.distributor_org_id)
     .maybeSingle();
   if (!brand) return null;
+  const directoryId = (brand as { brand_directory_id: string }).brand_directory_id;
 
   const [{ data: dataRows }, { count: unresolvedConflicts }] = await Promise.all([
     supabase
       .from('scraped_brand_data')
       .select('field_key, field_value, field_value_numeric, source_name, confidence, scraped_at')
-      .eq('brand_profile_id', brand.id)
+      .eq('brand_directory_id', directoryId)
       .is('superseded_by', null)
       .order('confidence', { ascending: false }),
     supabase
       .from('brand_data_conflicts')
       .select('id', { count: 'exact', head: true })
-      .eq('brand_profile_id', brand.id)
+      .eq('brand_directory_id', directoryId)
       .is('resolution', null),
   ]);
 

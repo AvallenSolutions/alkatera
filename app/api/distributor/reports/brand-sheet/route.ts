@@ -23,18 +23,25 @@ export async function GET(request: Request) {
 
   const { data: brand } = await auth.supabase
     .from('brand_profiles')
-    .select('id, name, category, country_of_origin, alkatera_tier, completeness_score')
+    .select('id, brand_directory_id, name, category, country_of_origin, alkatera_tier')
     .eq('id', brandProfileId)
     .eq('distributor_org_id', auth.organization.id)
     .maybeSingle();
   if (!brand) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
+  const brandDirectoryId = (brand as { brand_directory_id: string }).brand_directory_id;
+
+  const { data: directoryScores } = await auth.supabase
+    .from('brand_directory')
+    .select('completeness_score')
+    .eq('id', brandDirectoryId)
+    .maybeSingle();
 
   const { data: rows } = await auth.supabase
     .from('scraped_brand_data')
     .select('field_key, field_value, field_value_numeric, source_name, confidence, scraped_at')
-    .eq('brand_profile_id', brand.id)
+    .eq('brand_directory_id', brandDirectoryId)
     .is('superseded_by', null);
 
   const fields: BrandSheetField[] = ((rows ?? []) as Array<{
@@ -59,7 +66,7 @@ export async function GET(request: Request) {
     category: (brand as { category: string | null }).category,
     country_of_origin: (brand as { country_of_origin: string | null }).country_of_origin,
     alkatera_tier: (brand as { alkatera_tier: number }).alkatera_tier,
-    completeness_score: (brand as { completeness_score: number | null }).completeness_score,
+    completeness_score: (directoryScores as { completeness_score: number | null } | null)?.completeness_score ?? null,
     fields,
     generated_at: new Date(),
   });

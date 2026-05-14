@@ -35,15 +35,18 @@ export default async function DistributorDashboardPage() {
 
   // Pull every brand row we need to compute the dashboard. Cheaper than
   // running six count queries because we use the same dataset for the
-  // stat cards, the chart, and the action queue.
+  // stat cards, the chart, and the action queue. Phase 3: scores live
+  // on brand_directory now, so we hydrate them in a second batch keyed
+  // by brand_directory_id.
   const { data: brandRows } = await supabase
     .from('brand_profiles')
     .select(
-      'id, name, completeness_score, sustainability_score, score_tier, outreach_email, outreach_sent_at, first_submission_at, last_submission_at',
+      'id, brand_directory_id, name, outreach_email, outreach_sent_at, first_submission_at, last_submission_at',
     )
     .eq('distributor_org_id', orgId);
   type BrandRow = {
     id: string;
+    brand_directory_id: string;
     name: string;
     completeness_score: number | null;
     sustainability_score: number | null;
@@ -53,7 +56,41 @@ export default async function DistributorDashboardPage() {
     first_submission_at: string | null;
     last_submission_at: string | null;
   };
-  const brands = (brandRows ?? []) as BrandRow[];
+  const baseBrands = (brandRows ?? []) as Array<Omit<BrandRow, 'completeness_score' | 'sustainability_score' | 'score_tier'>>;
+  const directoryIds = Array.from(new Set(baseBrands.map((b) => b.brand_directory_id)));
+
+  const { data: directoryScoresRaw } = directoryIds.length > 0
+    ? await supabase
+        .from('brand_directory')
+        .select('id, completeness_score, sustainability_score, score_tier')
+        .in('id', directoryIds)
+    : { data: [] };
+  const scoresById = new Map<string, {
+    completeness_score: number | null;
+    sustainability_score: number | null;
+    score_tier: string | null;
+  }>();
+  for (const row of (directoryScoresRaw ?? []) as Array<{
+    id: string;
+    completeness_score: number | null;
+    sustainability_score: number | null;
+    score_tier: string | null;
+  }>) {
+    scoresById.set(row.id, {
+      completeness_score: row.completeness_score,
+      sustainability_score: row.sustainability_score,
+      score_tier: row.score_tier,
+    });
+  }
+  const brands: BrandRow[] = baseBrands.map((b) => {
+    const s = scoresById.get(b.brand_directory_id);
+    return {
+      ...b,
+      completeness_score: s?.completeness_score ?? null,
+      sustainability_score: s?.sustainability_score ?? null,
+      score_tier: s?.score_tier ?? null,
+    };
+  });
 
   const totalBrands = brands.length;
   const totalSkus = await countActiveSkus(supabase, orgId);
@@ -71,8 +108,8 @@ export default async function DistributorDashboardPage() {
     .from('brand_data_conflicts')
     .select('id', { count: 'exact', head: true })
     .in(
-      'brand_profile_id',
-      brands.length > 0 ? brands.map((b) => b.id) : ['00000000-0000-0000-0000-000000000000'],
+      'brand_directory_id',
+      directoryIds.length > 0 ? directoryIds : ['00000000-0000-0000-0000-000000000000'],
     )
     .is('resolution', null);
 
@@ -385,6 +422,7 @@ async function buildActionQueue(
   supabase: SupabaseClient,
   brands: Array<{
     id: string;
+    brand_directory_id: string;
     name: string;
     completeness_score: number | null;
     outreach_email: string | null;
@@ -395,24 +433,28 @@ async function buildActionQueue(
   if (brands.length === 0) return [];
   const items: ActionItem[] = [];
 
-  // 1. Conflicts — query and aggregate by brand.
+  // 1. Conflicts — query the directory-keyed conflict table, then map
+  //    back to the listing(s) the distributor sees in their portfolio.
+  const directoryIds = Array.from(new Set(brands.map((b) => b.brand_directory_id)));
   const { data: conflicts } = await supabase
     .from('brand_data_conflicts')
-    .select('brand_profile_id')
-    .in(
-      'brand_profile_id',
-      brands.map((b) => b.id),
-    )
+    .select('brand_directory_id')
+    .in('brand_directory_id', directoryIds)
     .is('resolution', null);
-  const conflictCounts = new Map<string, number>();
-  for (const c of (conflicts ?? []) as Array<{ brand_profile_id: string }>) {
-    conflictCounts.set(c.brand_profile_id, (conflictCounts.get(c.brand_profile_id) ?? 0) + 1);
+  const conflictCountsByDirectory = new Map<string, number>();
+  for (const c of (conflicts ?? []) as Array<{ brand_directory_id: string }>) {
+    conflictCountsByDirectory.set(
+      c.brand_directory_id,
+      (conflictCountsByDirectory.get(c.brand_directory_id) ?? 0) + 1,
+    );
   }
-  const brandById = new Map(brands.map((b) => [b.id, b]));
-  for (const [brandId, count] of Array.from(conflictCounts.entries())) {
-    const brand = brandById.get(brandId);
-    if (!brand) continue;
-    items.push({ type: 'conflict', brand_id: brandId, brand_name: brand.name, count });
+  // Surface against this org's listing of the brand. If two listings
+  // share one directory entry (rare pre-Phase 4) both surface the same
+  // count — acceptable for now since dedup is a Phase 4 concern.
+  for (const brand of brands) {
+    const count = conflictCountsByDirectory.get(brand.brand_directory_id);
+    if (!count) continue;
+    items.push({ type: 'conflict', brand_id: brand.id, brand_name: brand.name, count });
   }
 
   // 2. Stale outreach (>14d, no response).

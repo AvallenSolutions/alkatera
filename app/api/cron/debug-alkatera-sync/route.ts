@@ -69,13 +69,15 @@ export async function GET(request: NextRequest) {
 
   const result: Record<string, unknown> = { brand_profile_id: brandProfileId };
 
-  // 1. Brand profile
+  // 1. Brand profile (listing) + canonical directory entry
   const { data: brand } = await supabase
     .from('brand_profiles')
-    .select('id, name, alkatera_org_id, alkatera_tier')
+    .select('id, brand_directory_id, name, alkatera_org_id, alkatera_tier')
     .eq('id', brandProfileId)
     .maybeSingle();
   result.brand_profile = brand;
+  const brandDirectoryId = (brand as { brand_directory_id?: string } | null)?.brand_directory_id;
+  result.brand_directory_id = brandDirectoryId ?? null;
 
   // 2. Link state
   const { data: link } = await supabase
@@ -162,19 +164,28 @@ export async function GET(request: NextRequest) {
     }
     result.alkatera_data_counts = dataCounts;
 
-    // 7. Run the sync and capture its full result
-    const syncResult = await syncAlkateraDataForBrand(supabase, brandProfileId);
-    result.sync_result = syncResult;
+    // 7. Run the sync and capture its full result. Sync is keyed by
+    //    directory id (Phase 3) so resolve from the listing first.
+    if (brandDirectoryId) {
+      const syncResult = await syncAlkateraDataForBrand(supabase, brandDirectoryId);
+      result.sync_result = syncResult;
+    } else {
+      result.sync_result = { error: 'no_brand_directory_id_on_listing' };
+    }
   }
 
-  // 5. What's currently on file as alkatera_live for this brand
-  const { data: liveRows } = await supabase
-    .from('scraped_brand_data')
-    .select('field_key, field_value, confidence, scraped_at')
-    .eq('brand_profile_id', brandProfileId)
-    .eq('source_name', 'alkatera_live')
-    .is('superseded_by', null);
-  result.alkatera_live_on_file = liveRows;
+  // 5. What's currently on file as alkatera_live for this directory entry.
+  if (brandDirectoryId) {
+    const { data: liveRows } = await supabase
+      .from('scraped_brand_data')
+      .select('field_key, field_value, confidence, scraped_at')
+      .eq('brand_directory_id', brandDirectoryId)
+      .eq('source_name', 'alkatera_live')
+      .is('superseded_by', null);
+    result.alkatera_live_on_file = liveRows;
+  } else {
+    result.alkatera_live_on_file = null;
+  }
 
   return NextResponse.json(result);
 }
