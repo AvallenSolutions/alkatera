@@ -23,6 +23,14 @@ export interface BrandTableRow extends BrandProfile {
   latest_finding_status: string | null;
   /** completed_at or created_at of the most recent data-finding job. */
   latest_finding_at: string | null;
+  /**
+   * Canonical scores hydrated from `brand_directory`. After Phase 4 the
+   * mirror columns on `brand_profiles` were dropped; the brand list
+   * page joins on the directory and overlays these fields per row.
+   */
+  sustainability_score: number | null;
+  score_tier: 'leader' | 'progressing' | 'developing' | 'insufficient' | null;
+  completeness_score: number | null;
 }
 
 interface Props {

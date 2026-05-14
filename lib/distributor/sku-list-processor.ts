@@ -147,26 +147,58 @@ export async function processSkuList(args: ProcessArgs): Promise<ProcessResult> 
       match_via: match.matchVia,
     });
 
-    const { data, error } = await supabase
+    // Phase 4: dedupe by (distributor_org_id, brand_directory_id) before
+    // we touch brand_profiles. The directory matcher may have collapsed
+    // a slightly-different spelling of this brand onto an existing
+    // canonical entry — in which case we have to update the existing
+    // listing rather than insert a fresh row, otherwise the unique
+    // constraint added in migration 20262607000000 rejects us. Look
+    // first, then branch.
+    const { data: existing } = await supabase
       .from('brand_profiles')
-      .upsert(
-        {
+      .select('id, website')
+      .eq('distributor_org_id', distributorOrgId)
+      .eq('brand_directory_id', match.directoryId)
+      .maybeSingle();
+
+    let row: { id: string; website: string | null } | null;
+    if (existing) {
+      const { data: updated, error: updateError } = await supabase
+        .from('brand_profiles')
+        .update({
+          name: bucket.displayName,
+          normalized_name: normalized,
+          category: bucket.category,
+          country_of_origin: bucket.country,
+        })
+        .eq('id', (existing as { id: string }).id)
+        .select('id, website')
+        .single();
+      row = (updated as { id: string; website: string | null } | null) ?? null;
+      if (updateError || !row) {
+        errors.push(`Brand "${bucket.displayName}": ${updateError?.message ?? 'no row returned'}`);
+        continue;
+      }
+    } else {
+      const { data: inserted, error: insertError } = await supabase
+        .from('brand_profiles')
+        .insert({
           distributor_org_id: distributorOrgId,
           brand_directory_id: match.directoryId,
           name: bucket.displayName,
           normalized_name: normalized,
           category: bucket.category,
           country_of_origin: bucket.country,
-        },
-        { onConflict: 'distributor_org_id,normalized_name' },
-      )
-      .select('id, website')
-      .single();
-
-    if (error || !data) {
-      errors.push(`Brand "${bucket.displayName}": ${error?.message ?? 'no row returned'}`);
-      continue;
+        })
+        .select('id, website')
+        .single();
+      row = (inserted as { id: string; website: string | null } | null) ?? null;
+      if (insertError || !row) {
+        errors.push(`Brand "${bucket.displayName}": ${insertError?.message ?? 'no row returned'}`);
+        continue;
+      }
     }
+    const data = row;
     profileIdByNormalized.set(normalized, data.id);
 
     // If the CSV/XLSX provided a website AND the existing brand_profile

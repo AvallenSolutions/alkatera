@@ -22,9 +22,19 @@ export default async function DistributorBrandsPage() {
     .maybeSingle();
   if (!member) return null;
 
+  // Phase 4: explicit column list (was '*'). The legacy score-mirror
+  // columns were dropped from brand_profiles; canonical scores are
+  // hydrated separately from brand_directory below.
   let brandsQuery = supabase
     .from('brand_profiles')
-    .select('*')
+    .select(
+      'id, brand_directory_id, distributor_org_id, alkatera_org_id, name, normalized_name, ' +
+      'website, country_of_origin, category, alkatera_tier, ' +
+      'outreach_email, outreach_sent_at, outreach_last_reminder_at, outreach_reminder_count, ' +
+      'upload_token, upload_token_expires_at, ' +
+      'first_submission_at, last_submission_at, ' +
+      'directory_opt_in, created_at, updated_at',
+    )
     .eq('distributor_org_id', member.distributor_org_id)
     .order('name', { ascending: true });
 

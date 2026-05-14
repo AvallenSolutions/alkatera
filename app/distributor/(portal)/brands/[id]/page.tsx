@@ -48,7 +48,14 @@ export default async function BrandOverviewPage({ params }: PageProps) {
 
   const { data: brand } = (await supabase
     .from('brand_profiles')
-    .select('*')
+    .select(
+      'id, brand_directory_id, distributor_org_id, alkatera_org_id, name, normalized_name, ' +
+      'website, country_of_origin, category, alkatera_tier, ' +
+      'outreach_email, outreach_sent_at, outreach_last_reminder_at, outreach_reminder_count, ' +
+      'upload_token, upload_token_expires_at, ' +
+      'first_submission_at, last_submission_at, ' +
+      'directory_opt_in, created_at, updated_at',
+    )
     .eq('id', params.id)
     .eq('distributor_org_id', member.distributor_org_id)
     .maybeSingle()) as { data: BrandProfile | null };

@@ -81,10 +81,6 @@ export interface BrandProfile {
   upload_token_expires_at: string | null;
   first_submission_at: string | null;
   last_submission_at: string | null;
-  completeness_score: number | null;
-  sustainability_score: number | null;
-  score_tier: ScoreTier | null;
-  score_updated_at: string | null;
   directory_opt_in: boolean;
   created_at: string;
   updated_at: string;
