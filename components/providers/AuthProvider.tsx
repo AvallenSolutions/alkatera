@@ -91,10 +91,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null)
         setLoading(false)
         // Don't redirect to login on public invite pages — unauthenticated users
-        // need to stay on those pages to create an account and accept the invite
+        // need to stay on those pages to create an account and accept the invite.
+        // Also route distributor-portal sign-outs to /distributor/login so users
+        // don't end up on the brand-portal login by accident.
         const pathname = window.location.pathname
-        const isPublicInvitePage = pathname.startsWith('/team-invite/') || pathname.startsWith('/advisor-invite/')
-        if (!isPublicInvitePage) {
+        const isPublicInvitePage = pathname.startsWith('/team-invite/') || pathname.startsWith('/advisor-invite/') || pathname.startsWith('/brand-upload/') || pathname.startsWith('/supplier-invite/')
+        const isDistributorRoute = pathname.startsWith('/distributor')
+        if (isDistributorRoute) {
+          router.push('/distributor/login')
+        } else if (!isPublicInvitePage) {
           router.push('/login')
         }
       } else if (event === 'TOKEN_REFRESHED' && currentSession) {

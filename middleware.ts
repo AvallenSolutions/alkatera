@@ -55,7 +55,20 @@ export async function middleware(request: NextRequest) {
   )
 
   // Refresh session if expired - required for Server Components
-  await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  // Distributor portal: bounce unauthenticated users to the distributor
+  // login page. The (distributor)/layout.tsx still does a robust check
+  // including a distributor_members lookup — this middleware bounce is just
+  // the fast path so unauth users never hit a server component first.
+  const path = request.nextUrl.pathname
+  const isDistributorAuthPage = /^\/distributor\/(login|signup|password-reset|update-password)(\/|$)/.test(path)
+  if (path.startsWith('/distributor') && !isDistributorAuthPage && !user) {
+    const redirectUrl = new URL('/distributor/login', request.url)
+    return NextResponse.redirect(redirectUrl)
+  }
 
   return response
 }
