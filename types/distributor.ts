@@ -81,6 +81,10 @@ export interface BrandProfile {
   upload_token_expires_at: string | null;
   first_submission_at: string | null;
   last_submission_at: string | null;
+  /** Brand-controlled per-listing on/off switch (Phase 5). 'delisted' = the
+   *  brand asked to be removed from this distributor's portfolio. Listings
+   *  are hidden from the distributor's default brand list when delisted. */
+  listing_status: 'active' | 'delisted';
   directory_opt_in: boolean;
   created_at: string;
   updated_at: string;

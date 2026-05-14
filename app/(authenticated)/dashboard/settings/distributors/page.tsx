@@ -12,10 +12,12 @@ export default function BrandDistributorsSettingsPage() {
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-4xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Distributors</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Distributors who list you</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Manage which distributors can see your sustainability data and exactly which fields are
-          shared. You can pause or disconnect any distributor at any time.
+          Every distributor that lists your brand on alka<strong>tera</strong>, in one place.
+          Block any distributor from seeing your verified sustainability data, customise sharing
+          field by field, or remove yourself from a portfolio entirely. Your data always stays in
+          the canonical brand directory.
         </p>
       </div>
       <DistributorListPanel />

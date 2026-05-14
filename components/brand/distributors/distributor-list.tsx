@@ -1,37 +1,58 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Building2, ShieldCheck, ShieldOff, Loader2, Check, X } from 'lucide-react';
+import {
+  Building2,
+  ShieldCheck,
+  ShieldOff,
+  Loader2,
+  SlidersHorizontal,
+  Trash2,
+  Undo2,
+  Package,
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { FieldSharingControls } from './field-sharing-controls';
+import type {
+  BrandDistributorListing,
+  SharingState,
+} from '@/app/api/brand/distributors/listings/route';
 
-interface LinkRow {
-  id: string;
-  distributor_org_id: string;
-  distributor_name: string;
-  brand_profile_id: string;
-  match_method: string;
-  match_confidence: number | null;
-  confirmed_by_brand: boolean;
-  confirmed_at: string | null;
-  sharing_active: boolean;
-  deactivated_at: string | null;
-  created_at: string;
-}
+const SHARING_BADGE: Record<SharingState, { label: string; className: string; icon: JSX.Element }> = {
+  shared: {
+    label: 'Sharing all data',
+    className: 'text-emerald-300 border-emerald-500/30',
+    icon: <ShieldCheck className="h-3 w-3 mr-1" />,
+  },
+  blocked: {
+    label: 'Blocked',
+    className: 'text-destructive border-destructive/30',
+    icon: <ShieldOff className="h-3 w-3 mr-1" />,
+  },
+  custom: {
+    label: 'Custom (per-field)',
+    className: 'text-amber-300 border-amber-500/30',
+    icon: <SlidersHorizontal className="h-3 w-3 mr-1" />,
+  },
+};
 
 /**
- * Brand-side panel: list every distributor that has linked to this
- * brand's alkatera org, with controls to confirm pending requests,
- * pause sharing per distributor, and disconnect entirely.
+ * Brand-side panel listing every distributor that lists this brand
+ * (Phase 5). Unlike the previous version which only showed
+ * confirmed-link distributors, this view is the canonical "who's
+ * looking at me" surface. Each row offers:
  *
- * The expandable per-distributor section drills into FieldSharingControls
- * for granular per-field privacy.
+ *   - a blanket "Block this distributor" toggle (writes
+ *     brand_sharing_preferences with block_all_fields=true)
+ *   - expandable per-field controls (reuse FieldSharingControls)
+ *   - "Remove from this portfolio" (sets listing_status='delisted'
+ *     for this distributor's listing only)
  */
 export function DistributorListPanel() {
   const [loading, setLoading] = useState(true);
-  const [links, setLinks] = useState<LinkRow[]>([]);
+  const [listings, setListings] = useState<BrandDistributorListing[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -39,13 +60,13 @@ export function DistributorListPanel() {
   async function load() {
     setLoading(true);
     try {
-      const res = await fetch('/api/brand/distributors');
+      const res = await fetch('/api/brand/distributors/listings');
       if (!res.ok) {
         setFeedback({ type: 'err', text: 'Could not load distributors.' });
         return;
       }
-      const body = (await res.json()) as { links: LinkRow[] };
-      setLinks(body.links ?? []);
+      const body = (await res.json()) as { listings: BrandDistributorListing[] };
+      setListings(body.listings ?? []);
     } finally {
       setLoading(false);
     }
@@ -55,39 +76,61 @@ export function DistributorListPanel() {
     load();
   }, []);
 
-  async function patch(id: string, payload: Record<string, unknown>) {
-    setBusy(id);
+  async function setVisibility(distributorOrgId: string, blocked: boolean) {
+    setBusy(distributorOrgId);
     setFeedback(null);
     try {
-      const res = await fetch(`/api/brand/distributors/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      const res = await fetch(
+        `/api/brand/distributors/listings/${distributorOrgId}/visibility`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ blocked }),
+        },
+      );
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         setFeedback({ type: 'err', text: `Save failed (${body.error ?? res.status}).` });
         return;
       }
       await load();
-      setFeedback({ type: 'ok', text: 'Saved.' });
+      setFeedback({
+        type: 'ok',
+        text: blocked ? 'Distributor blocked.' : 'Sharing restored.',
+      });
     } finally {
       setBusy(null);
     }
   }
 
-  async function disconnect(id: string) {
-    if (!confirm('Disconnect this distributor entirely? They will lose access to your data immediately.')) return;
-    setBusy(id);
+  async function setDelisted(distributorOrgId: string, delisted: boolean) {
+    if (delisted) {
+      const ok = confirm(
+        'Remove yourself from this distributor\'s portfolio? They will no longer see your brand in their default brand list. Your sustainability data stays in the directory.',
+      );
+      if (!ok) return;
+    }
+    setBusy(distributorOrgId);
     setFeedback(null);
     try {
-      const res = await fetch(`/api/brand/distributors/${id}`, { method: 'DELETE' });
+      const res = await fetch(
+        `/api/brand/distributors/listings/${distributorOrgId}/delist`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ delisted }),
+        },
+      );
       if (!res.ok) {
-        setFeedback({ type: 'err', text: 'Disconnect failed.' });
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setFeedback({ type: 'err', text: `Save failed (${body.error ?? res.status}).` });
         return;
       }
       await load();
-      setFeedback({ type: 'ok', text: 'Distributor disconnected.' });
+      setFeedback({
+        type: 'ok',
+        text: delisted ? 'Listing removed.' : 'Listing restored.',
+      });
     } finally {
       setBusy(null);
     }
@@ -117,109 +160,129 @@ export function DistributorListPanel() {
         </div>
       )}
 
-      {links.length === 0 ? (
+      {listings.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-sm text-muted-foreground">
-            No distributors are connected to your alkatera profile yet. If a distributor adds your
-            brand to their portfolio, they will appear here.
+            No distributors list your brand on alka<strong>tera</strong> yet. If a distributor adds
+            your brand to their portfolio, they will appear here.
           </CardContent>
         </Card>
       ) : (
-        links.map((link) => (
-          <Card key={link.id}>
-            <CardHeader className="flex flex-row items-start justify-between space-y-0">
-              <div>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Building2 className="h-4 w-4 text-teal-500" />
-                  {link.distributor_name}
-                </CardTitle>
-                <div className="text-xs text-muted-foreground mt-1">
-                  Connected {new Date(link.created_at).toLocaleDateString()} · {humanMethod(link.match_method)}
-                  {link.match_confidence != null &&
-                    ` · ${Math.round(link.match_confidence * 100)}% confidence`}
+        listings.map((listing) => {
+          const isDelisted = listing.listing_status === 'delisted';
+          const badge = SHARING_BADGE[listing.sharing_state];
+          const isBlocked = listing.sharing_state === 'blocked';
+          return (
+            <Card
+              key={listing.distributor_org_id}
+              className={isDelisted ? 'opacity-60' : ''}
+            >
+              <CardHeader className="flex flex-row items-start justify-between space-y-0">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Building2 className="h-4 w-4 text-teal-500" />
+                    {listing.distributor_name}
+                  </CardTitle>
+                  <div className="text-xs text-muted-foreground mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                    <span>Listed {new Date(listing.listing_created_at).toLocaleDateString()}</span>
+                    <span>·</span>
+                    <span className="inline-flex items-center gap-1">
+                      <Package className="h-3 w-3" />
+                      {listing.sku_count} SKU{listing.sku_count === 1 ? '' : 's'}
+                    </span>
+                    {listing.link?.confirmed_by_brand && (
+                      <>
+                        <span>·</span>
+                        <span className="text-emerald-300/80">Connected via alka<strong>tera</strong></span>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {!link.confirmed_by_brand ? (
-                  <Badge variant="outline" className="text-xs text-amber-300 border-amber-500/30">
-                    Awaiting your confirmation
-                  </Badge>
-                ) : link.sharing_active ? (
-                  <Badge variant="outline" className="text-xs text-emerald-300 border-emerald-500/30">
-                    <ShieldCheck className="h-3 w-3 mr-1" /> Sharing active
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="text-xs text-muted-foreground border-muted">
-                    <ShieldOff className="h-3 w-3 mr-1" /> Paused
-                  </Badge>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex flex-wrap items-center gap-2">
-                {!link.confirmed_by_brand && (
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  {isDelisted ? (
+                    <Badge variant="outline" className="text-xs text-muted-foreground border-muted">
+                      Removed from portfolio
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className={`text-xs ${badge.className}`}>
+                      {badge.icon}
+                      {badge.label}
+                    </Badge>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  {!isDelisted && (
+                    <>
+                      <Button
+                        size="sm"
+                        variant={isBlocked ? 'default' : 'outline'}
+                        disabled={busy === listing.distributor_org_id}
+                        onClick={() =>
+                          setVisibility(listing.distributor_org_id, !isBlocked)
+                        }
+                        className={
+                          isBlocked
+                            ? 'bg-teal-500 hover:bg-teal-400 text-black'
+                            : ''
+                        }
+                      >
+                        {isBlocked ? 'Unblock sharing' : 'Block this distributor'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          setExpanded((cur) =>
+                            cur === listing.distributor_org_id
+                              ? null
+                              : listing.distributor_org_id,
+                          )
+                        }
+                      >
+                        {expanded === listing.distributor_org_id
+                          ? 'Hide field controls'
+                          : 'Field-level controls'}
+                      </Button>
+                    </>
+                  )}
                   <Button
                     size="sm"
-                    disabled={busy === link.id}
-                    onClick={() => patch(link.id, { confirmed: true })}
-                    className="bg-teal-500 hover:bg-teal-400 text-black"
+                    variant="ghost"
+                    disabled={busy === listing.distributor_org_id}
+                    onClick={() => setDelisted(listing.distributor_org_id, !isDelisted)}
+                    className={
+                      isDelisted
+                        ? 'text-muted-foreground hover:text-foreground'
+                        : 'text-muted-foreground hover:text-destructive'
+                    }
                   >
-                    <Check className="h-3.5 w-3.5 mr-1.5" /> Confirm connection
+                    {isDelisted ? (
+                      <>
+                        <Undo2 className="h-3.5 w-3.5 mr-1.5" /> Undo removal
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Remove from this portfolio
+                      </>
+                    )}
                   </Button>
-                )}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={busy === link.id || !link.confirmed_by_brand}
-                  onClick={() => patch(link.id, { sharing_active: !link.sharing_active })}
-                >
-                  {link.sharing_active ? 'Pause sharing' : 'Resume sharing'}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={busy === link.id}
-                  onClick={() => disconnect(link.id)}
-                  className="text-muted-foreground hover:text-destructive"
-                >
-                  <X className="h-3.5 w-3.5 mr-1.5" /> Disconnect
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setExpanded((cur) => (cur === link.id ? null : link.id))}
-                >
-                  {expanded === link.id ? 'Hide field controls' : 'Field-level controls'}
-                </Button>
-              </div>
-
-              {expanded === link.id && (
-                <div className="pt-3 border-t border-border">
-                  <FieldSharingControls
-                    distributorOrgId={link.distributor_org_id}
-                    distributorName={link.distributor_name}
-                  />
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        ))
+
+                {expanded === listing.distributor_org_id && !isDelisted && (
+                  <div className="pt-3 border-t border-border">
+                    <FieldSharingControls
+                      distributorOrgId={listing.distributor_org_id}
+                      distributorName={listing.distributor_name}
+                    />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })
       )}
     </div>
   );
-}
-
-function humanMethod(method: string): string {
-  switch (method) {
-    case 'auto_name':
-      return 'matched by name';
-    case 'auto_domain':
-      return 'matched by domain';
-    case 'auto_fuzzy':
-      return 'fuzzy match';
-    case 'manual':
-      return 'added manually';
-    default:
-      return method;
-  }
 }

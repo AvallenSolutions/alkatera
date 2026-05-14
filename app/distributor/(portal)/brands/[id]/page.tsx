@@ -54,7 +54,7 @@ export default async function BrandOverviewPage({ params }: PageProps) {
       'outreach_email, outreach_sent_at, outreach_last_reminder_at, outreach_reminder_count, ' +
       'upload_token, upload_token_expires_at, ' +
       'first_submission_at, last_submission_at, ' +
-      'directory_opt_in, created_at, updated_at',
+      'listing_status, directory_opt_in, created_at, updated_at',
     )
     .eq('id', params.id)
     .eq('distributor_org_id', member.distributor_org_id)
@@ -127,6 +127,18 @@ export default async function BrandOverviewPage({ params }: PageProps) {
 
   return (
     <div className="space-y-6">
+      {brand.listing_status === 'delisted' && (
+        <div className="rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent px-4 py-3 text-sm flex items-center gap-3">
+          <div className="rounded-md bg-amber-500/15 border border-amber-400/30 p-1.5">
+            <AlertTriangle className="h-4 w-4 text-amber-300" />
+          </div>
+          <span className="text-muted-foreground">
+            <span className="font-semibold text-foreground">{brand.name}</span> asked to be removed
+            from your portfolio. Their sustainability data is still on file in the directory but
+            this brand is hidden from your default brand list.
+          </span>
+        </div>
+      )}
       {unresolvedConflicts != null && unresolvedConflicts > 0 && (
         <Link
           href={`/distributor/brands/${brand.id}/data`}

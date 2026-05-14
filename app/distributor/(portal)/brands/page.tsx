@@ -25,6 +25,10 @@ export default async function DistributorBrandsPage() {
   // Phase 4: explicit column list (was '*'). The legacy score-mirror
   // columns were dropped from brand_profiles; canonical scores are
   // hydrated separately from brand_directory below.
+  // Phase 5: filter out brands the brand-owner has removed from this
+  // distributor's portfolio (listing_status='delisted'). The brand
+  // data still lives in the canonical directory and serves every
+  // other distributor that lists them.
   let brandsQuery = supabase
     .from('brand_profiles')
     .select(
@@ -33,9 +37,10 @@ export default async function DistributorBrandsPage() {
       'outreach_email, outreach_sent_at, outreach_last_reminder_at, outreach_reminder_count, ' +
       'upload_token, upload_token_expires_at, ' +
       'first_submission_at, last_submission_at, ' +
-      'directory_opt_in, created_at, updated_at',
+      'listing_status, directory_opt_in, created_at, updated_at',
     )
     .eq('distributor_org_id', member.distributor_org_id)
+    .eq('listing_status', 'active')
     .order('name', { ascending: true });
 
   if (member.role === 'viewer') {

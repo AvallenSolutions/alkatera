@@ -105,7 +105,15 @@ export default async function BrandUploadPage({ params }: PageProps) {
             </span>
             <span className="text-muted-foreground">
               Your verified data is shared with the {details.listing_count} distributors that list
-              your products. Verify once and the answers reach every distributor automatically.
+              your products. Verify once and the answers reach every distributor automatically. You
+              control who sees what — manage sharing per distributor at your{' '}
+              <a
+                href="/dashboard/settings/distributors"
+                className="text-sky-300 hover:text-sky-200 underline underline-offset-2"
+              >
+                alka<strong>tera</strong> sharing settings
+              </a>
+              .
             </span>
           </section>
         )}
