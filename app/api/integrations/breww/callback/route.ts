@@ -23,8 +23,15 @@ export const dynamic = 'force-dynamic'
 
 const SETTINGS_PATH = '/settings?tab=integrations'
 
-function settingsRedirect(request: NextRequest, params: Record<string, string>): NextResponse {
-  const url = new URL(SETTINGS_PATH, request.url)
+/**
+ * Redirect back to wherever the connect call was kicked off from. The Breww
+ * /connect route stores an optional `returnTo` in the encrypted state cookie;
+ * onboarding sets `/dashboard` so the user lands back in the wizard rather
+ * than on the settings page. Falls back to settings for the historical path.
+ */
+function landingRedirect(request: NextRequest, returnTo: string | undefined, params: Record<string, string>): NextResponse {
+  const target = returnTo || SETTINGS_PATH
+  const url = new URL(target, request.url)
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
   const res = NextResponse.redirect(url)
   res.cookies.delete(BREWW_OAUTH_COOKIE)
@@ -36,26 +43,29 @@ export async function GET(request: NextRequest) {
   const state = request.nextUrl.searchParams.get('state')
   const errParam = request.nextUrl.searchParams.get('error')
 
+  // Pre-stash errors: no returnTo available, default to settings.
   if (errParam) {
-    return settingsRedirect(request, { error: 'breww_denied', detail: errParam })
+    return landingRedirect(request, undefined, { error: 'breww_denied', detail: errParam })
   }
   if (!code || !state) {
-    return settingsRedirect(request, { error: 'breww_invalid_callback' })
+    return landingRedirect(request, undefined, { error: 'breww_invalid_callback' })
   }
 
   const cookie = request.cookies.get(BREWW_OAUTH_COOKIE)?.value
   const stash = cookie ? decodeOAuthCookie(cookie) : null
   if (!stash) {
-    return settingsRedirect(request, { error: 'breww_oauth_state' })
+    return landingRedirect(request, undefined, { error: 'breww_oauth_state' })
   }
+  // State mismatch may indicate CSRF; don't honour an attacker-controlled
+  // returnTo. Land on settings with the error.
   if (stash.state !== state) {
-    return settingsRedirect(request, { error: 'breww_state_mismatch' })
+    return landingRedirect(request, undefined, { error: 'breww_state_mismatch' })
   }
 
   const { user, error: authError } = await getSupabaseAPIClient()
   if (authError || !user) {
     const url = new URL('/auth/login', request.url)
-    url.searchParams.set('next', SETTINGS_PATH)
+    url.searchParams.set('next', stash.returnTo || SETTINGS_PATH)
     return NextResponse.redirect(url)
   }
 
@@ -70,7 +80,7 @@ export async function GET(request: NextRequest) {
     .eq('user_id', user.id)
     .maybeSingle()
   if (!membership) {
-    return settingsRedirect(request, { error: 'breww_access_denied' })
+    return landingRedirect(request, stash.returnTo, { error: 'breww_access_denied' })
   }
 
   let tokens
@@ -78,7 +88,7 @@ export async function GET(request: NextRequest) {
     tokens = await exchangeCode({ code, codeVerifier: stash.codeVerifier })
   } catch (err) {
     console.error('[breww/callback] token exchange failed:', err)
-    return settingsRedirect(request, {
+    return landingRedirect(request, stash.returnTo, {
       error: 'breww_token_exchange_failed',
       detail: (err as Error).message.slice(0, 200),
     })
@@ -114,17 +124,17 @@ export async function GET(request: NextRequest) {
       )
     if (upsertErr) {
       console.error('[breww/callback] upsert error:', upsertErr)
-      return settingsRedirect(request, { error: 'breww_save_failed' })
+      return landingRedirect(request, stash.returnTo, { error: 'breww_save_failed' })
     }
   } catch (err) {
     const detail =
       err instanceof BrewwError ? err.message : (err as Error)?.message || 'unknown'
     console.error('[breww/callback] smoke-test failed:', detail)
-    return settingsRedirect(request, {
+    return landingRedirect(request, stash.returnTo, {
       error: 'breww_token_unusable',
       detail: detail.slice(0, 200),
     })
   }
 
-  return settingsRedirect(request, { connected: 'breww' })
+  return landingRedirect(request, stash.returnTo, { connected: 'breww' })
 }

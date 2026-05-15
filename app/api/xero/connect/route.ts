@@ -18,6 +18,19 @@ export const dynamic = 'force-dynamic'
  */
 export async function POST(request: NextRequest) {
   try {
+    // Fail fast with a friendly message if the Xero developer-app credentials
+    // are missing — common in local dev where the team member hasn't been
+    // given the test-mode keys yet.
+    if (!process.env.XERO_CLIENT_ID || !process.env.XERO_CLIENT_SECRET || !process.env.XERO_REDIRECT_URI) {
+      return NextResponse.json(
+        {
+          error:
+            'Xero is not configured for this environment. Add XERO_CLIENT_ID, XERO_CLIENT_SECRET and XERO_REDIRECT_URI to .env.local to enable the connect flow.',
+        },
+        { status: 503 },
+      )
+    }
+
     const supabase = getSupabaseServerClient()
 
     // 1. Authenticate
@@ -27,10 +40,15 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Parse body
-    const { organizationId } = await request.json()
+    const { organizationId, returnTo: returnToRaw } = await request.json()
     if (!organizationId) {
       return NextResponse.json({ error: 'organizationId is required' }, { status: 400 })
     }
+    // Optional: where to land the user after the callback. Restricted to
+    // relative paths to prevent open-redirects. Falls back to /settings.
+    const returnTo = typeof returnToRaw === 'string' && returnToRaw.startsWith('/') && !returnToRaw.startsWith('//')
+      ? returnToRaw
+      : undefined
 
     // 3. Check admin role
     const role = await getMemberRole(supabase, organizationId, user.id)
@@ -41,9 +59,10 @@ export async function POST(request: NextRequest) {
     // 4. Generate state for CSRF protection
     const state = randomBytes(32).toString('hex')
 
-    // Store state + orgId in a secure cookie so we can validate on callback
+    // Store state + orgId + optional returnTo in a secure cookie so we can
+    // validate on callback and land the user back where they kicked it off.
     const cookieStore = cookies()
-    cookieStore.set('xero_oauth_state', JSON.stringify({ state, organizationId, userId: user.id }), {
+    cookieStore.set('xero_oauth_state', JSON.stringify({ state, organizationId, userId: user.id, returnTo }), {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',

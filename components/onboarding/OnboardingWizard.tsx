@@ -1,11 +1,14 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import Image from 'next/image'
 import { useOnboarding, ONBOARDING_STEPS, MEMBER_ONBOARDING_STEPS, FAST_TRACK_STEPS, FAST_TRACK_PHASES, PHASE_CONFIG, MEMBER_PHASES, getStepConfig } from '@/lib/onboarding'
+import { trackOnboarding } from '@/lib/onboarding/telemetry'
 import type { OnboardingPhase } from '@/lib/onboarding'
+import { useOrganization } from '@/lib/organizationContext'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
-import { X } from 'lucide-react'
+import { X, ChevronLeft, Check, Loader2, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // Step components — owner flow
@@ -73,7 +76,43 @@ const STEP_COMPONENTS: Record<string, React.ComponentType> = {
 const OWNER_PHASES: OnboardingPhase[] = ['welcome', 'quick-wins', 'core-setup', 'first-insights', 'power-features']
 
 export function OnboardingWizard() {
-  const { state, shouldShowOnboarding, isLoading, progress, dismissOnboarding, onboardingFlow } = useOnboarding()
+  const {
+    state, shouldShowOnboarding, isLoading, progress, dismissOnboarding, onboardingFlow,
+    saveStatus, canGoBack, previousStep,
+  } = useOnboarding()
+  const { currentOrganization } = useOrganization()
+
+  // Fire a 'view' telemetry event whenever the visible step changes. Tracked
+  // via ref so we don't double-fire on the cosmetic re-renders that the
+  // wizard does for things like progress updates.
+  const lastViewedStepRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!shouldShowOnboarding || isLoading || !currentOrganization?.id) return
+    if (lastViewedStepRef.current === state.currentStep) return
+    lastViewedStepRef.current = state.currentStep
+    trackOnboarding({
+      organizationId: currentOrganization.id,
+      flow: onboardingFlow,
+      step: state.currentStep,
+      event: 'view',
+    })
+  }, [shouldShowOnboarding, isLoading, currentOrganization?.id, state.currentStep, onboardingFlow])
+
+  // a11y: keyboard dismiss via Escape. Matches what users expect from any
+  // full-screen modal; previously they had to find the X button.
+  useEffect(() => {
+    if (!shouldShowOnboarding) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      // Don't dismiss if an inner dialog (Radix Dialog) is open — its own
+      // Escape handler should win. Detect by checking for an open dialog
+      // anywhere in the DOM.
+      if (document.querySelector('[role="dialog"][data-state="open"]')) return
+      dismissOnboarding()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [shouldShowOnboarding, dismissOnboarding])
 
   if (isLoading || !shouldShowOnboarding) {
     return null
@@ -146,17 +185,48 @@ export function OnboardingWizard() {
                 })}
               </div>
 
-              {!isCompletion && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={dismissOnboarding}
-                  className="text-white/40 hover:text-white hover:bg-white/10 -mr-2"
-                  aria-label="Skip onboarding"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              )}
+              <div className="flex items-center gap-1">
+                {/* Saved indicator — surfaces the debounced persistence so
+                    users know their progress is durable. Hidden on the
+                    completion step where it'd be noise. */}
+                {!isCompletion && (
+                  <span
+                    className={cn(
+                      'hidden sm:inline-flex items-center gap-1 text-[11px] mr-1 transition-opacity',
+                      saveStatus === 'idle' && 'opacity-0',
+                      saveStatus !== 'idle' && 'opacity-100',
+                      saveStatus === 'error' ? 'text-red-300' : 'text-white/40',
+                    )}
+                    aria-live="polite"
+                  >
+                    {saveStatus === 'saving' && (<><Loader2 className="w-3 h-3 animate-spin" />Saving…</>)}
+                    {saveStatus === 'saved' && (<><Check className="w-3 h-3" />Saved</>)}
+                    {saveStatus === 'error' && (<><AlertCircle className="w-3 h-3" />Couldn't save</>)}
+                  </span>
+                )}
+                {!isCompletion && canGoBack && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={previousStep}
+                    className="text-white/40 hover:text-white hover:bg-white/10"
+                    aria-label="Go back to previous step"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                )}
+                {!isCompletion && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={dismissOnboarding}
+                    className="text-white/40 hover:text-white hover:bg-white/10 -mr-2"
+                    aria-label="Skip onboarding"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
             </div>
 
             {/* Progress bar */}

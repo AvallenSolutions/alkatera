@@ -17,8 +17,16 @@ export type OnboardingHandlerAction =
   | { kind: 'oauth_redirect'; href: string }
   | { kind: 'modal'; modalKey: OnboardingModalKey }
   | { kind: 'external_link'; href: string }
+  /**
+   * Opens the URL in a popup window. Used for OAuth flows so the wizard
+   * stays mounted in the parent tab. The popup must end on
+   * /onboarding/oauth-complete which postMessages the parent and closes
+   * itself. The `provider` is matched in the parent's message handler so
+   * we can mark the right tile as completed.
+   */
+  | { kind: 'popup'; href: string; provider: string }
 
-export type OnboardingModalKey = 'url_import'
+export type OnboardingModalKey = 'url_import' | 'csv_upload' | 'utility_bill_upload'
 
 export type OnboardingHandlerIcon =
   | 'globe'
@@ -47,35 +55,43 @@ export interface OnboardingHandler {
   onStart: (ctx: { orgId: string; userId: string }) => Promise<OnboardingHandlerAction>
 }
 
-/**
- * Build the OAuth redirect for an integration. We let the existing /connect
- * route handle CSRF state, scopes, and return URL. After install completes,
- * the user lands back at /settings/integrations?connected={slug}; we'll add
- * a hook so they're returned to onboarding mid-flow if that's where they
- * started.
- */
-function buildOAuthRedirect(slug: string): string {
-  return `/api/integrations/${slug}/connect?return=/onboarding`
-}
-
 const HANDLER_BY_INTEGRATION_SLUG: Record<string, Omit<OnboardingHandler, 'slug' | 'label' | 'description'>> = {
   breww: {
     icon: 'beer',
     kind: 'connect',
     visibleFor: ({ beverageTypes }) =>
       !beverageTypes?.length || beverageTypes.includes('beer') || beverageTypes.includes('cider'),
-    onStart: async () => ({
-      kind: 'oauth_redirect',
-      href: '/api/integrations/breww/connect?return=/onboarding',
+    // Breww's /connect route is a GET that requires `organizationId` in the
+    // querystring before issuing the OAuth redirect.
+    onStart: async ({ orgId }) => ({
+      kind: 'popup',
+      provider: 'breww',
+      // returnTo=/onboarding/oauth-complete?provider=breww — the bridge page
+      // postMessages the parent wizard and closes the popup. The parent
+      // never navigates away, so the wizard remounts nothing.
+      href: `/api/integrations/breww/connect?organizationId=${encodeURIComponent(orgId)}&returnTo=${encodeURIComponent('/onboarding/oauth-complete?provider=breww')}`,
     }),
   },
   xero: {
     icon: 'banknote',
     kind: 'connect',
-    onStart: async () => ({
-      kind: 'oauth_redirect',
-      href: '/api/xero/connect?return=/onboarding',
-    }),
+    // Xero's /connect route is a POST that returns the consent URL in the
+    // response body. We POST first, then open the consent URL in a popup.
+    onStart: async ({ orgId }) => {
+      const res = await fetch('/api/xero/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organizationId: orgId,
+          returnTo: '/onboarding/oauth-complete?provider=xero',
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data?.url) {
+        throw new Error(data?.error || 'Failed to start Xero connection')
+      }
+      return { kind: 'popup', provider: 'xero', href: data.url as string }
+    },
   },
 }
 
@@ -94,19 +110,19 @@ const NON_INTEGRATION_HANDLERS: OnboardingHandler[] = [
     slug: 'csv-upload',
     label: 'Upload a spreadsheet',
     description:
-      'Bring an Excel of your products, ingredients or packaging. Opens our bulk import in a new tab.',
+      "Bring an Excel of your products. We parse it on the spot and add them as drafts you can refine later.",
     icon: 'file-spreadsheet',
     kind: 'upload',
-    onStart: async () => ({ kind: 'external_link', href: '/products/import' }),
+    onStart: async () => ({ kind: 'modal', modalKey: 'csv_upload' }),
   },
   {
     slug: 'utility-bill',
     label: 'Upload a utility bill',
     description:
-      'Drop an energy, gas or water bill into the data hub. Rosa reads it and logs the usage.',
+      "Drop an energy, gas or water bill (PDF or image). Rosa reads it in the background while you keep going.",
     icon: 'receipt',
     kind: 'upload',
-    onStart: async () => ({ kind: 'external_link', href: '/utilities' }),
+    onStart: async () => ({ kind: 'modal', modalKey: 'utility_bill_upload' }),
   },
 ]
 

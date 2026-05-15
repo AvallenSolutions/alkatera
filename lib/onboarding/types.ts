@@ -184,6 +184,12 @@ export interface PersonalizationData {
   targetReductionPct?: number
   /** First sustainability target: target year (e.g. 2030). */
   targetYear?: number
+  /**
+   * Slugs of import-step tiles the user has already completed. Persisted so
+   * an OAuth round-trip (Breww, Xero) doesn't lose the green-tick UI state
+   * when the component remounts.
+   */
+  importedSources?: string[]
 }
 
 export interface OnboardingState {

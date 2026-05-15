@@ -80,22 +80,41 @@ export async function POST(request: NextRequest) {
     const payload = JSON.stringify({ jobId: job.id, url: normalizedUrl });
     const signature = createHmac('sha256', hmacSecret).update(payload).digest('hex');
 
-    // Fire-and-forget: kick off the Netlify background function. The -background
-    // suffix gives it 15 min of runtime, so the slow Claude call no longer
-    // threatens the 26s synchronous cap that produces 504s.
-    const baseUrl = process.env.URL || process.env.DEPLOY_URL || `${parsedUrl.protocol}//${request.headers.get('host')}`;
-    const target = `${baseUrl}/.netlify/functions/import-from-url-background`;
-
-    void fetch(target, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-internal-hmac': signature,
-      },
-      body: payload,
-    }).catch((err) => {
-      console.error('[import-from-url] Failed to trigger background function:', err);
-    });
+    // Local dev (`pnpm dev`) doesn't run Netlify functions, so firing at
+    // `/.netlify/functions/...` would 404 and the job would sit at 'pending'
+    // forever. Invoke the runner directly in-process instead — Next.js dev
+    // doesn't impose the 26s synchronous cap that drove the original
+    // background-function split, so a long-running scrape is fine.
+    const isDev = process.env.NODE_ENV !== 'production' && !process.env.NETLIFY;
+    if (isDev) {
+      // Fire-and-forget: don't await, the client polls for completion.
+      void (async () => {
+        try {
+          const { handler } = await import('@/netlify/functions/import-from-url-background');
+          await handler({
+            body: payload,
+            headers: { 'x-internal-hmac': signature },
+          });
+        } catch (err) {
+          console.error('[import-from-url] Inline runner failed:', err);
+        }
+      })();
+    } else {
+      // Production: kick off the Netlify background function. The -background
+      // suffix gives it 15 min of runtime, dodging the 26s sync cap.
+      const baseUrl = process.env.URL || process.env.DEPLOY_URL || `${parsedUrl.protocol}//${request.headers.get('host')}`;
+      const target = `${baseUrl}/.netlify/functions/import-from-url-background`;
+      void fetch(target, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-hmac': signature,
+        },
+        body: payload,
+      }).catch((err) => {
+        console.error('[import-from-url] Failed to trigger background function:', err);
+      });
+    }
 
     return NextResponse.json({ jobId: job.id }, { status: 202 });
   } catch (error: any) {

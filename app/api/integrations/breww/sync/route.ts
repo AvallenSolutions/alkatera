@@ -31,10 +31,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { organizationId } = await request.json().catch(() => ({}))
+    const body = await request.json().catch(() => ({})) as {
+      organizationId?: string
+      kinds?: string[]
+    }
+    const { organizationId, kinds } = body
     if (!organizationId) {
       return NextResponse.json({ error: 'organizationId required' }, { status: 400 })
     }
+    // Drop unknown kinds silently so a client typo doesn't 400 the sync.
+    const VALID_KINDS = new Set(['sites', 'products', 'recipes', 'production', 'packaging'])
+    const safeKinds = Array.isArray(kinds)
+      ? (kinds.filter((k): k is string => typeof k === 'string' && VALID_KINDS.has(k)) as Array<'sites' | 'products' | 'recipes' | 'production' | 'packaging'>)
+      : undefined
 
     const serviceClient = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -86,7 +95,9 @@ export async function POST(request: NextRequest) {
       .eq('provider_slug', 'breww')
 
     try {
-      const result = await syncBreww(serviceClient, organizationId, accessToken)
+      const result = await syncBreww(serviceClient, organizationId, accessToken, {
+        kinds: safeKinds,
+      })
       await serviceClient
         .from('integration_connections')
         .update({

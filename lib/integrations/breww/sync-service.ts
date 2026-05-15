@@ -75,8 +75,19 @@ export type SyncPhase =
   | 'packaging'
   | 'done'
 
+/** Tile slugs the onboarding UI uses to scope the sync. */
+export type SyncKind = 'sites' | 'products' | 'recipes' | 'production' | 'packaging'
+const ALL_KINDS: SyncKind[] = ['sites', 'products', 'recipes', 'production', 'packaging']
+
 export interface SyncOptions {
   onPhase?: (phase: SyncPhase, detail?: string) => void
+  /**
+   * Which categories of data to sync. Defaults to all five. Skipping a kind
+   * skips its corresponding upsert phases (fetches still run — they're
+   * already parallelised and we can't reliably skip a single Promise.all
+   * leg without restructuring).
+   */
+  kinds?: SyncKind[]
 }
 
 export async function syncBreww(
@@ -85,6 +96,8 @@ export async function syncBreww(
   accessToken: string,
   options: SyncOptions = {},
 ): Promise<SyncResult> {
+  const kinds = new Set<SyncKind>(options.kinds && options.kinds.length > 0 ? options.kinds : ALL_KINDS)
+  const want = (k: SyncKind) => kinds.has(k)
   const phase = (p: SyncPhase, detail?: string) => {
     try { options.onPhase?.(p, detail) } catch { /* swallow */ }
   }
@@ -141,47 +154,67 @@ export async function syncBreww(
   const stockItemById = new Map<string, BrewwStockItem>()
   for (const s of stockItemsMaster) stockItemById.set(String(s.id), s)
 
-  phase('sites', `${sites.length} sites`)
-  const sitesUpserted = await syncSites(serviceClient, organizationId, sites)
+  // Always build the lookup maps even if we're skipping a kind — downstream
+  // phases reference them (e.g. packaging runs reference sites).
   const siteById = new Map<string, BrewwSite>()
   for (const s of sites) siteById.set(String(s.id), s)
-
-  phase('production', `${batches.length} batches`)
-  const [runsUpserted, totalHl] = await syncProductionRuns(
-    serviceClient, organizationId, batches, drinkById, siteById,
-  )
-
-  phase('ingredients', `${stockItemsUsed.length + ingredientBatchStockItems.length} usage records`)
-  const ingredientsUpserted = await syncIngredientUsage(
-    serviceClient, organizationId, batches, drinkById,
-    stockItemsUsed, ingredientBatchStockItems, stockItemById,
-  )
-
-  phase('stock_items', `${stockItemsMaster.length} stock items`)
-  const stockItemsUpserted = await syncStockItemsMaster(
-    serviceClient, organizationId, stockItemsMaster,
-  )
-
-  phase('containers', `${containerTypes.length} container types`)
-  const containerTypesUpserted = await syncContainerTypes(
-    serviceClient, organizationId, containerTypes,
-  )
-
   const containerById = new Map<string, BrewwContainerType>()
   for (const c of containerTypes) containerById.set(String(c.id), c)
 
-  phase('skus', `${products.length} products`)
-  const skusUpserted = await syncProductSkus(
-    serviceClient, organizationId, products, drinkById, containerById,
-  )
+  let sitesUpserted = 0
+  if (want('sites')) {
+    phase('sites', `${sites.length} sites`)
+    sitesUpserted = await syncSites(serviceClient, organizationId, sites)
+  }
 
-  phase('sku_components', 'packaging components')
-  await syncSkuComponents(serviceClient, organizationId, products, stockItemById)
+  let runsUpserted = 0
+  let totalHl = 0
+  if (want('production')) {
+    phase('production', `${batches.length} batches`)
+    ;[runsUpserted, totalHl] = await syncProductionRuns(
+      serviceClient, organizationId, batches, drinkById, siteById,
+    )
+  }
 
-  phase('packaging', `${plannedPackagings.length} packaging runs`)
-  const packagingRunsUpserted = await syncPackagingRuns(
-    serviceClient, organizationId, plannedPackagings, siteById,
-  )
+  let ingredientsUpserted = 0
+  let stockItemsUpserted = 0
+  if (want('recipes')) {
+    phase('ingredients', `${stockItemsUsed.length + ingredientBatchStockItems.length} usage records`)
+    ingredientsUpserted = await syncIngredientUsage(
+      serviceClient, organizationId, batches, drinkById,
+      stockItemsUsed, ingredientBatchStockItems, stockItemById,
+    )
+
+    phase('stock_items', `${stockItemsMaster.length} stock items`)
+    stockItemsUpserted = await syncStockItemsMaster(
+      serviceClient, organizationId, stockItemsMaster,
+    )
+  }
+
+  let containerTypesUpserted = 0
+  let packagingRunsUpserted = 0
+  if (want('packaging')) {
+    phase('containers', `${containerTypes.length} container types`)
+    containerTypesUpserted = await syncContainerTypes(
+      serviceClient, organizationId, containerTypes,
+    )
+
+    phase('packaging', `${plannedPackagings.length} packaging runs`)
+    packagingRunsUpserted = await syncPackagingRuns(
+      serviceClient, organizationId, plannedPackagings, siteById,
+    )
+  }
+
+  let skusUpserted = 0
+  if (want('products')) {
+    phase('skus', `${products.length} products`)
+    skusUpserted = await syncProductSkus(
+      serviceClient, organizationId, products, drinkById, containerById,
+    )
+
+    phase('sku_components', 'packaging components')
+    await syncSkuComponents(serviceClient, organizationId, products, stockItemById)
+  }
   phase('done')
 
   return {

@@ -8,7 +8,8 @@ import { supabase } from '@/lib/supabaseClient'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ArrowRight, TrendingDown, Loader2 } from 'lucide-react'
+import { ArrowRight, TrendingDown, Loader2, Sparkles } from 'lucide-react'
+import { RosaIntro } from './RosaIntro'
 import { getBenchmarkForCategory } from '@/lib/industry-benchmarks'
 import { cn } from '@/lib/utils'
 
@@ -110,6 +111,11 @@ export function FastTrackEstimateStep() {
     state.personalization?.annualProductionBucket ?? '<10k'
   )
 
+  // Track which products got their volume auto-filled from Breww so we can
+  // show a small "from Breww" caption in the UI rather than the field
+  // appearing magically.
+  const [autofilledFromBreww, setAutofilledFromBreww] = useState<Set<string>>(new Set())
+
   useEffect(() => {
     if (!currentOrganization) return
     ;(async () => {
@@ -125,12 +131,83 @@ export function FastTrackEstimateStep() {
       const fetched = data ?? []
       setProducts(fetched)
 
-      // Initialise volume state — default to 'Units' if product has a unit size, else 'Litres'
+      // ── Breww autofill ────────────────────────────────────────────────────
+      // If any of these products is linked to a Breww SKU, sum the last 12
+      // months of production from `brewery_production_runs` for the matching
+      // drink and pre-fill the volume. Saves the user a tedious copy-paste.
+      const productIds = fetched.map(p => p.id)
+      let brewwFill: Record<string, { volume: number; unit: ProductionUnit }> = {}
+      const brewwAutofilled = new Set<string>()
+      if (productIds.length > 0) {
+        try {
+          // 1. Find Breww links for these products.
+          const { data: links } = await supabase
+            .from('breww_product_links')
+            .select('breww_sku_external_id, alkatera_product_id')
+            .eq('organization_id', currentOrganization.id)
+            .in('alkatera_product_id', productIds)
+          const linkArr = (links ?? []) as Array<{ breww_sku_external_id: string; alkatera_product_id: string }>
+
+          if (linkArr.length > 0) {
+            // 2. Resolve SKU → primary drink external id.
+            const { data: skus } = await supabase
+              .from('breww_products_skus')
+              .select('external_id, primary_drink_external_id')
+              .eq('organization_id', currentOrganization.id)
+              .in('external_id', linkArr.map(l => l.breww_sku_external_id))
+            const drinkBySku = new Map<string, string | null>(
+              (skus ?? []).map((s: any) => [String(s.external_id), s.primary_drink_external_id ? String(s.primary_drink_external_id) : null]),
+            )
+
+            // 3. Last 12 months of production aggregated by drink.
+            const since = new Date()
+            since.setUTCMonth(since.getUTCMonth() - 12)
+            const sinceDate = since.toISOString().slice(0, 10)
+            const { data: runs } = await supabase
+              .from('brewery_production_runs')
+              .select('product_external_id, volume_hl, period_start')
+              .eq('organization_id', currentOrganization.id)
+              .eq('provider_slug', 'breww')
+              .gte('period_start', sinceDate)
+            const hlByDrink = new Map<string, number>()
+            for (const r of (runs ?? []) as Array<{ product_external_id: string; volume_hl: number }>) {
+              const cur = hlByDrink.get(String(r.product_external_id)) ?? 0
+              hlByDrink.set(String(r.product_external_id), cur + (Number(r.volume_hl) || 0))
+            }
+
+            // 4. Resolve back per product. If multiple SKUs share a drink,
+            //    they each receive the full drink volume — that's wrong, but
+            //    the field is editable and the most common case is 1:1.
+            for (const link of linkArr) {
+              const drinkId = drinkBySku.get(String(link.breww_sku_external_id))
+              if (!drinkId) continue
+              const hl = hlByDrink.get(drinkId)
+              if (!hl || hl <= 0) continue
+              // Default unit = Hectolitres — that's how Breww measures and
+              // it makes the autofilled value cleanest.
+              brewwFill[link.alkatera_product_id] = { volume: hl, unit: 'Hectolitres' }
+              brewwAutofilled.add(link.alkatera_product_id)
+            }
+          }
+        } catch (err) {
+          console.warn('[fast-track-estimate] Breww autofill failed:', err)
+        }
+      }
+      setAutofilledFromBreww(brewwAutofilled)
+
+      // Initialise volume state — default to 'Units' if product has a unit
+      // size, else 'Litres'. Breww-linked products use the auto-filled value
+      // in Hectolitres (the unit Breww reports in).
       const initial: Record<string, ProductVolume> = {}
       for (const p of fetched) {
-        initial[p.id] = {
-          volume: '',
-          unit: p.unit_size_value ? 'Units' : 'Litres',
+        const breww = brewwFill[p.id]
+        if (breww) {
+          initial[p.id] = { volume: String(Math.round(breww.volume)), unit: breww.unit }
+        } else {
+          initial[p.id] = {
+            volume: '',
+            unit: p.unit_size_value ? 'Units' : 'Litres',
+          }
         }
       }
       setProductVolumes(initial)
@@ -293,6 +370,8 @@ export function FastTrackEstimateStep() {
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 animate-in fade-in duration-500">
       <div className="w-full max-w-md space-y-5">
 
+        <RosaIntro message="Here's a starting estimate using industry benchmarks. The volumes you enter sharpen it; real LCAs later make it bottom-up accurate." />
+
         {/* Header */}
         <div className="text-center space-y-2">
           <div className="text-5xl">🌍</div>
@@ -341,6 +420,12 @@ export function FastTrackEstimateStep() {
                     {entry.unit === 'Units' && canUseUnits && (
                       <p className="text-xs text-white/30">
                         {product.unit_size_value}{product.unit_size_unit} per unit
+                      </p>
+                    )}
+                    {autofilledFromBreww.has(product.id) && (
+                      <p className="text-xs text-[#ccff00]/70 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" />
+                        Auto-filled from Breww — edit if needed
                       </p>
                     )}
                   </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo, useEffect } from 'react'
 import { useOnboarding } from '@/lib/onboarding'
 import type { BeverageType, CompanySize } from '@/lib/onboarding'
 import { useOrganization } from '@/lib/organizationContext'
@@ -12,6 +12,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { ArrowRight, Building2, Globe, Upload, Loader2, Image as ImageIcon, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { CountrySelect } from '@/components/shared/CountrySelect'
+import { COUNTRIES } from '@/lib/countries'
+import { RosaIntro } from './RosaIntro'
 
 const BEVERAGE_OPTIONS: { value: BeverageType; label: string; icon: string }[] = [
   { value: 'beer', label: 'Beer', icon: '🍺' },
@@ -53,7 +56,19 @@ export function FastTrackSetupStep() {
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [websiteUrl, setWebsiteUrl] = useState(state.personalization?.websiteUrl ?? '')
   const [description, setDescription] = useState('')
-  const [country, setCountry] = useState(state.personalization?.country ?? '')
+  // We store the ISO 3166 alpha-2 code in state so the dropdown stays in
+  // sync; on save we convert to the human-readable label (back-compat with
+  // existing freeform country text in organizations.country and elsewhere).
+  // Existing legacy values (full names) get matched back to ISO so the
+  // dropdown shows them as selected on a re-visit.
+  const [countryCode, setCountryCode] = useState<string>(() => {
+    const raw = state.personalization?.country
+    if (!raw) return ''
+    const direct = COUNTRIES.find(c => c.value === raw)
+    if (direct) return direct.value
+    const byLabel = COUNTRIES.find(c => c.label.toLowerCase() === raw.toLowerCase())
+    return byLabel?.value ?? ''
+  })
   const [foundingYear, setFoundingYear] = useState(
     state.personalization?.foundingYear ? String(state.personalization.foundingYear) : ''
   )
@@ -64,8 +79,105 @@ export function FastTrackSetupStep() {
     state.personalization?.companySize ?? null
   )
   const [isSaving, setIsSaving] = useState(false)
+  // Track which fields the background crawl filled, so we can show a small
+  // "from your website" caption + avoid clobbering anything the user has
+  // already typed.
+  const [autofilledFromSite, setAutofilledFromSite] = useState<Set<'country' | 'foundingYear' | 'description' | 'logo'>>(new Set())
+  const crawlInflightRef = useRef<string | null>(null)
 
-  const isValid = companyName.trim().length > 0 && teamSize !== null && beverageType !== null
+  // Lightweight URL check: accept anything that has a dot (domain) and no
+  // whitespace. Don't require a scheme — the import route normalises that.
+  // Empty is OK (the website field is optional). Declared up here so the
+  // background-crawl effect below can gate on it.
+  const websiteUrlError = useMemo(() => {
+    const trimmed = websiteUrl.trim()
+    if (!trimmed) return null
+    if (/\s/.test(trimmed)) return 'No spaces, please'
+    if (!/^(?:https?:\/\/)?[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:\/.*)?$/i.test(trimmed)) {
+      return "That doesn't look like a website URL"
+    }
+    return null
+  }, [websiteUrl])
+
+  // Background website crawl: when the user finishes typing a URL (and we
+  // pass URL validation), kick off the import in the background. When it
+  // returns brand_metadata, gently pre-fill any fields the user hasn't
+  // already touched. Empty/invalid URL cancels in-flight work.
+  useEffect(() => {
+    const trimmed = websiteUrl.trim()
+    if (!trimmed) { crawlInflightRef.current = null; return }
+    // Debounce so we don't fire on every keystroke.
+    const handle = setTimeout(async () => {
+      // Bail if URL doesn't look right or already crawling this one.
+      if (websiteUrlError) return
+      if (crawlInflightRef.current === trimmed) return
+      crawlInflightRef.current = trimmed
+      try {
+        const start = await fetch('/api/products/import-from-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: trimmed }),
+        })
+        const startBody = await start.json().catch(() => ({}))
+        if (!start.ok || !startBody?.jobId) return
+        const jobId = startBody.jobId as string
+
+        // Poll up to ~60s. The crawl typically finishes well before that.
+        for (let i = 0; i < 30; i++) {
+          await new Promise(r => setTimeout(r, 2000))
+          // User wiped the field or typed something else; abort.
+          if (crawlInflightRef.current !== trimmed) return
+          const poll = await fetch(`/api/products/import-from-url/${jobId}`)
+          const data = await poll.json().catch(() => ({}))
+          if (data?.status === 'completed') {
+            applyBrandPrefill(data.brandMetadata ?? null, data.orgDescription ?? null)
+            return
+          }
+          if (data?.status === 'failed') return
+        }
+      } catch (err) {
+        console.warn('[fast-track-setup] background crawl failed:', err)
+      }
+    }, 1200)
+    return () => clearTimeout(handle)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [websiteUrl, websiteUrlError])
+
+  // Apply scraped brand metadata to empty fields only. Never overwrite
+  // what the user typed.
+  const applyBrandPrefill = (
+    brand: {
+      founding_year?: number | null
+      logo_url?: string | null
+      mission?: string | null
+    } | null,
+    orgDescription: string | null,
+  ) => {
+    const filled = new Set(autofilledFromSite)
+    if (!countryCode) {
+      // brand_metadata doesn't carry a country directly, so we leave it
+      // alone. Could be enhanced by reading distribution_markets[0].
+    }
+    if (!foundingYear && brand?.founding_year) {
+      setFoundingYear(String(brand.founding_year))
+      filled.add('foundingYear')
+    }
+    if (!description) {
+      const candidate = brand?.mission || orgDescription || null
+      if (candidate) {
+        setDescription(candidate)
+        filled.add('description')
+      }
+    }
+    if (!logoUrl && brand?.logo_url) {
+      setLogoUrl(brand.logo_url)
+      filled.add('logo')
+    }
+    if (filled.size > 0) setAutofilledFromSite(filled)
+  }
+
+  const isValid =
+    companyName.trim().length > 0 && teamSize !== null && beverageType !== null && !websiteUrlError
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -94,10 +206,13 @@ export function FastTrackSetupStep() {
     if (!isValid) return
     setIsSaving(true)
 
-    // Save to personalization (used by estimate + ROSA)
+    const countryLabel = COUNTRIES.find(c => c.value === countryCode)?.label
+
+    // Save to personalization (used by estimate + ROSA). Persist the
+    // human-readable label to keep parity with existing freeform consumers.
     updatePersonalization({
       websiteUrl: websiteUrl.trim() || undefined,
-      country: country.trim() || undefined,
+      country: countryLabel || undefined,
       foundingYear: foundingYear ? parseInt(foundingYear) : undefined,
       companySize: teamSize ?? undefined,
       beverageTypes: [beverageType!],
@@ -110,7 +225,7 @@ export function FastTrackSetupStep() {
       if (logoUrl) updates.logo_url = logoUrl
       if (websiteUrl.trim()) updates.website = websiteUrl.trim()
       if (description.trim()) updates.description = description.trim()
-      if (country.trim()) updates.country = country.trim()
+      if (countryLabel) updates.country = countryLabel
       if (foundingYear && !isNaN(parseInt(foundingYear))) updates.founding_year = parseInt(foundingYear)
       if (teamSize) updates.company_size = teamSize
       if (beverageType) updates.product_type = BEVERAGE_TO_PRODUCT_TYPE[beverageType]
@@ -128,6 +243,8 @@ export function FastTrackSetupStep() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 py-6 animate-in fade-in duration-300">
       <div className="w-full max-w-md space-y-5">
+
+        <RosaIntro message="Tell me about your company. If you give me a website, I'll go and read it while you finish — saves you typing." />
 
         <div className="text-center space-y-2">
           <div className="mx-auto w-16 h-16 bg-[#ccff00]/20 backdrop-blur-md border border-[#ccff00]/30 rounded-2xl flex items-center justify-center">
@@ -204,10 +321,18 @@ export function FastTrackSetupStep() {
               placeholder="www.yourcompany.com"
               value={websiteUrl}
               onChange={e => setWebsiteUrl(e.target.value)}
-              className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50 pl-9"
+              aria-invalid={!!websiteUrlError}
+              className={cn(
+                'bg-white/5 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50 pl-9',
+                websiteUrlError ? 'border-red-400/60' : 'border-white/10',
+              )}
             />
           </div>
-          <p className="text-xs text-white/30">We'll scan this to import your products automatically in the next step.</p>
+          {websiteUrlError ? (
+            <p className="text-xs text-red-300">{websiteUrlError}</p>
+          ) : (
+            <p className="text-xs text-white/30">We'll scan this to import your products automatically in the next step.</p>
+          )}
         </div>
 
         {/* Description */}
@@ -216,21 +341,24 @@ export function FastTrackSetupStep() {
           <Textarea
             placeholder="A few words about what you make and your sustainability ambitions..."
             value={description}
-            onChange={e => setDescription(e.target.value)}
+            onChange={e => { setDescription(e.target.value); autofilledFromSite.delete('description') }}
             rows={2}
             className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50 resize-none"
           />
+          {autofilledFromSite.has('description') && (
+            <p className="text-xs text-[#ccff00]/70">Pulled from your website — edit if needed.</p>
+          )}
         </div>
 
         {/* Country + Year */}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
             <Label className="text-sm font-medium text-white/70">Country</Label>
-            <Input
-              placeholder="e.g., United Kingdom"
-              value={country}
-              onChange={e => setCountry(e.target.value)}
-              className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
+            <CountrySelect
+              dark
+              value={countryCode}
+              onChange={setCountryCode}
+              placeholder="Select country"
             />
           </div>
           <div className="space-y-2">
@@ -238,9 +366,12 @@ export function FastTrackSetupStep() {
             <Input
               placeholder="e.g., 2018"
               value={foundingYear}
-              onChange={e => setFoundingYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              onChange={e => { setFoundingYear(e.target.value.replace(/\D/g, '').slice(0, 4)); autofilledFromSite.delete('foundingYear') }}
               className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
             />
+            {autofilledFromSite.has('foundingYear') && (
+              <p className="text-xs text-[#ccff00]/70">From your website</p>
+            )}
           </div>
         </div>
 

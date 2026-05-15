@@ -31,6 +31,14 @@ export async function GET(request: NextRequest) {
   if (!organizationId) {
     return NextResponse.json({ error: 'organizationId required' }, { status: 400 })
   }
+  // Optional: where to land the user after the callback completes. Defaults
+  // to the settings page (the historic flow); onboarding passes /dashboard
+  // so the user lands back in the wizard rather than on the settings page.
+  // Restricted to relative paths to prevent open-redirects.
+  const returnToParam = request.nextUrl.searchParams.get('returnTo')
+  const returnTo = returnToParam && returnToParam.startsWith('/') && !returnToParam.startsWith('//')
+    ? returnToParam
+    : undefined
 
   const serviceClient = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -53,7 +61,7 @@ export async function GET(request: NextRequest) {
   const response = NextResponse.redirect(authorizeUrl)
   response.cookies.set({
     name: BREWW_OAUTH_COOKIE,
-    value: encodeOAuthCookie({ state, codeVerifier, organizationId }),
+    value: encodeOAuthCookie({ state, codeVerifier, organizationId, returnTo }),
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
