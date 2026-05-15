@@ -45,6 +45,8 @@ interface OnboardingContextType {
   completeOnboarding: () => Promise<void>
   /** Dismiss onboarding without completing */
   dismissOnboarding: () => void
+  /** Reverse a dismissal — used by the resumable banner on /rosa/ */
+  resumeOnboarding: () => void
   /** Mark the post-onboarding dashboard guide as completed */
   markGuideCompleted: () => void
   /** Mark the product page guide as completed */
@@ -295,6 +297,17 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     }))
   }, [updateState])
 
+  // Reverse a dismissal so the wizard reappears at the step the user was on.
+  // Used by the resumable banner that surfaces on /rosa/ when the user closed
+  // onboarding without finishing.
+  const resumeOnboarding = useCallback(() => {
+    sessionDismissedRef.current = false
+    updateState(prev => ({
+      ...prev,
+      dismissed: false,
+    }))
+  }, [updateState])
+
   const markGuideCompleted = useCallback(() => {
     updateState(prev => ({
       ...prev,
@@ -411,6 +424,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         updatePersonalization,
         completeOnboarding,
         dismissOnboarding,
+        resumeOnboarding,
         markGuideCompleted,
         markProductGuideCompleted,
         markSearchGuideCompleted,

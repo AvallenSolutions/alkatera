@@ -13,6 +13,7 @@ import { QuickActions } from './QuickActions'
 import { QuickPrompts } from './QuickPrompts'
 import { ForwardTimeline } from './ForwardTimeline'
 import { HubSetupWizard } from './HubSetupWizard'
+import { OnboardingResumeBanner } from './OnboardingResumeBanner'
 import { useHubLayout } from '@/lib/rosa/useHubLayout'
 
 interface Props {
@@ -75,6 +76,7 @@ export function ForYouToday({ onOpenQueue, onSubmit }: Props) {
 
   return (
     <div className="space-y-6">
+      <OnboardingResumeBanner />
       <VitalityHero />
 
       {isVisible('priority_tiles') && <PriorityTiles onOpenQueue={onOpenQueue} />}

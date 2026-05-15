@@ -32,9 +32,11 @@ import { MemberCompletionStep } from './steps/MemberCompletionStep'
 
 // Step components — fast track flow
 import { FastTrackSetupStep } from './steps/FastTrackSetupStep'
+import { FastTrackImportStep } from './steps/FastTrackImportStep'
 import { FastTrackProductsStep } from './steps/FastTrackProductsStep'
 import { FastTrackFacilityStep } from './steps/FastTrackFacilityStep'
 import { FastTrackEstimateStep } from './steps/FastTrackEstimateStep'
+import { FastTrackTargetStep } from './steps/FastTrackTargetStep'
 import { FastTrackCompletionStep } from './steps/FastTrackCompletionStep'
 
 const STEP_COMPONENTS: Record<string, React.ComponentType> = {
@@ -60,9 +62,11 @@ const STEP_COMPONENTS: Record<string, React.ComponentType> = {
   'member-completion': MemberCompletionStep,
   // Fast Track steps
   'fast-track-setup': FastTrackSetupStep,
+  'fast-track-import': FastTrackImportStep,
   'fast-track-products': FastTrackProductsStep,
   'fast-track-facility': FastTrackFacilityStep,
   'fast-track-estimate': FastTrackEstimateStep,
+  'fast-track-target': FastTrackTargetStep,
   'fast-track-completion': FastTrackCompletionStep,
 }
 

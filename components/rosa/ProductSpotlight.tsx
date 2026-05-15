@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Package, ArrowRight, CheckCircle2, Clock, FileText } from 'lucide-react'
+import { Package, ArrowRight, CheckCircle2, Clock, FileText, Sparkles } from 'lucide-react'
 import { useProductSpotlight } from '@/hooks/data/useProductSpotlight'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
@@ -100,16 +100,19 @@ export function ProductSpotlight() {
  *   - draft       → the product page so they can configure ingredients
  *                    before kicking off the wizard
  */
-function hrefForProduct(id: string, status: 'completed' | 'in_progress' | 'draft'): string {
+function hrefForProduct(id: string, status: 'completed' | 'in_progress' | 'estimate' | 'draft'): string {
   if (status === 'completed') return `/products/${id}/lca-report/`
   if (status === 'in_progress') return `/products/${id}/compliance-wizard/`
+  // Estimates land users on the product page so they can refine ingredients
+  // and packaging — the natural path from a benchmark guess to a real LCA.
   return `/products/${id}/`
 }
 
-function StatusPill({ status }: { status: 'completed' | 'in_progress' | 'draft' }) {
+function StatusPill({ status }: { status: 'completed' | 'in_progress' | 'estimate' | 'draft' }) {
   const map = {
     completed: { label: 'LCA done', icon: CheckCircle2, cls: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' },
     in_progress: { label: 'In progress', icon: Clock, cls: 'bg-amber-500/20 text-amber-300 border-amber-500/30' },
+    estimate: { label: 'Estimate', icon: Sparkles, cls: 'bg-[#ccff00]/20 text-[#ccff00] border-[#ccff00]/30' },
     draft: { label: 'No LCA', icon: FileText, cls: 'bg-slate-500/20 text-slate-300 border-slate-500/30' },
   } as const
   const m = map[status]

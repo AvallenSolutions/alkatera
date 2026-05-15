@@ -45,9 +45,11 @@ export type OnboardingStep =
   | 'member-completion'
   // Fast Track flow steps
   | 'fast-track-setup'
+  | 'fast-track-import'
   | 'fast-track-products'
   | 'fast-track-facility'
   | 'fast-track-estimate'
+  | 'fast-track-target'
   | 'fast-track-completion'
 
 export interface OnboardingStepConfig {
@@ -96,14 +98,16 @@ export const MEMBER_ONBOARDING_STEPS: OnboardingStepConfig[] = [
 export const TOTAL_STEPS = ONBOARDING_STEPS.length
 export const TOTAL_MEMBER_STEPS = MEMBER_ONBOARDING_STEPS.length
 
-/** Fast Track onboarding: 6-step path that populates real account data */
+/** Fast Track onboarding: 8-step path that populates real account data */
 export const FAST_TRACK_STEPS: OnboardingStepConfig[] = [
   { id: 'welcome-screen',        phase: 'welcome',        title: 'Welcome',         description: 'Welcome to alkatera',          skippable: false, index: 0 },
   { id: 'fast-track-setup',      phase: 'welcome',        title: 'Your Company',    description: 'Tell us about your business',  skippable: false, index: 1 },
-  { id: 'fast-track-products',   phase: 'quick-wins',     title: 'Your Products',   description: 'Import or add products',       skippable: true,  index: 2 },
-  { id: 'fast-track-facility',   phase: 'quick-wins',     title: 'Your Facility',   description: 'Where you produce',            skippable: true,  index: 3 },
-  { id: 'fast-track-estimate',   phase: 'first-insights', title: 'Your Footprint',  description: 'Your instant estimate',        skippable: false, index: 4 },
-  { id: 'fast-track-completion', phase: 'power-features', title: 'All Set',         description: 'Next steps to improve',        skippable: false, index: 5 },
+  { id: 'fast-track-import',     phase: 'quick-wins',     title: 'Bring Your Data', description: 'Connect or import what you have', skippable: true, index: 2 },
+  { id: 'fast-track-products',   phase: 'quick-wins',     title: 'Your Products',   description: 'Add or refine products',       skippable: true,  index: 3 },
+  { id: 'fast-track-facility',   phase: 'quick-wins',     title: 'Your Facility',   description: 'Where you produce',            skippable: true,  index: 4 },
+  { id: 'fast-track-estimate',   phase: 'first-insights', title: 'Your Footprint',  description: 'Your instant estimate',        skippable: false, index: 5 },
+  { id: 'fast-track-target',     phase: 'first-insights', title: 'Your Target',     description: 'Set a reduction goal',         skippable: true,  index: 6 },
+  { id: 'fast-track-completion', phase: 'power-features', title: 'All Set',         description: 'Next steps to improve',        skippable: false, index: 7 },
 ]
 
 export const TOTAL_FAST_TRACK_STEPS = FAST_TRACK_STEPS.length
@@ -174,6 +178,12 @@ export interface PersonalizationData {
   country?: string
   /** Year company was founded */
   foundingYear?: number
+  /** Last estimated footprint in tonnes CO₂e/year. Set by the estimate step. */
+  estimateTonnesCO2e?: number
+  /** First sustainability target: % reduction from the estimate baseline. */
+  targetReductionPct?: number
+  /** First sustainability target: target year (e.g. 2030). */
+  targetYear?: number
 }
 
 export interface OnboardingState {

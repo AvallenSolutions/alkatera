@@ -307,7 +307,9 @@ async function buildLcaCoverage(
           .from('product_carbon_footprints')
           .select('id', { count: 'exact', head: true })
           .eq('organization_id', organizationId)
-          .eq('status', 'completed'),
+          // Onboarding estimates count as covered for tracker reporting; a
+          // completed LCA supersedes its estimate via DB trigger.
+          .in('status', ['completed', 'estimate']),
       ])
       const total = products ?? 0
       const done = completed ?? 0

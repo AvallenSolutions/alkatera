@@ -112,6 +112,77 @@ function categoriseShopifyProduct(
   return 'Spirits';
 }
 
+interface BrandMetadata {
+  founding_year?: number | null;
+  founder_names?: string[];
+  mission?: string | null;
+  awards?: string[];
+  suppliers?: string[];
+  distribution_markets?: string[];
+  production_locations?: string[];
+  logo_url?: string | null;
+  brand_colour?: string | null;
+}
+
+/**
+ * Light-weight brand metadata extraction from a homepage HTML string. Looks
+ * for JSON-LD Organization/Brand blocks (Shopify ships these on most themes)
+ * plus a few high-yield regex passes for things like footer "Est. 2018".
+ * This is the cheap path used by the Shopify fast lane so we don't have to
+ * spend an Anthropic call for every site.
+ */
+function extractBrandMetadataFromHtml(html: string): BrandMetadata {
+  const out: BrandMetadata = {};
+
+  // JSON-LD blocks
+  const ldMatches = Array.from(html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi));
+  for (const m of ldMatches) {
+    const raw = m[1].trim();
+    if (!raw) continue;
+    try {
+      const parsed = JSON.parse(raw);
+      const items = Array.isArray(parsed) ? parsed : [parsed];
+      for (const item of items) {
+        const type = item['@type'];
+        if (type === 'Organization' || type === 'Brand' || type === 'Corporation') {
+          if (item.foundingDate && !out.founding_year) {
+            const y = parseInt(String(item.foundingDate).slice(0, 4), 10);
+            if (Number.isFinite(y) && y > 1500 && y < 2100) out.founding_year = y;
+          }
+          if (item.founder && !out.founder_names?.length) {
+            const founders = Array.isArray(item.founder) ? item.founder : [item.founder];
+            out.founder_names = founders
+              .map((f: any) => (typeof f === 'string' ? f : f?.name))
+              .filter((s: any): s is string => typeof s === 'string' && s.length > 0);
+          }
+          if (item.logo && !out.logo_url) {
+            out.logo_url = typeof item.logo === 'string' ? item.logo : item.logo?.url ?? null;
+          }
+        }
+      }
+    } catch {
+      // ignore malformed JSON-LD
+    }
+  }
+
+  // Footer "Established YYYY" / "Est. YYYY" / "Since YYYY"
+  if (!out.founding_year) {
+    const m = html.match(/(?:est(?:ablished)?\.?|since)\s+(\d{4})/i);
+    if (m) {
+      const y = parseInt(m[1], 10);
+      if (y > 1500 && y < 2100) out.founding_year = y;
+    }
+  }
+
+  // Theme colour from meta tag
+  if (!out.brand_colour) {
+    const m = html.match(/<meta[^>]+name=["']theme-color["'][^>]+content=["']([^"']+)["']/i);
+    if (m) out.brand_colour = m[1];
+  }
+
+  return out;
+}
+
 function packagingFromShopify(p: ShopifyProduct): 'glass_bottle' | 'aluminium_can' | 'keg_cask' | 'pet_bag' | null {
   const haystack = [
     p.product_type || '',
@@ -426,6 +497,11 @@ export const handler = async (event: { body?: string | null; headers: Record<str
 
           const mapped = mapShopifyToExtracted(shopifyProducts);
 
+          // Pull lightweight brand metadata from JSON-LD blocks on the
+          // homepage when available. Most Shopify themes ship Organization
+          // schema with foundingDate, founder, sameAs links etc.
+          const brandMetadata = extractBrandMetadataFromHtml(probeHtml);
+
           await updateJob({
             status: 'completed',
             phase_message: null,
@@ -433,6 +509,7 @@ export const handler = async (event: { body?: string | null; headers: Record<str
             products: mapped,
             org_certifications: [],
             org_description: orgDescription,
+            brand_metadata: brandMetadata,
           });
           return { statusCode: 200, body: 'ok' };
         }
@@ -544,6 +621,50 @@ export const handler = async (event: { body?: string | null; headers: Record<str
                 type: ['string', 'null'],
                 description: 'A concise description of the company from its About page, homepage, or meta description. Null if not found.',
               },
+              brand_metadata: {
+                type: 'object',
+                description: 'Richer brand-level facts mined from the about/story/contact pages. Every field is optional — only set what is clearly stated on the site.',
+                properties: {
+                  founding_year: {
+                    type: ['integer', 'null'],
+                    description: 'Year the company was founded (4 digit, between 1500 and current year). Null if not found.',
+                  },
+                  founder_names: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Founder full names if explicitly stated. Empty array if not found.',
+                  },
+                  mission: {
+                    type: ['string', 'null'],
+                    description: 'One-sentence mission statement in the brand\'s own words, if clearly stated. Null otherwise.',
+                  },
+                  awards: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Notable awards or press recognition listed on the site (e.g. "World Gin Awards Gold 2023"). Empty array if none.',
+                  },
+                  suppliers: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Named production partners, contract distilleries, breweries, or suppliers explicitly mentioned (e.g. "distilled at X"). Empty array if none.',
+                  },
+                  distribution_markets: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Countries or regions where the product is sold, if listed (e.g. "available in the UK, US, Germany"). Empty array if not found.',
+                  },
+                  production_locations: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Cities or addresses where production happens (e.g. "Distilled in Wadebridge, Cornwall"). Empty array if not found.',
+                  },
+                  logo_url: {
+                    type: ['string', 'null'],
+                    description: 'URL of the brand logo from the provided image list. Pick the clearest non-product brand mark. Null if no clear logo image.',
+                  },
+                },
+                required: [],
+              },
               products: {
                 type: 'array',
                 description: 'Array of drink products found on the website',
@@ -565,7 +686,7 @@ export const handler = async (event: { body?: string | null; headers: Record<str
                 },
               },
             },
-            required: ['org_certifications', 'org_description', 'products'],
+            required: ['org_certifications', 'org_description', 'brand_metadata', 'products'],
           },
         },
       ],
@@ -580,6 +701,7 @@ Extract all individual drink products from the website content below. Focus on a
 Also extract:
 - org_certifications: any certifications held by the company itself (B Corp, Soil Association Organic, SIBA Member, Rainforest Alliance, etc.) visible anywhere on the site
 - org_description: a concise description of the company (from About page, homepage, or meta description)
+- brand_metadata: founding year, founder names, mission, awards, named production partners or suppliers, distribution markets, production locations, and brand logo URL. Be conservative: only fill a field when the site clearly states it. Leave arrays empty if unsure.
 
 IMAGE SELECTION RULES - this is critical:
 - Each image below includes its URL, alt text, and nearby page text
@@ -618,6 +740,7 @@ Important:
         products: [],
         org_certifications: [],
         org_description: null,
+        brand_metadata: {},
       });
       return { statusCode: 200, body: 'ok' };
     }
@@ -626,6 +749,7 @@ Important:
       products: unknown[];
       org_certifications?: string[];
       org_description?: string | null;
+      brand_metadata?: BrandMetadata;
     };
 
     await updateJob({
@@ -635,6 +759,7 @@ Important:
       products: toolInput.products ?? [],
       org_certifications: toolInput.org_certifications ?? [],
       org_description: toolInput.org_description ?? null,
+      brand_metadata: toolInput.brand_metadata ?? {},
     });
 
     return { statusCode: 200, body: 'ok' };

@@ -192,23 +192,97 @@ export function FastTrackEstimateStep() {
   const handleContinue = async () => {
     setIsSaving(true)
 
-    // Save per-product volumes to the products table
-    if (hasProducts) {
+    // Persist the headline estimate so the next step (target setting) and the
+    // server-side completion handler can use it as the baseline.
+    updatePersonalization({
+      estimateTonnesCO2e: displayTonnes,
+      ...(hasProducts ? {} : { annualProductionBucket: volumeBucket }),
+    })
+
+    // Save per-product volumes + write an estimate-status PCF per product so
+    // Rosa's hub has data on day one. PCFs are clearly tagged status='estimate'
+    // so ProductSpotlight renders them with a distinct "Estimate" pill rather
+    // than the green "LCA done" pill reserved for completed LCAs.
+    if (hasProducts && currentOrganization) {
+      const orgId = currentOrganization.id
+      const referenceYear = new Date().getFullYear()
+      const scopeSplit = {
+        // Mirror SCOPE_ROWS — ingredients (Scope 3 upstream) carry the bulk,
+        // energy/operations covers Scope 1+2, packaging is the rest of Scope 3.
+        raw_materials: 0.57,
+        processing: 0.18,
+        packaging: 0.25,
+      }
+
       for (const product of products) {
         const entry = productVolumes[product.id]
         const v = parseFloat(entry?.volume ?? '')
-        if (!isNaN(v) && v > 0) {
+        if (isNaN(v) || v <= 0) continue
+
+        const litres = volumeToLitres(v, entry.unit, product)
+        const categoryBenchmark = getBenchmarkForCategory(product.product_category).kgCO2ePerLitre
+        const totalKg = categoryBenchmark * litres
+        const litresPerUnit = unitSizeToLitres(product.unit_size_value, product.unit_size_unit)
+        const functionalUnit = litresPerUnit > 0
+          ? `1 × ${product.unit_size_value}${product.unit_size_unit ?? ''} unit`
+          : '1 litre'
+        // Per-unit kg CO₂e so the ProductSpotlight card shows a sensible number
+        // (litres-based totals would dwarf the per-unit footprints from real LCAs).
+        const totalPerUnit = litresPerUnit > 0 ? categoryBenchmark * litresPerUnit : categoryBenchmark
+
+        // Update annual production fields on the product row.
+        await supabase
+          .from('products')
+          .update({
+            annual_production_volume: v,
+            annual_production_unit: entry.unit,
+          })
+          .eq('id', product.id)
+
+        // Upsert an estimate PCF for this product. We key on product_id so
+        // repeated runs (user re-enters volumes) don't duplicate rows.
+        const { data: existing } = await supabase
+          .from('product_carbon_footprints')
+          .select('id')
+          .eq('organization_id', orgId)
+          .eq('product_id', product.id)
+          .eq('status', 'estimate')
+          .maybeSingle()
+
+        const pcfPayload = {
+          organization_id: orgId,
+          product_id: product.id,
+          product_name: product.name,
+          status: 'estimate',
+          is_draft: true,
+          functional_unit: functionalUnit,
+          system_boundary: 'cradle-to-gate (industry benchmark estimate)',
+          reference_year: referenceYear,
+          total_ghg_emissions: totalPerUnit,
+          total_ghg_raw_materials: totalPerUnit * scopeSplit.raw_materials,
+          total_ghg_processing: totalPerUnit * scopeSplit.processing,
+          total_ghg_packaging: totalPerUnit * scopeSplit.packaging,
+          ingredients_complete: false,
+          packaging_complete: false,
+          production_complete: false,
+          aggregated_impacts: {
+            methodology_note: `Industry-benchmark estimate. Source: ${getBenchmarkForCategory(product.product_category).sourceName} (${getBenchmarkForCategory(product.product_category).sourceYear}). Refine with real ingredient and production data.`,
+            annual_production_litres: litres,
+            annual_production_kg_co2e: totalKg,
+            climate_change_gwp100: totalPerUnit,
+            estimate_source: 'fast_track_onboarding',
+          },
+        }
+
+        if (existing?.id) {
           await supabase
-            .from('products')
-            .update({
-              annual_production_volume: v,
-              annual_production_unit: entry.unit,
-            })
-            .eq('id', product.id)
+            .from('product_carbon_footprints')
+            .update({ ...pcfPayload, updated_at: new Date().toISOString() })
+            .eq('id', existing.id)
+        } else {
+          await supabase.from('product_carbon_footprints').insert(pcfPayload)
         }
       }
-    } else {
-      updatePersonalization({ annualProductionBucket: volumeBucket })
     }
 
     setIsSaving(false)

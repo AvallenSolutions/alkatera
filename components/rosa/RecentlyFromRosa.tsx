@@ -182,9 +182,18 @@ function hrefForRecent(item: RecentItem): string | null {
   if (item.kind === 'historical_lca_report') {
     return '/reports/lcas/'
   }
-  if (item.kind === 'supplier_proxy') {
+  if (item.kind === 'supplier_proxy' || item.kind === 'website_supplier') {
     return '/suppliers/'
   }
+  // Onboarding-seeded items deep-link to the natural follow-up surface so
+  // the user can act on what Rosa just did, rather than dead-ending on the
+  // hub card.
+  if (item.kind === 'onboarding_estimate') return '/products/'
+  if (item.kind === 'propose_target') return '/pulse/targets/'
+  if (item.kind === 'website_production_location') return '/company/facilities/'
+  if (item.kind === 'website_certification') return '/settings/'
+  // Ingest-job result types we now emit:
+  if (item.kind === 'website_import') return '/products/'
   return null
 }
 

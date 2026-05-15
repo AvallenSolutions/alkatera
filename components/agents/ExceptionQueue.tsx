@@ -270,6 +270,46 @@ function PayloadPreview({ kind, payload }: { kind: string; payload: any }) {
     )
   }
 
+  // Onboarding-seeded and website-crawl kinds carry small structured payloads
+  // with a single field worth surfacing. Show it inline so the user knows
+  // what they're approving without needing to deep-link to the source page.
+  const inlineRows: Array<{ label: string; value: string }> = []
+  if (kind === 'onboarding_estimate' && payload?.estimate_tonnes_co2e != null) {
+    inlineRows.push({ label: 'Estimate', value: `~${Number(payload.estimate_tonnes_co2e).toLocaleString()} t CO₂e/yr` })
+    if (payload.methodology) inlineRows.push({ label: 'Method', value: String(payload.methodology) })
+  }
+  if (kind === 'propose_target') {
+    if (payload?.reduction_pct) inlineRows.push({ label: 'Reduction', value: `${payload.reduction_pct}%` })
+    if (payload?.target_year) inlineRows.push({ label: 'By', value: String(payload.target_year) })
+  }
+  if (kind === 'request_data' && payload?.suggested) {
+    inlineRows.push({ label: 'Suggested next step', value: String(payload.suggested).replace(/_/g, ' ') })
+  }
+  if (kind === 'website_supplier' && payload?.supplier_name) {
+    inlineRows.push({ label: 'Supplier', value: String(payload.supplier_name) })
+  }
+  if (kind === 'website_production_location' && payload?.location) {
+    inlineRows.push({ label: 'Location', value: String(payload.location) })
+  }
+  if (kind === 'website_certification' && payload?.certification) {
+    inlineRows.push({ label: 'Certification', value: String(payload.certification) })
+  }
+
+  if (inlineRows.length > 0) {
+    return (
+      <div className="rounded-md border border-border bg-background/40 p-3">
+        <ul className="space-y-1 text-sm">
+          {inlineRows.map((row, i) => (
+            <li key={i} className="flex items-center justify-between gap-2">
+              <span className="text-muted-foreground">{row.label}</span>
+              <span className="font-medium text-foreground">{row.value}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
+
   return (
     <div className="rounded-md border border-border bg-background/40 p-3 text-xs text-muted-foreground">
       <FileText className="mb-1 inline h-3 w-3" /> Raw payload. Open the source page to review.

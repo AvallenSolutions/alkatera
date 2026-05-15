@@ -12,7 +12,7 @@ export async function GET(
 
   const { data: job, error } = await (client as any)
     .from('product_import_jobs')
-    .select('id, user_id, status, phase_message, pages_analyzed, products, org_certifications, org_description, error')
+    .select('id, user_id, status, phase_message, pages_analyzed, products, org_certifications, org_description, brand_metadata, error')
     .eq('id', params.jobId)
     .maybeSingle();
 
@@ -27,6 +27,7 @@ export async function GET(
     products: job.products ?? null,
     orgCertifications: job.org_certifications ?? [],
     orgDescription: job.org_description ?? null,
+    brandMetadata: job.brand_metadata ?? null,
     error: job.error,
   });
 }

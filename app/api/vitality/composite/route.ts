@@ -210,7 +210,10 @@ async function buildEnvironmentalInputs(
       .from('product_carbon_footprints')
       .select('id, product_id, product_name, status, aggregated_impacts, csrd_compliant, updated_at')
       .eq('organization_id', organizationId)
-      .eq('status', 'completed')
+      // Include onboarding estimates so Vitality has a score on day one;
+      // a real completed LCA supersedes its estimate via DB trigger so we
+      // never double-count a product.
+      .in('status', ['completed', 'estimate'])
       .not('aggregated_impacts', 'is', null)
       .limit(500),
     service

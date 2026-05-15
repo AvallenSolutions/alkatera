@@ -6,7 +6,7 @@ export interface ProductSpotlightItem {
   id: string;
   name: string;
   image_url: string | null;
-  lca_status: 'completed' | 'in_progress' | 'draft';
+  lca_status: 'completed' | 'in_progress' | 'estimate' | 'draft';
   co2e_per_unit: number | null;
   declared_unit: string | null;
 }
@@ -91,14 +91,19 @@ export function useProductSpotlight() {
         if (pcf) {
           if (pcf.status === 'completed') lcaStatus = 'completed';
           else if (pcf.status === 'pending') lcaStatus = 'in_progress';
+          else if (pcf.status === 'estimate') lcaStatus = 'estimate';
         }
+
+        // Surface CO₂e for estimates too — the whole point of the day-one
+        // estimate is to give the user (and Rosa) a number to work with.
+        const showCo2e = lcaStatus === 'completed' || lcaStatus === 'estimate';
 
         return {
           id: product.id,
           name: product.name,
           image_url: product.product_image_url ?? null,
           lca_status: lcaStatus,
-          co2e_per_unit: lcaStatus === 'completed' && pcf?.total_co2e
+          co2e_per_unit: showCo2e && pcf?.total_co2e
             ? Math.round(pcf.total_co2e * 100) / 100
             : null,
           declared_unit: pcf?.functional_unit ?? null,

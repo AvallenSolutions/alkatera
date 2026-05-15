@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useOnboarding } from '@/lib/onboarding'
+import { useOrganization } from '@/lib/organizationContext'
 import type { AnnualProductionBucket } from '@/lib/onboarding'
 import { Button } from '@/components/ui/button'
 import { Zap, BarChart3, Package, Users, ArrowRight } from 'lucide-react'
@@ -55,15 +56,37 @@ const IMPROVEMENT_CARDS = [
 
 export function FastTrackCompletionStep() {
   const { completeOnboarding, state } = useOnboarding()
+  const { currentOrganization } = useOrganization()
   const router = useRouter()
   const [launching, setLaunching] = useState<string | null>(null)
+  const seedFiredRef = useRef(false)
 
   const beverageType = state.personalization?.beverageTypes?.[0] ?? null
   const volumeBucket = state.personalization?.annualProductionBucket ?? '<10k'
   const litres = VOLUME_MIDPOINTS[volumeBucket as AnnualProductionBucket]
   const category = beverageType ? BEVERAGE_TO_CATEGORY[beverageType] ?? null : null
   const benchmark = getBenchmarkForCategory(category)
-  const estimateTonnes = Math.round((benchmark.kgCO2ePerLitre * litres) / 1000)
+  // Prefer the value the estimate step persisted; fall back to recomputing
+  // for users who somehow landed here without going through it.
+  const estimateTonnes = state.personalization?.estimateTonnesCO2e
+    ?? Math.round((benchmark.kgCO2ePerLitre * litres) / 1000)
+
+  // Fire the server-side seed (persona, tracker, target, agent_exceptions)
+  // as soon as the user lands on this step. Idempotent thanks to the upserts
+  // on the server; the ref guards against StrictMode double-mounts.
+  useEffect(() => {
+    if (seedFiredRef.current || !currentOrganization?.id) return
+    seedFiredRef.current = true
+    fetch('/api/onboarding/complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ organizationId: currentOrganization.id }),
+    }).catch((err) => {
+      // Don't block the user — they can still complete onboarding even if
+      // the seed fails. Rosa just won't have the day-one richness.
+      console.error('[onboarding] seed call failed:', err)
+    })
+  }, [currentOrganization?.id])
 
   const handleNavigate = async (href: string, label: string) => {
     if (launching) return

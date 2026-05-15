@@ -458,7 +458,10 @@ export async function buildOrgSignalPack(
       .from('product_carbon_footprints')
       .select('id', { count: 'exact', head: true })
       .eq('organization_id', organizationId)
-      .eq('status', 'completed'),
+      // Onboarding estimates count as "covered" so day-one orgs aren't told
+      // they have 0% LCA coverage. A real completed LCA supersedes its
+      // estimate via DB trigger so we never double-count.
+      .in('status', ['completed', 'estimate']),
     service
       .from('product_carbon_footprints')
       .select('id', { count: 'exact', head: true })
@@ -469,12 +472,14 @@ export async function buildOrgSignalPack(
       .select('id, product_carbon_footprints!left(id, status)', { count: 'exact' })
       .eq('organization_id', organizationId)
       .limit(500),
-    // Most recent completed LCA — used as the "flagship" for narrative.
+    // Most recent completed LCA OR estimate — used as the "flagship" for
+    // narrative. Estimates participate so a fresh org has a flagship to
+    // talk about; completed rows naturally win once they exist.
     service
       .from('product_carbon_footprints')
       .select('id, product_id, product_name, total_co2e_kg, updated_at, status')
       .eq('organization_id', organizationId)
-      .eq('status', 'completed')
+      .in('status', ['completed', 'estimate'])
       .order('updated_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
@@ -618,12 +623,14 @@ export async function buildOrgSignalPack(
   const orgData = (valOrNull(orgRow) as any)?.data ?? null
   const flags = (orgData?.feature_flags ?? {}) as Record<string, unknown>
 
-  // Products without any completed footprint
+  // Products without any completed OR estimate footprint. A starter estimate
+  // counts as "has a footprint" — the right nudge for those products is
+  // "upgrade your estimate to a real LCA", not "you have zero data".
   const productsResult = (valOrNull(productsWithFootprintsRows) as any)?.data ?? []
   const noLcaCount = Array.isArray(productsResult)
     ? productsResult.filter((p: any) => {
         const fps = Array.isArray(p.product_carbon_footprints) ? p.product_carbon_footprints : []
-        return !fps.some((fp: any) => fp?.status === 'completed')
+        return !fps.some((fp: any) => fp?.status === 'completed' || fp?.status === 'estimate')
       }).length
     : 0
 

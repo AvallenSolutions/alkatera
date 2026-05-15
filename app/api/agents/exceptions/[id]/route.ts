@@ -192,11 +192,47 @@ export async function PATCH(
         return NextResponse.json({ error: data.error || 'Save failed' }, { status: res.status })
       }
       appliedTo = { table: 'facility_activity_entries', saved: data.saved, facilityId }
+    } else if (exception.kind === 'website_supplier') {
+      // Approving a supplier proposed from a website crawl creates a real
+      // suppliers row. The exception payload carries the name; everything
+      // else is best-filled in later from the supplier's own page.
+      const name = (payload?.supplier_name || exception.title || '').toString().trim()
+      if (!name) {
+        return NextResponse.json(
+          { error: 'Supplier name missing from payload' },
+          { status: 400 },
+        )
+      }
+      const { data: existing } = await (client as any)
+        .from('suppliers')
+        .select('id')
+        .eq('organization_id', organizationId)
+        .ilike('name', name)
+        .maybeSingle()
+      if (existing?.id) {
+        appliedTo = { table: 'suppliers', supplier_id: existing.id, matched: 'existing' }
+      } else {
+        const { data: newSupplier, error: supErr } = await (client as any)
+          .from('suppliers')
+          .insert({
+            organization_id: organizationId,
+            name,
+            notes: 'Added from website crawl during onboarding.',
+          })
+          .select('id')
+          .single()
+        if (supErr) {
+          return NextResponse.json({ error: supErr.message }, { status: 500 })
+        }
+        appliedTo = { table: 'suppliers', supplier_id: newSupplier.id, matched: 'new' }
+      }
     } else {
       // For kinds we don't auto-save yet (BOM, historical reports, spray
-      // diary, etc.) approving the exception just records the decision —
-      // the user follows the deep-link in the queue to handle the doc on
-      // its native page. This is fine as a v1 cut.
+      // diary, website_production_location, website_certification, the
+      // onboarding seed kinds, etc.) approving the exception just records
+      // the decision — the user follows the deep-link in the queue to
+      // handle the next step on the relevant native page. Fine as a v1
+      // cut: rejecting still trains the agent for next time.
       appliedTo = { table: null, deferred_save: true, kind: exception.kind }
     }
   } catch (err: any) {
