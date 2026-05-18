@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Card,
   CardContent,
@@ -75,6 +75,8 @@ interface GapAnalysisViewProps {
   onOpenRiskTool?: () => void;
   onRefresh?: () => Promise<void> | void;
   initialBlockingOnly?: boolean;
+  /** Increment to force the blocking-only filter + scroll into view. */
+  blockingSignal?: number;
 }
 
 const STATUS_CONFIG: Record<
@@ -123,6 +125,7 @@ export function GapAnalysisView({
   onOpenRiskTool,
   onRefresh,
   initialBlockingOnly = false,
+  blockingSignal = 0,
 }: GapAnalysisViewProps) {
   const [statusFilter, setStatusFilter] = useState<string>(
     initialBlockingOnly ? 'blocking' : 'all',
@@ -130,6 +133,20 @@ export function GapAnalysisView({
   const [yearFilter, setYearFilter] = useState<string>('all');
   const [activeRequirement, setActiveRequirement] =
     useState<RequirementStatus | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // "View blocking requirements" can be triggered while this view is already
+  // mounted, so react to the signal rather than only the initial prop.
+  useEffect(() => {
+    if (blockingSignal > 0) {
+      setStatusFilter('blocking');
+      setYearFilter('all');
+      rootRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    }
+  }, [blockingSignal]);
 
   const blockingIds = useMemo(
     () => new Set(readiness.blockingRequirements.map((r) => r.requirementId)),
@@ -165,7 +182,7 @@ export function GapAnalysisView({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" ref={rootRef}>
       {/* Filters */}
       <Card>
         <CardContent className="flex flex-wrap items-center gap-4 p-4">

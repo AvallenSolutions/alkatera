@@ -31,6 +31,7 @@ import { GapAnalysisDashboard } from '@/components/certifications/GapAnalysisDas
 import { FlagTargetSetting } from '@/components/certifications/FlagTargetSetting';
 import { EvidenceLinker } from '@/components/certifications/EvidenceLinker';
 import { YearProgressionStepper } from '@/components/certifications/YearProgressionStepper';
+import { BcorpExperience } from '@/components/certifications/BcorpExperience';
 import { useCertificationEvidence } from '@/hooks/data/useCertificationEvidence';
 import { useCertificationAuditPackages } from '@/hooks/data/useCertificationAuditPackages';
 import { toast } from 'sonner';
@@ -162,6 +163,16 @@ export default function CertificationDetailsPage() {
   const { currentOrganization } = useOrganization();
   const code = params.code as string;
   const requiredFeature = canopyFrameworkFeatures[code?.toLowerCase()] as FeatureCode | undefined;
+
+  // B Corp 2026 has its own full experience (journey, gap analysis, Risk
+  // Tool, audit workflow). It replaces the generic per-framework view here.
+  if (code?.toLowerCase() === 'bcorp_2026') {
+    return (
+      <FeatureGate feature="bcorp_tracking">
+        <BcorpExperience />
+      </FeatureGate>
+    );
+  }
 
   // Gate Canopy-only frameworks
   if (requiredFeature) {
