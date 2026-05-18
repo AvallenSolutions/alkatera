@@ -14,6 +14,7 @@ import { QuickPrompts } from './QuickPrompts'
 import { ForwardTimeline } from './ForwardTimeline'
 import { HubSetupWizard } from './HubSetupWizard'
 import { OnboardingResumeBanner } from './OnboardingResumeBanner'
+import { CertificationHealthWidget } from '@/components/certifications/CertificationHealthWidget'
 import { useHubLayout } from '@/lib/rosa/useHubLayout'
 
 interface Props {
@@ -78,6 +79,7 @@ export function ForYouToday({ onOpenQueue, onSubmit }: Props) {
     <div className="space-y-6">
       <OnboardingResumeBanner />
       <VitalityHero />
+      <CertificationHealthWidget />
 
       {isVisible('priority_tiles') && <PriorityTiles onOpenQueue={onOpenQueue} />}
 

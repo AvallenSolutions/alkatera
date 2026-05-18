@@ -82,7 +82,16 @@ export function useCertificationFrameworks(activeOnly = true) {
     fetchFrameworks();
   }, [fetchFrameworks]);
 
-  const startCertification = async (frameworkId: string, targetDate?: string) => {
+  const startCertification = async (
+    frameworkId: string,
+    options?: {
+      target_date?: string;
+      certification_type?: 'new' | 'recertification';
+      certification_start_date?: string;
+      ecgt_applicable?: boolean;
+      previous_bia_score?: number;
+    },
+  ) => {
     if (!currentOrganization?.id) return null;
 
     try {
@@ -93,7 +102,7 @@ export function useCertificationFrameworks(activeOnly = true) {
           organization_id: currentOrganization.id,
           framework_id: frameworkId,
           status: 'in_progress',
-          target_date: targetDate,
+          ...options,
         }),
       });
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FeatureGate } from '@/components/subscription/FeatureGate';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,11 +40,22 @@ import {
 } from 'lucide-react';
 import { CertificationReadinessHero } from '@/components/certifications/CertificationReadinessHero';
 import { FrameworkCard } from '@/components/certifications/FrameworkCard';
-import { EvidenceLinker } from '@/components/certifications/EvidenceLinker';
+import { GapAnalysisView } from '@/components/certifications/GapAnalysisView';
+import { ReadinessBanner } from '@/components/certifications/ReadinessBanner';
+import { EcgtBanner } from '@/components/certifications/EcgtBanner';
+import { JourneySelectionDialog } from '@/components/certifications/JourneySelectionDialog';
+import { RiskToolWizard } from '@/components/certifications/RiskToolWizard';
+import { PreAuditChecklist } from '@/components/certifications/PreAuditChecklist';
+import { AuditTimeline } from '@/components/certifications/AuditTimeline';
+import { ClarificationRequests } from '@/components/certifications/ClarificationRequests';
+import { UpcomingRequirements } from '@/components/certifications/UpcomingRequirements';
+import { StandardsBanner } from '@/components/certifications/StandardsBanner';
+import { RecertBanner } from '@/components/certifications/RecertBanner';
 import { useCertificationFrameworks } from '@/hooks/data/useCertificationFrameworks';
 import { useCertificationScore } from '@/hooks/data/useCertificationScore';
 import { useCertificationEvidence } from '@/hooks/data/useCertificationEvidence';
 import { useCertificationAuditPackages } from '@/hooks/data/useCertificationAuditPackages';
+import { useCertificationReadiness } from '@/hooks/data/useCertificationReadiness';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -77,7 +88,20 @@ function CertificationsPageContent() {
     createPackage,
     deletePackage,
   } = useCertificationAuditPackages();
+  const {
+    readiness,
+    loading: readinessLoading,
+    refetch: refetchReadiness,
+  } = useCertificationReadiness();
 
+  const [activeTab, setActiveTab] = useState('frameworks');
+  const [gapBlockingOnly, setGapBlockingOnly] = useState(false);
+  const [journeyOpen, setJourneyOpen] = useState(false);
+  const [riskToolOpen, setRiskToolOpen] = useState(false);
+  const [checklistReady, setChecklistReady] = useState(false);
+  const [exportingPackageId, setExportingPackageId] = useState<string | null>(
+    null,
+  );
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -112,7 +136,9 @@ function CertificationsPageContent() {
     if (!selectedFramework) return;
     setStarting(true);
     try {
-      await startCertification(selectedFramework, targetDate || undefined);
+      await startCertification(selectedFramework, {
+        target_date: targetDate || undefined,
+      });
       setStartDialogOpen(false);
       setSelectedFramework(null);
       setTargetDate('');
@@ -124,6 +150,75 @@ function CertificationsPageContent() {
   const openStartDialog = (frameworkId: string) => {
     setSelectedFramework(frameworkId);
     setStartDialogOpen(true);
+  };
+
+  const bcorpFrameworkId =
+    readiness?.frameworkId ||
+    frameworks.find((f) => f.code === 'bcorp_2026')?.id ||
+    null;
+
+  // Auto-open journey selection when the org has no B Corp certification yet.
+  useEffect(() => {
+    if (!readinessLoading && readiness && !readiness.hasCertification) {
+      setJourneyOpen(true);
+    }
+  }, [readinessLoading, readiness]);
+
+  // Once a package is submitted, the audit workflow becomes the primary view.
+  const hasSubmittedPackage = auditPackages.some((p) =>
+    ['submitted', 'scheduled', 'in_progress', 'clarifications'].includes(
+      p.audit_stage ?? '',
+    ),
+  );
+  useEffect(() => {
+    if (hasSubmittedPackage) setActiveTab('audit-packages');
+  }, [hasSubmittedPackage]);
+
+  const handleCreateEvidence = async (input: Parameters<typeof createEvidence>[0]) => {
+    await createEvidence(input);
+    await Promise.all([refetchEvidence(), refetchReadiness(), refetchScores()]);
+  };
+  const handleDeleteEvidence = async (id: string) => {
+    await deleteEvidence(id);
+    await Promise.all([refetchEvidence(), refetchReadiness(), refetchScores()]);
+  };
+  const handleVerifyEvidence = async (id: string) => {
+    await verifyEvidence(id, 'current_user');
+    await Promise.all([refetchEvidence(), refetchReadiness(), refetchScores()]);
+  };
+  const handleJourneyConfirm = async (choice: {
+    certification_type: 'new' | 'recertification';
+    certification_start_date: string;
+    ecgt_applicable: boolean;
+    previous_bia_score?: number;
+  }) => {
+    if (!bcorpFrameworkId) return;
+    await startCertification(bcorpFrameworkId, choice);
+    await Promise.all([refetch(), refetchReadiness(), refetchScores()]);
+    if (choice.certification_type === 'recertification') {
+      setActiveTab('gap-analysis');
+    }
+  };
+
+  const handleExportPackage = async (packageId: string) => {
+    setExportingPackageId(packageId);
+    try {
+      const res = await fetch('/api/certifications/audit-package/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ package_id: packageId }),
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.error || 'Export failed');
+      }
+      toast.success('Audit package exported');
+      await refetchPackages();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      setExportingPackageId(null);
+    }
   };
 
   // Count frameworks by status
@@ -157,8 +252,30 @@ function CertificationsPageContent() {
       {/* Readiness Hero */}
       <CertificationReadinessHero summary={readinessSummary} loading={scoreLoading} />
 
+      {/* Binary readiness signal + ECGT deadline (sticky) */}
+      {readiness?.hasCertification && (
+        <div className="sticky top-0 z-20 space-y-3 bg-background/95 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <EcgtBanner
+            ecgtApplicable={readiness.ecgtApplicable}
+            isReadyToSubmit={readiness.isReadyToSubmit}
+          />
+          <ReadinessBanner
+            readiness={readiness}
+            onPrepareAudit={() => setActiveTab('audit-packages')}
+            onViewBlocking={() => {
+              setGapBlockingOnly(true);
+              setActiveTab('gap-analysis');
+            }}
+          />
+        </div>
+      )}
+
       {/* Tabs for different views */}
-      <Tabs defaultValue="frameworks" className="space-y-6">
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="space-y-6"
+      >
         <TabsList>
           <TabsTrigger value="frameworks" className="flex items-center gap-2">
             <Award className="h-4 w-4" />
@@ -273,26 +390,59 @@ function CertificationsPageContent() {
 
         {/* Gap Analysis Tab */}
         <TabsContent value="gap-analysis">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Target className="h-5 w-5 text-blue-600" />
-                Gap Analysis
-              </CardTitle>
-              <CardDescription>
-                Select a framework to view and manage gap analysis
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center text-muted-foreground py-8">
-                <Target className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>Select a framework from the Frameworks tab to perform gap analysis.</p>
-                <p className="text-sm mt-1">
-                  Gap analysis helps identify requirements you need to meet for certification.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          {readiness && readiness.hasCertification ? (
+            <div className="space-y-6">
+              <StandardsBanner onApplied={() => refetchReadiness()} />
+              <RecertBanner active={!!readiness.recertPrepActive} />
+              {certifications.find(
+                (c) => c.framework_id === bcorpFrameworkId,
+              )?.status === 'certified' && (
+                <UpcomingRequirements readiness={readiness} />
+              )}
+              <GapAnalysisView
+              readiness={readiness}
+              loading={readinessLoading}
+              evidence={evidence}
+              onCreateEvidence={handleCreateEvidence}
+              onDeleteEvidence={handleDeleteEvidence}
+              onVerifyEvidence={handleVerifyEvidence}
+              onOpenRiskTool={() => setRiskToolOpen(true)}
+              onRefresh={async () => {
+                await Promise.all([
+                  refetchReadiness(),
+                  refetchEvidence(),
+                  refetchScores(),
+                ]);
+              }}
+              initialBlockingOnly={gapBlockingOnly}
+              />
+            </div>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="h-5 w-5 text-blue-600" />
+                  Gap Analysis
+                </CardTitle>
+                <CardDescription>
+                  Start your B Corp certification to see a live gap analysis
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center text-muted-foreground py-8">
+                  <Target className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>No active B Corp certification yet.</p>
+                  <Button
+                    className="mt-4"
+                    onClick={() => setJourneyOpen(true)}
+                    disabled={!bcorpFrameworkId}
+                  >
+                    Begin your B Corp journey
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* Evidence Tab */}
@@ -403,7 +553,74 @@ function CertificationsPageContent() {
         </TabsContent>
 
         {/* Audit Packages Tab */}
-        <TabsContent value="audit-packages">
+        <TabsContent value="audit-packages" className="space-y-6">
+          {readiness?.isReadyToSubmit && (
+            <PreAuditChecklist onReadyChange={setChecklistReady} />
+          )}
+
+          {auditPackages.length > 0 && (
+            <div className="space-y-4">
+              {auditPackages.map((pkg) => (
+                <div key={`wf-${pkg.id}`} className="space-y-3">
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-center justify-between gap-3">
+                        <CardTitle className="text-base">
+                          {pkg.package_name}
+                        </CardTitle>
+                        <div className="flex items-center gap-2">
+                          {pkg.export_url && (
+                            <a
+                              href={pkg.export_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <Button variant="outline" size="sm">
+                                Download ZIP
+                              </Button>
+                            </a>
+                          )}
+                          <Button
+                            size="sm"
+                            disabled={
+                              !checklistReady ||
+                              exportingPackageId === pkg.id
+                            }
+                            onClick={() => handleExportPackage(pkg.id)}
+                          >
+                            {exportingPackageId === pkg.id
+                              ? 'Exporting...'
+                              : pkg.exported_at
+                                ? 'Re-export package'
+                                : 'Prepare Audit Package'}
+                          </Button>
+                        </div>
+                      </div>
+                      {!checklistReady && (
+                        <CardDescription>
+                          Complete the pre-audit checklist above to enable
+                          export.
+                        </CardDescription>
+                      )}
+                    </CardHeader>
+                  </Card>
+                  {(pkg.exported_at || pkg.audit_stage) && (
+                    <AuditTimeline
+                      packageId={pkg.id}
+                      auditStage={pkg.audit_stage ?? 'exported'}
+                      auditScheduledDate={pkg.audit_scheduled_date ?? null}
+                      auditorName={pkg.auditor_name ?? null}
+                      sizeBand={null}
+                      onUpdated={refetchPackages}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <ClarificationRequests />
+
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -625,6 +842,26 @@ function CertificationsPageContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dual journey selection (first entry) */}
+      <JourneySelectionDialog
+        open={journeyOpen}
+        onOpenChange={setJourneyOpen}
+        onConfirm={handleJourneyConfirm}
+      />
+
+      {/* Risk Tool */}
+      <RiskToolWizard
+        open={riskToolOpen}
+        onOpenChange={setRiskToolOpen}
+        onCompleted={async () => {
+          await Promise.all([
+            refetchReadiness(),
+            refetchEvidence(),
+            refetchScores(),
+          ]);
+        }}
+      />
     </div>
   );
 }

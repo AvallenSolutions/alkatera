@@ -191,22 +191,53 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Insert record — always use verified org, never body.organization_id
-    const { data, error } = await supabase
+    // Build the payload. Only verified org is used, never body.organization_id.
+    const payload: Record<string, unknown> = {
+      organization_id: organizationId,
+      framework_id: body.framework_id,
+      status: body.status || 'not_started',
+      target_date: body.target_date,
+      certified_date: body.certification_date || body.certified_date,
+      expiry_date: body.expiry_date,
+      certification_number:
+        body.certificate_number || body.certification_number,
+      readiness_score: body.current_score || body.readiness_score,
+      notes: body.notes,
+    };
+    if (body.certification_type !== undefined) {
+      payload.certification_type = body.certification_type;
+    }
+    if (body.certification_start_date !== undefined) {
+      payload.certification_start_date = body.certification_start_date;
+    }
+    if (body.ecgt_applicable !== undefined) {
+      payload.ecgt_applicable = body.ecgt_applicable;
+    }
+    if (body.previous_bia_score !== undefined) {
+      payload.previous_bia_score = body.previous_bia_score;
+    }
+
+    // Avoid duplicate cert rows: update the existing row for this
+    // org + framework if one already exists, otherwise insert.
+    const { data: existing } = await supabase
       .from('organization_certifications')
-      .insert({
-        organization_id: organizationId,
-        framework_id: body.framework_id,
-        status: body.status || 'not_started',
-        target_date: body.target_date,
-        certified_date: body.certification_date || body.certified_date,
-        expiry_date: body.expiry_date,
-        certification_number: body.certificate_number || body.certification_number,
-        readiness_score: body.current_score || body.readiness_score,
-        notes: body.notes,
-      })
-      .select()
-      .single();
+      .select('id')
+      .eq('organization_id', organizationId)
+      .eq('framework_id', body.framework_id)
+      .maybeSingle();
+
+    const { data, error } = existing
+      ? await supabase
+          .from('organization_certifications')
+          .update(payload)
+          .eq('id', existing.id)
+          .select()
+          .single()
+      : await supabase
+          .from('organization_certifications')
+          .insert(payload)
+          .select()
+          .single();
 
     if (error) {
       console.error('[Certifications API] Error saving data:', {
