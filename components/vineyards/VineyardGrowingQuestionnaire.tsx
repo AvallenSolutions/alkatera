@@ -197,6 +197,7 @@ export function VineyardGrowingQuestionnaire({
     herbicide_applications_per_year: initSource?.herbicide_applications_per_year ?? 0,
     herbicide_type: (initSource?.herbicide_type ?? 'generic') as PesticideType,
     diesel_litres_per_year: initSource?.diesel_litres_per_year ?? 0,
+    red_diesel_litres_per_year: (initSource as any)?.red_diesel_litres_per_year ?? 0,
     petrol_litres_per_year: initSource?.petrol_litres_per_year ?? 0,
     is_irrigated: initSource?.is_irrigated ?? false,
     water_m3_per_ha: initSource?.water_m3_per_ha ?? 0,
@@ -442,6 +443,7 @@ export function VineyardGrowingQuestionnaire({
         herbicide_applications_per_year: form.herbicide_applications_per_year,
         herbicide_type: form.herbicide_type,
         diesel_litres_per_year: form.diesel_litres_per_year,
+        red_diesel_litres_per_year: form.red_diesel_litres_per_year,
         petrol_litres_per_year: form.petrol_litres_per_year,
         is_irrigated: form.is_irrigated,
         water_m3_per_ha: form.water_m3_per_ha,
@@ -593,6 +595,7 @@ export function VineyardGrowingQuestionnaire({
     herbicide_applications_per_year: form.herbicide_applications_per_year,
     herbicide_type: form.herbicide_type,
     diesel_litres_per_year: form.diesel_litres_per_year,
+    red_diesel_litres_per_year: form.red_diesel_litres_per_year,
     petrol_litres_per_year: form.petrol_litres_per_year,
     is_irrigated: form.is_irrigated,
     water_m3_per_ha: form.water_m3_per_ha,
@@ -1696,7 +1699,7 @@ export function VineyardGrowingQuestionnaire({
               <div className="grid gap-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="diesel">Diesel consumption (litres/year)</Label>
+                    <Label htmlFor="diesel">Road diesel (litres/year)</Label>
                     <Input
                       id="diesel"
                       type="number"
@@ -1708,7 +1711,7 @@ export function VineyardGrowingQuestionnaire({
                       placeholder="e.g. 500"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Total diesel for all vineyard operations. Sector average: 80-150 L/ha/yr.
+                      On-road (white) diesel for vineyard operations. Sector average: 80-150 L/ha/yr combined.
                     </p>
                     {form.diesel_litres_per_year > 0 && form.area_ha > 0 && (
                       <p className="text-xs text-muted-foreground">
@@ -1718,6 +1721,27 @@ export function VineyardGrowingQuestionnaire({
                             ⚠ Above 300 L/ha is unusually high
                           </span>
                         )}
+                      </p>
+                    )}
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="red-diesel">Red / agricultural diesel (litres/year)</Label>
+                    <Input
+                      id="red-diesel"
+                      type="number"
+                      min="0"
+                      value={form.red_diesel_litres_per_year || ''}
+                      onChange={(e) =>
+                        updateForm({ red_diesel_litres_per_year: parseFloat(e.target.value) || 0 })
+                      }
+                      placeholder="e.g. 1200"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Gas oil for off-road tractors, sprayers and harvesters. Priced with the DEFRA red-diesel factor (most vineyard machinery fuel sits here).
+                    </p>
+                    {form.red_diesel_litres_per_year > 0 && form.area_ha > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {(form.red_diesel_litres_per_year / form.area_ha).toFixed(0)} L/ha
                       </p>
                     )}
                   </div>

@@ -145,6 +145,8 @@ export interface VineyardGrowingProfile {
 
   // Step 3: Machinery & Fuel
   diesel_litres_per_year: number;
+  /** Red / agricultural (gas oil) diesel for off-road vineyard machinery. */
+  red_diesel_litres_per_year?: number | null;
   petrol_litres_per_year: number;
 
   // Step 4: Irrigation
@@ -222,6 +224,8 @@ export interface ViticultureCalculatorInput {
   herbicide_applications_per_year: number;
   herbicide_type?: PesticideType;
   diesel_litres_per_year: number;
+  /** Red / agricultural (gas oil) diesel for off-road vineyard machinery. */
+  red_diesel_litres_per_year?: number;
   petrol_litres_per_year: number;
   is_irrigated: boolean;
   water_m3_per_ha: number;

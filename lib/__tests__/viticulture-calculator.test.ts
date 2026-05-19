@@ -477,6 +477,35 @@ describe('calculateViticultureImpacts', () => {
       // Fuel is non-FLAG (energy emissions)
       expect(result.non_flag_emissions.machinery_fuel_co2e).toBeGreaterThan(0);
     });
+
+    it('should price red/agricultural diesel with the distinct DEFRA gas-oil factor', () => {
+      const base = calculateViticultureImpacts(UK_VINEYARD_BASELINE);
+      const withRed = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        red_diesel_litres_per_year: 1000,
+      });
+
+      const expectedDelta = 1000 * DEFRA_FUEL_FACTORS.RED_DIESEL_PER_LITRE;
+      expect(
+        withRed.non_flag_emissions.machinery_fuel_co2e -
+          base.non_flag_emissions.machinery_fuel_co2e,
+      ).toBeCloseTo(expectedDelta, 1);
+      // Red diesel factor is distinct from (and higher than) road diesel
+      expect(DEFRA_FUEL_FACTORS.RED_DIESEL_PER_LITRE).not.toBe(
+        DEFRA_FUEL_FACTORS.DIESEL_PER_LITRE,
+      );
+    });
+
+    it('should be backward-compatible when red diesel is absent (no recompute change)', () => {
+      const a = calculateViticultureImpacts(UK_VINEYARD_BASELINE);
+      const b = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        red_diesel_litres_per_year: 0,
+      });
+      expect(a.non_flag_emissions.machinery_fuel_co2e).toBe(
+        b.non_flag_emissions.machinery_fuel_co2e,
+      );
+    });
   });
 
   // --------------------------------------------------------------------------

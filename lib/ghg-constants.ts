@@ -253,8 +253,11 @@ export const SOIL_CARBON_REMOVAL_DEFAULTS: Record<string, number> = {
 // these are hardcoded for the calculator's direct use.
 
 export const DEFRA_FUEL_FACTORS = {
-  /** Diesel, including well-to-tank (kg CO2e per litre) */
+  /** Road diesel, including well-to-tank (kg CO2e per litre) */
   DIESEL_PER_LITRE: 2.54,
+  /** Red / agricultural diesel (gas oil) for off-road farm machinery,
+   *  DEFRA 2025 (kg CO2e per litre). Distinct from road diesel. */
+  RED_DIESEL_PER_LITRE: 2.66076,
   /** Petrol, average biofuel blend (kg CO2e per litre) */
   PETROL_PER_LITRE: 2.31,
 } as const;

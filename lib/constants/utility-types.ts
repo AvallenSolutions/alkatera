@@ -30,8 +30,10 @@ export const UTILITY_TYPES: UtilityType[] = [
   { value: 'diesel_mobile', label: 'Company Fleet (Diesel)', defaultUnit: 'litre', fuelType: 'diesel_stationary', scope: '1' },
   { value: 'petrol_mobile', label: 'Company Fleet (Petrol/Gasoline)', defaultUnit: 'litre', fuelType: 'petrol', scope: '1' },
   { value: 'co2_winemaking', label: 'CO₂ (Winemaking, purchased)', defaultUnit: 'kg', fuelType: 'co2_industrial', scope: '1', recommendedFor: ['winery'] },
-  { value: 'diesel_agricultural', label: 'Agricultural / Red Diesel', defaultUnit: 'litre', fuelType: 'gas_oil_red', scope: '1', recommendedFor: ['winery', 'vineyard'] },
-  { value: 'aviation_fuel', label: 'Aviation Fuel (Jet Kerosene)', defaultUnit: 'litre', fuelType: 'aviation_jet_a1', scope: '1', recommendedFor: ['winery'] },
+  // Note: agricultural/red diesel is captured in the vineyard growing profile
+  // (viticulture machinery fuel), and aviation fuel in the fleet module — not
+  // as facility utilities. The DB enum still carries diesel_agricultural /
+  // aviation_fuel (harmless, non-selectable) since dropping enum values is unsafe.
 ];
 
 // =============================================================================

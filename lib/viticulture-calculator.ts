@@ -265,8 +265,10 @@ export function calculateViticultureImpacts(
   // ========================================================================
 
   const dieselCo2e = input.diesel_litres_per_year * DEFRA_FUEL_FACTORS.DIESEL_PER_LITRE;
+  const redDieselCo2e =
+    (input.red_diesel_litres_per_year ?? 0) * DEFRA_FUEL_FACTORS.RED_DIESEL_PER_LITRE;
   const petrolCo2e = input.petrol_litres_per_year * DEFRA_FUEL_FACTORS.PETROL_PER_LITRE;
-  const machineryFuelCo2e = dieselCo2e + petrolCo2e;
+  const machineryFuelCo2e = dieselCo2e + redDieselCo2e + petrolCo2e;
 
   // Fossil CO2 from fuel combustion (approximate: ~99% of diesel/petrol CO2e is CO2)
   const co2FossilKg = machineryFuelCo2e * 0.99 + fertiliserProductionCo2e * 0.95;
@@ -713,7 +715,13 @@ function buildMethodologyNotes(
     parts.push(`Fertiliser: ${input.fertiliser_type}, ${input.fertiliser_quantity_kg} kg (${nKg.toFixed(1)} kg N)`);
   }
 
-  parts.push(`Fuel: ${input.diesel_litres_per_year} L diesel, ${input.petrol_litres_per_year} L petrol`);
+  parts.push(
+    `Fuel: ${input.diesel_litres_per_year} L road diesel` +
+    (input.red_diesel_litres_per_year
+      ? `, ${input.red_diesel_litres_per_year} L red/agricultural diesel (DEFRA gas-oil factor)`
+      : '') +
+    `, ${input.petrol_litres_per_year} L petrol`,
+  );
 
   if (input.is_irrigated) {
     parts.push(`Irrigation: ${input.water_m3_per_ha} m3/ha (${input.irrigation_energy_source})`);

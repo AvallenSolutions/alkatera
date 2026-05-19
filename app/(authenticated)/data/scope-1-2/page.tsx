@@ -86,8 +86,8 @@ const EMISSION_FACTORS: Record<string, { factor: number; unit: string; scope: 'S
   biomass_solid: { factor: 0.01551, unit: 'kgCO2e/kg', scope: 'Scope 1' },
   refrigerant_leakage: { factor: 1430, unit: 'kgCO2e/kg', scope: 'Scope 1' }, // R134a GWP fallback; per-entry refrigerant_type overrides via REFRIGERANT_GWP
   co2_winemaking: { factor: 1.0, unit: 'kgCO2e/kg', scope: 'Scope 1' }, // 1 kg purchased CO2 = 1 kg CO2e (GHG Protocol process emission)
-  diesel_agricultural: { factor: 2.66076, unit: 'kgCO2e/litre', scope: 'Scope 1' }, // DEFRA 2025 gas oil (red diesel)
-  aviation_fuel: { factor: 2.54470, unit: 'kgCO2e/litre', scope: 'Scope 1' }, // DEFRA 2025 aviation turbine fuel (jet kerosene)
+  // diesel_agricultural is handled in the vineyard growing profile (viticulture
+  // machinery fuel); aviation_fuel in the fleet module — not as facility utilities.
   // Scope 2 - Indirect emissions from purchased energy
   electricity_grid: { factor: 0.207, unit: 'kgCO2e/kWh', scope: 'Scope 2' },
   heat_steam_purchased: { factor: 0.1662, unit: 'kgCO2e/kWh', scope: 'Scope 2' },
@@ -106,8 +106,6 @@ const UTILITY_TYPE_LABELS: Record<string, string> = {
   diesel_mobile: 'Company Fleet (Diesel)',
   petrol_mobile: 'Company Fleet (Petrol/Gasoline)',
   co2_winemaking: 'CO₂ (Winemaking, purchased)',
-  diesel_agricultural: 'Agricultural / Red Diesel',
-  aviation_fuel: 'Aviation Fuel (Jet Kerosene)',
 };
 
 interface Facility {
