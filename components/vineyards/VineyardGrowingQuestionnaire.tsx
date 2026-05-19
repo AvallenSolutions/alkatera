@@ -184,8 +184,9 @@ export function VineyardGrowingQuestionnaire({
     area_ha: initSource?.area_ha ?? vineyardHectares,
     soil_management: (initSource?.soil_management ?? 'conventional_tillage') as SoilManagement,
     pruning_residue_returned: initSource?.pruning_residue_returned ?? true,
-    pruning_residue_management_type: (initSource as any)?.pruning_residue_management_type ?? 'in_field' as 'in_field' | 'removed_for_biomass' | 'chipped_and_spread',
+    pruning_residue_management_type: (initSource as any)?.pruning_residue_management_type ?? 'in_field' as 'in_field' | 'removed_for_biomass' | 'chipped_and_spread' | 'burned',
     pruning_residue_measured_kg_per_ha: (initSource as any)?.pruning_residue_measured_kg_per_ha ?? null as number | null,
+    pruning_residue_burned_kg_per_ha: (initSource as any)?.pruning_residue_burned_kg_per_ha ?? null as number | null,
     fertiliser_type: (initSource?.fertiliser_type ?? 'none') as FertiliserType,
     fertiliser_quantity_kg: initSource?.fertiliser_quantity_kg ?? 0,
     fertiliser_n_content_percent: initSource?.fertiliser_n_content_percent ?? 0,
@@ -430,6 +431,7 @@ export function VineyardGrowingQuestionnaire({
         pruning_residue_returned: form.pruning_residue_management_type !== 'removed_for_biomass',
         pruning_residue_management_type: form.pruning_residue_management_type,
         pruning_residue_measured_kg_per_ha: form.pruning_residue_measured_kg_per_ha,
+        pruning_residue_burned_kg_per_ha: form.pruning_residue_burned_kg_per_ha,
         fertiliser_type: form.fertiliser_type,
         fertiliser_quantity_kg: form.fertiliser_quantity_kg,
         fertiliser_n_content_percent: form.fertiliser_n_content_percent,
@@ -580,6 +582,7 @@ export function VineyardGrowingQuestionnaire({
     pruning_residue_returned: form.pruning_residue_management_type !== 'removed_for_biomass',
     pruning_residue_management_type: form.pruning_residue_management_type,
     pruning_residue_measured_kg_per_ha: form.pruning_residue_measured_kg_per_ha ?? undefined,
+    pruning_residue_burned_kg_per_ha: form.pruning_residue_burned_kg_per_ha ?? undefined,
     fertiliser_type: form.fertiliser_type,
     fertiliser_quantity_kg: form.fertiliser_quantity_kg,
     fertiliser_n_content_percent: form.fertiliser_n_content_percent,
@@ -837,7 +840,7 @@ export function VineyardGrowingQuestionnaire({
                   <Select
                     value={form.pruning_residue_management_type}
                     onValueChange={(v) => updateForm({
-                      pruning_residue_management_type: v as 'in_field' | 'removed_for_biomass' | 'chipped_and_spread',
+                      pruning_residue_management_type: v as 'in_field' | 'removed_for_biomass' | 'chipped_and_spread' | 'burned',
                       pruning_residue_returned: v !== 'removed_for_biomass',
                     })}
                   >
@@ -848,11 +851,13 @@ export function VineyardGrowingQuestionnaire({
                       <SelectItem value="in_field">Left in field to decompose (default)</SelectItem>
                       <SelectItem value="removed_for_biomass">Removed for biomass / off-site use</SelectItem>
                       <SelectItem value="chipped_and_spread">Chipped and spread back onto soil</SelectItem>
+                      <SelectItem value="burned">Burned in-field</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
-                {form.pruning_residue_management_type !== 'removed_for_biomass' && (
+                {(form.pruning_residue_management_type === 'in_field' ||
+                  form.pruning_residue_management_type === 'chipped_and_spread') && (
                   <div className="grid gap-2 max-w-[300px]">
                     <Label htmlFor="pruning-dm">Measured pruning dry matter (kg/ha/yr)</Label>
                     <p className="text-xs text-muted-foreground">
@@ -870,6 +875,28 @@ export function VineyardGrowingQuestionnaire({
                         })
                       }
                       placeholder="e.g. 2500"
+                    />
+                  </div>
+                )}
+
+                {form.pruning_residue_management_type === 'burned' && (
+                  <div className="grid gap-2 max-w-[300px]">
+                    <Label htmlFor="pruning-burned-dm">Pruning dry matter burned (kg/ha/yr)</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Optional. IPCC default for vine prunings is 1,500–2,500 kg dry matter/ha. Leave blank to use an age-based default. Burning emits CH4 and N2O (Scope 1); biogenic CO2 is excluded per the GHG Protocol.
+                    </p>
+                    <Input
+                      id="pruning-burned-dm"
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={form.pruning_residue_burned_kg_per_ha ?? ''}
+                      onChange={(e) =>
+                        updateForm({
+                          pruning_residue_burned_kg_per_ha: e.target.value ? parseFloat(e.target.value) : null,
+                        })
+                      }
+                      placeholder="e.g. 2000"
                     />
                   </div>
                 )}

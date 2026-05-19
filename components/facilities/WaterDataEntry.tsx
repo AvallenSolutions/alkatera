@@ -12,6 +12,14 @@ import { Droplets, Info, AlertTriangle, CheckCircle2, XCircle } from "lucide-rea
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 import { AgentBanner } from "@/components/agents/AgentBanner";
+import { calculateWastewaterCH4 } from "@/lib/wastewater-calculator";
+
+const DISCHARGE_DESTINATIONS = [
+  { value: "on_site_treatment", label: "On-site treatment (Scope 1)" },
+  { value: "land", label: "Land application (Scope 1)" },
+  { value: "water_body", label: "Discharge to water body (Scope 1)" },
+  { value: "sewer", label: "Municipal sewer (Scope 3, Cat 5)" },
+];
 
 interface WaterDataEntryProps {
   facilityId: string;
@@ -97,6 +105,8 @@ export function WaterDataEntry({
     water_source_type: "",
     water_classification: "",
     wastewater_treatment_method: "",
+    wastewater_cod_mg_per_litre: "",
+    wastewater_discharge_destination: "",
     water_recycling_rate_percent: "",
     water_stress_area_flag: false,
     data_provenance: isThirdParty ? "secondary_modelled_industry_average" : "primary_measured_onsite",
@@ -185,6 +195,8 @@ export function WaterDataEntry({
             water_source_type: formData.water_source_type || undefined,
             water_classification: formData.water_classification || undefined,
             wastewater_treatment_method: formData.wastewater_treatment_method || undefined,
+            wastewater_cod_mg_per_litre: formData.wastewater_cod_mg_per_litre ? parseFloat(formData.wastewater_cod_mg_per_litre) : undefined,
+            wastewater_discharge_destination: formData.wastewater_discharge_destination || undefined,
             water_recycling_rate_percent: formData.water_recycling_rate_percent ? parseFloat(formData.water_recycling_rate_percent) : undefined,
             water_stress_area_flag: formData.water_stress_area_flag,
             notes: formData.notes || undefined,
@@ -208,6 +220,8 @@ export function WaterDataEntry({
         water_source_type: "",
         water_classification: "",
         wastewater_treatment_method: "",
+        wastewater_cod_mg_per_litre: "",
+        wastewater_discharge_destination: "",
         water_recycling_rate_percent: "",
         water_stress_area_flag: false,
         data_provenance: isThirdParty ? "secondary_modelled_industry_average" : "primary_measured_onsite",
@@ -347,21 +361,87 @@ export function WaterDataEntry({
             </div>
 
             {formData.activity_category === "water_discharge" && (
-              <div className="space-y-2">
-                <Label htmlFor="wastewater_treatment_method">Treatment Method</Label>
-                <Select
-                  value={formData.wastewater_treatment_method}
-                  onValueChange={(value) => setFormData({ ...formData, wastewater_treatment_method: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select treatment method" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TREATMENT_METHODS.map((method) => (
-                      <SelectItem key={method.value} value={method.value}>{method.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="wastewater_treatment_method">Treatment Method</Label>
+                  <Select
+                    value={formData.wastewater_treatment_method}
+                    onValueChange={(value) => setFormData({ ...formData, wastewater_treatment_method: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select treatment method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TREATMENT_METHODS.map((method) => (
+                        <SelectItem key={method.value} value={method.value}>{method.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="wastewater_discharge_destination">Discharge destination</Label>
+                  <Select
+                    value={formData.wastewater_discharge_destination}
+                    onValueChange={(value) => setFormData({ ...formData, wastewater_discharge_destination: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Where does the wastewater go?" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DISCHARGE_DESTINATIONS.map((d) => (
+                        <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="wastewater_cod_mg_per_litre">
+                    COD concentration (mg O₂/L)
+                  </Label>
+                  <Input
+                    id="wastewater_cod_mg_per_litre"
+                    type="number"
+                    step="1"
+                    min="0"
+                    value={formData.wastewater_cod_mg_per_litre}
+                    onChange={(e) => setFormData({ ...formData, wastewater_cod_mg_per_litre: e.target.value })}
+                    placeholder="e.g. 5000 (winery wastewater is typically 2,000–10,000)"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Optional. From discharge monitoring reports if available.
+                    When provided, methane is calculated using the IPCC 2006
+                    COD model instead of a generic factor.
+                  </p>
+                </div>
+
+                {(() => {
+                  const vol = parseFloat(formData.quantity);
+                  const cod = parseFloat(formData.wastewater_cod_mg_per_litre);
+                  if (!vol || !cod || formData.unit !== "m³") return null;
+                  const r = calculateWastewaterCH4({
+                    volume_m3: vol,
+                    cod_mg_per_litre: cod,
+                    treatment_method: formData.wastewater_treatment_method || "unknown",
+                    discharge_destination:
+                      (formData.wastewater_discharge_destination as
+                        | "on_site_treatment"
+                        | "sewer"
+                        | "water_body"
+                        | "land") || null,
+                  });
+                  if (!r.used_cod_model) return null;
+                  return (
+                    <div className="rounded-md border bg-muted/40 p-3 text-xs">
+                      <p className="font-medium">
+                        Estimated CH₄: {r.ch4_kg.toFixed(1)} kg
+                        ({(r.ch4_co2e_kg / 1000).toFixed(2)} tCO₂e) — {r.scope}
+                      </p>
+                      <p className="text-muted-foreground mt-1">{r.methodology_note}</p>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 

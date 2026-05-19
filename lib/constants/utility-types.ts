@@ -13,6 +13,8 @@ export interface UtilityType {
   defaultUnit: string;
   fuelType: string;
   scope: '1' | '2';
+  /** Facility types this utility is especially relevant to. Untagged = always shown. Presentation-only grouping. */
+  recommendedFor?: ('winery' | 'vineyard' | 'general')[];
 }
 
 export const UTILITY_TYPES: UtilityType[] = [
@@ -27,6 +29,9 @@ export const UTILITY_TYPES: UtilityType[] = [
   { value: 'refrigerant_leakage', label: 'Refrigerants (Leakage)', defaultUnit: 'kg', fuelType: 'refrigerant_r410a', scope: '1' },
   { value: 'diesel_mobile', label: 'Company Fleet (Diesel)', defaultUnit: 'litre', fuelType: 'diesel_stationary', scope: '1' },
   { value: 'petrol_mobile', label: 'Company Fleet (Petrol/Gasoline)', defaultUnit: 'litre', fuelType: 'petrol', scope: '1' },
+  { value: 'co2_winemaking', label: 'CO₂ (Winemaking, purchased)', defaultUnit: 'kg', fuelType: 'co2_industrial', scope: '1', recommendedFor: ['winery'] },
+  { value: 'diesel_agricultural', label: 'Agricultural / Red Diesel', defaultUnit: 'litre', fuelType: 'gas_oil_red', scope: '1', recommendedFor: ['winery', 'vineyard'] },
+  { value: 'aviation_fuel', label: 'Aviation Fuel (Jet Kerosene)', defaultUnit: 'litre', fuelType: 'aviation_jet_a1', scope: '1', recommendedFor: ['winery'] },
 ];
 
 // =============================================================================
@@ -86,6 +91,7 @@ export const WASTE_TYPES = [
   { value: 'hazardous', label: 'Hazardous Materials' },
   { value: 'construction', label: 'Construction & Demolition' },
   { value: 'electronic', label: 'Electronic Waste (WEEE)' },
+  { value: 'grape_pomace', label: 'Grape Pomace / Marc (winery)' },
   { value: 'other', label: 'Other' },
 ] as const;
 

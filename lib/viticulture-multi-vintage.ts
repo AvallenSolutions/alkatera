@@ -127,6 +127,8 @@ function combineImpacts(
       n2o_direct_co2e: reduce(results.map((r) => r.flag_emissions.n2o_direct_co2e)),
       n2o_indirect_co2e: reduce(results.map((r) => r.flag_emissions.n2o_indirect_co2e)),
       n2o_crop_residue_co2e: reduce(results.map((r) => r.flag_emissions.n2o_crop_residue_co2e)),
+      n2o_residue_burning_co2e: reduce(results.map((r) => r.flag_emissions.n2o_residue_burning_co2e ?? 0)),
+      ch4_residue_burning_co2e: reduce(results.map((r) => r.flag_emissions.ch4_residue_burning_co2e ?? 0)),
       luc_co2e: reduce(results.map((r) => r.flag_emissions.luc_co2e)),
       land_use_m2: reduce(results.map((r) => r.flag_emissions.land_use_m2)),
       total_flag_co2e: reduce(results.map((r) => r.flag_emissions.total_flag_co2e)),

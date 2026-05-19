@@ -183,6 +183,7 @@ export interface VineyardGrowingProfile {
   // Pruning residue detail
   pruning_residue_management_type?: string | null;
   pruning_residue_measured_kg_per_ha?: number | null;
+  pruning_residue_burned_kg_per_ha?: number | null;
 
   // Draft support
   is_draft: boolean;
@@ -206,9 +207,11 @@ export interface ViticultureCalculatorInput {
   soil_management: SoilManagement;
   pruning_residue_returned?: boolean;
   /** How vine prunings are managed. Determines N2O calculation pathway. */
-  pruning_residue_management_type?: 'in_field' | 'removed_for_biomass' | 'chipped_and_spread';
+  pruning_residue_management_type?: 'in_field' | 'removed_for_biomass' | 'chipped_and_spread' | 'burned';
   /** Measured dry matter from prunings (kg/ha/yr). Overrides VINE_PRUNING_DM_PER_HA default. */
   pruning_residue_measured_kg_per_ha?: number;
+  /** Dry matter of prunings burned in-field (kg/ha/yr). Used when management type is 'burned'. */
+  pruning_residue_burned_kg_per_ha?: number;
   fertiliser_type: FertiliserType;
   fertiliser_quantity_kg: number;
   fertiliser_n_content_percent: number;
@@ -286,6 +289,10 @@ export interface ViticultureImpactResult {
     n2o_indirect_co2e: number;
     /** N2O from crop residue decomposition (vine prunings, IPCC Ch 11) */
     n2o_crop_residue_co2e: number;
+    /** N2O from in-field burning of prunings (IPCC 2006 Vol 4 Ch 2.4). 0 unless burned. */
+    n2o_residue_burning_co2e?: number;
+    /** CH4 from in-field burning of prunings (IPCC 2006 Vol 4 Ch 2.4). 0 unless burned. */
+    ch4_residue_burning_co2e?: number;
     /** dLUC emissions amortised over 20 years (kg CO2e, FLAG-C3) */
     luc_co2e: number;
     /** Land occupation (m2 per year) */

@@ -76,6 +76,10 @@ export async function POST(request: NextRequest) {
         reporting_period_end: periodEnd,
         data_quality: 'actual',
         calculated_scope: '',
+        refrigerant_type:
+          entry.utility_type === 'refrigerant_leakage'
+            ? (entry as any).refrigerant_type ?? null
+            : null,
         created_by: user.id,
         name: entryName,
         mpan,

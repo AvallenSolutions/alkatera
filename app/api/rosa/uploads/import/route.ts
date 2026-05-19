@@ -44,6 +44,9 @@ const VALID_UTILITY_TYPES = [
   'heavy_fuel_oil',
   'biomass_solid',
   'refrigerant_leakage',
+  'co2_winemaking',
+  'diesel_agricultural',
+  'aviation_fuel',
 ] as const;
 
 const WATER_TYPE = 'water_intake';

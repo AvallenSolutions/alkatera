@@ -47,6 +47,8 @@ interface RequestPayload {
   water_source_type?: string;
   water_classification?: string;
   wastewater_treatment_method?: string;
+  wastewater_cod_mg_per_litre?: number;
+  wastewater_discharge_destination?: string;
   water_recycling_rate_percent?: number;
   water_stress_area_flag?: boolean;
   waste_category?: string;
@@ -219,6 +221,8 @@ Deno.serve(async (req: Request) => {
       water_source_type: payload.water_source_type,
       water_classification: payload.water_classification,
       wastewater_treatment_method: payload.wastewater_treatment_method,
+      wastewater_cod_mg_per_litre: payload.wastewater_cod_mg_per_litre,
+      wastewater_discharge_destination: payload.wastewater_discharge_destination,
       water_recycling_rate_percent: payload.water_recycling_rate_percent,
       water_stress_area_flag: payload.water_stress_area_flag,
       waste_category: payload.waste_category,

@@ -49,6 +49,83 @@ export const IPCC_AR6_GWP = {
 export type IPCC_AR6_GWP_Type = typeof IPCC_AR6_GWP;
 
 // ---------------------------------------------------------------------------
+// IPCC 2006 Vol 4 Ch 2.4, Table 2.5 — open field burning of agricultural
+// residues (applied to vine prunings).
+// ---------------------------------------------------------------------------
+// Biogenic CO2 released by combustion is climate-neutral and EXCLUDED per
+// GHG Protocol / SBTi FLAG. Only CH4 and N2O from incomplete combustion are
+// reported (Scope 1 / FLAG).
+//
+//   CH4_kg = Mb_kg * Cf * Gef_CH4 / 1000
+//   N2O_kg = Mb_kg * Cf * Gef_N2O / 1000
+//   where Mb = dry matter available, Cf = combustion factor.
+export const BIOMASS_BURNING_FACTORS = {
+  /** Combustion factor Cf — fraction of available dry matter actually combusted */
+  COMBUSTION_FACTOR: 0.9,
+  /** CH4 emission factor (g CH4 per kg dry matter burned) */
+  GEF_CH4_G_PER_KG: 2.3,
+  /** N2O emission factor (g N2O per kg dry matter burned) */
+  GEF_N2O_G_PER_KG: 0.21,
+} as const;
+
+// ---------------------------------------------------------------------------
+// Refrigerant GWP-100 values (IPCC AR5/AR6).
+// ---------------------------------------------------------------------------
+// Used for Scope 1 fugitive emissions: co2e = kg_leaked * gwp.
+// The default key 'r134a' preserves the historical hardcoded factor (1430),
+// so existing refrigerant_leakage entries with no explicit type are unaffected.
+export const REFRIGERANT_GWP: Record<string, { label: string; gwp: number }> = {
+  r134a: { label: 'R-134a (HFC-134a)', gwp: 1430 }, // historical default — do not change
+  r404a: { label: 'R-404A (blend)', gwp: 3922 },
+  r410a: { label: 'R-410A (blend)', gwp: 2088 },
+  r407c: { label: 'R-407C (blend)', gwp: 1774 },
+  r507a: { label: 'R-507A (blend)', gwp: 3985 },
+  r32: { label: 'R-32 (HFC-32)', gwp: 675 },
+  r1234yf: { label: 'R-1234yf (HFO, low-GWP)', gwp: 4 },
+  r717: { label: 'R-717 (Ammonia / NH₃)', gwp: 0 },
+  r744: { label: 'R-744 (Carbon dioxide)', gwp: 1 },
+  r290: { label: 'R-290 (Propane)', gwp: 3 },
+};
+
+/** Default refrigerant key for legacy entries with no explicit type (R-134a, GWP 1430). */
+export const DEFAULT_REFRIGERANT_KEY = 'r134a';
+
+/**
+ * Resolve the GWP-100 for a refrigerant entry. Null/blank/unknown keys fall
+ * back to R-134a (GWP 1430), preserving the historical hardcoded behaviour for
+ * legacy entries with no explicit refrigerant type.
+ */
+export function resolveRefrigerantGwp(key: string | null | undefined): number {
+  const k = key || DEFAULT_REFRIGERANT_KEY;
+  return REFRIGERANT_GWP[k]?.gwp ?? REFRIGERANT_GWP[DEFAULT_REFRIGERANT_KEY].gwp;
+}
+
+// ---------------------------------------------------------------------------
+// IPCC 2006 Vol 5 Ch 6 — CH4 from biological treatment of wastewater.
+// ---------------------------------------------------------------------------
+// CH4_kg = COD_load_kg * Bo * MCF
+//   COD_load_kg = volume_m3 * COD_mg_per_L * 0.001
+//   Bo  = max CH4 producing capacity (kg CH4 / kg COD), IPCC industrial default
+//   MCF = methane correction factor by treatment pathway (anaerobic fraction)
+// Winery wastewater is high-COD (2,000–10,000+ mg/L vs ~300–600 for domestic).
+export const WASTEWATER_FACTORS = {
+  /** Maximum CH4 producing capacity, kg CH4 / kg COD (IPCC 2006 industrial default) */
+  Bo: 0.25,
+  /** Methane correction factor by treatment pathway. Keyed by
+   *  wastewater_treatment_method_enum plus future anaerobic options. */
+  MCF: {
+    none: 0.1,                 // discharge to aquatic environment, untreated
+    primary_treatment: 0.1,    // aerobic, minor anaerobic component
+    secondary_treatment: 0.1,  // well-managed aerobic
+    tertiary_treatment: 0.05,  // advanced aerobic
+    anaerobic_lagoon: 0.8,     // (future enum value)
+    anaerobic_reactor: 0.8,    // (future enum value)
+    septic: 0.5,               // (future enum value)
+    unknown: 0.3,              // conservative midpoint
+  } as Record<string, number>,
+} as const;
+
+// ---------------------------------------------------------------------------
 // IPCC 2019 Refinement: N2O Emission Factors from Managed Soils (Chapter 11)
 // ---------------------------------------------------------------------------
 // Used by viticulture-calculator.ts for field-level N2O from fertiliser

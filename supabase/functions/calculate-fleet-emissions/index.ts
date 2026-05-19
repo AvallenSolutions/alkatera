@@ -108,7 +108,11 @@ Deno.serve(async (req: Request) => {
           );
         }
         activityValue = payload.fuel_volume_litres;
-        emissionFactorName = fuelType === 'diesel' ? 'Diesel - Mobile Combustion' : 'Petrol - Mobile Combustion';
+        emissionFactorName =
+          fuelType === 'red_diesel' ? 'Gas Oil (Red Diesel) - Mobile Combustion'
+          : fuelType === 'aviation' ? 'Aviation Turbine Fuel - Mobile Combustion'
+          : fuelType === 'diesel' ? 'Diesel - Mobile Combustion'
+          : 'Petrol - Mobile Combustion';
         factorUnit = 'kgCO2e/litre';
         break;
 

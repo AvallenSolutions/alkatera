@@ -13,6 +13,7 @@ import {
   LUC_AMORTISATION_YEARS,
   VINE_PRUNING_DM_BY_AGE,
   VINE_BIOMASS_C_ACCUMULATION,
+  BIOMASS_BURNING_FACTORS,
 } from '../ghg-constants';
 import type { ViticultureCalculatorInput } from '../types/viticulture';
 
@@ -379,6 +380,78 @@ describe('calculateViticultureImpacts', () => {
       // pruning_residue_returned is optional, defaults to true
       const result = calculateViticultureImpacts(UK_VINEYARD_BASELINE);
       expect(result.flag_emissions.n2o_crop_residue_co2e).toBeGreaterThan(0);
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // Biomass burning: in-field burning of vine prunings (IPCC 2006 Vol 4 Ch 2.4)
+  // --------------------------------------------------------------------------
+
+  describe('biomass burning: in-field burning of vine prunings', () => {
+    it('should compute CH4 and N2O per IPCC 2006 Vol 4 Ch 2.4 (biogenic CO2 excluded)', () => {
+      const result = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        pruning_residue_management_type: 'burned',
+      });
+
+      // No measured/burned DM and no vine_age → mature default 2.5 t DM/ha
+      const dmKg =
+        CROP_RESIDUE_FACTORS.VINE_PRUNING_DM_PER_HA * 1000 *
+        UK_VINEYARD_BASELINE.area_ha *
+        BIOMASS_BURNING_FACTORS.COMBUSTION_FACTOR;
+      const ch4Kg = (dmKg * BIOMASS_BURNING_FACTORS.GEF_CH4_G_PER_KG) / 1000;
+      const n2oKg = (dmKg * BIOMASS_BURNING_FACTORS.GEF_N2O_G_PER_KG) / 1000;
+      const expectedCh4Co2e = ch4Kg * IPCC_AR6_GWP.CH4_BIOGENIC;
+      const expectedN2oCo2e = n2oKg * IPCC_AR6_GWP.N2O;
+
+      expect(result.flag_emissions.ch4_residue_burning_co2e).toBeCloseTo(expectedCh4Co2e, 2);
+      expect(result.flag_emissions.n2o_residue_burning_co2e).toBeCloseTo(expectedN2oCo2e, 2);
+      // Combusted residue does not also decompose
+      expect(result.flag_emissions.n2o_crop_residue_co2e).toBe(0);
+      // First CH4 source in viticulture scope — gas inventory now non-zero
+      expect(result.flag_emissions.gas_inventory?.ch4_total).toBeCloseTo(ch4Kg, 6);
+    });
+
+    it('should use the explicit burned dry-matter value when provided', () => {
+      const result = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        pruning_residue_management_type: 'burned',
+        pruning_residue_burned_kg_per_ha: 2000, // 2.0 t/ha
+      });
+
+      const dmKg = 2.0 * 1000 * UK_VINEYARD_BASELINE.area_ha * BIOMASS_BURNING_FACTORS.COMBUSTION_FACTOR;
+      const ch4Kg = (dmKg * BIOMASS_BURNING_FACTORS.GEF_CH4_G_PER_KG) / 1000;
+      expect(result.flag_emissions.gas_inventory?.ch4_total).toBeCloseTo(ch4Kg, 6);
+    });
+
+    it('should add burning emissions to total FLAG vs an otherwise-identical in-field vineyard', () => {
+      const inField = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        pruning_residue_management_type: 'in_field',
+      });
+      const burned = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        pruning_residue_management_type: 'burned',
+      });
+
+      expect(inField.flag_emissions.gas_inventory?.ch4_total).toBe(0);
+      expect(burned.flag_emissions.gas_inventory?.ch4_total).toBeGreaterThan(0);
+      expect(burned.flag_emissions.total_flag_co2e).toBeGreaterThan(
+        inField.flag_emissions.total_flag_co2e -
+          inField.flag_emissions.n2o_crop_residue_co2e
+      );
+    });
+
+    it('should keep ch4_total at zero for every non-burned management type (regression)', () => {
+      for (const t of ['in_field', 'removed_for_biomass', 'chipped_and_spread'] as const) {
+        const r = calculateViticultureImpacts({
+          ...UK_VINEYARD_BASELINE,
+          pruning_residue_management_type: t,
+        });
+        expect(r.flag_emissions.gas_inventory?.ch4_total).toBe(0);
+        expect(r.flag_emissions.ch4_residue_burning_co2e ?? 0).toBe(0);
+        expect(r.flag_emissions.n2o_residue_burning_co2e ?? 0).toBe(0);
+      }
     });
   });
 
