@@ -150,7 +150,11 @@ export function ProgressTracker() {
     return (
       <ProgressTrackerSetup
         onPicked={async () => {
+          // Clear stale data so the user sees a skeleton while the new
+          // tracker is fetched. Without this, if the GET fails or returns
+          // before re-render, the previous tracker's card lingers.
           setShowSetup(false)
+          setData(null)
           setLoading(true)
           await load({ fresh: true })
         }}

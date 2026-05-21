@@ -31,12 +31,12 @@ interface Props {
  *      stylised dog avatar.
  *   2. Three priority tiles (3-up) — biggest numbers in the room: items
  *      waiting, next deadline, products without LCAs. Click-throughs.
- *   3. Activity pulse + Product spotlight (8/12 + 4/12) — visual rather
- *      than text-heavy. 14-day activity bars and product cards with images.
- *   4. Quick prompts + Quick actions (6/12 + 6/12) — discoverability for
- *      what to ask Rosa and how to feed her data.
- *   5. Recently from Rosa + Recent conversations (6/12 + 6/12) — your
- *      day with Rosa at a glance.
+ *   3. Two parallel columns (8/12 + 4/12) that flow independently:
+ *      - Primary column: ProgressTracker, ForwardTimeline, QuickPrompts,
+ *        RecentlyFromRosa.
+ *      - Sidebar column: ProductSpotlight, QuickActions, RecentConversations.
+ *      Each column stacks its visible cards with `space-y-5` and collapses
+ *      cleanly if every card inside is hidden or returns null.
  *
  * Everything below the priority tiles is scrollable; everything from
  * the hero through the priority tiles fits above the fold on a 1080p
@@ -60,13 +60,6 @@ export function ForYouToday({ onOpenQueue, onSubmit }: Props) {
   const showWizardOnly =
     setupCompletedFlag === false && hasCustomLayout === false
 
-  // Hide entire two-column rows when both cards in the row are hidden, so
-  // we don't leave a gap. When only one of the pair is hidden the other
-  // simply takes its column without expanding.
-  const showActivityRow = isVisible('activity_pulse') || isVisible('forward_timeline') || isVisible('product_spotlight')
-  const showPromptsRow = isVisible('quick_prompts') || isVisible('quick_actions')
-  const showRecentRow = isVisible('recently_from_rosa') || isVisible('recent_conversations')
-
   if (showWizardOnly) {
     return (
       <div className="space-y-6">
@@ -83,55 +76,24 @@ export function ForYouToday({ onOpenQueue, onSubmit }: Props) {
 
       {isVisible('priority_tiles') && <PriorityTiles onOpenQueue={onOpenQueue} />}
 
-      {/* items-start prevents the grid from forcing each column to the
-          row's tallest height. Without this, the left column's stacked
-          ProgressTracker + ForwardTimeline overflows into the grid below
-          when the right column (ProductSpotlight) is shorter. */}
-      {showActivityRow && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-          {(isVisible('activity_pulse') || isVisible('forward_timeline')) && (
-            <div className="lg:col-span-8 space-y-5">
-              {isVisible('activity_pulse') && <ProgressTracker />}
-              {isVisible('forward_timeline') && <ForwardTimeline />}
-            </div>
-          )}
-          {isVisible('product_spotlight') && (
-            <div className="lg:col-span-4">
-              <ProductSpotlight />
-            </div>
-          )}
+      {/* Two parallel columns. items-start keeps them independent so the
+          taller column doesn't stretch the shorter one. [&:empty]:hidden
+          collapses a column whose every card returned null or was hidden,
+          so the other column doesn't get a phantom partner taking grid
+          space. */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        <div className="lg:col-span-8 space-y-5 [&:empty]:hidden">
+          {isVisible('activity_pulse') && <ProgressTracker />}
+          {isVisible('forward_timeline') && <ForwardTimeline />}
+          {isVisible('quick_prompts') && <QuickPrompts onAsk={handleAsk} />}
+          {isVisible('recently_from_rosa') && <RecentlyFromRosa />}
         </div>
-      )}
-
-      {showPromptsRow && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-          {isVisible('quick_prompts') && (
-            <div className="lg:col-span-7">
-              <QuickPrompts onAsk={handleAsk} />
-            </div>
-          )}
-          {isVisible('quick_actions') && (
-            <div className="lg:col-span-5">
-              <QuickActions onOpenQueue={onOpenQueue} />
-            </div>
-          )}
+        <div className="lg:col-span-4 space-y-5 [&:empty]:hidden">
+          {isVisible('product_spotlight') && <ProductSpotlight />}
+          {isVisible('quick_actions') && <QuickActions onOpenQueue={onOpenQueue} />}
+          {isVisible('recent_conversations') && <RecentConversations />}
         </div>
-      )}
-
-      {showRecentRow && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-          {isVisible('recently_from_rosa') && (
-            <div className="lg:col-span-6">
-              <RecentlyFromRosa />
-            </div>
-          )}
-          {isVisible('recent_conversations') && (
-            <div className="lg:col-span-6">
-              <RecentConversations />
-            </div>
-          )}
-        </div>
-      )}
+      </div>
 
       {isVisible('circular_partnerships') && <CircularPartnerships />}
       {isVisible('nature_positive_actions') && <NaturePositiveActions />}
