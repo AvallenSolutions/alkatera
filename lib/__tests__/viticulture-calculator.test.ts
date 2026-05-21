@@ -506,6 +506,24 @@ describe('calculateViticultureImpacts', () => {
         b.non_flag_emissions.machinery_fuel_co2e,
       );
     });
+
+    it('exposes per-fuel breakdown that reconciles with the machinery total', () => {
+      const r = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        red_diesel_litres_per_year: 1000,
+      });
+      const road = r.non_flag_emissions.road_diesel_co2e ?? 0;
+      const red = r.non_flag_emissions.red_diesel_co2e ?? 0;
+      const petrol = r.non_flag_emissions.petrol_co2e ?? 0;
+
+      expect(road).toBeCloseTo(500 * DEFRA_FUEL_FACTORS.DIESEL_PER_LITRE, 6);
+      expect(red).toBeCloseTo(1000 * DEFRA_FUEL_FACTORS.RED_DIESEL_PER_LITRE, 6);
+      expect(petrol).toBeCloseTo(50 * DEFRA_FUEL_FACTORS.PETROL_PER_LITRE, 6);
+      expect(road + red + petrol).toBeCloseTo(
+        r.non_flag_emissions.machinery_fuel_co2e,
+        6,
+      );
+    });
   });
 
   // --------------------------------------------------------------------------

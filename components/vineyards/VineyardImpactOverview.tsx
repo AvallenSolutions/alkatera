@@ -218,6 +218,24 @@ export function VineyardImpactOverview({ impacts, profile }: VineyardImpactOverv
             <DetailRow label="Direct N\u2082O (fertiliser)" value={`${fmt(impacts.flag_emissions.n2o_direct_co2e)} kg CO\u2082e`} />
             <DetailRow label="Indirect N\u2082O (volatilisation + leaching)" value={`${fmt(impacts.flag_emissions.n2o_indirect_co2e)} kg CO\u2082e`} />
             <DetailRow label="Crop residue N\u2082O (vine prunings)" value={`${fmt(impacts.flag_emissions.n2o_crop_residue_co2e)} kg CO\u2082e`} />
+            {(impacts.flag_emissions.ch4_residue_burning_co2e ?? 0) > 0 && (
+              <DetailRow
+                label="Biomass burning CH\u2084 (prunings)"
+                value={`${fmt(impacts.flag_emissions.ch4_residue_burning_co2e || 0)} kg CO\u2082e`}
+              />
+            )}
+            {(impacts.flag_emissions.n2o_residue_burning_co2e ?? 0) > 0 && (
+              <DetailRow
+                label="Biomass burning N\u2082O (prunings)"
+                value={`${fmt(impacts.flag_emissions.n2o_residue_burning_co2e || 0)} kg CO\u2082e`}
+              />
+            )}
+            {((impacts.flag_emissions.ch4_residue_burning_co2e ?? 0) > 0 ||
+              (impacts.flag_emissions.n2o_residue_burning_co2e ?? 0) > 0) && (
+              <p className="text-[10px] text-muted-foreground -mt-1">
+                IPCC 2006 Vol 4 Ch 2.4. Biogenic CO\u2082 from combustion excluded per GHG Protocol / SBTi FLAG.
+              </p>
+            )}
             {impacts.flag_emissions.luc_co2e > 0 && (
               <DetailRow label="Land use change (dLUC)" value={`${fmt(impacts.flag_emissions.luc_co2e)} kg CO\u2082e`} />
             )}
@@ -240,6 +258,21 @@ export function VineyardImpactOverview({ impacts, profile }: VineyardImpactOverv
           <CardContent className="space-y-2">
             <DetailRow label="Fertiliser production" value={`${fmt(impacts.non_flag_emissions.fertiliser_production_co2e)} kg CO\u2082e`} />
             <DetailRow label="Machinery fuel" value={`${fmt(impacts.non_flag_emissions.machinery_fuel_co2e)} kg CO\u2082e`} />
+            {(impacts.non_flag_emissions.road_diesel_co2e ?? 0) > 0 && (
+              <div className="pl-4">
+                <DetailRow label="\u21b3 Road diesel" value={`${fmt(impacts.non_flag_emissions.road_diesel_co2e || 0)} kg CO\u2082e`} muted />
+              </div>
+            )}
+            {(impacts.non_flag_emissions.red_diesel_co2e ?? 0) > 0 && (
+              <div className="pl-4">
+                <DetailRow label="\u21b3 Red / agricultural diesel" value={`${fmt(impacts.non_flag_emissions.red_diesel_co2e || 0)} kg CO\u2082e`} muted />
+              </div>
+            )}
+            {(impacts.non_flag_emissions.petrol_co2e ?? 0) > 0 && (
+              <div className="pl-4">
+                <DetailRow label="\u21b3 Petrol" value={`${fmt(impacts.non_flag_emissions.petrol_co2e || 0)} kg CO\u2082e`} muted />
+              </div>
+            )}
             <DetailRow label="Irrigation energy" value={`${fmt(impacts.non_flag_emissions.irrigation_energy_co2e)} kg CO\u2082e`} />
             <DetailRow label="Pesticide production" value={`${fmt(impacts.non_flag_emissions.pesticide_production_co2e)} kg CO\u2082e`} />
             <div className="border-t pt-2 mt-2">
@@ -419,7 +452,13 @@ export function VineyardImpactOverview({ impacts, profile }: VineyardImpactOverv
               </>
             )}
             <div className="border-t pt-2 mt-2">
-              <DetailRow label="Diesel" value={`${fmt(profile.diesel_litres_per_year)} L/yr (${fmt(profile.diesel_litres_per_year / areaHa)} L/ha)`} />
+              <DetailRow label="Road diesel" value={`${fmt(profile.diesel_litres_per_year)} L/yr (${fmt(profile.diesel_litres_per_year / areaHa)} L/ha)`} />
+              {((profile as any).red_diesel_litres_per_year ?? 0) > 0 && (
+                <DetailRow
+                  label="Red / agricultural diesel"
+                  value={`${fmt((profile as any).red_diesel_litres_per_year)} L/yr (${fmt(((profile as any).red_diesel_litres_per_year) / areaHa)} L/ha)`}
+                />
+              )}
               <DetailRow label="Petrol" value={`${fmt(profile.petrol_litres_per_year)} L/yr (${fmt(profile.petrol_litres_per_year / areaHa)} L/ha)`} />
             </div>
             {profile.is_irrigated && (
@@ -428,7 +467,34 @@ export function VineyardImpactOverview({ impacts, profile }: VineyardImpactOverv
                 <DetailRow label="Energy source" value={profile.irrigation_energy_source.replace(/_/g, ' ')} muted />
               </div>
             )}
-            <DetailRow label="Pruning residue returned" value={profile.pruning_residue_returned ? 'Yes' : 'No'} muted />
+            {(() => {
+              const t = (profile.pruning_residue_management_type ?? (profile.pruning_residue_returned ? 'in_field' : 'removed_for_biomass')) as
+                | 'in_field' | 'removed_for_biomass' | 'chipped_and_spread' | 'burned';
+              const label =
+                t === 'in_field' ? 'Left in field to decompose'
+                : t === 'removed_for_biomass' ? 'Removed for biomass / off-site'
+                : t === 'chipped_and_spread' ? 'Chipped and spread back'
+                : 'Burned in-field';
+              return (
+                <>
+                  <DetailRow label="Pruning management" value={label} muted />
+                  {t === 'burned' && ((profile as any).pruning_residue_burned_kg_per_ha ?? 0) > 0 && (
+                    <DetailRow
+                      label="Pruning DM burned"
+                      value={`${fmt((profile as any).pruning_residue_burned_kg_per_ha)} kg/ha/yr`}
+                      muted
+                    />
+                  )}
+                  {(profile.pruning_residue_measured_kg_per_ha ?? 0) > 0 && t !== 'burned' && (
+                    <DetailRow
+                      label="Pruning DM (measured)"
+                      value={`${fmt(profile.pruning_residue_measured_kg_per_ha as number)} kg/ha/yr`}
+                      muted
+                    />
+                  )}
+                </>
+              );
+            })()}
           </CardContent>
         </Card>
       </div>

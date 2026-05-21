@@ -147,6 +147,9 @@ function combineImpacts(
     non_flag_emissions: {
       fertiliser_production_co2e: reduce(results.map((r) => r.non_flag_emissions.fertiliser_production_co2e)),
       machinery_fuel_co2e: reduce(results.map((r) => r.non_flag_emissions.machinery_fuel_co2e)),
+      road_diesel_co2e: reduce(results.map((r) => r.non_flag_emissions.road_diesel_co2e ?? 0)),
+      red_diesel_co2e: reduce(results.map((r) => r.non_flag_emissions.red_diesel_co2e ?? 0)),
+      petrol_co2e: reduce(results.map((r) => r.non_flag_emissions.petrol_co2e ?? 0)),
       irrigation_energy_co2e: reduce(results.map((r) => r.non_flag_emissions.irrigation_energy_co2e)),
       pesticide_production_co2e: reduce(results.map((r) => r.non_flag_emissions.pesticide_production_co2e)),
       total_non_flag_co2e: reduce(results.map((r) => r.non_flag_emissions.total_non_flag_co2e)),

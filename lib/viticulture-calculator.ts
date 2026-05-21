@@ -502,6 +502,10 @@ export function calculateViticultureImpacts(
     non_flag_emissions: {
       fertiliser_production_co2e: fertiliserProductionCo2e,
       machinery_fuel_co2e: machineryFuelCo2e,
+      // Fuel-type breakdown of machinery_fuel_co2e. Sums to machinery_fuel_co2e.
+      road_diesel_co2e: dieselCo2e,
+      red_diesel_co2e: redDieselCo2e,
+      petrol_co2e: petrolCo2e,
       irrigation_energy_co2e: irrigationEnergyCo2e,
       pesticide_production_co2e: pesticideProductionCo2e,
       total_non_flag_co2e: totalNonFlagEmissions,

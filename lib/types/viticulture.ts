@@ -344,8 +344,14 @@ export interface ViticultureImpactResult {
   non_flag_emissions: {
     /** Embodied CO2e from fertiliser manufacture */
     fertiliser_production_co2e: number;
-    /** Diesel + petrol combustion (DEFRA factors) */
+    /** Road diesel + red/agricultural diesel + petrol combustion (DEFRA factors) */
     machinery_fuel_co2e: number;
+    /** Road diesel (white) only. Sub-total of machinery_fuel_co2e. */
+    road_diesel_co2e?: number;
+    /** Red/agricultural (gas oil) diesel only. Sub-total of machinery_fuel_co2e. */
+    red_diesel_co2e?: number;
+    /** Petrol only. Sub-total of machinery_fuel_co2e. */
+    petrol_co2e?: number;
     /** Electricity/diesel for irrigation pumping */
     irrigation_energy_co2e: number;
     /** Embodied CO2e from pesticide/herbicide manufacture */
