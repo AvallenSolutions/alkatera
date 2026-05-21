@@ -102,7 +102,7 @@ export function VineyardImpactOverview({ impacts, profile }: VineyardImpactOverv
   const totalForBar = fertAndN2o + fuelEmissions + irrigationEmissions + pesticideEmissions;
 
   const segments = [
-    { label: 'Fertiliser & N\u2082O', value: fertAndN2o, colour: '#f59e0b' },
+    { label: 'Fertiliser & N₂O', value: fertAndN2o, colour: '#f59e0b' },
     { label: 'Fuel', value: fuelEmissions, colour: '#ef4444' },
     { label: 'Irrigation', value: irrigationEmissions, colour: '#3b82f6' },
     { label: 'Pesticides', value: pesticideEmissions, colour: '#8b5cf6' },
@@ -115,21 +115,21 @@ export function VineyardImpactOverview({ impacts, profile }: VineyardImpactOverv
         <MetricCard
           label="Emissions/ha"
           value={fmt(emissionsPerHa)}
-          unit="kg CO\u2082e"
+          unit="kg CO₂e"
           icon={<Leaf className="h-5 w-5 text-green-500" />}
           bgClass="bg-green-500/10"
         />
         <MetricCard
           label="Water/ha"
           value={fmt(waterPerHa)}
-          unit="m\u00B3"
+          unit="m³"
           icon={<Droplets className="h-5 w-5 text-blue-500" />}
           bgClass="bg-blue-500/10"
         />
         <MetricCard
           label="Removals/ha"
           value={fmt(removalsPerHa)}
-          unit="kg CO\u2082e"
+          unit="kg CO₂e"
           icon={<TreePine className="h-5 w-5 text-[#ccff00]" />}
           bgClass="bg-[#ccff00]/10"
         />
@@ -156,7 +156,7 @@ export function VineyardImpactOverview({ impacts, profile }: VineyardImpactOverv
                   <TooltipContent>
                     <p className="max-w-xs text-xs">
                       Breakdown of vineyard emissions by source. Fertiliser includes both
-                      production (Scope 3) and field N\u2082O emissions (FLAG).
+                      production (Scope 3) and field N₂O emissions (FLAG).
                     </p>
                   </TooltipContent>
                 </Tooltip>
@@ -180,7 +180,7 @@ export function VineyardImpactOverview({ impacts, profile }: VineyardImpactOverv
                       </TooltipTrigger>
                       <TooltipContent>
                         <p className="text-xs">
-                          {seg.label}: {fmt(seg.value)} kg CO\u2082e ({pct.toFixed(0)}%)
+                          {seg.label}: {fmt(seg.value)} kg CO₂e ({pct.toFixed(0)}%)
                         </p>
                       </TooltipContent>
                     </Tooltip>
@@ -211,39 +211,39 @@ export function VineyardImpactOverview({ impacts, profile }: VineyardImpactOverv
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <FlaskConical className="h-4 w-4 text-amber-500" />
-              FLAG Emissions (N\u2082O + dLUC)
+              FLAG Emissions (N₂O + dLUC)
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <DetailRow label="Direct N\u2082O (fertiliser)" value={`${fmt(impacts.flag_emissions.n2o_direct_co2e)} kg CO\u2082e`} />
-            <DetailRow label="Indirect N\u2082O (volatilisation + leaching)" value={`${fmt(impacts.flag_emissions.n2o_indirect_co2e)} kg CO\u2082e`} />
-            <DetailRow label="Crop residue N\u2082O (vine prunings)" value={`${fmt(impacts.flag_emissions.n2o_crop_residue_co2e)} kg CO\u2082e`} />
+            <DetailRow label="Direct N₂O (fertiliser)" value={`${fmt(impacts.flag_emissions.n2o_direct_co2e)} kg CO₂e`} />
+            <DetailRow label="Indirect N₂O (volatilisation + leaching)" value={`${fmt(impacts.flag_emissions.n2o_indirect_co2e)} kg CO₂e`} />
+            <DetailRow label="Crop residue N₂O (vine prunings)" value={`${fmt(impacts.flag_emissions.n2o_crop_residue_co2e)} kg CO₂e`} />
             {(impacts.flag_emissions.ch4_residue_burning_co2e ?? 0) > 0 && (
               <DetailRow
-                label="Biomass burning CH\u2084 (prunings)"
-                value={`${fmt(impacts.flag_emissions.ch4_residue_burning_co2e || 0)} kg CO\u2082e`}
+                label="Biomass burning CH₄ (prunings)"
+                value={`${fmt(impacts.flag_emissions.ch4_residue_burning_co2e || 0)} kg CO₂e`}
               />
             )}
             {(impacts.flag_emissions.n2o_residue_burning_co2e ?? 0) > 0 && (
               <DetailRow
-                label="Biomass burning N\u2082O (prunings)"
-                value={`${fmt(impacts.flag_emissions.n2o_residue_burning_co2e || 0)} kg CO\u2082e`}
+                label="Biomass burning N₂O (prunings)"
+                value={`${fmt(impacts.flag_emissions.n2o_residue_burning_co2e || 0)} kg CO₂e`}
               />
             )}
             {((impacts.flag_emissions.ch4_residue_burning_co2e ?? 0) > 0 ||
               (impacts.flag_emissions.n2o_residue_burning_co2e ?? 0) > 0) && (
               <p className="text-[10px] text-muted-foreground -mt-1">
-                IPCC 2006 Vol 4 Ch 2.4. Biogenic CO\u2082 from combustion excluded per GHG Protocol / SBTi FLAG.
+                IPCC 2006 Vol 4 Ch 2.4. Biogenic CO₂ from combustion excluded per GHG Protocol / SBTi FLAG.
               </p>
             )}
             {impacts.flag_emissions.luc_co2e > 0 && (
-              <DetailRow label="Land use change (dLUC)" value={`${fmt(impacts.flag_emissions.luc_co2e)} kg CO\u2082e`} />
+              <DetailRow label="Land use change (dLUC)" value={`${fmt(impacts.flag_emissions.luc_co2e)} kg CO₂e`} />
             )}
             <div className="border-t pt-2 mt-2">
-              <DetailRow label="Total FLAG emissions" value={`${fmt(impacts.flag_emissions.total_flag_co2e)} kg CO\u2082e`} bold />
+              <DetailRow label="Total FLAG emissions" value={`${fmt(impacts.flag_emissions.total_flag_co2e)} kg CO₂e`} bold />
             </div>
-            <DetailRow label="Actual N\u2082O mass" value={`${impacts.n2o_kg.toFixed(3)} kg`} muted />
-            <DetailRow label="Land occupation" value={`${fmt(impacts.flag_emissions.land_use_m2)} m\u00B2`} muted />
+            <DetailRow label="Actual N₂O mass" value={`${impacts.n2o_kg.toFixed(3)} kg`} muted />
+            <DetailRow label="Land occupation" value={`${fmt(impacts.flag_emissions.land_use_m2)} m²`} muted />
           </CardContent>
         </Card>
 
@@ -256,29 +256,29 @@ export function VineyardImpactOverview({ impacts, profile }: VineyardImpactOverv
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <DetailRow label="Fertiliser production" value={`${fmt(impacts.non_flag_emissions.fertiliser_production_co2e)} kg CO\u2082e`} />
-            <DetailRow label="Machinery fuel" value={`${fmt(impacts.non_flag_emissions.machinery_fuel_co2e)} kg CO\u2082e`} />
+            <DetailRow label="Fertiliser production" value={`${fmt(impacts.non_flag_emissions.fertiliser_production_co2e)} kg CO₂e`} />
+            <DetailRow label="Machinery fuel" value={`${fmt(impacts.non_flag_emissions.machinery_fuel_co2e)} kg CO₂e`} />
             {(impacts.non_flag_emissions.road_diesel_co2e ?? 0) > 0 && (
               <div className="pl-4">
-                <DetailRow label="\u21b3 Road diesel" value={`${fmt(impacts.non_flag_emissions.road_diesel_co2e || 0)} kg CO\u2082e`} muted />
+                <DetailRow label="↳ Road diesel" value={`${fmt(impacts.non_flag_emissions.road_diesel_co2e || 0)} kg CO₂e`} muted />
               </div>
             )}
             {(impacts.non_flag_emissions.red_diesel_co2e ?? 0) > 0 && (
               <div className="pl-4">
-                <DetailRow label="\u21b3 Red / agricultural diesel" value={`${fmt(impacts.non_flag_emissions.red_diesel_co2e || 0)} kg CO\u2082e`} muted />
+                <DetailRow label="↳ Red / agricultural diesel" value={`${fmt(impacts.non_flag_emissions.red_diesel_co2e || 0)} kg CO₂e`} muted />
               </div>
             )}
             {(impacts.non_flag_emissions.petrol_co2e ?? 0) > 0 && (
               <div className="pl-4">
-                <DetailRow label="\u21b3 Petrol" value={`${fmt(impacts.non_flag_emissions.petrol_co2e || 0)} kg CO\u2082e`} muted />
+                <DetailRow label="↳ Petrol" value={`${fmt(impacts.non_flag_emissions.petrol_co2e || 0)} kg CO₂e`} muted />
               </div>
             )}
-            <DetailRow label="Irrigation energy" value={`${fmt(impacts.non_flag_emissions.irrigation_energy_co2e)} kg CO\u2082e`} />
-            <DetailRow label="Pesticide production" value={`${fmt(impacts.non_flag_emissions.pesticide_production_co2e)} kg CO\u2082e`} />
+            <DetailRow label="Irrigation energy" value={`${fmt(impacts.non_flag_emissions.irrigation_energy_co2e)} kg CO₂e`} />
+            <DetailRow label="Pesticide production" value={`${fmt(impacts.non_flag_emissions.pesticide_production_co2e)} kg CO₂e`} />
             <div className="border-t pt-2 mt-2">
-              <DetailRow label="Total non-FLAG emissions" value={`${fmt(impacts.non_flag_emissions.total_non_flag_co2e)} kg CO\u2082e`} bold />
+              <DetailRow label="Total non-FLAG emissions" value={`${fmt(impacts.non_flag_emissions.total_non_flag_co2e)} kg CO₂e`} bold />
             </div>
-            <DetailRow label="Fossil CO\u2082" value={`${impacts.co2_fossil_kg.toFixed(1)} kg`} muted />
+            <DetailRow label="Fossil CO₂" value={`${impacts.co2_fossil_kg.toFixed(1)} kg`} muted />
           </CardContent>
         </Card>
 
@@ -291,11 +291,11 @@ export function VineyardImpactOverview({ impacts, profile }: VineyardImpactOverv
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <DetailRow label="Blue water consumption" value={`${fmt(impacts.water_m3)} m\u00B3`} />
-            <DetailRow label="Per hectare" value={`${fmt(waterPerHa)} m\u00B3/ha`} muted />
+            <DetailRow label="Blue water consumption" value={`${fmt(impacts.water_m3)} m³`} />
+            <DetailRow label="Per hectare" value={`${fmt(waterPerHa)} m³/ha`} muted />
             <div className="border-t pt-2 mt-2">
-              <DetailRow label="AWARE scarcity-weighted" value={`${fmt(impacts.water_scarcity_m3_eq)} m\u00B3 eq`} bold />
-              <DetailRow label="Per hectare (scarcity-weighted)" value={`${fmt(scarcityPerHa)} m\u00B3 eq/ha`} muted />
+              <DetailRow label="AWARE scarcity-weighted" value={`${fmt(impacts.water_scarcity_m3_eq)} m³ eq`} bold />
+              <DetailRow label="Per hectare (scarcity-weighted)" value={`${fmt(scarcityPerHa)} m³ eq/ha`} muted />
             </div>
             {impacts.water_scarcity_m3_eq !== impacts.water_m3 && impacts.water_m3 > 0 && (
               <p className="text-xs text-muted-foreground mt-1">
@@ -353,10 +353,10 @@ export function VineyardImpactOverview({ impacts, profile }: VineyardImpactOverv
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <DetailRow label="Total FLAG removals" value={`${fmt(impacts.total_removals)} kg CO\u2082e`} bold />
-            <DetailRow label="Per hectare" value={`${fmt(removalsPerHa)} kg CO\u2082e/ha`} muted />
+            <DetailRow label="Total FLAG removals" value={`${fmt(impacts.total_removals)} kg CO₂e`} bold />
+            <DetailRow label="Per hectare" value={`${fmt(removalsPerHa)} kg CO₂e/ha`} muted />
             <div className="border-t pt-2 mt-2">
-              <DetailRow label="Soil carbon" value={`${fmt(impacts.flag_removals.soil_carbon_co2e)} kg CO\u2082e`} />
+              <DetailRow label="Soil carbon" value={`${fmt(impacts.flag_removals.soil_carbon_co2e)} kg CO₂e`} />
               <DetailRow label="Soil management" value={SOIL_LABELS[profile.soil_management] || profile.soil_management} muted />
               <DetailRow
                 label="Soil methodology"
@@ -370,7 +370,7 @@ export function VineyardImpactOverview({ impacts, profile }: VineyardImpactOverv
               )}
             </div>
             <div className="border-t pt-2 mt-2">
-              <DetailRow label="Above-ground biomass carbon" value={`${fmt(impacts.flag_removals.biomass_carbon_co2e)} kg CO\u2082e`} />
+              <DetailRow label="Above-ground biomass carbon" value={`${fmt(impacts.flag_removals.biomass_carbon_co2e)} kg CO₂e`} />
               <DetailRow
                 label="Biomass methodology"
                 value={impacts.flag_removals.biomass_carbon_methodology === 'age_based_default' ? 'Age-based default (IPCC 2019 Vol 4 Ch 2)' : 'Not calculated'}
@@ -463,7 +463,7 @@ export function VineyardImpactOverview({ impacts, profile }: VineyardImpactOverv
             </div>
             {profile.is_irrigated && (
               <div className="border-t pt-2 mt-2">
-                <DetailRow label="Irrigation" value={`${fmt(profile.water_m3_per_ha)} m\u00B3/ha`} />
+                <DetailRow label="Irrigation" value={`${fmt(profile.water_m3_per_ha)} m³/ha`} />
                 <DetailRow label="Energy source" value={profile.irrigation_energy_source.replace(/_/g, ' ')} muted />
               </div>
             )}
@@ -506,15 +506,15 @@ export function VineyardImpactOverview({ impacts, profile }: VineyardImpactOverv
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
             <div>
               <p className="text-lg font-bold">{impacts.total_emissions_per_kg.toFixed(3)}</p>
-              <p className="text-xs text-muted-foreground">kg CO\u2082e/kg grapes</p>
+              <p className="text-xs text-muted-foreground">kg CO₂e/kg grapes</p>
             </div>
             <div>
               <p className="text-lg font-bold text-[#ccff00]">{impacts.removals_per_kg.toFixed(3)}</p>
-              <p className="text-xs text-muted-foreground">kg CO\u2082e removed/kg</p>
+              <p className="text-xs text-muted-foreground">kg CO₂e removed/kg</p>
             </div>
             <div>
               <p className="text-lg font-bold">{(impacts.water_m3 / (profile.grape_yield_tonnes * 1000)).toFixed(3)}</p>
-              <p className="text-xs text-muted-foreground">m\u00B3 water/kg grapes</p>
+              <p className="text-xs text-muted-foreground">m³ water/kg grapes</p>
             </div>
             <div>
               <p className="text-lg font-bold">{(impacts.freshwater_ecotoxicity / (profile.grape_yield_tonnes * 1000)).toFixed(1)}</p>
