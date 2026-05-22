@@ -81,14 +81,50 @@ Notes:
 
 ## Where the data goes
 
-After producing the two CSVs, upload them in the admin panel (brands
-first, then products — products need their brand to exist):
+### Preferred for a scheduled run: the JSON ingest endpoint (hands-free)
 
-1. **Brands** → <http://localhost:8889/admin/directory/brands/upload>
-2. **Products** → <http://localhost:8889/admin/directory/products/upload>
+POST a single JSON body to the ingest endpoint — no file upload, no
+clicking. Keys are the field names directly. Brands are processed
+before products automatically.
 
-The confirm screen reports `created` vs `linked` counts and lists any
-skipped rows with the reason (e.g. "brand not found in directory").
+```
+POST {SITE_URL}/api/admin/directory/ingest
+Authorization: Bearer {DIRECTORY_INGEST_TOKEN}     # falls back to CRON_SECRET
+Content-Type: application/json
+
+{
+  "brands": [
+    { "name": "Hayman's Gin", "website": "https://haymansgin.com",
+      "category": "spirits", "country_of_origin": "GB",
+      "founding_year": 1863, "description": "…", "aliases": "Haymans" }
+  ],
+  "products": [
+    { "brand_name": "Hayman's Gin", "product_name": "Hayman's London Dry 70cl",
+      "gtin": "5021692100019", "abv": 41.2, "container_size_ml": 700,
+      "container_format": "bottle" }
+  ]
+}
+```
+
+Response reports created/linked counts and any skipped rows with reasons:
+
+```json
+{ "ok": true,
+  "brands":   { "processed": 1, "created": 1, "linked": 0, "errors": [] },
+  "products": { "processed": 1, "created": 1, "linked": 0, "errors": [] } }
+```
+
+Numbers and strings are both accepted (e.g. `founding_year` can be
+`1863` or `"1863"`). Same idempotency + blank-fill rules as the CSV
+path. Cap: 5000 rows per array per call — batch larger runs.
+
+### Manual fallback: CSV upload in the admin panel
+
+If you'd rather review before importing, produce two CSVs and upload
+them (brands first, then products):
+
+1. **Brands** → `{SITE_URL}/admin/directory/brands/upload`
+2. **Products** → `{SITE_URL}/admin/directory/products/upload`
 
 Templates with worked examples live alongside this brief:
 - `tasks/templates/brands-template.csv`
