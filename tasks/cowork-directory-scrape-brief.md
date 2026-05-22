@@ -88,7 +88,7 @@ clicking. Keys are the field names directly. Brands are processed
 before products automatically.
 
 ```
-POST {SITE_URL}/api/admin/directory/ingest
+POST https://www.alkatera.com/api/admin/directory/ingest
 Authorization: Bearer {DIRECTORY_INGEST_TOKEN}     # falls back to CRON_SECRET
 Content-Type: application/json
 
@@ -123,8 +123,8 @@ path. Cap: 5000 rows per array per call — batch larger runs.
 If you'd rather review before importing, produce two CSVs and upload
 them (brands first, then products):
 
-1. **Brands** → `{SITE_URL}/admin/directory/brands/upload`
-2. **Products** → `{SITE_URL}/admin/directory/products/upload`
+1. **Brands** → <https://www.alkatera.com/admin/directory/brands/upload>
+2. **Products** → <https://www.alkatera.com/admin/directory/products/upload>
 
 Templates with worked examples live alongside this brief:
 - `tasks/templates/brands-template.csv`
