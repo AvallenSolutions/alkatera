@@ -1,28 +1,25 @@
 import { NextResponse } from 'next/server';
+import { createHmac } from 'crypto';
 import { requireAlkateraAdmin } from '@/lib/admin/auth';
 import { findBrands, type SourcingFilters } from '@/lib/admin/sourcing/find-brands';
-import { processBulkBrands } from '@/lib/admin/directory/process-bulk-brands';
-import { processBulkProducts } from '@/lib/admin/directory/process-bulk-products';
-import {
-  BRAND_FIELDS,
-  PRODUCT_FIELDS,
-  type BrandFieldKey,
-  type ProductFieldKey,
-} from '@/lib/admin/directory/field-specs';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
  * POST /api/admin/directory/sourcing
  * Body: { category?, country?, certifications?, keywords?, query?, limit? }
  *
- * Admin-driven brand sourcing. Uses Claude + web search to find real
- * drinks brands matching the filters (or a specific brand for a manual
- * query), then ingests them into the directory as `pending` — they
- * land in the review queue, never live until an admin verifies them.
+ * Enqueues an async sourcing job and returns its id immediately. The
+ * heavy web-search call (40-60s) runs in the directory-sourcing-background
+ * Netlify function; the client polls GET .../sourcing/[jobId].
  *
- * Returns what was found + how it landed (created vs linked).
+ * Locally (no Netlify background infra) we fall back to running the
+ * search inline as a floating promise — the Next dev server keeps the
+ * process alive long enough to finish.
  */
 export const runtime = 'nodejs';
-export const maxDuration = 120;
+export const maxDuration = 26;
+
+const TRIGGER_TIMEOUT_MS = 4000;
 
 export async function POST(request: Request) {
   const auth = await requireAlkateraAdmin();
@@ -48,78 +45,96 @@ export async function POST(request: Request) {
     );
   }
 
-  // 1. Search the web for matching brands.
-  const found = await findBrands(body);
-  if (found.error) {
+  // Insert the job (pending).
+  const { data: job, error: insertErr } = await auth.service
+    .from('brand_sourcing_jobs')
+    .insert({
+      created_by: auth.user.id,
+      status: 'pending',
+      phase_message: 'Queued…',
+      filters: body,
+    })
+    .select('id')
+    .single();
+  if (insertErr || !job) {
     return NextResponse.json(
-      { error: 'sourcing_failed', detail: found.error },
-      { status: 502 },
+      { error: 'create_job_failed', detail: insertErr?.message },
+      { status: 500 },
     );
   }
-  if (found.brands.length === 0) {
-    return NextResponse.json({
-      ok: true,
-      summary: found.summary ?? 'No matching brands found.',
-      found_brands: 0,
-      brands: { created: 0, linked: 0, errors: [] },
-      products: { created: 0, linked: 0, errors: [] },
+  const jobId = (job as { id: string }).id;
+
+  // Fire the background function (production). If the trigger isn't
+  // available (local dev / missing secret), fall back to an inline
+  // floating search so the same polling flow still completes.
+  const hmacSecret = process.env.INTERNAL_JOB_HMAC_SECRET;
+  const baseUrl =
+    process.env.URL ||
+    process.env.DEPLOY_URL ||
+    `${new URL(request.url).protocol}//${request.headers.get('host')}`;
+  const target = `${baseUrl}/.netlify/functions/directory-sourcing-background`;
+
+  let triggered = false;
+  if (hmacSecret) {
+    triggered = await triggerBackground(target, hmacSecret, jobId).catch(() => false);
+  }
+  if (!triggered) {
+    // Local / fallback path. Don't await — let it run in the background
+    // of the dev process; the client polls for completion.
+    void runSearchInline(auth.service, jobId, body);
+  }
+
+  return NextResponse.json({ jobId }, { status: 202 });
+}
+
+async function triggerBackground(
+  target: string,
+  hmacSecret: string,
+  jobId: string,
+): Promise<boolean> {
+  const payload = JSON.stringify({ jobId });
+  const signature = createHmac('sha256', hmacSecret).update(payload).digest('hex');
+  const ctrl = new AbortController();
+  const timeout = setTimeout(() => ctrl.abort(), TRIGGER_TIMEOUT_MS);
+  try {
+    const res = await fetch(target, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-internal-hmac': signature },
+      body: payload,
+      signal: ctrl.signal,
     });
+    return res.status >= 200 && res.status < 300;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
   }
-
-  // 2. Ingest as pending. Reuse the bulk processors with an identity
-  //    column mapping (the sourced objects are already keyed by field
-  //    name). Brands first so products can match.
-  const brandMapping = identityMapping(BRAND_FIELDS.map((f) => f.key)) as Partial<
-    Record<BrandFieldKey, string>
-  >;
-  const productMapping = identityMapping(PRODUCT_FIELDS.map((f) => f.key)) as Partial<
-    Record<ProductFieldKey, string>
-  >;
-
-  const brandResult = await processBulkBrands({
-    service: auth.service,
-    rows: found.brands.map(stringifyValues),
-    mapping: brandMapping,
-  });
-
-  const productResult =
-    found.products.length > 0
-      ? await processBulkProducts({
-          service: auth.service,
-          rows: found.products.map(stringifyValues),
-          mapping: productMapping,
-        })
-      : { rows_processed: 0, products_created: 0, products_linked: 0, errors: [] };
-
-  return NextResponse.json({
-    ok: true,
-    summary: found.summary,
-    found_brands: found.brands.length,
-    brand_names: found.brands.map((b) => b.name),
-    brands: {
-      created: brandResult.brands_created,
-      linked: brandResult.brands_linked,
-      errors: brandResult.errors,
-    },
-    products: {
-      created: productResult.products_created,
-      linked: productResult.products_linked,
-      errors: productResult.errors,
-    },
-  });
 }
 
-function identityMapping(keys: string[]): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const k of keys) out[k] = k;
-  return out;
-}
-
-function stringifyValues(row: object): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const [k, v] of Object.entries(row)) {
-    if (v === null || v === undefined) continue;
-    out[k] = typeof v === 'string' ? v : String(v);
+async function runSearchInline(
+  service: SupabaseClient,
+  jobId: string,
+  filters: SourcingFilters,
+): Promise<void> {
+  const update = (patch: Record<string, unknown>) =>
+    service
+      .from('brand_sourcing_jobs')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', jobId);
+  try {
+    await update({ status: 'searching', phase_message: 'Searching the web for brands…' });
+    const found = await findBrands(filters);
+    if (found.error) {
+      await update({ status: 'error', error: found.error.slice(0, 500), phase_message: null });
+      return;
+    }
+    await update({
+      status: 'searched',
+      phase_message: `Found ${found.brands.length} brand(s). Adding to the directory…`,
+      found: { brands: found.brands, products: found.products, summary: found.summary ?? null },
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    await update({ status: 'error', error: message.slice(0, 500), phase_message: null });
   }
-  return out;
 }

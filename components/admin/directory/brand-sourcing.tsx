@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Search, Loader2, Sparkles, CheckCircle2, AlertTriangle, Globe2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -34,8 +34,16 @@ export function BrandSourcing() {
   const [limit, setLimit] = useState(12);
 
   const [busy, setBusy] = useState(false);
+  const [phase, setPhase] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SourcingResponse | null>(null);
+  const cancelledRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      cancelledRef.current = true;
+    };
+  }, []);
 
   function toggleCert(c: string) {
     setCerts((prev) => {
@@ -47,9 +55,11 @@ export function BrandSourcing() {
   }
 
   async function run() {
+    cancelledRef.current = false;
     setBusy(true);
     setError(null);
     setResult(null);
+    setPhase('Queued…');
     try {
       const payload =
         mode === 'manual'
@@ -66,19 +76,61 @@ export function BrandSourcing() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const body = (await res.json().catch(() => ({}))) as SourcingResponse & {
+      const body = (await res.json().catch(() => ({}))) as {
+        jobId?: string;
         error?: string;
         detail?: string;
       };
-      if (!res.ok) {
+      if (!res.ok || !body.jobId) {
         setError(body.detail ?? body.error ?? `HTTP ${res.status}`);
+        setBusy(false);
+        setPhase(null);
         return;
       }
-      setResult(body);
+      await pollJob(body.jobId);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Search failed');
-    } finally {
       setBusy(false);
+      setPhase(null);
+    }
+  }
+
+  async function pollJob(jobId: string) {
+    // Poll up to ~3 minutes (web search + ingest). 3s interval.
+    const deadline = Date.now() + 3 * 60 * 1000;
+    while (!cancelledRef.current && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 3000));
+      if (cancelledRef.current) return;
+      let body: {
+        status?: string;
+        phase_message?: string | null;
+        result?: SourcingResponse;
+        error?: string;
+      };
+      try {
+        const res = await fetch(`/api/admin/directory/sourcing/${jobId}`);
+        body = await res.json();
+      } catch {
+        continue; // transient — keep polling
+      }
+      if (body.phase_message) setPhase(body.phase_message);
+      if (body.status === 'done' && body.result) {
+        setResult(body.result);
+        setBusy(false);
+        setPhase(null);
+        return;
+      }
+      if (body.status === 'error') {
+        setError(body.error ?? 'Search failed');
+        setBusy(false);
+        setPhase(null);
+        return;
+      }
+    }
+    if (!cancelledRef.current) {
+      setError('Timed out waiting for results. The search may still finish — check Pending brands shortly.');
+      setBusy(false);
+      setPhase(null);
     }
   }
 
@@ -200,7 +252,8 @@ export function BrandSourcing() {
         </div>
         {busy && (
           <p className="text-[11px] text-muted-foreground">
-            This can take 20-60 seconds while we search the web and pull together brand profiles.
+            {phase ?? 'Working…'} This runs in the background and can take up to a minute or two
+            while we search the web and build each profile. You can leave this page open.
           </p>
         )}
       </div>
