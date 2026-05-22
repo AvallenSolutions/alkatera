@@ -78,15 +78,29 @@ export default async function DiscoverBrandDetailPage({
     .from('brand_directory')
     .select(
       'id, name, category, country_of_origin, website, founding_year, parent_company, description, ' +
-        'alkatera_org_id, sustainability_score, score_tier, completeness_score, last_synced_at, discovery_opt_out',
+        'alkatera_org_id, sustainability_score, score_tier, completeness_score, last_synced_at, ' +
+        'discovery_opt_out, verification_status',
     )
     .eq('id', params.id)
-    .maybeSingle()) as { data: (DirectoryRow & { discovery_opt_out: boolean }) | null };
+    .maybeSingle()) as {
+    data: (DirectoryRow & { discovery_opt_out: boolean; verification_status: string }) | null;
+  };
   if (!directoryData) return notFound();
   if (directoryData.discovery_opt_out) {
     return (
       <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-6 text-sm">
         This brand has opted out of the discovery directory.{' '}
+        <Link href="/distributor/discover" className="text-sky-300 underline">
+          Back to Discover
+        </Link>
+      </div>
+    );
+  }
+  // Verification gate — only verified brands are browsable in Discover.
+  if (directoryData.verification_status !== 'verified') {
+    return (
+      <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-6 text-sm">
+        This brand isn't available in the directory yet.{' '}
         <Link href="/distributor/discover" className="text-sky-300 underline">
           Back to Discover
         </Link>
@@ -122,6 +136,7 @@ export default async function DiscoverBrandDetailPage({
         'id, name, category, container_size_ml, container_format, abv, embodied_carbon_kgco2e, embodied_water_l',
       )
       .eq('brand_directory_id', directory.id)
+      .eq('verification_status', 'verified')
       .order('name', { ascending: true })
       .limit(100),
     directory.alkatera_org_id

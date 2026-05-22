@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { ChevronLeft, Tag, Globe2, Building, Calendar, ShieldCheck } from 'lucide-react';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { BrandDiscoveryOptOutToggle } from '@/components/admin/directory/brand-discovery-opt-out-toggle';
+import { BrandVerificationControl } from '@/components/admin/directory/brand-verification-control';
 import { EsgBreakdownPanel, type EsgSnapshot } from '@/components/shared/esg-breakdown-panel';
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,7 @@ interface DirectoryRow {
   score_tier: string | null;
   discovery_opt_out: boolean;
   discovered_via: string;
+  verification_status: 'pending' | 'verified' | 'rejected';
   created_at: string;
   updated_at: string;
 }
@@ -38,7 +40,7 @@ export default async function AdminBrandDetailPage({
     .from('brand_directory')
     .select(
       'id, name, category, country_of_origin, website, founding_year, parent_company, description, aliases, ' +
-        'alkatera_org_id, sustainability_score, completeness_score, score_tier, discovery_opt_out, discovered_via, created_at, updated_at',
+        'alkatera_org_id, sustainability_score, completeness_score, score_tier, discovery_opt_out, discovered_via, verification_status, created_at, updated_at',
     )
     .eq('id', params.id)
     .maybeSingle()) as { data: DirectoryRow | null };
@@ -175,6 +177,12 @@ export default async function AdminBrandDetailPage({
           </div>
         )}
       </div>
+
+      <BrandVerificationControl
+        brandId={brand.id}
+        brandName={brand.name}
+        initialStatus={brand.verification_status}
+      />
 
       {snapshot && <EsgBreakdownPanel snapshot={snapshot} accent="lime" />}
 

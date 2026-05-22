@@ -47,14 +47,18 @@ export async function GET(request: Request) {
     Math.max(1, Number(url.searchParams.get('page_size') ?? '24') || 24),
   );
 
-  // 1. Build the directory query with discoverability gate.
+  // 1. Build the directory query with discoverability + verification
+  //    gate. A brand only appears in Discover once an admin has
+  //    verified it (or it auto-verified as an alka**tera** brand) AND
+  //    it hasn't opted out. Pending/rejected entries stay hidden.
   let query = auth.supabase
     .from('brand_directory')
     .select(
       'id, name, category, country_of_origin, alkatera_org_id, sustainability_score, score_tier, completeness_score, last_synced_at',
       { count: 'exact' },
     )
-    .eq('discovery_opt_out', false);
+    .eq('discovery_opt_out', false)
+    .eq('verification_status', 'verified');
 
   if (q) {
     // Trigram-friendly: use ILIKE on name. Free-text search across

@@ -412,12 +412,18 @@ export async function syncAlkateraDataForBrand(
   }
 
   // 4. Stamp brand_directory.last_synced_at so UI surfaces can show
-  //    "Synced N minutes ago" without scanning the queue. Best-effort —
-  //    a failure here doesn't invalidate the sync.
+  //    "Synced N minutes ago" without scanning the queue. We also
+  //    auto-verify here: this brand is alka**tera**-linked (it owns its
+  //    data), so it's trusted and can go live in Discover without
+  //    manual review. Best-effort — a failure doesn't invalidate the sync.
   try {
     await supabase
       .from('brand_directory')
-      .update({ last_synced_at: new Date().toISOString() })
+      .update({
+        last_synced_at: new Date().toISOString(),
+        verification_status: 'verified',
+        verified_at: new Date().toISOString(),
+      })
       .eq('id', brandDirectoryId);
   } catch {
     /* swallow */
@@ -583,6 +589,9 @@ async function mirrorAlkateraProductFootprints(
           embodied_carbon_kgco2e: emissions,
           discovered_via: 'alkatera_signup',
           last_synced_at: new Date().toISOString(),
+          // alka**tera** product data is brand-owned and trusted.
+          verification_status: 'verified',
+          verified_at: new Date().toISOString(),
         })
         .select('id')
         .single();
@@ -594,6 +603,7 @@ async function mirrorAlkateraProductFootprints(
       .from('product_directory')
       .update({
         embodied_carbon_kgco2e: emissions,
+        verification_status: 'verified',
         alkatera_product_id: pcf.id,
         last_synced_at: new Date().toISOString(),
       })

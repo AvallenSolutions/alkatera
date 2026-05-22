@@ -132,8 +132,12 @@ export default async function DistributorDashboardPage() {
     supabase
       .from('brand_directory')
       .select('id', { count: 'exact', head: true })
-      .eq('discovery_opt_out', false),
-    supabase.from('product_directory').select('id', { count: 'exact', head: true }),
+      .eq('discovery_opt_out', false)
+      .eq('verification_status', 'verified'),
+    supabase
+      .from('product_directory')
+      .select('id', { count: 'exact', head: true })
+      .eq('verification_status', 'verified'),
   ]);
 
   return (

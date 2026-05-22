@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic';
 interface SearchParams {
   q?: string;
   source?: string;
+  verification?: string;
   page?: string;
 }
 
@@ -22,6 +23,7 @@ export default async function AdminBrandsPage({
   const supabase = getSupabaseServerClient() as unknown as SupabaseClient;
   const q = (searchParams.q ?? '').trim();
   const source = searchParams.source ?? '';
+  const verification = searchParams.verification ?? '';
   const page = Math.max(1, Number(searchParams.page ?? '1') || 1);
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
@@ -29,12 +31,13 @@ export default async function AdminBrandsPage({
   let query = supabase
     .from('brand_directory')
     .select(
-      'id, name, category, country_of_origin, alkatera_org_id, sustainability_score, completeness_score, discovered_via, discovery_opt_out, created_at',
+      'id, name, category, country_of_origin, alkatera_org_id, sustainability_score, completeness_score, discovered_via, discovery_opt_out, verification_status, created_at',
       { count: 'exact' },
     )
     .order('created_at', { ascending: false });
   if (q) query = query.ilike('name', `%${q.replace(/[%_]/g, '\\$&')}%`);
   if (source) query = query.eq('discovered_via', source);
+  if (verification) query = query.eq('verification_status', verification);
   query = query.range(from, to);
 
   const { data: brands, count } = await query;
@@ -49,6 +52,7 @@ export default async function AdminBrandsPage({
     completeness_score: number | null;
     discovered_via: string;
     discovery_opt_out: boolean;
+    verification_status: string;
     created_at: string;
   };
   const rows = (brands ?? []) as Row[];
@@ -82,6 +86,16 @@ export default async function AdminBrandsPage({
           />
         </div>
         <select
+          name="verification"
+          defaultValue={verification}
+          className="px-3 py-2 rounded-md border border-border/60 bg-background/40 text-sm"
+        >
+          <option value="">All statuses</option>
+          <option value="verified">Verified</option>
+          <option value="pending">Pending review</option>
+          <option value="rejected">Rejected</option>
+        </select>
+        <select
           name="source"
           defaultValue={source}
           className="px-3 py-2 rounded-md border border-border/60 bg-background/40 text-sm"
@@ -114,6 +128,7 @@ export default async function AdminBrandsPage({
             <thead className="bg-muted/30 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
               <tr>
                 <th className="text-left px-4 py-2">Name</th>
+                <th className="text-left px-4 py-2">Status</th>
                 <th className="text-left px-4 py-2">Category</th>
                 <th className="text-left px-4 py-2">Country</th>
                 <th className="text-right px-4 py-2">Score</th>
@@ -143,6 +158,9 @@ export default async function AdminBrandsPage({
                       )}
                     </Link>
                   </td>
+                  <td className="px-4 py-2">
+                    <VerificationBadge status={b.verification_status} />
+                  </td>
                   <td className="px-4 py-2 text-muted-foreground">{b.category ?? '—'}</td>
                   <td className="px-4 py-2 text-muted-foreground">{b.country_of_origin ?? '—'}</td>
                   <td className="px-4 py-2 text-right tabular-nums">
@@ -165,11 +183,11 @@ export default async function AdminBrandsPage({
       )}
 
       <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <PageLink page={page - 1} disabled={page <= 1} q={q} source={source} label="Previous" />
+        <PageLink page={page - 1} disabled={page <= 1} q={q} source={source} verification={verification} label="Previous" />
         <span>
           Page {page} of {totalPages}
         </span>
-        <PageLink page={page + 1} disabled={page >= totalPages} q={q} source={source} label="Next" />
+        <PageLink page={page + 1} disabled={page >= totalPages} q={q} source={source} verification={verification} label="Next" />
       </div>
     </div>
   );
@@ -180,12 +198,14 @@ function PageLink({
   disabled,
   q,
   source,
+  verification,
   label,
 }: {
   page: number;
   disabled: boolean;
   q: string;
   source: string;
+  verification: string;
   label: string;
 }) {
   if (disabled) {
@@ -198,6 +218,7 @@ function PageLink({
   const params = new URLSearchParams();
   if (q) params.set('q', q);
   if (source) params.set('source', source);
+  if (verification) params.set('verification', verification);
   params.set('page', String(page));
   return (
     <Link
@@ -206,5 +227,22 @@ function PageLink({
     >
       {label}
     </Link>
+  );
+}
+
+function VerificationBadge({ status }: { status: string }) {
+  const style =
+    status === 'verified'
+      ? 'bg-emerald-500/15 border-emerald-400/30 text-emerald-300'
+      : status === 'rejected'
+        ? 'bg-destructive/15 border-destructive/30 text-destructive'
+        : 'bg-amber-500/15 border-amber-400/30 text-amber-300';
+  const label = status === 'verified' ? 'Verified' : status === 'rejected' ? 'Rejected' : 'Pending';
+  return (
+    <span
+      className={`inline-flex items-center text-[10px] uppercase tracking-wider font-semibold rounded-full border px-2 py-0.5 ${style}`}
+    >
+      {label}
+    </span>
   );
 }
