@@ -82,3 +82,35 @@
   [headers.values]
     Content-Type = "text/plain; charset=utf-8"
     Cache-Control = "public, max-age=86400"
+
+# ============================================================
+# Scheduled functions (distributor portal background jobs)
+# ============================================================
+# Recommended cron schedules for the distributor portal's cron
+# routes. Each entry maps the App Router route name (last segment
+# of the path) to a cron expression. The @netlify/plugin-nextjs
+# wraps each /api/cron/<name> route as a Netlify function named
+# `app/api/cron/<name>/route`, which is what we target here.
+#
+# All cron routes require `Authorization: Bearer $CRON_SECRET`.
+# Netlify's scheduled invoker adds this header automatically when
+# CRON_SECRET is set as an environment variable on the site.
+#
+# To fire one manually for testing:
+#   curl -X POST -H "Authorization: Bearer $CRON_SECRET" \
+#     https://<site>/api/cron/<name>
+
+[functions."app/api/cron/process-alkatera-sync-queue/route"]
+  schedule = "*/1 * * * *"   # every 1 minute — real-time directory sync
+
+[functions."app/api/cron/process-scraping-queue/route"]
+  schedule = "*/5 * * * *"   # every 5 minutes
+
+[functions."app/api/cron/process-document-queue/route"]
+  schedule = "*/2 * * * *"   # every 2 minutes
+
+[functions."app/api/cron/process-reminders/route"]
+  schedule = "0 9 * * *"     # daily at 09:00 UTC
+
+[functions."app/api/cron/run-brand-matching/route"]
+  schedule = "0 3 * * *"     # daily at 03:00 UTC (alkatera-sync sweep)

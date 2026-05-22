@@ -42,11 +42,15 @@ export async function POST(request: Request) {
   }
 
   try {
+    // Manual trigger means the distributor explicitly asked for a
+    // re-scrape — bypass the directory-first gate so they always get
+    // the freshest data possible.
     const result = await queueBrandsForScraping({
       supabase: auth.supabase,
       distributorOrgId: auth.organization.id,
       brandProfileIds,
       triggeredBy: 'manual',
+      forceScrape: true,
     });
     return NextResponse.json(result);
   } catch (err: unknown) {

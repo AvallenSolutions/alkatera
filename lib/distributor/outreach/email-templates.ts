@@ -202,6 +202,53 @@ export function renderDistributorNotificationEmail(
 }
 
 // ============================================================
+// Directory contact: distributor → brand from Discover detail page
+// ============================================================
+// Fired when a wholesaler/distributor clicks "Contact brand" on a
+// brand they don't yet list. Different in tone from initial outreach:
+// the recipient may not know who alka**tera** is and may not be a
+// confirmed alka**tera** customer. The email opens with the
+// distributor's intent, includes the typed message verbatim, and
+// invites reply-to-direct routing back to the sender.
+
+export interface DirectoryContactArgs {
+  brandName: string;
+  distributorName: string;
+  senderName: string;
+  senderEmail: string;
+  subject: string;
+  message: string;
+}
+
+export function renderDirectoryContactEmail(args: DirectoryContactArgs): RenderedEmail {
+  const safeBrand = escapeHtml(args.brandName);
+  const safeDistributor = escapeHtml(args.distributorName);
+  const safeSender = escapeHtml(args.senderName || args.distributorName);
+  const safeEmail = escapeHtml(args.senderEmail);
+  // Preserve line breaks in the user-typed message while escaping HTML.
+  const safeMessageHtml = escapeHtml(args.message).replace(/\n/g, '<br>');
+
+  const subject = args.subject || `${args.distributorName} would like to connect about ${args.brandName}`;
+  const html = wrap(
+    'Distributor enquiry',
+    `
+      <p style="color: #ccc; font-size: 14px; line-height: 1.8;">Hi ${safeBrand} team,</p>
+      <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
+        <strong style="color: #fff;">${safeSender}</strong> from <strong style="color: #fff;">${safeDistributor}</strong> found your brand in the alka<strong>tera</strong> industry directory and would like to get in touch.
+      </p>
+      <div style="margin: 24px 0; padding: 16px; background: #111; border-left: 3px solid #ccff00; color: #ddd; font-size: 14px; line-height: 1.7;">
+        ${safeMessageHtml}
+      </div>
+      <p style="color: #888; font-size: 13px; line-height: 1.8;">
+        Reply directly to this email and it will go straight back to <strong style="color: #ccc;">${safeEmail}</strong>.
+      </p>
+    `,
+    args.distributorName,
+  );
+  return { subject, html };
+}
+
+// ============================================================
 // Shared layout helpers
 // ============================================================
 

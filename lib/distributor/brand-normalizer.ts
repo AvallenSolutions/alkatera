@@ -26,6 +26,42 @@ export function normalizeBrandName(name: string): string {
     .trim();
 }
 
+/**
+ * Normalise a product name to the same shape used by
+ * `product_directory_normalize` in SQL: lowercased, alphanumeric +
+ * spaces only. Different from `normalizeBrandName` because legal-entity
+ * suffixes don't apply to products.
+ *
+ * "Avallen Calvados 70cl", "avallen calvados, 70cl" and
+ * "Avallen-Calvados 70cl" all collapse to "avallen calvados 70cl".
+ */
+export function normalizeProductName(name: string): string {
+  return (name ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(DIACRITIC_PATTERN, '')
+    .replace(APOSTROPHE_PATTERN, '')
+    .replace(/[^a-z0-9 ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Strip a GTIN/EAN/UPC barcode to digits only. Returns null if no
+ * digits remain (so callers can treat "n/a"/"none"/empty alike).
+ *
+ * GTIN-13 (5060538740019), GTIN-12 (UPC-A), GTIN-8 (EAN-8) and GTIN-14
+ * are all kept as-is once cleaned — exact equality is what we use for
+ * matching. We do NOT pad shorter codes to GTIN-14 here; that would
+ * collide e.g. UPC-A 012345678905 with the matching GTIN-13
+ * 0012345678905, and we want to revisit that conversion deliberately.
+ */
+export function normalizeGtin(gtin: string | null | undefined): string | null {
+  if (!gtin) return null;
+  const digits = String(gtin).replace(/\D+/g, '');
+  return digits.length > 0 ? digits : null;
+}
+
 const HEADER_ALIASES: Record<ColumnMappingField, string[]> = {
   brand_name: [
     'brand',
@@ -65,6 +101,21 @@ const HEADER_ALIASES: Record<ColumnMappingField, string[]> = {
     'item number',
     'reference',
     'ref',
+  ],
+  gtin: [
+    'gtin',
+    'gtin13',
+    'gtin-13',
+    'gtin 13',
+    'ean',
+    'ean13',
+    'ean-13',
+    'ean 13',
+    'upc',
+    'upc-a',
+    'barcode',
+    'bar code',
+    'global trade item number',
   ],
   category: ['category', 'type', 'product type', 'product category', 'segment', 'class'],
   country_of_origin: [

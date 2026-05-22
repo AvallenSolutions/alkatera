@@ -10,6 +10,7 @@ import {
   BarChart3,
   Settings,
   LogOut,
+  Search,
   type LucideIcon,
 } from 'lucide-react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
@@ -40,6 +41,7 @@ const NAV_SECTIONS: NavSection[] = [
     label: 'Portfolio',
     items: [
       { name: 'Brands', href: '/distributor/brands', icon: Building2 },
+      { name: 'Discover', href: '/distributor/discover', icon: Search },
       { name: 'Product Lists', href: '/distributor/sku-lists', icon: Upload },
     ],
   },

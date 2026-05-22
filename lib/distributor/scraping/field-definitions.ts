@@ -15,6 +15,7 @@ export type FieldKey =
   | 'sbt_status'
   | 'water_usage_litres_per_litre'
   | 'water_stress_region'
+  | 'water_recycled_percentage'
   | 'recycled_packaging_percentage'
   | 'packaging_primary_material'
   | 'sustainability_report_url'
@@ -56,6 +57,7 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     description: "One of 'committed', 'targets_set', or 'none'." },
   { key: 'water_usage_litres_per_litre',   label: 'Water Usage (L/L)',                 type: 'number',  pillar: 'water' },
   { key: 'water_stress_region',            label: 'In Water-Stressed Region',          type: 'boolean', pillar: 'water' },
+  { key: 'water_recycled_percentage',      label: 'Water Recycled %',                  type: 'number',  pillar: 'water' },
   { key: 'recycled_packaging_percentage',  label: 'Recycled Packaging %',              type: 'number',  pillar: 'packaging' },
   { key: 'packaging_primary_material',     label: 'Primary Packaging Material',        type: 'string',  pillar: 'packaging' },
   { key: 'sustainability_report_url',      label: 'Sustainability Report URL',         type: 'string',  pillar: 'governance' },

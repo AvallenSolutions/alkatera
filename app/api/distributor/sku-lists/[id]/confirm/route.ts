@@ -124,7 +124,14 @@ export async function POST(request: Request, { params }: { params: { id: string 
   // Kick off Phase 2 scraping for every brand profile this import
   // touched (new or existing). Best-effort — if it fails we don't break
   // the import. The cron picks up queued jobs every 5 minutes.
+  //
+  // Phase 3: the dispatcher consults the canonical brand_directory
+  // first and skips scrapes for brands that already have comprehensive,
+  // recent data. The counters below let the upload wizard surface
+  // "X brands skipped scraping — already comprehensive in the directory"
+  // so the distributor sees the directory's value at upload time.
   let scraping_queued = 0;
+  let scraping_skipped_directory_hit = 0;
   if (result.brand_profile_ids.length > 0) {
     try {
       const queueResult = await queueBrandsForScraping({
@@ -134,6 +141,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
         triggeredBy: 'sku_import',
       });
       scraping_queued = queueResult.queued;
+      scraping_skipped_directory_hit = queueResult.skipped_directory_hit;
     } catch {
       // swallow — the scraping_jobs table may not exist yet in dev
       // environments where Phase 2 migration hasn't been applied.
@@ -213,10 +221,12 @@ export async function POST(request: Request, { params }: { params: { id: string 
     sku_count: result.sku_count,
     row_count: parsed.rows.length,
     scraping_queued,
+    scraping_skipped_directory_hit,
     alkatera_auto_linked: matched,
     alkatera_suggested: suggested,
     warnings: result.errors,
     directory_matches: enrichedMatches,
+    product_directory_stats: result.product_directory_stats,
   });
 }
 
@@ -229,7 +239,14 @@ function validateMapping(input: unknown): ColumnMapping | null {
     brand_name: obj.brand_name,
     product_name: obj.product_name,
   };
-  for (const field of ['sku_code', 'category', 'country_of_origin', 'listing_status'] as const) {
+  for (const field of [
+    'sku_code',
+    'gtin',
+    'category',
+    'country_of_origin',
+    'listing_status',
+    'website',
+  ] as const) {
     if (typeof obj[field] === 'string' && obj[field]) {
       mapping[field] = obj[field] as string;
     }

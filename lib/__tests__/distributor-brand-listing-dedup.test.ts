@@ -57,6 +57,10 @@ function fakeSupabase(): unknown {
           error: null,
         };
       }
+      // Product matcher RPC: nothing in the test fixture, so always
+      // return no candidate. The processor will fall back to inserting
+      // a fresh product_directory row (handled by the from('product_directory')
+      // branch below).
       return { data: [], error: null };
     },
     from(table: string) {
@@ -145,6 +149,21 @@ function fakeSupabase(): unknown {
           // The matcher's create-fresh path. Tests below always hit the
           // "existing match" path so this should never run.
           throw new Error('test_should_not_create_directory_entry');
+        }
+        if (table === 'product_directory' && insertPatch) {
+          // The product matcher's create-fresh path. This test fixture
+          // doesn't exercise the product directory — every SKU just
+          // gets a fresh canonical product silently so the brand-level
+          // dedup assertions stay focused.
+          const row = {
+            id: 'product-new-' + (inserts.length + 1),
+            name: (insertPatch as { name: string }).name,
+          };
+          inserts.push({ table, row: insertPatch });
+          insertPatch = null;
+          filters = {};
+          nextSelect = null;
+          return { data: row, error: null };
         }
         return { data: null, error: null };
       }

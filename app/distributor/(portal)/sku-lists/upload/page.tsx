@@ -34,12 +34,21 @@ interface DirectoryMatch {
   score_tier: 'leader' | 'progressing' | 'developing' | 'insufficient' | null;
 }
 
+interface ProductDirectoryStats {
+  resolved: number;
+  matched_existing: number;
+  created_new: number;
+}
+
 interface UploadResult {
   brand_count: number;
   sku_count: number;
   row_count: number;
+  scraping_queued?: number;
+  scraping_skipped_directory_hit?: number;
   warnings: string[];
   directory_matches: DirectoryMatch[];
+  product_directory_stats: ProductDirectoryStats;
 }
 
 export default function UploadPage() {
@@ -182,6 +191,18 @@ export default function UploadPage() {
 
               {result.directory_matches.length > 0 && (
                 <DirectoryMatchPanel matches={result.directory_matches} />
+              )}
+
+              {result.product_directory_stats &&
+                result.product_directory_stats.resolved > 0 && (
+                  <ProductDirectoryPanel stats={result.product_directory_stats} />
+                )}
+
+              {(result.scraping_skipped_directory_hit ?? 0) > 0 && (
+                <ScrapeGatePanel
+                  skipped={result.scraping_skipped_directory_hit ?? 0}
+                  queued={result.scraping_queued ?? 0}
+                />
               )}
 
               {result.warnings.length > 0 && (
@@ -467,5 +488,61 @@ function Badge({
       {icon}
       {label}
     </span>
+  );
+}
+
+function ProductDirectoryPanel({ stats }: { stats: ProductDirectoryStats }) {
+  return (
+    <div className="rounded-xl border border-border/60 bg-gradient-to-br from-sky-500/5 via-card/40 to-card/40 px-5 py-4">
+      <div className="flex items-center gap-3">
+        <div className="rounded-md bg-sky-500/10 border border-sky-400/30 p-1.5">
+          <Sparkles className="h-4 w-4 text-sky-300" />
+        </div>
+        <div className="text-sm">
+          <div className="font-semibold">Products linked to the directory</div>
+          <div className="text-xs text-muted-foreground mt-0.5">
+            <strong className="text-foreground tabular-nums">{stats.matched_existing}</strong> of{' '}
+            <strong className="text-foreground tabular-nums">{stats.resolved}</strong> products
+            matched existing canonical records
+            {stats.created_new > 0 && (
+              <>
+                {' · '}
+                <strong className="text-sky-200 tabular-nums">{stats.created_new}</strong> added to
+                the directory
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ScrapeGatePanel({ skipped, queued }: { skipped: number; queued: number }) {
+  return (
+    <div className="rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-card/40 to-card/40 px-5 py-4">
+      <div className="flex items-center gap-3">
+        <div className="rounded-md bg-emerald-500/15 border border-emerald-400/30 p-1.5">
+          <ShieldCheck className="h-4 w-4 text-emerald-300" />
+        </div>
+        <div className="text-sm">
+          <div className="font-semibold">
+            <strong className="tabular-nums">{skipped}</strong> brand{skipped === 1 ? '' : 's'}{' '}
+            skipped finding
+          </div>
+          <div className="text-xs text-muted-foreground mt-0.5">
+            We already hold comprehensive, recent data on{' '}
+            {skipped === 1 ? 'this brand' : 'these brands'} in the directory, so no fresh scrape
+            was needed.{' '}
+            {queued > 0 && (
+              <>
+                <strong className="text-foreground tabular-nums">{queued}</strong> other brand
+                {queued === 1 ? '' : 's'} are being looked up now.
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

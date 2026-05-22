@@ -27,6 +27,7 @@ describe('calculateCompleteness', () => {
       'sbt_status',
       'water_usage_litres_per_litre',
       'water_stress_region',
+      'water_recycled_percentage',
       'recycled_packaging_percentage',
       'packaging_primary_material',
       'sustainability_report_url',

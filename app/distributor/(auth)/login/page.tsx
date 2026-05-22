@@ -40,15 +40,26 @@ export default function DistributorLoginPage() {
       .eq('user_id', data.user.id)
       .maybeSingle();
 
-    if (memberError || !member) {
-      await supabase.auth.signOut();
-      setError('No distributor account found for this email address.');
-      setLoading(false);
+    if (member && !memberError) {
+      router.push('/distributor/dashboard');
+      router.refresh();
       return;
     }
 
-    router.push('/distributor/dashboard');
-    router.refresh();
+    // Not a distributor member. Before rejecting, check whether this is
+    // an alka**tera** staff account — admins reach the directory admin
+    // panel through the same login form (their alka**tera** session
+    // works here too), so route them to /admin rather than erroring.
+    const { data: isAdmin } = await supabase.rpc('is_alkatera_admin');
+    if (isAdmin) {
+      router.push('/admin');
+      router.refresh();
+      return;
+    }
+
+    await supabase.auth.signOut();
+    setError('No distributor account found for this email address.');
+    setLoading(false);
   }
 
   return (

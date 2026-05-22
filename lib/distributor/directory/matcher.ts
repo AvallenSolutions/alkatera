@@ -86,7 +86,13 @@ export async function findDirectoryMatch(
  */
 export async function resolveOrCreateDirectoryEntry(
   supabase: SupabaseClient,
-  input: DirectoryMatchInput & { discoveredByDistributorOrgId?: string | null },
+  input: DirectoryMatchInput & {
+    discoveredByDistributorOrgId?: string | null;
+    /** Override the discovered_via stamp on fresh entries. Defaults
+     *  to 'sku_upload' for the SKU import flow; admin bulk-upload
+     *  passes 'manual'. */
+    discoveredVia?: 'sku_upload' | 'alkatera_signup' | 'manual' | 'phase1_backfill';
+  },
 ): Promise<DirectoryMatchResult> {
   const normalized = normalizeBrandName(input.displayName);
   if (!normalized) {
@@ -112,7 +118,7 @@ export async function resolveOrCreateDirectoryEntry(
       website: input.website ?? null,
       category: input.category ?? null,
       country_of_origin: input.countryOfOrigin ?? null,
-      discovered_via: 'sku_upload',
+      discovered_via: input.discoveredVia ?? 'sku_upload',
       discovered_by_distributor_org_id: input.discoveredByDistributorOrgId ?? null,
     })
     .select('id, name')

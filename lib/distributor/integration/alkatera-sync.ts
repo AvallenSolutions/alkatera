@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { coerceFieldValue, type FieldKey } from '../scraping/field-definitions';
+import { recalculateCompleteness } from '../scoring/recalculate';
+import { tierForScore } from '../scoring/vitality-calculator';
 
 /**
  * Sync an alka**tera** brand's live sustainability data into the
@@ -262,6 +264,52 @@ export async function syncAlkateraDataForBrand(
     skipped.push('targets');
   }
 
+  // facility_water_data → water_usage_litres_per_litre (avg of per-litre
+  // consumption across facilities) + water_recycled_percentage (avg).
+  // The alka**tera** schema for this table evolves; we sniff several
+  // plausible column names rather than assuming one shape, so a column
+  // rename doesn't silently drop the finding.
+  try {
+    const { data } = await supabase
+      .from('facility_water_data')
+      .select('*')
+      .eq('organization_id', alkateraOrgId);
+    type FacilityWaterRow = Record<string, unknown>;
+    const rows = (data ?? []) as FacilityWaterRow[];
+    const perLitreValues: number[] = [];
+    const recycledPctValues: number[] = [];
+    for (const row of rows) {
+      // Litres-per-litre intensity. Names we've seen across alkatera
+      // schemas: water_per_litre, water_consumption_l_per_litre,
+      // water_intensity, l_per_l.
+      const perLitre =
+        parseNum(row.water_per_litre) ??
+        parseNum(row.water_consumption_l_per_litre) ??
+        parseNum(row.water_intensity) ??
+        parseNum(row.l_per_l);
+      if (perLitre != null && perLitre > 0 && perLitre < 1000) {
+        perLitreValues.push(perLitre);
+      }
+      const recycledPct =
+        parseNum(row.recycled_water_percentage) ??
+        parseNum(row.water_recycled_percentage) ??
+        parseNum(row.recycled_percentage);
+      if (recycledPct != null && recycledPct >= 0 && recycledPct <= 100) {
+        recycledPctValues.push(recycledPct);
+      }
+    }
+    if (perLitreValues.length > 0) {
+      const avg = perLitreValues.reduce((a, b) => a + b, 0) / perLitreValues.length;
+      findings.push({ field_key: 'water_usage_litres_per_litre', raw_value: avg });
+    }
+    if (recycledPctValues.length > 0) {
+      const avg = recycledPctValues.reduce((a, b) => a + b, 0) / recycledPctValues.length;
+      findings.push({ field_key: 'water_recycled_percentage', raw_value: avg });
+    }
+  } catch {
+    skipped.push('facility_water_data');
+  }
+
   // packaging_circularity_profiles → recycled_packaging_percentage (avg),
   // packaging_primary_material (most common material_type).
   try {
@@ -363,6 +411,95 @@ export async function syncAlkateraDataForBrand(
     }
   }
 
+  // 4. Stamp brand_directory.last_synced_at so UI surfaces can show
+  //    "Synced N minutes ago" without scanning the queue. Best-effort —
+  //    a failure here doesn't invalidate the sync.
+  try {
+    await supabase
+      .from('brand_directory')
+      .update({ last_synced_at: new Date().toISOString() })
+      .eq('id', brandDirectoryId);
+  } catch {
+    /* swallow */
+  }
+
+  // 5. Mirror product-level LCA from alkatera into product_directory.
+  //    For every product_carbon_footprints row this org owns, find a
+  //    matching product_directory entry by either alkatera_product_id
+  //    (if the link was already set) or by matching the brand_skus row
+  //    we know about for this product. Updates embodied_carbon_kgco2e
+  //    and last_synced_at.
+  try {
+    await mirrorAlkateraProductFootprints(supabase, brandDirectoryId, alkateraOrgId);
+  } catch {
+    skipped.push('product_directory_mirror');
+  }
+
+  // 6. Recompute completeness + vitality from the local scraped_brand_data
+  //    so completeness_score is fresh. Best-effort — a recalc failure
+  //    doesn't invalidate the sync itself.
+  try {
+    await recalculateCompleteness(supabase, brandDirectoryId);
+  } catch {
+    skipped.push('recalc_after_sync');
+  }
+
+  // 7. Override sustainability_score AND completeness_score with the
+  //    authoritative alka**tera** ESG composite. The Rosa hub computes
+  //    a far richer score from facility data, anomalies, B Corp
+  //    evidence, targets and more — cached daily into
+  //    esg_score_snapshots by the /api/vitality/composite handler.
+  //
+  //    For completeness we derive a distributor-meaningful signal:
+  //    the fraction of E/S/G sub-pillars that have non-zero data in
+  //    the latest snapshot breakdown. A brand with 8/9 sub-pillars
+  //    populated shows 89%; a brand with only climate data shows ~11%.
+  try {
+    const { data: snapshot } = await supabase
+      .from('esg_score_snapshots')
+      .select('composite, breakdown, snapshot_date')
+      .eq('organization_id', alkateraOrgId)
+      .order('snapshot_date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const snap = snapshot as {
+      composite: number | null;
+      breakdown:
+        | {
+            e?: Record<string, number | null>;
+            s?: Record<string, number | null>;
+            g?: Record<string, number | null>;
+          }
+        | null;
+    } | null;
+
+    if (snap) {
+      const update: Record<string, unknown> = {
+        score_updated_at: new Date().toISOString(),
+      };
+      if (snap.composite != null && Number.isFinite(snap.composite)) {
+        update.sustainability_score = snap.composite;
+        update.score_tier = tierForScore(snap.composite);
+      }
+      if (snap.breakdown) {
+        const pillarsWithData = countPopulatedSubPillars(snap.breakdown);
+        if (pillarsWithData.total > 0) {
+          update.completeness_score =
+            Math.round((pillarsWithData.populated / pillarsWithData.total) * 10000) /
+            100;
+        }
+      }
+      if (Object.keys(update).length > 1) {
+        await supabase
+          .from('brand_directory')
+          .update(update)
+          .eq('id', brandDirectoryId);
+      }
+    }
+  } catch {
+    skipped.push('alkatera_vitality_override');
+  }
+
   return {
     ok: true,
     brand_directory_id: brandDirectoryId,
@@ -370,6 +507,98 @@ export async function syncAlkateraDataForBrand(
     fields_written: findings.length,
     fields_skipped: skipped,
   };
+}
+
+/**
+ * Push the alka**tera** customer's per-product carbon footprints into
+ * the canonical product_directory. Matching is best-effort:
+ *   1. If a product_directory row already carries alkatera_product_id,
+ *      update it in place.
+ *   2. Otherwise try to match by (brand_directory_id, name).
+ *   3. Otherwise CREATE a fresh product_directory row from the PCF —
+ *      this is what gives distributors access to alka**tera**-only
+ *      products in Discover before any of their distributors list the
+ *      brand.
+ */
+async function mirrorAlkateraProductFootprints(
+  supabase: SupabaseClient,
+  brandDirectoryId: string,
+  alkateraOrgId: string,
+): Promise<void> {
+  const { data: pcfRows } = await supabase
+    .from('product_carbon_footprints')
+    .select('id, product_name, total_ghg_emissions, status')
+    .eq('organization_id', alkateraOrgId);
+
+  type PcfRow = {
+    id: string;
+    product_name: string | null;
+    total_ghg_emissions: number | string | null;
+    status: string | null;
+  };
+  const rows = (pcfRows ?? []) as PcfRow[];
+  if (rows.length === 0) return;
+
+  for (const pcf of rows) {
+    const productName = (pcf.product_name ?? '').trim();
+    if (!productName) continue;
+    const emissions = parseNum(pcf.total_ghg_emissions);
+    const normalised = productName
+      .toLowerCase()
+      .replace(/[^a-z0-9 ]+/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!normalised) continue;
+
+    // 1. By alkatera_product_id (if previously linked).
+    const { data: byLink } = await supabase
+      .from('product_directory')
+      .select('id')
+      .eq('alkatera_product_id', pcf.id)
+      .maybeSingle();
+    let targetId: string | null = (byLink as { id: string } | null)?.id ?? null;
+
+    // 2. By (brand, normalised name).
+    if (!targetId) {
+      const { data: byName } = await supabase
+        .from('product_directory')
+        .select('id')
+        .eq('brand_directory_id', brandDirectoryId)
+        .eq('normalized_name', normalised)
+        .maybeSingle();
+      targetId = (byName as { id: string } | null)?.id ?? null;
+    }
+
+    // 3. Create a fresh product_directory row from the PCF. This is
+    //    what surfaces alka**tera**-only products in Discover for
+    //    brands that no distributor has listed yet.
+    if (!targetId) {
+      const { data: inserted, error: insertError } = await supabase
+        .from('product_directory')
+        .insert({
+          brand_directory_id: brandDirectoryId,
+          name: productName,
+          normalized_name: normalised,
+          alkatera_product_id: pcf.id,
+          embodied_carbon_kgco2e: emissions,
+          discovered_via: 'alkatera_signup',
+          last_synced_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single();
+      if (insertError || !inserted) continue;
+      continue; // already populated by the insert
+    }
+
+    await supabase
+      .from('product_directory')
+      .update({
+        embodied_carbon_kgco2e: emissions,
+        alkatera_product_id: pcf.id,
+        last_synced_at: new Date().toISOString(),
+      })
+      .eq('id', targetId);
+  }
 }
 
 // ------------------------------------------------------------
@@ -380,6 +609,37 @@ function parseNum(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null;
   const n = typeof value === 'number' ? value : parseFloat(String(value));
   return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Count how many ESG sub-pillars in a snapshot's breakdown carry
+ * non-null, non-zero data. The breakdown shape (see /api/vitality/composite)
+ * is `{ e: { climate, water, nature, circularity }, s: { community,
+ * supplier_esg, people_culture }, g: { governance, certifications } }`.
+ *
+ * A sub-pillar at 0 counts as "no real data" — at-zero usually means the
+ * brand hasn't entered anything on that axis yet. Brands that have
+ * meaningfully scored even a single sub-pillar above zero get partial
+ * completeness credit; brands that have populated all 9 sub-pillars get
+ * 100%.
+ */
+function countPopulatedSubPillars(breakdown: {
+  e?: Record<string, number | null>;
+  s?: Record<string, number | null>;
+  g?: Record<string, number | null>;
+}): { populated: number; total: number } {
+  let populated = 0;
+  let total = 0;
+  for (const pillar of ['e', 's', 'g'] as const) {
+    const sub = breakdown[pillar];
+    if (!sub) continue;
+    for (const v of Object.values(sub)) {
+      total += 1;
+      const n = typeof v === 'number' ? v : null;
+      if (n != null && n > 0) populated += 1;
+    }
+  }
+  return { populated, total };
 }
 
 /**

@@ -1,6 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { normalizeBrandName } from './brand-normalizer';
+import { normalizeBrandName, normalizeGtin, normalizeProductName } from './brand-normalizer';
 import { resolveBrandsToDirectory, type DirectoryMatchResult } from './directory/matcher';
+import {
+  resolveProductsToDirectory,
+  productMatchKey,
+  type ProductMatchResult,
+} from './directory/product-matcher';
 import type { ColumnMapping } from '@/types/distributor';
 
 export interface DirectoryMatchSummary {
@@ -10,6 +15,15 @@ export interface DirectoryMatchSummary {
   created: boolean;
   similarity: number;
   match_via: DirectoryMatchResult['matchVia'];
+}
+
+export interface ProductDirectoryStats {
+  /** Total upload rows we resolved to a canonical product. */
+  resolved: number;
+  /** How many of those resolutions hit an existing product_directory row. */
+  matched_existing: number;
+  /** How many of those resolutions created a new product_directory row. */
+  created_new: number;
 }
 
 export interface ProcessResult {
@@ -24,6 +38,12 @@ export interface ProcessResult {
    * distributor sees the directory's value at upload time.
    */
   directory_matches: DirectoryMatchSummary[];
+  /**
+   * Roll-up of how the upload's SKUs resolved against the canonical
+   * product_directory. Surfaced on the confirm screen as "X of N
+   * products matched existing canonical records".
+   */
+  product_directory_stats: ProductDirectoryStats;
 }
 
 interface ProcessArgs {
@@ -126,6 +146,7 @@ export async function processSkuList(args: ProcessArgs): Promise<ProcessResult> 
       brand_profile_ids: [],
       errors,
       directory_matches: [],
+      product_directory_stats: { resolved: 0, matched_existing: 0, created_new: 0 },
     };
   }
 
@@ -217,12 +238,83 @@ export async function processSkuList(args: ProcessArgs): Promise<ProcessResult> 
     }
   }
 
+  // Resolve every upload row against the canonical product_directory
+  // before we insert SKUs. GTIN takes precedence over name. This is
+  // the product-level mirror of the brand-directory dedup above —
+  // multiple distributors uploading the same SKU collapse onto a
+  // single canonical product, so embodied-carbon and other per-SKU
+  // findings (Phase 7) accumulate against one record.
+  type RowWithMeta = {
+    normalized: string;
+    profileId: string;
+    bucketWebsite: string | null;
+    raw: (typeof rows)[number];
+    productInput: {
+      brandDirectoryId: string;
+      displayName: string;
+      gtin: string | null;
+      category: string | null;
+      countryOfOrigin: string | null;
+    };
+  };
+  const rowsWithMeta: RowWithMeta[] = [];
+  for (const [normalized, bucket] of Array.from(brandToRows.entries())) {
+    const profileId = profileIdByNormalized.get(normalized);
+    const dirMatch = directoryMatches.get(normalized);
+    if (!profileId || !dirMatch) continue;
+    for (const row of bucket.rows) {
+      const productName = (row[mapping.product_name] ?? '').trim();
+      const gtin = normalizeGtin(
+        mapping.gtin ? (row[mapping.gtin] ?? '').trim() : null,
+      );
+      if (!productName && !gtin) continue;
+      rowsWithMeta.push({
+        normalized,
+        profileId,
+        bucketWebsite: bucket.website,
+        raw: row,
+        productInput: {
+          brandDirectoryId: dirMatch.directoryId,
+          displayName: productName,
+          gtin,
+          category: mapping.category ? (row[mapping.category] ?? '').trim() || null : null,
+          countryOfOrigin: mapping.country_of_origin
+            ? (row[mapping.country_of_origin] ?? '').trim() || null
+            : null,
+        },
+      });
+    }
+  }
+
+  let productMatches: Map<string, ProductMatchResult>;
+  try {
+    productMatches = await resolveProductsToDirectory(
+      supabase,
+      rowsWithMeta.map((r) => r.productInput),
+      distributorOrgId,
+    );
+  } catch (err) {
+    errors.push(
+      `Product directory matching failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    productMatches = new Map();
+  }
+
+  let productMatchedExisting = 0;
+  let productCreatedNew = 0;
+  for (const result of Array.from(productMatches.values())) {
+    if (result.created) productCreatedNew += 1;
+    else productMatchedExisting += 1;
+  }
+
   // Build the SKU insert payload from every successfully bucketed row.
   type SkuInsert = {
     brand_profile_id: string;
+    product_directory_id: string | null;
     distributor_org_id: string;
     sku_list_id: string;
     sku_code: string | null;
+    gtin: string | null;
     product_name: string;
     category: string | null;
     country_of_origin: string | null;
@@ -230,28 +322,32 @@ export async function processSkuList(args: ProcessArgs): Promise<ProcessResult> 
   };
 
   const skuInserts: SkuInsert[] = [];
-  for (const [normalized, bucket] of Array.from(brandToRows.entries())) {
-    const profileId = profileIdByNormalized.get(normalized);
-    if (!profileId) continue;
-    for (const row of bucket.rows) {
-      const listingValue = mapping.listing_status
-        ? (row[mapping.listing_status] ?? '').trim().toLowerCase()
-        : '';
-      const listing: 'active' | 'delisted' =
-        listingValue === 'delisted' || listingValue === 'inactive' ? 'delisted' : 'active';
-      skuInserts.push({
-        brand_profile_id: profileId,
-        distributor_org_id: distributorOrgId,
-        sku_list_id: skuListId,
-        sku_code: mapping.sku_code ? (row[mapping.sku_code] ?? '').trim() || null : null,
-        product_name: (row[mapping.product_name] ?? '').trim(),
-        category: mapping.category ? (row[mapping.category] ?? '').trim() || null : null,
-        country_of_origin: mapping.country_of_origin
-          ? (row[mapping.country_of_origin] ?? '').trim() || null
-          : null,
-        listing_status: listing,
-      });
-    }
+  for (const meta of rowsWithMeta) {
+    const { raw: row, productInput } = meta;
+    const listingValue = mapping.listing_status
+      ? (row[mapping.listing_status] ?? '').trim().toLowerCase()
+      : '';
+    const listing: 'active' | 'delisted' =
+      listingValue === 'delisted' || listingValue === 'inactive' ? 'delisted' : 'active';
+    const matchResult = productMatches.get(
+      productMatchKey(
+        productInput.brandDirectoryId,
+        productInput.displayName,
+        productInput.gtin,
+      ),
+    );
+    skuInserts.push({
+      brand_profile_id: meta.profileId,
+      product_directory_id: matchResult?.productDirectoryId ?? null,
+      distributor_org_id: distributorOrgId,
+      sku_list_id: skuListId,
+      sku_code: mapping.sku_code ? (row[mapping.sku_code] ?? '').trim() || null : null,
+      gtin: productInput.gtin,
+      product_name: productInput.displayName,
+      category: productInput.category,
+      country_of_origin: productInput.countryOfOrigin,
+      listing_status: listing,
+    });
   }
 
   if (skuInserts.length > 0) {
@@ -267,6 +363,11 @@ export async function processSkuList(args: ProcessArgs): Promise<ProcessResult> 
     brand_profile_ids: Array.from(profileIdByNormalized.values()),
     errors,
     directory_matches: directoryMatchSummaries,
+    product_directory_stats: {
+      resolved: productMatchedExisting + productCreatedNew,
+      matched_existing: productMatchedExisting,
+      created_new: productCreatedNew,
+    },
   };
 }
 

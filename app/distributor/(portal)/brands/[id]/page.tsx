@@ -100,7 +100,7 @@ export default async function BrandOverviewPage({ params }: PageProps) {
       .maybeSingle(),
     supabase
       .from('brand_directory')
-      .select('sustainability_score, score_tier, completeness_score')
+      .select('sustainability_score, score_tier, completeness_score, last_synced_at')
       .eq('id', directoryId)
       .maybeSingle(),
     supabase
@@ -119,6 +119,7 @@ export default async function BrandOverviewPage({ params }: PageProps) {
     sustainability_score: number | null;
     score_tier: 'leader' | 'progressing' | 'developing' | 'insufficient' | null;
     completeness_score: number | null;
+    last_synced_at: string | null;
   } | null) ?? null;
   const otherListings = Math.max(0, (listingCount ?? 1) - 1);
 
@@ -205,7 +206,14 @@ export default async function BrandOverviewPage({ params }: PageProps) {
       </div>
 
       {brand.alkatera_org_id && (
-        <AlkateraRefreshButton brandId={brand.id} brandName={brand.name} />
+        <div className="space-y-2">
+          <AlkateraRefreshButton brandId={brand.id} brandName={brand.name} />
+          {scores?.last_synced_at && (
+            <p className="text-[11px] text-muted-foreground pl-1">
+              Synced {formatTimeAgo(scores.last_synced_at)} from alka<strong>tera</strong>
+            </p>
+          )}
+        </div>
       )}
 
       <CompanyDescription
@@ -287,5 +295,20 @@ function Detail({
       <dd className="text-sm mt-1 font-medium">{value ?? '—'}</dd>
     </div>
   );
+}
+
+function formatTimeAgo(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return 'recently';
+  const diffSec = Math.max(0, Math.round((Date.now() - then) / 1000));
+  if (diffSec < 60) return 'just now';
+  const minutes = Math.round(diffSec / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  const days = Math.round(hours / 24);
+  if (days < 30) return `${days} day${days === 1 ? '' : 's'} ago`;
+  const months = Math.round(days / 30);
+  return `${months} month${months === 1 ? '' : 's'} ago`;
 }
 

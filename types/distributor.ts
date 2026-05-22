@@ -93,9 +93,14 @@ export interface BrandProfile {
 export interface BrandSku {
   id: string;
   brand_profile_id: string;
+  /** Canonical product identity (Phase 1 of the product directory). LCA
+   *  and per-SKU sustainability data attach to product_directory_id, so
+   *  data is shared across every distributor that lists the product. */
+  product_directory_id: string | null;
   distributor_org_id: string;
   sku_list_id: string | null;
   sku_code: string | null;
+  gtin: string | null;
   product_name: string;
   category: string | null;
   country_of_origin: string | null;
@@ -108,6 +113,7 @@ export type ColumnMappingField =
   | 'brand_name'
   | 'product_name'
   | 'sku_code'
+  | 'gtin'
   | 'category'
   | 'country_of_origin'
   | 'listing_status'
@@ -117,6 +123,9 @@ export interface ColumnMapping {
   brand_name: string;
   product_name: string;
   sku_code?: string;
+  /** GTIN/EAN/UPC barcode. Strong signal for product canonicalisation
+   *  during SKU upload — exact GTIN match wins over fuzzy name match. */
+  gtin?: string;
   category?: string;
   country_of_origin?: string;
   listing_status?: string;

@@ -103,12 +103,17 @@ export async function recalculateCompleteness(
   }
   await supabase.from('brand_completeness_snapshots').insert(snapshotRow);
 
+  // If the brand has zero findings, the vitality calculator still
+  // returns a non-zero "missing fields" floor (~8/100) which renders
+  // as a misleading score on the Discover page. Treat "no findings"
+  // as "no score" — null — so consumers fall back to a dash.
+  const hasAnyFindings = completeness.fields_populated > 0;
   await supabase
     .from('brand_directory')
     .update({
       completeness_score: completeness.overall,
-      sustainability_score: vitality.overall,
-      score_tier: vitality.tier,
+      sustainability_score: hasAnyFindings ? vitality.overall : null,
+      score_tier: hasAnyFindings ? vitality.tier : null,
       score_updated_at: new Date().toISOString(),
     })
     .eq('id', brandDirectoryId);

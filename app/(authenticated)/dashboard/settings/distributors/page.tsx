@@ -1,12 +1,18 @@
 'use client';
 
 import { DistributorListPanel } from '@/components/brand/distributors/distributor-list';
+import { DirectoryDiscoveryToggle } from '@/components/brand/distributors/discovery-toggle';
 
 /**
  * Brand-side Distributors management page. Sits in the existing alkatera
  * brand portal at /dashboard/settings/distributors. Shows every
  * distributor that has linked to the brand's alkatera org, with
  * confirm / pause / disconnect controls and per-field privacy toggles.
+ *
+ * Phase 4 of the proactive-data programme adds the
+ * DirectoryDiscoveryToggle at the top: a brand-wide switch that hides
+ * the brand from the new distributor Discover search surface without
+ * affecting distributors who already list them.
  */
 export default function BrandDistributorsSettingsPage() {
   return (
@@ -20,6 +26,7 @@ export default function BrandDistributorsSettingsPage() {
           the canonical brand directory.
         </p>
       </div>
+      <DirectoryDiscoveryToggle />
       <DistributorListPanel />
     </div>
   );

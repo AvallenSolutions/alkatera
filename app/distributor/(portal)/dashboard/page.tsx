@@ -12,6 +12,7 @@ import {
   Inbox,
   Sparkles,
   TrendingUp,
+  Search,
 } from 'lucide-react';
 import { CompletenessChart } from '@/components/distributor/dashboard/completeness-chart';
 import { ActionQueue, type ActionItem } from '@/components/distributor/dashboard/action-queue';
@@ -123,11 +124,50 @@ export default async function DistributorDashboardPage() {
     .limit(1);
   const hasUploaded = (lists ?? []).length > 0;
 
+  // Industry directory totals — used to power the Discover tile in
+  // the hero strip below. Both queries are head-only counts so they
+  // don't pull rows. Defensive nulls on errors (e.g. product_directory
+  // missing in environments where Phase 1 hasn't been applied).
+  const [{ count: directoryBrandCount }, { count: directoryProductCount }] = await Promise.all([
+    supabase
+      .from('brand_directory')
+      .select('id', { count: 'exact', head: true })
+      .eq('discovery_opt_out', false),
+    supabase.from('product_directory').select('id', { count: 'exact', head: true }),
+  ]);
+
   return (
     <div className="space-y-10">
       <DashboardHero hasUploaded={hasUploaded} />
 
       {!hasUploaded && <OnboardingCard />}
+
+      <Link
+        href="/distributor/discover"
+        className="group block rounded-2xl border border-sky-500/30 bg-gradient-to-r from-sky-500/10 via-sky-500/5 to-transparent px-5 py-4 hover:from-sky-500/15 transition-colors"
+      >
+        <div className="flex items-center gap-4">
+          <div className="rounded-xl bg-sky-500/15 border border-sky-400/30 p-3 shrink-0 shadow-[0_0_24px_rgba(56,189,248,0.15)]">
+            <Search className="h-5 w-5 text-sky-300" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold">Industry directory</div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              <strong className="text-foreground tabular-nums">
+                {(directoryBrandCount ?? 0).toLocaleString()}
+              </strong>{' '}
+              brand{(directoryBrandCount ?? 0) === 1 ? '' : 's'} ·{' '}
+              <strong className="text-foreground tabular-nums">
+                {(directoryProductCount ?? 0).toLocaleString()}
+              </strong>{' '}
+              product{(directoryProductCount ?? 0) === 1 ? '' : 's'} ready to add to your portfolio.
+            </div>
+          </div>
+          <span className="text-[11px] text-sky-200 font-semibold uppercase tracking-wider">
+            Discover →
+          </span>
+        </div>
+      </Link>
 
       <section className="space-y-4">
         <SectionEyebrow icon={<TrendingUp className="h-3 w-3" />}>
