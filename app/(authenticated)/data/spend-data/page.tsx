@@ -1,7 +1,9 @@
 'use client'
 
 import Link from 'next/link'
+import { useMemo } from 'react'
 import { FeatureGate } from '@/components/subscription/FeatureGate'
+import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider'
 import {
   Accordion,
   AccordionContent,
@@ -64,6 +66,22 @@ function StepHeader({ index, title, description, count, countLabel, complete }: 
 
 export default function SpendDataPage() {
   const state = useSpendInboxState()
+
+  // Tell Rosa about the spend-data inbox state so questions like
+  // "what's the next step?" or "how do I categorise this row?" can
+  // reference the actual queue counts and connection status.
+  const rosaSlice = useMemo(() => ({
+    id: 'spend-data',
+    label: 'Spend data importer',
+    priority: 8,
+    data: {
+      page: 'spend-data',
+      xero_connected: state.connected,
+      unclassified_count: state.unclassifiedCount,
+      ai_classification_count: (state as any).aiClassificationCount ?? null,
+    },
+  }), [state.connected, state.unclassifiedCount, (state as any).aiClassificationCount])
+  useRosaPageContext(rosaSlice)
 
   return (
     <FeatureGate feature="xero_integration_beta">

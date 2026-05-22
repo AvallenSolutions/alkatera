@@ -19,6 +19,16 @@ const FACILITY_TYPE_OPTIONS = [
 
 type OperationalControl = 'owned' | 'third_party'
 
+const FUNCTION_OPTIONS = [
+  { value: 'manufacturing', label: 'Manufacturing' },
+  { value: 'packaging', label: 'Packaging' },
+  { value: 'distribution', label: 'Distribution' },
+  { value: 'storage', label: 'Storage / warehousing' },
+  { value: 'office', label: 'Office / admin' },
+] as const
+
+type FacilityFunction = (typeof FUNCTION_OPTIONS)[number]['value']
+
 export function FastTrackFacilityStep() {
   const { completeStep, state } = useOnboarding()
   const { currentOrganization } = useOrganization()
@@ -28,7 +38,14 @@ export function FastTrackFacilityStep() {
   const [operationalControl, setOperationalControl] = useState<OperationalControl>('owned')
   const [facilityName, setFacilityName] = useState(orgName ? `${orgName} Facility` : '')
   const [location, setLocation] = useState<LocationData | null>(null)
+  const [functions, setFunctions] = useState<FacilityFunction[]>(['manufacturing', 'packaging'])
   const [isSaving, setIsSaving] = useState(false)
+
+  const toggleFunction = (fn: FacilityFunction) => {
+    setFunctions(prev =>
+      prev.includes(fn) ? prev.filter(f => f !== fn) : [...prev, fn],
+    )
+  }
 
   // Update facility name if org name loads after mount
   useEffect(() => {
@@ -52,6 +69,7 @@ export function FastTrackFacilityStep() {
           organization_id: currentOrganization.id,
           name: facilityName.trim(),
           operational_control: operationalControl,
+          functions: functions.length > 0 ? functions : null,
           address_line1: location?.address || null,
           address_city: location?.city || null,
           address_country: location?.country || null,
@@ -149,6 +167,31 @@ export function FastTrackFacilityStep() {
               {[location.city, location.country].filter(Boolean).join(', ')}
             </p>
           )}
+        </div>
+
+        {/* What happens here — drives Scope 1/2/3 boundary calculations */}
+        <div className="space-y-2">
+          <Label className="text-sm font-medium text-white/70">What happens at this site?</Label>
+          <div className="flex flex-wrap gap-1.5">
+            {FUNCTION_OPTIONS.map(opt => {
+              const picked = functions.includes(opt.value)
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => toggleFunction(opt.value)}
+                  className={cn(
+                    'px-3 py-1.5 rounded-full text-xs border transition-all',
+                    picked
+                      ? 'bg-[#ccff00]/15 border-[#ccff00]/50 text-[#ccff00]'
+                      : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10 hover:border-white/20',
+                  )}
+                >
+                  {opt.label}
+                </button>
+              )
+            })}
+          </div>
+          <p className="text-[11px] text-white/30">Helps us draw the right Scope 1, 2 and 3 boundaries.</p>
         </div>
 
         <Button

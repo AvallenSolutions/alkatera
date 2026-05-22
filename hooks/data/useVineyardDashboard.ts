@@ -80,6 +80,10 @@ export function useVineyardDashboard(vineyardId: string): UseVineyardDashboardRe
           area_ha: profile.area_ha,
           soil_management: profile.soil_management,
           pruning_residue_returned: profile.pruning_residue_returned,
+          pruning_residue_management_type: (profile.pruning_residue_management_type ?? undefined) as
+            | 'in_field' | 'removed_for_biomass' | 'chipped_and_spread' | 'burned' | undefined,
+          pruning_residue_measured_kg_per_ha: profile.pruning_residue_measured_kg_per_ha ?? undefined,
+          pruning_residue_burned_kg_per_ha: (profile as any).pruning_residue_burned_kg_per_ha ?? undefined,
           fertiliser_type: profile.fertiliser_type,
           fertiliser_quantity_kg: profile.fertiliser_quantity_kg,
           fertiliser_n_content_percent: profile.fertiliser_n_content_percent,
@@ -90,6 +94,7 @@ export function useVineyardDashboard(vineyardId: string): UseVineyardDashboardRe
           herbicide_applications_per_year: profile.herbicide_applications_per_year,
           herbicide_type: profile.herbicide_type,
           diesel_litres_per_year: profile.diesel_litres_per_year,
+          red_diesel_litres_per_year: (profile as any).red_diesel_litres_per_year ?? undefined,
           petrol_litres_per_year: profile.petrol_litres_per_year,
           is_irrigated: profile.is_irrigated,
           water_m3_per_ha: profile.water_m3_per_ha,

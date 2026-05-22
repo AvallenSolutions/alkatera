@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    let storedState: { state: string; organizationId: string; userId: string }
+    let storedState: { state: string; organizationId: string; userId: string; returnTo?: string }
     try {
       storedState = JSON.parse(storedCookie.value)
     } catch {
@@ -67,6 +67,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (returnedState !== storedState.state) {
+      // Don't honour an attacker-controlled returnTo on a state mismatch.
       return NextResponse.redirect(
         `${baseUrl}/settings?tab=integrations&xero=error&message=${encodeURIComponent(
           'OAuth state mismatch. This may indicate a CSRF attack. Please try again.'
@@ -76,6 +77,20 @@ export async function GET(request: NextRequest) {
 
     // Clear the state cookie
     cookieStore.delete('xero_oauth_state')
+
+    // Where to land the user after success / post-state-validation errors.
+    // The wizard auto-pops on /dashboard so onboarding-originated connects
+    // never see the settings page; everything else falls back to settings.
+    const validatedReturnTo = storedState.returnTo
+      && storedState.returnTo.startsWith('/')
+      && !storedState.returnTo.startsWith('//')
+        ? storedState.returnTo
+        : '/settings?tab=integrations'
+    const buildLanding = (params: Record<string, string>) => {
+      const url = new URL(validatedReturnTo, baseUrl)
+      for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
+      return url.toString()
+    }
 
     // 3. Exchange code for tokens
     // Pass the original state so the OpenID client can validate it
@@ -89,9 +104,10 @@ export async function GET(request: NextRequest) {
 
     if (!tenants || tenants.length === 0) {
       return NextResponse.redirect(
-        `${baseUrl}/settings?tab=integrations&xero=error&message=${encodeURIComponent(
-          'No Xero organisations found. Please ensure you have access to at least one Xero organisation.'
-        )}`
+        buildLanding({
+          xero: 'error',
+          message: 'No Xero organisations found. Please ensure you have access to at least one Xero organisation.',
+        }),
       )
     }
 
@@ -144,10 +160,10 @@ export async function GET(request: NextRequest) {
       connectedBy: storedState.userId,
     })
 
-    // 7. Redirect to settings with success + auto-sync trigger
-    return NextResponse.redirect(
-      `${baseUrl}/settings?tab=integrations&xero=connected&auto-sync=true`
-    )
+    // 7. Redirect back to wherever the connect was initiated (defaults to
+    // /settings; onboarding-originated connects land on /dashboard so the
+    // wizard re-pops at the saved step).
+    return NextResponse.redirect(buildLanding({ xero: 'connected', 'auto-sync': 'true' }))
   } catch (err: unknown) {
     console.error('Error in Xero OAuth callback:', err)
     const message = err instanceof Error ? err.message : 'Failed to complete Xero authorisation'

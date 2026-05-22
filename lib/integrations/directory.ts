@@ -159,12 +159,11 @@ export const INTEGRATIONS: IntegrationProvider[] = [
     slug: 'unleashed',
     name: 'Unleashed',
     category: 'inventory',
-    status: 'available',
+    status: 'coming_soon',
     authType: 'api_key',
     description: 'Pull SKUs, Bills of Materials, suppliers and purchase orders. Auto-builds the LCA recipe for each finished product so you start with a draft footprint, not a blank page.',
     provides: ['Product catalog', 'Bill of Materials', 'Suppliers', 'Purchase orders'],
     docsUrl: 'https://apidocs.unleashedsoftware.com/',
-    featureFlag: 'unleashed_integration_beta',
   },
   {
     slug: 'katana',

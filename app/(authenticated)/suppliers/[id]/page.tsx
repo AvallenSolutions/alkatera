@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import { useRosaPageContext } from "@/lib/rosa/RosaContextProvider";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -52,6 +53,30 @@ export default function SupplierDetailPage() {
   } = useOrganizationSupplierDetail(orgSupplierId);
 
   const [activeTab, setActiveTab] = useState("overview");
+
+  // Tell Rosa about this supplier so questions like "should we follow up?",
+  // "what data are we still waiting on?", or "how does this supplier
+  // compare?" can be answered with the supplier in context.
+  const rosaSlice = useMemo(() => {
+    if (!supplierProfile) return null
+    return {
+      id: 'supplier-detail',
+      label: `Supplier: ${(supplierProfile as any).name || 'unknown'}`,
+      priority: 9,
+      data: {
+        supplier_id: resolvedSupplierId ?? orgSupplierId,
+        name: (supplierProfile as any).name ?? null,
+        country: (supplierProfile as any).country ?? null,
+        industry_sector: (supplierProfile as any).industry_sector ?? null,
+        engagement_status: (brandRelationship as any)?.engagement_status ?? null,
+        annual_spend: (brandRelationship as any)?.annual_spend ?? null,
+        product_count: Array.isArray(products) ? products.length : 0,
+        has_esg_assessment: !!esgAssessment,
+        active_tab: activeTab,
+      },
+    }
+  }, [supplierProfile, brandRelationship, products, esgAssessment, orgSupplierId, resolvedSupplierId, activeTab])
+  useRosaPageContext(rosaSlice)
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "Not set";

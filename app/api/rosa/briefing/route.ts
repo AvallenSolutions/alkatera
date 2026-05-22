@@ -14,15 +14,39 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
-import { expandDeadlines, COMPLIANCE_DEADLINES } from '@/lib/pulse/regulatory-deadlines';
+import {
+  expandDeadlinesForOrg,
+  COMPLIANCE_DEADLINES,
+  type DeadlineApplicabilityFlags,
+} from '@/lib/pulse/regulatory-deadlines';
 
 export const runtime = 'nodejs';
-export const revalidate = 300;
+// No revalidate — responses depend on the auth-resolved org which the
+// segment-level cache can't distinguish. Per-user / per-org dedup happens
+// at the route level if needed.
+export const dynamic = 'force-dynamic';
 
 interface BriefingResponse {
   insight: { headline: string; generated_at: string } | null;
   anomalies: { open_count: number; top_severity: 'low' | 'medium' | 'high' | null };
-  next_deadline: { title: string; regime_label: string; due_date: string; days_away: number; action_href: string } | null;
+  next_deadline: {
+    title: string;
+    regime_label: string;
+    why_it_matters: string;
+    due_date: string;
+    days_away: number;
+    action_href: string;
+  } | null;
+  /** Forward-looking deadline used for the "no urgent items" anticipate
+      tile. Same shape as next_deadline but filtered to >14 days out. */
+  next_anticipated: {
+    title: string;
+    regime_label: string;
+    why_it_matters: string;
+    due_date: string;
+    days_away: number;
+    action_href: string;
+  } | null;
   next_gap: { step: string; why: string; href: string } | null;
 }
 
@@ -54,14 +78,21 @@ export async function GET() {
 
   // Only orgs with the pulse_beta flag get insight/anomaly tiles — they read
   // from Pulse-only tables that shouldn't leak into the UI for non-Pulse orgs.
+  // Same row also tells us which regulatory regimes this org is in scope for
+  // so we don't fire ETS / CBAM / CSRD / SECR deadlines at non-applicable orgs.
   const { data: orgRow } = await service
     .from('organizations')
     .select('feature_flags')
     .eq('id', organizationId)
     .maybeSingle();
-  const pulseEnabled = Boolean(
-    (orgRow as any)?.feature_flags?.pulse_beta === true,
-  );
+  const flags = ((orgRow as any)?.feature_flags ?? {}) as Record<string, unknown>;
+  const pulseEnabled = flags.pulse_beta === true;
+  const deadlineFlags: DeadlineApplicabilityFlags = {
+    uk_ets_operator: flags.uk_ets_operator === true,
+    cbam_imports: flags.cbam_imports === true,
+    csrd_in_scope: flags.csrd_in_scope === true,
+    secr_in_scope: flags.secr_in_scope === true,
+  };
 
   const [
     insightRes,
@@ -98,7 +129,7 @@ export async function GET() {
       .eq('status', 'completed'),
     service
       .from('product_carbon_footprints')
-      .select('id, product_name, status, updated_at')
+      .select('id, product_id, product_name, status, updated_at')
       .eq('organization_id', organizationId)
       .in('status', ['draft', 'in_progress'])
       .order('updated_at', { ascending: true })
@@ -118,11 +149,15 @@ export async function GET() {
     return severityOrder[sev] > severityOrder[acc] ? sev : acc;
   }, null);
 
-  // Next deadline in the next 12 months
-  const upcoming = expandDeadlines(COMPLIANCE_DEADLINES, 12, new Date());
-  const nextDeadline = upcoming
-    .filter(d => d.days_away >= -30)
-    .sort((a, b) => a.days_away - b.days_away)[0];
+  // Next deadline in the next 12 months — filtered by what actually applies
+  // to this org. Drinks producers see EPR + Plastic Tax by default; ETS,
+  // CBAM, CSRD, SECR only when the org has explicitly opted in.
+  const upcoming = expandDeadlinesForOrg(COMPLIANCE_DEADLINES, deadlineFlags, 12, new Date());
+  const sorted = [...upcoming].sort((a, b) => a.days_away - b.days_away);
+  const nextDeadline = sorted.find(d => d.days_away >= -30);
+  // Anticipate tile picks the next forward-looking deadline that's far enough
+  // out to be informational rather than urgent.
+  const nextAnticipated = sorted.find(d => d.days_away > 14);
 
   // Next data gap
   const p = productsCount.count ?? 0;
@@ -131,21 +166,45 @@ export async function GET() {
   const lc = completedLcasCount.count ?? 0;
   let nextGap: BriefingResponse['next_gap'];
   if (p === 0) {
-    nextGap = { step: 'Add your first product', why: 'Rosa needs a product to calculate anything against.', href: '/products' };
-  } else if (f === 0) {
-    nextGap = { step: 'Add a facility', why: 'Footprints need to know where production happens.', href: '/company/facilities' };
-  } else if (s === 0) {
-    nextGap = { step: 'Add a supplier', why: 'Scope 3, the biggest chunk of a drinks footprint, needs supplier data.', href: '/suppliers' };
-  } else if (lc === 0) {
-    nextGap = { step: 'Complete your first LCA', why: 'An LCA unlocks benchmarks, hotspots and reports.', href: '/products' };
-  } else if (draftLca.data && draftLca.data.length > 0) {
     nextGap = {
-      step: `Finish the LCA for ${(draftLca.data[0] as any).product_name}`,
+      step: 'Add your first product',
+      why: 'Rosa needs a product to calculate anything against.',
+      href: '/products/new/',
+    };
+  } else if (f === 0) {
+    nextGap = {
+      step: 'Add a facility',
+      why: 'Footprints need to know where production happens.',
+      href: '/company/facilities/?addFacility=1',
+    };
+  } else if (s === 0) {
+    nextGap = {
+      step: 'Add a supplier',
+      why: 'Scope 3, the biggest chunk of a drinks footprint, needs supplier data.',
+      href: '/suppliers/new/',
+    };
+  } else if (lc === 0) {
+    nextGap = {
+      step: 'Complete your first LCA',
+      why: 'An LCA unlocks benchmarks, hotspots and reports.',
+      href: '/products/',
+    };
+  } else if (draftLca.data && draftLca.data.length > 0) {
+    const draft = draftLca.data[0] as any;
+    // Deep-link straight into the compliance wizard for THIS product so
+    // the user lands exactly where the work happens, not on the index.
+    const productId = draft.product_id as string | undefined;
+    nextGap = {
+      step: `Finish the LCA for ${draft.product_name}`,
       why: 'Draft or in-progress LCAs block compliance claims.',
-      href: '/products',
+      href: productId ? `/products/${productId}/compliance-wizard/` : '/products/',
     };
   } else {
-    nextGap = { step: 'Set a reduction target', why: 'You have a baseline. Next lever is committing to a target.', href: '/performance' };
+    nextGap = {
+      step: 'Set a reduction target',
+      why: 'You have a baseline. Next lever is committing to a target.',
+      href: '/pulse/targets/',
+    };
   }
 
   const payload: BriefingResponse = {
@@ -157,9 +216,20 @@ export async function GET() {
       ? {
           title: nextDeadline.title,
           regime_label: nextDeadline.regime_label,
+          why_it_matters: nextDeadline.why_it_matters,
           due_date: nextDeadline.due_date,
           days_away: nextDeadline.days_away,
           action_href: nextDeadline.action_href,
+        }
+      : null,
+    next_anticipated: nextAnticipated
+      ? {
+          title: nextAnticipated.title,
+          regime_label: nextAnticipated.regime_label,
+          why_it_matters: nextAnticipated.why_it_matters,
+          due_date: nextAnticipated.due_date,
+          days_away: nextAnticipated.days_away,
+          action_href: nextAnticipated.action_href,
         }
       : null,
     next_gap: nextGap,
@@ -167,7 +237,7 @@ export async function GET() {
 
   return NextResponse.json(payload, {
     headers: {
-      'Cache-Control': 'private, max-age=300',
+      'Cache-Control': 'no-store',
     },
   });
 }

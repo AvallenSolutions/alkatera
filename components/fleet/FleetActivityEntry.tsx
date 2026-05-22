@@ -49,6 +49,8 @@ const VEHICLE_CATEGORIES = [
 const FUEL_TYPES = [
   { value: "diesel", label: "Diesel" },
   { value: "petrol", label: "Petrol" },
+  { value: "red_diesel", label: "Red / Agricultural Diesel (Gas Oil)" },
+  { value: "aviation", label: "Aviation Fuel (Jet Kerosene)" },
   { value: "electric", label: "Electric" },
   { value: "hybrid_diesel", label: "Hybrid (Diesel)" },
   { value: "hybrid_petrol", label: "Hybrid (Petrol)" },

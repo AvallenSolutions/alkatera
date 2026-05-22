@@ -96,7 +96,7 @@ export function OrchardTrendCharts({ harvestImpacts }: OrchardTrendChartsProps) 
     const area = imp.flag_emissions.land_use_m2 / 10000 || 1;
     return {
       harvest_year: v.harvest_year,
-      'Fertiliser & N\u2082O': (imp.flag_emissions.total_flag_co2e + imp.non_flag_emissions.fertiliser_production_co2e) / area,
+      'Fertiliser & N₂O': (imp.flag_emissions.total_flag_co2e + imp.non_flag_emissions.fertiliser_production_co2e) / area,
       Fuel: imp.non_flag_emissions.machinery_fuel_co2e / area,
       Irrigation: imp.non_flag_emissions.irrigation_energy_co2e / area,
       Pesticides: imp.non_flag_emissions.pesticide_production_co2e / area,
@@ -153,7 +153,7 @@ export function OrchardTrendCharts({ harvestImpacts }: OrchardTrendChartsProps) 
     const area = v.impacts.flag_emissions.land_use_m2 / 10000 || 1;
     return {
       harvest_year: v.harvest_year,
-      'Fuel CO\u2082e/ha': v.impacts.non_flag_emissions.machinery_fuel_co2e / area,
+      'Fuel CO₂e/ha': v.impacts.non_flag_emissions.machinery_fuel_co2e / area,
     };
   });
 
@@ -183,7 +183,7 @@ export function OrchardTrendCharts({ harvestImpacts }: OrchardTrendChartsProps) 
                 width={60}
                 tickFormatter={(v: number) => v.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
               />
-              <Tooltip content={<ChartTooltip unit="kg CO\u2082e/ha" />} />
+              <Tooltip content={<ChartTooltip unit="kg CO₂e/ha" />} />
               <Line
                 type="monotone"
                 dataKey="emissions_per_ha"
@@ -216,9 +216,9 @@ export function OrchardTrendCharts({ harvestImpacts }: OrchardTrendChartsProps) 
                 width={60}
                 tickFormatter={(v: number) => v.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
               />
-              <Tooltip content={<ChartTooltip unit="kg CO\u2082e/ha" />} />
+              <Tooltip content={<ChartTooltip unit="kg CO₂e/ha" />} />
               <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
-              <Area type="monotone" dataKey="Fertiliser & N\u2082O" stackId="1" stroke={COLOURS.amber} fill={COLOURS.amber} fillOpacity={0.6} />
+              <Area type="monotone" dataKey="Fertiliser & N₂O" stackId="1" stroke={COLOURS.amber} fill={COLOURS.amber} fillOpacity={0.6} />
               <Area type="monotone" dataKey="Fuel" stackId="1" stroke={COLOURS.red} fill={COLOURS.red} fillOpacity={0.6} />
               <Area type="monotone" dataKey="Irrigation" stackId="1" stroke={COLOURS.blue} fill={COLOURS.blue} fillOpacity={0.6} />
               <Area type="monotone" dataKey="Pesticides" stackId="1" stroke={COLOURS.purple} fill={COLOURS.purple} fillOpacity={0.6} />
@@ -233,7 +233,7 @@ export function OrchardTrendCharts({ harvestImpacts }: OrchardTrendChartsProps) 
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-sm">
             <FlaskConical className="h-4 w-4 text-muted-foreground" />
-            N{'\u2082'}O Emissions Breakdown (per ha)
+            N{'₂'}O Emissions Breakdown (per ha)
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -246,7 +246,7 @@ export function OrchardTrendCharts({ harvestImpacts }: OrchardTrendChartsProps) 
                 width={60}
                 tickFormatter={(v: number) => v.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
               />
-              <Tooltip content={<ChartTooltip unit="kg CO\u2082e/ha" />} />
+              <Tooltip content={<ChartTooltip unit="kg CO₂e/ha" />} />
               <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
               <Bar dataKey="Direct (fertiliser)" stackId="1" fill={COLOURS.amber} radius={[0, 0, 0, 0]} maxBarSize={40} />
               <Bar dataKey="Indirect (vol. + leach.)" stackId="1" fill={COLOURS.red} radius={[0, 0, 0, 0]} maxBarSize={40} />
@@ -280,7 +280,7 @@ export function OrchardTrendCharts({ harvestImpacts }: OrchardTrendChartsProps) 
                 width={60}
                 tickFormatter={(v: number) => v.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
               />
-              <Tooltip content={<ChartTooltip unit="m\u00B3/ha" />} />
+              <Tooltip content={<ChartTooltip unit="m³/ha" />} />
               <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
               <Area type="monotone" dataKey="water_per_ha" name="Volume" stroke={COLOURS.blue} fill="url(#gradWaterOrchard)" strokeWidth={2} dot={{ r: 3, fill: COLOURS.blue }} />
               <Line type="monotone" dataKey="scarcity_weighted" name="Scarcity-weighted (AWARE)" stroke={COLOURS.blue} strokeWidth={1.5} strokeDasharray="5 5" dot={false} />
@@ -307,7 +307,7 @@ export function OrchardTrendCharts({ harvestImpacts }: OrchardTrendChartsProps) 
                 width={60}
                 tickFormatter={(v: number) => v.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
               />
-              <Tooltip content={<ChartTooltip unit="kg CO\u2082e/ha" />} />
+              <Tooltip content={<ChartTooltip unit="kg CO₂e/ha" />} />
               <Bar dataKey="removals_per_ha" name="Removals" fill={COLOURS.green} radius={[4, 4, 0, 0]} maxBarSize={48} />
             </BarChart>
           </ResponsiveContainer>
@@ -395,7 +395,7 @@ export function OrchardTrendCharts({ harvestImpacts }: OrchardTrendChartsProps) 
               <Tooltip content={<ChartTooltip />} />
               <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
               <Line yAxisId="left" type="monotone" dataKey="yield_per_ha" name="Yield (t/ha)" stroke={COLOURS.amber} strokeWidth={2} dot={{ r: 4, fill: COLOURS.amber }} />
-              <Line yAxisId="right" type="monotone" dataKey="emissions_per_tonne" name="kg CO\u2082e/t fruit" stroke={COLOURS.red} strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3, fill: COLOURS.red }} />
+              <Line yAxisId="right" type="monotone" dataKey="emissions_per_tonne" name="kg CO₂e/t fruit" stroke={COLOURS.red} strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3, fill: COLOURS.red }} />
             </LineChart>
           </ResponsiveContainer>
         </CardContent>

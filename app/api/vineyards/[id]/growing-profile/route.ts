@@ -158,6 +158,7 @@ export async function POST(
 
         // Step 3: Machinery & Fuel
         diesel_litres_per_year: merged.diesel_litres_per_year || 0,
+        red_diesel_litres_per_year: merged.red_diesel_litres_per_year || 0,
         petrol_litres_per_year: merged.petrol_litres_per_year || 0,
 
         // Step 4: Irrigation
@@ -196,6 +197,7 @@ export async function POST(
         // Pruning residue detail
         pruning_residue_management_type: merged.pruning_residue_management_type || null,
         pruning_residue_measured_kg_per_ha: merged.pruning_residue_measured_kg_per_ha || null,
+        pruning_residue_burned_kg_per_ha: merged.pruning_residue_burned_kg_per_ha || null,
 
         // Draft
         is_draft: isDraft,

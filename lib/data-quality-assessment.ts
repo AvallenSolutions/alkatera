@@ -188,6 +188,50 @@ export const PEDIGREE_UNCERTAINTY: Record<keyof PedigreeMatrix, Record<1 | 2 | 3
 };
 
 // ============================================================================
+// ISO 14064-1 uncertainty tiers (for the auditor worksheet export)
+// ============================================================================
+// Simple IPCC-aligned uncertainty bands mapped from the existing
+// data_provenance enum. Verifiers use these to see which sources drive
+// inventory uncertainty. No data migration — pure mapping of existing values.
+
+export type UncertaintyTierKey = 'low' | 'medium' | 'high';
+
+export const UNCERTAINTY_TIERS: Record<
+  UncertaintyTierKey,
+  { label: string; pct: number; provenance: string[] }
+> = {
+  low: {
+    label: 'Low (measured / supplier-verified)',
+    pct: 8,
+    provenance: ['primary_measured_onsite', 'primary_supplier_verified'],
+  },
+  medium: {
+    label: 'Medium (calculated / allocated)',
+    pct: 20,
+    provenance: ['secondary_calculated_allocation'],
+  },
+  high: {
+    label: 'High (modelled / industry average)',
+    pct: 50,
+    provenance: ['secondary_modelled_industry_average'],
+  },
+};
+
+/** Map a data_provenance value to its ISO 14064-1 uncertainty tier. */
+export function uncertaintyTierForProvenance(
+  provenance: string | null | undefined,
+): { key: UncertaintyTierKey; label: string; pct: number } {
+  const p = provenance ?? '';
+  for (const key of ['low', 'medium', 'high'] as UncertaintyTierKey[]) {
+    if (UNCERTAINTY_TIERS[key].provenance.includes(p)) {
+      return { key, label: UNCERTAINTY_TIERS[key].label, pct: UNCERTAINTY_TIERS[key].pct };
+    }
+  }
+  // Unknown provenance → conservative (High)
+  return { key: 'high', label: UNCERTAINTY_TIERS.high.label, pct: UNCERTAINTY_TIERS.high.pct };
+}
+
+// ============================================================================
 // CORE FUNCTIONS
 // ============================================================================
 

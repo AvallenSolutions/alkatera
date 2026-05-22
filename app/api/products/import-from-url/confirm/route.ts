@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
 async function getAuthenticatedSupabase() {
@@ -21,7 +22,28 @@ async function getAuthenticatedSupabase() {
   );
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) return null;
-  return supabase;
+  return { supabase, userId: user.id };
+}
+
+/** Service-role client for inserts into tables with no anon insert policy
+ *  (agent_exceptions, ingest_jobs). */
+function getServiceClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
+}
+
+interface BrandMetadata {
+  founding_year?: number | null;
+  founder_names?: string[];
+  mission?: string | null;
+  awards?: string[];
+  suppliers?: string[];
+  distribution_markets?: string[];
+  production_locations?: string[];
+  logo_url?: string | null;
+  brand_colour?: string | null;
 }
 
 export interface ProductToConfirm {
@@ -62,16 +84,26 @@ const PACKAGING_TYPE_NAMES: Record<string, string> = {
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await getAuthenticatedSupabase();
-    if (!supabase) {
+    const auth = await getAuthenticatedSupabase();
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const supabase = auth.supabase;
+    const userId = auth.userId;
 
     const body = await request.json();
-    const { organizationId, products, orgDescription }: {
+    const {
+      organizationId,
+      products,
+      orgDescription,
+      orgCertifications,
+      brandMetadata,
+    }: {
       organizationId: string;
       products: ProductToConfirm[];
       orgDescription?: string | null;
+      orgCertifications?: string[];
+      brandMetadata?: BrandMetadata | null;
     } = body;
 
     if (!organizationId) {
@@ -256,24 +288,124 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Save org description if provided and org description is currently empty
-    if (orgDescription?.trim()) {
+    // Save org description if provided and org description is currently empty.
+    // Brand-metadata mission is a richer source than description if present.
+    const incomingDescription = brandMetadata?.mission?.trim() || orgDescription?.trim() || null;
+    if (incomingDescription) {
       const { data: org } = await supabase
         .from('organizations')
-        .select('description')
+        .select('description, founding_year, logo_url')
         .eq('id', organizationId)
         .single();
 
-      if (org && !org.description) {
-        await supabase
-          .from('organizations')
-          .update({ description: orgDescription.trim() })
-          .eq('id', organizationId);
+      const patch: Record<string, unknown> = {};
+      if (org && !org.description) patch.description = incomingDescription;
+      // Only fill founding_year / logo_url when not already set — never overwrite
+      // user-entered values with scraper guesses.
+      if (org && !org.founding_year && brandMetadata?.founding_year) {
+        patch.founding_year = brandMetadata.founding_year;
+      }
+      if (org && !org.logo_url && brandMetadata?.logo_url) {
+        patch.logo_url = brandMetadata.logo_url;
+      }
+      if (Object.keys(patch).length > 0) {
+        await supabase.from('organizations').update(patch).eq('id', organizationId);
       }
     }
     } catch (postInsertErr: any) {
       // Products were created successfully; this is non-fatal enrichment work.
       console.error('[import-from-url/confirm] post-insert enrichment failed (non-fatal):', postInsertErr);
+    }
+
+    // Org-level certifications and suppliers — write via the service client
+    // since organization_certifications and agent_exceptions don't have an
+    // anon insert policy. All of this is best-effort; errors are logged but
+    // don't fail the import (the products are already saved).
+    const seedCerts = orgCertifications ?? [];
+    const seedSuppliers = brandMetadata?.suppliers ?? [];
+    const seedProductionLocations = brandMetadata?.production_locations ?? [];
+
+    if (seedCerts.length > 0 || seedSuppliers.length > 0 || seedProductionLocations.length > 0) {
+      try {
+        const service = getServiceClient();
+
+        if (seedCerts.length > 0) {
+          // organization_certifications schema isn't standardised across the
+          // codebase — defensive insert (any failure is silently skipped).
+          const certRows = seedCerts.map((cert) => ({
+            organization_id: organizationId,
+            certification_name: cert,
+            status: 'self_declared',
+            source: 'website_import',
+          }));
+          const { error } = await service
+            .from('organization_certifications')
+            .insert(certRows);
+          if (error) {
+            // Schema mismatch is expected if the table uses different columns.
+            // Fall back to agent_exceptions so the data isn't lost.
+            const exceptionRows = seedCerts.map((cert) => ({
+              organization_id: organizationId,
+              kind: 'website_certification',
+              source: 'manual',
+              source_ref: { source: 'website_import' },
+              payload: { certification: cert },
+              title: `${cert} — confirm certification`,
+              summary: 'Found on your website. Confirm to add it to your profile.',
+              status: 'open',
+            }));
+            await service.from('agent_exceptions').insert(exceptionRows);
+          }
+        }
+
+        const supplierExceptions = seedSuppliers.map((name) => ({
+          organization_id: organizationId,
+          kind: 'website_supplier',
+          source: 'manual',
+          source_ref: { source: 'website_import' },
+          payload: { supplier_name: name },
+          title: `Production partner mentioned: ${name}`,
+          summary: 'Found on your website. Confirm to add to suppliers.',
+          status: 'open',
+          confidence: 0.6,
+        }));
+        const locationExceptions = seedProductionLocations.map((loc) => ({
+          organization_id: organizationId,
+          kind: 'website_production_location',
+          source: 'manual',
+          source_ref: { source: 'website_import' },
+          payload: { location: loc },
+          title: `Production location: ${loc}`,
+          summary: 'Found on your website. Use it to map a facility.',
+          status: 'open',
+          confidence: 0.7,
+        }));
+        const allExceptions = [...supplierExceptions, ...locationExceptions];
+        if (allExceptions.length > 0) {
+          await service.from('agent_exceptions').insert(allExceptions);
+        }
+
+        // Emit one ingest_jobs row so RecentlyFromRosa shows "Read your website"
+        // when the user lands on /rosa/. stash_path is a synthetic identifier
+        // since this ingestion is from a URL, not a real file in storage.
+        await service.from('ingest_jobs').insert({
+          user_id: userId,
+          organization_id: organizationId,
+          status: 'completed',
+          stash_path: `website-import/${organizationId}/${Date.now()}.json`,
+          file_name: 'Your website',
+          file_mime: 'text/html',
+          result_type: 'website_import',
+          result_payload: {
+            products_created: createdIds.length,
+            certifications_found: seedCerts.length,
+            suppliers_proposed: seedSuppliers.length,
+            production_locations_proposed: seedProductionLocations.length,
+          },
+        });
+      } catch (seedErr: any) {
+        console.error('[import-from-url/confirm] seed writes failed (non-fatal):', seedErr);
+      }
     }
 
     return NextResponse.json({

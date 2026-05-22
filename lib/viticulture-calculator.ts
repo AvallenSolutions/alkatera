@@ -48,6 +48,7 @@ import {
   VINE_SO2_EQ_PER_HA_DEFAULT,
   VINE_PRUNING_DM_BY_AGE,
   VINE_BIOMASS_C_ACCUMULATION,
+  BIOMASS_BURNING_FACTORS,
 } from './ghg-constants';
 
 import { getGridFactor } from './grid-emission-factors';
@@ -214,13 +215,28 @@ export function calculateViticultureImpacts(
   // and below-ground root turnover that decomposes and releases N2O.
 
   let n2oCropResidueCo2e = 0;
+  // Biomass burning (IPCC 2006 Vol 4 Ch 2.4) — populated only when prunings burned
+  let n2oResidueBurningCo2e = 0;
+  let ch4ResidueBurningCo2e = 0;
+  let ch4Kg = 0; // Actual CH4 mass (not CO2e). Only non-zero when prunings burned.
 
   // Derive pruning_residue_returned from management type for backward compatibility
   const residueManagementType = input.pruning_residue_management_type ?? (
     input.pruning_residue_returned === false ? 'removed_for_biomass' : 'in_field'
   );
 
-  if (residueManagementType !== 'removed_for_biomass') {
+  if (residueManagementType === 'burned') {
+    // Prunings are combusted in-field, not decomposed: no soil-residue N2O.
+    // Instead, CH4 + N2O from incomplete combustion (Scope 1 / FLAG).
+    const burnDmTPerHa = input.pruning_residue_burned_kg_per_ha != null
+      ? input.pruning_residue_burned_kg_per_ha / 1000 // kg → tonnes
+      : getVinePruningDmForAge(input.vine_age);
+    const burn = calculateBiomassBurningEmissions(burnDmTPerHa, input.area_ha);
+    n2oResidueBurningCo2e = burn.n2o_co2e;
+    ch4ResidueBurningCo2e = burn.ch4_co2e;
+    n2oKg += burn.n2o_kg;
+    ch4Kg += burn.ch4_kg;
+  } else if (residueManagementType !== 'removed_for_biomass') {
     // Use measured dry matter if provided (primary data)
     // Otherwise use age-graduated default when vine_age is known, else fall back to mature default
     const pruningDmPerHa = input.pruning_residue_measured_kg_per_ha != null
@@ -249,8 +265,10 @@ export function calculateViticultureImpacts(
   // ========================================================================
 
   const dieselCo2e = input.diesel_litres_per_year * DEFRA_FUEL_FACTORS.DIESEL_PER_LITRE;
+  const redDieselCo2e =
+    (input.red_diesel_litres_per_year ?? 0) * DEFRA_FUEL_FACTORS.RED_DIESEL_PER_LITRE;
   const petrolCo2e = input.petrol_litres_per_year * DEFRA_FUEL_FACTORS.PETROL_PER_LITRE;
-  const machineryFuelCo2e = dieselCo2e + petrolCo2e;
+  const machineryFuelCo2e = dieselCo2e + redDieselCo2e + petrolCo2e;
 
   // Fossil CO2 from fuel combustion (approximate: ~99% of diesel/petrol CO2e is CO2)
   const co2FossilKg = machineryFuelCo2e * 0.99 + fertiliserProductionCo2e * 0.95;
@@ -398,7 +416,9 @@ export function calculateViticultureImpacts(
   // TOTALS AND NORMALISATION
   // ========================================================================
 
-  const totalFlagEmissions = n2oDirectCo2e + n2oIndirectCo2e + n2oCropResidueCo2e + lucCo2e;
+  const totalFlagEmissions =
+    n2oDirectCo2e + n2oIndirectCo2e + n2oCropResidueCo2e + lucCo2e +
+    n2oResidueBurningCo2e + ch4ResidueBurningCo2e;
   const totalNonFlagEmissions =
     fertiliserProductionCo2e +
     machineryFuelCo2e +
@@ -457,13 +477,15 @@ export function calculateViticultureImpacts(
       n2o_direct_co2e: n2oDirectCo2e,
       n2o_indirect_co2e: n2oIndirectCo2e,
       n2o_crop_residue_co2e: n2oCropResidueCo2e,
+      n2o_residue_burning_co2e: n2oResidueBurningCo2e,
+      ch4_residue_burning_co2e: ch4ResidueBurningCo2e,
       luc_co2e: lucCo2e,
       land_use_m2: landUseM2,
       total_flag_co2e: totalFlagEmissions,
       gas_inventory: {
         co2_luc: lucCo2e, // LUC emissions are CO2
         n2o_total: n2oKg,
-        ch4_total: 0, // No CH4 in viticulture scope currently
+        ch4_total: ch4Kg, // Non-zero only when prunings are burned in-field
       },
     },
     flag_removals: {
@@ -480,6 +502,10 @@ export function calculateViticultureImpacts(
     non_flag_emissions: {
       fertiliser_production_co2e: fertiliserProductionCo2e,
       machinery_fuel_co2e: machineryFuelCo2e,
+      // Fuel-type breakdown of machinery_fuel_co2e. Sums to machinery_fuel_co2e.
+      road_diesel_co2e: dieselCo2e,
+      red_diesel_co2e: redDieselCo2e,
+      petrol_co2e: petrolCo2e,
       irrigation_energy_co2e: irrigationEnergyCo2e,
       pesticide_production_co2e: pesticideProductionCo2e,
       total_non_flag_co2e: totalNonFlagEmissions,
@@ -639,6 +665,28 @@ function getVinePruningDmForAge(vineAge: number | null | undefined): number {
 }
 
 /**
+ * CH4 and N2O from open field burning of vine prunings (IPCC 2006 Vol 4 Ch 2.4).
+ * Biogenic CO2 from combustion is excluded per GHG Protocol / SBTi FLAG.
+ *
+ * @param dmTPerHa  dry matter available to burn, tonnes/ha/yr
+ * @param areaHa    vineyard area, hectares
+ */
+function calculateBiomassBurningEmissions(
+  dmTPerHa: number,
+  areaHa: number,
+): { ch4_kg: number; n2o_kg: number; ch4_co2e: number; n2o_co2e: number } {
+  const dmKg = dmTPerHa * 1000 * areaHa * BIOMASS_BURNING_FACTORS.COMBUSTION_FACTOR;
+  const ch4Kg = (dmKg * BIOMASS_BURNING_FACTORS.GEF_CH4_G_PER_KG) / 1000;
+  const n2oKg = (dmKg * BIOMASS_BURNING_FACTORS.GEF_N2O_G_PER_KG) / 1000;
+  return {
+    ch4_kg: ch4Kg,
+    n2o_kg: n2oKg,
+    ch4_co2e: ch4Kg * IPCC_AR6_GWP.CH4_BIOGENIC,
+    n2o_co2e: n2oKg * IPCC_AR6_GWP.N2O,
+  };
+}
+
+/**
  * Return the annual above-ground biomass carbon accumulation rate (tC/ha/yr)
  * for vines at the given age.
  */
@@ -671,7 +719,13 @@ function buildMethodologyNotes(
     parts.push(`Fertiliser: ${input.fertiliser_type}, ${input.fertiliser_quantity_kg} kg (${nKg.toFixed(1)} kg N)`);
   }
 
-  parts.push(`Fuel: ${input.diesel_litres_per_year} L diesel, ${input.petrol_litres_per_year} L petrol`);
+  parts.push(
+    `Fuel: ${input.diesel_litres_per_year} L road diesel` +
+    (input.red_diesel_litres_per_year
+      ? `, ${input.red_diesel_litres_per_year} L red/agricultural diesel (DEFRA gas-oil factor)`
+      : '') +
+    `, ${input.petrol_litres_per_year} L petrol`,
+  );
 
   if (input.is_irrigated) {
     parts.push(`Irrigation: ${input.water_m3_per_ha} m3/ha (${input.irrigation_energy_source})`);
@@ -686,6 +740,8 @@ function buildMethodologyNotes(
     parts.push('Crop residue N2O: prunings removed for biomass (zero N2O)');
   } else if (noteResidueType === 'chipped_and_spread') {
     parts.push('Crop residue N2O: vine prunings chipped and spread (0.7x N fraction, IPCC Ch 11)');
+  } else if (noteResidueType === 'burned') {
+    parts.push('Biomass burning: vine prunings burned in-field — CH4 + N2O per IPCC 2006 Vol 4 Ch 2.4 (biogenic CO2 excluded). No soil-residue N2O.');
   } else {
     parts.push('Crop residue N2O: vine prunings in field (IPCC Ch 11)');
   }

@@ -145,6 +145,8 @@ export interface VineyardGrowingProfile {
 
   // Step 3: Machinery & Fuel
   diesel_litres_per_year: number;
+  /** Red / agricultural (gas oil) diesel for off-road vineyard machinery. */
+  red_diesel_litres_per_year?: number | null;
   petrol_litres_per_year: number;
 
   // Step 4: Irrigation
@@ -183,6 +185,7 @@ export interface VineyardGrowingProfile {
   // Pruning residue detail
   pruning_residue_management_type?: string | null;
   pruning_residue_measured_kg_per_ha?: number | null;
+  pruning_residue_burned_kg_per_ha?: number | null;
 
   // Draft support
   is_draft: boolean;
@@ -206,9 +209,11 @@ export interface ViticultureCalculatorInput {
   soil_management: SoilManagement;
   pruning_residue_returned?: boolean;
   /** How vine prunings are managed. Determines N2O calculation pathway. */
-  pruning_residue_management_type?: 'in_field' | 'removed_for_biomass' | 'chipped_and_spread';
+  pruning_residue_management_type?: 'in_field' | 'removed_for_biomass' | 'chipped_and_spread' | 'burned';
   /** Measured dry matter from prunings (kg/ha/yr). Overrides VINE_PRUNING_DM_PER_HA default. */
   pruning_residue_measured_kg_per_ha?: number;
+  /** Dry matter of prunings burned in-field (kg/ha/yr). Used when management type is 'burned'. */
+  pruning_residue_burned_kg_per_ha?: number;
   fertiliser_type: FertiliserType;
   fertiliser_quantity_kg: number;
   fertiliser_n_content_percent: number;
@@ -219,6 +224,8 @@ export interface ViticultureCalculatorInput {
   herbicide_applications_per_year: number;
   herbicide_type?: PesticideType;
   diesel_litres_per_year: number;
+  /** Red / agricultural (gas oil) diesel for off-road vineyard machinery. */
+  red_diesel_litres_per_year?: number;
   petrol_litres_per_year: number;
   is_irrigated: boolean;
   water_m3_per_ha: number;
@@ -286,6 +293,10 @@ export interface ViticultureImpactResult {
     n2o_indirect_co2e: number;
     /** N2O from crop residue decomposition (vine prunings, IPCC Ch 11) */
     n2o_crop_residue_co2e: number;
+    /** N2O from in-field burning of prunings (IPCC 2006 Vol 4 Ch 2.4). 0 unless burned. */
+    n2o_residue_burning_co2e?: number;
+    /** CH4 from in-field burning of prunings (IPCC 2006 Vol 4 Ch 2.4). 0 unless burned. */
+    ch4_residue_burning_co2e?: number;
     /** dLUC emissions amortised over 20 years (kg CO2e, FLAG-C3) */
     luc_co2e: number;
     /** Land occupation (m2 per year) */
@@ -333,8 +344,14 @@ export interface ViticultureImpactResult {
   non_flag_emissions: {
     /** Embodied CO2e from fertiliser manufacture */
     fertiliser_production_co2e: number;
-    /** Diesel + petrol combustion (DEFRA factors) */
+    /** Road diesel + red/agricultural diesel + petrol combustion (DEFRA factors) */
     machinery_fuel_co2e: number;
+    /** Road diesel (white) only. Sub-total of machinery_fuel_co2e. */
+    road_diesel_co2e?: number;
+    /** Red/agricultural (gas oil) diesel only. Sub-total of machinery_fuel_co2e. */
+    red_diesel_co2e?: number;
+    /** Petrol only. Sub-total of machinery_fuel_co2e. */
+    petrol_co2e?: number;
     /** Electricity/diesel for irrigation pumping */
     irrigation_energy_co2e: number;
     /** Embodied CO2e from pesticide/herbicide manufacture */

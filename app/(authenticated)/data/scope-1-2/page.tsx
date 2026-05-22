@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -68,6 +69,7 @@ import { UsePhaseCard } from '@/components/reports/UsePhaseCard';
 import Link from 'next/link';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import { calculateCorporateEmissions } from '@/lib/calculations/corporate-emissions';
+import { resolveRefrigerantGwp } from '@/lib/ghg-constants';
 import { EmissionsGuide } from '@/components/emissions/EmissionsGuide';
 import { ScopeTipBanner } from '@/components/emissions/ScopeTipBanner';
 
@@ -82,7 +84,10 @@ const EMISSION_FACTORS: Record<string, { factor: number; unit: string; scope: 'S
   lpg: { factor: 1.55537, unit: 'kgCO2e/litre', scope: 'Scope 1' },
   heavy_fuel_oil: { factor: 3.17740, unit: 'kgCO2e/litre', scope: 'Scope 1' },
   biomass_solid: { factor: 0.01551, unit: 'kgCO2e/kg', scope: 'Scope 1' },
-  refrigerant_leakage: { factor: 1430, unit: 'kgCO2e/kg', scope: 'Scope 1' }, // R134a GWP
+  refrigerant_leakage: { factor: 1430, unit: 'kgCO2e/kg', scope: 'Scope 1' }, // R134a GWP fallback; per-entry refrigerant_type overrides via REFRIGERANT_GWP
+  co2_winemaking: { factor: 1.0, unit: 'kgCO2e/kg', scope: 'Scope 1' }, // 1 kg purchased CO2 = 1 kg CO2e (GHG Protocol process emission)
+  // diesel_agricultural is handled in the vineyard growing profile (viticulture
+  // machinery fuel); aviation_fuel in the fleet module — not as facility utilities.
   // Scope 2 - Indirect emissions from purchased energy
   electricity_grid: { factor: 0.207, unit: 'kgCO2e/kWh', scope: 'Scope 2' },
   heat_steam_purchased: { factor: 0.1662, unit: 'kgCO2e/kWh', scope: 'Scope 2' },
@@ -100,6 +105,7 @@ const UTILITY_TYPE_LABELS: Record<string, string> = {
   refrigerant_leakage: 'Refrigerants (Leakage)',
   diesel_mobile: 'Company Fleet (Diesel)',
   petrol_mobile: 'Company Fleet (Petrol/Gasoline)',
+  co2_winemaking: 'CO₂ (Winemaking, purchased)',
 };
 
 interface Facility {
@@ -142,6 +148,7 @@ interface UtilityDataEntry {
   utility_type: string;
   quantity: number;
   unit: string;
+  refrigerant_type?: string | null;
   reporting_period_start: string;
   reporting_period_end: string;
   calculated_scope: string;
@@ -186,6 +193,24 @@ export default function CompanyEmissionsPage() {
   const [activeTab, setActiveTab] = useState('footprint');
 
   const [selectedYear, setSelectedYear] = useState(currentLabelYear);
+
+  // Tell Rosa where the user is in the company emissions surface so she
+  // can answer "what's missing for scope 2 this year?" or "is this enough
+  // for CSRD?" without the user having to spell out the period or scope.
+  const rosaSlice = useMemo(() => {
+    return {
+      id: 'scope-1-2',
+      label: `Company emissions · ${selectedYear}`,
+      priority: 8,
+      data: {
+        page: 'scope-1-2',
+        active_tab: activeTab,
+        reporting_year: selectedYear,
+        facility_count: facilities.length,
+      },
+    }
+  }, [activeTab, selectedYear, facilities.length])
+  useRosaPageContext(rosaSlice)
 
   // Derive date range from the selected year (FY-aware)
   const { yearStart: selectedYearStart, yearEnd: selectedYearEnd } = getYearRange(selectedYear);
@@ -288,6 +313,7 @@ export default function CompanyEmissionsPage() {
           utility_type,
           quantity,
           unit,
+          refrigerant_type,
           reporting_period_start,
           reporting_period_end,
           calculated_scope,
@@ -314,6 +340,7 @@ export default function CompanyEmissionsPage() {
         utility_type: item.utility_type,
         quantity: item.quantity,
         unit: item.unit,
+        refrigerant_type: item.refrigerant_type ?? null,
         reporting_period_start: item.reporting_period_start,
         reporting_period_end: item.reporting_period_end,
         calculated_scope: item.calculated_scope,
@@ -346,6 +373,12 @@ export default function CompanyEmissionsPage() {
         if (entry.utility_type === 'natural_gas' && entry.unit === 'm³') {
           // Convert cubic meters to kWh (approx 10.55 kWh per m³)
           co2e = entry.quantity * 10.55 * emissionConfig.factor;
+        }
+
+        // Per-refrigerant-type GWP. Legacy entries (no refrigerant_type)
+        // fall back to R-134a (GWP 1430), identical to prior behaviour.
+        if (entry.utility_type === 'refrigerant_leakage') {
+          co2e = entry.quantity * resolveRefrigerantGwp(entry.refrigerant_type);
         }
 
         // Update totals

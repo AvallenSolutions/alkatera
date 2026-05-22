@@ -264,6 +264,7 @@ export const WASTE_CATEGORY_LABELS: Record<string, string> = {
   metals: 'Metals',
   wood: 'Wood',
   textiles: 'Textiles',
+  grape_pomace: 'Grape Pomace / Marc',
   other: 'Other Waste',
 } as const;
 
@@ -312,6 +313,7 @@ export type WasteType =
   | 'wood'
   | 'textiles'
   | 'hazardous'
+  | 'grape_pomace'
   | 'other';
 
 export type DiversionLevel = 'excellent' | 'high' | 'medium' | 'low';

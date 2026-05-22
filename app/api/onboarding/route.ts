@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { INITIAL_ONBOARDING_STATE, INITIAL_MEMBER_ONBOARDING_STATE } from '@/lib/onboarding/types'
+import { INITIAL_ONBOARDING_STATE, INITIAL_MEMBER_ONBOARDING_STATE, INITIAL_FAST_TRACK_STATE } from '@/lib/onboarding/types'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -114,7 +114,9 @@ export async function GET(request: NextRequest) {
           .eq('organization_id', organizationId)
 
         if ((productCount ?? 0) > 0 || (facilityCount ?? 0) > 0) {
-          // Org already has data — mark onboarding as completed and persist it
+          // Org already has data — mark onboarding as completed and persist it.
+          // We keep the historical 'owner' flow label for these pre-existing
+          // accounts since the wizard is already considered done.
           const completedState = {
             ...INITIAL_ONBOARDING_STATE,
             completed: true,
@@ -134,10 +136,13 @@ export async function GET(request: NextRequest) {
           return NextResponse.json({ state: completedState, flow: 'owner' })
         }
 
-        // Fresh owner — return initial owner state
+        // Fresh owner — fast-track is now the canonical first-run flow. The
+        // 14-step owner flow remains available only for in-flight users
+        // (already-saved onboarding_state rows with onboarding_flow='owner'
+        // continue on that path; this branch only fires for brand-new orgs).
         return NextResponse.json({
-          state: { ...INITIAL_ONBOARDING_STATE, startedAt: new Date().toISOString() },
-          flow: 'owner',
+          state: { ...INITIAL_FAST_TRACK_STATE, startedAt: new Date().toISOString() },
+          flow: 'fast_track',
         })
       }
 

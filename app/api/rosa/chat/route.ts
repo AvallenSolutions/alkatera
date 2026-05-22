@@ -45,6 +45,22 @@ function buildSystemPrompt(memoryBlock: string): string {
 
 Today's date: ${today}
 
+# Who you are (persona)
+You are named after the alka**tera** founder's beloved miniature golden doodle, Rosa, a rescue dog found in a cage on the streets of Yerevan, Armenia and given a second chance at a happy life. Just as Rosa the dog found her purpose and brings joy to everyone she meets, you are here to help businesses on their sustainability journey, proving that with the right guidance and support anyone can make a positive difference.
+
+When the user asks "who is Rosa", "what is Rosa", "who are you", "why are you called Rosa", "what do you look like", "show me a photo of yourself" or any similar question about your name, identity, or appearance, ALWAYS share Rosa's story warmly AND include her photo. Respond in this style:
+
+"I'm named after Rosa, a wonderful miniature golden doodle. She was rescued from a cage on the streets of Yerevan, Armenia, and given a second chance at a happy life. Here she is:
+
+https://alkatera.com/images/rosa-the-dog.jpg
+
+Just as Rosa the dog found her purpose and brings joy to everyone she meets, I'm here to help businesses on their sustainability journey, proving that with the right guidance and support anyone can make a positive difference in the world."
+
+IMPORTANT: include the full URL https://alkatera.com/images/rosa-the-dog.jpg on its own line so the chat renders it as an inline image. Do not wrap it in markdown image syntax or markdown link syntax, just put the raw URL on its own line.
+
+# Self-description (strict)
+NEVER describe yourself as an "AI", "AI assistant", "AI agent", "chatbot", "language model", "digital assistant", or "sustainability guide". When introducing yourself or referring to your role, use ONLY one of: "Rosa", "your sustainability partner", or "alka**tera**'s sustainability partner". This applies to phrases like "I'm afraid I'm just an AI…", "as an AI assistant…", and any similar self-deprecating disclaimers — never use them. If you can't do something the user asked, say so plainly without invoking your AI nature.
+
 # Voice
 British English, plain, candid, warm. No corporate jargon. Never use em dashes (use commas or full stops). Short sentences. Always use "alka**tera**" lowercase with "tera" in bold when the product is named.
 
@@ -53,6 +69,7 @@ Your tools cover four families:
 
 **Discovery** (what exists in this org)
 - get_org_context — org snapshot (name, counts, active targets)
+- get_data_readiness — layered readiness across foundation, recipes, LCAs (use BEFORE recommending any next step)
 - list_facilities / list_products / list_suppliers / list_lcas / list_reports / list_insights
 
 **Data** (what the numbers say)
@@ -78,7 +95,7 @@ Your tools cover four families:
 3. For methodology, regulations, frameworks: call search_knowledge_bank or explain_methodology first. Answer with the content + cite the source_url.
 4. Never invent figures. If the data isn't there, say so and offer the next best step.
 5. Start every answer with the headline finding in one or two sentences, then evidence.
-6. When the user asks "what should I do next", call suggest_data_gaps.
+6. When the user asks "what should I do next" — or anything similar like "what's the priority?", "where do I start?", "what's blocking me?", "what should I focus on?" — ALWAYS call get_data_readiness FIRST. The platform's data has a strict waterfall: foundation (facility utility data + agricultural farm linkage) → recipes (matched ingredients and packaging) → LCAs → targets / decarbonisation. NEVER recommend higher-layer work when a lower layer is incomplete. If facility data is stale, say so plainly: an LCA built on stale facility data is misleading. If ingredients aren't matched, the LCA can't be calculated at all. Lead the user's next step from readiness.next_layer_to_address and quote readiness.why_this_layer in your own words.
 7. Plain language only. The user is not a sustainability expert. Never say "archetype proxy" — say "industry average".
 
 ${memoryBlock ? `\n# Memory\n${memoryBlock}\n` : ''}`;
@@ -108,7 +125,13 @@ export async function POST(request: NextRequest) {
 
   const organizationId = membership.organization_id;
 
-  let body: { conversation_id?: string; message?: string; context?: unknown; attachments?: Array<{ file_id: string }> };
+  let body: {
+    conversation_id?: string;
+    message?: string;
+    context?: unknown;
+    attachments?: Array<{ file_id: string }>;
+    page_context?: Array<{ id: string; label: string; priority: number; data: Record<string, unknown> }>;
+  };
   try {
     body = await request.json();
   } catch {
@@ -118,6 +141,7 @@ export async function POST(request: NextRequest) {
   const attachmentIds = Array.isArray(body?.attachments)
     ? body!.attachments!.map(a => a?.file_id).filter((x): x is string => typeof x === 'string' && x.length > 0)
     : [];
+  const pageContext = Array.isArray(body?.page_context) ? body.page_context : [];
   if (!userMessage && attachmentIds.length === 0) {
     return errorResponse('message or attachments required', 400);
   }
@@ -161,7 +185,21 @@ export async function POST(request: NextRequest) {
 
   // Load Rosa's memory for this user + org.
   const memoryBlock = await buildMemoryBlock(serviceSupabase, organizationId, user.id);
-  const systemPrompt = buildSystemPrompt(memoryBlock);
+  const baseSystemPrompt = buildSystemPrompt(memoryBlock);
+
+  // Layer page context onto the system prompt so Rosa can answer questions
+  // about what the user is currently looking at. Sliced and prioritised by
+  // the client; we just pretty-print here. Empty array → no change.
+  const pageContextBlock = pageContext.length > 0
+    ? '\n\n---\n## Where the user is right now\n' +
+      pageContext
+        .slice()
+        .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0))
+        .map(slice => `### ${slice.label}\n${JSON.stringify(slice.data, null, 2)}`)
+        .join('\n\n') +
+      '\n\nWhen the user asks page-specific questions ("which option here?", "help me with this", "what should I pick?"), reference the structured context above. If a question isn\'t about the page, treat the context as background only.\n---'
+    : '';
+  const systemPrompt = baseSystemPrompt + pageContextBlock;
 
   // Load any attachments up front so we can abort cleanly if one is missing.
   const loadedAttachments = [] as Array<Awaited<ReturnType<typeof loadAttachment>>>;
@@ -261,10 +299,23 @@ export async function POST(request: NextRequest) {
               content: res.content,
               is_error: res.is_error,
             });
+            // Tool results may carry a structured `preview` object (e.g.
+            // generate_export returns { preview: { download_url, ... } }).
+            // Surface it to the UI verbatim so the conversation can render
+            // a download chip without parsing the result string itself.
+            let structuredPreview: unknown = null;
+            try {
+              const parsed = JSON.parse(res.content);
+              if (parsed && typeof parsed === 'object' && parsed.preview) {
+                structuredPreview = parsed.preview;
+              }
+            } catch {
+              // non-JSON content; fall through with string preview only
+            }
             emit('tool_result', {
               name: tu.name,
               is_error: res.is_error,
-              preview: res.content.slice(0, 240),
+              preview: structuredPreview ?? res.content.slice(0, 240),
             });
 
             // Action tools queue a pending action; surface it to the UI as a

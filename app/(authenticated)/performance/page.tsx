@@ -43,9 +43,23 @@ import type {
   WasteDetail,
 } from '@/hooks/data/useScope3GranularData';
 
-import { VitalityScoreHero, calculateVitalityScores } from '@/components/vitality/VitalityScoreHero';
+import { supabase } from '@/lib/supabaseClient';
+import { calculateVitalityScores } from '@/components/vitality/VitalityScoreHero';
+import { EsgVitalityScoreHero } from '@/components/vitality/EsgVitalityScoreHero';
+import type { VitalityComposite } from '@/lib/vitality/composite';
+import {
+  listMissingSubScores,
+  listStrongSubScores,
+  listWeakSubScores,
+} from '@/lib/vitality/read-prompt';
 import { getBenchmarkForProductType } from '@/lib/industry-benchmarks';
 import { fetchProducts } from '@/lib/products';
+import type {
+  ClimateScoreBreakdown,
+  WaterScoreBreakdown,
+  CircularityScoreBreakdown,
+  NatureScoreBreakdown,
+} from '@/lib/vitality/environmental';
 import { PillarCard, PillarGrid, PerformanceSummary } from '@/components/vitality/PillarCard';
 import { CarbonDeepDive } from '@/components/vitality/CarbonDeepDive';
 import { WaterDeepDive } from '@/components/vitality/WaterDeepDive';
@@ -380,7 +394,31 @@ function transformFootprintToScope3Categories(
   };
 }
 
+/**
+ * Build the Strengths and Areas-for-Improvement lists shown on the
+ * Performance page.
+ *
+ * The previous implementation only checked five narrow signals
+ * (circularity, water risk, Scope 2 share, LCA count, CSRD readiness),
+ * so most orgs landed on the same generic fallback message ("Continue
+ * monitoring and improving data quality"). The new approach is to
+ * lean on the Vitality composite, which already grades every sub-pillar
+ * 0-100 with a clear what-to-do action attached:
+ *
+ *   - STRENGTHS:    sub-pillars scoring ≥65 (Healthy band or above)
+ *   - IMPROVEMENTS: sub-pillars that are null (missing data) or ≤30
+ *                   (Needs Attention band). Missing data is shown as
+ *                   high priority because there's a fix the user can do
+ *                   immediately; very-low scores show as high priority
+ *                   too, low-medium scores fall to medium.
+ *
+ * The function falls back to the old metrics-only logic when the
+ * composite isn't loaded yet, so the cards render something useful
+ * during the brief loading window. Once composite arrives, the lists
+ * stay consistent with what Rosa's read on the same page says.
+ */
 function generateStrengthsAndImprovements(
+  composite: VitalityComposite | null,
   metrics: CompanyMetrics | null,
   scopeBreakdown: ScopeBreakdown | null,
   circularityRate: number,
@@ -389,41 +427,96 @@ function generateStrengthsAndImprovements(
   const strengths: Array<{ text: string }> = [];
   const improvements: Array<{ text: string; priority?: 'high' | 'medium' }> = [];
 
-  if (metrics?.total_products_assessed && metrics.total_products_assessed > 0) {
-    strengths.push({ text: `${metrics.total_products_assessed} products with complete LCA assessments` });
+  // Primary source: Vitality composite sub-scores. These are the same
+  // numbers the user sees on the Pillar Breakdown cards above, so the
+  // Strengths/Improvements never contradict the visual.
+  if (composite) {
+    const strong = listStrongSubScores(composite);
+    for (const item of strong) {
+      strengths.push({
+        text: `${item.label} at ${Math.round(item.score!)} — healthy band`,
+      });
+    }
+
+    const missing = listMissingSubScores(composite);
+    for (const item of missing) {
+      improvements.push({ text: `${item.label}: ${item.action}`, priority: 'high' });
+    }
+
+    const weak = listWeakSubScores(composite);
+    for (const item of weak) {
+      improvements.push({
+        text: `${item.label} at ${Math.round(item.score!)} — ${item.action}`,
+        priority: (item.score ?? 0) <= 15 ? 'high' : 'medium',
+      });
+    }
   }
 
-  if (circularityRate >= 60) {
-    strengths.push({ text: `Strong circularity rate at ${circularityRate.toFixed(0)}%` });
-  } else if (circularityRate < 40) {
-    improvements.push({ text: `Circularity rate at ${circularityRate.toFixed(0)}% - target 60%+`, priority: 'high' });
+  // Secondary signals from the existing metrics: only add these when
+  // they're genuinely informative AND not already covered by a
+  // Vitality sub-pillar above. They give the user concrete reporting
+  // and assessment context that doesn't fit cleanly into the 0-100
+  // sub-pillar model.
+  if (metrics?.total_products_assessed && metrics.total_products_assessed >= 5) {
+    strengths.push({
+      text: `${metrics.total_products_assessed} products fully LCA-assessed`,
+    });
   }
 
-  if (waterRiskLevel === 'low') {
-    strengths.push({ text: 'Low water scarcity risk across operations' });
-  } else if (waterRiskLevel === 'high') {
-    improvements.push({ text: 'High water scarcity risk in some facilities', priority: 'high' });
+  if (metrics?.csrd_compliant_percentage && metrics.csrd_compliant_percentage >= 80) {
+    strengths.push({
+      text: `${metrics.csrd_compliant_percentage}% CSRD reporting readiness`,
+    });
   }
 
   if (scopeBreakdown) {
     const total = scopeBreakdown.scope1 + scopeBreakdown.scope2 + scopeBreakdown.scope3;
     const scope2Pct = total > 0 ? (scopeBreakdown.scope2 / total) * 100 : 0;
-    if (scope2Pct < 10) {
-      strengths.push({ text: 'Low Scope 2 emissions - efficient energy use' });
-    } else if (scope2Pct > 30) {
-      improvements.push({ text: 'Switch to renewable electricity to reduce Scope 2', priority: 'medium' });
+    if (scope2Pct > 30) {
+      improvements.push({
+        text: 'Scope 2 is over 30% of your footprint — switch to a renewable electricity tariff to cut it fastest',
+        priority: 'medium',
+      });
+    } else if (scope2Pct < 10 && total > 0) {
+      strengths.push({ text: 'Low Scope 2 share — efficient grid sourcing' });
     }
   }
 
-  if (metrics?.csrd_compliant_percentage && metrics.csrd_compliant_percentage >= 80) {
-    strengths.push({ text: `${metrics.csrd_compliant_percentage}% CSRD reporting readiness` });
-  }
+  // Cap each list so the cards stay readable. Prioritise high-priority
+  // improvements first (missing data and lowest scores).
+  improvements.sort((a, b) => {
+    const ap = a.priority === 'high' ? 0 : a.priority === 'medium' ? 1 : 2;
+    const bp = b.priority === 'high' ? 0 : b.priority === 'medium' ? 1 : 2;
+    return ap - bp;
+  });
 
-  if (improvements.length === 0) {
-    improvements.push({ text: 'Continue monitoring and improving data quality' });
-  }
+  return {
+    strengths: strengths.slice(0, 5),
+    improvements: improvements.slice(0, 5),
+  };
+}
 
-  return { strengths, improvements };
+/**
+ * Compact row used inside the Methodology & Reporting card. Frames the
+ * standards/methods as informational (what the platform applies) rather
+ * than as "Compliant" status badges, which used to mislead users into
+ * believing they had achieved third-party certifications.
+ */
+function MethodologyRow({ name, summary }: { name: string; summary: string }) {
+  return (
+    <div className="flex items-start justify-between gap-3 p-3 rounded-lg bg-muted/40">
+      <div className="min-w-0">
+        <div className="text-sm font-medium">{name}</div>
+        <div className="text-xs text-muted-foreground mt-0.5">{summary}</div>
+      </div>
+      <Badge
+        variant="outline"
+        className="shrink-0 border-muted-foreground/30 text-muted-foreground"
+      >
+        Method
+      </Badge>
+    </div>
+  );
 }
 
 const AVAILABLE_YEARS = Array.from({ length: 4 }, (_, i) => new Date().getFullYear() - i);
@@ -482,6 +575,101 @@ export default function PerformancePage() {
   const [showHotspots, setShowHotspots] = useState(true);
   const [showCompliance, setShowCompliance] = useState(false);
 
+  // Fetch the Vitality composite so the Strengths/Improvements panel can
+  // be driven by the same sub-pillar scores users see in the hero ring
+  // and Rosa's read. The hero card has its own internal fetch already;
+  // this duplicate hit is cheap (the route is fast and HTTP-cached) and
+  // it keeps this page's strengths/improvements logic self-contained.
+  const [vitalityComposite, setVitalityComposite] = useState<VitalityComposite | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/vitality/composite', { credentials: 'include' });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!cancelled) setVitalityComposite(json?.composite ?? null);
+      } catch {
+        // Non-fatal — the panel falls back to metrics-only signals.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentOrganization?.id]);
+
+  // Actual certifications the org holds or is progressing — joined with
+  // certification_frameworks so we can show the human-readable name and
+  // category. Replaces the previous hardcoded "ISO 14044 / GHG Protocol"
+  // chips, which were methodology labels masquerading as compliance.
+  type OrgCertRow = {
+    id: string;
+    status: string | null;
+    readiness_score: number | null;
+    target_date: string | null;
+    certified_date: string | null;
+    certification_frameworks: {
+      framework_name: string | null;
+      framework_code: string | null;
+      category: string | null;
+    } | null;
+  };
+  const [orgCertifications, setOrgCertifications] = useState<OrgCertRow[]>([]);
+  useEffect(() => {
+    if (!currentOrganization?.id) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('organization_certifications')
+        .select(
+          'id, status, readiness_score, target_date, certified_date, certification_frameworks(framework_name, framework_code, category)',
+        )
+        .eq('organization_id', currentOrganization.id);
+      if (!cancelled && !error && data) setOrgCertifications(data as unknown as OrgCertRow[]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentOrganization?.id]);
+
+  // Dedupe certifications by framework family so legacy and current
+  // versions of the same certification (e.g. B Corp v2.1 vs the 2026
+  // standard) don't both render. Prefer the current version: non-legacy
+  // beats legacy, then lexicographically-higher framework_code as a
+  // tie-breaker (so bcorp_2026 beats bcorp_21).
+  const dedupedCertifications = useMemo(() => {
+    const normalize = (name: string) =>
+      name
+        .replace(/\s*\(Legacy[^)]*\)/i, '')
+        .replace(/\s*\(v?\d[^)]*\)/i, '')
+        .trim()
+        .toLowerCase();
+    const byFamily = new Map<string, OrgCertRow>();
+    for (const cert of orgCertifications) {
+      const name = cert.certification_frameworks?.framework_name ?? cert.id;
+      const family = normalize(name);
+      const existing = byFamily.get(family);
+      if (!existing) {
+        byFamily.set(family, cert);
+        continue;
+      }
+      const existingName = existing.certification_frameworks?.framework_name ?? '';
+      const currentName = cert.certification_frameworks?.framework_name ?? '';
+      const existingIsLegacy = /legacy/i.test(existingName);
+      const currentIsLegacy = /legacy/i.test(currentName);
+      if (existingIsLegacy && !currentIsLegacy) {
+        byFamily.set(family, cert);
+      } else if (!existingIsLegacy && currentIsLegacy) {
+        // keep existing
+      } else {
+        const existingCode = existing.certification_frameworks?.framework_code ?? '';
+        const currentCode = cert.certification_frameworks?.framework_code ?? '';
+        if (currentCode > existingCode) byFamily.set(family, cert);
+      }
+    }
+    return Array.from(byFamily.values());
+  }, [orgCertifications]);
+
   const corporateTotalCO2 = footprintData?.total_emissions || 0;
   const productLcaTotalCO2 = metrics?.total_impacts.climate_change_gwp100 || 0;
   const totalCO2 = corporateTotalCO2 > 0 ? corporateTotalCO2 : productLcaTotalCO2;
@@ -513,43 +701,65 @@ export default function PerformancePage() {
     [currentOrganization?.product_type, productCategories]
   );
 
-  const estimatedLitresPerProduct = 50000;
-  const industryBenchmarkTotal = industryBenchmarkData.kgCO2ePerLitre * estimatedLitresPerProduct
-    * (metrics?.total_products_assessed || 1);
+  // Climate + water scores now come from the same /api/vitality/composite
+  // endpoint that /rosa/ uses, so the two surfaces always agree. Each
+  // breakdown carries intensity / YoY sub-scores + blend weights and (for
+  // water) the AWARE scarcity context — fed into the score explainer below
+  // for full transparency to the user.
+  const [climateBreakdown, setClimateBreakdown] = useState<ClimateScoreBreakdown | null>(null);
+  const [waterBreakdown, setWaterBreakdown] = useState<WaterScoreBreakdown | null>(null);
+  const [circularityBreakdown, setCircularityBreakdown] = useState<CircularityScoreBreakdown | null>(null);
+  const [natureBreakdown, setNatureBreakdown] = useState<NatureScoreBreakdown | null>(null);
+  useEffect(() => {
+    if (!currentOrganization?.id) return;
+    let cancelled = false;
+    fetch('/api/vitality/composite', { credentials: 'include' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(json => {
+        if (cancelled) return;
+        setClimateBreakdown(json?.composite?.e?.climate_breakdown ?? null);
+        setWaterBreakdown(json?.composite?.e?.water_breakdown ?? null);
+        setCircularityBreakdown(json?.composite?.e?.circularity_breakdown ?? null);
+        setNatureBreakdown(json?.composite?.e?.nature_breakdown ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [currentOrganization?.id]);
 
   const vitalityScores = useMemo(() => {
-    const numProducts = metrics?.total_products_assessed || 1;
     // Check if we have actual product data (not just zeros)
     const hasProductData = metrics?.total_products_assessed !== undefined &&
                            metrics.total_products_assessed > 0;
     // Check if we have actual waste data
     const hasWasteData = wasteMetrics !== null && wasteMetrics !== undefined;
 
-    return calculateVitalityScores({
-      totalEmissions: totalCO2,
-      emissionsIntensity: totalCO2 / numProducts,
-      industryBenchmark: industryBenchmarkTotal / numProducts,
-      waterConsumption,
-      waterRiskLevel: metrics?.water_risk_level as 'high' | 'medium' | 'low' | undefined,
-      recyclingRate: wasteMetrics?.circularity_rate,
-      circularityRate: circularityRate,
-      landUseIntensity: landUse,
-      biodiversityRisk: deriveBiodiversityRisk(natureMetrics),
+    // All four environmental sub-scores now come from /api/vitality/composite
+    // so /rosa/ and /performance/ agree. We pass nothing to the local
+    // calculator (it would otherwise re-derive nature client-side, which is
+    // exactly the parity bug the redesign kills).
+    const local = calculateVitalityScores({
       hasProductData,
       hasWasteData,
     });
-  }, [totalCO2, waterConsumption, metrics, wasteMetrics, circularityRate, landUse, natureMetrics, industryBenchmarkTotal]);
-
-  const emissionsIntensity = totalCO2 / (metrics?.total_products_assessed || 1);
-  const industryBenchmarkPerProduct = industryBenchmarkTotal / (metrics?.total_products_assessed || 1);
-  const intensityRatio = industryBenchmarkPerProduct > 0 ? emissionsIntensity / industryBenchmarkPerProduct : 0;
+    return {
+      ...local,
+      climate: climateBreakdown?.score ?? null,
+      water: waterBreakdown?.score ?? null,
+      circularity: circularityBreakdown?.score ?? null,
+      nature: natureBreakdown?.score ?? null,
+    };
+  }, [metrics, wasteMetrics, climateBreakdown, waterBreakdown, circularityBreakdown, natureBreakdown]);
 
   const scoreCalculationInputs = useMemo(() => ({
     climate: {
+      // Old per-LCA-count fields kept for the explainer's existing layout
+      // until the climate explainer UI is refreshed for the breakdown.
       totalEmissions: totalCO2,
-      emissionsIntensity,
-      industryBenchmark: industryBenchmarkPerProduct,
-      intensityRatio,
+      // Blended-climate fields. The ScoreExplainer climate section renders
+      // these when present (intensity sub, YoY sub, blend mode + weights).
+      climateBreakdown,
       benchmarkSource: {
         name: industryBenchmarkData.sourceName,
         url: industryBenchmarkData.sourceUrl,
@@ -558,36 +768,61 @@ export default function PerformancePage() {
       },
     },
     water: {
+      // Legacy fields kept for any caller still on the old explainer path.
       waterRiskLevel: metrics?.water_risk_level as 'high' | 'medium' | 'low' | undefined,
       waterConsumption,
+      // Blended-water breakdown. The ScoreExplainer water section renders
+      // these when present (intensity sub, YoY sub, blend mode + weights,
+      // scarcity context).
+      waterBreakdown,
     },
     circularity: {
+      // Legacy field kept for unmigrated callers.
       circularityRate,
+      // Blended-circularity breakdown — drives the new explainer UI
+      // (3 axes + waste-intensity YoY + treatment mix).
+      circularityBreakdown,
     },
     nature: {
+      // Legacy fields kept for unmigrated callers.
       biodiversityRisk: deriveBiodiversityRisk(natureMetrics),
       landUse,
+      // Blended-nature breakdown (4 axes weighted by EU EF 3.1).
+      natureBreakdown,
     },
-  }), [totalCO2, emissionsIntensity, industryBenchmarkPerProduct, intensityRatio, metrics, waterConsumption, circularityRate, natureMetrics, landUse, industryBenchmarkData, dominantCategory]);
+  }), [totalCO2, climateBreakdown, waterBreakdown, circularityBreakdown, natureBreakdown, metrics, waterConsumption, circularityRate, natureMetrics, landUse, industryBenchmarkData, dominantCategory]);
 
   const { strengths, improvements } = useMemo(() => {
     return generateStrengthsAndImprovements(
+      vitalityComposite,
       metrics,
       scopeBreakdown,
       circularityRate,
       metrics?.water_risk_level
     );
-  }, [metrics, scopeBreakdown, circularityRate]);
+  }, [vitalityComposite, metrics, scopeBreakdown, circularityRate]);
 
+  // Percentages here are share-within-materials, not share of the whole
+  // corporate footprint. A single raw material against the full Scope 1+2+3
+  // total would always be a sliver (~1%), making the card look broken. The
+  // useful question is "which materials dominate my material emissions?",
+  // so the denominator is the sum of materialBreakdown's climate values.
+  const materialBreakdownTotal = (materialBreakdown || []).reduce(
+    (sum, m) => sum + (Number.isFinite(m.climate) ? m.climate : 0),
+    0,
+  );
   const topMaterialHotspots = (materialBreakdown || [])
     .sort((a, b) => b.climate - a.climate)
     .slice(0, 5)
-    .map(m => ({
-      label: m.name,
-      value: m.climate,
-      percentage: totalCO2 > 0 ? (m.climate / totalCO2) * 100 : 0,
-      severity: (m.climate / totalCO2) * 100 > 20 ? 'high' : (m.climate / totalCO2) * 100 > 10 ? 'medium' : 'low' as any,
-    }));
+    .map(m => {
+      const pct = materialBreakdownTotal > 0 ? (m.climate / materialBreakdownTotal) * 100 : 0;
+      return {
+        label: m.name,
+        value: m.climate,
+        percentage: pct,
+        severity: pct > 20 ? 'high' : pct > 10 ? 'medium' : 'low' as any,
+      };
+    });
 
   const waterSourceItems = useMemo(() => {
     if (!facilityWaterRisks || facilityWaterRisks.length === 0) {
@@ -655,23 +890,11 @@ export default function PerformancePage() {
 
   return (
     <div className="space-y-6 animate-fade-in-up">
-      {/* Hero Section - Vitality Score */}
-      <VitalityScoreHero
-        overallScore={vitalityScores.overall}
-        climateScore={vitalityScores.climate}
-        waterScore={vitalityScores.water}
-        circularityScore={vitalityScores.circularity}
-        natureScore={vitalityScores.nature}
-        hasData={vitalityScores.hasData}
-        benchmarkData={getBenchmarkForPillar('overall')}
-        lastUpdated={metrics?.last_updated
-          ? new Date(metrics.last_updated).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-          : undefined
-        }
-        onRefresh={refetch}
-        loading={loading}
-        calculationInputs={scoreCalculationInputs}
-      />
+      {/* ESG composite hero — composes E + S + G with configurable weights.
+          Replaces the legacy environmental-only VitalityScoreHero. The
+          deep environmental pillar deep-dives still live further down the
+          page (Carbon / Water / Circularity / Nature DeepDive sections). */}
+      <EsgVitalityScoreHero />
 
       {/* Action Bar */}
       <div className="flex items-center justify-between">
@@ -851,9 +1074,9 @@ export default function PerformancePage() {
                 <div className="text-left">
                   <h3 className="font-semibold">Impact Hotspots</h3>
                   <p className="text-sm text-muted-foreground">
-                    {topMaterialHotspots.length} materials contributing to {
+                    Top {topMaterialHotspots.length} materials driving {
                       topMaterialHotspots.reduce((sum, m) => sum + m.percentage, 0).toFixed(0)
-                    }% of emissions
+                    }% of your material emissions
                   </p>
                 </div>
               </div>
@@ -904,7 +1127,7 @@ export default function PerformancePage() {
         </Card>
       </Collapsible>
 
-      {/* Collapsible: Compliance & Standards */}
+      {/* Collapsible: Methodology & Reporting */}
       <Collapsible open={showCompliance} onOpenChange={setShowCompliance}>
         <Card>
           <CollapsibleTrigger asChild>
@@ -914,9 +1137,17 @@ export default function PerformancePage() {
                   <Award className="h-5 w-5 text-green-600" />
                 </div>
                 <div className="text-left">
-                  <h3 className="font-semibold">Compliance & Standards</h3>
+                  <h3 className="font-semibold">Methodology & Reporting</h3>
                   <p className="text-sm text-muted-foreground">
-                    {metrics?.csrd_compliant_percentage || 0}% CSRD ready
+                    {(() => {
+                      const total = dedupedCertifications.length;
+                      const achieved = dedupedCertifications.filter(c => c.status === 'achieved' || c.status === 'certified').length;
+                      const inProgress = dedupedCertifications.filter(c => c.status === 'in_progress').length;
+                      if (total === 0) {
+                        return `${metrics?.csrd_compliant_percentage || 0}% CSRD-aligned LCAs · No certifications logged`;
+                      }
+                      return `${achieved} of ${total} certifications achieved · ${inProgress} in progress`;
+                    })()}
                   </p>
                 </div>
               </div>
@@ -928,44 +1159,133 @@ export default function PerformancePage() {
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <CardContent className="pt-0">
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="text-center p-4 rounded-lg bg-green-50 dark:bg-green-950/20">
-                  <div className="flex items-center justify-center mb-2">
-                    <CheckCircle2 className="h-6 w-6 text-green-600" />
-                  </div>
-                  <div className="text-2xl font-bold">{metrics?.csrd_compliant_percentage || 0}%</div>
-                  <div className="text-xs text-muted-foreground mt-1">CSRD Ready</div>
-                </div>
+            <CardContent className="pt-0 space-y-5">
+              {/* Headline stats */}
+              <div className="grid grid-cols-2 gap-4">
                 <div className="text-center p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20">
-                  <div className="flex items-center justify-center mb-2">
-                    <CheckCircle2 className="h-6 w-6 text-blue-600" />
-                  </div>
                   <div className="text-2xl font-bold">{metrics?.total_products_assessed || 0}</div>
-                  <div className="text-xs text-muted-foreground mt-1">Products Assessed</div>
+                  <div className="text-xs text-muted-foreground mt-1">Products fully LCA-assessed</div>
+                </div>
+                <div className="text-center p-4 rounded-lg bg-green-50 dark:bg-green-950/20">
+                  <div className="text-2xl font-bold">{metrics?.csrd_compliant_percentage || 0}%</div>
+                  <div
+                    className="text-xs text-muted-foreground mt-1"
+                    title="Reflects LCA-level CSRD alignment only. Full CSRD reporting also requires social disclosures (S1-S4), governance disclosures (G1), value-chain analysis, and a double-materiality assessment."
+                  >
+                    CSRD-aligned LCAs
+                    <span className="ml-1 opacity-60 cursor-help">ⓘ</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <span className="text-sm font-medium">ISO 14044:2006</span>
-                  <Badge variant="outline" className="border-green-500 text-green-700">Compliant</Badge>
-                </div>
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <span className="text-sm font-medium">GHG Protocol</span>
-                  <Badge variant="outline" className="border-green-500 text-green-700">Compliant</Badge>
-                </div>
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <span className="text-sm font-medium">ReCiPe 2016 (H)</span>
-                  <Badge variant="outline" className="border-green-500 text-green-700">Active</Badge>
-                </div>
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <span className="text-sm font-medium">TNFD LEAP</span>
-                  <Badge variant="outline" className="border-blue-500 text-blue-700">In Progress</Badge>
+              {/* Methodology used by the platform */}
+              <div>
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                  Methodology applied
+                </h4>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Calculations follow these international standards and methods. These are the methodologies alka<strong>tera</strong> uses, not certifications your organisation has achieved.
+                </p>
+                <div className="space-y-2">
+                  <MethodologyRow
+                    name="ISO 14044:2006"
+                    summary="Life Cycle Assessment principles and requirements"
+                  />
+                  <MethodologyRow
+                    name="GHG Protocol Corporate Standard"
+                    summary="Scope 1, 2, and 3 emissions accounting"
+                  />
+                  <MethodologyRow
+                    name="ReCiPe 2016 (H) / EU PEF v3"
+                    summary="Impact assessment method (climate, water, land, biodiversity)"
+                  />
+                  <MethodologyRow
+                    name="TNFD LEAP"
+                    summary="Nature-related dependency and impact framework"
+                  />
                 </div>
               </div>
 
-              <Button asChild className="w-full mt-4">
+              {/* Org's actual certifications */}
+              <div>
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                  Your certifications
+                </h4>
+                {dedupedCertifications.length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic">
+                    No certifications logged yet. Open Compliance, Certifications to add ones you hold or are progressing.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {dedupedCertifications
+                      .slice()
+                      .sort((a, b) => {
+                        const rank = (s: string | null) =>
+                          s === 'achieved' || s === 'certified'
+                            ? 0
+                            : s === 'in_progress'
+                              ? 1
+                              : 2;
+                        return rank(a.status) - rank(b.status);
+                      })
+                      .map(cert => {
+                        const name =
+                          cert.certification_frameworks?.framework_name ?? 'Certification';
+                        const status = cert.status;
+                        const statusLabel =
+                          status === 'achieved' || status === 'certified'
+                            ? 'Achieved'
+                            : status === 'in_progress'
+                              ? 'In progress'
+                              : status === 'not_started'
+                                ? 'Not started'
+                                : status === 'expired'
+                                  ? 'Expired'
+                                  : (status ?? 'Unknown');
+                        const statusTone =
+                          status === 'achieved' || status === 'certified'
+                            ? 'border-green-500 text-green-700'
+                            : status === 'in_progress'
+                              ? 'border-blue-500 text-blue-700'
+                              : status === 'expired'
+                                ? 'border-red-500 text-red-700'
+                                : 'border-muted-foreground/40 text-muted-foreground';
+                        const targetSuffix = cert.target_date
+                          ? ` — target ${new Date(cert.target_date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`
+                          : cert.certified_date
+                            ? ` — since ${new Date(cert.certified_date).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`
+                            : '';
+                        return (
+                          <div
+                            key={cert.id}
+                            className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                          >
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium truncate">{name}</div>
+                              {cert.certification_frameworks?.category ? (
+                                <div className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">
+                                  {cert.certification_frameworks.category}
+                                </div>
+                              ) : null}
+                            </div>
+                            <div className="text-right shrink-0 ml-3">
+                              <Badge variant="outline" className={statusTone}>
+                                {statusLabel}
+                              </Badge>
+                              {targetSuffix ? (
+                                <div className="text-[10px] text-muted-foreground mt-1">
+                                  {targetSuffix.replace(/^ — /, '')}
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+
+              <Button asChild className="w-full">
                 <Link href="/reports/sustainability">
                   Generate Sustainability Report
                   <ArrowRight className="ml-2 h-4 w-4" />

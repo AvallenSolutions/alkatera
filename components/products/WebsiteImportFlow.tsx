@@ -74,6 +74,7 @@ export function WebsiteImportFlow({
   const [isConfirming, setIsConfirming] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [orgData, setOrgData] = useState<{ certifications: string[]; description: string | null } | null>(null)
+  const [brandMetadata, setBrandMetadata] = useState<Record<string, unknown> | null>(null)
   const [scanPhase, setScanPhase] = useState<string>('Starting import…')
   const autoScanDoneRef = useRef(false)
   const pollAbortRef = useRef<AbortController | null>(null)
@@ -98,6 +99,7 @@ export function WebsiteImportFlow({
     setProducts([])
     setError(null)
     setOrgData(null)
+    setBrandMetadata(null)
     setScanPhase('Starting import…')
     onClose()
   }
@@ -175,6 +177,9 @@ export function WebsiteImportFlow({
               description: statusData.orgDescription ?? null,
             })
           }
+          if (statusData.brandMetadata && Object.keys(statusData.brandMetadata).length > 0) {
+            setBrandMetadata(statusData.brandMetadata)
+          }
           setStage('review')
           return
         }
@@ -198,7 +203,13 @@ export function WebsiteImportFlow({
       const response = await fetch('/api/products/import-from-url/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ organizationId, products, orgDescription: orgData?.description ?? null }),
+        body: JSON.stringify({
+          organizationId,
+          products,
+          orgDescription: orgData?.description ?? null,
+          orgCertifications: orgData?.certifications ?? [],
+          brandMetadata: brandMetadata ?? null,
+        }),
       })
 
       const data = await response.json()

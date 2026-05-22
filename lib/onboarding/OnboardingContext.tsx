@@ -17,6 +17,7 @@ import {
   getInitialStateForFlow,
   FAST_TRACK_STEPS,
 } from './types'
+import { trackOnboarding } from './telemetry'
 
 interface OnboardingContextType {
   /** Current onboarding state */
@@ -29,6 +30,12 @@ interface OnboardingContextType {
   progress: number
   /** The onboarding flow type: 'owner' or 'member' */
   onboardingFlow: OnboardingFlow
+  /** Persistence status — drives the "Saved" indicator in the wizard chrome. */
+  saveStatus: 'idle' | 'saving' | 'saved' | 'error'
+  /** ISO timestamp of the last successful save, or null. */
+  lastSavedAt: string | null
+  /** True when there's a previous step in the current flow. */
+  canGoBack: boolean
   /** Go to the next step */
   nextStep: () => void
   /** Go to the previous step */
@@ -45,6 +52,8 @@ interface OnboardingContextType {
   completeOnboarding: () => Promise<void>
   /** Dismiss onboarding without completing */
   dismissOnboarding: () => void
+  /** Reverse a dismissal — used by the resumable banner on /rosa/ */
+  resumeOnboarding: () => void
   /** Mark the post-onboarding dashboard guide as completed */
   markGuideCompleted: () => void
   /** Mark the product page guide as completed */
@@ -73,6 +82,8 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const [state, setState] = useState<OnboardingState>(INITIAL_ONBOARDING_STATE)
   const [isLoading, setIsLoading] = useState(true)
   const [onboardingFlow, setOnboardingFlow] = useState<OnboardingFlow>('fast_track')
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
   const { user } = useAuth()
   const { currentOrganization, userRole } = useOrganization()
   const isOwner = userRole === 'owner'
@@ -112,9 +123,12 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const saveState = useCallback((newState: OnboardingState): Promise<boolean> => {
     return new Promise((resolve) => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+      // The instant a save is scheduled, show "saving" — the indicator lags
+      // by the 300ms debounce but that's an honest reflection of state.
+      setSaveStatus('saving')
       saveTimerRef.current = setTimeout(async () => {
         const orgId = orgIdRef.current
-        if (!orgId) { resolve(false); return }
+        if (!orgId) { setSaveStatus('error'); resolve(false); return }
 
         try {
           const res = await fetch('/api/onboarding', {
@@ -126,9 +140,16 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
               flow: flowRef.current,
             }),
           })
+          if (res.ok) {
+            setSaveStatus('saved')
+            setLastSavedAt(new Date().toISOString())
+          } else {
+            setSaveStatus('error')
+          }
           resolve(res.ok)
         } catch (err) {
           console.error('Failed to save onboarding state:', err)
+          setSaveStatus('error')
           resolve(false)
         }
       }, 300)
@@ -225,9 +246,15 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     updateState(prev => {
       const prevStep = getPreviousStep(prev.currentStep, flowRef.current)
       if (!prevStep) return prev
+      trackOnboarding({
+        organizationId: currentOrganization?.id,
+        flow: flowRef.current,
+        step: prev.currentStep,
+        event: 'back',
+      })
       return { ...prev, currentStep: prevStep }
     })
-  }, [updateState])
+  }, [updateState, currentOrganization?.id])
 
   const goToStep = useCallback((step: OnboardingStep) => {
     updateState(prev => ({ ...prev, currentStep: step }))
@@ -240,6 +267,12 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         : [...prev.completedSteps, prev.currentStep]
 
       const next = getNextStep(prev.currentStep, flowRef.current)
+      trackOnboarding({
+        organizationId: currentOrganization?.id,
+        flow: flowRef.current,
+        step: prev.currentStep,
+        event: 'complete',
+      })
 
       return {
         ...prev,
@@ -247,7 +280,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         currentStep: next ?? prev.currentStep,
       }
     })
-  }, [updateState])
+  }, [updateState, currentOrganization?.id])
 
   const skipStep = useCallback(() => {
     updateState(prev => {
@@ -255,10 +288,16 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       if (!config.skippable) return prev
       const next = getNextStep(prev.currentStep, flowRef.current)
       if (!next) return prev
+      trackOnboarding({
+        organizationId: currentOrganization?.id,
+        flow: flowRef.current,
+        step: prev.currentStep,
+        event: 'skip',
+      })
 
       return { ...prev, currentStep: next }
     })
-  }, [updateState])
+  }, [updateState, currentOrganization?.id])
 
   const updatePersonalization = useCallback((data: Partial<PersonalizationData>) => {
     updateState(prev => ({
@@ -283,15 +322,39 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         : [...state.completedSteps, completionStep as OnboardingStep],
     }
     setState(completedState)
+    trackOnboarding({
+      organizationId: currentOrganization?.id,
+      flow: flowRef.current,
+      step: completionStep,
+      event: 'complete',
+      meta: { final: true, completedSteps: completedState.completedSteps.length },
+    })
     // Await the save so callers can wait for persistence before navigating
     await saveState(completedState)
-  }, [state, saveState])
+  }, [state, saveState, currentOrganization?.id])
 
   const dismissOnboarding = useCallback(() => {
     sessionDismissedRef.current = true
+    trackOnboarding({
+      organizationId: currentOrganization?.id,
+      flow: flowRef.current,
+      step: state.currentStep,
+      event: 'dismiss',
+    })
     updateState(prev => ({
       ...prev,
       dismissed: true,
+    }))
+  }, [updateState, currentOrganization?.id, state.currentStep])
+
+  // Reverse a dismissal so the wizard reappears at the step the user was on.
+  // Used by the resumable banner that surfaces on /rosa/ when the user closed
+  // onboarding without finishing.
+  const resumeOnboarding = useCallback(() => {
+    sessionDismissedRef.current = false
+    updateState(prev => ({
+      ...prev,
+      dismissed: false,
     }))
   }, [updateState])
 
@@ -394,6 +457,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     !!currentOrganization
 
   const progress = getProgressPercentage(state.currentStep, onboardingFlow)
+  const canGoBack = getPreviousStep(state.currentStep, onboardingFlow) !== null
 
   return (
     <OnboardingContext.Provider
@@ -403,6 +467,9 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         isLoading,
         progress,
         onboardingFlow,
+        saveStatus,
+        lastSavedAt,
+        canGoBack,
         nextStep,
         previousStep,
         goToStep,
@@ -411,6 +478,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         updatePersonalization,
         completeOnboarding,
         dismissOnboarding,
+        resumeOnboarding,
         markGuideCompleted,
         markProductGuideCompleted,
         markSearchGuideCompleted,

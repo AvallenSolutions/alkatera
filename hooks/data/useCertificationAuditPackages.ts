@@ -18,6 +18,11 @@ interface AuditPackage {
   methodology: string | null;
   generated_documents: any | null;
   review_notes: string | null;
+  exported_at?: string | null;
+  export_url?: string | null;
+  audit_stage?: string | null;
+  audit_scheduled_date?: string | null;
+  auditor_name?: string | null;
   created_at: string;
   updated_at: string;
   framework?: {

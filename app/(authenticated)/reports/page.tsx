@@ -1,13 +1,27 @@
 'use client'
 
+import { useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { FileText, Download } from 'lucide-react'
 import Link from 'next/link'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { VerificationCard } from '@/components/partners/VerificationCard'
+import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider'
 
 export default function ReportsPage() {
+  const rosaSlice = useMemo(() => ({
+    id: 'reports',
+    label: 'Reports & valuation',
+    priority: 7,
+    data: {
+      page: 'reports',
+      sections: ['corporate', 'products', 'supply_chain'],
+      note: 'User can view and download sustainability and product reports here.',
+    },
+  }), [])
+  useRosaPageContext(rosaSlice)
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">

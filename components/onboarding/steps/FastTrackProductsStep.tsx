@@ -1,89 +1,339 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useOnboarding } from '@/lib/onboarding'
 import { useOrganization } from '@/lib/organizationContext'
-import { Globe, ArrowRight, SkipForward } from 'lucide-react'
-import { WebsiteImportFlow } from '@/components/products/WebsiteImportFlow'
+import { supabase } from '@/lib/supabaseClient'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ArrowRight, Loader2, Plus, X, Sparkles, SkipForward, CheckCircle2, Pencil } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import {
+  getTemplatesForBeverageType,
+  PRODUCT_TEMPLATES,
+  type ProductTemplate,
+} from '@/lib/product-templates'
+
+type Unit = 'ml' | 'cl' | 'l'
+
+interface SelectedItem {
+  // Template-derived items keep their template id; custom items get a temp id.
+  id: string
+  templateId?: string
+  name: string
+  unitSize: number
+  unitSizeUnit: Unit
+  abv: number | null
+  category: string
+  subcategory: string
+  benchmarkPerLitre: number
+}
+
+const DEFAULT_CUSTOM_ITEM = (): SelectedItem => ({
+  id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+  name: '',
+  unitSize: 750,
+  unitSizeUnit: 'ml',
+  abv: null,
+  category: 'Spirits',
+  subcategory: 'Other',
+  benchmarkPerLitre: 0,
+})
+
+function templateToItem(t: ProductTemplate): SelectedItem {
+  return {
+    id: t.id,
+    templateId: t.id,
+    name: t.name,
+    unitSize: t.unit_size_value,
+    unitSizeUnit: t.unit_size_unit,
+    abv: t.abv,
+    category: t.category,
+    subcategory: t.subcategory,
+    benchmarkPerLitre: t.benchmark_co2e_per_litre,
+  }
+}
 
 export function FastTrackProductsStep() {
-  const { completeStep, state } = useOnboarding()
+  const { completeStep, skipStep, state } = useOnboarding()
   const { currentOrganization } = useOrganization()
 
-  const websiteUrl = state.personalization?.websiteUrl ?? null
+  const beverageTypes = state.personalization?.beverageTypes ?? []
 
-  const [showImport, setShowImport] = useState(false)
+  // Templates filtered to the user's chosen beverage types. Falls back to the
+  // full catalogue if they didn't pick any (shouldn't happen via the canonical
+  // flow, but handles edge cases gracefully).
+  const templates = useMemo(() => {
+    if (!beverageTypes.length) return PRODUCT_TEMPLATES.slice(0, 8)
+    const seen = new Set<string>()
+    const out: ProductTemplate[] = []
+    for (const bt of beverageTypes) {
+      for (const t of getTemplatesForBeverageType(bt)) {
+        if (!seen.has(t.id)) {
+          seen.add(t.id)
+          out.push(t)
+        }
+      }
+    }
+    return out.slice(0, 8)
+  }, [beverageTypes])
 
-  const handleImportSuccess = () => {
-    setShowImport(false)
-    setTimeout(() => completeStep(), 300)
+  const [selected, setSelected] = useState<SelectedItem[]>([])
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [existingCount, setExistingCount] = useState<number | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+
+  // Detect products already created in this org session (e.g. from the
+  // import step's website scrape, or a previous in-flight onboarding run).
+  // We don't auto-skip — the user might want to add more — but we soften
+  // the framing and pre-stock the basket with what's already there.
+  useEffect(() => {
+    if (!currentOrganization) return
+    let cancelled = false
+    ;(async () => {
+      const cutoff = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+      const { count } = await supabase
+        .from('products')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', currentOrganization.id)
+        .gte('created_at', cutoff)
+      if (!cancelled) setExistingCount(count ?? 0)
+    })()
+    return () => { cancelled = true }
+  }, [currentOrganization])
+
+  const isSelected = (templateId: string) =>
+    selected.some(s => s.templateId === templateId)
+
+  const toggleTemplate = (t: ProductTemplate) => {
+    setSelected(prev => {
+      const exists = prev.find(s => s.templateId === t.id)
+      if (exists) return prev.filter(s => s.templateId !== t.id)
+      return [...prev, templateToItem(t)]
+    })
   }
 
+  const addCustom = () => {
+    const item = DEFAULT_CUSTOM_ITEM()
+    setSelected(prev => [...prev, item])
+    setEditingId(item.id)
+  }
+
+  const updateSelected = (id: string, patch: Partial<SelectedItem>) => {
+    setSelected(prev => prev.map(s => (s.id === id ? { ...s, ...patch } : s)))
+  }
+
+  const removeSelected = (id: string) => {
+    setSelected(prev => prev.filter(s => s.id !== id))
+  }
+
+  const handleContinue = async () => {
+    if (!currentOrganization) return
+    if (selected.length === 0) {
+      // Nothing to save — same as skip.
+      completeStep()
+      return
+    }
+    setIsSaving(true)
+    try {
+      const rows = selected
+        .filter(s => s.name.trim().length > 0)
+        .map(s => ({
+          organization_id: currentOrganization.id,
+          name: s.name.trim(),
+          product_category: s.category,
+          unit_size_value: s.unitSize,
+          unit_size_unit: s.unitSizeUnit,
+          is_draft: true,
+        }))
+      if (rows.length > 0) {
+        await supabase.from('products').insert(rows)
+      }
+    } finally {
+      setIsSaving(false)
+    }
+    completeStep()
+  }
+
+  const totalToAdd = selected.length
+  const showExistingNudge = (existingCount ?? 0) > 0 && selected.length === 0
+
   return (
-    <>
-      <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 animate-in fade-in duration-300">
-        <div className="w-full max-w-md space-y-6">
-          <div className="text-center space-y-2">
-            <h3 className="text-xl font-serif font-bold text-white">Add your products</h3>
-            <p className="text-sm text-white/50">
-              We&apos;ll use your products to calculate a more accurate estimate.
-            </p>
-          </div>
+    <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 py-6 animate-in fade-in duration-300">
+      <div className="w-full max-w-2xl space-y-5">
 
-          <div className="space-y-3">
-            {/* Website import */}
-            <button
-              onClick={() => setShowImport(true)}
-              className="w-full flex items-center gap-4 p-5 bg-[#ccff00]/10 border-2 border-[#ccff00]/40 hover:bg-[#ccff00]/20 hover:border-[#ccff00]/70 rounded-2xl text-left transition-all group"
-            >
-              <div className="h-12 w-12 rounded-xl bg-[#ccff00]/20 flex items-center justify-center shrink-0">
-                <Globe className="w-6 h-6 text-[#ccff00]" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="font-semibold text-white text-sm">
-                    {websiteUrl ? `Import from ${websiteUrl.replace(/^https?:\/\//, '')}` : 'Import from your website'}
-                  </p>
-                  <span className="text-xs bg-[#ccff00]/20 text-[#ccff00] px-2 py-0.5 rounded-full">Recommended</span>
+        <div className="text-center space-y-2">
+          <h3 className="text-2xl font-serif font-bold text-white">
+            {showExistingNudge ? 'Add more products' : 'Pick your products'}
+          </h3>
+          <p className="text-sm text-white/50">
+            {showExistingNudge
+              ? `You've already got ${existingCount} product${existingCount === 1 ? '' : 's'} on the platform. Add more from templates below or continue.`
+              : 'Tap one or two to start. You can edit names and sizes, or add a custom one.'}
+          </p>
+        </div>
+
+        {/* Template grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+          {templates.map(t => {
+            const picked = isSelected(t.id)
+            return (
+              <button
+                key={t.id}
+                onClick={() => toggleTemplate(t)}
+                className={cn(
+                  'group relative flex flex-col items-start gap-1.5 p-3 rounded-xl border text-left transition-all',
+                  picked
+                    ? 'bg-[#ccff00]/15 border-[#ccff00]/50'
+                    : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20',
+                )}
+              >
+                <div className="flex items-start justify-between w-full">
+                  <span className="text-2xl leading-none">{t.icon}</span>
+                  {picked && <CheckCircle2 className="w-4 h-4 text-[#ccff00]" />}
                 </div>
-                <p className="text-xs text-white/50 mt-0.5">
-                  {websiteUrl
-                    ? 'We\'ll scan your site and find your products automatically.'
-                    : 'Enter your URL and we\'ll find your products automatically.'}
+                <p className={cn('text-xs font-medium leading-tight line-clamp-2', picked ? 'text-[#ccff00]' : 'text-white')}>
+                  {t.subcategory} {t.unit_size_value}{t.unit_size_unit}
                 </p>
-              </div>
-              <ArrowRight className="w-4 h-4 text-[#ccff00]/50 group-hover:text-[#ccff00] transition-colors shrink-0" />
-            </button>
+                <p className="text-[10px] text-white/40">
+                  {t.abv ? `${t.abv}% ABV` : 'Non-alcoholic'}
+                </p>
+              </button>
+            )
+          })}
+        </div>
 
-            {/* Skip */}
-            <button
-              onClick={completeStep}
-              className="w-full flex items-center gap-4 p-4 bg-white/3 border border-white/8 hover:bg-white/5 rounded-2xl text-left transition-all group"
-            >
-              <div className="h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center shrink-0">
-                <SkipForward className="w-5 h-5 text-white/40" />
-              </div>
-              <div className="flex-1">
-                <p className="font-medium text-white/60 text-sm">Skip for now</p>
-                <p className="text-xs text-white/30 mt-0.5">
-                  We&apos;ll use your drink type and volume to estimate your footprint.
-                </p>
-              </div>
-            </button>
+        {/* Custom add */}
+        <button
+          onClick={addCustom}
+          className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-white/15 bg-white/3 hover:bg-white/5 hover:border-white/25 transition-colors"
+        >
+          <Plus className="w-4 h-4 text-white/40" />
+          <span className="text-sm text-white/60">Add a custom product</span>
+        </button>
+
+        {/* Selected basket */}
+        {selected.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs uppercase tracking-wide text-white/50">
+                <Sparkles className="inline w-3 h-3 text-[#ccff00] mr-1" />
+                {totalToAdd} product{totalToAdd === 1 ? '' : 's'} ready to add
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              {selected.map(item => {
+                const isEditing = editingId === item.id || !item.name
+                return (
+                  <div
+                    key={item.id}
+                    className="bg-white/5 border border-white/10 rounded-xl p-3"
+                  >
+                    {isEditing ? (
+                      <div className="flex flex-col gap-2">
+                        <Input
+                          autoFocus
+                          placeholder="Product name (e.g. Avallen Calvados)"
+                          value={item.name}
+                          onChange={e => updateSelected(item.id, { name: e.target.value })}
+                          className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:ring-[#ccff00]/50 text-sm"
+                        />
+                        <div className="flex gap-2">
+                          <Input
+                            type="number"
+                            min={1}
+                            placeholder="Size"
+                            value={item.unitSize}
+                            onChange={e => updateSelected(item.id, { unitSize: parseFloat(e.target.value) || 0 })}
+                            className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:ring-[#ccff00]/50 text-sm flex-1 min-w-0"
+                          />
+                          <Select
+                            value={item.unitSizeUnit}
+                            onValueChange={v => updateSelected(item.id, { unitSizeUnit: v as Unit })}
+                          >
+                            <SelectTrigger className="w-24 bg-white/5 border-white/10 text-white text-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ml">ml</SelectItem>
+                              <SelectItem value="cl">cl</SelectItem>
+                              <SelectItem value="l">l</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <button
+                            onClick={() => setEditingId(null)}
+                            disabled={!item.name.trim()}
+                            className={cn(
+                              'px-3 rounded-md text-xs font-medium transition-colors',
+                              item.name.trim()
+                                ? 'bg-[#ccff00]/20 text-[#ccff00] hover:bg-[#ccff00]/30'
+                                : 'bg-white/5 text-white/30 cursor-not-allowed',
+                            )}
+                          >
+                            Done
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-white truncate">{item.name}</p>
+                          <p className="text-xs text-white/40">
+                            {item.unitSize}{item.unitSizeUnit}
+                            {item.abv ? ` • ${item.abv}% ABV` : ''}
+                            {' • '}{item.subcategory}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => setEditingId(item.id)}
+                            className="p-1.5 rounded-md text-white/40 hover:text-white hover:bg-white/10"
+                            aria-label="Edit"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => removeSelected(item.id)}
+                            className="p-1.5 rounded-md text-white/40 hover:text-red-300 hover:bg-white/10"
+                            aria-label="Remove"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           </div>
+        )}
+
+        <div className="flex flex-col sm:flex-row gap-2 pt-2">
+          <button
+            onClick={skipStep}
+            className="flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border border-white/10 bg-white/3 hover:bg-white/5 transition-colors"
+          >
+            <SkipForward className="w-4 h-4 text-white/40" />
+            <span className="text-sm text-white/60">Skip for now</span>
+          </button>
+          <Button
+            onClick={handleContinue}
+            disabled={isSaving}
+            className="flex-1 bg-[#ccff00] text-black hover:bg-[#ccff00]/90 font-medium rounded-xl"
+          >
+            {isSaving ? (
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</>
+            ) : (
+              <>
+                {totalToAdd > 0 ? `Add ${totalToAdd} & continue` : 'Continue'}
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </>
+            )}
+          </Button>
         </div>
       </div>
-
-      {currentOrganization && (
-        <WebsiteImportFlow
-          open={showImport}
-          onClose={() => setShowImport(false)}
-          organizationId={currentOrganization.id}
-          onSuccess={handleImportSuccess}
-          darkMode
-          initialUrl={websiteUrl ?? undefined}
-        />
-      )}
-    </>
+    </div>
   )
 }

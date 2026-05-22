@@ -35,6 +35,12 @@ export const PACKAGING_DEFAULTS: Record<string, PackagingDefaults> = {
   can: { recycled_content_percentage: 70, recyclability_percent: 95, end_of_life_pathway: 'recycling' },
   'glass bottle': { recycled_content_percentage: 40, recyclability_percent: 100, end_of_life_pathway: 'recycling' },
   'pet bottle': { recycled_content_percentage: 30, recyclability_percent: 90, end_of_life_pathway: 'recycling' },
+  // Multi-word keys placed before generic ones (first substring match wins).
+  'bag-in-box': { recycled_content_percentage: 30, recyclability_percent: 40, end_of_life_pathway: 'landfill' },
+  'bag in box': { recycled_content_percentage: 30, recyclability_percent: 40, end_of_life_pathway: 'landfill' },
+  'tetra pak': { recycled_content_percentage: 25, recyclability_percent: 50, end_of_life_pathway: 'recycling' },
+  tetra: { recycled_content_percentage: 25, recyclability_percent: 50, end_of_life_pathway: 'recycling' },
+  carton: { recycled_content_percentage: 25, recyclability_percent: 50, end_of_life_pathway: 'recycling' },
 }
 
 export function lookupPackagingDefaults(name: string | null | undefined): PackagingDefaults | null {

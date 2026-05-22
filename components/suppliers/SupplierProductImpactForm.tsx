@@ -31,6 +31,7 @@ import {
   SYSTEM_BOUNDARY_LABELS,
   METHODOLOGY_STANDARDS,
 } from "@/lib/types/supplier-product";
+import { AgentBanner } from "@/components/agents/AgentBanner";
 
 interface SupplierProductImpactFormProps {
   formData: SupplierProductFormData;
@@ -114,6 +115,10 @@ export function SupplierProductImpactForm({
 
   return (
     <div className="space-y-6">
+      <AgentBanner
+        kinds={['bom', 'historical_lca_report']}
+        formName="supplier impact data"
+      />
       {/* Completion Status */}
       <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border">
         <div className="flex items-center gap-2">

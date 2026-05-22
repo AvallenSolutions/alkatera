@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { EnhancedComplianceWizard } from '@/components/lca/EnhancedComplianceWizard';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, ArrowLeft, AlertTriangle } from 'lucide-react';
+import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider';
 
 // ============================================================================
 // PAGE COMPONENT
@@ -76,6 +77,26 @@ export default function ComplianceWizardPage() {
   const handleBack = () => {
     router.back();
   };
+
+  // Tell Rosa what the user is doing in the LCA wizard so questions like
+  // "what does cradle-to-grave mean?" or "which methodology applies to
+  // me?" can be answered without the user copy-pasting their product
+  // name and current step.
+  const rosaSlice = useMemo(() => {
+    if (!productId) return null
+    return {
+      id: 'compliance-wizard',
+      label: `LCA wizard${productName ? ` for ${productName}` : ''}`,
+      priority: 9,
+      data: {
+        product_id: productId,
+        product_name: productName || null,
+        pcf_id: pcfId,
+        has_existing_pcf: !!pcfId,
+      },
+    }
+  }, [productId, productName, pcfId])
+  useRosaPageContext(rosaSlice)
 
   // ============================================================================
   // LOADING STATE

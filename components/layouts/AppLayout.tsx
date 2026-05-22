@@ -17,6 +17,9 @@ import { OnboardingProvider } from '@/lib/onboarding'
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard'
 import { SupplierOnboardingProvider } from '@/lib/supplier-onboarding'
 import { SupplierOnboardingWizard } from '@/components/supplier-onboarding/SupplierOnboardingWizard'
+import { RosaContextProvider } from '@/lib/rosa/RosaContextProvider'
+import { RosaDrawer } from '@/components/rosa/RosaDrawer'
+import { RosaTrigger } from '@/components/rosa/RosaTrigger'
 
 interface AppLayoutProps {
   children: React.ReactNode
@@ -24,13 +27,17 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children, requireOrganization = true }: AppLayoutProps) {
-  // OnboardingProvider wraps everything so it never remounts during
-  // auth / org / subscription state transitions.
+  // Both providers wrap everything so they never remount during auth /
+  // org / subscription state transitions. RosaContextProvider holds the
+  // drawer's open/pinned/width state plus page-level context slices the
+  // drawer reads on every send.
   return (
     <OnboardingProvider>
-      <AppLayoutInner requireOrganization={requireOrganization}>
-        {children}
-      </AppLayoutInner>
+      <RosaContextProvider>
+        <AppLayoutInner requireOrganization={requireOrganization}>
+          {children}
+        </AppLayoutInner>
+      </RosaContextProvider>
     </OnboardingProvider>
   )
 }
@@ -182,7 +189,16 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
             </div>
           </main>
         </div>
+
+        {/*
+          Rosa drawer mounts as a flex sibling so when pinned it pushes
+          content left; when overlay it fixes-positions over the page
+          (handled inside the component). Mounted only for authenticated,
+          org-enrolled, non-supplier users (this branch already gates that).
+        */}
+        <RosaDrawer />
       </div>
+      <RosaTrigger />
     </>
   )
 }

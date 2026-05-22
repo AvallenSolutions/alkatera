@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Plus, Trash2, Loader2, Zap, Droplets, Trash, Upload, Copy } from "lucide-react";
@@ -22,7 +22,9 @@ import {
   WASTE_TREATMENT_METHODS,
   DATA_QUALITY_OPTIONS,
 } from "@/lib/constants/utility-types";
+import { REFRIGERANT_GWP } from "@/lib/ghg-constants";
 import type { Cadence, Period } from "@/lib/log-data/period-utils";
+import { AgentBanner } from "@/components/agents/AgentBanner";
 import { UtilityBillImportDialog } from "./UtilityBillImportDialog";
 import { UtilityRolloverDialog } from "./UtilityRolloverDialog";
 import { WaterBillImportDialog } from "./WaterBillImportDialog";
@@ -37,6 +39,7 @@ interface UtilityRow {
   quantity: string;
   unit: string;
   activity_date: string;
+  refrigerant_type?: string;
 }
 
 interface WaterRow {
@@ -184,6 +187,10 @@ export function DirectDataEntry({
             reporting_period_end: selectedPeriod.end,
             data_quality: "actual",
             calculated_scope: "",
+            refrigerant_type:
+              entry.utility_type === "refrigerant_leakage"
+                ? entry.refrigerant_type ?? null
+                : null,
             created_by: userData.user.id,
           });
 
@@ -355,6 +362,8 @@ export function DirectDataEntry({
   // =========================================================================
 
   return (
+    <>
+    <AgentBanner kinds={['utility_bill', 'water_bill', 'waste_bill']} formName="energy, water and waste data" />
     <Card>
       <CardHeader>
         <CardTitle>Enter Facility Data</CardTitle>
@@ -451,9 +460,21 @@ export function DirectDataEntry({
                   >
                     <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
                     <SelectContent>
-                      {UTILITY_TYPES.map((u) => (
-                        <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
-                      ))}
+                      <SelectGroup>
+                        {UTILITY_TYPES.filter(
+                          (u) => !u.recommendedFor || u.recommendedFor.includes("general"),
+                        ).map((u) => (
+                          <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
+                        ))}
+                      </SelectGroup>
+                      <SelectGroup>
+                        <SelectLabel>Winery / vineyard-specific</SelectLabel>
+                        {UTILITY_TYPES.filter(
+                          (u) => u.recommendedFor && !u.recommendedFor.includes("general"),
+                        ).map((u) => (
+                          <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
+                        ))}
+                      </SelectGroup>
                     </SelectContent>
                   </Select>
                 </div>
@@ -493,6 +514,38 @@ export function DirectDataEntry({
                     </Button>
                   )}
                 </div>
+                {row.utility_type === "co2_winemaking" && (
+                  <p className="md:col-span-5 text-xs text-muted-foreground">
+                    Enter <strong>purchased</strong> CO₂ used in winemaking (tank
+                    blanketing, sparging, purging, carbonation), in kg. Do not
+                    include CO₂ produced by fermentation, which is biogenic and
+                    excluded under the GHG Protocol and ISO 14064.
+                  </p>
+                )}
+                {row.utility_type === "refrigerant_leakage" && (
+                  <div className="md:col-span-5">
+                    <Label className="text-xs">Refrigerant type</Label>
+                    <Select
+                      value={row.refrigerant_type ?? ""}
+                      onValueChange={(v) => updateUtilityRow(i, "refrigerant_type", v)}
+                      disabled={isSubmitting}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Select refrigerant (defaults to R-134a)" /></SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(REFRIGERANT_GWP).map(([key, r]) => (
+                          <SelectItem key={key} value={key}>
+                            {r.label} — GWP {r.gwp}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Enter the mass leaked (kg). Emissions = kg leaked × GWP. If
+                      left blank, R-134a (GWP 1430) is assumed for backward
+                      compatibility.
+                    </p>
+                  </div>
+                )}
               </div>
             ))}
 
@@ -726,5 +779,6 @@ export function DirectDataEntry({
         }}
       />
     </Card>
+    </>
   );
 }

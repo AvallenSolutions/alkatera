@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 import { resolveUserOrganization } from '@/lib/supabase/resolve-organization';
+import { recalculateAndNotify } from '@/lib/certifications/recalculate';
 
 export async function GET(request: NextRequest) {
   try {
@@ -126,6 +127,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
+    try {
+      await recalculateAndNotify(supabase, organizationId);
+    } catch (e) {
+      console.error('recalc after evidence create failed:', e);
+    }
+
     return NextResponse.json(data, { status: 201 });
   } catch (error) {
     console.error('Error in POST /api/certifications/evidence:', error);
@@ -177,6 +184,12 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
+    try {
+      await recalculateAndNotify(supabase, organizationId);
+    } catch (e) {
+      console.error('recalc after evidence update failed:', e);
+    }
+
     return NextResponse.json(data);
   } catch (error) {
     console.error('Error in PUT /api/certifications/evidence:', error);
@@ -213,6 +226,12 @@ export async function DELETE(request: NextRequest) {
     if (error) {
       console.error('Error deleting evidence link:', error);
       return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    }
+
+    try {
+      await recalculateAndNotify(supabase, organizationId);
+    } catch (e) {
+      console.error('recalc after evidence delete failed:', e);
     }
 
     return NextResponse.json({ success: true });

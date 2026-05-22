@@ -12,17 +12,27 @@ import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { buildUploadPath, inferMediaType, isSupportedMediaType } from '@/lib/rosa/document-extraction';
+import { checkRateLimit } from '@/lib/rosa/rate-limiter';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 
 const MAX_BYTES = 10 * 1024 * 1024;
+const UPLOAD_RATE_LIMIT = 10; // per minute
 
 export async function POST(request: NextRequest) {
   const userSupabase = getSupabaseServerClient();
   const { data: { user }, error: userErr } = await userSupabase.auth.getUser();
   if (userErr || !user) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+  }
+
+  const rl = checkRateLimit(`upload:${user.id}`, UPLOAD_RATE_LIMIT);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: `Too many uploads. Please wait ${Math.ceil(rl.retryAfterMs / 1000)} seconds.` },
+      { status: 429 },
+    );
   }
 
   const { data: membership } = await userSupabase

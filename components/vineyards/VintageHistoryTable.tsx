@@ -104,9 +104,9 @@ export function VintageHistoryTable({
               <TableHead className="w-[30px]"></TableHead>
               <TableHead>Year</TableHead>
               <TableHead className="text-right">Yield (t/ha)</TableHead>
-              <TableHead className="text-right">Emissions (kg CO{'\u2082'}e/ha)</TableHead>
-              <TableHead className="text-right">Water (m{'\u00B3'}/ha)</TableHead>
-              <TableHead className="text-right">Removals (kg CO{'\u2082'}e/ha)</TableHead>
+              <TableHead className="text-right">Emissions (kg CO{'₂'}e/ha)</TableHead>
+              <TableHead className="text-right">Water (m{'³'}/ha)</TableHead>
+              <TableHead className="text-right">Removals (kg CO{'₂'}e/ha)</TableHead>
               <TableHead className="text-right">Ecotox (CTUe/ha)</TableHead>
               <TableHead>Quality</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -209,11 +209,11 @@ export function VintageHistoryTable({
                           <div className="px-6 py-4 grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-3 text-xs">
                             {/* Column 1: FLAG N2O */}
                             <div className="space-y-1.5">
-                              <p className="font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">FLAG N{'\u2082'}O Emissions</p>
+                              <p className="font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">FLAG N{'₂'}O Emissions</p>
                               <DetailItem label="Direct (fertiliser)" value={`${fmt(imp.flag_emissions.n2o_direct_co2e)} kg`} />
                               <DetailItem label="Indirect (vol.+leach.)" value={`${fmt(imp.flag_emissions.n2o_indirect_co2e)} kg`} />
                               <DetailItem label="Crop residue" value={`${fmt(imp.flag_emissions.n2o_crop_residue_co2e)} kg`} />
-                              <DetailItem label="N\u2082O mass" value={`${imp.n2o_kg.toFixed(3)} kg`} muted />
+                              <DetailItem label="N₂O mass" value={`${imp.n2o_kg.toFixed(3)} kg`} muted />
                             </div>
 
                             {/* Column 2: Non-FLAG */}
@@ -228,8 +228,8 @@ export function VintageHistoryTable({
                             {/* Column 3: Water & ecotox */}
                             <div className="space-y-1.5">
                               <p className="font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Water & Ecotoxicity</p>
-                              <DetailItem label="Water volume" value={`${fmt(imp.water_m3)} m\u00B3`} />
-                              <DetailItem label="Scarcity-weighted" value={`${fmt(imp.water_scarcity_m3_eq)} m\u00B3 eq`} />
+                              <DetailItem label="Water volume" value={`${fmt(imp.water_m3)} m³`} />
+                              <DetailItem label="Scarcity-weighted" value={`${fmt(imp.water_scarcity_m3_eq)} m³ eq`} />
                               <DetailItem label="Freshwater ecotox" value={`${fmt(imp.freshwater_ecotoxicity)} CTUe`} />
                               <DetailItem label="Terrestrial ecotox" value={`${fmt(imp.terrestrial_ecotoxicity)} CTUe`} />
                               <DetailItem label="Human toxicity" value={`${fmtSci(imp.human_toxicity_non_carcinogenic)} CTUh`} />
@@ -239,10 +239,10 @@ export function VintageHistoryTable({
                             {/* Column 4: Normalised */}
                             <div className="space-y-1.5">
                               <p className="font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Per kg Grapes</p>
-                              <DetailItem label="Emissions" value={`${imp.total_emissions_per_kg.toFixed(3)} kg CO\u2082e`} />
-                              <DetailItem label="Removals" value={`${imp.removals_per_kg.toFixed(3)} kg CO\u2082e`} />
+                              <DetailItem label="Emissions" value={`${imp.total_emissions_per_kg.toFixed(3)} kg CO₂e`} />
+                              <DetailItem label="Removals" value={`${imp.removals_per_kg.toFixed(3)} kg CO₂e`} />
                               <DetailItem label="Soil carbon method" value={imp.flag_removals.methodology === 'measured' ? 'Verified' : 'Practice default'} />
-                              <DetailItem label="Soil management" value={imp.flag_removals.is_verified ? '\u2705 Verified' : 'Unverified'} muted />
+                              <DetailItem label="Soil management" value={imp.flag_removals.is_verified ? '✅ Verified' : 'Unverified'} muted />
                             </div>
                           </div>
                         </TableCell>

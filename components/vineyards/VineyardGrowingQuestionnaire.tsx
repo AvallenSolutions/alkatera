@@ -184,8 +184,9 @@ export function VineyardGrowingQuestionnaire({
     area_ha: initSource?.area_ha ?? vineyardHectares,
     soil_management: (initSource?.soil_management ?? 'conventional_tillage') as SoilManagement,
     pruning_residue_returned: initSource?.pruning_residue_returned ?? true,
-    pruning_residue_management_type: (initSource as any)?.pruning_residue_management_type ?? 'in_field' as 'in_field' | 'removed_for_biomass' | 'chipped_and_spread',
+    pruning_residue_management_type: (initSource as any)?.pruning_residue_management_type ?? 'in_field' as 'in_field' | 'removed_for_biomass' | 'chipped_and_spread' | 'burned',
     pruning_residue_measured_kg_per_ha: (initSource as any)?.pruning_residue_measured_kg_per_ha ?? null as number | null,
+    pruning_residue_burned_kg_per_ha: (initSource as any)?.pruning_residue_burned_kg_per_ha ?? null as number | null,
     fertiliser_type: (initSource?.fertiliser_type ?? 'none') as FertiliserType,
     fertiliser_quantity_kg: initSource?.fertiliser_quantity_kg ?? 0,
     fertiliser_n_content_percent: initSource?.fertiliser_n_content_percent ?? 0,
@@ -196,6 +197,7 @@ export function VineyardGrowingQuestionnaire({
     herbicide_applications_per_year: initSource?.herbicide_applications_per_year ?? 0,
     herbicide_type: (initSource?.herbicide_type ?? 'generic') as PesticideType,
     diesel_litres_per_year: initSource?.diesel_litres_per_year ?? 0,
+    red_diesel_litres_per_year: (initSource as any)?.red_diesel_litres_per_year ?? 0,
     petrol_litres_per_year: initSource?.petrol_litres_per_year ?? 0,
     is_irrigated: initSource?.is_irrigated ?? false,
     water_m3_per_ha: initSource?.water_m3_per_ha ?? 0,
@@ -430,6 +432,7 @@ export function VineyardGrowingQuestionnaire({
         pruning_residue_returned: form.pruning_residue_management_type !== 'removed_for_biomass',
         pruning_residue_management_type: form.pruning_residue_management_type,
         pruning_residue_measured_kg_per_ha: form.pruning_residue_measured_kg_per_ha,
+        pruning_residue_burned_kg_per_ha: form.pruning_residue_burned_kg_per_ha,
         fertiliser_type: form.fertiliser_type,
         fertiliser_quantity_kg: form.fertiliser_quantity_kg,
         fertiliser_n_content_percent: form.fertiliser_n_content_percent,
@@ -440,6 +443,7 @@ export function VineyardGrowingQuestionnaire({
         herbicide_applications_per_year: form.herbicide_applications_per_year,
         herbicide_type: form.herbicide_type,
         diesel_litres_per_year: form.diesel_litres_per_year,
+        red_diesel_litres_per_year: form.red_diesel_litres_per_year,
         petrol_litres_per_year: form.petrol_litres_per_year,
         is_irrigated: form.is_irrigated,
         water_m3_per_ha: form.water_m3_per_ha,
@@ -580,6 +584,7 @@ export function VineyardGrowingQuestionnaire({
     pruning_residue_returned: form.pruning_residue_management_type !== 'removed_for_biomass',
     pruning_residue_management_type: form.pruning_residue_management_type,
     pruning_residue_measured_kg_per_ha: form.pruning_residue_measured_kg_per_ha ?? undefined,
+    pruning_residue_burned_kg_per_ha: form.pruning_residue_burned_kg_per_ha ?? undefined,
     fertiliser_type: form.fertiliser_type,
     fertiliser_quantity_kg: form.fertiliser_quantity_kg,
     fertiliser_n_content_percent: form.fertiliser_n_content_percent,
@@ -590,6 +595,7 @@ export function VineyardGrowingQuestionnaire({
     herbicide_applications_per_year: form.herbicide_applications_per_year,
     herbicide_type: form.herbicide_type,
     diesel_litres_per_year: form.diesel_litres_per_year,
+    red_diesel_litres_per_year: form.red_diesel_litres_per_year,
     petrol_litres_per_year: form.petrol_litres_per_year,
     is_irrigated: form.is_irrigated,
     water_m3_per_ha: form.water_m3_per_ha,
@@ -837,7 +843,7 @@ export function VineyardGrowingQuestionnaire({
                   <Select
                     value={form.pruning_residue_management_type}
                     onValueChange={(v) => updateForm({
-                      pruning_residue_management_type: v as 'in_field' | 'removed_for_biomass' | 'chipped_and_spread',
+                      pruning_residue_management_type: v as 'in_field' | 'removed_for_biomass' | 'chipped_and_spread' | 'burned',
                       pruning_residue_returned: v !== 'removed_for_biomass',
                     })}
                   >
@@ -848,11 +854,13 @@ export function VineyardGrowingQuestionnaire({
                       <SelectItem value="in_field">Left in field to decompose (default)</SelectItem>
                       <SelectItem value="removed_for_biomass">Removed for biomass / off-site use</SelectItem>
                       <SelectItem value="chipped_and_spread">Chipped and spread back onto soil</SelectItem>
+                      <SelectItem value="burned">Burned in-field</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
-                {form.pruning_residue_management_type !== 'removed_for_biomass' && (
+                {(form.pruning_residue_management_type === 'in_field' ||
+                  form.pruning_residue_management_type === 'chipped_and_spread') && (
                   <div className="grid gap-2 max-w-[300px]">
                     <Label htmlFor="pruning-dm">Measured pruning dry matter (kg/ha/yr)</Label>
                     <p className="text-xs text-muted-foreground">
@@ -870,6 +878,28 @@ export function VineyardGrowingQuestionnaire({
                         })
                       }
                       placeholder="e.g. 2500"
+                    />
+                  </div>
+                )}
+
+                {form.pruning_residue_management_type === 'burned' && (
+                  <div className="grid gap-2 max-w-[300px]">
+                    <Label htmlFor="pruning-burned-dm">Pruning dry matter burned (kg/ha/yr)</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Optional. IPCC default for vine prunings is 1,500–2,500 kg dry matter/ha. Leave blank to use an age-based default. Burning emits CH4 and N2O (Scope 1); biogenic CO2 is excluded per the GHG Protocol.
+                    </p>
+                    <Input
+                      id="pruning-burned-dm"
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={form.pruning_residue_burned_kg_per_ha ?? ''}
+                      onChange={(e) =>
+                        updateForm({
+                          pruning_residue_burned_kg_per_ha: e.target.value ? parseFloat(e.target.value) : null,
+                        })
+                      }
+                      placeholder="e.g. 2000"
                     />
                   </div>
                 )}
@@ -1669,7 +1699,7 @@ export function VineyardGrowingQuestionnaire({
               <div className="grid gap-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="diesel">Diesel consumption (litres/year)</Label>
+                    <Label htmlFor="diesel">Road diesel (litres/year)</Label>
                     <Input
                       id="diesel"
                       type="number"
@@ -1681,7 +1711,7 @@ export function VineyardGrowingQuestionnaire({
                       placeholder="e.g. 500"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Total diesel for all vineyard operations. Sector average: 80-150 L/ha/yr.
+                      On-road (white) diesel for vineyard operations. Sector average: 80-150 L/ha/yr combined.
                     </p>
                     {form.diesel_litres_per_year > 0 && form.area_ha > 0 && (
                       <p className="text-xs text-muted-foreground">
@@ -1691,6 +1721,27 @@ export function VineyardGrowingQuestionnaire({
                             ⚠ Above 300 L/ha is unusually high
                           </span>
                         )}
+                      </p>
+                    )}
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="red-diesel">Red / agricultural diesel (litres/year)</Label>
+                    <Input
+                      id="red-diesel"
+                      type="number"
+                      min="0"
+                      value={form.red_diesel_litres_per_year || ''}
+                      onChange={(e) =>
+                        updateForm({ red_diesel_litres_per_year: parseFloat(e.target.value) || 0 })
+                      }
+                      placeholder="e.g. 1200"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Gas oil for off-road tractors, sprayers and harvesters. Priced with the DEFRA red-diesel factor (most vineyard machinery fuel sits here).
+                    </p>
+                    {form.red_diesel_litres_per_year > 0 && form.area_ha > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {(form.red_diesel_litres_per_year / form.area_ha).toFixed(0)} L/ha
                       </p>
                     )}
                   </div>
