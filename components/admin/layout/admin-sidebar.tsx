@@ -10,6 +10,7 @@ import {
   Activity,
   Database,
   ShieldCheck,
+  Sparkles,
   LogOut,
   type LucideIcon,
 } from 'lucide-react';
@@ -35,6 +36,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: 'Directory',
     items: [
+      { name: 'Find brands', href: '/admin/directory/sourcing', icon: Sparkles },
       { name: 'Review queue', href: '/admin/directory/review', icon: ShieldCheck },
       { name: 'Brands', href: '/admin/directory/brands', icon: Building2 },
       { name: 'Products', href: '/admin/directory/products', icon: Package },
