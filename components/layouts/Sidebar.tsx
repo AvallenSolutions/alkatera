@@ -913,7 +913,6 @@ export function Sidebar({ className }: SidebarProps) {
                     { href: '/admin/beta-access/', icon: FlaskConical, label: 'Beta Access' },
                     { href: '/admin/emissions-trace/', icon: Eye, label: 'Emissions Trace' },
                     { href: '/admin/reconciliation/', icon: Scale, label: 'Reconciliation' },
-                    { href: '/admin/demo-seed/', icon: Wheat, label: 'Demo Seed' },
                   ].map(({ href, icon: AdminIcon, label }) => (
                     isCollapsed ? (
                       <Tooltip key={href}>
