@@ -74,7 +74,7 @@ export async function POST(
     return NextResponse.json({ error: 'parse_failed', detail: parsed.error }, { status: 422 });
   }
 
-  const aliases =
+  const aliases: Record<string, string[]> =
     row.kind === 'brands' ? BRAND_HEADER_ALIASES : PRODUCT_HEADER_ALIASES;
   const suggestions = suggestHeaderMapping(parsed.headers, aliases);
 

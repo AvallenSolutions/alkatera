@@ -68,7 +68,7 @@ async function buildKpis(s: SupabaseClient) {
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
   const safeCount = async (
-    fn: () => Promise<{ count: number | null }>,
+    fn: () => PromiseLike<{ count: number | null }>,
   ): Promise<number> => {
     try {
       const { count } = await fn();
