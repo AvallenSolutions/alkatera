@@ -903,6 +903,7 @@ export function Sidebar({ className }: SidebarProps) {
                 <>
                   {[
                     { href: '/admin/platform/', icon: Activity, label: 'Platform Dashboard' },
+                    { href: '/admin/directory/brands/', icon: Library, label: 'Brand Directory' },
                     { href: '/admin/suppliers/', icon: Handshake, label: 'Platform Suppliers' },
                     { href: '/admin/blog/', icon: FileEdit, label: 'Blog CMS' },
                     { href: '/admin/feedback/', icon: MessageSquare, label: 'User Feedback' },
