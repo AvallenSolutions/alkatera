@@ -7,6 +7,13 @@ export interface BulkBrandsResult {
   rows_processed: number;
   brands_created: number;
   brands_linked: number;
+  /**
+   * Rows that resolved via the alkatera-org fallback — either reused an
+   * existing alkatera-linked directory row, or minted one tied to the
+   * matched org. Counted in addition to brands_linked / brands_created
+   * so the admin sees how often the second matcher pass saved a dupe.
+   */
+  brands_alkatera_linked: number;
   errors: Array<{ row: number; brand: string; error: string }>;
   /** Directory IDs that were freshly created by this run. */
   created_directory_ids: string[];
@@ -40,6 +47,7 @@ export async function processBulkBrands(args: Args): Promise<BulkBrandsResult> {
     rows_processed: 0,
     brands_created: 0,
     brands_linked: 0,
+    brands_alkatera_linked: 0,
     errors: [],
     created_directory_ids: [],
     scrape_enqueue: { queued: 0, skipped_no_website: 0, skipped_already_queued: 0 },
@@ -87,6 +95,9 @@ export async function processBulkBrands(args: Args): Promise<BulkBrandsResult> {
         result.created_directory_ids.push(resolved.directoryId);
       } else {
         result.brands_linked += 1;
+      }
+      if (resolved.alkateraLinked) {
+        result.brands_alkatera_linked += 1;
       }
 
       // Fill optional columns, never overwrite an existing populated value.

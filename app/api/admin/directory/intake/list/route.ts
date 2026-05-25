@@ -26,10 +26,10 @@ const URL_PATTERN = /^https?:\/\//i;
 
 interface ResolvedLine {
   line: string;
-  status: 'linked' | 'created' | 'invalid';
+  status: 'linked' | 'created' | 'alkatera_linked' | 'invalid';
   brand_name: string | null;
   directory_id: string | null;
-  match_via: 'exact_name' | 'alias' | 'fuzzy' | 'created' | null;
+  match_via: 'exact_name' | 'alias' | 'fuzzy' | 'created' | 'alkatera_org' | null;
   error?: string;
 }
 
@@ -67,6 +67,7 @@ export async function POST(request: Request) {
   const resolved: ResolvedLine[] = [];
   let createdCount = 0;
   let linkedCount = 0;
+  let alkateraLinkedCount = 0;
   let invalidCount = 0;
   const createdDirectoryIds: string[] = [];
 
@@ -91,12 +92,21 @@ export async function POST(request: Request) {
         website: parsed.website,
         discoveredVia: 'manual',
       });
-      if (result.created) createdCount += 1;
-      else linkedCount += 1;
-      if (result.created) createdDirectoryIds.push(result.directoryId);
+      if (result.created) {
+        createdCount += 1;
+        createdDirectoryIds.push(result.directoryId);
+      } else {
+        linkedCount += 1;
+      }
+      if (result.alkateraLinked) alkateraLinkedCount += 1;
+      const status: ResolvedLine['status'] = result.alkateraLinked
+        ? 'alkatera_linked'
+        : result.created
+          ? 'created'
+          : 'linked';
       resolved.push({
         line,
-        status: result.created ? 'created' : 'linked',
+        status,
         brand_name: result.canonicalName,
         directory_id: result.directoryId,
         match_via: result.matchVia,
@@ -139,6 +149,7 @@ export async function POST(request: Request) {
       total: lines.length,
       created: createdCount,
       linked: linkedCount,
+      alkatera_linked: alkateraLinkedCount,
       invalid: invalidCount,
     },
     resolved,

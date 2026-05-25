@@ -17,7 +17,12 @@ interface SourcingResponse {
   summary?: string;
   found_brands: number;
   brand_names?: string[];
-  brands: { created: number; linked: number; errors: Array<{ row: number; brand?: string; error: string }> };
+  brands: {
+    created: number;
+    linked: number;
+    alkatera_linked?: number;
+    errors: Array<{ row: number; brand?: string; error: string }>;
+  };
   products: { created: number; linked: number; errors: Array<{ row: number; brand?: string; error: string }> };
   scrape_enqueue?: { queued: number; skipped_no_website: number; skipped_already_queued: number };
 }
@@ -336,6 +341,7 @@ function ResultPanel({ result }: { result: SourcingResponse }) {
   }
   const added = result.brands.created;
   const linked = result.brands.linked;
+  const alkateraLinked = result.brands.alkatera_linked ?? 0;
   return (
     <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-5 space-y-3">
       <div className="flex items-start gap-3">
@@ -344,6 +350,12 @@ function ResultPanel({ result }: { result: SourcingResponse }) {
           <div className="text-sm font-semibold">
             Found {result.found_brands} brand{result.found_brands === 1 ? '' : 's'} ·{' '}
             {added} added, {linked} already in the directory
+            {alkateraLinked > 0 && (
+              <>
+                {' '}
+                · {alkateraLinked} matched an existing alka<strong>tera</strong> customer
+              </>
+            )}
           </div>
           <div className="text-xs text-muted-foreground mt-0.5">
             {result.products.created + result.products.linked > 0 && (

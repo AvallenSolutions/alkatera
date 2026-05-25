@@ -106,6 +106,7 @@ async function ingest(
           rows_processed: 0,
           brands_created: 0,
           brands_linked: 0,
+          brands_alkatera_linked: 0,
           errors: [],
           created_directory_ids: [] as string[],
           scrape_enqueue: { queued: 0, skipped_no_website: 0, skipped_already_queued: 0 },
@@ -129,6 +130,7 @@ async function ingest(
     brands: {
       created: brandResult.brands_created,
       linked: brandResult.brands_linked,
+      alkatera_linked: brandResult.brands_alkatera_linked,
       errors: brandResult.errors,
     },
     products: {

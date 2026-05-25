@@ -10,7 +10,12 @@ export interface DirectoryMatchInput {
   website?: string | null;
 }
 
-export type DirectoryMatchVia = 'exact_name' | 'alias' | 'fuzzy' | 'created';
+export type DirectoryMatchVia =
+  | 'exact_name'
+  | 'alias'
+  | 'fuzzy'
+  | 'created'
+  | 'alkatera_org';
 
 export interface DirectoryMatchResult {
   /** brand_directory.id we resolved to. */
@@ -23,6 +28,8 @@ export interface DirectoryMatchResult {
   matchVia: DirectoryMatchVia;
   /** The directory entry's canonical name. */
   canonicalName: string;
+  /** True when we resolved by matching against the alka**tera** organizations table (and not via the directory's own rows). Useful so the admin UI can call out the rescue. */
+  alkateraLinked?: boolean;
 }
 
 /**
@@ -79,8 +86,41 @@ export async function findDirectoryMatch(
 }
 
 /**
+ * Find an alka**tera** organization whose name fuzzy-matches the
+ * candidate brand. Used as a fallback when findDirectoryMatch returns
+ * null — it catches brands the LLM names slightly differently than the
+ * legal entity stored in the organizations table (e.g. brand "Warner's
+ * Distillery" vs org "Warner Edwards Distillery Ltd").
+ */
+export async function findAlkateraOrgMatch(
+  supabase: SupabaseClient,
+  displayName: string,
+  threshold: number = AUTO_LINK_THRESHOLD,
+): Promise<{ orgId: string; orgName: string; similarity: number } | null> {
+  const normalized = normalizeBrandName(displayName);
+  if (!normalized) return null;
+  const { data, error } = await supabase.rpc('match_alkatera_org', {
+    query_name: displayName,
+    similarity_threshold: threshold,
+  });
+  if (error || !Array.isArray(data) || data.length === 0) return null;
+  type Row = { id: string; name: string; similarity: number };
+  const top = (data as Row[])[0];
+  if (!top || top.similarity < threshold) return null;
+  return { orgId: top.id, orgName: top.name, similarity: top.similarity };
+}
+
+/**
  * Resolve a brand to a `brand_directory` entry, creating one if no
  * auto-link match exists.
+ *
+ * Match precedence:
+ *   1. brand_directory exact / alias / fuzzy match (match_brand_directory)
+ *   2. alka**tera** organizations fuzzy match (match_alkatera_org). If we
+ *      hit an org and a directory row already points at it, reuse that
+ *      row; otherwise insert a new directory row with alkatera_org_id
+ *      set — the verification gate auto-marks it 'verified'.
+ *   3. No match → create a fresh entry.
  *
  * Requires a service-role client to insert into brand_directory.
  */
@@ -99,6 +139,7 @@ export async function resolveOrCreateDirectoryEntry(
     throw new Error(`Brand name "${input.displayName}" normalises to an empty string`);
   }
 
+  // Pass 1: directory match.
   const match = await findDirectoryMatch(supabase, input.displayName);
   if (match) {
     return {
@@ -110,6 +151,60 @@ export async function resolveOrCreateDirectoryEntry(
     };
   }
 
+  // Pass 2: alka**tera** organizations match. Either reuse a directory
+  // row already linked to this org, or mint a new directory row pointing
+  // at the org (verification trigger will auto-verify it).
+  const orgMatch = await findAlkateraOrgMatch(supabase, input.displayName);
+  if (orgMatch) {
+    const { data: existing } = await supabase
+      .from('brand_directory')
+      .select('id, name')
+      .eq('alkatera_org_id', orgMatch.orgId)
+      .maybeSingle();
+    if (existing) {
+      return {
+        directoryId: (existing as { id: string }).id,
+        created: false,
+        similarity: orgMatch.similarity,
+        matchVia: 'alkatera_org',
+        canonicalName: (existing as { name: string }).name,
+        alkateraLinked: true,
+      };
+    }
+    // No existing directory row for this org (the trigger / backfill
+    // missed it). Mint one — it auto-verifies via the directory-
+    // verification migration trigger logic on insert.
+    const { data: minted, error: mintErr } = await supabase
+      .from('brand_directory')
+      .insert({
+        name: orgMatch.orgName,
+        normalized_name: normalizeBrandName(orgMatch.orgName),
+        website: input.website ?? null,
+        category: input.category ?? null,
+        country_of_origin: input.countryOfOrigin ?? null,
+        alkatera_org_id: orgMatch.orgId,
+        discovered_via: 'alkatera_signup',
+        verification_status: 'verified',
+        verified_at: new Date().toISOString(),
+      })
+      .select('id, name')
+      .single();
+    if (!mintErr && minted) {
+      return {
+        directoryId: (minted as { id: string }).id,
+        created: true,
+        similarity: orgMatch.similarity,
+        matchVia: 'alkatera_org',
+        canonicalName: (minted as { name: string }).name,
+        alkateraLinked: true,
+      };
+    }
+    // Fall through to a fresh create if the alkatera-linked insert
+    // failed (e.g. uniqueness collision on alkatera_org_id — race with
+    // the org-sync trigger). The matcher will catch it on the next pass.
+  }
+
+  // Pass 3: no match anywhere — create a fresh pending entry.
   const { data, error } = await supabase
     .from('brand_directory')
     .insert({

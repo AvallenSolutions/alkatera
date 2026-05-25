@@ -7,6 +7,7 @@ import {
   type SourcingFilters,
   type BatchProgress,
 } from '@/lib/admin/sourcing/find-brands';
+import { loadKnownBrandNames } from '@/lib/admin/sourcing/known-brand-names';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
@@ -160,8 +161,13 @@ async function runSearchInline(
         last_chunk_added: 0,
       },
     });
+    const knownNames = await loadKnownBrandNames(service);
+    const mergedFilters: SourcingFilters = {
+      ...filters,
+      excludeNames: [...(filters.excludeNames ?? []), ...knownNames],
+    };
     const batch = await findBrandsBatched({
-      filters,
+      filters: mergedFilters,
       targetCount,
       onChunk: async (progress: BatchProgress) => {
         const phase =

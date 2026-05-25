@@ -13,15 +13,21 @@ import { Button } from '@/components/ui/button';
 
 interface ResolvedLine {
   line: string;
-  status: 'linked' | 'created' | 'invalid';
+  status: 'linked' | 'created' | 'alkatera_linked' | 'invalid';
   brand_name: string | null;
   directory_id: string | null;
-  match_via: 'exact_name' | 'alias' | 'fuzzy' | 'created' | null;
+  match_via: 'exact_name' | 'alias' | 'fuzzy' | 'created' | 'alkatera_org' | null;
   error?: string;
 }
 
 interface ListResponse {
-  counts: { total: number; created: number; linked: number; invalid: number };
+  counts: {
+    total: number;
+    created: number;
+    linked: number;
+    alkatera_linked?: number;
+    invalid: number;
+  };
   resolved: ResolvedLine[];
   scrape_enqueue?: { queued: number; skipped_no_website: number; skipped_already_queued: number };
 }
@@ -131,6 +137,9 @@ function ListResultPanel({ result }: { result: ListResponse }) {
         <div>
           <div className="text-sm font-semibold">
             {counts.created} created, {counts.linked} linked
+            {counts.alkatera_linked && counts.alkatera_linked > 0 ? (
+              <> ({counts.alkatera_linked} via alka<strong>tera</strong> customer match)</>
+            ) : null}
             {counts.invalid > 0 && <>, {counts.invalid} couldn't be parsed</>}
           </div>
           <div className="text-xs text-muted-foreground mt-0.5">
@@ -201,14 +210,19 @@ function ListResultPanel({ result }: { result: ListResponse }) {
   );
 }
 
-function StatusPill({ status }: { status: 'linked' | 'created' | 'invalid' }) {
+function StatusPill({
+  status,
+}: {
+  status: 'linked' | 'created' | 'alkatera_linked' | 'invalid';
+}) {
   const styles =
     status === 'created'
       ? 'bg-neon-lime/15 border-neon-lime/40 text-neon-lime'
-      : status === 'linked'
-        ? 'bg-sky-400/15 border-sky-400/40 text-sky-300'
-        : 'bg-amber-300/15 border-amber-300/40 text-amber-300';
-  return (
-    <span className={`text-[10px] rounded-full border px-2 py-0.5 ${styles}`}>{status}</span>
-  );
+      : status === 'alkatera_linked'
+        ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+        : status === 'linked'
+          ? 'bg-sky-400/15 border-sky-400/40 text-sky-300'
+          : 'bg-amber-300/15 border-amber-300/40 text-amber-300';
+  const label = status === 'alkatera_linked' ? 'alkatera' : status;
+  return <span className={`text-[10px] rounded-full border px-2 py-0.5 ${styles}`}>{label}</span>;
 }

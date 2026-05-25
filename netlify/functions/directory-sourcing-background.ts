@@ -10,6 +10,7 @@ import {
   type SourcingFilters,
   type BatchProgress,
 } from '../../lib/admin/sourcing/find-brands';
+import { loadKnownBrandNames } from '../../lib/admin/sourcing/known-brand-names';
 
 /**
  * Background runner for admin brand sourcing. The Netlify -background
@@ -113,8 +114,15 @@ export const handler = async (event: {
       },
     });
 
+    const baseFilters = (job.filters ?? {}) as SourcingFilters;
+    const knownNames = await loadKnownBrandNames(supabase);
+    const mergedFilters: SourcingFilters = {
+      ...baseFilters,
+      excludeNames: [...(baseFilters.excludeNames ?? []), ...knownNames],
+    };
+
     const batch = await findBrandsBatched({
-      filters: (job.filters ?? {}) as SourcingFilters,
+      filters: mergedFilters,
       targetCount,
       onChunk: async (progress: BatchProgress) => {
         const phase =
