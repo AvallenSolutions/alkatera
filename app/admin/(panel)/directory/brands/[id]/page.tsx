@@ -24,8 +24,9 @@ import {
 } from '@/components/admin/directory/brand-awards-panel';
 import { BrandNotableFactsPanel } from '@/components/admin/directory/brand-notable-facts-panel';
 import { BrandScoreBreakdownPanel } from '@/components/admin/directory/brand-score-breakdown-panel';
-import { FIELD_DEFINITIONS, type FieldKey, type Pillar } from '@/lib/distributor/scraping/field-definitions';
+import { FIELD_DEFINITIONS, type FieldKey } from '@/lib/distributor/scraping/field-definitions';
 import { calculateVitality, type FieldValue } from '@/lib/distributor/scoring/vitality-calculator';
+import { calculateScrapedVitality } from '@/lib/distributor/scoring/scraped-vitality';
 import { EsgBreakdownPanel, type EsgSnapshot } from '@/components/shared/esg-breakdown-panel';
 
 export const dynamic = 'force-dynamic';
@@ -45,6 +46,7 @@ interface DirectoryRow {
   sustainability_score: number | null;
   completeness_score: number | null;
   score_tier: string | null;
+  scoring_mode: 'scraped' | 'alkatera' | null;
   discovery_opt_out: boolean;
   discovered_via: string;
   verification_status: 'pending' | 'verified' | 'rejected';
@@ -63,7 +65,7 @@ export default async function AdminBrandDetailPage({
     .from('brand_directory')
     .select(
       'id, name, category, country_of_origin, website, founding_year, parent_company, description, aliases, ' +
-        'alkatera_org_id, sustainability_score, completeness_score, score_tier, discovery_opt_out, discovered_via, verification_status, notable_facts, created_at, updated_at',
+        'alkatera_org_id, sustainability_score, completeness_score, score_tier, scoring_mode, discovery_opt_out, discovered_via, verification_status, notable_facts, created_at, updated_at',
     )
     .eq('id', params.id)
     .maybeSingle()) as { data: DirectoryRow | null };
@@ -155,14 +157,25 @@ export default async function AdminBrandDetailPage({
       numeric: row.field_value_numeric,
     });
   }
-  const vitality = calculateVitality(valuesMap);
+  // Two-tier scoring: brand_directory.scoring_mode drives which scorer
+  // runs here (mirrors recalculate.ts so the on-page breakdown matches
+  // the persisted sustainability_score exactly).
+  const scoringMode: 'scraped' | 'alkatera' =
+    brand.scoring_mode ?? (brand.alkatera_org_id ? 'alkatera' : 'scraped');
+  const vitality =
+    scoringMode === 'alkatera'
+      ? calculateVitality(valuesMap)
+      : calculateScrapedVitality(valuesMap);
   const REQUIRED_FIELDS_DISPLAY = [
     'carbon_intensity_kgco2e_per_litre',
     'water_usage_litres_per_litre',
     'packaging_primary_material',
     'sustainability_report_url',
   ];
-  const missingRequired = REQUIRED_FIELDS_DISPLAY.filter((k) => !valuesMap.has(k as FieldKey));
+  const missingRequired =
+    scoringMode === 'alkatera'
+      ? REQUIRED_FIELDS_DISPLAY.filter((k) => !valuesMap.has(k as FieldKey))
+      : [];
 
   // ── Certifications panel input. Every boolean cert FieldKey, with
   //    its active status + source URL (if any).
@@ -335,8 +348,9 @@ export default async function AdminBrandDetailPage({
       <BrandScoreBreakdownPanel
         overall={vitality.overall}
         tier={vitality.tier}
-        byPillar={vitality.by_pillar}
+        byPillar={vitality.by_pillar as Record<string, number>}
         missingRequired={missingRequired}
+        scoringMode={scoringMode}
       />
 
       <BrandNotableFactsPanel facts={notableFacts} />

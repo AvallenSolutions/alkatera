@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { calculateCompleteness } from './completeness-calculator';
-import { calculateVitality, type FieldValue } from './vitality-calculator';
+import { calculateVitality, type FieldValue, type ScoreTier } from './vitality-calculator';
+import { calculateScrapedVitality } from './scraped-vitality';
 import type { FieldKey, Pillar } from '../scraping/field-definitions';
 
 const PILLAR_COLUMN: Record<Pillar, string> = {
@@ -46,10 +47,13 @@ export async function recalculateCompleteness(
 ): Promise<RecalcResult | null> {
   const { data: directory } = await supabase
     .from('brand_directory')
-    .select('id')
+    .select('id, alkatera_org_id')
     .eq('id', brandDirectoryId)
     .maybeSingle();
   if (!directory) return null;
+  const scoringMode = (directory as { alkatera_org_id: string | null }).alkatera_org_id
+    ? 'alkatera'
+    : 'scraped';
 
   // Fetch the full active row set so we can grade values, not just count keys.
   const { data: rows } = await supabase
@@ -87,7 +91,14 @@ export async function recalculateCompleteness(
       numeric: row.field_value_numeric,
     });
   }
-  const vitality = calculateVitality(valuesForVitality);
+  // Dispatch by scoring mode. Scraped (non-alka**tera**) brands use the
+  // 3-pillar credit-based scorer; alka**tera** customers use the
+  // existing 6-pillar penalty-based scorer because they have full
+  // control of their own data.
+  const vitality: { overall: number; tier: ScoreTier } =
+    scoringMode === 'alkatera'
+      ? calculateVitality(valuesForVitality)
+      : calculateScrapedVitality(valuesForVitality);
 
   const snapshotRow: Record<string, unknown> = {
     brand_directory_id: brandDirectoryId,
@@ -114,6 +125,7 @@ export async function recalculateCompleteness(
       completeness_score: completeness.overall,
       sustainability_score: hasAnyFindings ? vitality.overall : null,
       score_tier: hasAnyFindings ? vitality.tier : null,
+      scoring_mode: scoringMode,
       score_updated_at: new Date().toISOString(),
     })
     .eq('id', brandDirectoryId);

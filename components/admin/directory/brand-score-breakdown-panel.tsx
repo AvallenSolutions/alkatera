@@ -1,28 +1,36 @@
 import { Info } from 'lucide-react';
-import type { Pillar } from '@/lib/distributor/scraping/field-definitions';
+
+export type ScoringMode = 'scraped' | 'alkatera';
 
 interface Props {
   overall: number | null;
   tier: string | null;
-  byPillar: Record<Pillar, number> | null;
+  /** Mode-shaped pillar map. Scraped → 3 keys (environment / social /
+   *  governance); alkatera → 6 keys (carbon / water / packaging /
+   *  agriculture / governance / corporate). */
+  byPillar: Record<string, number> | null;
   missingRequired: string[];
+  scoringMode: ScoringMode;
 }
 
-const PILLAR_ORDER: Pillar[] = [
+const SCRAPED_PILLAR_ORDER = ['environment', 'social', 'governance'] as const;
+const ALKATERA_PILLAR_ORDER = [
   'carbon',
   'water',
   'packaging',
   'agriculture',
   'governance',
   'corporate',
-];
+] as const;
 
-const PILLAR_LABEL: Record<Pillar, string> = {
+const PILLAR_LABEL: Record<string, string> = {
+  environment: 'Environment',
+  social: 'Social',
+  governance: 'Governance',
   carbon: 'Carbon',
   water: 'Water',
   packaging: 'Packaging',
   agriculture: 'Agriculture',
-  governance: 'Governance',
   corporate: 'Corporate',
 };
 
@@ -40,13 +48,23 @@ const REQUIRED_LABEL: Record<string, string> = {
  * Avoids hand-coding the explanation in copy: the panel surfaces the
  * inputs to the calculator so it's self-documenting.
  */
-export function BrandScoreBreakdownPanel({ overall, tier, byPillar, missingRequired }: Props) {
+export function BrandScoreBreakdownPanel({
+  overall,
+  tier,
+  byPillar,
+  missingRequired,
+  scoringMode,
+}: Props) {
+  const pillarOrder = scoringMode === 'alkatera' ? ALKATERA_PILLAR_ORDER : SCRAPED_PILLAR_ORDER;
   return (
     <div className="rounded-xl border border-border/60 bg-card/40 p-5 space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm font-semibold flex items-center gap-2">
           <Info className="h-4 w-4 text-muted-foreground" />
           Score breakdown
+          <span className="ml-1 text-[10px] uppercase tracking-wider text-muted-foreground font-normal">
+            {scoringMode === 'alkatera' ? 'alkatera mode · 6 pillars' : 'scraped mode · 3 pillars'}
+          </span>
         </div>
         <div className="text-right">
           <div className="text-2xl font-semibold tabular-nums leading-none">
@@ -62,7 +80,7 @@ export function BrandScoreBreakdownPanel({ overall, tier, byPillar, missingRequi
 
       {byPillar && (
         <ul className="space-y-1.5">
-          {PILLAR_ORDER.map((p) => {
+          {pillarOrder.map((p) => {
             const score = Math.max(0, Math.min(100, Math.round(byPillar[p] ?? 0)));
             return (
               <li key={p} className="space-y-0.5">
@@ -90,7 +108,7 @@ export function BrandScoreBreakdownPanel({ overall, tier, byPillar, missingRequi
         </ul>
       )}
 
-      {missingRequired.length > 0 && (
+      {scoringMode === 'alkatera' && missingRequired.length > 0 && (
         <div className="rounded-lg border border-amber-300/30 bg-amber-300/5 px-3 py-2 text-[11px]">
           <div className="font-semibold text-amber-200 mb-1">
             Missing required — these drag the score the most:
@@ -104,11 +122,23 @@ export function BrandScoreBreakdownPanel({ overall, tier, byPillar, missingRequi
       )}
 
       <p className="text-[11px] text-muted-foreground leading-relaxed">
-        The score is a weighted average across every sustainability field. Each field is graded
-        0–100 (boolean certs are 100 or 0; carbon intensity, water usage etc. grade against
-        industry bands). Missing required fields score 0; missing optional fields score 10. A
-        B Corp badge alone can't lift the score when the carbon, water and packaging numbers
-        are empty — those are the heaviest weights.
+        {scoringMode === 'alkatera' ? (
+          <>
+            <strong>alka<strong>tera</strong> mode.</strong> Weighted average across every field
+            in the model. Required fields (carbon intensity, water usage, packaging material,
+            sustainability report) score 0 when missing because alka<strong>tera</strong>
+            customers control their own data and a gap there is a real signal. Boolean certs
+            are 100 or 0; carbon intensity, water usage etc. grade against industry bands.
+          </>
+        ) : (
+          <>
+            <strong>Scraped mode.</strong> Credit-based weighted mean across three pillars. Each
+            field that has data contributes its weighted grade; missing fields contribute zero
+            (no penalty either way). Fairer for brands that haven't published full disclosure
+            but carry real certification evidence. Every contributing field cites a source URL
+            so the score is fully auditable.
+          </>
+        )}
       </p>
     </div>
   );
