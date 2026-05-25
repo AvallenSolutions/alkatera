@@ -8,6 +8,10 @@ import {
   BrandLinkAlkateraControl,
   type UnlinkedOrg,
 } from '@/components/admin/directory/brand-link-alkatera-control';
+import {
+  BrandMergeControl,
+  type DuplicateCandidate,
+} from '@/components/admin/directory/brand-merge-control';
 import { EsgBreakdownPanel, type EsgSnapshot } from '@/components/shared/esg-breakdown-panel';
 
 export const dynamic = 'force-dynamic';
@@ -65,6 +69,7 @@ export default async function AdminBrandDetailPage({
     { count: listingCount },
     { data: snapshotRow },
     unlinkedOrgs,
+    duplicateCandidates,
   ] = await Promise.all([
     supabase
       .from('product_directory')
@@ -90,6 +95,7 @@ export default async function AdminBrandDetailPage({
     // manual "link to alkatera customer" control for unlinked directory
     // rows. Skip the query when the row is already linked.
     brand.alkatera_org_id ? Promise.resolve([] as UnlinkedOrg[]) : loadUnlinkedOrgs(supabase),
+    loadDuplicateCandidates(supabase, brand.id),
   ]);
   type ProductRow = {
     id: string;
@@ -204,6 +210,14 @@ export default async function AdminBrandDetailPage({
         />
       )}
 
+      {duplicateCandidates.length > 0 && (
+        <BrandMergeControl
+          canonicalId={brand.id}
+          canonicalName={brand.name}
+          candidates={duplicateCandidates}
+        />
+      )}
+
       {snapshot && <EsgBreakdownPanel snapshot={snapshot} accent="lime" />}
 
       <BrandDiscoveryOptOutToggle
@@ -258,6 +272,82 @@ export default async function AdminBrandDetailPage({
       </div>
     </div>
   );
+}
+
+/**
+ * Find directory rows that look like duplicates of the given canonical
+ * row. Candidates: rows that share the normalised name (exact dupes
+ * after the descriptor stripping) plus fuzzy matches >=0.85. Limit to
+ * a small set so the UI stays focused.
+ */
+async function loadDuplicateCandidates(
+  supabase: SupabaseClient,
+  canonicalId: string,
+): Promise<DuplicateCandidate[]> {
+  const { data: canonical } = await supabase
+    .from('brand_directory')
+    .select('id, name, normalized_name')
+    .eq('id', canonicalId)
+    .maybeSingle();
+  if (!canonical) return [];
+  const canon = canonical as { id: string; name: string; normalized_name: string };
+
+  // Use match_brand_directory to find the top candidates; filter out
+  // the canonical row itself.
+  const { data } = await supabase.rpc('match_brand_directory', {
+    query_name: canon.name,
+    similarity_threshold: 0.85,
+  });
+  const matches = (data ?? []) as Array<{
+    id: string;
+    name: string;
+    normalized_name: string;
+    alkatera_org_id: string | null;
+    similarity: number;
+    match_via: 'exact_name' | 'alias' | 'fuzzy';
+  }>;
+
+  const candidates = matches.filter((m) => m.id !== canon.id);
+  if (candidates.length === 0) return [];
+
+  const ids = candidates.map((c) => c.id);
+  const [{ data: details }, { data: productRows }] = await Promise.all([
+    supabase
+      .from('brand_directory')
+      .select('id, verification_status, discovered_via')
+      .in('id', ids),
+    supabase
+      .from('product_directory')
+      .select('brand_directory_id')
+      .in('brand_directory_id', ids),
+  ]);
+  type DetailRow = {
+    id: string;
+    verification_status: 'pending' | 'verified' | 'rejected';
+    discovered_via: string;
+  };
+  const detailById = new Map<string, DetailRow>();
+  for (const d of (details ?? []) as DetailRow[]) detailById.set(d.id, d);
+  const productCounts = new Map<string, number>();
+  for (const p of (productRows ?? []) as Array<{ brand_directory_id: string }>) {
+    productCounts.set(p.brand_directory_id, (productCounts.get(p.brand_directory_id) ?? 0) + 1);
+  }
+
+  return candidates.map((c) => {
+    const detail = detailById.get(c.id);
+    return {
+      id: c.id,
+      name: c.name,
+      normalized_name: c.normalized_name,
+      alkatera_org_id: c.alkatera_org_id,
+      verification_status: detail?.verification_status ?? 'pending',
+      discovered_via: detail?.discovered_via ?? 'manual',
+      similarity: c.similarity,
+      match_via:
+        c.match_via === 'exact_name' || c.match_via === 'alias' ? 'exact' : 'fuzzy',
+      product_count: productCounts.get(c.id) ?? 0,
+    };
+  });
 }
 
 /**
