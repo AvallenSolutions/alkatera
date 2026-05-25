@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Loader2,
@@ -13,7 +13,6 @@ import {
 import { Button } from '@/components/ui/button';
 
 interface DeepEnrichResponse {
-  ok: true;
   summary: string | null;
   brand: { fields_updated: number; patch: Record<string, unknown> };
   credentials: { written: number; errors: string[] };
@@ -46,34 +45,83 @@ interface Props {
 export function BrandDeepEnrichControl({ brandId, brandName, hasWebsite }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [phase, setPhase] = useState<string | null>(null);
   const [result, setResult] = useState<DeepEnrichResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const cancelledRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      cancelledRef.current = true;
+    };
+  }, []);
 
   async function run() {
+    cancelledRef.current = false;
     setBusy(true);
     setError(null);
     setResult(null);
+    setPhase('Queued…');
     try {
       const res = await fetch(`/api/admin/directory/brands/${brandId}/deep-enrich`, {
         method: 'POST',
       });
-      const body = (await res.json().catch(() => ({}))) as
-        | DeepEnrichResponse
-        | { error?: string; detail?: string };
-      if (!res.ok || !('ok' in body)) {
-        setError(
-          (body as { detail?: string; error?: string }).detail ??
-            (body as { detail?: string; error?: string }).error ??
-            `HTTP ${res.status}`,
-        );
+      const body = (await res.json().catch(() => ({}))) as {
+        jobId?: string;
+        error?: string;
+        detail?: string;
+      };
+      if (!res.ok || !body.jobId) {
+        setError(body.detail ?? body.error ?? `HTTP ${res.status}`);
+        setBusy(false);
+        setPhase(null);
         return;
       }
-      setResult(body);
-      router.refresh();
+      await pollJob(body.jobId);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Enrich failed');
-    } finally {
       setBusy(false);
+      setPhase(null);
+    }
+  }
+
+  async function pollJob(jobId: string) {
+    // Up to 15 minutes — the bg fn has a 15-min window. 3s interval.
+    const deadline = Date.now() + 15 * 60 * 1000;
+    while (!cancelledRef.current && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 3000));
+      if (cancelledRef.current) return;
+      let body: {
+        status?: string;
+        phase_message?: string | null;
+        result?: DeepEnrichResponse;
+        error?: string;
+      };
+      try {
+        const res = await fetch(`/api/admin/directory/deep-enrich/${jobId}`);
+        body = await res.json();
+      } catch {
+        continue; // transient — keep polling
+      }
+      if (body.phase_message) setPhase(body.phase_message);
+      if (body.status === 'done' && body.result) {
+        setResult(body.result);
+        setBusy(false);
+        setPhase(null);
+        router.refresh();
+        return;
+      }
+      if (body.status === 'error') {
+        setError(body.error ?? 'Enrich failed');
+        setBusy(false);
+        setPhase(null);
+        return;
+      }
+    }
+    if (!cancelledRef.current) {
+      setError("Timed out waiting for results — the job may still finish. Refresh the page to see what landed.");
+      setBusy(false);
+      setPhase(null);
     }
   }
 
@@ -115,6 +163,14 @@ export function BrandDeepEnrichControl({ brandId, brandName, hasWebsite }: Props
           </>
         )}
       </Button>
+
+      {busy && (
+        <p className="text-[11px] text-muted-foreground">
+          {phase ?? 'Working…'} Multi-source enrichment runs in the background and can take a
+          minute or two while we check certifier directories, sustainability databases, and the
+          brand's own pages. You can leave this page open.
+        </p>
+      )}
 
       {error && (
         <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs flex items-start gap-2">
