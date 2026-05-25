@@ -10,7 +10,10 @@ import { scoreConfidence } from './confidence-scorer';
 import { coerceFieldValue, type FieldKey } from './field-definitions';
 import { delay } from './http';
 import { recalculateCompleteness } from '../scoring/recalculate';
-import { resolveOrCreateProductEntry } from '../directory/product-matcher';
+import {
+  resolveOrCreateProductEntrySmart,
+  clearProductDedupCache,
+} from '../directory/product-dedup';
 import { ingestDiscoveredPdf } from './pdf-ingester';
 
 const DELAY_BETWEEN_SOURCES_MS = 2_000;
@@ -170,22 +173,34 @@ export async function runBrandAgent(args: RunBrandAgentArgs): Promise<RunBrandAg
     }
   }
 
-  // Persist crawled products into product_directory. Matcher handles
-  // dedup against existing rows (by GTIN or normalised name) so repeat
-  // scrapes don't fan out duplicates.
+  // Persist crawled products into product_directory. Smart matcher
+  // handles GTIN + normalised + LLM-verified dedup against existing
+  // rows so repeat scrapes (or names that diverge across pages) don't
+  // fan out duplicates.
   if (crawledProducts.length > 0) {
+    // Make sure this run sees a fresh per-brand cache — the matcher
+    // caches the existing-products list within a single request to
+    // avoid hammering the DB.
+    clearProductDedupCache();
     const seenInRun = new Set<string>();
     for (const p of crawledProducts) {
       const key = p.name.trim().toLowerCase();
       if (!key || seenInRun.has(key)) continue;
       seenInRun.add(key);
       try {
-        const result = await resolveOrCreateProductEntry(supabase, {
-          brandDirectoryId,
-          displayName: p.name,
-          category: p.category ?? null,
-          discoveredVia: 'manual',
-        });
+        const result = await resolveOrCreateProductEntrySmart(
+          supabase,
+          {
+            brandDirectoryId,
+            brandName: snapshot.name,
+            displayName: p.name,
+            category: p.category ?? null,
+            abv: p.abv ?? null,
+            containerSizeMl: p.container_size_ml ?? null,
+            containerFormat: p.container_format ?? null,
+          },
+          { discoveredVia: 'manual' },
+        );
         if (result.created) productsCreated += 1;
         else productsLinked += 1;
       } catch (err: unknown) {

@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { requireAlkateraAdmin } from '@/lib/admin/auth';
 import { deepEnrichBrand } from '@/lib/admin/sourcing/deep-enrich';
-import { resolveOrCreateProductEntry } from '@/lib/distributor/directory/product-matcher';
+import {
+  resolveOrCreateProductEntrySmart,
+  clearProductDedupCache,
+} from '@/lib/distributor/directory/product-dedup';
 import { ingestDiscoveredPdf } from '@/lib/distributor/scraping/pdf-ingester';
 import { recalculateCompleteness } from '@/lib/distributor/scoring/recalculate';
 
@@ -154,8 +157,12 @@ export async function POST(_request: Request, { params }: { params: { id: string
   let productsCreated = 0;
   let productsLinked = 0;
   let productsSkippedByMap = 0;
+  let productsSkippedByLlm = 0;
   const productErrors: string[] = [];
   const productSeen = new Set<string>();
+  // Reset the smart-matcher cache so it sees a fresh existing-products
+  // snapshot for this brand.
+  clearProductDedupCache();
   for (const p of enriched.products) {
     if (p.matches_existing_id) {
       productsSkippedByMap += 1;
@@ -165,13 +172,21 @@ export async function POST(_request: Request, { params }: { params: { id: string
     if (!key || productSeen.has(key)) continue;
     productSeen.add(key);
     try {
-      const result = await resolveOrCreateProductEntry(auth.service, {
-        brandDirectoryId: directory.id,
-        displayName: p.name,
-        category: p.category ?? null,
-        discoveredVia: 'manual',
-      });
+      const result = await resolveOrCreateProductEntrySmart(
+        auth.service,
+        {
+          brandDirectoryId: directory.id,
+          brandName: directory.name,
+          displayName: p.name,
+          category: p.category ?? null,
+          abv: p.abv ?? null,
+          containerSizeMl: p.container_size_ml ?? null,
+          containerFormat: p.container_format ?? null,
+        },
+        { discoveredVia: 'manual' },
+      );
       if (result.created) productsCreated += 1;
+      else if (result.llmDeduped) productsSkippedByLlm += 1;
       else productsLinked += 1;
     } catch (err: unknown) {
       productErrors.push(`${p.name}: ${err instanceof Error ? err.message : String(err)}`);
@@ -236,7 +251,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
     products: {
       created: productsCreated,
       linked: productsLinked,
-      skipped_by_dedup: productsSkippedByMap,
+      skipped_by_dedup: productsSkippedByMap + productsSkippedByLlm,
       errors: productErrors,
     },
     documents: { ingested: docsIngested, skipped: docsSkipped, details: docDetails },

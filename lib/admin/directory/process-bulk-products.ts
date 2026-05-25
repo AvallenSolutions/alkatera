@@ -1,5 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { resolveOrCreateProductEntry } from '@/lib/distributor/directory/product-matcher';
+import {
+  resolveOrCreateProductEntrySmart,
+  clearProductDedupCache,
+} from '@/lib/distributor/directory/product-dedup';
 import { normalizeBrandName } from '@/lib/distributor/brand-normalizer';
 import type { ProductFieldKey } from './field-specs';
 
@@ -95,14 +98,26 @@ export async function processBulkProducts(args: Args): Promise<BulkProductsResul
     const format = pick(row, mapping.container_format);
 
     try {
-      const resolved = await resolveOrCreateProductEntry(service, {
-        brandDirectoryId,
-        displayName: productName,
-        gtin,
-        category,
-        discoveredByDistributorOrgId: null,
-        discoveredVia: 'manual',
-      });
+      const resolved = await resolveOrCreateProductEntrySmart(
+        service,
+        {
+          brandDirectoryId,
+          brandName,
+          displayName: productName,
+          gtin,
+          category,
+          abv: parseNumberOrNull(abvRaw),
+          containerSizeMl: parseNumberOrNull(sizeMlRaw),
+          containerFormat: format,
+        },
+        {
+          discoveredByDistributorOrgId: null,
+          discoveredVia: 'manual',
+          // Big admin CSVs can run dozens of LLM calls — keep them on,
+          // it's the whole point of the smart matcher. processBulkBrands
+          // already clears the cache once per row though.
+        },
+      );
       if (resolved.created) result.products_created += 1;
       else result.products_linked += 1;
 
@@ -149,6 +164,12 @@ export async function processBulkProducts(args: Args): Promise<BulkProductsResul
   }
 
   return result;
+}
+
+function parseNumberOrNull(value: string | null): number | null {
+  if (!value) return null;
+  const n = parseFloat(value.replace(/[^0-9.-]/g, ''));
+  return Number.isFinite(n) ? n : null;
 }
 
 function pick(row: Record<string, string>, column: string | undefined): string | null {
