@@ -16,8 +16,18 @@ describe('normalizeBrandName', () => {
 
   it('removes common legal suffixes', () => {
     expect(normalizeBrandName('Château Margaux SAS')).toBe('chateau margaux');
-    expect(normalizeBrandName('Acme Distillery Ltd')).toBe('acme distillery');
     expect(normalizeBrandName('Beam Suntory Inc')).toBe('beam suntory');
+  });
+
+  it('strips producer + product descriptors so brand variants collapse', () => {
+    // The bare brand is the canonical key; "Distillery", "Rum", "Spirits"
+    // and friends are descriptors that don't change brand identity.
+    expect(normalizeBrandName('Acme Distillery Ltd')).toBe('acme');
+    expect(normalizeBrandName('Two Drifters Rum')).toBe(
+      normalizeBrandName('Two Drifters Distillery'),
+    );
+    expect(normalizeBrandName('Warner Edwards Distillery Ltd')).toBe('warner edwards');
+    expect(normalizeBrandName('Sapling Spirits')).toBe('sapling');
   });
 
   it('treats apostrophe variants as identical', () => {

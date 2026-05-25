@@ -241,8 +241,11 @@ describe('processSkuList — Phase 4 dedup-on-write', () => {
     const profileInserts = inserts.filter((i) => i.table === 'brand_profiles');
     expect(profileInserts).toHaveLength(0);
     // Instead, the existing listing was updated with the latest spelling.
+    // Normalised collapses to "avallen" because the descriptor "Cognac"
+    // is stripped — the matcher is right to treat "Avallen Cognac" and
+    // "Avallen" as the same brand.
     expect(updates).toHaveLength(1);
     expect(updates[0].patch.name).toBe('Avallen Cognac');
-    expect(updates[0].patch.normalized_name).toBe('avallen cognac');
+    expect(updates[0].patch.normalized_name).toBe('avallen');
   });
 });

@@ -1,7 +1,13 @@
 import type { ColumnMapping, ColumnMappingField } from '@/types/distributor';
 
+// Legal-entity suffixes + drinks-industry producer/product descriptors.
+// Stripped anywhere in the string (the regex uses \b…\b so partial
+// matches inside another word don't fire). Kept in sync with the SQL
+// brand_directory_normalize function. Stripping rum/gin/vodka/etc lets
+// "Two Drifters Rum" and "Two Drifters Distillery" collapse to the
+// same canonical key — see migration 20262701600000.
 const LEGAL_SUFFIX_PATTERN =
-  /\b(sas|s\.a\.s\.|sa|s\.a\.|sarl|s\.a\.r\.l\.|srl|s\.r\.l\.|spa|s\.p\.a\.|ltd|limited|llc|l\.l\.c\.|gmbh|bv|b\.v\.|inc|incorporated|plc|pty|co|company|kg|ag)\b/gi;
+  /\b(sas|s\.a\.s\.|sa|s\.a\.|sarl|s\.a\.r\.l\.|srl|s\.r\.l\.|spa|s\.p\.a\.|ltd|limited|llc|l\.l\.c\.|gmbh|bv|b\.v\.|inc|incorporated|plc|pty|co|company|kg|ag|distillery|distilleries|distillers|distilling|brewery|breweries|brewers|brewing|winery|wineries|winemakers|vineyard|vineyards|cellars|rum|gin|vodka|whisky|whiskey|bourbon|scotch|brandy|cognac|tequila|mezcal|spirits|spirit|drinks|drink|beverages|beverage)\b/gi;
 
 const DIACRITIC_PATTERN = /[̀-ͯ]/g;
 
