@@ -64,11 +64,40 @@ export interface EnrichedProduct extends CrawledProduct {
   matches_existing_id: string | null;
 }
 
+export type AwardMedalTier =
+  | 'gold'
+  | 'silver'
+  | 'bronze'
+  | 'platinum'
+  | 'best_in_class'
+  | 'master'
+  | 'double_gold'
+  | 'finalist'
+  | 'winner'
+  | 'other';
+
+export interface EnrichedAward {
+  awarding_body: string;
+  award_name: string;
+  medal_tier: AwardMedalTier | null;
+  year: number | null;
+  source_url: string | null;
+  notes: string | null;
+  /** id of an existing product the award applies to, or null for
+   *  brand-level awards. The endpoint validates against the brand's
+   *  product list before persisting. */
+  matches_product_id: string | null;
+}
+
 export interface DeepEnrichResult {
   brand: EnrichedBrandFields;
   credentials: EnrichedCredential[];
   products: EnrichedProduct[];
   documents: CrawledDocument[];
+  awards: EnrichedAward[];
+  /** Short narrative facts ("Carbon negative since 2019", "First B Corp
+   *  distillery in Devon"). Brand-level. */
+  notable_facts: string[];
   summary?: string;
   error?: string;
 }
@@ -80,6 +109,18 @@ const VALID_KINDS = new Set<CrawledDocumentKind>([
   'lca',
   'sustainability_report',
   'datasheet',
+  'other',
+]);
+const VALID_MEDALS = new Set<AwardMedalTier>([
+  'gold',
+  'silver',
+  'bronze',
+  'platinum',
+  'best_in_class',
+  'master',
+  'double_gold',
+  'finalist',
+  'winner',
   'other',
 ]);
 
@@ -144,6 +185,8 @@ export async function deepEnrichBrand(args: DeepEnrichArgs): Promise<DeepEnrichR
     credentials: sanitiseCredentials(parsed.credentials),
     products: sanitiseProducts(parsed.products, fallbackSource, args.existingProducts),
     documents: sanitiseDocuments(parsed.documents, fallbackSource),
+    awards: sanitiseAwards(parsed.awards, args.existingProducts),
+    notable_facts: sanitiseNotableFacts(parsed.notable_facts),
     summary: typeof parsed.summary === 'string' ? parsed.summary : undefined,
   };
 }
@@ -154,6 +197,8 @@ function EMPTY_RESULT(extra: { error?: string }): DeepEnrichResult {
     credentials: [],
     products: [],
     documents: [],
+    awards: [],
+    notable_facts: [],
     ...extra,
   };
 }
@@ -247,8 +292,28 @@ Output ONE JSON object and NOTHING else (no markdown, no commentary):
   ],
   "documents": [
     { "url": "https://…/lightly-spiced-rum-epd.pdf", "title": "Two Drifters Lightly Spiced Rum EPD", "kind": "epd" }
+  ],
+  "awards": [
+    {
+      "awarding_body": "International Wine & Spirit Competition",
+      "award_name": "Gold — Spiced Rum",
+      "medal_tier": "gold",
+      "year": 2024,
+      "source_url": "https://www.iwsc.net/...",
+      "notes": "Optional 1-line context",
+      "matches_product_id": "uuid-of-the-product-this-award-belongs-to-or-null"
+    }
+  ],
+  "notable_facts": [
+    "Carbon negative since 2019",
+    "First B Corp rum distillery in the UK",
+    "All bottles use 100% British glass"
   ]
 }
+
+Award sources to search: IWSC (iwsc.net), International Spirits Challenge (internationalspiritschallenge.com), San Francisco World Spirits Competition (sfwsc.com), World Whisky Awards, World Gin Awards, World Wine Awards, Decanter (decanter.com), Wine Spectator, Wine Enthusiast, World Beer Awards, Beverage Testing Institute, The Drinks Business awards, The Spirits Business awards. Cite a URL for every award.
+
+Notable facts guidance: short, verifiable, sustainability- or provenance-relevant. Skip marketing puffery ("the best gin in the world"). Good examples: "Carbon negative since 2019", "First B Corp distillery in Devon", "100% British glass packaging", "Partnered with Cool Earth for rainforest protection". 1-6 facts. Skip the section if you can't find any.
 
 Hard rules:
 - Only include a credential row if you actually verified the value. Skip the row otherwise. Do not include 'unknown' / 'maybe' entries.
@@ -259,7 +324,9 @@ Hard rules:
 - "container_size_ml": 70cl = 700, 1L = 1000.
 - Products: "matches_existing_id" must be one of the ids listed above (when the finding refers to the same product) or null (when it's genuinely new). When in doubt about size variants, prefer to MATCH rather than CREATE — operations can split later if needed.
 - Documents: include only PDF URLs you can verify. Prefer the direct .pdf URL over a landing page.
-- British English. Never use em dashes in the description.`;
+- Awards: every award must cite an authoritative source URL. Skip rumour. "matches_product_id" must be one of the existing-product ids above (when the award is for that specific SKU) or null (brand-level award). When unsure, prefer null.
+- Notable facts: short single-line strings. Verifiable. No em dashes.
+- British English.`;
 }
 
 function extractJson(text: string): {
@@ -268,6 +335,8 @@ function extractJson(text: string): {
   credentials?: unknown;
   products?: unknown;
   documents?: unknown;
+  awards?: unknown;
+  notable_facts?: unknown;
 } | null {
   if (!text) return null;
   const start = text.indexOf('{');
@@ -455,6 +524,59 @@ function sanitiseDocuments(input: unknown, fallbackSourceUrl: string): CrawledDo
       kind,
       source_url: fallbackSourceUrl,
     });
+  }
+  return out;
+}
+
+function sanitiseAwards(input: unknown, existingProducts: ExistingProductRef[]): EnrichedAward[] {
+  if (!Array.isArray(input)) return [];
+  const validProductIds = new Set(existingProducts.map((p) => p.id));
+  const out: EnrichedAward[] = [];
+  const seen = new Set<string>();
+  for (const raw of input) {
+    if (!raw || typeof raw !== 'object') continue;
+    const r = raw as Record<string, unknown>;
+    const awardingBody = str(r.awarding_body);
+    const awardName = str(r.award_name);
+    if (!awardingBody || !awardName) continue;
+    const year = num(r.year);
+    const productIdRaw = str(r.matches_product_id);
+    const productId = productIdRaw && validProductIds.has(productIdRaw) ? productIdRaw : null;
+    const key = `${productId ?? ''}|${awardingBody.toLowerCase()}|${awardName.toLowerCase()}|${year ?? ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const medalRaw = str(r.medal_tier)?.toLowerCase();
+    const medal = medalRaw && VALID_MEDALS.has(medalRaw as AwardMedalTier)
+      ? (medalRaw as AwardMedalTier)
+      : null;
+    const sourceUrl = str(r.source_url);
+    out.push({
+      awarding_body: awardingBody,
+      award_name: awardName,
+      medal_tier: medal,
+      year: year && year > 1900 && year < 2100 ? Math.round(year) : null,
+      source_url: sourceUrl && /^https?:\/\//i.test(sourceUrl) ? sourceUrl : null,
+      notes: str(r.notes),
+      matches_product_id: productId,
+    });
+  }
+  return out;
+}
+
+function sanitiseNotableFacts(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of input) {
+    const v = str(raw);
+    if (!v) continue;
+    const trimmed = v.replace(/\s+/g, ' ').trim();
+    if (!trimmed || trimmed.length > 200) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(trimmed);
+    if (out.length >= 6) break;
   }
   return out;
 }

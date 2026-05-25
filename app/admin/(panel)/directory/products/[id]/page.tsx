@@ -10,6 +10,8 @@ import {
   Building2,
 } from 'lucide-react';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { BrandAwardsPanel, type AwardRow } from '@/components/admin/directory/brand-awards-panel';
+import { BrandNotableFactsPanel } from '@/components/admin/directory/brand-notable-facts-panel';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +30,7 @@ interface ProductRow {
   completeness_score: number | null;
   alkatera_product_id: string | null;
   discovered_via: string;
+  notable_facts: string[] | null;
   last_synced_at: string | null;
   created_at: string;
   updated_at: string;
@@ -45,7 +48,7 @@ export default async function AdminProductDetailPage({
     .select(
       'id, name, gtin, brand_directory_id, category, abv, container_size_ml, container_format, ' +
         'recipe_overview, embodied_carbon_kgco2e, embodied_water_l, completeness_score, ' +
-        'alkatera_product_id, discovered_via, last_synced_at, created_at, updated_at',
+        'alkatera_product_id, discovered_via, notable_facts, last_synced_at, created_at, updated_at',
     )
     .eq('id', params.id)
     .maybeSingle()) as { data: ProductRow | null };
@@ -61,24 +64,33 @@ export default async function AdminProductDetailPage({
   }
   const product = productData;
 
-  const [{ data: brandRow }, { count: listingCount }, { data: findingRows }] =
-    await Promise.all([
-      supabase
-        .from('brand_directory')
-        .select('id, name, alkatera_org_id')
-        .eq('id', product.brand_directory_id)
-        .maybeSingle(),
-      supabase
-        .from('brand_skus')
-        .select('id', { count: 'exact', head: true })
-        .eq('product_directory_id', product.id),
-      supabase
-        .from('scraped_brand_data')
-        .select('field_key, field_value, source_name, scraped_at, confidence')
-        .eq('product_directory_id', product.id)
-        .is('superseded_by', null)
-        .order('confidence', { ascending: false }),
-    ]);
+  const [
+    { data: brandRow },
+    { count: listingCount },
+    { data: findingRows },
+    { data: awardRows },
+  ] = await Promise.all([
+    supabase
+      .from('brand_directory')
+      .select('id, name, alkatera_org_id')
+      .eq('id', product.brand_directory_id)
+      .maybeSingle(),
+    supabase
+      .from('brand_skus')
+      .select('id', { count: 'exact', head: true })
+      .eq('product_directory_id', product.id),
+    supabase
+      .from('scraped_brand_data')
+      .select('field_key, field_value, source_name, scraped_at, confidence')
+      .eq('product_directory_id', product.id)
+      .is('superseded_by', null)
+      .order('confidence', { ascending: false }),
+    supabase
+      .from('brand_awards')
+      .select('id, awarding_body, award_name, medal_tier, year, source_url, notes, product_directory_id')
+      .eq('product_directory_id', product.id)
+      .order('year', { ascending: false, nullsFirst: false }),
+  ]);
 
   const brand = brandRow as { id: string; name: string; alkatera_org_id: string | null } | null;
   type Finding = {
@@ -114,6 +126,22 @@ export default async function AdminProductDetailPage({
     }
   }
   const findings = Array.from(bestByField.values());
+
+  type AwardRowDb = {
+    id: string;
+    awarding_body: string;
+    award_name: string;
+    medal_tier: AwardRow['medal_tier'];
+    year: number | null;
+    source_url: string | null;
+    notes: string | null;
+    product_directory_id: string | null;
+  };
+  const awards: AwardRow[] = ((awardRows ?? []) as AwardRowDb[]).map((a) => ({
+    ...a,
+    product_name: product.name,
+  }));
+  const notableFacts = product.notable_facts ?? [];
 
   return (
     <div className="space-y-6">
@@ -212,6 +240,10 @@ export default async function AdminProductDetailPage({
           </div>
         )}
       </div>
+
+      <BrandNotableFactsPanel facts={notableFacts} />
+
+      <BrandAwardsPanel awards={awards} />
 
       <div className="rounded-xl border border-border/60 bg-card/40 overflow-hidden">
         <div className="px-5 pt-5 pb-3 text-sm font-semibold">

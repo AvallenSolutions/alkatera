@@ -9,6 +9,7 @@ import { ingestDiscoveredPdf } from '@/lib/distributor/scraping/pdf-ingester';
 import { recalculateCompleteness } from '@/lib/distributor/scoring/recalculate';
 import type {
   DeepEnrichResult,
+  EnrichedAward,
   EnrichedCredential,
   EnrichedProduct,
 } from '@/lib/admin/sourcing/deep-enrich';
@@ -105,6 +106,8 @@ interface IngestSummary {
     skipped: number;
     details: Array<{ url: string; status: string; reason?: string }>;
   };
+  awards: { added: number; existing: number; errors: string[] };
+  notable_facts: { added: number; existing: number };
   enrich_error: string | null;
 }
 
@@ -248,7 +251,53 @@ async function persistEnriched(
     }
   }
 
-  // ── 5. Recalc completeness so scores update immediately. ──
+  // ── 5. Awards. Upsert each row keyed by (brand, product, body, name, year). ──
+  let awardsAdded = 0;
+  let awardsExisting = 0;
+  const awardErrors: string[] = [];
+  for (const award of enriched.awards as EnrichedAward[]) {
+    try {
+      const wasAdded = await persistAward(service, brandDirectoryId, award);
+      if (wasAdded) awardsAdded += 1;
+      else awardsExisting += 1;
+    } catch (err: unknown) {
+      awardErrors.push(
+        `${award.awarding_body} ${award.award_name}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  // ── 6. Notable facts. Append to the directory column, dedup by case-insensitive match. ──
+  let notableAdded = 0;
+  let notableExisting = 0;
+  if (enriched.notable_facts.length > 0) {
+    const { data: current } = await service
+      .from('brand_directory')
+      .select('notable_facts')
+      .eq('id', brandDirectoryId)
+      .maybeSingle();
+    const existing = ((current as { notable_facts?: string[] } | null)?.notable_facts ?? []);
+    const existingLower = new Set(existing.map((f) => f.toLowerCase()));
+    const toAdd: string[] = [];
+    for (const fact of enriched.notable_facts) {
+      if (existingLower.has(fact.toLowerCase())) {
+        notableExisting += 1;
+        continue;
+      }
+      existingLower.add(fact.toLowerCase());
+      toAdd.push(fact);
+    }
+    if (toAdd.length > 0) {
+      const next = [...existing, ...toAdd];
+      const { error } = await service
+        .from('brand_directory')
+        .update({ notable_facts: next, updated_at: new Date().toISOString() })
+        .eq('id', brandDirectoryId);
+      if (!error) notableAdded = toAdd.length;
+    }
+  }
+
+  // ── 7. Recalc completeness so scores update immediately. ──
   try {
     await recalculateCompleteness(service, brandDirectoryId);
   } catch {
@@ -266,8 +315,46 @@ async function persistEnriched(
       errors: productErrors,
     },
     documents: { ingested: docsIngested, skipped: docsSkipped, details: docDetails },
+    awards: { added: awardsAdded, existing: awardsExisting, errors: awardErrors },
+    notable_facts: { added: notableAdded, existing: notableExisting },
     enrich_error: enriched.error ?? null,
   };
+}
+
+async function persistAward(
+  service: SupabaseClient,
+  brandDirectoryId: string,
+  award: EnrichedAward,
+): Promise<boolean> {
+  // Manual dedup check so we can return added/existing counts without
+  // a per-row upsert race.
+  const { data: existing } = await service
+    .from('brand_awards')
+    .select('id')
+    .eq('brand_directory_id', brandDirectoryId)
+    .filter(
+      'product_directory_id',
+      award.matches_product_id ? 'eq' : 'is',
+      award.matches_product_id ?? null,
+    )
+    .ilike('awarding_body', award.awarding_body)
+    .ilike('award_name', award.award_name)
+    .eq('year', award.year ?? 0)
+    .maybeSingle();
+  if (existing) return false;
+  const { error } = await service.from('brand_awards').insert({
+    brand_directory_id: brandDirectoryId,
+    product_directory_id: award.matches_product_id,
+    awarding_body: award.awarding_body,
+    award_name: award.award_name,
+    medal_tier: award.medal_tier,
+    year: award.year,
+    source_url: award.source_url,
+    notes: award.notes,
+    discovered_via: 'deep_enrich',
+  });
+  if (error) throw new Error(error.message);
+  return true;
 }
 
 async function persistCredential(
