@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createHmac } from 'crypto';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { requireAlkateraAdmin } from '@/lib/admin/auth';
-import { deepEnrichBrand } from '@/lib/admin/sourcing/deep-enrich';
 
 /**
  * POST /api/admin/directory/brands/[id]/deep-enrich
@@ -65,7 +63,48 @@ export async function POST(request: Request, { params }: { params: { id: string 
     triggered = await triggerBackground(target, hmacSecret, jobId).catch(() => false);
   }
   if (!triggered) {
-    void runInline(auth.service, jobId);
+    // Netlify waits for floating promises to settle before terminating
+    // a lambda instance, so void-firing the inline Sonnet call here
+    // would tie the response up for 60s+ — the connection gets killed
+    // by the platform sync timeout before the 202 reaches the browser.
+    // Production REQUIRES the HMAC-signed background fn path. Locally
+    // we use a deferred-import dynamic to avoid bundling the Anthropic
+    // SDK into this route, then fire-and-forget.
+    if (process.env.NODE_ENV === 'production') {
+      await auth.service
+        .from('deep_enrich_jobs')
+        .update({
+          status: 'error',
+          error: hmacSecret
+            ? 'background_trigger_failed_in_production'
+            : 'missing_internal_job_hmac_secret',
+          phase_message: null,
+        })
+        .eq('id', jobId);
+      return NextResponse.json(
+        {
+          error: 'background_unavailable',
+          detail: hmacSecret
+            ? 'Background function did not respond; check Netlify deploy + function logs.'
+            : 'INTERNAL_JOB_HMAC_SECRET is not set on this environment.',
+        },
+        { status: 503 },
+      );
+    }
+    // Local dev: import + fire inline. Dynamic import keeps the
+    // Anthropic SDK out of the production lambda bundle.
+    void (async () => {
+      try {
+        const { runInline } = await import('./_inline');
+        await runInline(auth.service, jobId);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        await auth.service
+          .from('deep_enrich_jobs')
+          .update({ status: 'error', error: `inline_failed: ${message}`, phase_message: null })
+          .eq('id', jobId);
+      }
+    })();
   }
 
   return NextResponse.json({ jobId }, { status: 202 });
@@ -95,90 +134,3 @@ async function triggerBackground(
   }
 }
 
-/**
- * Inline fallback for local dev. Loads the brand context, runs the
- * Claude pass, writes `enriched` onto the job. The poll endpoint
- * picks it up from there.
- */
-async function runInline(service: SupabaseClient, jobId: string): Promise<void> {
-  const update = (patch: Record<string, unknown>) =>
-    service
-      .from('deep_enrich_jobs')
-      .update({ ...patch, updated_at: new Date().toISOString() })
-      .eq('id', jobId);
-  try {
-    const { data: job } = await service
-      .from('deep_enrich_jobs')
-      .select('brand_directory_id')
-      .eq('id', jobId)
-      .maybeSingle();
-    if (!job) {
-      await update({ status: 'error', error: 'job_not_found', phase_message: null });
-      return;
-    }
-    const brandDirectoryId = (job as { brand_directory_id: string }).brand_directory_id;
-
-    const { data: brand } = await service
-      .from('brand_directory')
-      .select(
-        'id, name, website, country_of_origin, category, founding_year, parent_company, description',
-      )
-      .eq('id', brandDirectoryId)
-      .maybeSingle();
-    if (!brand) {
-      await update({ status: 'error', error: 'brand_not_found', phase_message: null });
-      return;
-    }
-    const directory = brand as {
-      id: string;
-      name: string;
-      website: string | null;
-      country_of_origin: string | null;
-      category: string | null;
-      founding_year: number | null;
-      parent_company: string | null;
-      description: string | null;
-    };
-
-    const { data: existingRows } = await service
-      .from('product_directory')
-      .select('id, name')
-      .eq('brand_directory_id', directory.id)
-      .order('name');
-    const existingProducts = ((existingRows ?? []) as Array<{ id: string; name: string }>);
-
-    await update({ status: 'searching', phase_message: 'Searching the web for this brand…' });
-
-    const enriched = await deepEnrichBrand({
-      brandName: directory.name,
-      website: directory.website,
-      country: directory.country_of_origin,
-      category: directory.category,
-      existingBrand: {
-        description: directory.description,
-        founding_year: directory.founding_year,
-        parent_company: directory.parent_company,
-      },
-      existingProducts,
-    });
-
-    if (
-      enriched.error &&
-      enriched.products.length === 0 &&
-      enriched.documents.length === 0 &&
-      enriched.credentials.length === 0 &&
-      Object.keys(enriched.brand).length === 0
-    ) {
-      await update({ status: 'error', error: enriched.error.slice(0, 500), phase_message: null });
-      return;
-    }
-    await update({
-      status: 'searched',
-      phase_message: 'Persisting findings…',
-      enriched,
-    });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    await update({ status: 'error', error: message.slice(0, 500), phase_message: null });
-  }
-}
