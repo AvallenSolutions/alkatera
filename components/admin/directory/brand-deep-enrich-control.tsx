@@ -15,7 +15,14 @@ import { Button } from '@/components/ui/button';
 interface DeepEnrichResponse {
   ok: true;
   summary: string | null;
-  products: { created: number; linked: number; errors: string[] };
+  brand: { fields_updated: number; patch: Record<string, unknown> };
+  credentials: { written: number; errors: string[] };
+  products: {
+    created: number;
+    linked: number;
+    skipped_by_dedup: number;
+    errors: string[];
+  };
   documents: {
     ingested: number;
     skipped: number;
@@ -120,17 +127,34 @@ export function BrandDeepEnrichControl({ brandId, brandName, hasWebsite }: Props
         <div className="space-y-3">
           <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-sm flex items-start gap-2">
             <CheckCircle2 className="h-4 w-4 text-emerald-300 shrink-0 mt-0.5" />
-            <div className="space-y-0.5">
-              <div className="font-semibold">
-                {result.products.created} new product
-                {result.products.created === 1 ? '' : 's'},{' '}
-                {result.products.linked} linked
+            <div className="space-y-1 min-w-0">
+              <div className="font-semibold flex flex-wrap gap-x-3 gap-y-0.5">
+                {result.brand.fields_updated > 0 && (
+                  <span>
+                    {result.brand.fields_updated} brand field
+                    {result.brand.fields_updated === 1 ? '' : 's'} filled
+                  </span>
+                )}
+                {result.credentials.written > 0 && (
+                  <span>
+                    {result.credentials.written} credential
+                    {result.credentials.written === 1 ? '' : 's'} recorded
+                  </span>
+                )}
+                <span>
+                  {result.products.created} new product
+                  {result.products.created === 1 ? '' : 's'}
+                </span>
+                {result.products.skipped_by_dedup > 0 && (
+                  <span className="text-muted-foreground">
+                    {result.products.skipped_by_dedup} dedup
+                  </span>
+                )}
                 {result.documents.ingested > 0 && (
-                  <>
-                    {' '}
-                    · {result.documents.ingested} document
-                    {result.documents.ingested === 1 ? '' : 's'} queued for processing
-                  </>
+                  <span>
+                    {result.documents.ingested} document
+                    {result.documents.ingested === 1 ? '' : 's'} queued
+                  </span>
                 )}
               </div>
               {result.summary && (

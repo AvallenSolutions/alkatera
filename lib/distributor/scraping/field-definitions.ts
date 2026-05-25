@@ -25,7 +25,9 @@ export type FieldKey =
   | 'founding_year'
   | 'company_registration_number'
   | 'contact_email'
-  | 'company_description';
+  | 'company_description'
+  | 'iwca_member'
+  | 'porto_protocol_signatory';
 
 export type FieldType = 'boolean' | 'number' | 'year' | 'string' | 'longtext';
 export type Pillar = 'carbon' | 'water' | 'packaging' | 'agriculture' | 'governance' | 'corporate';
@@ -70,6 +72,10 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     description: 'A public sustainability / press / general contact email on the brand website. Used to seed outreach.' },
   { key: 'company_description',            label: 'Company Description',               type: 'longtext', pillar: 'corporate',
     description: "AI-generated 2-3 paragraph overview of the brand with a focus on its sustainability story. Regenerated each scrape." },
+  { key: 'iwca_member',                    label: 'IWCA Member',                       type: 'boolean', pillar: 'carbon',
+    description: "International Wineries for Climate Action signatory. Wine producers only." },
+  { key: 'porto_protocol_signatory',       label: 'Porto Protocol Signatory',          type: 'boolean', pillar: 'carbon',
+    description: "Porto Protocol signatory for climate action in wine. Wine producers only." },
 ];
 
 const FIELD_BY_KEY = new Map<FieldKey, FieldDefinition>(FIELD_DEFINITIONS.map((f) => [f.key, f]));

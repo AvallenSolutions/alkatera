@@ -1,9 +1,13 @@
 import Anthropic from '@anthropic-ai/sdk';
-import type { CrawledDocument, CrawledDocumentKind, CrawledProduct } from '@/lib/distributor/scraping/sources';
+import type {
+  CrawledDocument,
+  CrawledDocumentKind,
+  CrawledProduct,
+} from '@/lib/distributor/scraping/sources';
 
 const MODEL = 'claude-sonnet-4-6';
-const MAX_TOKENS = 4000;
-const WEB_SEARCH_MAX_USES = 6;
+const MAX_TOKENS = 6000;
+const WEB_SEARCH_MAX_USES = 10;
 
 let cachedClient: Anthropic | null = null;
 function getClient(): Anthropic | null {
@@ -14,17 +18,57 @@ function getClient(): Anthropic | null {
   return cachedClient;
 }
 
+export interface ExistingProductRef {
+  id: string;
+  name: string;
+}
+
 export interface DeepEnrichArgs {
   brandName: string;
   website: string | null;
   country?: string | null;
   category?: string | null;
+  /** What we already know about this brand on alka**tera**. Shown to the
+   *  model so it can fill gaps rather than re-collecting the same facts. */
+  existingBrand: {
+    description?: string | null;
+    founding_year?: number | null;
+    parent_company?: string | null;
+  };
+  /** Products already on file for this brand. Claude maps any new findings
+   *  to these where they refer to the same SKU, so we never insert a
+   *  duplicate row. */
+  existingProducts: ExistingProductRef[];
+}
+
+export interface EnrichedBrandFields {
+  description?: string | null;
+  category?: string | null;
+  country_of_origin?: string | null;
+  founding_year?: number | null;
+  parent_company?: string | null;
+  website?: string | null;
+}
+
+export interface EnrichedCredential {
+  /** FieldKey value or one of the new credential keys. */
+  field_key: string;
+  value: string | number | boolean | null;
+  /** Public URL the value was sourced from. */
+  source_url: string | null;
+}
+
+export interface EnrichedProduct extends CrawledProduct {
+  /** Set when Claude maps this finding to an existing product_directory
+   *  row. The endpoint skips creating a new row in that case. */
+  matches_existing_id: string | null;
 }
 
 export interface DeepEnrichResult {
-  products: CrawledProduct[];
+  brand: EnrichedBrandFields;
+  credentials: EnrichedCredential[];
+  products: EnrichedProduct[];
   documents: CrawledDocument[];
-  /** Short note from the model on what it searched / found. */
   summary?: string;
   error?: string;
 }
@@ -40,22 +84,29 @@ const VALID_KINDS = new Set<CrawledDocumentKind>([
 ]);
 
 /**
- * Single-brand deep enrichment using Claude with the web_search tool.
- * Returns the brand's product list + any sustainability documents found
- * across the web (not just on their own site). Used as a fallback when
- * the brand-website crawler misses products (JS-heavy sites, Shopify
- * catalogues hidden behind app routing) or when sustainability docs
- * are hosted on third-party platforms (B Corp directory, certifier
- * sites, sustainability databases).
+ * Comprehensive single-brand enrichment using Claude with the
+ * web_search tool. The prompt names authoritative sources for each
+ * credential class (B Corp directory, Soil Association / USDA / OFG
+ * for organic, Fairtrade / Rainforest Alliance / Carbon Trust, IWCA,
+ * Porto Protocol, Ethical Consumer, Companies House, the brand's own
+ * sustainability page) so the model knows where to look rather than
+ * spraying the open web.
  *
- * Same persistence layer as the crawler: products go through the
- * product matcher; documents go through the PDF ingester (any URL
- * ending in .pdf is downloaded + queued for the document processor).
+ * Returns:
+ *   - brand: free-form fields that go onto brand_directory directly
+ *     (coalesce(new, existing) — alka**tera** values win where set,
+ *     enrichment fills gaps)
+ *   - credentials: typed findings written into scraped_brand_data
+ *     with source_name='admin_deep_enrich' and high confidence
+ *   - products: includes a matches_existing_id pointer when the
+ *     finding refers to a product we already have on file, so the
+ *     caller skips creating a dupe row
+ *   - documents: PDFs the caller feeds into the existing pdf-ingester
  */
 export async function deepEnrichBrand(args: DeepEnrichArgs): Promise<DeepEnrichResult> {
   const client = getClient();
   if (!client) {
-    return { products: [], documents: [], error: 'ANTHROPIC_API_KEY not configured' };
+    return EMPTY_RESULT({ error: 'ANTHROPIC_API_KEY not configured' });
   }
 
   const prompt = buildPrompt(args);
@@ -79,70 +130,142 @@ export async function deepEnrichBrand(args: DeepEnrichArgs): Promise<DeepEnrichR
     }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    return { products: [], documents: [], error: `anthropic_error: ${message}` };
+    return EMPTY_RESULT({ error: `anthropic_error: ${message}` });
   }
 
   const parsed = extractJson(text);
   if (!parsed) {
-    return { products: [], documents: [], error: 'model_returned_invalid_json' };
+    return EMPTY_RESULT({ error: 'model_returned_invalid_json' });
   }
 
-  const products = sanitiseProducts(parsed.products, args.website ?? args.brandName);
-  const documents = sanitiseDocuments(parsed.documents, args.website ?? args.brandName);
+  const fallbackSource = args.website ?? args.brandName;
   return {
-    products,
-    documents,
+    brand: sanitiseBrand(parsed.brand),
+    credentials: sanitiseCredentials(parsed.credentials),
+    products: sanitiseProducts(parsed.products, fallbackSource, args.existingProducts),
+    documents: sanitiseDocuments(parsed.documents, fallbackSource),
     summary: typeof parsed.summary === 'string' ? parsed.summary : undefined,
   };
 }
 
+function EMPTY_RESULT(extra: { error?: string }): DeepEnrichResult {
+  return {
+    brand: {},
+    credentials: [],
+    products: [],
+    documents: [],
+    ...extra,
+  };
+}
+
 function buildPrompt(args: DeepEnrichArgs): string {
-  const contextLines: string[] = [`Brand name: ${args.brandName}.`];
-  if (args.website) contextLines.push(`Website: ${args.website}.`);
-  if (args.country) contextLines.push(`Country: ${args.country}.`);
-  if (args.category) contextLines.push(`Category: ${args.category}.`);
+  const ctx: string[] = [`Brand name: ${args.brandName}.`];
+  if (args.website) ctx.push(`Website: ${args.website}.`);
+  if (args.country) ctx.push(`Country: ${args.country}.`);
+  if (args.category) ctx.push(`Category: ${args.category}.`);
 
-  return `You are researching the drinks brand below. Use web search to find:
-  1. Every product this brand makes (with size variants where they exist).
-  2. Any sustainability documents they have published — EPDs (Environmental Product Declarations), LCAs, sustainability reports, impact reports, ESG reports, carbon-footprint statements, B Corp impact reports.
+  const known: string[] = [];
+  if (args.existingBrand.description) known.push(`- We already have a description on file.`);
+  if (args.existingBrand.founding_year) known.push(`- Founded: ${args.existingBrand.founding_year}.`);
+  if (args.existingBrand.parent_company) known.push(`- Parent company: ${args.existingBrand.parent_company}.`);
 
-${contextLines.join('\n')}
+  const products = args.existingProducts.length > 0
+    ? args.existingProducts.map((p) => `  - id "${p.id}": ${p.name}`).join('\n')
+    : '  (none — we have no products on file yet)';
 
-After researching, output ONE JSON object and NOTHING else (no markdown, no commentary) with this exact shape:
+  return `You are completing alka**tera**'s sustainability profile for the drinks brand below. Use the web_search tool extensively. Cite a URL for every fact you return.
+
+${ctx.join('\n')}
+
+What we already know:
+${known.length > 0 ? known.join('\n') : '  - Almost nothing — please fill the gaps.'}
+
+Products already on file for this brand:
+${products}
+
+Sources to consult (don't limit yourself to these, but always check the relevant ones for each credential):
+  - The brand's own website (about / sustainability / impact pages)
+  - bcorporation.net find-a-b-corp directory (for B Corp status + year)
+  - Soil Association soilassociation.org and ofgorganic.org (UK organic certifiers)
+  - USDA Organic Integrity Database (US organic)
+  - fairtrade.org.uk (Fairtrade)
+  - rainforest-alliance.org find-certified
+  - carbontrust.com certifications
+  - wineriesforclimateaction.org (IWCA — wineries only)
+  - portoprotocol.com signatory list (Porto Protocol — wineries only)
+  - ethicalconsumer.org, ethicalsuperstore.com, ethicalshop.co.uk (ethical-shopping ratings)
+  - sciencebasedtargets.org companies-taking-action (SBT status)
+  - find-and-update.company-information.service.gov.uk (UK Companies House — founding year, parent company, registration number)
+  - LinkedIn / official press releases for parent-company / acquisition details
+  - The brand's published sustainability / impact / ESG / EPD / LCA PDFs
+
+Output ONE JSON object and NOTHING else (no markdown, no commentary):
 
 {
-  "summary": "one sentence describing what you searched and found",
+  "summary": "1-2 sentence note on what you searched and the highest-value things you found.",
+  "brand": {
+    "description": "2-3 sentence overview leading with the sustainability story. British English. No em dashes. null if you can't write a good one.",
+    "category": "spirits | wine | beer | non_alc | other",
+    "country_of_origin": "ISO-2 code (e.g. GB, FR) or full country name",
+    "founding_year": 2018,
+    "parent_company": "owning group, or null if independent",
+    "website": "https://… canonical brand website, or null if it's the same as the one above"
+  },
+  "credentials": [
+    { "field_key": "bcorp_certified",                "value": true,    "source_url": "https://www.bcorporation.net/..." },
+    { "field_key": "organic_certified",              "value": false,   "source_url": null },
+    { "field_key": "fairtrade_certified",            "value": false,   "source_url": null },
+    { "field_key": "rainforest_alliance_certified",  "value": false,   "source_url": null },
+    { "field_key": "carbon_trust_certified",         "value": false,   "source_url": null },
+    { "field_key": "iso_14001_certified",            "value": false,   "source_url": null },
+    { "field_key": "iso_50001_certified",            "value": false,   "source_url": null },
+    { "field_key": "iwca_member",                    "value": false,   "source_url": null },
+    { "field_key": "porto_protocol_signatory",       "value": false,   "source_url": null },
+    { "field_key": "sbt_status",                     "value": "committed", "source_url": "https://sciencebasedtargets.org/..." },
+    { "field_key": "net_zero_target_year",           "value": 2030,    "source_url": "..." },
+    { "field_key": "carbon_intensity_kgco2e_per_litre", "value": 1.2,  "source_url": "..." },
+    { "field_key": "scope_1_tco2e",                  "value": 42,      "source_url": "..." },
+    { "field_key": "scope_2_tco2e",                  "value": 17,      "source_url": "..." },
+    { "field_key": "scope_3_tco2e",                  "value": 320,     "source_url": "..." },
+    { "field_key": "water_usage_litres_per_litre",   "value": 3.4,     "source_url": "..." },
+    { "field_key": "recycled_packaging_percentage",  "value": 100,     "source_url": "..." },
+    { "field_key": "packaging_primary_material",     "value": "glass", "source_url": "..." },
+    { "field_key": "sustainability_report_url",      "value": "https://…", "source_url": "..." },
+    { "field_key": "sustainability_report_year",     "value": 2024,    "source_url": "..." },
+    { "field_key": "contact_email",                  "value": "sustainability@...", "source_url": "..." },
+    { "field_key": "company_registration_number",    "value": "12345678", "source_url": "..." }
+  ],
   "products": [
     {
-      "name": "Product name as the brand uses it (e.g. 'Lightly Spiced Rum 70cl')",
-      "category": "spirits | wine | beer | non_alc | other",
-      "abv": 41.2,
+      "name": "Lightly Spiced Rum 70cl",
+      "category": "spirits",
+      "abv": 40.0,
       "container_size_ml": 700,
-      "container_format": "bottle | can | keg | bag_in_box | other"
+      "container_format": "bottle",
+      "matches_existing_id": "uuid-of-the-row-this-refers-to-or-null"
     }
   ],
   "documents": [
-    {
-      "url": "https://… absolute URL of the actual PDF or page",
-      "title": "Two Drifters EPD - Lightly Spiced Rum",
-      "kind": "epd | lca | sustainability_report | datasheet | other"
-    }
+    { "url": "https://…/lightly-spiced-rum-epd.pdf", "title": "Two Drifters Lightly Spiced Rum EPD", "kind": "epd" }
   ]
 }
 
-Rules:
-- Real products only — confirmed via search.
-- Documents: only include URLs you actually verified via search. Never invent URLs.
-- If a document URL is to a landing page that links to a PDF, prefer the PDF URL when you can find it.
-- "category" must be exactly one of the allowed values.
-- "container_size_ml" is a number (70cl = 700, 1L = 1000).
-- "abv" is a percent (e.g. 41.2, not 0.412).
-- Leave a field null rather than guessing. Don't invent GTINs.
-- British English in any prose. No em dashes.`;
+Hard rules:
+- Only include a credential row if you actually verified the value. Skip the row otherwise. Do not include 'unknown' / 'maybe' entries.
+- Every credential must have a source_url EXCEPT a clean negative (value=false with no URL means "I checked and could not find evidence of certification"); only include the negative if you actually looked.
+- For booleans, "value" must be true or false (JSON), not strings.
+- For "sbt_status", value must be one of 'committed', 'targets_set', 'none'.
+- For numeric fields, value must be a number, not a string. No units, no commas.
+- "container_size_ml": 70cl = 700, 1L = 1000.
+- Products: "matches_existing_id" must be one of the ids listed above (when the finding refers to the same product) or null (when it's genuinely new). When in doubt about size variants, prefer to MATCH rather than CREATE — operations can split later if needed.
+- Documents: include only PDF URLs you can verify. Prefer the direct .pdf URL over a landing page.
+- British English. Never use em dashes in the description.`;
 }
 
 function extractJson(text: string): {
   summary?: unknown;
+  brand?: unknown;
+  credentials?: unknown;
   products?: unknown;
   documents?: unknown;
 } | null {
@@ -157,9 +280,133 @@ function extractJson(text: string): {
   }
 }
 
-function sanitiseProducts(input: unknown, fallbackSourceUrl: string): CrawledProduct[] {
+function sanitiseBrand(input: unknown): EnrichedBrandFields {
+  if (!input || typeof input !== 'object') return {};
+  const b = input as Record<string, unknown>;
+  const out: EnrichedBrandFields = {};
+  const desc = str(b.description);
+  if (desc) out.description = desc;
+  const cat = str(b.category);
+  if (cat && VALID_CATEGORY.has(cat)) out.category = cat;
+  const country = str(b.country_of_origin);
+  if (country) out.country_of_origin = country;
+  const founding = num(b.founding_year);
+  if (founding && founding >= 1500 && founding <= new Date().getFullYear() + 1) {
+    out.founding_year = Math.round(founding);
+  }
+  const parent = str(b.parent_company);
+  if (parent) out.parent_company = parent;
+  const website = str(b.website);
+  if (website && /^https?:\/\//i.test(website)) out.website = website;
+  return out;
+}
+
+const KNOWN_CREDENTIAL_KEYS = new Set([
+  'bcorp_certified',
+  'carbon_trust_certified',
+  'iso_14001_certified',
+  'iso_50001_certified',
+  'fairtrade_certified',
+  'rainforest_alliance_certified',
+  'organic_certified',
+  'organic_percentage',
+  'carbon_intensity_kgco2e_per_litre',
+  'scope_1_tco2e',
+  'scope_2_tco2e',
+  'scope_3_tco2e',
+  'net_zero_target_year',
+  'sbt_status',
+  'water_usage_litres_per_litre',
+  'water_stress_region',
+  'water_recycled_percentage',
+  'recycled_packaging_percentage',
+  'packaging_primary_material',
+  'sustainability_report_url',
+  'sustainability_report_year',
+  'iwca_member',
+  'porto_protocol_signatory',
+  'company_registration_number',
+  'contact_email',
+]);
+
+function sanitiseCredentials(input: unknown): EnrichedCredential[] {
   if (!Array.isArray(input)) return [];
-  const out: CrawledProduct[] = [];
+  const out: EnrichedCredential[] = [];
+  const seen = new Set<string>();
+  for (const raw of input) {
+    if (!raw || typeof raw !== 'object') continue;
+    const r = raw as Record<string, unknown>;
+    const fieldKey = str(r.field_key);
+    if (!fieldKey || !KNOWN_CREDENTIAL_KEYS.has(fieldKey)) continue;
+    if (seen.has(fieldKey)) continue;
+    seen.add(fieldKey);
+    const value = sanitiseCredentialValue(fieldKey, r.value);
+    if (value === undefined) continue;
+    const sourceUrl = str(r.source_url);
+    out.push({
+      field_key: fieldKey,
+      value,
+      source_url: sourceUrl && /^https?:\/\//i.test(sourceUrl) ? sourceUrl : null,
+    });
+  }
+  return out;
+}
+
+function sanitiseCredentialValue(key: string, raw: unknown): string | number | boolean | null | undefined {
+  const isBoolean =
+    key.endsWith('_certified') ||
+    key === 'iwca_member' ||
+    key === 'porto_protocol_signatory' ||
+    key === 'water_stress_region';
+  if (isBoolean) {
+    if (typeof raw === 'boolean') return raw;
+    if (typeof raw === 'string') {
+      const v = raw.trim().toLowerCase();
+      if (v === 'true' || v === 'yes') return true;
+      if (v === 'false' || v === 'no') return false;
+    }
+    return undefined;
+  }
+  if (key === 'sbt_status') {
+    const v = str(raw)?.toLowerCase();
+    if (v === 'committed' || v === 'targets_set' || v === 'none') return v;
+    return undefined;
+  }
+  if (key === 'sustainability_report_url') {
+    const v = str(raw);
+    if (v && /^https?:\/\//i.test(v)) return v;
+    return undefined;
+  }
+  if (
+    key === 'organic_percentage' ||
+    key === 'carbon_intensity_kgco2e_per_litre' ||
+    key === 'scope_1_tco2e' ||
+    key === 'scope_2_tco2e' ||
+    key === 'scope_3_tco2e' ||
+    key === 'net_zero_target_year' ||
+    key === 'water_usage_litres_per_litre' ||
+    key === 'water_recycled_percentage' ||
+    key === 'recycled_packaging_percentage' ||
+    key === 'sustainability_report_year'
+  ) {
+    const n = num(raw);
+    if (n !== null && Number.isFinite(n)) return n;
+    return undefined;
+  }
+  // string-ish: contact_email, company_registration_number,
+  // packaging_primary_material.
+  const v = str(raw);
+  return v ?? undefined;
+}
+
+function sanitiseProducts(
+  input: unknown,
+  fallbackSourceUrl: string,
+  existingProducts: ExistingProductRef[],
+): EnrichedProduct[] {
+  if (!Array.isArray(input)) return [];
+  const validExistingIds = new Set(existingProducts.map((p) => p.id));
+  const out: EnrichedProduct[] = [];
   const seen = new Set<string>();
   for (const raw of input) {
     if (!raw || typeof raw !== 'object') continue;
@@ -171,6 +418,8 @@ function sanitiseProducts(input: unknown, fallbackSourceUrl: string): CrawledPro
     seen.add(key);
     const cat = str(r.category);
     const fmt = str(r.container_format);
+    const matchesIdRaw = str(r.matches_existing_id);
+    const matchesId = matchesIdRaw && validExistingIds.has(matchesIdRaw) ? matchesIdRaw : null;
     out.push({
       name,
       category: cat && VALID_CATEGORY.has(cat) ? cat : null,
@@ -178,6 +427,7 @@ function sanitiseProducts(input: unknown, fallbackSourceUrl: string): CrawledPro
       container_size_ml: num(r.container_size_ml),
       container_format: fmt && VALID_FORMAT.has(fmt) ? fmt : null,
       source_url: fallbackSourceUrl,
+      matches_existing_id: matchesId,
     });
   }
   return out;
@@ -219,7 +469,7 @@ function str(v: unknown): string | null {
 function num(v: unknown): number | null {
   if (typeof v === 'number' && Number.isFinite(v)) return v;
   if (typeof v === 'string') {
-    const n = parseFloat(v.replace(/[^0-9.]/g, ''));
+    const n = parseFloat(v.replace(/[^0-9.-]/g, ''));
     return Number.isFinite(n) ? n : null;
   }
   return null;

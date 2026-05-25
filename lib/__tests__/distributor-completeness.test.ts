@@ -38,6 +38,8 @@ describe('calculateCompleteness', () => {
       'company_registration_number',
       'contact_email',
       'company_description',
+      'iwca_member',
+      'porto_protocol_signatory',
     ]);
     expect(result.overall).toBe(100);
   });
