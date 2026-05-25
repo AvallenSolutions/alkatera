@@ -85,19 +85,17 @@ export default async function BrandOverviewPage({ params }: PageProps) {
       .select('id', { count: 'exact', head: true })
       .eq('brand_directory_id', directoryId)
       .is('resolution', null),
+    // Pull every active company_description finding; we apply the
+    // canonical precedence (brand_verified > alkatera_live > confidence)
+    // below so an alka**tera**-customer description always wins over a
+    // scraped one, regardless of the scrape's confidence score.
     supabase
       .from('scraped_brand_data')
       .select('field_value, source_name, source_url, scraped_at, confidence')
       .eq('brand_directory_id', directoryId)
       .eq('field_key', 'company_description')
       .is('brand_sku_id', null)
-      .is('superseded_by', null)
-      // Highest confidence wins: alkatera_live (0.99) outranks LLM
-      // extract (0.65). When confidences tie, prefer the newer row.
-      .order('confidence', { ascending: false })
-      .order('scraped_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .is('superseded_by', null),
     supabase
       .from('brand_directory')
       .select('sustainability_score, score_tier, completeness_score, last_synced_at')
@@ -109,12 +107,15 @@ export default async function BrandOverviewPage({ params }: PageProps) {
       .eq('brand_directory_id', directoryId),
   ]);
 
-  const description = (descriptionRow as {
-    field_value: string | null;
-    source_name: string | null;
-    source_url: string | null;
-    scraped_at: string | null;
-  } | null) ?? null;
+  const description = pickActiveDescription(
+    (descriptionRow ?? []) as Array<{
+      field_value: string | null;
+      source_name: string | null;
+      source_url: string | null;
+      scraped_at: string | null;
+      confidence: number;
+    }>,
+  );
   const scores = (directoryScores as {
     sustainability_score: number | null;
     score_tier: 'leader' | 'progressing' | 'developing' | 'insufficient' | null;
@@ -275,6 +276,56 @@ export default async function BrandOverviewPage({ params }: PageProps) {
       </div>
     </div>
   );
+}
+
+/**
+ * Pick the active company_description from a set of active findings.
+ * Mirrors data-merger's pickActivePerField for a single field: prefer
+ * brand_verified, then alkatera_live, then highest confidence. Tie-
+ * breaks on newer scraped_at.
+ */
+function pickActiveDescription(
+  rows: Array<{
+    field_value: string | null;
+    source_name: string | null;
+    source_url: string | null;
+    scraped_at: string | null;
+    confidence: number;
+  }>,
+): {
+  field_value: string | null;
+  source_name: string | null;
+  source_url: string | null;
+  scraped_at: string | null;
+} | null {
+  let best: (typeof rows)[number] | null = null;
+  for (const r of rows) {
+    if (!best) {
+      best = r;
+      continue;
+    }
+    if (r.source_name === 'brand_verified' && best.source_name !== 'brand_verified') {
+      best = r;
+      continue;
+    }
+    if (best.source_name === 'brand_verified') continue;
+    if (r.source_name === 'alkatera_live' && best.source_name !== 'alkatera_live') {
+      best = r;
+      continue;
+    }
+    if (best.source_name === 'alkatera_live') continue;
+    if (r.confidence > best.confidence) {
+      best = r;
+      continue;
+    }
+    if (
+      r.confidence === best.confidence &&
+      (r.scraped_at ?? '') > (best.scraped_at ?? '')
+    ) {
+      best = r;
+    }
+  }
+  return best;
 }
 
 function Detail({

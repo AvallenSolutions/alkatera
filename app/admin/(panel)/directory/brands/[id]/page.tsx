@@ -4,6 +4,10 @@ import { ChevronLeft, Tag, Globe2, Building, Calendar, ShieldCheck } from 'lucid
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { BrandDiscoveryOptOutToggle } from '@/components/admin/directory/brand-discovery-opt-out-toggle';
 import { BrandVerificationControl } from '@/components/admin/directory/brand-verification-control';
+import {
+  BrandLinkAlkateraControl,
+  type UnlinkedOrg,
+} from '@/components/admin/directory/brand-link-alkatera-control';
 import { EsgBreakdownPanel, type EsgSnapshot } from '@/components/shared/esg-breakdown-panel';
 
 export const dynamic = 'force-dynamic';
@@ -56,29 +60,37 @@ export default async function AdminBrandDetailPage({
   }
   const brand = directoryData;
 
-  const [{ data: productRows }, { count: listingCount }, { data: snapshotRow }] =
-    await Promise.all([
-      supabase
-        .from('product_directory')
-        .select('id, name, gtin, embodied_carbon_kgco2e')
-        .eq('brand_directory_id', brand.id)
-        .order('name'),
-      supabase
-        .from('brand_profiles')
-        .select('id', { count: 'exact', head: true })
-        .eq('brand_directory_id', brand.id),
-      // ESG breakdown from the brand's alka**tera** vitality card. Only
-      // relevant for alka**tera**-linked brands; skip the query otherwise.
-      brand.alkatera_org_id
-        ? supabase
-            .from('esg_score_snapshots')
-            .select('composite, environmental, social, governance, breakdown')
-            .eq('organization_id', brand.alkatera_org_id)
-            .order('snapshot_date', { ascending: false })
-            .limit(1)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
-    ]);
+  const [
+    { data: productRows },
+    { count: listingCount },
+    { data: snapshotRow },
+    unlinkedOrgs,
+  ] = await Promise.all([
+    supabase
+      .from('product_directory')
+      .select('id, name, gtin, embodied_carbon_kgco2e')
+      .eq('brand_directory_id', brand.id)
+      .order('name'),
+    supabase
+      .from('brand_profiles')
+      .select('id', { count: 'exact', head: true })
+      .eq('brand_directory_id', brand.id),
+    // ESG breakdown from the brand's alka**tera** vitality card. Only
+    // relevant for alka**tera**-linked brands; skip the query otherwise.
+    brand.alkatera_org_id
+      ? supabase
+          .from('esg_score_snapshots')
+          .select('composite, environmental, social, governance, breakdown')
+          .eq('organization_id', brand.alkatera_org_id)
+          .order('snapshot_date', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    // Unlinked alka**tera** customer orgs — surfaced as options in the
+    // manual "link to alkatera customer" control for unlinked directory
+    // rows. Skip the query when the row is already linked.
+    brand.alkatera_org_id ? Promise.resolve([] as UnlinkedOrg[]) : loadUnlinkedOrgs(supabase),
+  ]);
   type ProductRow = {
     id: string;
     name: string;
@@ -184,6 +196,14 @@ export default async function AdminBrandDetailPage({
         initialStatus={brand.verification_status}
       />
 
+      {!brand.alkatera_org_id && unlinkedOrgs.length > 0 && (
+        <BrandLinkAlkateraControl
+          brandId={brand.id}
+          brandName={brand.name}
+          unlinkedOrgs={unlinkedOrgs}
+        />
+      )}
+
       {snapshot && <EsgBreakdownPanel snapshot={snapshot} accent="lime" />}
 
       <BrandDiscoveryOptOutToggle
@@ -238,6 +258,30 @@ export default async function AdminBrandDetailPage({
       </div>
     </div>
   );
+}
+
+/**
+ * Pull alka**tera** organisations that aren't yet linked to any
+ * brand_directory row. Cap at a small number — these are surfaced in a
+ * dropdown for the manual link control, and admins typically know
+ * exactly which org they mean.
+ */
+async function loadUnlinkedOrgs(supabase: SupabaseClient): Promise<UnlinkedOrg[]> {
+  const { data: linkedRows } = await supabase
+    .from('brand_directory')
+    .select('alkatera_org_id')
+    .not('alkatera_org_id', 'is', null);
+  const linkedIds = new Set(
+    ((linkedRows ?? []) as Array<{ alkatera_org_id: string }>).map((r) => r.alkatera_org_id),
+  );
+
+  const { data } = await supabase
+    .from('organizations')
+    .select('id, name, website, country')
+    .not('name', 'is', null)
+    .order('name')
+    .limit(200);
+  return ((data ?? []) as UnlinkedOrg[]).filter((o) => !linkedIds.has(o.id));
 }
 
 function Detail({

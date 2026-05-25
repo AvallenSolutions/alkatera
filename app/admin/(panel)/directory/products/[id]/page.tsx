@@ -88,10 +88,30 @@ export default async function AdminProductDetailPage({
     scraped_at: string;
     confidence: number;
   };
-  // Highest-confidence value per field_key.
+  // Per-field precedence: brand_verified > alkatera_live > highest
+  // confidence. Mirrors pickActivePerField in lib/distributor/integration/
+  // data-merger.ts so alka**tera**-customer data always wins over a
+  // higher-confidence scrape.
   const bestByField = new Map<string, Finding>();
   for (const f of (findingRows ?? []) as Finding[]) {
-    if (!bestByField.has(f.field_key)) bestByField.set(f.field_key, f);
+    const existing = bestByField.get(f.field_key);
+    if (!existing) {
+      bestByField.set(f.field_key, f);
+      continue;
+    }
+    if (f.source_name === 'brand_verified' && existing.source_name !== 'brand_verified') {
+      bestByField.set(f.field_key, f);
+      continue;
+    }
+    if (existing.source_name === 'brand_verified') continue;
+    if (f.source_name === 'alkatera_live' && existing.source_name !== 'alkatera_live') {
+      bestByField.set(f.field_key, f);
+      continue;
+    }
+    if (existing.source_name === 'alkatera_live') continue;
+    if (f.confidence > existing.confidence) {
+      bestByField.set(f.field_key, f);
+    }
   }
   const findings = Array.from(bestByField.values());
 

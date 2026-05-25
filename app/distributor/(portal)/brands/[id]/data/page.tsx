@@ -4,6 +4,7 @@ import { AlertTriangle, ArrowRight } from 'lucide-react';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { DataStatusTable, type DataStatusRow } from '@/components/distributor/brand-detail/data-status-table';
 import type { FieldKey } from '@/lib/distributor/scraping/field-definitions';
+import { readMergedBrandData, pickActivePerField } from '@/lib/distributor/integration/data-merger';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,13 +34,8 @@ export default async function BrandDataTabPage({ params }: PageProps) {
   if (!brand) return null;
   const directoryId = (brand as { brand_directory_id: string }).brand_directory_id;
 
-  const [{ data: dataRows }, { count: unresolvedConflicts }] = await Promise.all([
-    supabase
-      .from('scraped_brand_data')
-      .select('field_key, field_value, field_value_numeric, source_name, confidence, scraped_at')
-      .eq('brand_directory_id', directoryId)
-      .is('superseded_by', null)
-      .order('confidence', { ascending: false }),
+  const [findings, { count: unresolvedConflicts }] = await Promise.all([
+    readMergedBrandData(supabase, directoryId, member.distributor_org_id),
     supabase
       .from('brand_data_conflicts')
       .select('id', { count: 'exact', head: true })
@@ -47,28 +43,22 @@ export default async function BrandDataTabPage({ params }: PageProps) {
       .is('resolution', null),
   ]);
 
-  // When there are multiple active rows per field (mid-conflict), we
-  // pick the highest-confidence one for display.
+  // Apply the canonical precedence (brand_verified > alkatera_live >
+  // confidence) so alka**tera**-customer data always wins over a
+  // higher-confidence scrape.
+  const active = pickActivePerField(
+    findings.filter((f) => f.field_key && !(f as { brand_sku_id?: unknown }).brand_sku_id),
+  );
   const byField = new Map<FieldKey, DataStatusRow>();
-  for (const row of (dataRows ?? []) as Array<{
-    field_key: string;
-    field_value: string | null;
-    field_value_numeric: number | null;
-    source_name: string;
-    confidence: number;
-    scraped_at: string;
-  }>) {
-    const existing = byField.get(row.field_key as FieldKey);
-    if (!existing || row.confidence > (existing.confidence ?? 0)) {
-      byField.set(row.field_key as FieldKey, {
-        field_key: row.field_key as FieldKey,
-        value: row.field_value,
-        numeric: row.field_value_numeric,
-        source: row.source_name,
-        confidence: row.confidence,
-        updated_at: row.scraped_at,
-      });
-    }
+  for (const [field, row] of Array.from(active.entries())) {
+    byField.set(field, {
+      field_key: field,
+      value: row.field_value,
+      numeric: row.field_value_numeric,
+      source: row.source,
+      confidence: row.confidence,
+      updated_at: row.scraped_at,
+    });
   }
 
   return (
