@@ -323,7 +323,7 @@ Hard rules:
 - For numeric fields, value must be a number, not a string. No units, no commas.
 - "container_size_ml": 70cl = 700, 1L = 1000.
 - Products: "matches_existing_id" must be one of the ids listed above (when the finding refers to the same product) or null (when it's genuinely new). When in doubt about size variants, prefer to MATCH rather than CREATE — operations can split later if needed.
-- Documents: include only PDF URLs you can verify. Prefer the direct .pdf URL over a landing page.
+- Documents: include URLs you can verify lead to a PDF. The direct .pdf URL is best, but cloud-share links to PDFs (Dropbox, Google Drive, OneDrive) are also accepted — paste the sharing URL verbatim, the platform handles the redirect to the file bytes. Do NOT include landing pages that merely link to PDFs; chase the actual PDF URL.
 - Awards: every award must cite an authoritative source URL. Skip rumour. "matches_product_id" must be one of the existing-product ids above (when the award is for that specific SKU) or null (brand-level award). When unsure, prefer null.
 - Notable facts: short single-line strings. Verifiable. No em dashes.
 - British English.`;

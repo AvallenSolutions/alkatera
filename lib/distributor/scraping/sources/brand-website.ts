@@ -4,6 +4,7 @@ import { extractFieldsFromContent } from '../extractors/llm-extractor';
 import { extractPatterns } from '../extractors/pattern-extractor';
 import { generateCompanyDescription } from '../extractors/description-generator';
 import { extractProductsFromPage } from '../extractors/product-extractor';
+import { looksLikePdfUrl } from '../pdf-ingester';
 import type { FieldKey } from '../field-definitions';
 import type {
   BrandSnapshot,
@@ -312,12 +313,21 @@ function collectPdfLinks(
   while ((match = anchorRegex.exec(html))) {
     const rawHref = match[1] ?? match[2] ?? match[3] ?? '';
     if (!rawHref) continue;
-    if (!/\.pdf(\?|#|$)/i.test(rawHref)) continue;
     const resolved = combine(baseUrl, rawHref);
     if (!resolved) continue;
+    const anchorText = stripTags(match[4] ?? '').replace(/\s+/g, ' ').trim();
+    // Accept the link if either: the URL looks like a PDF (suffix or
+    // known cloud-share host), OR the anchor text mentions a known
+    // sustainability-document keyword (EPD / LCA / report / etc.) —
+    // the keyword path catches PDFs hosted on platforms we don't know
+    // about yet. Both routes feed into classifyPdfCandidates() which
+    // re-checks the keywords to set the document kind.
+    const anchorHasKeyword = SUSTAINABILITY_PDF_KEYWORDS.some((kw) =>
+      anchorText.toLowerCase().includes(kw),
+    );
+    if (!looksLikePdfUrl(resolved) && !anchorHasKeyword) continue;
     const key = resolved.toLowerCase();
     if (out.has(key)) continue;
-    const anchorText = stripTags(match[4] ?? '').replace(/\s+/g, ' ').trim();
     out.set(key, { url: resolved, anchorText, sourceUrl: baseUrl });
   }
 }

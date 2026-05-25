@@ -5,7 +5,7 @@ import {
   resolveOrCreateProductEntrySmart,
   clearProductDedupCache,
 } from '@/lib/distributor/directory/product-dedup';
-import { ingestDiscoveredPdf } from '@/lib/distributor/scraping/pdf-ingester';
+import { ingestDiscoveredPdf, looksLikePdfUrl } from '@/lib/distributor/scraping/pdf-ingester';
 import { recalculateCompleteness } from '@/lib/distributor/scoring/recalculate';
 import type {
   DeepEnrichResult,
@@ -218,7 +218,7 @@ async function persistEnriched(
   let docsSkipped = 0;
   const docDetails: Array<{ url: string; status: string; reason?: string }> = [];
   for (const doc of enriched.documents) {
-    if (!/\.pdf(\?|#|$)/i.test(doc.url)) {
+    if (!looksLikePdfUrl(doc.url)) {
       docsSkipped += 1;
       docDetails.push({ url: doc.url, status: 'skipped', reason: 'not_a_pdf' });
       continue;
