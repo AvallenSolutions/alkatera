@@ -23,6 +23,24 @@ export interface CrawledProduct {
   source_url: string;
 }
 
+export type CrawledDocumentKind =
+  | 'epd'
+  | 'lca'
+  | 'sustainability_report'
+  | 'datasheet'
+  | 'other';
+
+export interface CrawledDocument {
+  /** Absolute URL of the PDF. */
+  url: string;
+  /** Anchor text the link appeared under (used to classify + name). */
+  anchor_text: string;
+  /** Best-guess kind based on URL + anchor keywords. */
+  kind: CrawledDocumentKind;
+  /** URL of the page the link was discovered on. */
+  source_url: string;
+}
+
 export interface SourceRunResult {
   ok: boolean;
   /** Truthy when the source itself decided to skip (e.g. no website URL on file). */
@@ -33,6 +51,10 @@ export interface SourceRunResult {
   findings: SourceFinding[];
   /** Products discovered during the scrape — persisted into product_directory. */
   products?: CrawledProduct[];
+  /** PDF documents discovered on the brand's site — persisted into
+   *  brand_document_submissions with submission_source='auto_scrape'
+   *  and queued for the document processor. */
+  documents?: CrawledDocument[];
 }
 
 export interface BrandSnapshot {

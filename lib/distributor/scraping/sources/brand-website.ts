@@ -7,6 +7,8 @@ import { extractProductsFromPage } from '../extractors/product-extractor';
 import type { FieldKey } from '../field-definitions';
 import type {
   BrandSnapshot,
+  CrawledDocument,
+  CrawledDocumentKind,
   CrawledProduct,
   SourceFinding,
   SourceRunResult,
@@ -140,7 +142,7 @@ export const brandWebsiteSource: SourceScraper = {
 
     const findings: SourceFinding[] = [];
     const products: CrawledProduct[] = [];
-    const pdfCandidates = new Map<string, { url: string; anchorText: string }>();
+    const pdfCandidates = new Map<string, { url: string; anchorText: string; sourceUrl: string }>();
 
     // Homepage is mandatory — if we can't fetch it, treat the source
     // as failed (not skipped) so the user knows something's wrong.
@@ -268,14 +270,17 @@ export const brandWebsiteSource: SourceScraper = {
       }
     }
 
-    // Promote the best-looking sustainability PDF to a finding. We
-    // can't enumerate "all PDFs" via the field-key model, but we can
-    // surface the most signal-dense one (the one whose anchor text or
-    // URL contains EPD / LCA / sustainability-report-style keywords).
-    // The admin sees the link in the brand-detail Data tab and can
-    // upload it through the existing brand-upload flow for full
-    // extraction.
-    const bestPdf = pickBestSustainabilityPdf(Array.from(pdfCandidates.values()));
+    // Classify every PDF candidate. Anything that scores above zero
+    // for the sustainability keyword set is returned as a CrawledDocument
+    // so the brand-agent can auto-download + queue for the document
+    // processor. The single best candidate is ALSO mirrored into
+    // findings as sustainability_report_url so the brand-detail Data
+    // tab links to it even before the processor runs.
+    const allDocs = classifyPdfCandidates(Array.from(pdfCandidates.values()));
+    const documents = allDocs;
+    const bestPdf = documents.length > 0
+      ? documents.slice().sort((a, b) => kindPriority(a.kind) - kindPriority(b.kind))[0]
+      : null;
     if (bestPdf) {
       findings.push({
         field_key: 'sustainability_report_url',
@@ -285,21 +290,22 @@ export const brandWebsiteSource: SourceScraper = {
       });
     }
 
-    return { ok: true, findings, products };
+    return { ok: true, findings, products, documents };
   },
 };
 
 /**
  * Scan rendered HTML for anchor tags pointing at PDFs. Build a map
  * keyed by the absolute URL so the same PDF linked from multiple pages
- * collapses to a single candidate. Anchor text is preserved so the
- * keyword-classifier downstream can prefer EPD / sustainability-report
- * candidates over generic datasheets.
+ * collapses to a single candidate. Anchor text + the page it was found
+ * on are preserved so the classifier downstream can label the doc kind
+ * (EPD / LCA / sustainability-report / datasheet) and the brand-agent
+ * can record where each link came from.
  */
 function collectPdfLinks(
   html: string,
   baseUrl: string,
-  out: Map<string, { url: string; anchorText: string }>,
+  out: Map<string, { url: string; anchorText: string; sourceUrl: string }>,
 ): void {
   const anchorRegex = /<a\b[^>]*href=(?:"([^"]+)"|'([^']+)'|([^\s>]+))[^>]*>([\s\S]*?)<\/a>/gi;
   let match: RegExpExecArray | null;
@@ -312,7 +318,7 @@ function collectPdfLinks(
     const key = resolved.toLowerCase();
     if (out.has(key)) continue;
     const anchorText = stripTags(match[4] ?? '').replace(/\s+/g, ' ').trim();
-    out.set(key, { url: resolved, anchorText });
+    out.set(key, { url: resolved, anchorText, sourceUrl: baseUrl });
   }
 }
 
@@ -321,27 +327,61 @@ function stripTags(s: string): string {
 }
 
 /**
- * Pick the PDF candidate most likely to be a sustainability / EPD / LCA
- * document. Scores each candidate by keyword hits in the anchor text +
- * URL; returns the highest-scoring candidate above a small threshold.
- * Returns null when nothing looks plausible — we'd rather record no
- * finding than a generic terms-and-conditions PDF.
+ * Score and classify every PDF candidate. Anything that hits at least
+ * one sustainability / EPD / LCA / datasheet keyword in the anchor
+ * text or URL is returned; classification picks the most specific kind
+ * (epd > lca > sustainability_report > datasheet). Generic legal /
+ * terms-and-conditions PDFs (zero keyword score) are discarded — we'd
+ * rather miss those than burn cycles auto-processing them.
  */
-function pickBestSustainabilityPdf(
-  candidates: Array<{ url: string; anchorText: string }>,
-): { url: string; anchorText: string } | null {
-  let best: { url: string; anchorText: string; score: number } | null = null;
+function classifyPdfCandidates(
+  candidates: Array<{ url: string; anchorText: string; sourceUrl: string }>,
+): CrawledDocument[] {
+  const out: CrawledDocument[] = [];
   for (const c of candidates) {
-    const haystack = `${c.anchorText} ${c.url}`.toLowerCase();
-    let score = 0;
-    for (const keyword of SUSTAINABILITY_PDF_KEYWORDS) {
-      if (haystack.includes(keyword)) score += keyword.length;
-    }
-    if (score > 0 && (!best || score > best.score)) {
-      best = { ...c, score };
-    }
+    const kind = classifyKind(`${c.anchorText} ${c.url}`);
+    if (!kind) continue;
+    out.push({
+      url: c.url,
+      anchor_text: c.anchorText || c.url,
+      kind,
+      source_url: c.sourceUrl,
+    });
   }
-  return best ? { url: best.url, anchorText: best.anchorText } : null;
+  return out;
+}
+
+function classifyKind(haystackRaw: string): CrawledDocumentKind | null {
+  const h = haystackRaw.toLowerCase();
+  if (/(\bepd\b|environmental[- ]product[- ]declaration)/.test(h)) return 'epd';
+  if (/(\blca\b|life[- ]cycle[- ]assessment)/.test(h)) return 'lca';
+  if (/(sustainability[- ]report|impact[- ]report|esg[- ]report|carbon[- ]report|b[- ]corp[- ]impact)/.test(h)) {
+    return 'sustainability_report';
+  }
+  if (/(datasheet|data[- ]sheet|technical[- ]sheet|product[- ]sheet|spec[- ]sheet)/.test(h)) {
+    return 'datasheet';
+  }
+  // Fall back to a generic keyword match — keeps the legacy
+  // SUSTAINABILITY_PDF_KEYWORDS list as the safety net.
+  for (const keyword of SUSTAINABILITY_PDF_KEYWORDS) {
+    if (h.includes(keyword)) return 'other';
+  }
+  return null;
+}
+
+function kindPriority(kind: CrawledDocumentKind): number {
+  switch (kind) {
+    case 'epd':
+      return 0;
+    case 'lca':
+      return 1;
+    case 'sustainability_report':
+      return 2;
+    case 'datasheet':
+      return 3;
+    default:
+      return 4;
+  }
 }
 
 /**

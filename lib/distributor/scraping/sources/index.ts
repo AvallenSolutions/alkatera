@@ -27,4 +27,6 @@ export {
   type SourceFinding,
   type SourceRunResult,
   type CrawledProduct,
+  type CrawledDocument,
+  type CrawledDocumentKind,
 } from './types';

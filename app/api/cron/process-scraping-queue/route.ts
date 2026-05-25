@@ -96,6 +96,8 @@ export async function POST(request: NextRequest) {
         findings_written: 0,
         products_created: 0,
         products_linked: 0,
+        documents_ingested: 0,
+        documents_skipped: 0,
         errors: [errorMessage],
         skip_reasons: [] as string[],
       };
@@ -155,6 +157,8 @@ export async function POST(request: NextRequest) {
       findings_written: result.findings_written,
       products_created: result.products_created,
       products_linked: result.products_linked,
+      documents_ingested: result.documents_ingested,
+      documents_skipped: result.documents_skipped,
       errors: result.errors,
       skip_reasons: result.skip_reasons,
     });

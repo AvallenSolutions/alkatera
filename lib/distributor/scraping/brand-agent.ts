@@ -1,10 +1,17 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { ALL_SOURCES, type BrandSnapshot, type CrawledProduct, type SourceFinding } from './sources';
+import {
+  ALL_SOURCES,
+  type BrandSnapshot,
+  type CrawledDocument,
+  type CrawledProduct,
+  type SourceFinding,
+} from './sources';
 import { scoreConfidence } from './confidence-scorer';
 import { coerceFieldValue, type FieldKey } from './field-definitions';
 import { delay } from './http';
 import { recalculateCompleteness } from '../scoring/recalculate';
 import { resolveOrCreateProductEntry } from '../directory/product-matcher';
+import { ingestDiscoveredPdf } from './pdf-ingester';
 
 const DELAY_BETWEEN_SOURCES_MS = 2_000;
 
@@ -39,6 +46,10 @@ export interface RunBrandAgentResult {
   products_created: number;
   /** Products linked to existing product_directory rows. */
   products_linked: number;
+  /** PDFs downloaded + queued for the document processor this run. */
+  documents_ingested: number;
+  /** Already-seen PDFs we skipped during ingest. */
+  documents_skipped: number;
   errors: string[];
   /** Informational, not failure: "source X skipped because Y". */
   skip_reasons: string[];
@@ -78,6 +89,8 @@ export async function runBrandAgent(args: RunBrandAgentArgs): Promise<RunBrandAg
       findings_written: 0,
       products_created: 0,
       products_linked: 0,
+      documents_ingested: 0,
+      documents_skipped: 0,
       errors: ['runBrandAgent requires exactly one of brandProfileId or brandDirectoryId'],
       skip_reasons: [],
     };
@@ -95,6 +108,8 @@ export async function runBrandAgent(args: RunBrandAgentArgs): Promise<RunBrandAg
       findings_written: 0,
       products_created: 0,
       products_linked: 0,
+      documents_ingested: 0,
+      documents_skipped: 0,
       errors: [`brand_not_found: ${ref}`],
       skip_reasons: [],
     };
@@ -104,12 +119,15 @@ export async function runBrandAgent(args: RunBrandAgentArgs): Promise<RunBrandAg
   const errors: string[] = [];
   const skipReasons: string[] = [];
   const crawledProducts: CrawledProduct[] = [];
+  const crawledDocuments: CrawledDocument[] = [];
   let attempted = 0;
   let succeeded = 0;
   let skipped = 0;
   let written = 0;
   let productsCreated = 0;
   let productsLinked = 0;
+  let documentsIngested = 0;
+  let documentsSkipped = 0;
 
   for (let i = 0; i < ALL_SOURCES.length; i++) {
     const source = ALL_SOURCES[i];
@@ -137,6 +155,9 @@ export async function runBrandAgent(args: RunBrandAgentArgs): Promise<RunBrandAg
         written += newCount;
         if (result.products && result.products.length > 0) {
           crawledProducts.push(...result.products);
+        }
+        if (result.documents && result.documents.length > 0) {
+          crawledDocuments.push(...result.documents);
         }
       }
     } catch (err: unknown) {
@@ -170,6 +191,34 @@ export async function runBrandAgent(args: RunBrandAgentArgs): Promise<RunBrandAg
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         errors.push(`product_persist_failed: ${p.name}: ${message}`);
+      }
+    }
+  }
+
+  // Auto-ingest discovered PDFs: download each, upload to the
+  // brand-documents storage bucket, insert a submission row +
+  // processing job. The existing 2-minute doc-processor cron then
+  // extracts sustainability fields from the file. URL-keyed dedup
+  // prevents re-ingesting on subsequent scrape passes.
+  if (crawledDocuments.length > 0) {
+    const seenInRun = new Set<string>();
+    for (const doc of crawledDocuments) {
+      const key = doc.url.toLowerCase();
+      if (seenInRun.has(key)) continue;
+      seenInRun.add(key);
+      try {
+        const result = await ingestDiscoveredPdf({
+          supabase,
+          brandDirectoryId,
+          distributorOrgId: null,
+          document: doc,
+        });
+        if (result.ingested) documentsIngested += 1;
+        else documentsSkipped += 1;
+        if (result.error) errors.push(`document_ingest: ${doc.url}: ${result.error}`);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        errors.push(`document_ingest_failed: ${doc.url}: ${message}`);
       }
     }
   }
@@ -214,6 +263,8 @@ export async function runBrandAgent(args: RunBrandAgentArgs): Promise<RunBrandAg
     findings_written: written,
     products_created: productsCreated,
     products_linked: productsLinked,
+    documents_ingested: documentsIngested,
+    documents_skipped: documentsSkipped,
     errors,
     skip_reasons: skipReasons,
   };
