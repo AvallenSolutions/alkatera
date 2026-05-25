@@ -24,8 +24,13 @@ export interface SourcingFilters {
   keywords?: string | null;
   /** Manual brand-name search — when set, find this specific brand. */
   query?: string | null;
-  /** Max brands to return (capped). */
+  /** Max brands to return per call (capped at MAX_LIMIT). */
   limit?: number;
+  /**
+   * Optional. Brand names the LLM should NOT return. Used by the batch
+   * runner to prevent repeats across chunks of the same brief.
+   */
+  excludeNames?: string[];
 }
 
 export interface SourcedBrand {
@@ -58,6 +63,146 @@ export interface FindBrandsResult {
 }
 
 const MAX_LIMIT = 25;
+/** Hard cap on chunks per batched job — protects against runaway cost. */
+export const MAX_BATCH_CHUNKS = 12;
+/** Hard cap on target_count per brief. 12 chunks * 25 per chunk = 300. */
+export const MAX_TARGET_COUNT = 300;
+/** Stop early if this many consecutive chunks produce zero new brands. */
+const ZERO_STREAK_STOP = 2;
+
+export interface BatchProgress {
+  chunks_run: number;
+  chunks_target: number;
+  found: number;
+  duplicates_skipped: number;
+  zero_streak: number;
+  last_chunk_added: number;
+}
+
+export interface BatchOptions {
+  filters: SourcingFilters;
+  targetCount: number;
+  /** Called between chunks so the caller can persist progress. */
+  onChunk?: (
+    progress: BatchProgress,
+    chunkBrands: SourcedBrand[],
+    chunkProducts: SourcedProduct[],
+  ) => Promise<void> | void;
+}
+
+/**
+ * Loop findBrands in chunks of up to MAX_LIMIT until we hit the caller's
+ * targetCount or stop conditions trip:
+ *   - MAX_BATCH_CHUNKS reached (cost cap)
+ *   - ZERO_STREAK_STOP consecutive chunks add no new brands (the model
+ *     is out of ideas — keep searching is just burning credit)
+ *
+ * Across chunks we accumulate found brand names and pass them back as
+ * `excludeNames` so the LLM doesn't repeat itself. Dedup within the
+ * batch is case-insensitive on name.
+ *
+ * Note: this dedups within-batch only. Cross-batch dedup (against rows
+ * already in brand_directory) is the matcher's job at ingest time.
+ */
+export async function findBrandsBatched(opts: BatchOptions): Promise<FindBrandsResult & {
+  progress: BatchProgress;
+}> {
+  const target = Math.max(1, Math.min(MAX_TARGET_COUNT, opts.targetCount));
+  const chunksTarget = Math.min(MAX_BATCH_CHUNKS, Math.ceil(target / MAX_LIMIT));
+
+  const allBrands: SourcedBrand[] = [];
+  const allProducts: SourcedProduct[] = [];
+  const seenNames = new Set<string>();
+  const externalExclusions = new Set(
+    (opts.filters.excludeNames ?? []).map((n) => n.toLowerCase()),
+  );
+
+  let chunksRun = 0;
+  let duplicates = 0;
+  let zeroStreak = 0;
+  let summary: string | undefined;
+  let lastError: string | undefined;
+  let lastChunkAdded = 0;
+
+  for (let i = 0; i < chunksTarget; i += 1) {
+    const remaining = target - allBrands.length;
+    if (remaining <= 0) break;
+    const chunkLimit = Math.min(MAX_LIMIT, remaining);
+
+    const chunkFilters: SourcingFilters = {
+      ...opts.filters,
+      limit: chunkLimit,
+      // Combine external exclusion (passed in) with everything found so
+      // far in this batch.
+      excludeNames: [
+        ...Array.from(externalExclusions),
+        ...allBrands.map((b) => b.name),
+      ],
+    };
+
+    const result = await findBrands(chunkFilters);
+    chunksRun += 1;
+    if (result.error) {
+      lastError = result.error;
+      // Errors abort the batch — we'd rather show what we found than
+      // burn more budget against a misconfigured client.
+      break;
+    }
+    if (result.summary) summary = result.summary;
+
+    let added = 0;
+    const acceptedBrandNames = new Set<string>();
+    for (const brand of result.brands) {
+      const key = brand.name.trim().toLowerCase();
+      if (!key || seenNames.has(key) || externalExclusions.has(key)) {
+        duplicates += 1;
+        continue;
+      }
+      seenNames.add(key);
+      acceptedBrandNames.add(brand.name.toLowerCase());
+      allBrands.push(brand);
+      added += 1;
+    }
+
+    const chunkProducts = result.products.filter((p) =>
+      acceptedBrandNames.has(p.brand_name.toLowerCase()),
+    );
+    allProducts.push(...chunkProducts);
+    lastChunkAdded = added;
+
+    if (added === 0) zeroStreak += 1;
+    else zeroStreak = 0;
+
+    const progress: BatchProgress = {
+      chunks_run: chunksRun,
+      chunks_target: chunksTarget,
+      found: allBrands.length,
+      duplicates_skipped: duplicates,
+      zero_streak: zeroStreak,
+      last_chunk_added: added,
+    };
+    if (opts.onChunk) await opts.onChunk(progress, result.brands, chunkProducts);
+
+    if (zeroStreak >= ZERO_STREAK_STOP) break;
+  }
+
+  const progress: BatchProgress = {
+    chunks_run: chunksRun,
+    chunks_target: chunksTarget,
+    found: allBrands.length,
+    duplicates_skipped: duplicates,
+    zero_streak: zeroStreak,
+    last_chunk_added: lastChunkAdded,
+  };
+
+  return {
+    brands: allBrands,
+    products: allProducts,
+    summary,
+    error: lastError,
+    progress,
+  };
+}
 
 /**
  * Use Claude with the web_search server tool to find real drinks
@@ -124,10 +269,18 @@ function buildPrompt(filters: SourcingFilters, limit: number): string {
   if (filters.keywords) criteria.push(`Focus: ${filters.keywords}.`);
   const criteriaBlock = criteria.length > 0 ? criteria.join('\n') : 'Any notable drinks brands.';
 
+  // Send up to 300 exclusion names — beyond that the prompt gets bloated
+  // and the most-recent chunk's contribution dominates anyway.
+  const exclusions = (filters.excludeNames ?? []).slice(0, 300);
+  const exclusionBlock =
+    exclusions.length > 0
+      ? `\n\nAlready in our directory — DO NOT return any of these (skip if a candidate matches by name or any reasonable alias):\n${exclusions.map((n) => `- ${n}`).join('\n')}`
+      : '';
+
   return `You are sourcing real drinks brands for a sustainability directory. Use web search to find brands that genuinely exist and match the criteria. Prioritise brands with a real website and a verifiable sustainability angle (certifications, carbon, packaging, sourcing).
 
 Criteria:
-${criteriaBlock}
+${criteriaBlock}${exclusionBlock}
 
 Return up to ${limit} brands.
 

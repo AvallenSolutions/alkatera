@@ -10,12 +10,22 @@ const DELAY_BETWEEN_SOURCES_MS = 2_000;
 export interface RunBrandAgentArgs {
   supabase: SupabaseClient;
   /**
-   * Listing the scraping job belongs to (one job per listing in
-   * scraping_jobs, even though findings now hang off the directory).
-   * Used to read the brand snapshot + outreach_email auto-fill, and to
-   * resolve the directory entry that findings attach to.
+   * Listing the scraping job belongs to. Provided for jobs enqueued via
+   * the distributor scrape dispatcher (one job per listing). Used to
+   * resolve the directory entry that findings attach to and to auto-
+   * fill outreach_email on the listing.
+   *
+   * Mutually exclusive with brandDirectoryId — exactly one must be set.
    */
-  brandProfileId: string;
+  brandProfileId?: string;
+  /**
+   * Directory entry the scraping job targets directly. Provided for
+   * admin-intake jobs that have no distributor listing yet. Findings
+   * attach to this entry; no outreach_email auto-fill happens.
+   *
+   * Mutually exclusive with brandProfileId — exactly one must be set.
+   */
+  brandDirectoryId?: string;
   jobId: string;
 }
 
@@ -29,13 +39,22 @@ export interface RunBrandAgentResult {
   skip_reasons: string[];
 }
 
+interface ResolvedTarget {
+  brandDirectoryId: string;
+  snapshot: BrandSnapshot;
+  /** Present only when this run originated from a distributor listing. */
+  listingId: string | null;
+  /** Present only on listing-driven runs; allows outreach_email auto-fill. */
+  listingHasOutreachEmail: boolean;
+}
+
 /**
  * Run every source for a single brand and persist findings. Findings
  * attach to the canonical brand_directory entry (Phase 3) so any other
  * distributor that lists the same brand benefits immediately.
  *
  * Flow:
- *   1. Load the brand snapshot (listing-level: name, website, etc).
+ *   1. Resolve the snapshot from either a listing or a directory entry.
  *   2. For each source: call run(brand), wait DELAY_BETWEEN_SOURCES_MS.
  *   3. For each finding: coerce → score confidence → soft-supersede any
  *      previous winner → insert a fresh scraped_brand_data row.
@@ -44,33 +63,34 @@ export interface RunBrandAgentResult {
  * function just returns counts + error messages.
  */
 export async function runBrandAgent(args: RunBrandAgentArgs): Promise<RunBrandAgentResult> {
-  const { supabase, brandProfileId, jobId } = args;
+  const { supabase, brandProfileId, brandDirectoryId: directIdArg, jobId } = args;
 
-  const { data: brand, error } = await supabase
-    .from('brand_profiles')
-    .select('id, brand_directory_id, name, normalized_name, website, country_of_origin, category, outreach_email')
-    .eq('id', brandProfileId)
-    .maybeSingle();
-  if (error || !brand) {
+  if (!!brandProfileId === !!directIdArg) {
     return {
       sources_attempted: 0,
       sources_succeeded: 0,
       sources_skipped: 0,
       findings_written: 0,
-      errors: [`brand_not_found: ${error?.message ?? brandProfileId}`],
+      errors: ['runBrandAgent requires exactly one of brandProfileId or brandDirectoryId'],
       skip_reasons: [],
     };
   }
-  const brandDirectoryId = (brand as { brand_directory_id: string }).brand_directory_id;
 
-  const snapshot: BrandSnapshot = {
-    id: brand.id,
-    name: brand.name,
-    normalized_name: brand.normalized_name,
-    website: brand.website,
-    country_of_origin: brand.country_of_origin,
-    category: brand.category,
-  };
+  const target = brandProfileId
+    ? await loadFromListing(supabase, brandProfileId)
+    : await loadFromDirectory(supabase, directIdArg!);
+  if (!target) {
+    const ref = brandProfileId ?? directIdArg;
+    return {
+      sources_attempted: 0,
+      sources_succeeded: 0,
+      sources_skipped: 0,
+      findings_written: 0,
+      errors: [`brand_not_found: ${ref}`],
+      skip_reasons: [],
+    };
+  }
+  const { brandDirectoryId, snapshot, listingId, listingHasOutreachEmail } = target;
 
   const errors: string[] = [];
   const skipReasons: string[] = [];
@@ -116,9 +136,10 @@ export async function runBrandAgent(args: RunBrandAgentArgs): Promise<RunBrandAg
 
   // Promote a scraped contact_email up onto brand_profiles.outreach_email
   // so the Phase 3 outreach dashboard can populate without manual input.
-  // Only auto-fills when the brand has no outreach_email set — never
-  // overwrites a value the distributor curated.
-  if (!brand.outreach_email) {
+  // Only runs on listing-driven jobs (admin-intake jobs have no listing
+  // to write to), and only when the listing has no outreach_email set so
+  // we never overwrite a value the distributor curated.
+  if (listingId && !listingHasOutreachEmail) {
     const { data: emailFinding } = await supabase
       .from('scraped_brand_data')
       .select('field_value, confidence')
@@ -132,7 +153,7 @@ export async function runBrandAgent(args: RunBrandAgentArgs): Promise<RunBrandAg
       await supabase
         .from('brand_profiles')
         .update({ outreach_email: emailFinding.field_value })
-        .eq('id', brandProfileId)
+        .eq('id', listingId)
         .is('outreach_email', null);
     }
   }
@@ -153,6 +174,58 @@ export async function runBrandAgent(args: RunBrandAgentArgs): Promise<RunBrandAg
     findings_written: written,
     errors,
     skip_reasons: skipReasons,
+  };
+}
+
+async function loadFromListing(
+  supabase: SupabaseClient,
+  brandProfileId: string,
+): Promise<ResolvedTarget | null> {
+  const { data: brand, error } = await supabase
+    .from('brand_profiles')
+    .select('id, brand_directory_id, name, normalized_name, website, country_of_origin, category, outreach_email')
+    .eq('id', brandProfileId)
+    .maybeSingle();
+  if (error || !brand) return null;
+  const directoryId = (brand as { brand_directory_id: string }).brand_directory_id;
+  if (!directoryId) return null;
+  return {
+    brandDirectoryId: directoryId,
+    snapshot: {
+      id: brand.id,
+      name: brand.name,
+      normalized_name: brand.normalized_name,
+      website: brand.website,
+      country_of_origin: brand.country_of_origin,
+      category: brand.category,
+    },
+    listingId: brand.id,
+    listingHasOutreachEmail: !!brand.outreach_email,
+  };
+}
+
+async function loadFromDirectory(
+  supabase: SupabaseClient,
+  brandDirectoryId: string,
+): Promise<ResolvedTarget | null> {
+  const { data: row, error } = await supabase
+    .from('brand_directory')
+    .select('id, name, normalized_name, website, country_of_origin, category')
+    .eq('id', brandDirectoryId)
+    .maybeSingle();
+  if (error || !row) return null;
+  return {
+    brandDirectoryId: row.id,
+    snapshot: {
+      id: row.id,
+      name: row.name,
+      normalized_name: row.normalized_name,
+      website: row.website,
+      country_of_origin: row.country_of_origin,
+      category: row.category,
+    },
+    listingId: null,
+    listingHasOutreachEmail: false,
   };
 }
 

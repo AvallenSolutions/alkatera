@@ -28,8 +28,9 @@ const MAX_JOBS_PER_RUN = 3;
 
 interface JobRow {
   id: string;
-  brand_profile_id: string;
-  distributor_org_id: string;
+  brand_profile_id: string | null;
+  distributor_org_id: string | null;
+  brand_directory_id: string | null;
 }
 
 export async function POST(request: NextRequest) {
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
   // 2. Claim up to N queued jobs.
   const { data: claimed } = await supabase
     .from('scraping_jobs')
-    .select('id, brand_profile_id, distributor_org_id')
+    .select('id, brand_profile_id, distributor_org_id, brand_directory_id')
     .eq('status', 'queued')
     .order('created_at', { ascending: true })
     .limit(MAX_JOBS_PER_RUN);
@@ -82,7 +83,8 @@ export async function POST(request: NextRequest) {
     try {
       result = await runBrandAgent({
         supabase,
-        brandProfileId: job.brand_profile_id,
+        brandProfileId: job.brand_profile_id ?? undefined,
+        brandDirectoryId: job.brand_directory_id ?? undefined,
         jobId: job.id,
       });
     } catch (err: unknown) {
@@ -125,16 +127,25 @@ export async function POST(request: NextRequest) {
       })
       .eq('id', job.id);
 
-    // Bump the brand profile so the "last activity" column in the UI
+    // Bump the brand profile (listing-driven jobs) or directory entry
+    // (admin-intake jobs) so the "last activity" column in the UI
     // reflects this scrape even if nothing was found.
-    await supabase
-      .from('brand_profiles')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', job.brand_profile_id);
+    if (job.brand_profile_id) {
+      await supabase
+        .from('brand_profiles')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', job.brand_profile_id);
+    } else if (job.brand_directory_id) {
+      await supabase
+        .from('brand_directory')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', job.brand_directory_id);
+    }
 
     summaries.push({
       job_id: job.id,
       brand_profile_id: job.brand_profile_id,
+      brand_directory_id: job.brand_directory_id,
       status: finalStatus,
       sources_attempted: result.sources_attempted,
       sources_succeeded: result.sources_succeeded,

@@ -19,10 +19,21 @@ interface SourcingResponse {
   brand_names?: string[];
   brands: { created: number; linked: number; errors: Array<{ row: number; brand?: string; error: string }> };
   products: { created: number; linked: number; errors: Array<{ row: number; brand?: string; error: string }> };
+  scrape_enqueue?: { queued: number; skipped_no_website: number; skipped_already_queued: number };
+}
+
+interface BatchProgress {
+  chunks_run: number;
+  chunks_target: number;
+  found: number;
+  duplicates_skipped: number;
+  zero_streak: number;
+  last_chunk_added: number;
 }
 
 const CATEGORY_NONE = '__any__';
 const CERT_OPTIONS = ['B Corp', 'Organic', 'Carbon neutral', 'Fairtrade', 'Regenerative'];
+const TARGET_PRESETS = [12, 25, 50, 100, 200, 300];
 
 export function BrandSourcing() {
   const [mode, setMode] = useState<'filter' | 'manual'>('filter');
@@ -31,10 +42,12 @@ export function BrandSourcing() {
   const [keywords, setKeywords] = useState('');
   const [certs, setCerts] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
-  const [limit, setLimit] = useState(12);
+
+  const [targetCount, setTargetCount] = useState(12);
 
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState<string | null>(null);
+  const [progress, setProgress] = useState<BatchProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SourcingResponse | null>(null);
   const cancelledRef = useRef(false);
@@ -59,17 +72,18 @@ export function BrandSourcing() {
     setBusy(true);
     setError(null);
     setResult(null);
+    setProgress(null);
     setPhase('Queued…');
     try {
       const payload =
         mode === 'manual'
-          ? { query: query.trim(), limit }
+          ? { query: query.trim(), target_count: 1 }
           : {
               category: category === CATEGORY_NONE ? undefined : category,
               country: country.trim() || undefined,
               keywords: keywords.trim() || undefined,
               certifications: Array.from(certs),
-              limit,
+              target_count: targetCount,
             };
       const res = await fetch('/api/admin/directory/sourcing', {
         method: 'POST',
@@ -96,8 +110,9 @@ export function BrandSourcing() {
   }
 
   async function pollJob(jobId: string) {
-    // Poll up to ~3 minutes (web search + ingest). 3s interval.
-    const deadline = Date.now() + 3 * 60 * 1000;
+    // Poll up to 15 minutes — a 300-brand batch can run 8-12 chunks of
+    // ~60s each plus an ingest pass at the end. 3s interval.
+    const deadline = Date.now() + 15 * 60 * 1000;
     while (!cancelledRef.current && Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 3000));
       if (cancelledRef.current) return;
@@ -106,6 +121,7 @@ export function BrandSourcing() {
         phase_message?: string | null;
         result?: SourcingResponse;
         error?: string;
+        progress?: BatchProgress;
       };
       try {
         const res = await fetch(`/api/admin/directory/sourcing/${jobId}`);
@@ -114,6 +130,7 @@ export function BrandSourcing() {
         continue; // transient — keep polling
       }
       if (body.phase_message) setPhase(body.phase_message);
+      if (body.progress) setProgress(body.progress);
       if (body.status === 'done' && body.result) {
         setResult(body.result);
         setBusy(false);
@@ -218,22 +235,33 @@ export function BrandSourcing() {
           </Field>
         )}
 
-        <div className="flex items-center justify-between gap-3 pt-1">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span>Max results</span>
-            <Select value={String(limit)} onValueChange={(v) => setLimit(Number(v))}>
-              <SelectTrigger className="bg-background/40 h-8 w-20 text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {[5, 12, 20, 25].map((n) => (
-                  <SelectItem key={n} value={String(n)}>
-                    {n}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        {mode === 'filter' && (
+          <div className="space-y-1 pt-1">
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+              How many brands?
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              {TARGET_PRESETS.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setTargetCount(n)}
+                  className={`text-[11px] rounded-full border px-3 py-1 transition-colors ${
+                    targetCount === n
+                      ? 'bg-neon-lime/15 border-neon-lime/40 text-neon-lime'
+                      : 'border-border/60 text-muted-foreground hover:border-neon-lime/40'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+              <span className="text-[11px] text-muted-foreground">
+                Chunked into ≤25 per web-search call. Up to 300 per brief.
+              </span>
+            </div>
           </div>
+        )}
+        <div className="flex items-center justify-end gap-3 pt-1">
           <Button
             onClick={run}
             disabled={!canRun || busy}
@@ -251,10 +279,38 @@ export function BrandSourcing() {
           </Button>
         </div>
         {busy && (
-          <p className="text-[11px] text-muted-foreground">
-            {phase ?? 'Working…'} This runs in the background and can take up to a minute or two
-            while we search the web and build each profile. You can leave this page open.
-          </p>
+          <div className="space-y-2">
+            <p className="text-[11px] text-muted-foreground">
+              {phase ?? 'Working…'} Larger briefs can run for several minutes while we chunk the
+              web search. You can leave this page open.
+            </p>
+            {progress && progress.chunks_target > 0 && (
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-[11px] text-muted-foreground">
+                  <span>
+                    Chunk {progress.chunks_run} / {progress.chunks_target}
+                  </span>
+                  <span>
+                    {progress.found} brand{progress.found === 1 ? '' : 's'} found
+                    {progress.duplicates_skipped > 0 && (
+                      <>
+                        {' '}
+                        · {progress.duplicates_skipped} duplicate{progress.duplicates_skipped === 1 ? '' : 's'}
+                      </>
+                    )}
+                  </span>
+                </div>
+                <div className="h-1.5 rounded-full bg-background/60 overflow-hidden">
+                  <div
+                    className="h-full bg-neon-lime transition-[width] duration-500"
+                    style={{
+                      width: `${Math.min(100, (progress.chunks_run / progress.chunks_target) * 100)}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
@@ -294,6 +350,13 @@ function ResultPanel({ result }: { result: SourcingResponse }) {
               <>
                 {result.products.created} new product
                 {result.products.created === 1 ? '' : 's'} added.{' '}
+              </>
+            )}
+            {result.scrape_enqueue && result.scrape_enqueue.queued > 0 && (
+              <>
+                {result.scrape_enqueue.queued} brand-website scrape
+                {result.scrape_enqueue.queued === 1 ? '' : 's'} queued for first-pass
+                enrichment.{' '}
               </>
             )}
             New entries are <strong>pending</strong> — review and verify them before they go

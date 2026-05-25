@@ -29,7 +29,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 
   const { data: jobRow } = await auth.service
     .from('brand_sourcing_jobs')
-    .select('id, status, phase_message, found, result, error')
+    .select('id, status, phase_message, found, result, error, progress, target_count')
     .eq('id', params.id)
     .maybeSingle();
   if (!jobRow) {
@@ -42,6 +42,8 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     found: { brands?: unknown; products?: unknown; summary?: string | null } | null;
     result: unknown;
     error: string | null;
+    progress: Record<string, unknown> | null;
+    target_count: number | null;
   };
 
   // Finalise: once the web search is done, ingest as pending. Claim the
@@ -64,7 +66,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
           completed_at: new Date().toISOString(),
         })
         .eq('id', job.id);
-      return NextResponse.json({ status: 'done', result });
+      return NextResponse.json({ status: 'done', result, progress: job.progress });
     }
     // Another poll claimed it — fall through and report current state.
   }
@@ -74,6 +76,8 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     phase_message: job.phase_message,
     result: job.result,
     error: job.error,
+    progress: job.progress,
+    target_count: job.target_count,
   });
 }
 
@@ -98,7 +102,14 @@ async function ingest(
           rows: brands.map(stringifyValues),
           mapping: brandMapping,
         })
-      : { rows_processed: 0, brands_created: 0, brands_linked: 0, errors: [] };
+      : {
+          rows_processed: 0,
+          brands_created: 0,
+          brands_linked: 0,
+          errors: [],
+          created_directory_ids: [] as string[],
+          scrape_enqueue: { queued: 0, skipped_no_website: 0, skipped_already_queued: 0 },
+        };
 
   const productResult =
     products.length > 0
@@ -125,6 +136,7 @@ async function ingest(
       linked: productResult.products_linked,
       errors: productResult.errors,
     },
+    scrape_enqueue: brandResult.scrape_enqueue,
   };
 }
 

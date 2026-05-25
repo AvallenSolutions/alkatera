@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import { createHmac } from 'crypto';
 import { requireAlkateraAdmin } from '@/lib/admin/auth';
-import { findBrands, type SourcingFilters } from '@/lib/admin/sourcing/find-brands';
+import {
+  findBrandsBatched,
+  MAX_TARGET_COUNT,
+  type SourcingFilters,
+  type BatchProgress,
+} from '@/lib/admin/sourcing/find-brands';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
@@ -21,13 +26,17 @@ export const maxDuration = 26;
 
 const TRIGGER_TIMEOUT_MS = 4000;
 
+interface SourcingPayload extends SourcingFilters {
+  target_count?: number;
+}
+
 export async function POST(request: Request) {
   const auth = await requireAlkateraAdmin();
   if (!auth.ok) return auth.response;
 
-  let body: SourcingFilters;
+  let body: SourcingPayload;
   try {
-    body = (await request.json()) as SourcingFilters;
+    body = (await request.json()) as SourcingPayload;
   } catch {
     return NextResponse.json({ error: 'invalid_json' }, { status: 400 });
   }
@@ -45,6 +54,20 @@ export async function POST(request: Request) {
     );
   }
 
+  const targetCount = Math.max(
+    1,
+    Math.min(
+      MAX_TARGET_COUNT,
+      typeof body.target_count === 'number' && Number.isFinite(body.target_count)
+        ? body.target_count
+        : 12,
+    ),
+  );
+
+  // Filters get persisted on the job and re-read by the bg fn; strip
+  // target_count out of them since it lives on its own column now.
+  const { target_count: _ignored, ...filters } = body;
+
   // Insert the job (pending).
   const { data: job, error: insertErr } = await auth.service
     .from('brand_sourcing_jobs')
@@ -52,7 +75,8 @@ export async function POST(request: Request) {
       created_by: auth.user.id,
       status: 'pending',
       phase_message: 'Queued…',
-      filters: body,
+      filters,
+      target_count: targetCount,
     })
     .select('id')
     .single();
@@ -81,7 +105,7 @@ export async function POST(request: Request) {
   if (!triggered) {
     // Local / fallback path. Don't await — let it run in the background
     // of the dev process; the client polls for completion.
-    void runSearchInline(auth.service, jobId, body);
+    void runSearchInline(auth.service, jobId, filters as SourcingFilters, targetCount);
   }
 
   return NextResponse.json({ jobId }, { status: 202 });
@@ -115,6 +139,7 @@ async function runSearchInline(
   service: SupabaseClient,
   jobId: string,
   filters: SourcingFilters,
+  targetCount: number,
 ): Promise<void> {
   const update = (patch: Record<string, unknown>) =>
     service
@@ -122,16 +147,39 @@ async function runSearchInline(
       .update({ ...patch, updated_at: new Date().toISOString() })
       .eq('id', jobId);
   try {
-    await update({ status: 'searching', phase_message: 'Searching the web for brands…' });
-    const found = await findBrands(filters);
-    if (found.error) {
-      await update({ status: 'error', error: found.error.slice(0, 500), phase_message: null });
+    const chunksTarget = Math.max(1, Math.ceil(targetCount / 25));
+    await update({
+      status: 'searching',
+      phase_message: `Searching the web — chunk 1 of up to ${chunksTarget}…`,
+      progress: {
+        chunks_run: 0,
+        chunks_target: chunksTarget,
+        found: 0,
+        duplicates_skipped: 0,
+        zero_streak: 0,
+        last_chunk_added: 0,
+      },
+    });
+    const batch = await findBrandsBatched({
+      filters,
+      targetCount,
+      onChunk: async (progress: BatchProgress) => {
+        const phase =
+          progress.chunks_run < progress.chunks_target
+            ? `Chunk ${progress.chunks_run}/${progress.chunks_target} · ${progress.found} brand${progress.found === 1 ? '' : 's'} so far…`
+            : `Found ${progress.found} brand${progress.found === 1 ? '' : 's'}. Adding to the directory…`;
+        await update({ progress, phase_message: phase });
+      },
+    });
+    if (batch.error && batch.brands.length === 0) {
+      await update({ status: 'error', error: batch.error.slice(0, 500), phase_message: null });
       return;
     }
     await update({
       status: 'searched',
-      phase_message: `Found ${found.brands.length} brand(s). Adding to the directory…`,
-      found: { brands: found.brands, products: found.products, summary: found.summary ?? null },
+      phase_message: `Found ${batch.brands.length} brand${batch.brands.length === 1 ? '' : 's'}. Adding to the directory…`,
+      progress: batch.progress,
+      found: { brands: batch.brands, products: batch.products, summary: batch.summary ?? null },
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);

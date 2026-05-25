@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { resolveOrCreateDirectoryEntry } from '@/lib/distributor/directory/matcher';
+import { queueDirectoryBrandsForScraping } from '@/lib/distributor/scraping/agent-dispatcher';
 import type { BrandFieldKey } from './field-specs';
 
 export interface BulkBrandsResult {
@@ -7,6 +8,14 @@ export interface BulkBrandsResult {
   brands_created: number;
   brands_linked: number;
   errors: Array<{ row: number; brand: string; error: string }>;
+  /** Directory IDs that were freshly created by this run. */
+  created_directory_ids: string[];
+  /** Outcome of the auto-scrape enqueue pass (best-effort). */
+  scrape_enqueue: {
+    queued: number;
+    skipped_no_website: number;
+    skipped_already_queued: number;
+  };
 }
 
 interface Args {
@@ -32,6 +41,8 @@ export async function processBulkBrands(args: Args): Promise<BulkBrandsResult> {
     brands_created: 0,
     brands_linked: 0,
     errors: [],
+    created_directory_ids: [],
+    scrape_enqueue: { queued: 0, skipped_no_website: 0, skipped_already_queued: 0 },
   };
 
   if (!mapping.name) {
@@ -71,8 +82,12 @@ export async function processBulkBrands(args: Args): Promise<BulkBrandsResult> {
         discoveredByDistributorOrgId: null,
         discoveredVia: 'manual',
       });
-      if (resolved.created) result.brands_created += 1;
-      else result.brands_linked += 1;
+      if (resolved.created) {
+        result.brands_created += 1;
+        result.created_directory_ids.push(resolved.directoryId);
+      } else {
+        result.brands_linked += 1;
+      }
 
       // Fill optional columns, never overwrite an existing populated value.
       const fill: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -121,6 +136,27 @@ export async function processBulkBrands(args: Args): Promise<BulkBrandsResult> {
         brand: name,
         error: err instanceof Error ? err.message : String(err),
       });
+    }
+  }
+
+  // Auto-scrape: kick the brand-website source against every newly
+  // created entry that has a website. The reviewer's queue gets richer
+  // data without a second click. Failures here are non-fatal — the
+  // ingest result still returns; admins can hand-trigger later.
+  if (result.created_directory_ids.length > 0) {
+    try {
+      const queued = await queueDirectoryBrandsForScraping({
+        supabase: service,
+        brandDirectoryIds: result.created_directory_ids,
+        triggeredBy: 'admin_intake',
+      });
+      result.scrape_enqueue = {
+        queued: queued.queued,
+        skipped_no_website: queued.skipped_no_website,
+        skipped_already_queued: queued.skipped_already_queued,
+      };
+    } catch {
+      // best-effort
     }
   }
 

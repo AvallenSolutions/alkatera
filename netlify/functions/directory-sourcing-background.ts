@@ -5,7 +5,11 @@ import { createHmac, timingSafeEqual } from 'crypto';
 // ONLY @anthropic-ai/sdk, so it bundles cleanly here. We deliberately do NOT
 // import the bulk processors (they use the `@/` alias) — the ingest happens
 // in the Next.js route once this function writes the raw results back.
-import { findBrands, type SourcingFilters } from '../../lib/admin/sourcing/find-brands';
+import {
+  findBrandsBatched,
+  type SourcingFilters,
+  type BatchProgress,
+} from '../../lib/admin/sourcing/find-brands';
 
 /**
  * Background runner for admin brand sourcing. The Netlify -background
@@ -83,7 +87,7 @@ export const handler = async (event: {
   try {
     const { data: job, error: jobErr } = await supabase
       .from('brand_sourcing_jobs')
-      .select('id, filters')
+      .select('id, filters, target_count')
       .eq('id', jobId)
       .maybeSingle();
     if (jobErr || !job) {
@@ -91,13 +95,40 @@ export const handler = async (event: {
       return { statusCode: 404, body: 'job not found' };
     }
 
-    await updateJob({ status: 'searching', phase_message: 'Searching the web for brands…' });
+    const targetCount =
+      typeof (job as { target_count?: number }).target_count === 'number'
+        ? (job as { target_count: number }).target_count
+        : 12;
 
-    const found = await findBrands((job.filters ?? {}) as SourcingFilters);
-    if (found.error) {
+    await updateJob({
+      status: 'searching',
+      phase_message: `Searching the web — chunk 1 of up to ${Math.max(1, Math.ceil(targetCount / 25))}…`,
+      progress: {
+        chunks_run: 0,
+        chunks_target: Math.max(1, Math.ceil(targetCount / 25)),
+        found: 0,
+        duplicates_skipped: 0,
+        zero_streak: 0,
+        last_chunk_added: 0,
+      },
+    });
+
+    const batch = await findBrandsBatched({
+      filters: (job.filters ?? {}) as SourcingFilters,
+      targetCount,
+      onChunk: async (progress: BatchProgress) => {
+        const phase =
+          progress.chunks_run < progress.chunks_target
+            ? `Chunk ${progress.chunks_run}/${progress.chunks_target} · ${progress.found} brand${progress.found === 1 ? '' : 's'} so far…`
+            : `Found ${progress.found} brand${progress.found === 1 ? '' : 's'}. Adding to the directory…`;
+        await updateJob({ progress, phase_message: phase });
+      },
+    });
+
+    if (batch.error && batch.brands.length === 0) {
       await updateJob({
         status: 'error',
-        error: found.error.slice(0, 500),
+        error: batch.error.slice(0, 500),
         phase_message: null,
       });
       return { statusCode: 200, body: 'ok' };
@@ -105,8 +136,9 @@ export const handler = async (event: {
 
     await updateJob({
       status: 'searched',
-      phase_message: `Found ${found.brands.length} brand(s). Adding to the directory…`,
-      found: { brands: found.brands, products: found.products, summary: found.summary ?? null },
+      phase_message: `Found ${batch.brands.length} brand${batch.brands.length === 1 ? '' : 's'}. Adding to the directory…`,
+      progress: batch.progress,
+      found: { brands: batch.brands, products: batch.products, summary: batch.summary ?? null },
     });
 
     return { statusCode: 200, body: 'ok' };

@@ -36,7 +36,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: 'Directory',
     items: [
-      { name: 'Find brands', href: '/admin/directory/sourcing', icon: Sparkles },
+      { name: 'Add brands', href: '/admin/directory/intake', icon: Sparkles },
       { name: 'Review queue', href: '/admin/directory/review', icon: ShieldCheck },
       { name: 'Brands', href: '/admin/directory/brands', icon: Building2 },
       { name: 'Products', href: '/admin/directory/products', icon: Package },

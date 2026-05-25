@@ -16,6 +16,10 @@ export interface PendingBrand {
   completeness_score: number | null;
   product_count: number;
   created_at: string;
+  /** Active scraped_brand_data rows attached to this directory entry. */
+  scraped_field_count: number;
+  /** Latest admin-intake scrape job status — null if none has fired. */
+  scrape_status: 'queued' | 'running' | 'complete' | 'error' | 'skipped' | null;
 }
 
 export function ReviewQueue({ initialBrands }: { initialBrands: PendingBrand[] }) {
@@ -25,6 +29,12 @@ export function ReviewQueue({ initialBrands }: { initialBrands: PendingBrand[] }
   const [busyId, setBusyId] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [safetyOn, setSafetyOn] = useState(true);
+
+  const visibleIds = brands.map((b) => b.id);
+  const safeIds = brands
+    .filter((b) => isSafeToBulkVerify(b))
+    .map((b) => b.id);
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -65,12 +75,12 @@ export function ReviewQueue({ initialBrands }: { initialBrands: PendingBrand[] }
     }
   }
 
-  async function bulk(status: 'verified' | 'rejected') {
-    if (selected.size === 0) return;
+  async function bulk(status: 'verified' | 'rejected', overrideIds?: string[]) {
+    const ids = overrideIds ?? Array.from(selected);
+    if (ids.length === 0) return;
     setBulkBusy(true);
     setError(null);
     try {
-      const ids = Array.from(selected);
       const res = await fetch('/api/admin/directory/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -88,6 +98,12 @@ export function ReviewQueue({ initialBrands }: { initialBrands: PendingBrand[] }
     } finally {
       setBulkBusy(false);
     }
+  }
+
+  async function verifyAllSafe() {
+    const target = safetyOn ? safeIds : visibleIds;
+    if (target.length === 0) return;
+    await bulk('verified', target);
   }
 
   if (brands.length === 0) {
@@ -111,7 +127,7 @@ export function ReviewQueue({ initialBrands }: { initialBrands: PendingBrand[] }
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-card/40 px-4 py-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 bg-card/40 px-4 py-2.5">
         <label className="flex items-center gap-2 text-sm cursor-pointer">
           <input
             type="checkbox"
@@ -121,7 +137,7 @@ export function ReviewQueue({ initialBrands }: { initialBrands: PendingBrand[] }
           />
           {selected.size > 0 ? `${selected.size} selected` : 'Select all'}
         </label>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             size="sm"
             variant="outline"
@@ -140,6 +156,30 @@ export function ReviewQueue({ initialBrands }: { initialBrands: PendingBrand[] }
           >
             {bulkBusy && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
             Verify selected
+          </Button>
+          <div className="h-5 w-px bg-border/60 mx-1" />
+          <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer">
+            <input
+              type="checkbox"
+              checked={safetyOn}
+              onChange={(e) => setSafetyOn(e.target.checked)}
+              className="h-3 w-3 rounded border-border/60 bg-background/40 text-neon-lime focus:ring-neon-lime"
+            />
+            Require website scrape or ≥2 sources
+          </label>
+          <Button
+            size="sm"
+            disabled={bulkBusy || (safetyOn ? safeIds.length === 0 : visibleIds.length === 0)}
+            onClick={verifyAllSafe}
+            className="bg-neon-lime/90 hover:bg-neon-lime text-black font-semibold"
+            title={
+              safetyOn
+                ? `Verify ${safeIds.length} brand(s) that pass the safety check`
+                : `Verify all ${visibleIds.length} visible brand(s)`
+            }
+          >
+            {bulkBusy && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+            Verify {safetyOn ? safeIds.length : visibleIds.length} visible
           </Button>
         </div>
       </div>
@@ -175,11 +215,12 @@ export function ReviewQueue({ initialBrands }: { initialBrands: PendingBrand[] }
                   </a>
                 )}
               </div>
-              <div className="text-[11px] text-muted-foreground mt-0.5 flex flex-wrap gap-x-3">
+              <div className="text-[11px] text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
                 <span>{b.category ?? 'uncategorised'}</span>
                 {b.country_of_origin && <span>{b.country_of_origin}</span>}
                 <span>{b.product_count} product{b.product_count === 1 ? '' : 's'}</span>
                 <span className="text-muted-foreground/60">via {b.discovered_via.replace(/_/g, ' ')}</span>
+                <RichnessPills brand={b} />
               </div>
             </div>
             <div className="flex gap-1.5 shrink-0">
@@ -211,5 +252,53 @@ export function ReviewQueue({ initialBrands }: { initialBrands: PendingBrand[] }
         ))}
       </ul>
     </div>
+  );
+}
+
+function isSafeToBulkVerify(b: PendingBrand): boolean {
+  // We treat a brand as "safe" if we have evidence beyond the LLM:
+  //   - the brand-website scrape has completed (regardless of fields),
+  //     because that means the site exists and was crawled, OR
+  //   - we have at least two scraped fields (any source).
+  // The reviewer can still flip the safety off if they want to verify
+  // pure-LLM rows in bulk.
+  if (b.scrape_status === 'complete') return true;
+  return b.scraped_field_count >= 2;
+}
+
+function RichnessPills({ brand }: { brand: PendingBrand }) {
+  const pills: Array<{ label: string; tone: 'good' | 'wait' | 'thin' | 'fail' }> = [];
+  if (brand.website) pills.push({ label: 'site', tone: 'good' });
+  if (brand.scrape_status === 'complete' && brand.scraped_field_count > 0) {
+    pills.push({
+      label: `${brand.scraped_field_count} field${brand.scraped_field_count === 1 ? '' : 's'}`,
+      tone: 'good',
+    });
+  } else if (brand.scrape_status === 'queued' || brand.scrape_status === 'running') {
+    pills.push({ label: 'scraping…', tone: 'wait' });
+  } else if (brand.scrape_status === 'error') {
+    pills.push({ label: 'scrape failed', tone: 'fail' });
+  } else if (!brand.website) {
+    pills.push({ label: 'name only', tone: 'thin' });
+  }
+  return (
+    <>
+      {pills.map((p) => (
+        <span
+          key={p.label}
+          className={`text-[10px] rounded-full border px-1.5 py-0.5 ${
+            p.tone === 'good'
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+              : p.tone === 'wait'
+                ? 'bg-sky-400/10 border-sky-400/30 text-sky-300'
+                : p.tone === 'fail'
+                  ? 'bg-amber-300/10 border-amber-300/30 text-amber-300'
+                  : 'bg-muted/40 border-border/60 text-muted-foreground'
+          }`}
+        >
+          {p.label}
+        </span>
+      ))}
+    </>
   );
 }
