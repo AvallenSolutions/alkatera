@@ -46,7 +46,6 @@ interface DirectoryRow {
   sustainability_score: number | null;
   completeness_score: number | null;
   score_tier: string | null;
-  scoring_mode: 'scraped' | 'alkatera' | null;
   discovery_opt_out: boolean;
   discovered_via: string;
   verification_status: 'pending' | 'verified' | 'rejected';
@@ -65,7 +64,7 @@ export default async function AdminBrandDetailPage({
     .from('brand_directory')
     .select(
       'id, name, category, country_of_origin, website, founding_year, parent_company, description, aliases, ' +
-        'alkatera_org_id, sustainability_score, completeness_score, score_tier, scoring_mode, discovery_opt_out, discovered_via, verification_status, notable_facts, created_at, updated_at',
+        'alkatera_org_id, sustainability_score, completeness_score, score_tier, discovery_opt_out, discovered_via, verification_status, notable_facts, created_at, updated_at',
     )
     .eq('id', params.id)
     .maybeSingle()) as { data: DirectoryRow | null };
@@ -157,11 +156,12 @@ export default async function AdminBrandDetailPage({
       numeric: row.field_value_numeric,
     });
   }
-  // Two-tier scoring: brand_directory.scoring_mode drives which scorer
-  // runs here (mirrors recalculate.ts so the on-page breakdown matches
-  // the persisted sustainability_score exactly).
-  const scoringMode: 'scraped' | 'alkatera' =
-    brand.scoring_mode ?? (brand.alkatera_org_id ? 'alkatera' : 'scraped');
+  // Two-tier scoring: derive the mode from the alka**tera** link so
+  // this page works whether or not the scoring_mode migration has been
+  // applied yet. recalculate.ts persists the same value for cron-side
+  // consumers; the on-page breakdown re-runs the calculator locally
+  // so the two stay in sync regardless of column presence.
+  const scoringMode: 'scraped' | 'alkatera' = brand.alkatera_org_id ? 'alkatera' : 'scraped';
   const vitality =
     scoringMode === 'alkatera'
       ? calculateVitality(valuesMap)
