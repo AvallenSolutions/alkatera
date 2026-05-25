@@ -16,9 +16,11 @@
 --                                 'distributor_upload' and a CHECK
 --   document_processing_jobs
 --     - brand_profile_id        → nullable (was NOT NULL)
---     - distributor_org_id      → nullable (was NOT NULL)
 --     - brand_directory_id      → new uuid FK so the cron + processor
 --                                 can read context for listing-less jobs
+--                                 (note: this table never carried
+--                                 distributor_org_id — that audit lives
+--                                 on the submission row)
 --
 -- RLS updates: alka**tera** admins get a SELECT path on submissions
 -- + jobs that come from auto_scrape / have no distributor_org_id.
@@ -40,8 +42,6 @@ alter table public.brand_document_submissions
 -- 2. document_processing_jobs
 alter table public.document_processing_jobs
   alter column brand_profile_id drop not null;
-alter table public.document_processing_jobs
-  alter column distributor_org_id drop not null;
 alter table public.document_processing_jobs
   add column if not exists brand_directory_id uuid
     references public.brand_directory(id) on delete cascade;
@@ -72,7 +72,7 @@ drop policy if exists "alkatera admins read auto-scrape jobs"
 create policy "alkatera admins read auto-scrape jobs"
   on public.document_processing_jobs for select
   using (
-    distributor_org_id is null and public.is_alkatera_admin()
+    brand_profile_id is null and public.is_alkatera_admin()
   );
 
 commit;

@@ -114,14 +114,15 @@ export async function ingestDiscoveredPdf(args: IngestArgs): Promise<IngestResul
     };
   }
 
-  // Queue the processor.
+  // Queue the processor. document_processing_jobs only has
+  // brand_profile_id (now nullable post-migration); distributor_org_id
+  // audit lives on the submission row alone.
   const submissionId = (submission as { id: string }).id;
   const { error: jobError } = await supabase
     .from('document_processing_jobs')
     .insert({
       submission_id: submissionId,
       brand_directory_id: brandDirectoryId,
-      distributor_org_id: distributorOrgId,
       brand_profile_id: null,
       status: 'queued',
     });
