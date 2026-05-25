@@ -12,6 +12,7 @@ import {
   BrandMergeControl,
   type DuplicateCandidate,
 } from '@/components/admin/directory/brand-merge-control';
+import { BrandDeepEnrichControl } from '@/components/admin/directory/brand-deep-enrich-control';
 import { EsgBreakdownPanel, type EsgSnapshot } from '@/components/shared/esg-breakdown-panel';
 
 export const dynamic = 'force-dynamic';
@@ -217,6 +218,12 @@ export default async function AdminBrandDetailPage({
           candidates={duplicateCandidates}
         />
       )}
+
+      <BrandDeepEnrichControl
+        brandId={brand.id}
+        brandName={brand.name}
+        hasWebsite={!!brand.website}
+      />
 
       {snapshot && <EsgBreakdownPanel snapshot={snapshot} accent="lime" />}
 
