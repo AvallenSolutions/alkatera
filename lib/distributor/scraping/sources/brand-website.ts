@@ -3,8 +3,15 @@ import { htmlToText } from '../extractors/html-to-text';
 import { extractFieldsFromContent } from '../extractors/llm-extractor';
 import { extractPatterns } from '../extractors/pattern-extractor';
 import { generateCompanyDescription } from '../extractors/description-generator';
+import { extractProductsFromPage } from '../extractors/product-extractor';
 import type { FieldKey } from '../field-definitions';
-import type { BrandSnapshot, SourceFinding, SourceRunResult, SourceScraper } from './types';
+import type {
+  BrandSnapshot,
+  CrawledProduct,
+  SourceFinding,
+  SourceRunResult,
+  SourceScraper,
+} from './types';
 
 /**
  * Pull what we can from the brand's own website.
@@ -44,8 +51,53 @@ const CRAWL_PATHS = [
   '/who-we-are',
 ];
 
-const MAX_CRAWL_PAGES = 6; // homepage + 5 paths max — keeps fetches polite
+// Product / shop / range paths. Crawled separately from the corpus
+// pages so we can run a focused product extractor on each one and avoid
+// burning the LLM corpus budget on long product-card markup.
+const PRODUCT_PATHS = [
+  '/products',
+  '/our-products',
+  '/all-products',
+  '/shop',
+  '/store',
+  '/range',
+  '/our-range',
+  '/the-range',
+  '/our-spirits',
+  '/spirits',
+  '/our-gin',
+  '/our-rum',
+  '/our-whisky',
+  '/our-vodka',
+  '/our-wines',
+  '/our-beers',
+  '/collection',
+  '/buy',
+];
+
+const MAX_CRAWL_PAGES = 6; // homepage + 5 corpus paths
+const MAX_PRODUCT_PAGES = 6; // bounded so a sprawling Shopify catalogue can't blow the budget
 const COMBINED_TEXT_BUDGET = 16_000;
+const PRODUCT_TEXT_BUDGET_PER_PAGE = 18_000;
+
+// Words that suggest a PDF link is a sustainability / EPD / LCA report.
+// Case-insensitive, applied to the anchor text + the URL itself.
+const SUSTAINABILITY_PDF_KEYWORDS = [
+  'epd',
+  'environmental product declaration',
+  'lca',
+  'life cycle assessment',
+  'life-cycle assessment',
+  'sustainability report',
+  'sustainability-report',
+  'esg report',
+  'esg-report',
+  'impact report',
+  'impact-report',
+  'carbon report',
+  'carbon-footprint',
+  'b corp impact',
+];
 
 const TARGET_FIELDS: FieldKey[] = [
   'bcorp_certified',
@@ -87,6 +139,8 @@ export const brandWebsiteSource: SourceScraper = {
     }
 
     const findings: SourceFinding[] = [];
+    const products: CrawledProduct[] = [];
+    const pdfCandidates = new Map<string, { url: string; anchorText: string }>();
 
     // Homepage is mandatory — if we can't fetch it, treat the source
     // as failed (not skipped) so the user knows something's wrong.
@@ -102,6 +156,7 @@ export const brandWebsiteSource: SourceScraper = {
     const pages: Array<{ url: string; text: string }> = [];
     const homeText = htmlToText(home.body);
     if (homeText.trim()) pages.push({ url: home.url, text: homeText });
+    collectPdfLinks(home.body, home.url, pdfCandidates);
 
     // Walk the candidate paths. We collect text from each and keep
     // going until we've gathered MAX_CRAWL_PAGES — including duplicates
@@ -119,6 +174,38 @@ export const brandWebsiteSource: SourceScraper = {
       const text = htmlToText(res.body);
       if (!text.trim()) continue;
       pages.push({ url: res.url, text });
+      collectPdfLinks(res.body, res.url, pdfCandidates);
+    }
+
+    // Product-page crawl. Each candidate path gets a fetch + a focused
+    // product-extractor LLM call. We dedupe by normalised product name
+    // (case-insensitive) within this run so the same product on two
+    // pages doesn't get persisted twice.
+    const seenProductKeys = new Set<string>();
+    let productPagesFetched = 0;
+    for (const path of PRODUCT_PATHS) {
+      if (productPagesFetched >= MAX_PRODUCT_PAGES) break;
+      const url = combine(homepage, path);
+      if (!url || seen.has(url.toLowerCase())) continue;
+      seen.add(url.toLowerCase());
+      const res = await fetchPage(url);
+      if (!res.ok || !res.body) continue;
+      productPagesFetched += 1;
+
+      collectPdfLinks(res.body, res.url, pdfCandidates);
+      const text = htmlToText(res.body);
+      if (!text.trim()) continue;
+      const extracted = await extractProductsFromPage({
+        text: text.slice(0, PRODUCT_TEXT_BUDGET_PER_PAGE),
+        brandName: brand.name,
+        sourceUrl: res.url,
+      });
+      for (const p of extracted.products) {
+        const key = p.name.toLowerCase();
+        if (seenProductKeys.has(key)) continue;
+        seenProductKeys.add(key);
+        products.push(p);
+      }
     }
 
     if (pages.length === 0) {
@@ -181,9 +268,81 @@ export const brandWebsiteSource: SourceScraper = {
       }
     }
 
-    return { ok: true, findings };
+    // Promote the best-looking sustainability PDF to a finding. We
+    // can't enumerate "all PDFs" via the field-key model, but we can
+    // surface the most signal-dense one (the one whose anchor text or
+    // URL contains EPD / LCA / sustainability-report-style keywords).
+    // The admin sees the link in the brand-detail Data tab and can
+    // upload it through the existing brand-upload flow for full
+    // extraction.
+    const bestPdf = pickBestSustainabilityPdf(Array.from(pdfCandidates.values()));
+    if (bestPdf) {
+      findings.push({
+        field_key: 'sustainability_report_url',
+        raw_value: bestPdf.url,
+        extraction_method: 'pattern_match',
+        source_url: bestPdf.url,
+      });
+    }
+
+    return { ok: true, findings, products };
   },
 };
+
+/**
+ * Scan rendered HTML for anchor tags pointing at PDFs. Build a map
+ * keyed by the absolute URL so the same PDF linked from multiple pages
+ * collapses to a single candidate. Anchor text is preserved so the
+ * keyword-classifier downstream can prefer EPD / sustainability-report
+ * candidates over generic datasheets.
+ */
+function collectPdfLinks(
+  html: string,
+  baseUrl: string,
+  out: Map<string, { url: string; anchorText: string }>,
+): void {
+  const anchorRegex = /<a\b[^>]*href=(?:"([^"]+)"|'([^']+)'|([^\s>]+))[^>]*>([\s\S]*?)<\/a>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = anchorRegex.exec(html))) {
+    const rawHref = match[1] ?? match[2] ?? match[3] ?? '';
+    if (!rawHref) continue;
+    if (!/\.pdf(\?|#|$)/i.test(rawHref)) continue;
+    const resolved = combine(baseUrl, rawHref);
+    if (!resolved) continue;
+    const key = resolved.toLowerCase();
+    if (out.has(key)) continue;
+    const anchorText = stripTags(match[4] ?? '').replace(/\s+/g, ' ').trim();
+    out.set(key, { url: resolved, anchorText });
+  }
+}
+
+function stripTags(s: string): string {
+  return s.replace(/<[^>]*>/g, '');
+}
+
+/**
+ * Pick the PDF candidate most likely to be a sustainability / EPD / LCA
+ * document. Scores each candidate by keyword hits in the anchor text +
+ * URL; returns the highest-scoring candidate above a small threshold.
+ * Returns null when nothing looks plausible — we'd rather record no
+ * finding than a generic terms-and-conditions PDF.
+ */
+function pickBestSustainabilityPdf(
+  candidates: Array<{ url: string; anchorText: string }>,
+): { url: string; anchorText: string } | null {
+  let best: { url: string; anchorText: string; score: number } | null = null;
+  for (const c of candidates) {
+    const haystack = `${c.anchorText} ${c.url}`.toLowerCase();
+    let score = 0;
+    for (const keyword of SUSTAINABILITY_PDF_KEYWORDS) {
+      if (haystack.includes(keyword)) score += keyword.length;
+    }
+    if (score > 0 && (!best || score > best.score)) {
+      best = { ...c, score };
+    }
+  }
+  return best ? { url: best.url, anchorText: best.anchorText } : null;
+}
 
 /**
  * Concatenate the per-page texts with URL labels so the LLM can keep

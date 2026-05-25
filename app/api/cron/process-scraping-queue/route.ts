@@ -94,6 +94,8 @@ export async function POST(request: NextRequest) {
         sources_succeeded: 0,
         sources_skipped: 0,
         findings_written: 0,
+        products_created: 0,
+        products_linked: 0,
         errors: [errorMessage],
         skip_reasons: [] as string[],
       };
@@ -151,6 +153,8 @@ export async function POST(request: NextRequest) {
       sources_succeeded: result.sources_succeeded,
       sources_skipped: result.sources_skipped,
       findings_written: result.findings_written,
+      products_created: result.products_created,
+      products_linked: result.products_linked,
       errors: result.errors,
       skip_reasons: result.skip_reasons,
     });

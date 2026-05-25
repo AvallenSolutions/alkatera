@@ -8,6 +8,21 @@ export interface SourceFinding {
   source_url: string;
 }
 
+export interface CrawledProduct {
+  /** Display name as it appeared on the page. */
+  name: string;
+  /** spirits | wine | beer | non_alc | other, when the page makes it clear. */
+  category?: string | null;
+  /** Alcohol by volume, percentage (e.g. 41.2). */
+  abv?: number | null;
+  /** Container size in millilitres, when stated. */
+  container_size_ml?: number | null;
+  /** bottle | can | keg | bag_in_box | other. */
+  container_format?: string | null;
+  /** URL of the page the product was found on. */
+  source_url: string;
+}
+
 export interface SourceRunResult {
   ok: boolean;
   /** Truthy when the source itself decided to skip (e.g. no website URL on file). */
@@ -16,6 +31,8 @@ export interface SourceRunResult {
   reason?: string;
   /** Findings to write to scraped_brand_data. */
   findings: SourceFinding[];
+  /** Products discovered during the scrape — persisted into product_directory. */
+  products?: CrawledProduct[];
 }
 
 export interface BrandSnapshot {

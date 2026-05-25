@@ -21,4 +21,10 @@ export function getSourceByName(name: string): SourceScraper | undefined {
   return ALL_SOURCES.find((s) => s.name === name);
 }
 
-export { type SourceScraper, type BrandSnapshot, type SourceFinding, type SourceRunResult } from './types';
+export {
+  type SourceScraper,
+  type BrandSnapshot,
+  type SourceFinding,
+  type SourceRunResult,
+  type CrawledProduct,
+} from './types';

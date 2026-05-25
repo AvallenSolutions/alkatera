@@ -1,9 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { ALL_SOURCES, type BrandSnapshot, type SourceFinding } from './sources';
+import { ALL_SOURCES, type BrandSnapshot, type CrawledProduct, type SourceFinding } from './sources';
 import { scoreConfidence } from './confidence-scorer';
 import { coerceFieldValue, type FieldKey } from './field-definitions';
 import { delay } from './http';
 import { recalculateCompleteness } from '../scoring/recalculate';
+import { resolveOrCreateProductEntry } from '../directory/product-matcher';
 
 const DELAY_BETWEEN_SOURCES_MS = 2_000;
 
@@ -34,6 +35,10 @@ export interface RunBrandAgentResult {
   sources_succeeded: number;
   sources_skipped: number;
   findings_written: number;
+  /** Products created in product_directory during this run. */
+  products_created: number;
+  /** Products linked to existing product_directory rows. */
+  products_linked: number;
   errors: string[];
   /** Informational, not failure: "source X skipped because Y". */
   skip_reasons: string[];
@@ -71,6 +76,8 @@ export async function runBrandAgent(args: RunBrandAgentArgs): Promise<RunBrandAg
       sources_succeeded: 0,
       sources_skipped: 0,
       findings_written: 0,
+      products_created: 0,
+      products_linked: 0,
       errors: ['runBrandAgent requires exactly one of brandProfileId or brandDirectoryId'],
       skip_reasons: [],
     };
@@ -86,6 +93,8 @@ export async function runBrandAgent(args: RunBrandAgentArgs): Promise<RunBrandAg
       sources_succeeded: 0,
       sources_skipped: 0,
       findings_written: 0,
+      products_created: 0,
+      products_linked: 0,
       errors: [`brand_not_found: ${ref}`],
       skip_reasons: [],
     };
@@ -94,10 +103,13 @@ export async function runBrandAgent(args: RunBrandAgentArgs): Promise<RunBrandAg
 
   const errors: string[] = [];
   const skipReasons: string[] = [];
+  const crawledProducts: CrawledProduct[] = [];
   let attempted = 0;
   let succeeded = 0;
   let skipped = 0;
   let written = 0;
+  let productsCreated = 0;
+  let productsLinked = 0;
 
   for (let i = 0; i < ALL_SOURCES.length; i++) {
     const source = ALL_SOURCES[i];
@@ -123,6 +135,9 @@ export async function runBrandAgent(args: RunBrandAgentArgs): Promise<RunBrandAg
           findings: result.findings,
         });
         written += newCount;
+        if (result.products && result.products.length > 0) {
+          crawledProducts.push(...result.products);
+        }
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -131,6 +146,31 @@ export async function runBrandAgent(args: RunBrandAgentArgs): Promise<RunBrandAg
     // Be polite — even on skip — so we don't flood a single source.
     if (i < ALL_SOURCES.length - 1) {
       await delay(DELAY_BETWEEN_SOURCES_MS);
+    }
+  }
+
+  // Persist crawled products into product_directory. Matcher handles
+  // dedup against existing rows (by GTIN or normalised name) so repeat
+  // scrapes don't fan out duplicates.
+  if (crawledProducts.length > 0) {
+    const seenInRun = new Set<string>();
+    for (const p of crawledProducts) {
+      const key = p.name.trim().toLowerCase();
+      if (!key || seenInRun.has(key)) continue;
+      seenInRun.add(key);
+      try {
+        const result = await resolveOrCreateProductEntry(supabase, {
+          brandDirectoryId,
+          displayName: p.name,
+          category: p.category ?? null,
+          discoveredVia: 'manual',
+        });
+        if (result.created) productsCreated += 1;
+        else productsLinked += 1;
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        errors.push(`product_persist_failed: ${p.name}: ${message}`);
+      }
     }
   }
 
@@ -172,6 +212,8 @@ export async function runBrandAgent(args: RunBrandAgentArgs): Promise<RunBrandAg
     sources_succeeded: succeeded,
     sources_skipped: skipped,
     findings_written: written,
+    products_created: productsCreated,
+    products_linked: productsLinked,
     errors,
     skip_reasons: skipReasons,
   };
