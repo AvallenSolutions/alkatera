@@ -12,6 +12,25 @@ export interface FieldValue {
   text: string;
   /** Numeric mirror for number / year / boolean fields. */
   numeric: number | null;
+  /** Optional provenance — passed through from scraped_brand_data.source_name.
+   *  alka**tera** scoring uses this to give a 1.25× weight bonus to
+   *  fields where the source is platform-verified (alkatera_live or
+   *  brand_verified). Omit when not known. */
+  source?: string | null;
+}
+
+/** Sources that earn the alka**tera** "verified" weight multiplier. */
+const VERIFIED_SOURCES = new Set(['alkatera_live', 'brand_verified']);
+/** Multiplier applied to a field's weight when the source is verified. */
+const VERIFIED_WEIGHT_MULTIPLIER = 1.25;
+
+export interface AlkateraInputs {
+  /** ESG composite score from esg_score_snapshots (0..100). When
+   *  present this is folded into the alka**tera** scorer as a high-
+   *  weight Governance signal — captures the granular per-pillar
+   *  calculation alka**tera** customers get on-platform that the
+   *  field-level model can't replicate. */
+  esgComposite?: number | null;
 }
 
 export interface VitalityResult {
@@ -94,7 +113,32 @@ const TIER_BANDS: Array<{ tier: ScoreTier; min: number }> = [
 const TYPE_BY_KEY = new Map<FieldKey, string>(FIELD_DEFINITIONS.map((f) => [f.key, f.type]));
 const PILLAR_BY_KEY = new Map<FieldKey, Pillar>(FIELD_DEFINITIONS.map((f) => [f.key, f.pillar]));
 
-export function calculateVitality(values: Map<FieldKey, FieldValue>): VitalityResult {
+/**
+ * Vitality for alka**tera**-linked brands.
+ *
+ * Now credit-based (same fairness as the scraped scorer) — missing
+ * fields contribute zero rather than zero-times-high-weight. The
+ * penalty model was unfair to alka**tera** customers who are mid-
+ * journey of populating their data: a brand that's done the hard
+ * work of running ghg_emissions through alka**tera** but hasn't filled
+ * facility_water_data yet was getting punished harder than a scraped
+ * brand with the same gap.
+ *
+ * What sets the alka**tera** scorer apart from the scraped scorer:
+ *   1. The full 6-pillar breakdown (vs 3 pillars for scraped) —
+ *      reflects the richer data structure alka**tera** customers have.
+ *   2. Verified-source bonus: when a field's source is alkatera_live
+ *      or brand_verified, the field's weight is multiplied by 1.25.
+ *      Recognises that platform-verified data is materially stronger
+ *      evidence than open-web scrapes.
+ *   3. ESG composite from esg_score_snapshots folds in as a heavy
+ *      Governance signal when present — captures alka**tera**'s
+ *      granular per-pillar calculation the field model can't replicate.
+ */
+export function calculateVitality(
+  values: Map<FieldKey, FieldValue>,
+  alkateraInputs?: AlkateraInputs,
+): VitalityResult {
   const perField: Partial<Record<FieldKey, number>> = {};
   const pillarTotals: Record<string, { weight: number; achieved: number }> = {};
 
@@ -102,24 +146,50 @@ export function calculateVitality(values: Map<FieldKey, FieldValue>): VitalityRe
   let missing = 0;
 
   for (const def of FIELD_DEFINITIONS) {
-    const weight = WEIGHTS[def.key] ?? DEFAULT_WEIGHT;
+    const baseWeight = WEIGHTS[def.key] ?? DEFAULT_WEIGHT;
     const value = values.get(def.key);
 
-    let score: number;
-    if (value === undefined) {
-      // Missing — required fields hurt more than nice-to-haves.
-      score = REQUIRED_FIELDS.includes(def.key) ? 0 : 10;
-      missing += 1;
-    } else {
-      score = gradeField(def.key, value);
-      graded += 1;
-    }
-    perField[def.key] = score;
-
+    // Pillar denominator always includes the base weight of every
+    // field in the model — that's the "out of possible" semantics.
+    // Missing fields don't earn anything (no penalty value of 0×weight)
+    // but the score's ceiling stays bound by the data we're missing.
     const pillarBucket = pillarTotals[def.pillar] ?? { weight: 0, achieved: 0 };
-    pillarBucket.weight += weight;
-    pillarBucket.achieved += (score / 100) * weight;
+    pillarBucket.weight += baseWeight;
+
+    if (value === undefined) {
+      missing += 1;
+      pillarTotals[def.pillar] = pillarBucket;
+      continue;
+    }
+
+    const score = gradeField(def.key, value);
+    perField[def.key] = score;
+    graded += 1;
+
+    // Verified-source bonus: alka**tera**-platform data wins more
+    // weight than scraped evidence. Brand-verified (the brand itself
+    // confirmed via the upload portal) gets the same lift. Bonus only
+    // applies to the *achieved* side — the denominator stays at
+    // baseWeight so a brand with verified data can score *higher* than
+    // 100 × baseWeight / baseWeight, lifting the overall.
+    const verified = value.source ? VERIFIED_SOURCES.has(value.source) : false;
+    const effectiveWeight = verified ? baseWeight * VERIFIED_WEIGHT_MULTIPLIER : baseWeight;
+
+    pillarBucket.achieved += (score / 100) * effectiveWeight;
     pillarTotals[def.pillar] = pillarBucket;
+  }
+
+  // Fold in the ESG composite as a heavy Governance signal when
+  // alka**tera** has computed one. Weight 5 — about half the existing
+  // Governance pillar — so it materially lifts the score for brands
+  // doing the full ESG calc without dominating the field-level data.
+  if (alkateraInputs?.esgComposite != null && Number.isFinite(alkateraInputs.esgComposite)) {
+    const ESG_WEIGHT = 5;
+    const composite = Math.max(0, Math.min(100, alkateraInputs.esgComposite));
+    const bucket = pillarTotals['governance'] ?? { weight: 0, achieved: 0 };
+    bucket.weight += ESG_WEIGHT;
+    bucket.achieved += (composite / 100) * ESG_WEIGHT;
+    pillarTotals['governance'] = bucket;
   }
 
   const totalWeight = Object.values(pillarTotals).reduce((acc, p) => acc + p.weight, 0);

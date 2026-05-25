@@ -9,6 +9,7 @@ function build(values: Array<[FieldKey, Partial<FieldValue>]>) {
       field_key: key,
       text: partial.text ?? '',
       numeric: partial.numeric ?? null,
+      source: partial.source,
     });
   }
   return map;
@@ -111,17 +112,59 @@ describe('calculateVitality — B Corp boolean grading', () => {
   });
 });
 
-describe('calculateVitality — required field penalty', () => {
-  it('a brand missing a required field scores worse than one with it, all else equal', () => {
-    const withRequired = calculateVitality(
+describe('calculateVitality — more data lifts the score (credit-based)', () => {
+  it('a brand with more verified fields scores higher than one with fewer', () => {
+    const more = calculateVitality(
       build([
         ['bcorp_certified', { text: 'true', numeric: 1 }],
         ['carbon_intensity_kgco2e_per_litre', { text: '1.0', numeric: 1.0 }],
       ]),
     );
-    const missingRequired = calculateVitality(
+    const fewer = calculateVitality(
       build([['bcorp_certified', { text: 'true', numeric: 1 }]]),
     );
-    expect(withRequired.overall).toBeGreaterThan(missingRequired.overall);
+    expect(more.overall).toBeGreaterThan(fewer.overall);
+  });
+});
+
+describe('calculateVitality — verified-source bonus', () => {
+  it('alkatera_live source weighs 25% more than an unsourced finding, same grade', () => {
+    const unsourced = calculateVitality(
+      build([['bcorp_certified', { text: 'true', numeric: 1 }]]),
+    );
+    const verified = calculateVitality(
+      build([
+        ['bcorp_certified', { text: 'true', numeric: 1, source: 'alkatera_live' }],
+      ]),
+    );
+    expect(verified.overall).toBeGreaterThan(unsourced.overall);
+  });
+
+  it('brand_verified source earns the same bonus as alkatera_live', () => {
+    const verifiedBrand = calculateVitality(
+      build([
+        ['bcorp_certified', { text: 'true', numeric: 1, source: 'brand_verified' }],
+      ]),
+    );
+    const verifiedAlka = calculateVitality(
+      build([
+        ['bcorp_certified', { text: 'true', numeric: 1, source: 'alkatera_live' }],
+      ]),
+    );
+    expect(verifiedBrand.overall).toBeCloseTo(verifiedAlka.overall);
+  });
+});
+
+describe('calculateVitality — ESG composite', () => {
+  it('folds the on-platform ESG composite into Governance when supplied', () => {
+    const without = calculateVitality(
+      build([['bcorp_certified', { text: 'true', numeric: 1 }]]),
+    );
+    const withEsg = calculateVitality(
+      build([['bcorp_certified', { text: 'true', numeric: 1 }]]),
+      { esgComposite: 80 },
+    );
+    expect(withEsg.overall).toBeGreaterThan(without.overall);
+    expect(withEsg.by_pillar.governance).toBeGreaterThan(without.by_pillar.governance);
   });
 });

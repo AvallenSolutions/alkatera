@@ -58,7 +58,7 @@ export async function recalculateCompleteness(
   // Fetch the full active row set so we can grade values, not just count keys.
   const { data: rows } = await supabase
     .from('scraped_brand_data')
-    .select('field_key, field_value, field_value_numeric, confidence')
+    .select('field_key, field_value, field_value_numeric, source_name, confidence')
     .eq('brand_directory_id', brandDirectoryId)
     .is('superseded_by', null);
 
@@ -66,17 +66,35 @@ export async function recalculateCompleteness(
     field_key: string;
     field_value: string | null;
     field_value_numeric: number | null;
+    source_name: string;
     confidence: number;
   };
   const all = (rows ?? []) as Row[];
 
-  // Highest-confidence winner per field_key (matches the display layer).
+  // Pick the active row per field using the same precedence as the
+  // data-merger (brand_verified > alkatera_live > highest confidence)
+  // so the persisted score and the on-page breakdown agree on which
+  // source is the canonical one. Provenance matters for the alka**tera**
+  // scorer's verified-source bonus.
   const bestByKey = new Map<FieldKey, Row>();
   for (const row of all) {
-    const existing = bestByKey.get(row.field_key as FieldKey);
-    if (!existing || row.confidence > existing.confidence) {
-      bestByKey.set(row.field_key as FieldKey, row);
+    const key = row.field_key as FieldKey;
+    const existing = bestByKey.get(key);
+    if (!existing) {
+      bestByKey.set(key, row);
+      continue;
     }
+    if (row.source_name === 'brand_verified' && existing.source_name !== 'brand_verified') {
+      bestByKey.set(key, row);
+      continue;
+    }
+    if (existing.source_name === 'brand_verified') continue;
+    if (row.source_name === 'alkatera_live' && existing.source_name !== 'alkatera_live') {
+      bestByKey.set(key, row);
+      continue;
+    }
+    if (existing.source_name === 'alkatera_live') continue;
+    if (row.confidence > existing.confidence) bestByKey.set(key, row);
   }
 
   const fieldKeys = Array.from(bestByKey.keys());
@@ -89,15 +107,39 @@ export async function recalculateCompleteness(
       field_key: key,
       text: row.field_value,
       numeric: row.field_value_numeric,
+      source: row.source_name,
     });
   }
-  // Dispatch by scoring mode. Scraped (non-alka**tera**) brands use the
-  // 3-pillar credit-based scorer; alka**tera** customers use the
-  // existing 6-pillar penalty-based scorer because they have full
-  // control of their own data.
+  // alka**tera** brands also feed the latest ESG composite into the
+  // scorer when present — captures alka**tera**'s on-platform pillar
+  // calculation the field-level model can't fully replicate.
+  let esgComposite: number | null = null;
+  if (scoringMode === 'alkatera') {
+    const { data: directoryWithOrg } = await supabase
+      .from('brand_directory')
+      .select('alkatera_org_id')
+      .eq('id', brandDirectoryId)
+      .maybeSingle();
+    const orgId = (directoryWithOrg as { alkatera_org_id: string | null } | null)?.alkatera_org_id;
+    if (orgId) {
+      const { data: latestSnapshot } = await supabase
+        .from('esg_score_snapshots')
+        .select('composite')
+        .eq('organization_id', orgId)
+        .order('snapshot_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const composite = (latestSnapshot as { composite: number | null } | null)?.composite;
+      if (typeof composite === 'number' && Number.isFinite(composite)) esgComposite = composite;
+    }
+  }
+
+  // Dispatch by scoring mode. Both scorers are credit-based now, so
+  // the difference is structural: alka**tera** uses 6 pillars + verified-
+  // source weight bonus + ESG composite, scraped uses 3 pillars.
   const vitality: { overall: number; tier: ScoreTier } =
     scoringMode === 'alkatera'
-      ? calculateVitality(valuesForVitality)
+      ? calculateVitality(valuesForVitality, { esgComposite })
       : calculateScrapedVitality(valuesForVitality);
 
   const snapshotRow: Record<string, unknown> = {

@@ -124,11 +124,15 @@ export function BrandScoreBreakdownPanel({
       <p className="text-[11px] text-muted-foreground leading-relaxed">
         {scoringMode === 'alkatera' ? (
           <>
-            <strong>alka<strong>tera</strong> mode.</strong> Weighted average across every field
-            in the model. Required fields (carbon intensity, water usage, packaging material,
-            sustainability report) score 0 when missing because alka<strong>tera</strong>
-            customers control their own data and a gap there is a real signal. Boolean certs
-            are 100 or 0; carbon intensity, water usage etc. grade against industry bands.
+            <strong>alka<strong>tera</strong> mode.</strong> Credit-based weighted mean across
+            six pillars, same fairness as scraped mode. Two structural advantages: every field
+            whose source is platform-verified (<code className="text-[10px] bg-muted/50 px-1 py-0.5 rounded">alkatera_live</code>{' '}
+            or{' '}
+            <code className="text-[10px] bg-muted/50 px-1 py-0.5 rounded">brand_verified</code>)
+            earns a 1.25× weight bonus, recognising that platform-verified data is materially
+            stronger evidence than open-web scrapes; and the granular ESG composite the brand
+            calculates on alka<strong>tera</strong> folds into Governance as a heavy signal the
+            field model can't replicate on its own.
           </>
         ) : (
           <>
