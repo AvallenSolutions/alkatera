@@ -6,7 +6,13 @@ import type {
 } from '@/lib/distributor/scraping/sources';
 
 const MODEL = 'claude-sonnet-4-6';
-const MAX_TOKENS = 6000;
+// Sonnet supports much higher output; we kept this conservative
+// initially but every iteration adds another structured section
+// (credentials, products, documents, awards, notable_facts, brand
+// metadata) and 6000 tokens was visibly being hit — Claude's response
+// silently dropped the credentials block on at least one Two Drifters
+// run. 12000 leaves comfortable headroom.
+const MAX_TOKENS = 12000;
 const WEB_SEARCH_MAX_USES = 10;
 
 let cachedClient: Anthropic | null = null;
@@ -316,7 +322,8 @@ Award sources to search: IWSC (iwsc.net), International Spirits Challenge (inter
 Notable facts guidance: short, verifiable, sustainability- or provenance-relevant. Skip marketing puffery ("the best gin in the world"). Good examples: "Carbon negative since 2019", "First B Corp distillery in Devon", "100% British glass packaging", "Partnered with Cool Earth for rainforest protection". 1-6 facts. Skip the section if you can't find any.
 
 Hard rules:
-- Only include a credential row if you actually verified the value. Skip the row otherwise. Do not include 'unknown' / 'maybe' entries.
+- "credentials" is mandatory in the response. You MUST include every certification you mention in the summary as a credential row (with field_key + value + source_url). The credentials array IS the source of truth for the certifications panel — if you write "B Corp certified" in the summary but omit it from credentials, the platform records no certification.
+- Include a credential row for any certification you verified (positive OR negative). The credentials section is how this brand earns its score; do not skip it.
 - Every credential must have a source_url EXCEPT a clean negative (value=false with no URL means "I checked and could not find evidence of certification"); only include the negative if you actually looked.
 - For booleans, "value" must be true or false (JSON), not strings.
 - For "sbt_status", value must be one of 'committed', 'targets_set', 'none'.
@@ -429,10 +436,14 @@ function sanitiseCredentialValue(key: string, raw: unknown): string | number | b
     key === 'water_stress_region';
   if (isBoolean) {
     if (typeof raw === 'boolean') return raw;
+    if (typeof raw === 'number') {
+      if (raw === 1) return true;
+      if (raw === 0) return false;
+    }
     if (typeof raw === 'string') {
       const v = raw.trim().toLowerCase();
-      if (v === 'true' || v === 'yes') return true;
-      if (v === 'false' || v === 'no') return false;
+      if (v === 'true' || v === 'yes' || v === '1') return true;
+      if (v === 'false' || v === 'no' || v === '0') return false;
     }
     return undefined;
   }

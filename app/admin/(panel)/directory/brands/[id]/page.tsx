@@ -13,6 +13,7 @@ import {
   type DuplicateCandidate,
 } from '@/components/admin/directory/brand-merge-control';
 import { BrandDeepEnrichControl } from '@/components/admin/directory/brand-deep-enrich-control';
+import { BrandEnrichDiagnostic } from '@/components/admin/directory/brand-enrich-diagnostic';
 import { BrandProductDedupControl } from '@/components/admin/directory/brand-product-dedup-control';
 import {
   BrandCertificationsPanel,
@@ -88,6 +89,7 @@ export default async function AdminBrandDetailPage({
     duplicateCandidates,
     { data: scrapedFindings },
     { data: awardRows },
+    { data: latestEnrich },
   ] = await Promise.all([
     supabase
       .from('product_directory')
@@ -125,6 +127,13 @@ export default async function AdminBrandDetailPage({
       .select('id, awarding_body, award_name, medal_tier, year, source_url, notes, product_directory_id')
       .eq('brand_directory_id', brand.id)
       .order('year', { ascending: false, nullsFirst: false }),
+    supabase
+      .from('deep_enrich_jobs')
+      .select('id, status, phase_message, enriched, result, error, created_at, completed_at')
+      .eq('brand_directory_id', brand.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
   type ProductRow = {
     id: string;
@@ -341,6 +350,23 @@ export default async function AdminBrandDetailPage({
         brandId={brand.id}
         brandName={brand.name}
         hasWebsite={!!brand.website}
+      />
+
+      <BrandEnrichDiagnostic
+        job={
+          latestEnrich
+            ? (latestEnrich as {
+                id: string;
+                status: string;
+                phase_message: string | null;
+                enriched: unknown;
+                result: unknown;
+                error: string | null;
+                created_at: string;
+                completed_at: string | null;
+              })
+            : null
+        }
       />
 
       <BrandProductDedupControl brandId={brand.id} productCount={products.length} />
