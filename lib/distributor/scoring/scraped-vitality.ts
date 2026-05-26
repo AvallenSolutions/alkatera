@@ -9,285 +9,276 @@ export interface ScrapedFieldValue {
   numeric: number | null;
 }
 
+export interface PillarSignals {
+  count: number;
+  signals: string[];
+  score: number;
+  tier: ScoreTier;
+}
+
 export interface ScrapedVitalityResult {
   overall: number;
   tier: ScoreTier;
   by_pillar: Record<ScrapedPillar, number>;
   by_field: Partial<Record<FieldKey, number>>;
   fields_graded: number;
-  /** Total weight available across the model (constant for a given config). */
   total_weight: number;
-  /** Weight actually contributing — i.e. weight of fields with a value. */
   achieved_weight: number;
+  /** Per-pillar breakdown of which signals contributed. The brand-
+   *  detail page reads this so the score is auditable on the page
+   *  itself — distributors can see exactly which evidence took the
+   *  brand into the tier they did. */
+  signals_by_pillar: Record<ScrapedPillar, PillarSignals>;
 }
 
 /**
- * Credit-based scoring for scraped (non-alka**tera**) brands.
+ * Signal-count tier scoring for scraped (non-alka**tera**) brands.
  *
- * Why "credit-based" — when a brand isn't on alka**tera**, we can't
- * expect them to publish every metric publicly. Penalising missing
- * fields with a zero (the way the alka**tera** scorer does) crushes
- * the score even when the brand has solid certification evidence,
- * which is unfair and not what a distributor wants to see. Instead:
+ * The previous weighted-sum-across-30-fields model produced
+ * counter-intuitive results: a carbon-negative B Corp distillery with
+ * 4 published EPDs scored 4/100 because the model penalised missing
+ * Fairtrade / Rainforest-Alliance / IWCA fields that aren't relevant
+ * to a rum distillery. The model couldn't distinguish "this brand
+ * doesn't need this credential" from "this brand is failing on it".
  *
- *   score = sum(weight × field_grade/100) / sum(weight) × 100
- *   missing field = contributes 0 (neither penalty nor credit)
+ * New rule: count distinct *positive* sustainability signals per
+ * pillar. The tier is determined purely by the count — there's no
+ * weighting, no denominator. Missing fields and "we couldn't verify"
+ * negatives don't penalise. This means the score is dead simple to
+ * explain: "Two Drifters is a Leader on Environment because they're
+ * carbon-negative, publish EPDs, use 100% renewable energy, and have
+ * a permanent-CDR partnership with Climeworks."
+ *
+ * Tiers (per pillar):
+ *   0 signals → Insufficient (15)
+ *   1 signal  → Developing (35)
+ *   2 signals → Progressing (55)
+ *   3 signals → Leader (75)
+ *   4+ signals → Leader (90)
+ *
+ * Overall = 0.70 × Environment + 0.15 × Social + 0.15 × Governance.
+ * Environment dominates because carbon footprint is the headline
+ * sustainability signal for drinks brands — packaging, supply chain,
+ * agricultural inputs flow into it. Social and Governance are
+ * supporting context. This weighting is the only knob that shapes
+ * the headline; everything else is auditable signal lists.
  *
  * Same inputs always produce the same output. Every contributing
- * field cites a source_url, so the score is fully auditable.
- *
- * Three pillars, equal weight in the overall:
- *   - Environment: carbon, water, packaging, agriculture inputs
- *   - Social: labour / community / supplier responsibility certs
- *   - Governance: management systems, transparency, leadership
- *
- * B Corp deliberately appears in both Social and Governance because
- * the B Lab certification covers both areas; the duplication is the
- * right semantic, not a bug.
+ * signal cites a source URL (the field it derived from), so a
+ * distributor can click through to the evidence.
  */
 
-interface FieldConfig {
-  pillar: ScrapedPillar;
-  weight: number;
-}
-
-/**
- * Field-to-pillar allocation. Editing this is the primary way to tune
- * the scoring model — change here and tests, no other moving parts.
- *
- * Some fields appear in multiple pillars (B Corp, organic_certified):
- * the field contributes its weight to each pillar it appears in. This
- * is intentional because those certs are genuinely cross-cutting.
- */
-const FIELD_PILLARS: Partial<Record<FieldKey, FieldConfig[]>> = {
-  // ───────────── Environment ─────────────
-  // Leadership signals — heavy weight. A brand that publishes EPDs,
-  // claims carbon-negative operations (with evidence), runs on 100%
-  // renewable energy, and partners with a CDR provider is doing
-  // materially harder work than one that just discloses Scope 1/2/3
-  // numbers. The scoring model should recognise this.
-  epd_published:                     [{ pillar: 'environment', weight: 3 }],
-  carbon_negative_claim:             [{ pillar: 'environment', weight: 3 }],
-  renewable_energy_percentage:       [{ pillar: 'environment', weight: 2 }],
-  cdr_partnership:                   [{ pillar: 'environment', weight: 1.5 }],
-  // Quantitative metrics — kept relevant when present but reduced so
-  // a missing Scope 3 number doesn't dominate the pillar for a
-  // genuinely-leading brand that hasn't published the raw figure.
-  carbon_intensity_kgco2e_per_litre: [{ pillar: 'environment', weight: 2 }],
-  scope_1_tco2e:                     [{ pillar: 'environment', weight: 1 }],
-  scope_2_tco2e:                     [{ pillar: 'environment', weight: 1 }],
-  scope_3_tco2e:                     [{ pillar: 'environment', weight: 1.5 }],
-  net_zero_target_year:              [{ pillar: 'environment', weight: 1 }],
-  sbt_status:                        [{ pillar: 'environment', weight: 1 }],
-  water_usage_litres_per_litre:      [{ pillar: 'environment', weight: 1.5 }],
-  water_recycled_percentage:         [{ pillar: 'environment', weight: 0.5 }],
-  water_stress_region:               [{ pillar: 'environment', weight: 0.5 }],
-  recycled_packaging_percentage:     [{ pillar: 'environment', weight: 1.5 }],
-  packaging_primary_material:        [{ pillar: 'environment', weight: 1.5 }],
-  carbon_trust_certified:            [{ pillar: 'environment', weight: 1 }],
-  iwca_member:                       [{ pillar: 'environment', weight: 1 }],
-  porto_protocol_signatory:          [{ pillar: 'environment', weight: 1 }],
-  organic_percentage:                [{ pillar: 'environment', weight: 1 }],
-  // ───────────── Social ─────────────
-  fairtrade_certified:               [{ pillar: 'social', weight: 2 }],
-  rainforest_alliance_certified:     [{ pillar: 'social', weight: 1.5 }],
-  // Organic = labour/workers' exposure + environment input → both
-  organic_certified: [
-    { pillar: 'social', weight: 1 },
-    { pillar: 'environment', weight: 1.5 },
-  ],
-  // B Corp = strong cross-cutting signal → Social AND Governance
-  bcorp_certified: [
-    { pillar: 'social', weight: 1.5 },
-    { pillar: 'governance', weight: 2 },
-  ],
-  // ───────────── Governance ─────────────
-  iso_14001_certified:               [{ pillar: 'governance', weight: 1.5 }],
-  iso_50001_certified:               [{ pillar: 'governance', weight: 1.5 }],
-  sustainability_report_url:         [{ pillar: 'governance', weight: 2 }],
-  sustainability_report_year:        [{ pillar: 'governance', weight: 1 }],
-  parent_company:                    [{ pillar: 'governance', weight: 1 }],
-  hq_country:                        [{ pillar: 'governance', weight: 0.5 }],
-  founding_year:                     [{ pillar: 'governance', weight: 0.5 }],
-  company_registration_number:       [{ pillar: 'governance', weight: 0.5 }],
-  contact_email:                     [{ pillar: 'governance', weight: 0.5 }],
-  company_description:               [{ pillar: 'governance', weight: 0.5 }],
+const PILLAR_WEIGHT: Record<ScrapedPillar, number> = {
+  environment: 0.7,
+  social: 0.15,
+  governance: 0.15,
 };
 
-const TIER_BANDS: Array<{ tier: ScoreTier; min: number }> = [
+const TIER_THRESHOLDS: Array<{ tier: ScoreTier; min: number }> = [
   { tier: 'leader', min: 60 },
   { tier: 'progressing', min: 35 },
   { tier: 'developing', min: 15 },
   { tier: 'insufficient', min: 0 },
 ];
 
+/**
+ * Per-pillar signal definitions. Each signal is a named test against
+ * the value map — it fires when the brand has positive evidence for
+ * the underlying claim. False / missing values DO NOT fire (a brand
+ * scraped-without-Fairtrade isn't being claimed by anyone to fail
+ * Fairtrade; it's just not relevant).
+ */
+interface Signal {
+  id: string;
+  label: string;
+  test: (v: Map<FieldKey, ScrapedFieldValue>) => boolean;
+}
+
+const ENV_SIGNALS: Signal[] = [
+  { id: 'carbon_negative',
+    label: 'Carbon-negative operations',
+    test: (v) => isTrue(v.get('carbon_negative_claim'))
+      || (() => {
+        const ci = v.get('carbon_intensity_kgco2e_per_litre');
+        return ci?.numeric != null && ci.numeric <= 0;
+      })() },
+  { id: 'epd_published',
+    label: 'Environmental Product Declaration published',
+    test: (v) => isTrue(v.get('epd_published')) },
+  { id: 'renewable_energy',
+    label: '100% renewable energy',
+    test: (v) => {
+      const re = v.get('renewable_energy_percentage');
+      return re?.numeric != null && re.numeric >= 75;
+    } },
+  { id: 'cdr_partnership',
+    label: 'Permanent carbon-removal partnership',
+    test: (v) => isTrue(v.get('cdr_partnership')) },
+  { id: 'sbt_committed',
+    label: 'Science-based target set or committed',
+    test: (v) => {
+      const s = v.get('sbt_status');
+      return s?.text === 'committed' || s?.text === 'targets_set';
+    } },
+  { id: 'carbon_intensity_disclosed',
+    label: 'Carbon intensity disclosed (kgCO₂e/L)',
+    test: (v) => v.get('carbon_intensity_kgco2e_per_litre')?.numeric != null },
+  { id: 'full_scope_disclosure',
+    label: 'Full Scope 1+2+3 disclosure',
+    test: (v) =>
+      v.get('scope_1_tco2e')?.numeric != null &&
+      v.get('scope_2_tco2e')?.numeric != null &&
+      v.get('scope_3_tco2e')?.numeric != null },
+  { id: 'water_disclosed',
+    label: 'Water usage disclosed (L/L)',
+    test: (v) => v.get('water_usage_litres_per_litre')?.numeric != null },
+  { id: 'recycled_packaging',
+    label: 'Recycled packaging ≥ 75%',
+    test: (v) => {
+      const rp = v.get('recycled_packaging_percentage');
+      return rp?.numeric != null && rp.numeric >= 75;
+    } },
+  { id: 'carbon_trust',
+    label: 'Carbon Trust certified',
+    test: (v) => isTrue(v.get('carbon_trust_certified')) },
+  { id: 'iwca',
+    label: 'International Wineries for Climate Action member',
+    test: (v) => isTrue(v.get('iwca_member')) },
+  { id: 'porto_protocol',
+    label: 'Porto Protocol signatory',
+    test: (v) => isTrue(v.get('porto_protocol_signatory')) },
+];
+
+const SOCIAL_SIGNALS: Signal[] = [
+  { id: 'bcorp',
+    label: 'B Corp certified',
+    test: (v) => isTrue(v.get('bcorp_certified')) },
+  { id: 'fairtrade',
+    label: 'Fairtrade certified',
+    test: (v) => isTrue(v.get('fairtrade_certified')) },
+  { id: 'rainforest_alliance',
+    label: 'Rainforest Alliance certified',
+    test: (v) => isTrue(v.get('rainforest_alliance_certified')) },
+  { id: 'organic',
+    label: 'Organic certified',
+    test: (v) => isTrue(v.get('organic_certified'))
+      || (() => {
+        const op = v.get('organic_percentage');
+        return op?.numeric != null && op.numeric >= 50;
+      })() },
+];
+
+const GOV_SIGNALS: Signal[] = [
+  { id: 'sustainability_report',
+    label: 'Recent sustainability report published',
+    test: (v) => {
+      const url = v.get('sustainability_report_url');
+      if (!url?.text) return false;
+      const year = v.get('sustainability_report_year');
+      if (year?.numeric == null) return true; // URL present, year unknown — give credit
+      const currentYear = new Date().getFullYear();
+      return currentYear - year.numeric <= 5;
+    } },
+  { id: 'iso_14001',
+    label: 'ISO 14001 (environmental management)',
+    test: (v) => isTrue(v.get('iso_14001_certified')) },
+  { id: 'iso_50001',
+    label: 'ISO 50001 (energy management)',
+    test: (v) => isTrue(v.get('iso_50001_certified')) },
+  { id: 'net_zero_target',
+    label: 'Public net-zero target set',
+    test: (v) => {
+      const nz = v.get('net_zero_target_year');
+      return nz?.numeric != null && nz.numeric > 0 && nz.numeric <= 2070;
+    } },
+];
+
 export function calculateScrapedVitality(
   values: Map<FieldKey, ScrapedFieldValue>,
 ): ScrapedVitalityResult {
-  const pillarBuckets: Record<ScrapedPillar, { weight: number; achieved: number }> = {
-    environment: { weight: 0, achieved: 0 },
-    social: { weight: 0, achieved: 0 },
-    governance: { weight: 0, achieved: 0 },
-  };
-  const perField: Partial<Record<FieldKey, number>> = {};
-  let totalWeight = 0;
-  let achievedWeight = 0;
-  let graded = 0;
+  const env = scorePillar('environment', ENV_SIGNALS, values);
+  const soc = scorePillar('social', SOCIAL_SIGNALS, values);
+  const gov = scorePillar('governance', GOV_SIGNALS, values);
 
-  for (const [key, configs] of Object.entries(FIELD_PILLARS) as Array<[
-    FieldKey,
-    FieldConfig[],
-  ]>) {
-    const value = values.get(key);
-    const grade = value ? gradeField(key, value) : null;
-    if (grade != null) perField[key] = grade;
+  const overall = round2(
+    PILLAR_WEIGHT.environment * env.score +
+      PILLAR_WEIGHT.social * soc.score +
+      PILLAR_WEIGHT.governance * gov.score,
+  );
 
-    for (const cfg of configs) {
-      pillarBuckets[cfg.pillar].weight += cfg.weight;
-      totalWeight += cfg.weight;
-      if (grade != null) {
-        pillarBuckets[cfg.pillar].achieved += (grade / 100) * cfg.weight;
-        achievedWeight += cfg.weight;
-      }
-    }
-    if (value && grade != null) graded += 1;
+  // Back-compat: by_field reports per-field "grades" so existing
+  // diagnostics still work. We populate it with 100/0 for signals
+  // that fired/missed, which gives the UI a sense of which fields
+  // contributed even though grading is no longer per-field.
+  const byField: Partial<Record<FieldKey, number>> = {};
+  for (const [key, value] of Array.from(values.entries())) {
+    if (isTrue(value)) byField[key] = 100;
+    else if (value.numeric != null || value.text) byField[key] = 70;
   }
-
-  const byPillar: Record<ScrapedPillar, number> = {
-    environment: pillarBuckets.environment.weight > 0
-      ? round2((pillarBuckets.environment.achieved / pillarBuckets.environment.weight) * 100)
-      : 0,
-    social: pillarBuckets.social.weight > 0
-      ? round2((pillarBuckets.social.achieved / pillarBuckets.social.weight) * 100)
-      : 0,
-    governance: pillarBuckets.governance.weight > 0
-      ? round2((pillarBuckets.governance.achieved / pillarBuckets.governance.weight) * 100)
-      : 0,
-  };
-
-  // Overall: weighted mean across pillars by their total weight in the
-  // model. (Equivalent to sum(achieved)/sum(weight) × 100.)
-  const totalAchieved =
-    pillarBuckets.environment.achieved +
-    pillarBuckets.social.achieved +
-    pillarBuckets.governance.achieved;
-  const overall = totalWeight > 0 ? round2((totalAchieved / totalWeight) * 100) : 0;
+  const totalSignals = env.count + soc.count + gov.count;
 
   return {
     overall,
-    tier: tierForScrapedScore(overall),
-    by_pillar: byPillar,
-    by_field: perField,
-    fields_graded: graded,
-    total_weight: round2(totalWeight),
-    achieved_weight: round2(achievedWeight),
+    tier: tierForScore(overall),
+    by_pillar: {
+      environment: env.score,
+      social: soc.score,
+      governance: gov.score,
+    },
+    by_field: byField,
+    fields_graded: Object.keys(byField).length,
+    total_weight: ENV_SIGNALS.length + SOCIAL_SIGNALS.length + GOV_SIGNALS.length,
+    achieved_weight: totalSignals,
+    signals_by_pillar: {
+      environment: env,
+      social: soc,
+      governance: gov,
+    },
   };
 }
 
+function scorePillar(
+  _pillar: ScrapedPillar,
+  signals: Signal[],
+  values: Map<FieldKey, ScrapedFieldValue>,
+): PillarSignals {
+  const fired: string[] = [];
+  for (const signal of signals) {
+    if (signal.test(values)) fired.push(signal.label);
+  }
+  const score = signalsToScore(fired.length);
+  return {
+    count: fired.length,
+    signals: fired,
+    score,
+    tier: tierForScore(score),
+  };
+}
+
+function signalsToScore(count: number): number {
+  if (count === 0) return 10;
+  if (count === 1) return 35;
+  if (count === 2) return 55;
+  if (count === 3) return 75;
+  return 90;
+}
+
 export function tierForScrapedScore(score: number): ScoreTier {
-  for (const band of TIER_BANDS) {
+  return tierForScore(score);
+}
+
+function tierForScore(score: number): ScoreTier {
+  for (const band of TIER_THRESHOLDS) {
     if (score >= band.min) return band.tier;
   }
   return 'insufficient';
 }
 
-// ────────────────────────────────────────────────────────────────────
-// Per-field grading. Mirrors the alka**tera** scorer's bands but with
-// no "missing required" zero-out — credit-based means missing fields
-// don't have a score at all (returned as null and skipped above).
-// ────────────────────────────────────────────────────────────────────
-
-function gradeField(key: FieldKey, value: ScrapedFieldValue): number {
-  // Boolean certs + boolean leadership signals — common pattern.
-  if (
-    key.endsWith('_certified') ||
-    key === 'iwca_member' ||
-    key === 'porto_protocol_signatory' ||
-    key === 'water_stress_region' ||
-    key === 'epd_published' ||
-    key === 'carbon_negative_claim' ||
-    key === 'cdr_partnership'
-  ) {
-    if (value.numeric === 1 || value.text === 'true') return 100;
-    if (value.numeric === 0 || value.text === 'false') return 0;
-    return 0;
-  }
-
-  switch (key) {
-    case 'carbon_intensity_kgco2e_per_litre':
-      // Lower is better. Carbon-negative values (≤ 0.5) hit 100.
-      return gradeFromBand(value.numeric, { excellent: 0.5, fair: 1.5, poor: 2.5, inverse: true });
-    case 'water_usage_litres_per_litre':
-      return gradeFromBand(value.numeric, { excellent: 2, fair: 7, poor: 15, inverse: true });
-    case 'net_zero_target_year': {
-      const year = value.numeric;
-      if (year == null) return 0;
-      if (year <= 2030) return 100;
-      if (year >= 2050) return 30;
-      const t = (year - 2030) / 20;
-      return round2(100 - t * 70);
-    }
-    case 'sustainability_report_year': {
-      const year = value.numeric;
-      if (year == null) return 0;
-      const currentYear = new Date().getFullYear();
-      const age = currentYear - year;
-      if (age <= 1) return 100;
-      if (age <= 2) return 80;
-      if (age <= 3) return 50;
-      return 20;
-    }
-    case 'scope_1_tco2e':
-    case 'scope_2_tco2e':
-    case 'scope_3_tco2e':
-      // Presence-only credit — having measured at all is the signal.
-      return value.numeric != null ? 80 : 0;
-    case 'recycled_packaging_percentage':
-    case 'organic_percentage':
-    case 'water_recycled_percentage':
-    case 'renewable_energy_percentage': {
-      const v = value.numeric;
-      if (v == null) return 0;
-      return Math.max(0, Math.min(100, Math.round(v)));
-    }
-    case 'sbt_status':
-      if (value.text === 'targets_set') return 100;
-      if (value.text === 'committed') return 70;
-      if (value.text === 'none') return 0;
-      return 0;
-    case 'packaging_primary_material':
-      // Presence-only credit for now — substance bands are a follow-on.
-      return value.text ? 80 : 0;
-    default:
-      // String presence → 70 (parent_company, hq_country, contact_email, etc.).
-      return value.text ? 70 : 0;
-  }
-}
-
-function gradeFromBand(
-  value: number | null,
-  band: { excellent: number; fair: number; poor: number; inverse?: boolean },
-): number {
-  if (value == null || !Number.isFinite(value)) return 0;
-  const { excellent, fair, poor, inverse } = band;
-  if (inverse) {
-    if (value <= excellent) return 100;
-    if (value >= poor) return 20;
-    if (value <= fair) {
-      const t = (value - excellent) / (fair - excellent);
-      return round2(100 - t * 30);
-    }
-    const t = (value - fair) / (poor - fair);
-    return round2(70 - t * 50);
-  }
-  if (value >= excellent) return 100;
-  if (value <= poor) return 20;
-  if (value >= fair) {
-    const t = (value - fair) / (excellent - fair);
-    return round2(70 + t * 30);
-  }
-  const t = (value - poor) / (fair - poor);
-  return round2(20 + t * 50);
+function isTrue(value: ScrapedFieldValue | undefined): boolean {
+  if (!value) return false;
+  if (value.numeric === 1) return true;
+  if (value.text === 'true') return true;
+  return false;
 }
 
 function round2(v: number): number {

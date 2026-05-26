@@ -388,6 +388,15 @@ export default async function AdminBrandDetailPage({
         overall={vitality.overall}
         tier={vitality.tier}
         byPillar={vitality.by_pillar as Record<string, number>}
+        signalsByPillar={
+          scoringMode === 'scraped' && 'signals_by_pillar' in vitality
+            ? Object.fromEntries(
+                Object.entries(
+                  (vitality as { signals_by_pillar: Record<string, { count: number; signals: string[] }> }).signals_by_pillar,
+                ).map(([k, v]) => [k, { count: v.count, signals: v.signals }]),
+              )
+            : undefined
+        }
         missingRequired={missingRequired}
         scoringMode={scoringMode}
       />

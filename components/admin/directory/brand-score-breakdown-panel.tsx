@@ -1,6 +1,11 @@
-import { Info } from 'lucide-react';
+import { Info, CheckCircle2 } from 'lucide-react';
 
 export type ScoringMode = 'scraped' | 'alkatera';
+
+export interface PillarSignalsSummary {
+  count: number;
+  signals: string[];
+}
 
 interface Props {
   overall: number | null;
@@ -9,6 +14,10 @@ interface Props {
    *  governance); alkatera → 6 keys (carbon / water / packaging /
    *  agriculture / governance / corporate). */
   byPillar: Record<string, number> | null;
+  /** Per-pillar lists of which signals fired. Only present in scraped
+   *  mode (the alka**tera** scorer is still a weighted-sum so there's
+   *  nothing analogous to surface). */
+  signalsByPillar?: Record<string, PillarSignalsSummary>;
   missingRequired: string[];
   scoringMode: ScoringMode;
 }
@@ -41,17 +50,27 @@ const REQUIRED_LABEL: Record<string, string> = {
   sustainability_report_url: 'Sustainability report URL',
 };
 
+function tierLabel(score: number): string {
+  if (score >= 60) return 'Leader';
+  if (score >= 35) return 'Progressing';
+  if (score >= 15) return 'Developing';
+  return 'Insufficient';
+}
+
 /**
  * Brand-detail panel that explains the headline sustainability score.
- * Shows per-pillar bars + a "missing required" callout so the admin
- * can immediately see which fields are dragging the score down.
- * Avoids hand-coding the explanation in copy: the panel surfaces the
- * inputs to the calculator so it's self-documenting.
+ *
+ * For scraped brands the model is a signal-count tier per pillar:
+ * count how many distinct positive signals the brand has, map to
+ * tier (0=Insufficient, 1=Developing, 2=Progressing, 3+=Leader).
+ * The panel surfaces the signals themselves so the tier is auditable
+ * — a distributor can see exactly why the brand is where it is.
  */
 export function BrandScoreBreakdownPanel({
   overall,
   tier,
   byPillar,
+  signalsByPillar,
   missingRequired,
   scoringMode,
 }: Props) {
@@ -79,13 +98,22 @@ export function BrandScoreBreakdownPanel({
       </div>
 
       {byPillar && (
-        <ul className="space-y-1.5">
+        <ul className="space-y-3">
           {pillarOrder.map((p) => {
             const score = Math.max(0, Math.min(100, Math.round(byPillar[p] ?? 0)));
+            const pillarSignals = signalsByPillar?.[p];
             return (
-              <li key={p} className="space-y-0.5">
+              <li key={p} className="space-y-1">
                 <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-muted-foreground">{PILLAR_LABEL[p]}</span>
+                  <span className="text-muted-foreground">
+                    {PILLAR_LABEL[p]}
+                    {pillarSignals && (
+                      <span className="ml-2 text-[10px] uppercase tracking-wider">
+                        {tierLabel(score)} · {pillarSignals.count} signal
+                        {pillarSignals.count === 1 ? '' : 's'}
+                      </span>
+                    )}
+                  </span>
                   <span className="tabular-nums font-medium">{score}</span>
                 </div>
                 <div className="h-1.5 rounded-full bg-background/60 overflow-hidden">
@@ -102,6 +130,19 @@ export function BrandScoreBreakdownPanel({
                     style={{ width: `${score}%` }}
                   />
                 </div>
+                {pillarSignals && pillarSignals.signals.length > 0 && (
+                  <ul className="pt-1 space-y-0.5">
+                    {pillarSignals.signals.map((s) => (
+                      <li
+                        key={s}
+                        className="flex items-center gap-1.5 text-[11px] text-emerald-200"
+                      >
+                        <CheckCircle2 className="h-3 w-3 shrink-0" />
+                        <span>{s}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </li>
             );
           })}
@@ -136,11 +177,12 @@ export function BrandScoreBreakdownPanel({
           </>
         ) : (
           <>
-            <strong>Scraped mode.</strong> Credit-based weighted mean across three pillars. Each
-            field that has data contributes its weighted grade; missing fields contribute zero
-            (no penalty either way). Fairer for brands that haven't published full disclosure
-            but carry real certification evidence. Every contributing field cites a source URL
-            so the score is fully auditable.
+            <strong>Signal-count tier.</strong> Per pillar, the panel counts distinct positive
+            sustainability signals (B Corp, EPD published, carbon-negative operations, etc.).
+            0 signals = Insufficient, 1 = Developing, 2 = Progressing, 3+ = Leader. Missing
+            fields and unverified-by-scraping items do not penalise. The overall headline is
+            Environment-weighted (70/15/15) because carbon footprint is the most material
+            signal for drinks brands.
           </>
         )}
       </p>

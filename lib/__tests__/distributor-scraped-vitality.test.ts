@@ -13,115 +13,122 @@ function build(values: Record<string, { text: string; numeric: number | null }>)
   return map;
 }
 
-describe('calculateScrapedVitality', () => {
-  it('returns 0 for a brand with no findings', () => {
+describe('calculateScrapedVitality (signal-count tier model)', () => {
+  it('returns insufficient for a brand with no findings', () => {
     const result = calculateScrapedVitality(new Map());
-    expect(result.overall).toBe(0);
+    // 0 signals everywhere → pillars 10 → overall 10
+    expect(result.overall).toBe(10);
     expect(result.tier).toBe('insufficient');
-    expect(result.by_pillar.environment).toBe(0);
-    expect(result.by_pillar.social).toBe(0);
-    expect(result.by_pillar.governance).toBe(0);
-    expect(result.fields_graded).toBe(0);
+    expect(result.by_pillar.environment).toBe(10);
+    expect(result.by_pillar.social).toBe(10);
+    expect(result.by_pillar.governance).toBe(10);
+    expect(result.signals_by_pillar.environment.count).toBe(0);
   });
 
-  it('credits a B Corp brand meaningfully (governance + social)', () => {
+  it('B Corp alone lights up Social only', () => {
     const result = calculateScrapedVitality(build({
       bcorp_certified: { text: 'true', numeric: 1 },
     }));
-    // B Corp contributes 1.5 to social + 2 to governance = 3.5 achieved
-    // out of total weight ~46. Score sits around 7-8 — by design: a B
-    // Corp brand alone is on the journey but isn't a leader. Environment
-    // pillar carries Leadership signals (EPD, carbon-negative, etc.)
-    // that B Corp alone doesn't satisfy.
-    expect(result.overall).toBeGreaterThan(5);
-    expect(result.overall).toBeLessThan(12);
-    expect(result.by_pillar.environment).toBe(0); // B Corp not in env
-    expect(result.by_pillar.social).toBeGreaterThan(0);
-    expect(result.by_pillar.governance).toBeGreaterThan(0);
+    // Env 0 → 10, Soc 1 → 35, Gov 0 → 10
+    // Overall = 0.7*10 + 0.15*35 + 0.15*10 = 7 + 5.25 + 1.5 = 13.75
+    expect(result.by_pillar.environment).toBe(10);
+    expect(result.by_pillar.social).toBe(35);
+    expect(result.by_pillar.governance).toBe(10);
+    expect(result.signals_by_pillar.social.signals).toContain('B Corp certified');
     expect(result.tier).toBe('insufficient');
   });
 
-  it('carbon-negative brand scores top of carbon-band', () => {
+  it('carbon-negative + EPD published + 100% renewable + CDR = Leader environment', () => {
+    // Two Drifters' core profile. Four leadership signals on env alone.
     const result = calculateScrapedVitality(build({
-      carbon_intensity_kgco2e_per_litre: { text: '-0.5', numeric: -0.5 },
-    }));
-    // Carbon intensity -0.5 ≤ excellent (0.5) → 100. Field weight 3 in env pillar.
-    expect(result.by_field.carbon_intensity_kgco2e_per_litre).toBe(100);
-    expect(result.by_pillar.environment).toBeGreaterThan(0);
-  });
-
-  it('comprehensive disclosure lands in leader band', () => {
-    const result = calculateScrapedVitality(build({
-      bcorp_certified: { text: 'true', numeric: 1 },
-      carbon_trust_certified: { text: 'true', numeric: 1 },
-      fairtrade_certified: { text: 'true', numeric: 1 },
-      organic_certified: { text: 'true', numeric: 1 },
-      iso_14001_certified: { text: 'true', numeric: 1 },
-      sustainability_report_url: { text: 'https://example.com/report.pdf', numeric: null },
-      sustainability_report_year: { text: '2024', numeric: 2024 },
-      carbon_intensity_kgco2e_per_litre: { text: '0.3', numeric: 0.3 },
-      scope_1_tco2e: { text: '40', numeric: 40 },
-      scope_2_tco2e: { text: '10', numeric: 10 },
-      scope_3_tco2e: { text: '300', numeric: 300 },
-      net_zero_target_year: { text: '2030', numeric: 2030 },
-      water_usage_litres_per_litre: { text: '1.5', numeric: 1.5 },
-      recycled_packaging_percentage: { text: '100', numeric: 100 },
-      packaging_primary_material: { text: 'glass', numeric: null },
-      parent_company: { text: 'Acme Group', numeric: null },
-      hq_country: { text: 'GB', numeric: null },
-      founding_year: { text: '2018', numeric: 2018 },
-      // Leadership signals — a "leader" should be doing the harder
-      // process work too, not just publishing the raw numbers.
-      epd_published: { text: 'true', numeric: 1 },
       carbon_negative_claim: { text: 'true', numeric: 1 },
+      epd_published: { text: 'true', numeric: 1 },
       renewable_energy_percentage: { text: '100', numeric: 100 },
       cdr_partnership: { text: 'true', numeric: 1 },
     }));
-    expect(result.overall).toBeGreaterThanOrEqual(60);
+    // Env 4 signals → 90. Soc/Gov 0 → 15 each.
+    // Overall = 0.7*90 + 0.15*15 + 0.15*15 = 63 + 2.25 + 2.25 = 67.5
+    expect(result.by_pillar.environment).toBe(90);
+    expect(result.signals_by_pillar.environment.count).toBe(4);
     expect(result.tier).toBe('leader');
   });
 
-  it('leadership signals alone are insufficient (must show real disclosure)', () => {
-    // A brand that ticks the leadership boxes (claims carbon-negative,
-    // EPD published) but provides no quantitative evidence still
-    // doesn't land in the leader band. Leadership claims must be
-    // anchored by disclosure for the top tier.
+  it('Two Drifters realistic profile lands in leader tier', () => {
+    // B Corp + carbon-negative + EPDs + renewable + CDR + sustainability page +
+    // full disclosure (Scope 1/2/3 + carbon intensity + water from EPD).
     const result = calculateScrapedVitality(build({
-      epd_published: { text: 'true', numeric: 1 },
+      bcorp_certified: { text: 'true', numeric: 1 },
       carbon_negative_claim: { text: 'true', numeric: 1 },
+      epd_published: { text: 'true', numeric: 1 },
+      renewable_energy_percentage: { text: '100', numeric: 100 },
+      cdr_partnership: { text: 'true', numeric: 1 },
+      carbon_intensity_kgco2e_per_litre: { text: '-0.5', numeric: -0.5 },
+      scope_1_tco2e: { text: '12', numeric: 12 },
+      scope_2_tco2e: { text: '0', numeric: 0 },
+      scope_3_tco2e: { text: '85', numeric: 85 },
+      water_usage_litres_per_litre: { text: '2.4', numeric: 2.4 },
+      sustainability_report_url: { text: 'https://twodriftersrum.com/pages/sustainability-report', numeric: null },
+      sustainability_report_year: { text: '2022', numeric: 2022 },
+    }));
+    // Env 4+ signals → 90. Soc 1 → 35. Gov 1 → 35.
+    // Overall = 63 + 5.25 + 5.25 = 73.5
+    expect(result.by_pillar.environment).toBe(90);
+    expect(result.by_pillar.social).toBe(35);
+    expect(result.by_pillar.governance).toBe(35);
+    expect(result.tier).toBe('leader');
+  });
+
+  it('explicit false certifications do not penalise', () => {
+    // A brand where Claude reported "false" for every cert it checked
+    // (because scraping found no evidence) should look identical to a
+    // brand where Claude was silent — "we couldn't verify" is not the
+    // same as "the brand is not certified".
+    const allFalse = calculateScrapedVitality(build({
+      bcorp_certified: { text: 'false', numeric: 0 },
+      fairtrade_certified: { text: 'false', numeric: 0 },
+      organic_certified: { text: 'false', numeric: 0 },
+      rainforest_alliance_certified: { text: 'false', numeric: 0 },
+      carbon_trust_certified: { text: 'false', numeric: 0 },
+      iso_14001_certified: { text: 'false', numeric: 0 },
+    }));
+    const allMissing = calculateScrapedVitality(new Map());
+    expect(allFalse.overall).toBe(allMissing.overall);
+    expect(allFalse.tier).toBe('insufficient');
+  });
+
+  it('overall is environment-weighted (70/15/15)', () => {
+    // A brand with strong Social/Gov but zero Environment shouldn't
+    // outperform a brand with the opposite — Environment is the
+    // headline pillar for drinks brands.
+    const strongSocGov = calculateScrapedVitality(build({
+      bcorp_certified: { text: 'true', numeric: 1 },
+      fairtrade_certified: { text: 'true', numeric: 1 },
+      organic_certified: { text: 'true', numeric: 1 },
+      sustainability_report_url: { text: 'https://example.com/r.pdf', numeric: null },
+      sustainability_report_year: { text: '2024', numeric: 2024 },
+      iso_14001_certified: { text: 'true', numeric: 1 },
+    }));
+    const strongEnv = calculateScrapedVitality(build({
+      carbon_negative_claim: { text: 'true', numeric: 1 },
+      epd_published: { text: 'true', numeric: 1 },
       renewable_energy_percentage: { text: '100', numeric: 100 },
       cdr_partnership: { text: 'true', numeric: 1 },
     }));
-    // Leadership signals total weight ~9.5 of 46 = ~20% achieved at
-    // 100% each. Not yet leader (60+).
-    expect(result.overall).toBeLessThan(40);
-    expect(result.tier).not.toBe('leader');
+    expect(strongEnv.overall).toBeGreaterThan(strongSocGov.overall);
   });
 
-  it('honours dual-pillar fields (B Corp counts in both Social and Governance)', () => {
-    const justBcorp = calculateScrapedVitality(build({
-      bcorp_certified: { text: 'true', numeric: 1 },
+  it('counts carbon-negative via either claim OR negative carbon intensity', () => {
+    const viaClaim = calculateScrapedVitality(build({
+      carbon_negative_claim: { text: 'true', numeric: 1 },
     }));
-    expect(justBcorp.by_pillar.social).toBeGreaterThan(0);
-    expect(justBcorp.by_pillar.governance).toBeGreaterThan(0);
-  });
-
-  it('missing fields contribute nothing (no penalty)', () => {
-    const single = calculateScrapedVitality(build({
-      fairtrade_certified: { text: 'true', numeric: 1 },
+    const viaIntensity = calculateScrapedVitality(build({
+      carbon_intensity_kgco2e_per_litre: { text: '-0.2', numeric: -0.2 },
     }));
-    const double = calculateScrapedVitality(build({
-      fairtrade_certified: { text: 'true', numeric: 1 },
-      bcorp_certified: { text: 'false', numeric: 0 },
-    }));
-    // Adding an explicit "false" cert grades it 0 with non-zero weight,
-    // which DOES drag the score down. That's intentional: a confirmed
-    // negative is information.
-    expect(double.overall).toBeLessThanOrEqual(single.overall);
-    // But OMITTING a field should NOT change the score:
-    const same = calculateScrapedVitality(build({
-      fairtrade_certified: { text: 'true', numeric: 1 },
-    }));
-    expect(same.overall).toBe(single.overall);
+    // viaIntensity fires both 'carbon_negative' AND 'carbon_intensity_disclosed'
+    // so it should actually beat viaClaim alone.
+    expect(viaIntensity.signals_by_pillar.environment.count).toBeGreaterThanOrEqual(
+      viaClaim.signals_by_pillar.environment.count,
+    );
+    expect(viaClaim.signals_by_pillar.environment.count).toBeGreaterThanOrEqual(1);
   });
 });
