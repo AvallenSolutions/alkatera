@@ -577,19 +577,116 @@ function sanitiseAwards(input: unknown, existingProducts: ExistingProductRef[]):
 function sanitiseNotableFacts(input: unknown): string[] {
   if (!Array.isArray(input)) return [];
   const out: string[] = [];
-  const seen = new Set<string>();
+  const tokenSets: Set<string>[] = [];
   for (const raw of input) {
     const v = str(raw);
     if (!v) continue;
     const trimmed = v.replace(/\s+/g, ' ').trim();
     if (!trimmed || trimmed.length > 200) continue;
-    const key = trimmed.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
+    const tokens = tokenisefact(trimmed);
+    if (tokens.size === 0) continue;
+    if (tokenSets.some((existing) => factsAreSimilar(existing, tokens))) continue;
+    tokenSets.push(tokens);
     out.push(trimmed);
-    if (out.length >= 6) break;
+    if (out.length >= 4) break;
   }
   return out;
+}
+
+/** Same dedup logic but compared against a *pre-existing* set of facts
+ *  (e.g. brand_directory.notable_facts already in the DB) so the caller
+ *  can drop incoming items that are near-dupes of stored ones. */
+export function dedupeAgainstExisting(incoming: string[], existing: string[]): string[] {
+  const existingTokens = existing.map(tokenisefact);
+  const out: string[] = [];
+  const acceptedTokens: Set<string>[] = [];
+  for (const fact of incoming) {
+    const tokens = tokenisefact(fact);
+    if (tokens.size === 0) continue;
+    if (existingTokens.some((t) => factsAreSimilar(t, tokens))) continue;
+    if (acceptedTokens.some((t) => factsAreSimilar(t, tokens))) continue;
+    acceptedTokens.push(tokens);
+    out.push(fact);
+  }
+  return out;
+}
+
+const STOP_WORDS = new Set([
+  'a','an','the','of','with','and','or','for','in','on','at','by','to','is','was','has','have',
+  'that','this','its','it','itss','more','than','as','from','our','their','they','our','we',
+  'us','be','been','being','are','were','one','first','via','using','use','uses','also','any',
+  'all','some','very','only','even','just','well','these','those','through','across','about',
+  'made','make','makes','since','over','under','between','into','onto','out','up','down','off',
+]);
+
+/** Tokenise a fact for token-Jaccard similarity comparison. Lowercase,
+ *  strip non-alphanumerics, drop stop-words and very short tokens, then
+ *  collapse to a set. "B Corp certified with score 89.8" and
+ *  "B Corp certified, score 89.8 vs median 50.9" share enough core
+ *  tokens (bcorp, corp, certified, score, 898) to hit Jaccard ≥ 0.45.
+ *  Numbers stay as tokens — the 89.8 anchor catches B-Impact-score
+ *  variants. */
+function tokenisefact(fact: string): Set<string> {
+  const tokens = fact
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((t) => t.length > 1 && !STOP_WORDS.has(t));
+  return new Set(tokens);
+}
+
+/** Anchor concepts: distinctive terms that, when present in both facts,
+ *  mark them as restatements of the same underlying claim. Two flavours:
+ *
+ *  - `required`: every listed token must appear on both sides. Used
+ *    for multi-word concepts where individual words are too generic
+ *    (e.g. "carbon" + "negative" — either alone is common).
+ *  - `any`: at least one token from the group must appear on both
+ *    sides. Used for distinctive single-word concepts and synonyms.
+ *
+ *  Used in addition to Jaccard similarity. Catches different prose
+ *  forms ("Certified B Corp with score 89.8" vs "B Corp in Jan 2022")
+ *  that Jaccard would miss because the supporting prose differs.
+ */
+const FACT_ANCHORS: Array<{ id: string; required?: string[]; any?: string[] }> = [
+  // B Corp variants — "bcorp" / "corp" / "corporation" are all
+  // distinctive enough to anchor when shared between two facts.
+  { id: 'bcorp', any: ['bcorp', 'corp', 'corporation'] },
+  // Climeworks + Carbfix — both proper nouns, very unique.
+  { id: 'climeworks_carbfix', any: ['climeworks', 'carbfix'] },
+  // EPD acronym is unique on its own.
+  { id: 'epd', any: ['epd'] },
+  // "Carbon negative" requires BOTH words — "carbon" alone is common
+  // (carbon intensity, carbon trust), as is "negative".
+  { id: 'carbon_negative', required: ['carbon', 'negative'] },
+];
+
+function sharesAnchor(a: Set<string>, b: Set<string>): boolean {
+  for (const anchor of FACT_ANCHORS) {
+    const matches = (s: Set<string>) => {
+      if (anchor.required && !anchor.required.every((t) => s.has(t))) return false;
+      if (anchor.any && !anchor.any.some((t) => s.has(t))) return false;
+      return true;
+    };
+    if (matches(a) && matches(b)) return true;
+  }
+  return false;
+}
+
+/** Combined similarity test: Jaccard >= 0.30 OR they share a named
+ *  anchor concept. The anchor list catches "B Corp" / "EPD" / "Carbon
+ *  negative" variants that diverge in supporting prose but mean the
+ *  same thing. Jaccard catches everything else. */
+function factsAreSimilar(a: Set<string>, b: Set<string>): boolean {
+  return jaccardSimilarity(a, b) >= 0.3 || sharesAnchor(a, b);
+}
+
+function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 && b.size === 0) return 1;
+  let intersection = 0;
+  for (const t of Array.from(a)) if (b.has(t)) intersection += 1;
+  const union = a.size + b.size - intersection;
+  return union === 0 ? 0 : intersection / union;
 }
 
 function str(v: unknown): string | null {

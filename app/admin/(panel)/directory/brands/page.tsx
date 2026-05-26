@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Upload, Search, Plus, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getSupabaseAdminClient } from '@/lib/supabase/api-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +20,7 @@ export default async function AdminBrandsPage({
 }: {
   searchParams: SearchParams;
 }) {
-  const supabase = getSupabaseServerClient() as unknown as SupabaseClient;
+  const supabase = getSupabaseAdminClient() as unknown as SupabaseClient;
   const q = (searchParams.q ?? '').trim();
   const source = searchParams.source ?? '';
   const verification = searchParams.verification ?? '';

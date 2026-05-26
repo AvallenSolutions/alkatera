@@ -9,7 +9,7 @@ import {
   Droplets,
   Building2,
 } from 'lucide-react';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getSupabaseAdminClient } from '@/lib/supabase/api-client';
 import { BrandAwardsPanel, type AwardRow } from '@/components/admin/directory/brand-awards-panel';
 import { BrandNotableFactsPanel } from '@/components/admin/directory/brand-notable-facts-panel';
 
@@ -41,7 +41,7 @@ export default async function AdminProductDetailPage({
 }: {
   params: { id: string };
 }) {
-  const supabase = getSupabaseServerClient() as unknown as SupabaseClient;
+  const supabase = getSupabaseAdminClient() as unknown as SupabaseClient;
 
   const { data: productData } = (await supabase
     .from('product_directory')

@@ -1,11 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Database, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getSupabaseAdminClient } from '@/lib/supabase/api-client';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminSyncPage() {
-  const supabase = getSupabaseServerClient() as unknown as SupabaseClient;
+  const supabase = getSupabaseAdminClient() as unknown as SupabaseClient;
 
   const [
     { data: queueByStatus },

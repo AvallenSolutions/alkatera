@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Building2, Users } from 'lucide-react';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getSupabaseAdminClient } from '@/lib/supabase/api-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +15,7 @@ interface OrgRow {
 }
 
 export default async function AdminDistributorsPage() {
-  const supabase = getSupabaseServerClient() as unknown as SupabaseClient;
+  const supabase = getSupabaseAdminClient() as unknown as SupabaseClient;
 
   const { data: orgs } = (await supabase
     .from('distributor_organizations')

@@ -1,12 +1,12 @@
 import Link from 'next/link';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Activity, Search, Mail, Eye } from 'lucide-react';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getSupabaseAdminClient } from '@/lib/supabase/api-client';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminActivityPage() {
-  const supabase = getSupabaseServerClient() as unknown as SupabaseClient;
+  const supabase = getSupabaseAdminClient() as unknown as SupabaseClient;
 
   const [
     { data: views },

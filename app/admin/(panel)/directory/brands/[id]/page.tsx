@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ChevronLeft, Tag, Globe2, Building, Calendar, ShieldCheck } from 'lucide-react';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getSupabaseAdminClient } from '@/lib/supabase/api-client';
 import { BrandDiscoveryOptOutToggle } from '@/components/admin/directory/brand-discovery-opt-out-toggle';
 import { BrandVerificationControl } from '@/components/admin/directory/brand-verification-control';
 import {
@@ -59,7 +59,13 @@ export default async function AdminBrandDetailPage({
 }: {
   params: { id: string };
 }) {
-  const supabase = getSupabaseServerClient() as unknown as SupabaseClient;
+  // Service-role client. The admin (panel) layout already gates on
+  // is_alkatera_admin, so RLS-bypass is safe here — and necessary,
+  // because scraped_brand_data RLS only lets distributor MEMBERS read
+  // findings for brands they list. alka**tera** staff aren't members,
+  // so an anon-key/cookie client returns zero rows and the score
+  // breakdown + certifications panels render empty.
+  const supabase = getSupabaseAdminClient() as unknown as SupabaseClient;
 
   const { data: directoryData } = (await supabase
     .from('brand_directory')

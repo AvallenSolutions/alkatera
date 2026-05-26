@@ -7,11 +7,12 @@ import {
 } from '@/lib/distributor/directory/product-dedup';
 import { ingestDiscoveredPdf, looksLikePdfUrl } from '@/lib/distributor/scraping/pdf-ingester';
 import { recalculateCompleteness } from '@/lib/distributor/scoring/recalculate';
-import type {
-  DeepEnrichResult,
-  EnrichedAward,
-  EnrichedCredential,
-  EnrichedProduct,
+import {
+  dedupeAgainstExisting,
+  type DeepEnrichResult,
+  type EnrichedAward,
+  type EnrichedCredential,
+  type EnrichedProduct,
 } from '@/lib/admin/sourcing/deep-enrich';
 
 /**
@@ -267,7 +268,11 @@ async function persistEnriched(
     }
   }
 
-  // ── 6. Notable facts. Append to the directory column, dedup by case-insensitive match. ──
+  // ── 6. Notable facts. Append to the directory column with semantic
+  //    dedup — token-Jaccard so different phrasings of the same fact
+  //    ("B Corp certified" / "Certified B Corporation with B Impact
+  //    score of 89.8") collapse to one entry. Cap the column at 8 so
+  //    repeat runs can't grow the list indefinitely.
   let notableAdded = 0;
   let notableExisting = 0;
   if (enriched.notable_facts.length > 0) {
@@ -277,18 +282,14 @@ async function persistEnriched(
       .eq('id', brandDirectoryId)
       .maybeSingle();
     const existing = ((current as { notable_facts?: string[] } | null)?.notable_facts ?? []);
-    const existingLower = new Set(existing.map((f) => f.toLowerCase()));
-    const toAdd: string[] = [];
-    for (const fact of enriched.notable_facts) {
-      if (existingLower.has(fact.toLowerCase())) {
-        notableExisting += 1;
-        continue;
-      }
-      existingLower.add(fact.toLowerCase());
-      toAdd.push(fact);
-    }
+    const toAdd = dedupeAgainstExisting(enriched.notable_facts, existing);
+    notableExisting = enriched.notable_facts.length - toAdd.length;
     if (toAdd.length > 0) {
-      const next = [...existing, ...toAdd];
+      const NOTABLE_FACTS_CAP = 8;
+      const combined = [...existing, ...toAdd];
+      const next = combined.length > NOTABLE_FACTS_CAP
+        ? combined.slice(combined.length - NOTABLE_FACTS_CAP)
+        : combined;
       const { error } = await service
         .from('brand_directory')
         .update({ notable_facts: next, updated_at: new Date().toISOString() })
