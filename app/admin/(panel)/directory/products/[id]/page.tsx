@@ -12,6 +12,7 @@ import {
 import { getSupabaseAdminClient } from '@/lib/supabase/api-client';
 import { BrandAwardsPanel, type AwardRow } from '@/components/admin/directory/brand-awards-panel';
 import { BrandNotableFactsPanel } from '@/components/admin/directory/brand-notable-facts-panel';
+import { ProductEditControl } from '@/components/admin/directory/product-edit-control';
 
 export const dynamic = 'force-dynamic';
 
@@ -240,6 +241,21 @@ export default async function AdminProductDetailPage({
           </div>
         )}
       </div>
+
+      <ProductEditControl
+        productId={product.id}
+        productName={product.name}
+        brandDirectoryId={product.brand_directory_id}
+        initial={{
+          name: product.name,
+          gtin: product.gtin,
+          category: product.category,
+          abv: product.abv,
+          container_size_ml: product.container_size_ml,
+          container_format: product.container_format,
+          recipe_overview: product.recipe_overview,
+        }}
+      />
 
       <BrandNotableFactsPanel facts={notableFacts} />
 
