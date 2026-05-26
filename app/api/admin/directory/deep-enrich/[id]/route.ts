@@ -367,22 +367,36 @@ async function persistAward(
   brandDirectoryId: string,
   award: EnrichedAward,
 ): Promise<boolean> {
-  // Manual dedup check so we can return added/existing counts without
-  // a per-row upsert race.
-  const { data: existing } = await service
+  // Semantic dedup. Awards from successive deep-enrich runs come back
+  // with the same body / award / year but slightly different prose
+  // ("Wine & Spirit Competition" vs "Wine and Spirit Competition";
+  // "Green Spirit Trophy" vs "Green Spirit Initiative Trophy"). A
+  // straight ilike misses these — normalise the body + name first,
+  // then compare. We also pull every award row on this brand once
+  // and dedup in JS rather than try to express the normalisation in
+  // a Postgres filter.
+  const normNewBody = normaliseAwardKey(award.awarding_body);
+  const normNewName = normaliseAwardKey(award.award_name);
+  const newYear = award.year ?? null;
+  const newProductId = award.matches_product_id ?? null;
+  const { data: rows } = await service
     .from('brand_awards')
-    .select('id')
-    .eq('brand_directory_id', brandDirectoryId)
-    .filter(
-      'product_directory_id',
-      award.matches_product_id ? 'eq' : 'is',
-      award.matches_product_id ?? null,
-    )
-    .ilike('awarding_body', award.awarding_body)
-    .ilike('award_name', award.award_name)
-    .eq('year', award.year ?? 0)
-    .maybeSingle();
-  if (existing) return false;
+    .select('id, awarding_body, award_name, year, product_directory_id')
+    .eq('brand_directory_id', brandDirectoryId);
+  const existingRows = (rows ?? []) as Array<{
+    id: string;
+    awarding_body: string;
+    award_name: string;
+    year: number | null;
+    product_directory_id: string | null;
+  }>;
+  for (const r of existingRows) {
+    if ((r.year ?? null) !== newYear) continue;
+    if ((r.product_directory_id ?? null) !== newProductId) continue;
+    if (normaliseAwardKey(r.awarding_body) !== normNewBody) continue;
+    if (!awardNamesMatch(r.award_name, award.award_name)) continue;
+    return false;
+  }
   const { error } = await service.from('brand_awards').insert({
     brand_directory_id: brandDirectoryId,
     product_directory_id: award.matches_product_id,
@@ -395,6 +409,59 @@ async function persistAward(
     discovered_via: 'deep_enrich',
   });
   if (error) throw new Error(error.message);
+  return true;
+}
+
+/** Lowercase, replace & with " and ", strip leading "the ", drop
+ *  punctuation and collapse whitespace. Used as the body-equality key
+ *  for award dedup. */
+function normaliseAwardKey(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/^the\s+/, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const AWARD_NAME_STOP_WORDS = new Set([
+  'a','an','the','of','for','and','or','to','in','at','by','on',
+  'award','awards','prize','trophy','medal','category',
+]);
+
+/** True when two award names refer to the same prize. Tokenises after
+ *  the body-style normalisation, drops generic award-suffix words
+ *  ("Trophy", "Award", "Prize"), then requires Jaccard ≥ 0.5 on the
+ *  remaining tokens OR the smaller token set (size ≥ 2) being a strict
+ *  subset of the larger. Catches "Green Spirit Trophy" vs "Green Spirit
+ *  Initiative Trophy" without false-matching "Sustainability Award" to
+ *  "Best Sustainability Initiative" via single-token subset. */
+function awardNamesMatch(a: string, b: string): boolean {
+  const tokenise = (s: string): Set<string> => {
+    const tokens = normaliseAwardKey(s)
+      .split(' ')
+      .filter((t) => t.length > 1 && !AWARD_NAME_STOP_WORDS.has(t));
+    return new Set(tokens);
+  };
+  const ta = tokenise(a);
+  const tb = tokenise(b);
+  if (ta.size === 0 && tb.size === 0) return true;
+  if (ta.size === 0 || tb.size === 0) return false;
+  let intersect = 0;
+  for (const t of Array.from(ta)) if (tb.has(t)) intersect += 1;
+  const union = ta.size + tb.size - intersect;
+  const jaccard = union === 0 ? 0 : intersect / union;
+  if (jaccard >= 0.5) return true;
+  // Strict-subset fallback — only fires when the smaller set has ≥ 2
+  // tokens, so "Sustainability" (1 token) doesn't claim a match
+  // against "Best Sustainability Initiative".
+  const smaller = ta.size <= tb.size ? ta : tb;
+  const larger = ta.size <= tb.size ? tb : ta;
+  if (smaller.size < 2) return false;
+  for (const t of Array.from(smaller)) {
+    if (!larger.has(t)) return false;
+  }
   return true;
 }
 
