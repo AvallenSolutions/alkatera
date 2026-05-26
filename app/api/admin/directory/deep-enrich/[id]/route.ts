@@ -5,7 +5,11 @@ import {
   resolveOrCreateProductEntrySmart,
   clearProductDedupCache,
 } from '@/lib/distributor/directory/product-dedup';
-import { ingestDiscoveredPdf, looksLikePdfUrl } from '@/lib/distributor/scraping/pdf-ingester';
+import {
+  discoverPdfsAtLandingPage,
+  ingestDiscoveredPdf,
+  looksLikePdfUrl,
+} from '@/lib/distributor/scraping/pdf-ingester';
 import { recalculateCompleteness } from '@/lib/distributor/scoring/recalculate';
 import {
   dedupeAgainstExisting,
@@ -105,6 +109,7 @@ interface IngestSummary {
   documents: {
     ingested: number;
     skipped: number;
+    landing_pages_crawled: Array<{ landingUrl: string; foundCount: number }>;
     details: Array<{ url: string; status: string; reason?: string }>;
   };
   awards: { added: number; existing: number; errors: string[] };
@@ -215,15 +220,45 @@ async function persistEnriched(
   }
 
   // ── 4. Documents → PDF ingester. ──
+  // Direct PDF URLs go straight to the ingester. For URLs that aren't
+  // PDFs (landing pages — e.g. Shopify's /pages/sustainability-report
+  // listing several Dropbox EPDs), fetch the page and run a focused
+  // anchor crawl. Each discovered PDF is then fed through the same
+  // ingester. Bounded to 12 discovered PDFs per landing page.
   let docsIngested = 0;
   let docsSkipped = 0;
   const docDetails: Array<{ url: string; status: string; reason?: string }> = [];
+  const ingestQueue: typeof enriched.documents = [];
+  const landingPageDetails: Array<{ landingUrl: string; foundCount: number }> = [];
   for (const doc of enriched.documents) {
-    if (!looksLikePdfUrl(doc.url)) {
-      docsSkipped += 1;
-      docDetails.push({ url: doc.url, status: 'skipped', reason: 'not_a_pdf' });
+    if (looksLikePdfUrl(doc.url)) {
+      ingestQueue.push(doc);
       continue;
     }
+    try {
+      const discovered = await discoverPdfsAtLandingPage(doc.url);
+      landingPageDetails.push({ landingUrl: doc.url, foundCount: discovered.length });
+      if (discovered.length === 0) {
+        docsSkipped += 1;
+        docDetails.push({ url: doc.url, status: 'skipped', reason: 'landing_page_no_pdfs' });
+        continue;
+      }
+      docDetails.push({
+        url: doc.url,
+        status: 'landing_page_crawled',
+        reason: `${discovered.length}_pdfs_found`,
+      });
+      ingestQueue.push(...discovered);
+    } catch (err: unknown) {
+      docsSkipped += 1;
+      docDetails.push({
+        url: doc.url,
+        status: 'failed',
+        reason: `landing_page_crawl_failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
+  }
+  for (const doc of ingestQueue) {
     try {
       const result = await ingestDiscoveredPdf({
         supabase: service,
@@ -315,7 +350,12 @@ async function persistEnriched(
       skipped_by_dedup: productsSkippedByMap + productsSkippedByLlm,
       errors: productErrors,
     },
-    documents: { ingested: docsIngested, skipped: docsSkipped, details: docDetails },
+    documents: {
+      ingested: docsIngested,
+      skipped: docsSkipped,
+      landing_pages_crawled: landingPageDetails,
+      details: docDetails,
+    },
     awards: { added: awardsAdded, existing: awardsExisting, errors: awardErrors },
     notable_facts: { added: notableAdded, existing: notableExisting },
     enrich_error: enriched.error ?? null,

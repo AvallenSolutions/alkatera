@@ -28,10 +28,13 @@ describe('calculateScrapedVitality', () => {
     const result = calculateScrapedVitality(build({
       bcorp_certified: { text: 'true', numeric: 1 },
     }));
-    // B Corp contributes 2 to governance + 1.5 to social = 3.5 achieved
-    // out of total weight ~30. Score sits around 11-12.
-    expect(result.overall).toBeGreaterThan(8);
-    expect(result.overall).toBeLessThan(15);
+    // B Corp contributes 1.5 to social + 2 to governance = 3.5 achieved
+    // out of total weight ~46. Score sits around 7-8 — by design: a B
+    // Corp brand alone is on the journey but isn't a leader. Environment
+    // pillar carries Leadership signals (EPD, carbon-negative, etc.)
+    // that B Corp alone doesn't satisfy.
+    expect(result.overall).toBeGreaterThan(5);
+    expect(result.overall).toBeLessThan(12);
     expect(result.by_pillar.environment).toBe(0); // B Corp not in env
     expect(result.by_pillar.social).toBeGreaterThan(0);
     expect(result.by_pillar.governance).toBeGreaterThan(0);
@@ -67,9 +70,32 @@ describe('calculateScrapedVitality', () => {
       parent_company: { text: 'Acme Group', numeric: null },
       hq_country: { text: 'GB', numeric: null },
       founding_year: { text: '2018', numeric: 2018 },
+      // Leadership signals — a "leader" should be doing the harder
+      // process work too, not just publishing the raw numbers.
+      epd_published: { text: 'true', numeric: 1 },
+      carbon_negative_claim: { text: 'true', numeric: 1 },
+      renewable_energy_percentage: { text: '100', numeric: 100 },
+      cdr_partnership: { text: 'true', numeric: 1 },
     }));
     expect(result.overall).toBeGreaterThanOrEqual(60);
     expect(result.tier).toBe('leader');
+  });
+
+  it('leadership signals alone are insufficient (must show real disclosure)', () => {
+    // A brand that ticks the leadership boxes (claims carbon-negative,
+    // EPD published) but provides no quantitative evidence still
+    // doesn't land in the leader band. Leadership claims must be
+    // anchored by disclosure for the top tier.
+    const result = calculateScrapedVitality(build({
+      epd_published: { text: 'true', numeric: 1 },
+      carbon_negative_claim: { text: 'true', numeric: 1 },
+      renewable_energy_percentage: { text: '100', numeric: 100 },
+      cdr_partnership: { text: 'true', numeric: 1 },
+    }));
+    // Leadership signals total weight ~9.5 of 46 = ~20% achieved at
+    // 100% each. Not yet leader (60+).
+    expect(result.overall).toBeLessThan(40);
+    expect(result.tier).not.toBe('leader');
   });
 
   it('honours dual-pillar fields (B Corp counts in both Social and Governance)', () => {

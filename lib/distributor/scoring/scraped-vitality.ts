@@ -61,16 +61,28 @@ interface FieldConfig {
  */
 const FIELD_PILLARS: Partial<Record<FieldKey, FieldConfig[]>> = {
   // ───────────── Environment ─────────────
-  carbon_intensity_kgco2e_per_litre: [{ pillar: 'environment', weight: 3 }],
-  scope_1_tco2e:                     [{ pillar: 'environment', weight: 1.5 }],
-  scope_2_tco2e:                     [{ pillar: 'environment', weight: 1.5 }],
-  scope_3_tco2e:                     [{ pillar: 'environment', weight: 2 }],
-  net_zero_target_year:              [{ pillar: 'environment', weight: 1.5 }],
-  sbt_status:                        [{ pillar: 'environment', weight: 1.5 }],
-  water_usage_litres_per_litre:      [{ pillar: 'environment', weight: 2 }],
+  // Leadership signals — heavy weight. A brand that publishes EPDs,
+  // claims carbon-negative operations (with evidence), runs on 100%
+  // renewable energy, and partners with a CDR provider is doing
+  // materially harder work than one that just discloses Scope 1/2/3
+  // numbers. The scoring model should recognise this.
+  epd_published:                     [{ pillar: 'environment', weight: 3 }],
+  carbon_negative_claim:             [{ pillar: 'environment', weight: 3 }],
+  renewable_energy_percentage:       [{ pillar: 'environment', weight: 2 }],
+  cdr_partnership:                   [{ pillar: 'environment', weight: 1.5 }],
+  // Quantitative metrics — kept relevant when present but reduced so
+  // a missing Scope 3 number doesn't dominate the pillar for a
+  // genuinely-leading brand that hasn't published the raw figure.
+  carbon_intensity_kgco2e_per_litre: [{ pillar: 'environment', weight: 2 }],
+  scope_1_tco2e:                     [{ pillar: 'environment', weight: 1 }],
+  scope_2_tco2e:                     [{ pillar: 'environment', weight: 1 }],
+  scope_3_tco2e:                     [{ pillar: 'environment', weight: 1.5 }],
+  net_zero_target_year:              [{ pillar: 'environment', weight: 1 }],
+  sbt_status:                        [{ pillar: 'environment', weight: 1 }],
+  water_usage_litres_per_litre:      [{ pillar: 'environment', weight: 1.5 }],
   water_recycled_percentage:         [{ pillar: 'environment', weight: 0.5 }],
   water_stress_region:               [{ pillar: 'environment', weight: 0.5 }],
-  recycled_packaging_percentage:     [{ pillar: 'environment', weight: 2 }],
+  recycled_packaging_percentage:     [{ pillar: 'environment', weight: 1.5 }],
   packaging_primary_material:        [{ pillar: 'environment', weight: 1.5 }],
   carbon_trust_certified:            [{ pillar: 'environment', weight: 1 }],
   iwca_member:                       [{ pillar: 'environment', weight: 1 }],
@@ -186,12 +198,15 @@ export function tierForScrapedScore(score: number): ScoreTier {
 // ────────────────────────────────────────────────────────────────────
 
 function gradeField(key: FieldKey, value: ScrapedFieldValue): number {
-  // Boolean certs first — common pattern.
+  // Boolean certs + boolean leadership signals — common pattern.
   if (
     key.endsWith('_certified') ||
     key === 'iwca_member' ||
     key === 'porto_protocol_signatory' ||
-    key === 'water_stress_region'
+    key === 'water_stress_region' ||
+    key === 'epd_published' ||
+    key === 'carbon_negative_claim' ||
+    key === 'cdr_partnership'
   ) {
     if (value.numeric === 1 || value.text === 'true') return 100;
     if (value.numeric === 0 || value.text === 'false') return 0;
@@ -229,7 +244,8 @@ function gradeField(key: FieldKey, value: ScrapedFieldValue): number {
       return value.numeric != null ? 80 : 0;
     case 'recycled_packaging_percentage':
     case 'organic_percentage':
-    case 'water_recycled_percentage': {
+    case 'water_recycled_percentage':
+    case 'renewable_energy_percentage': {
       const v = value.numeric;
       if (v == null) return 0;
       return Math.max(0, Math.min(100, Math.round(v)));

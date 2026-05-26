@@ -27,7 +27,16 @@ export type FieldKey =
   | 'contact_email'
   | 'company_description'
   | 'iwca_member'
-  | 'porto_protocol_signatory';
+  | 'porto_protocol_signatory'
+  // Leadership signals — process-level indicators that capture the
+  // *act* of doing sustainability work, not just the numbers. These
+  // are critical for scraped brands because most don't publish raw
+  // Scope 1/2/3 figures publicly even when they're carbon-negative
+  // operating with renewable energy and shipping EPDs.
+  | 'epd_published'
+  | 'carbon_negative_claim'
+  | 'renewable_energy_percentage'
+  | 'cdr_partnership';
 
 export type FieldType = 'boolean' | 'number' | 'year' | 'string' | 'longtext';
 export type Pillar = 'carbon' | 'water' | 'packaging' | 'agriculture' | 'governance' | 'corporate';
@@ -76,6 +85,14 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     description: "International Wineries for Climate Action signatory. Wine producers only." },
   { key: 'porto_protocol_signatory',       label: 'Porto Protocol Signatory',          type: 'boolean', pillar: 'carbon',
     description: "Porto Protocol signatory for climate action in wine. Wine producers only." },
+  { key: 'epd_published',                  label: 'EPD Published',                     type: 'boolean', pillar: 'carbon',
+    description: "Brand has published at least one Environmental Product Declaration (third-party verified product LCA). A strong leadership signal: very few drinks brands have done this." },
+  { key: 'carbon_negative_claim',          label: 'Carbon Negative',                   type: 'boolean', pillar: 'carbon',
+    description: "Brand publicly claims carbon-negative operations (removes more CO2 than it emits) and the claim is supported by published evidence (sustainability page, EPD, third-party verification)." },
+  { key: 'renewable_energy_percentage',    label: 'Renewable Energy %',                type: 'number',  pillar: 'carbon',
+    description: "Percentage of energy from renewable sources. 100 = fully renewable." },
+  { key: 'cdr_partnership',                label: 'CDR Partnership',                   type: 'boolean', pillar: 'carbon',
+    description: "Active partnership with a permanent carbon-removal provider (Climeworks, Carbfix, Heirloom, Charm, etc.) — direct-air-capture or mineralisation, not offsetting." },
 ];
 
 const FIELD_BY_KEY = new Map<FieldKey, FieldDefinition>(FIELD_DEFINITIONS.map((f) => [f.key, f]));

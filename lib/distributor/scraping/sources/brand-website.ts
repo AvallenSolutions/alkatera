@@ -52,6 +52,21 @@ const CRAWL_PATHS = [
   '/our-values',
   '/mission',
   '/who-we-are',
+  // Shopify-themed: drinks brands on Shopify usually host these under
+  // /pages/* rather than at the root. Two Drifters' EPD library lives
+  // at /pages/sustainability-report — without these we miss the docs.
+  '/pages/sustainability',
+  '/pages/sustainability-report',
+  '/pages/our-sustainability',
+  '/pages/responsibility',
+  '/pages/impact',
+  '/pages/our-impact',
+  '/pages/esg',
+  '/pages/carbon-negative',
+  '/pages/carbon-neutral',
+  '/pages/environment',
+  '/pages/about',
+  '/pages/about-us',
 ];
 
 // Product / shop / range paths. Crawled separately from the corpus

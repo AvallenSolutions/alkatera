@@ -40,6 +40,10 @@ describe('calculateCompleteness', () => {
       'company_description',
       'iwca_member',
       'porto_protocol_signatory',
+      'epd_published',
+      'carbon_negative_claim',
+      'renewable_energy_percentage',
+      'cdr_partnership',
     ]);
     expect(result.overall).toBe(100);
   });

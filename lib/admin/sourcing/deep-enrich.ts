@@ -284,7 +284,11 @@ Output ONE JSON object and NOTHING else (no markdown, no commentary):
     { "field_key": "sustainability_report_url",      "value": "https://…", "source_url": "..." },
     { "field_key": "sustainability_report_year",     "value": 2024,    "source_url": "..." },
     { "field_key": "contact_email",                  "value": "sustainability@...", "source_url": "..." },
-    { "field_key": "company_registration_number",    "value": "12345678", "source_url": "..." }
+    { "field_key": "company_registration_number",    "value": "12345678", "source_url": "..." },
+    { "field_key": "epd_published",                  "value": true,    "source_url": "https://… link to the EPD or the page listing EPDs" },
+    { "field_key": "carbon_negative_claim",          "value": true,    "source_url": "https://… brand's own claim page or third-party verification" },
+    { "field_key": "renewable_energy_percentage",    "value": 100,     "source_url": "..." },
+    { "field_key": "cdr_partnership",                "value": true,    "source_url": "https://… Climeworks / Carbfix / etc. partnership announcement" }
   ],
   "products": [
     {
@@ -322,15 +326,20 @@ Award sources to search: IWSC (iwsc.net), International Spirits Challenge (inter
 Notable facts guidance: short, verifiable, sustainability- or provenance-relevant. Skip marketing puffery ("the best gin in the world"). Good examples: "Carbon negative since 2019", "First B Corp distillery in Devon", "100% British glass packaging", "Partnered with Cool Earth for rainforest protection". 1-6 facts. Skip the section if you can't find any.
 
 Hard rules:
-- "credentials" is mandatory in the response. You MUST include every certification you mention in the summary as a credential row (with field_key + value + source_url). The credentials array IS the source of truth for the certifications panel — if you write "B Corp certified" in the summary but omit it from credentials, the platform records no certification.
-- Include a credential row for any certification you verified (positive OR negative). The credentials section is how this brand earns its score; do not skip it.
+- "credentials" is mandatory in the response. You MUST include every certification AND leadership signal you mention in the summary as a credential row (with field_key + value + source_url). The credentials array IS the source of truth for the certifications panel AND the score — if you write "B Corp certified" or "carbon-negative" or "publishes EPDs" in the summary but omit it from credentials, the platform records no credit.
+- Include a credential row for any certification or leadership signal you verified (positive OR negative). The credentials section is how this brand earns its score; do not skip it.
+- LEADERSHIP SIGNALS to look for and report explicitly:
+   * epd_published: true if any product page or the sustainability page links to a published Environmental Product Declaration (EPD) PDF for the brand's product(s). Strong signal — very few drinks brands publish EPDs.
+   * carbon_negative_claim: true ONLY if the brand publicly claims carbon-negative operations AND there's supporting evidence (a sustainability page describing the methodology, an EPD with negative net carbon, third-party verification). Marketing puff alone doesn't qualify; require evidence.
+   * renewable_energy_percentage: numeric 0-100. 100 if the brand uses 100% renewable energy (look for "all-electric", "100% renewable", "fully solar/wind powered"). Estimate conservatively if the brand uses some renewables without a stated percentage.
+   * cdr_partnership: true if the brand has an active partnership with a permanent carbon-removal provider (Climeworks, Carbfix, Heirloom, Charm, etc.). Carbon-offset purchases (forestry, biochar) do NOT qualify — must be permanent removal via DAC or mineralisation.
 - Every credential must have a source_url EXCEPT a clean negative (value=false with no URL means "I checked and could not find evidence of certification"); only include the negative if you actually looked.
 - For booleans, "value" must be true or false (JSON), not strings.
 - For "sbt_status", value must be one of 'committed', 'targets_set', 'none'.
 - For numeric fields, value must be a number, not a string. No units, no commas.
 - "container_size_ml": 70cl = 700, 1L = 1000.
 - Products: "matches_existing_id" must be one of the ids listed above (when the finding refers to the same product) or null (when it's genuinely new). When in doubt about size variants, prefer to MATCH rather than CREATE — operations can split later if needed.
-- Documents: include URLs you can verify lead to a PDF. The direct .pdf URL is best, but cloud-share links to PDFs (Dropbox, Google Drive, OneDrive) are also accepted — paste the sharing URL verbatim, the platform handles the redirect to the file bytes. Do NOT include landing pages that merely link to PDFs; chase the actual PDF URL.
+- Documents: prefer direct PDF URLs. Cloud-share links (Dropbox, Google Drive, OneDrive) are accepted — paste the sharing URL verbatim, the platform handles the redirect to the file bytes. Landing pages that LIST PDF documents (e.g. a "Sustainability Report" page with multiple downloadable EPDs / LCAs) are ALSO accepted — the platform will crawl them for the actual PDF links. Do NOT include landing pages that are purely marketing prose with no document downloads.
 - Awards: every award must cite an authoritative source URL. Skip rumour. "matches_product_id" must be one of the existing-product ids above (when the award is for that specific SKU) or null (brand-level award). When unsure, prefer null.
 - Notable facts: short single-line strings. Verifiable. No em dashes.
 - British English.`;
@@ -403,6 +412,11 @@ const KNOWN_CREDENTIAL_KEYS = new Set([
   'porto_protocol_signatory',
   'company_registration_number',
   'contact_email',
+  // Leadership signals — see field-definitions.ts.
+  'epd_published',
+  'carbon_negative_claim',
+  'renewable_energy_percentage',
+  'cdr_partnership',
 ]);
 
 function sanitiseCredentials(input: unknown): EnrichedCredential[] {
@@ -433,7 +447,10 @@ function sanitiseCredentialValue(key: string, raw: unknown): string | number | b
     key.endsWith('_certified') ||
     key === 'iwca_member' ||
     key === 'porto_protocol_signatory' ||
-    key === 'water_stress_region';
+    key === 'water_stress_region' ||
+    key === 'epd_published' ||
+    key === 'carbon_negative_claim' ||
+    key === 'cdr_partnership';
   if (isBoolean) {
     if (typeof raw === 'boolean') return raw;
     if (typeof raw === 'number') {
@@ -467,7 +484,8 @@ function sanitiseCredentialValue(key: string, raw: unknown): string | number | b
     key === 'water_usage_litres_per_litre' ||
     key === 'water_recycled_percentage' ||
     key === 'recycled_packaging_percentage' ||
-    key === 'sustainability_report_year'
+    key === 'sustainability_report_year' ||
+    key === 'renewable_energy_percentage'
   ) {
     const n = num(raw);
     if (n !== null && Number.isFinite(n)) return n;

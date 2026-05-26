@@ -268,6 +268,137 @@ export function looksLikePdfUrl(rawUrl: string): boolean {
   }
 }
 
+// Keywords that mark an anchor as a sustainability-relevant document.
+// Mirrors brand-website.ts's list — kept in sync so deep-enrich's
+// post-Claude landing-page crawl recognises the same docs as the
+// initial site scrape would.
+const SUSTAINABILITY_PDF_KEYWORDS = [
+  'epd',
+  'environmental product declaration',
+  'lca',
+  'life cycle assessment',
+  'life-cycle assessment',
+  'sustainability report',
+  'sustainability-report',
+  'esg report',
+  'esg-report',
+  'impact report',
+  'impact-report',
+  'carbon report',
+  'carbon-footprint',
+  'b corp impact',
+  'carbon negative',
+  'carbon-negative',
+];
+
+/**
+ * Fetch a landing-page URL and extract every link that looks like a
+ * sustainability document (EPD / LCA / sustainability report / etc.).
+ *
+ * Claude's web_search tool can find the URL of a sustainability page
+ * (e.g. twodriftersrum.com/pages/sustainability-report) but it doesn't
+ * crawl the page itself, so the actual PDF links on that page never
+ * make it into the deep_enrich result. This helper closes that gap:
+ * deep-enrich persistence calls it for any "document" URL Claude
+ * returned that isn't itself a direct PDF, and the discovered PDFs
+ * (including Dropbox / Drive / OneDrive sharing links) flow into the
+ * existing ingester just like crawler-discovered ones.
+ *
+ * Returns at most `maxLinks` documents (default 12) so a single page
+ * with hundreds of anchors can't queue an unbounded batch of fetches.
+ */
+export async function discoverPdfsAtLandingPage(
+  url: string,
+  maxLinks = 12,
+): Promise<CrawledDocument[]> {
+  const { fetchPage } = await import('./http');
+  const res = await fetchPage(url);
+  if (!res.ok || !res.body) return [];
+  const html = res.body;
+  const candidates = new Map<string, { url: string; anchorText: string }>();
+  const anchorRegex = /<a\b[^>]*href=(?:"([^"]+)"|'([^']+)'|([^\s>]+))[^>]*>([\s\S]*?)<\/a>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = anchorRegex.exec(html))) {
+    const rawHref = decodeHtmlEntities(match[1] ?? match[2] ?? match[3] ?? '');
+    if (!rawHref) continue;
+    const resolved = resolveRelativeUrl(rawHref, res.url);
+    if (!resolved) continue;
+    const anchorText = stripTags(match[4] ?? '').replace(/\s+/g, ' ').trim();
+    // Hard gate on the URL: must be a direct .pdf URL or a known
+    // cloud-share host (Dropbox / Drive / OneDrive). Anchor-text
+    // keywords ("Carbon Negative", "Impact Report") are too eagerly
+    // shared with non-PDF page navigation, so we don't use them as
+    // sufficient signal here — Two Drifters' page links its own
+    // /pages/carbon-negative HTML route with that anchor text, which
+    // we don't want to ingest as a PDF.
+    if (!looksLikePdfUrl(resolved)) continue;
+    // Suppress same-page self-links and the obvious sibling Shopify
+    // /pages/* HTML routes (caught defensively even though the URL
+    // gate above already filters them — costs nothing).
+    if (resolved.toLowerCase() === url.toLowerCase()) continue;
+    const key = resolved.toLowerCase();
+    if (candidates.has(key)) continue;
+    candidates.set(key, { url: resolved, anchorText });
+    if (candidates.size >= maxLinks) break;
+  }
+  const out: CrawledDocument[] = [];
+  for (const c of Array.from(candidates.values())) {
+    const kind = classifyDocumentKind(`${c.anchorText} ${c.url}`);
+    if (!kind) continue;
+    out.push({
+      url: c.url,
+      anchor_text: c.anchorText || c.url,
+      kind,
+      source_url: url,
+    });
+  }
+  return out;
+}
+
+function classifyDocumentKind(haystackRaw: string): CrawledDocumentKind | null {
+  const h = haystackRaw.toLowerCase();
+  if (/(\bepd\b|environmental[- ]product[- ]declaration)/.test(h)) return 'epd';
+  if (/(\blca\b|life[- ]cycle[- ]assessment)/.test(h)) return 'lca';
+  if (/(sustainability[- ]report|impact[- ]report|esg[- ]report|carbon[- ]report|b[- ]corp[- ]impact)/.test(h)) {
+    return 'sustainability_report';
+  }
+  if (/(datasheet|data[- ]sheet|technical[- ]sheet|product[- ]sheet|spec[- ]sheet)/.test(h)) {
+    return 'datasheet';
+  }
+  for (const keyword of SUSTAINABILITY_PDF_KEYWORDS) {
+    if (h.includes(keyword)) return 'other';
+  }
+  return null;
+}
+
+function stripTags(s: string): string {
+  return s.replace(/<[^>]*>/g, '');
+}
+
+/** Decode the small set of HTML entities that commonly appear in
+ *  hrefs. The big one is &amp; → & — Dropbox sharing links use multiple
+ *  query params separated by &, which gets HTML-escaped in the page
+ *  source. Without this, fetch() would call the URL with literal
+ *  "&amp;" in the query string and the server would return 400. */
+function decodeHtmlEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x2F;/gi, '/')
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)));
+}
+
+function resolveRelativeUrl(href: string, baseUrl: string): string | null {
+  try {
+    return new URL(href, baseUrl).toString();
+  } catch {
+    return null;
+  }
+}
+
 function buildStoragePath(brandDirectoryId: string, document: CrawledDocument): string {
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
   const safeKind = document.kind.replace(/[^a-zA-Z0-9_-]/g, '');

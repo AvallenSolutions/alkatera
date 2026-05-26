@@ -192,8 +192,12 @@ export default async function AdminBrandDetailPage({
       ? REQUIRED_FIELDS_DISPLAY.filter((k) => !valuesMap.has(k as FieldKey))
       : [];
 
-  // ── Certifications panel input. Every boolean cert FieldKey, with
-  //    its active status + source URL (if any).
+  // ── Certifications panel input. Every boolean cert / leadership-
+  //    signal FieldKey, with its active status + source URL (if any).
+  //    Leadership signals (EPD published, carbon-negative claim, CDR
+  //    partnership) sit alongside formal certifications because they
+  //    represent the same "is this brand doing the work?" signal class
+  //    even though they're not third-party certifications.
   const CERT_KEYS: FieldKey[] = [
     'bcorp_certified',
     'carbon_trust_certified',
@@ -204,6 +208,9 @@ export default async function AdminBrandDetailPage({
     'organic_certified',
     'iwca_member',
     'porto_protocol_signatory',
+    'epd_published',
+    'carbon_negative_claim',
+    'cdr_partnership',
   ];
   const certifications: CertificationFinding[] = CERT_KEYS.map((key) => {
     const row = activeByField.get(key);
