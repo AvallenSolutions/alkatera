@@ -279,10 +279,16 @@ export async function POST(request: NextRequest) {
 
           let roundText = '';
           const functionCalls: FunctionCall[] = [];
+          // Preserve the model's parts verbatim so we can echo them back on
+          // the next round. Gemini 3.x requires `thoughtSignature` (a sibling
+          // of `functionCall` on the Part) to round-trip unchanged or the
+          // follow-up request 400s.
+          const modelParts: Part[] = [];
 
           for await (const chunk of streamResult.stream) {
             for (const cand of chunk.candidates ?? []) {
               for (const part of cand.content?.parts ?? []) {
+                modelParts.push(part);
                 if (typeof (part as any).text === 'string') {
                   const delta = (part as any).text as string;
                   if (delta) {
@@ -303,11 +309,6 @@ export async function POST(request: NextRequest) {
           // No tool calls → conversation turn complete.
           if (functionCalls.length === 0) break;
 
-          // Record the model turn (text + functionCall parts) so the next
-          // round has the right history for Gemini to follow up coherently.
-          const modelParts: Part[] = [];
-          if (roundText) modelParts.push({ text: roundText });
-          for (const fc of functionCalls) modelParts.push({ functionCall: fc });
           conversation.push({ role: 'model', parts: modelParts });
 
           // Execute each tool and feed results back.

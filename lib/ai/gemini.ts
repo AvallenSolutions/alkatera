@@ -205,6 +205,8 @@ export async function runToolLoop({
 
     if (functionCalls.length === 0) break;
 
+    // Echo the model's parts back verbatim. Gemini 3.x requires
+    // `thoughtSignature` on functionCall parts to round-trip unchanged.
     history.push({ role: 'model', parts });
 
     const responseParts: Part[] = [];
@@ -287,11 +289,16 @@ export async function streamToolLoop({
 
     let roundText = '';
     const functionCalls: FunctionCall[] = [];
+    // Preserve the model's parts verbatim. Gemini 3.x requires
+    // `thoughtSignature` (a sibling of `functionCall` on the Part) to
+    // round-trip unchanged or the follow-up request 400s.
+    const modelParts: Part[] = [];
 
     for await (const chunk of streamResult.stream) {
       const candidates = chunk.candidates ?? [];
       for (const cand of candidates) {
         for (const part of partsFromCandidate(cand)) {
+          modelParts.push(part);
           if (typeof (part as any).text === 'string') {
             const delta = (part as any).text as string;
             if (delta) {
@@ -309,9 +316,6 @@ export async function streamToolLoop({
 
     if (functionCalls.length === 0) break;
 
-    const modelParts: Part[] = [];
-    if (roundText) modelParts.push({ text: roundText });
-    for (const fc of functionCalls) modelParts.push({ functionCall: fc });
     conversation.push({ role: 'model', parts: modelParts });
 
     const responseParts: Part[] = [];
