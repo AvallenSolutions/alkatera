@@ -3,7 +3,7 @@ import {
   buildUploadPath,
   ownsUploadPath,
   inferMediaType,
-  toAnthropicBlock,
+  toGeminiPart,
   isSupportedMediaType,
   type LoadedAttachment,
 } from '../document-extraction';
@@ -57,7 +57,7 @@ describe('isSupportedMediaType', () => {
   });
 });
 
-describe('toAnthropicBlock', () => {
+describe('toGeminiPart', () => {
   const base: LoadedAttachment = {
     file_id: 'org/user/abc.pdf',
     filename: 'bill.pdf',
@@ -66,15 +66,14 @@ describe('toAnthropicBlock', () => {
     size_bytes: 10,
   };
 
-  it('emits a document block for PDFs', () => {
-    const b = toAnthropicBlock(base);
-    expect(b.type).toBe('document');
-    expect(b.source.media_type).toBe('application/pdf');
+  it('emits an inlineData part for PDFs', () => {
+    const b = toGeminiPart(base) as { inlineData: { mimeType: string; data: string } };
+    expect(b.inlineData.mimeType).toBe('application/pdf');
+    expect(b.inlineData.data).toBe('AAAA');
   });
 
-  it('emits an image block for images', () => {
-    const b = toAnthropicBlock({ ...base, media_type: 'image/png' });
-    expect(b.type).toBe('image');
-    expect(b.source.media_type).toBe('image/png');
+  it('emits an inlineData part for images', () => {
+    const b = toGeminiPart({ ...base, media_type: 'image/png' }) as { inlineData: { mimeType: string } };
+    expect(b.inlineData.mimeType).toBe('image/png');
   });
 });

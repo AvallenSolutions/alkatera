@@ -4,14 +4,20 @@
  * GET /api/rosa/progress-tracker?fresh=1
  *
  * Reads the user's tracker config from rosa_memory, computes a 12-week
- * timeseries, calls Claude for the consultant read, caches per (org, user).
- * Falls back to a deterministic read if Claude is unavailable.
+ * timeseries, calls Gemini for the consultant read, caches per (org, user).
+ * Falls back to a deterministic read if Gemini is unavailable.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { FunctionCallingMode } from '@google/generative-ai'
 import { getSupabaseServerClient } from '@/lib/supabase/server-client'
+import {
+  getGeminiClient,
+  toGeminiFunctionDeclarations,
+  GEMINI_ROSA_MODEL,
+} from '@/lib/ai/gemini'
 import {
   buildTrackerTimeseries,
   resolveCustomRosaTracker,
@@ -35,7 +41,6 @@ import { isOverDailyBudget, logRosaTelemetry } from '@/lib/rosa/budget'
 export const runtime = 'nodejs'
 export const maxDuration = 30
 
-const MODEL = 'claude-sonnet-4-6'
 const MAX_OUTPUT_TOKENS = 800
 const CACHE_TTL_MS = 60 * 60 * 1000 // 1 hour
 
@@ -164,32 +169,43 @@ function fallbackRead(
   }
 }
 
-async function curateReadWithClaude(args: {
+async function curateReadWithGemini(args: {
   trackerId: ProgressTrackerId
   series: TrackerTimeseries
   org: PromptOrgContext
 }): Promise<ReadPayload | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) return null
-  const Anthropic = (await import('@anthropic-ai/sdk')).default
-  const client = new Anthropic({ apiKey })
   try {
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: MAX_OUTPUT_TOKENS,
-      system: buildTrackerReadSystemPrompt(),
-      tools: [PROGRESS_TRACKER_READ_TOOL],
-      tool_choice: { type: 'tool', name: PROGRESS_TRACKER_READ_TOOL.name },
-      messages: [
+    const client = getGeminiClient(apiKey)
+    const model = client.getGenerativeModel({
+      model: GEMINI_ROSA_MODEL,
+      systemInstruction: buildTrackerReadSystemPrompt(),
+      tools: toGeminiFunctionDeclarations([PROGRESS_TRACKER_READ_TOOL]),
+      toolConfig: {
+        functionCallingConfig: {
+          mode: FunctionCallingMode.ANY,
+          allowedFunctionNames: [PROGRESS_TRACKER_READ_TOOL.name],
+        },
+      },
+      generationConfig: { maxOutputTokens: MAX_OUTPUT_TOKENS },
+    })
+    const result = await model.generateContent({
+      contents: [
         {
           role: 'user',
-          content: formatTrackerForPrompt(args.trackerId, args.series, args.org),
+          parts: [{ text: formatTrackerForPrompt(args.trackerId, args.series, args.org) }],
         },
       ],
     })
-    const toolUse = response.content.find(c => c.type === 'tool_use')
-    if (!toolUse || toolUse.type !== 'tool_use') return null
-    return validateRead(toolUse.input, args.series)
+    for (const cand of result.response.candidates ?? []) {
+      for (const part of cand.content?.parts ?? []) {
+        if ((part as any).functionCall?.name === PROGRESS_TRACKER_READ_TOOL.name) {
+          return validateRead((part as any).functionCall.args ?? null, args.series)
+        }
+      }
+    }
+    return null
   } catch (err) {
     console.error('[progress-tracker] read curator failed:', err)
     return null
@@ -378,7 +394,7 @@ export async function GET(req: NextRequest) {
       : trackerId
   const def = PROGRESS_TRACKERS[resolvedTrackerId]
 
-  // Curate the read via Claude, with fallback. Skipped when the user has
+  // Curate the read via Gemini, with fallback. Skipped when the user has
   // already exhausted their daily budget for tracker reads.
   let read: ReadPayload | null = null
   let source: ResponsePayload['source'] = 'fallback'
@@ -393,7 +409,7 @@ export async function GET(req: NextRequest) {
       tracker_id: trackerId,
     })
   } else {
-    read = await curateReadWithClaude({ trackerId, series, org: orgCtx })
+    read = await curateReadWithGemini({ trackerId, series, org: orgCtx })
     if (read) {
       source = 'curator'
       await logRosaTelemetry(service, organizationId, userId, 'tracker.read.curated', {

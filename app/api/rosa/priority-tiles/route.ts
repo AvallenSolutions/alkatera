@@ -3,9 +3,9 @@
  *
  * GET /api/rosa/priority-tiles?fresh=1&snoozed=queue,deadline
  *
- * Builds a signal pack for the calling user's org, asks Claude to pick up
- * to three tiles via forced tool_use, validates the output, caches per
- * (org, user), and returns. On any failure the route returns a
+ * Builds a signal pack for the calling user's org, asks Gemini to pick up
+ * to three tiles via forced function-calling, validates the output, caches
+ * per (org, user), and returns. On any failure the route returns a
  * deterministic fallback computed from the same signals so the page
  * always renders.
  */
@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { FunctionCallingMode } from '@google/generative-ai'
 import { getSupabaseServerClient } from '@/lib/supabase/server-client'
 import { buildOrgSignalPack, stableStringify, type OrgSignalPack } from '@/lib/rosa/priority-signals'
 import {
@@ -24,11 +25,15 @@ import {
   validateCuratedTiles,
   type CuratedTile,
 } from '@/lib/rosa/priority-tiles-validate'
+import {
+  getGeminiClient,
+  toGeminiFunctionDeclarations,
+  GEMINI_ROSA_MODEL,
+} from '@/lib/ai/gemini'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
 
-const MODEL = 'claude-sonnet-4-6'
 const MAX_OUTPUT_TOKENS = 1500
 const CACHE_TTL_MS = 60 * 60 * 1000 // 1 hour
 const DAILY_BUDGET_PER_USER = 50
@@ -357,34 +362,46 @@ function fallbackTiles(
 }
 
 /**
- * Call Claude with the curator prompt + signal pack. Returns the raw
- * tool_use input (or null if the call fails / Claude doesn't call the
- * tool).
+ * Call Gemini with the curator prompt + signal pack. Returns the raw
+ * function-call args (or null if the call fails / the model doesn't call
+ * the function).
  */
-async function curateWithClaude(pack: OrgSignalPack): Promise<unknown | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+async function curateWithGemini(pack: OrgSignalPack): Promise<unknown | null> {
+  const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) return null
 
-  const Anthropic = (await import('@anthropic-ai/sdk')).default
-  const client = new Anthropic({ apiKey })
-
   try {
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: MAX_OUTPUT_TOKENS,
-      system: buildCuratorSystemPrompt(),
-      tools: [SET_PRIORITY_TILES_TOOL],
-      tool_choice: { type: 'tool', name: SET_PRIORITY_TILES_TOOL.name },
-      messages: [
+    const client = getGeminiClient(apiKey)
+    const model = client.getGenerativeModel({
+      model: GEMINI_ROSA_MODEL,
+      systemInstruction: buildCuratorSystemPrompt(),
+      tools: toGeminiFunctionDeclarations([SET_PRIORITY_TILES_TOOL]),
+      toolConfig: {
+        functionCallingConfig: {
+          mode: FunctionCallingMode.ANY,
+          allowedFunctionNames: [SET_PRIORITY_TILES_TOOL.name],
+        },
+      },
+      generationConfig: { maxOutputTokens: MAX_OUTPUT_TOKENS },
+    })
+
+    const result = await model.generateContent({
+      contents: [
         {
           role: 'user',
-          content: formatSignalPackForPrompt(pack),
+          parts: [{ text: formatSignalPackForPrompt(pack) }],
         },
       ],
     })
-    const toolUse = response.content.find(c => c.type === 'tool_use')
-    if (!toolUse || toolUse.type !== 'tool_use') return null
-    return toolUse.input
+
+    for (const cand of result.response.candidates ?? []) {
+      for (const part of cand.content?.parts ?? []) {
+        if ((part as any).functionCall?.name === SET_PRIORITY_TILES_TOOL.name) {
+          return (part as any).functionCall.args ?? null
+        }
+      }
+    }
+    return null
   } catch (err) {
     console.error('[priority-tiles] curator call failed:', err)
     return null
@@ -447,7 +464,7 @@ export async function GET(req: NextRequest) {
   })
   const signalsHash = hashSignalPack(pack)
 
-  // Debug: ?dump=1 returns the raw pack without calling Claude. Useful
+  // Debug: ?dump=1 returns the raw pack without calling Gemini. Useful
   // for verifying signal coverage during development.
   if (dump) {
     return NextResponse.json({ pack, signals_hash: signalsHash })
@@ -508,8 +525,8 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  // Curate via Claude
-  const rawCurated = await curateWithClaude(pack)
+  // Curate via Gemini
+  const rawCurated = await curateWithGemini(pack)
   let tiles: CuratedTile[] = []
   let drops: Array<{ index: number; reason: string }> = []
   let source: ResponsePayload['source'] = 'curator'

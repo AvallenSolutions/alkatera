@@ -1,9 +1,10 @@
 /**
  * Rosa -- Tool library.
  *
- * Anthropic tool-use definitions Rosa can call during a conversation, plus a
+ * Gemini function declarations Rosa can call during a conversation, plus a
  * dispatcher that executes each tool with an organisation-scoped service-role
- * client.
+ * client. Tool schemas are kept in JSON Schema form here and converted to
+ * Gemini's FunctionDeclarationSchema in lib/ai/gemini.ts.
  *
  * Security model
  * ==============
@@ -1571,9 +1572,9 @@ async function toolExtractFromDocument(
   if (!input?.file_id) {
     return { is_error: true, content: 'file_id is required', audit: { tool: 'extract_from_document', error: 'missing_file_id' } };
   }
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) {
-    return { is_error: true, content: 'Anthropic API key not configured', audit: { tool: 'extract_from_document', error: 'no_api_key' } };
+    return { is_error: true, content: 'Gemini API key not configured', audit: { tool: 'extract_from_document', error: 'no_api_key' } };
   }
   const attachment = await loadAttachment(ctx.supabase, input.file_id, ctx.organizationId, ctx.userId);
   if (!attachment) {

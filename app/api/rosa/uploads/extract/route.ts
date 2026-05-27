@@ -5,7 +5,7 @@
  * Body: { file_id: string }
  *
  * Loads the uploaded file from storage, runs a structured extraction pass
- * via Claude Sonnet vision, and returns the extracted fields alongside the
+ * via Gemini Flash vision, and returns the extracted fields alongside the
  * org's facility list so the client can render a review + import modal in
  * one round-trip.
  */
@@ -18,7 +18,7 @@ import { checkRateLimit } from '@/lib/rosa/rate-limiter';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const EXTRACT_RATE_LIMIT = 5; // per minute — Claude vision is the most expensive call on the platform
+const EXTRACT_RATE_LIMIT = 5; // per minute — vision calls are expensive even on Gemini Flash
 
 export async function POST(request: NextRequest) {
   const userSupabase = getSupabaseServerClient();
@@ -59,12 +59,12 @@ export async function POST(request: NextRequest) {
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY;
   if (!supabaseUrl || !supabaseKey) {
     return NextResponse.json({ error: 'Supabase service role not configured' }, { status: 500 });
   }
-  if (!anthropicKey) {
-    return NextResponse.json({ error: 'Anthropic API key not configured' }, { status: 500 });
+  if (!geminiKey) {
+    return NextResponse.json({ error: 'Gemini API key not configured' }, { status: 500 });
   }
 
   const service = createClient(supabaseUrl, supabaseKey, {
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
   }>;
 
   const extraction = await extractStructured(
-    anthropicKey,
+    geminiKey,
     attachmentResult,
     [
       'document_type',

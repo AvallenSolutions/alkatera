@@ -14,6 +14,7 @@ import { QuickPrompts } from './QuickPrompts'
 import { ForwardTimeline } from './ForwardTimeline'
 import { HubSetupWizard } from './HubSetupWizard'
 import { OnboardingResumeBanner } from './OnboardingResumeBanner'
+import { SustainableAINote } from './SustainableAINote'
 import { CertificationHealthWidget } from '@/components/certifications/CertificationHealthWidget'
 import { useHubLayout } from '@/lib/rosa/useHubLayout'
 
@@ -70,6 +71,7 @@ export function ForYouToday({ onOpenQueue, onSubmit }: Props) {
 
   return (
     <div className="space-y-6">
+      <SustainableAINote />
       <OnboardingResumeBanner />
       <VitalityHero />
       <CertificationHealthWidget />
