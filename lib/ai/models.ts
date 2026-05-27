@@ -14,11 +14,12 @@
 
 /**
  * Used for Rosa (tool-calling, reasoning-heavy work, document understanding).
- * Default: Gemini 3.1 Pro. Override with env GEMINI_ROSA_MODEL during an
- * incident or A/B test.
+ * Default: Gemini 3.1 Pro (currently in preview — when it goes stable the
+ * API ID becomes `gemini-3.1-pro`; bump it here). Override with env
+ * GEMINI_ROSA_MODEL during an incident or A/B test.
  */
 export const GEMINI_ROSA_MODEL =
-  process.env.GEMINI_ROSA_MODEL?.trim() || 'gemini-3.1-pro';
+  process.env.GEMINI_ROSA_MODEL?.trim() || 'gemini-3.1-pro-preview';
 
 /**
  * Used for narrative helpers, classifiers, extractors, single-shot prompts.
