@@ -40,8 +40,8 @@ export const PROGRESS_TRACKERS: Record<ProgressTrackerId, ProgressTrackerDefinit
   total_emissions: {
     id: 'total_emissions',
     label: 'Total emissions',
-    description: 'Your scope 1+2 emissions over time. The headline footprint number.',
-    unit: 'kg CO₂e',
+    description: 'Your full scope 1+2+3 corporate emissions over time. The headline footprint number.',
+    unit: 't CO₂e',
     higher_is_better: false,
     default_comparison: 'baseline',
     href: '/data/scope-1-2/',

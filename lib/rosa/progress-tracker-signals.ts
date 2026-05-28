@@ -227,7 +227,19 @@ async function buildTotalEmissions(
   service: SupabaseClient,
   organizationId: string,
 ): Promise<TrackerTimeseries> {
-  const series = await metricSnapshotSeries(service, organizationId, 'total_co2e', 'sum')
+  // `total_co2e` snapshots are cumulative state (year-to-date corporate
+  // emissions as of each snapshot's asOfDate), not incremental deltas, so
+  // 'last' is the right per-week aggregation. Using 'sum' here double-counts
+  // when two snapshots land in the same ISO week — exactly what happens when
+  // a re-backfill writes a corrected snapshot next to a stale daily-cron one.
+  const kgSeries = await metricSnapshotSeries(service, organizationId, 'total_co2e', 'last')
+  // Snapshots store kg; we display this tracker in tonnes so the number isn't
+  // a giant 6-digit value that loses meaning. Scale every series point and the
+  // baseline by 1/1000 — `def.unit` is already 't CO₂e'.
+  const series = kgSeries.map(p => ({
+    week_start: p.week_start,
+    value: p.value === null ? null : p.value / 1000,
+  }))
   const def = PROGRESS_TRACKERS.total_emissions
   const delta = computeDelta(series, def.higher_is_better)
   const baseline = series.find(p => p.value !== null)?.value ?? null
@@ -256,7 +268,9 @@ async function buildWaterUse(
   service: SupabaseClient,
   organizationId: string,
 ): Promise<TrackerTimeseries> {
-  const series = await metricSnapshotSeries(service, organizationId, 'water_consumption', 'sum')
+  // Water consumption is also a cumulative trailing-12m state, not an
+  // incremental period delta — use 'last' for the same reason as total_co2e.
+  const series = await metricSnapshotSeries(service, organizationId, 'water_consumption', 'last')
   const def = PROGRESS_TRACKERS.water_use
   const delta = computeDelta(series, def.higher_is_better)
   const baseline = series.find(p => p.value !== null)?.value ?? null

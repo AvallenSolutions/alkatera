@@ -12,6 +12,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { RelatableMetric } from '@/components/shared/RelatableMetric';
 
 interface FootprintHeroSummaryProps {
   totalEmissions: number;
@@ -86,6 +87,15 @@ export function FootprintHeroSummary({
                 <div className="text-2xl font-semibold text-slate-400">
                   No emissions data yet
                 </div>
+              )}
+
+              {totalEmissions > 0 && (
+                <RelatableMetric
+                  kind="co2e"
+                  valueKg={totalEmissions}
+                  variant="dark"
+                  className="pt-1 max-w-2xl"
+                />
               )}
 
               {lastUpdated && (

@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart3, Leaf, Package, FlaskConical, AlertCircle, CheckCircle2, Info, Globe } from 'lucide-react';
 import { ScopeBreakdown } from '@/hooks/data/useCompanyMetrics';
+import { RelatableMetric } from '@/components/shared/RelatableMetric';
 import { MaterialBreakdownItem, GHGBreakdown } from './CarbonBreakdownSheet';
 import { LifecycleStageBreakdown, FacilityEmissionsBreakdown } from '@/hooks/data/useCompanyMetrics';
 import { Scope3CategoryBreakdown } from './Scope3CategoryBreakdown';
@@ -388,6 +389,14 @@ export function CarbonDeepDive({
                       {(totalCO2 / 1000).toFixed(3)} tCO₂eq
                     </span>
                   </div>
+                  {totalCO2 > 0 && (
+                    <RelatableMetric
+                      kind="co2e"
+                      valueKg={totalCO2}
+                      variant="light"
+                      className="px-1"
+                    />
+                  )}
 
                   {materialBreakdown && materialBreakdown.length > 0 && (
                     <>

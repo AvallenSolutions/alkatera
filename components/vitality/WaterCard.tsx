@@ -8,6 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { Droplets, AlertTriangle, CheckCircle2, ArrowRight, TrendingDown, TrendingUp, Recycle, Factory } from 'lucide-react';
 import { CompanyMetrics } from '@/hooks/data/useCompanyMetrics';
 import type { CompanyWaterOverview, WaterSourceBreakdown, WaterTimeSeries } from '@/hooks/data/useFacilityWaterData';
+import { RelatableMetric } from '@/components/shared/RelatableMetric';
 
 interface WaterCardProps {
   metrics: CompanyMetrics | null;
@@ -156,6 +157,14 @@ export function WaterCard({
             <p className="text-xs text-muted-foreground">AWARE weighted</p>
           </div>
         </div>
+
+        {totalWaterFootprint > 0 && (
+          <RelatableMetric
+            kind="water"
+            valueM3={totalWaterFootprint}
+            variant="light"
+          />
+        )}
 
         {sourceBreakdown.length > 0 && (
           <div className="space-y-2">

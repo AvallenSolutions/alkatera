@@ -14,6 +14,7 @@
 
 import { SupabaseClient } from '@supabase/supabase-js';
 import { GRID_FACTORS_BY_COUNTRY } from '@/lib/grid-emission-factors';
+import { getXeroResolvedEmissions } from '@/lib/xero/resolved-emissions';
 
 // ============================================================================
 // TYPES
@@ -592,13 +593,26 @@ export async function calculateCorporateEmissions(
   const yearEnd = `${year}-12-31`;
 
   // Calculate all scopes
-  const [scope1, scope2, scope3] = await Promise.all([
+  const [scope1Base, scope2Base, scope3Base, xero] = await Promise.all([
     calculateScope1(supabase, organizationId, yearStart, yearEnd),
     calculateScope2(supabase, organizationId, yearStart, yearEnd),
     calculateScope3(supabase, organizationId, year, yearStart, yearEnd),
+    getXeroResolvedEmissions(supabase, organizationId, yearStart, yearEnd),
   ]);
 
-  const total = scope1 + scope2 + scope3.total;
+  // Xero spend-based emissions, post coverage-resolver suppression. The
+  // resolver already drops any Xero row that overlaps a utility / overhead /
+  // LCA / inventory-ledger row for the same (scope slice, month), so adding
+  // these totals here is double-count-free by construction.
+  const scope1 = scope1Base + xero.totalScope1Kg;
+  const scope2 = scope2Base + xero.totalScope2Kg;
+  const scope3Total = scope3Base.total + xero.totalScope3Kg;
+  const scope3: Scope3Breakdown = {
+    ...scope3Base,
+    total: scope3Total,
+  };
+
+  const total = scope1 + scope2 + scope3Total;
 
   return {
     year,

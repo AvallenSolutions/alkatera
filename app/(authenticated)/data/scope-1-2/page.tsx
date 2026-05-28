@@ -69,9 +69,11 @@ import { UsePhaseCard } from '@/components/reports/UsePhaseCard';
 import Link from 'next/link';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import { calculateCorporateEmissions } from '@/lib/calculations/corporate-emissions';
+import { useCompanyFootprint } from '@/hooks/data/useCompanyFootprint';
 import { resolveRefrigerantGwp } from '@/lib/ghg-constants';
 import { EmissionsGuide } from '@/components/emissions/EmissionsGuide';
 import { ScopeTipBanner } from '@/components/emissions/ScopeTipBanner';
+import { RelatableMetric } from '@/components/shared/RelatableMetric';
 
 // Emission factors for auto-calculation from facility utility data
 const EMISSION_FACTORS: Record<string, { factor: number; unit: string; scope: 'Scope 1' | 'Scope 2' }> = {
@@ -193,6 +195,11 @@ export default function CompanyEmissionsPage() {
   const [activeTab, setActiveTab] = useState('footprint');
 
   const [selectedYear, setSelectedYear] = useState(currentLabelYear);
+
+  // Pulls the same SoT total that Company Vitality and the Rosa snapshot
+  // both use, so the headline number on this page can never disagree with
+  // those surfaces.
+  const { footprint: sotFootprint } = useCompanyFootprint(selectedYear);
 
   // Tell Rosa where the user is in the company emissions surface so she
   // can answer "what's missing for scope 2 this year?" or "is this enough
@@ -1168,16 +1175,20 @@ export default function CompanyEmissionsPage() {
     .filter((o) => scope3OverheadCategories.includes(o.category))
     .reduce((sum, entry) => sum + (entry.computed_co2e || 0), 0);
 
-  // Persist calculated emissions to corporate_reports for Rosa AI to read
+  // Persist calculated emissions to corporate_reports for Rosa AI to read.
+  // Totals now come from the SoT (`calculateCorporateEmissions` via the
+  // `useCompanyFootprint` hook) so Rosa AI sees the same number the user
+  // sees on this page, on Company Vitality, and on the Progress Tracker.
   useEffect(() => {
     const persistEmissions = async () => {
       if (!report?.id || !currentOrganization?.id) return;
+      if (!sotFootprint?.breakdown) return;
 
-      // Calculate total emissions (matching the display logic)
-      // Fleet values are in tCO2e, utility values are in kgCO2e
-      const totalScope1Tonnes = (scope1CO2e / 1000) + fleetScope1CO2e + (xeroScope1Kg / 1000);
-      const totalScope2Tonnes = (scope2CO2e / 1000) + fleetScope2CO2e + (xeroScope2Kg / 1000);
-      const totalScope3Tonnes = scope3Cat1CO2e + scope3Cat11CO2e + (calculatedScope3OverheadsCO2e / 1000) + fleetScope3CO2e + (xeroScope3Kg / 1000);
+      const sb = sotFootprint.breakdown;
+      // SoT returns kg; corporate_reports stores tonnes.
+      const totalScope1Tonnes = sb.scope1 / 1000;
+      const totalScope2Tonnes = sb.scope2 / 1000;
+      const totalScope3Tonnes = sb.scope3.total / 1000;
       const totalEmissionsTonnes = totalScope1Tonnes + totalScope2Tonnes + totalScope3Tonnes;
 
       // Only persist if we have actual data
@@ -1222,7 +1233,7 @@ export default function CompanyEmissionsPage() {
     // Debounce to avoid too many updates
     const timeoutId = setTimeout(persistEmissions, 1000);
     return () => clearTimeout(timeoutId);
-  }, [report?.id, currentOrganization?.id, scope1CO2e, scope2CO2e, fleetScope1CO2e, fleetScope2CO2e, fleetScope3CO2e, scope3Cat1CO2e, scope3Cat11CO2e, calculatedScope3OverheadsCO2e, xeroScope1Kg, xeroScope2Kg, xeroScope3Kg, scope3Cat1Breakdown]);
+  }, [report?.id, currentOrganization?.id, sotFootprint, fleetScope1CO2e, fleetScope2CO2e, fleetScope3CO2e, scope3Cat1CO2e, scope3Cat11CO2e, calculatedScope3OverheadsCO2e, xeroScope3Kg, scope3Cat1Breakdown]);
 
   return (
     <div className="space-y-6">
@@ -1317,23 +1328,39 @@ export default function CompanyEmissionsPage() {
           ) : (
             <div className="space-y-6">
               {(() => {
-                // ── Compute all values once ────────────────────────
+                // ── Per-source values for transparency in the bar chart ──
+                // These show "what's inside" each scope at the data-source
+                // level. They are NOT the totals — totals come from the
+                // single-source-of-truth `calculateCorporateEmissions`
+                // (via `useCompanyFootprint`) to stay aligned with Company
+                // Vitality and the Rosa Progress Tracker.
                 const s1Utilities = scope1CO2e / 1000;
                 const s1Fleet = fleetScope1CO2e;
                 const s1Xero = xeroScope1Kg / 1000;
-                const totalScope1 = s1Utilities + s1Fleet + s1Xero;
 
                 const s2Utilities = scope2CO2e / 1000;
                 const s2Fleet = fleetScope2CO2e;
                 const s2Xero = xeroScope2Kg / 1000;
-                const totalScope2 = s2Utilities + s2Fleet + s2Xero;
 
                 const s3Products = scope3Cat1CO2e;
                 const s3UsePhase = scope3Cat11CO2e;
                 const s3Activities = calculatedScope3OverheadsCO2e / 1000;
                 const s3Xero = xeroScope3Kg / 1000;
                 const s3Fleet = fleetScope3CO2e;
-                const totalScope3 = s3Products + s3UsePhase + s3Activities + s3Xero + s3Fleet;
+
+                // SoT scope totals (kg → tonnes). When the SoT hook is still
+                // loading, fall back to the piecewise sum so the UI never
+                // shows zeros during data fetch.
+                const sotBreakdown = sotFootprint?.breakdown;
+                const totalScope1 = sotBreakdown
+                  ? sotBreakdown.scope1 / 1000
+                  : s1Utilities + s1Fleet + s1Xero;
+                const totalScope2 = sotBreakdown
+                  ? sotBreakdown.scope2 / 1000
+                  : s2Utilities + s2Fleet + s2Xero;
+                const totalScope3 = sotBreakdown
+                  ? sotBreakdown.scope3.total / 1000
+                  : s3Products + s3UsePhase + s3Activities + s3Xero + s3Fleet;
 
                 const totalEmissions = totalScope1 + totalScope2 + totalScope3;
                 const hasData = totalEmissions > 0;
@@ -1478,6 +1505,14 @@ export default function CompanyEmissionsPage() {
                               {totalEmissions.toFixed(2)}
                             </div>
                             <div className="text-lg text-muted-foreground">tonnes CO₂e</div>
+                            {totalEmissions > 0 && (
+                              <RelatableMetric
+                                kind="co2e"
+                                valueKg={totalEmissions * 1000}
+                                variant="light"
+                                className="mt-4 justify-center md:justify-start"
+                              />
+                            )}
                             {report?.updated_at && (
                               <div className="text-xs text-muted-foreground mt-3">
                                 Last calculated: {new Date(report.updated_at).toLocaleString('en-GB')}
