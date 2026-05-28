@@ -113,7 +113,7 @@ export async function createBrandDistributorLink(
       distributorOrgId: (brand as { distributor_org_id: string }).distributor_org_id,
       brandProfileId,
       type: 'brand_joined_alkatera',
-      title: `${(brand as { name: string }).name} is on alka**tera**`,
+      title: `${(brand as { name: string }).name} is on alkatera`,
       body: args.needsBrandConfirmation
         ? `We've requested confirmation from the brand. Their data tier will upgrade once they accept.`
         : `Their data has been upgraded to Tier ${tier} and is now syncing live.`,

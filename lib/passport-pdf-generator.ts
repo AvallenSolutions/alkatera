@@ -174,7 +174,7 @@ function addPageFooter(doc: jsPDF, generationDate: string): void {
 
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(PASSPORT_COLORS.stone300);
-  doc.text('Alkatera', MARGIN + 26, footerY);
+  doc.text('alkatera', MARGIN + 26, footerY);
 
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(PASSPORT_COLORS.stone500);
@@ -1684,7 +1684,7 @@ function drawConclusionPage(doc: jsPDF, data: PassportPDFData): void {
 
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(PASSPORT_COLORS.stone600);
-  doc.text('Alkatera', MARGIN + 28, y);
+  doc.text('alkatera', MARGIN + 28, y);
 
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(PASSPORT_COLORS.stone400);

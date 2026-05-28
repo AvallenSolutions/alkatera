@@ -394,7 +394,7 @@ export default function CompanyFootprintPage() {
                   <div className="mt-3 p-4 rounded-lg bg-slate-50 dark:bg-slate-800/50 text-left text-xs text-muted-foreground space-y-2">
                     <p>
                       Most of your footprint is <strong>auto-calculated</strong> from data you&apos;ve already entered
-                      across Alkatera — facility utility bills, product assessments, and fleet data.
+                      across alkatera — facility utility bills, product assessments, and fleet data.
                     </p>
                     <p>
                       You&apos;ll add a few additional data points like business travel, team commuting, and

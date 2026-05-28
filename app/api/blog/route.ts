@@ -175,7 +175,7 @@ export async function POST(request: NextRequest) {
         .eq('id', user.id)
         .single();
 
-      finalAuthorName = profile?.full_name || user.email?.split('@')[0] || 'AlkaTera Team';
+      finalAuthorName = profile?.full_name || user.email?.split('@')[0] || 'alkatera Team';
     }
 
     // Prepare blog post data (with all optional new columns)

@@ -319,7 +319,7 @@ export default function SettingsPage() {
                 Subscription Required
               </h3>
               <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-                Please select a plan below to access the Alkatera platform.
+                Please select a plan below to access the alkatera platform.
                 Choose from Seed or Blossom to get started, or contact us for Canopy.
               </p>
             </div>

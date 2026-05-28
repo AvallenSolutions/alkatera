@@ -405,7 +405,7 @@ export default function ItemDetailPage() {
                     <User className="h-4 w-4 text-muted-foreground" />
                     <span className="text-muted-foreground">Author:</span>
                     <span className="font-medium ml-auto truncate">
-                      {item.author?.full_name || (item.organization_id === null ? 'AlkaTera' : 'Unknown')}
+                      {item.author?.full_name || (item.organization_id === null ? 'alkatera' : 'Unknown')}
                     </span>
                   </div>
                 )}

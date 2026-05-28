@@ -325,10 +325,10 @@ export default function MethodologyPageContent({ tier }: MethodologyPageContentP
                   Assessment Platform
                 </h3>
                 <p className="text-lg font-semibold text-stone-900 mb-2">
-                  Alkatera
+                  alkatera
                 </p>
                 <p className="text-sm text-stone-600">
-                  LCA conducted using the Alkatera platform with
+                  LCA conducted using the alkatera platform with
                   methodology oversight and quality assurance.
                 </p>
               </div>
@@ -684,7 +684,7 @@ export default function MethodologyPageContent({ tier }: MethodologyPageContentP
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-2">
             <Leaf className="w-5 h-5 text-lime-600" />
-            <span className="font-semibold text-stone-700">Alkatera</span>
+            <span className="font-semibold text-stone-700">alkatera</span>
           </div>
           <p className="text-sm text-stone-500">
             Environmental data transparency through verified life cycle assessment

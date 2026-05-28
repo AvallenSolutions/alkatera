@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, Mail, User, Building2, Send, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Brand } from '@/components/shared/Brand';
 
 const BiomeVisual = () => {
   return (
@@ -54,7 +55,7 @@ const BiomeVisual = () => {
           Let&apos;s <span className="italic text-[#ccff00]">Cultivate</span><br/> Tomorrow
         </h2>
         <p className="font-mono text-xs text-gray-400 uppercase tracking-widest max-w-md">
-          Join the network of leaders redefining ecological intelligence. Start your journey with AlkaTera.
+          Join the network of leaders redefining ecological intelligence. Start your journey with <Brand />.
         </p>
       </div>
     </div>
@@ -219,7 +220,7 @@ function ContactForm() {
                   )}
                 </div>
                 <span className="text-gray-400 text-sm leading-relaxed group-hover:text-white transition-colors">
-                  I agree to receive updates, newsletters, and marketing communications from AlkaTera.
+                  I agree to receive updates, newsletters, and marketing communications from <Brand />.
                   You can unsubscribe at any time.
                 </span>
               </label>
@@ -320,7 +321,7 @@ export function ContactPageClient() {
           <div className="flex items-center mb-16">
             <img
               src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png"
-              alt="AlkaTera"
+              alt="alkatera"
               className="h-10 w-auto object-contain"
             />
           </div>
@@ -337,7 +338,7 @@ export function ContactPageClient() {
         {/* Footer */}
         <div className="absolute bottom-8 left-0 right-0 text-center">
           <p className="text-gray-700 text-[10px] font-mono uppercase tracking-widest">
-            AlkaTera Intelligence Engine &bull; Support Terminal 0-1
+            <Brand /> Intelligence Engine &bull; Support Terminal 0-1
           </p>
         </div>
       </div>

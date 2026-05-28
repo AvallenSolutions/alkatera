@@ -1,7 +1,7 @@
 import MethodologyPageContent from '../MethodologyPageContent';
 
 export const metadata = {
-  title: 'LCA Methodology - Canopy Tier | Alkatera',
+  title: 'LCA Methodology - Canopy Tier | alkatera',
   description: 'Comprehensive methodology documentation for Canopy tier product passports.',
 };
 

@@ -171,7 +171,7 @@ function sortByPostcodeRelevance(results: any[], district: string): any[] {
 // ============================================================================
 
 const NOMINATIM_HEADERS = {
-  'User-Agent': 'AlkaTera-Sustainability-Platform/1.0 (https://alkatera.com)',
+  'User-Agent': 'alkatera-Sustainability-Platform/1.0 (https://alkatera.com)',
   'Accept': 'application/json',
   'Accept-Language': 'en',
 };

@@ -172,7 +172,7 @@ export default function SupplierVerificationPage() {
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground">
-              This page is only accessible to Alkatera administrators. If you believe you should have access, please contact your system administrator.
+              This page is only accessible to alkatera administrators. If you believe you should have access, please contact your system administrator.
             </p>
           </CardContent>
         </Card>

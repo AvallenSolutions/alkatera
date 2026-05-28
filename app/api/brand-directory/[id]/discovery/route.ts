@@ -48,7 +48,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       {
         error: 'not_linked',
         detail:
-          'This directory entry is not linked to an alka**tera** brand. Only linked brands can manage discovery.',
+          'This directory entry is not linked to an alkatera brand. Only linked brands can manage discovery.',
       },
       { status: 403 },
     );

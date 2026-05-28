@@ -1800,8 +1800,8 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         impact_source: 'secondary_modelled',
         impact_reference_id: null,
         data_quality_grade: 'LOW',
-        gwp_data_source: 'Alkatera staging factor',
-        non_gwp_data_source: 'Alkatera staging factor',
+        gwp_data_source: 'alkatera staging factor',
+        non_gwp_data_source: 'alkatera staging factor',
         is_hybrid_source: false,
         category_type: 'maturation',
       });

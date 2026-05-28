@@ -26,6 +26,7 @@ import {
 import { AlertTriangle, Loader2, ShieldAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import type { EmissionsTrace } from '@/lib/emissions/types'
+import { Brand } from '@/components/shared/Brand'
 
 interface Organization {
   id: string
@@ -93,7 +94,7 @@ export default function EmissionsTracePage() {
           <div>
             <h2 className="font-semibold">Admin access required</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              This diagnostic tool is only available to alka**tera** platform administrators.
+              This diagnostic tool is only available to <Brand /> platform administrators.
             </p>
           </div>
         </CardContent>

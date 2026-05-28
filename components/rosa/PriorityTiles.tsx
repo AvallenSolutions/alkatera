@@ -30,6 +30,7 @@ import { useOrganization } from '@/lib/organizationContext'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useRealtimeRefresh } from '@/lib/rosa/useRealtimeRefresh'
 import { trackRosa } from '@/lib/rosa/track'
+import { RichText } from '@/components/shared/Brand'
 
 /**
  * Map of icon names (as emitted by the curator and validated server-side)
@@ -328,8 +329,12 @@ function PriorityTile({
             <span className="text-sm text-muted-foreground">{tile.unit}</span>
           )}
         </div>
-        <p className="mt-2 text-sm font-medium leading-snug">{tile.title}</p>
-        <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{tile.hint}</p>
+        <p className="mt-2 text-sm font-medium leading-snug">
+          <RichText>{tile.title}</RichText>
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
+          <RichText>{tile.hint}</RichText>
+        </p>
         {tile.recommendation && (
           <p
             className={cn(
@@ -338,7 +343,7 @@ function PriorityTile({
             )}
           >
             <Sparkles className="inline h-3 w-3 mr-1 -mt-0.5" />
-            Rosa: {tile.recommendation}
+            Rosa: <RichText>{tile.recommendation}</RichText>
           </p>
         )}
       </div>

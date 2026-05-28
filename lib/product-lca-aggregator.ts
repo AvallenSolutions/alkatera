@@ -1237,7 +1237,7 @@ export async function aggregateProductImpacts(
       status: 'not_conducted' as const,
       disclosure: 'This LCA study has not undergone an independent critical review per ISO 14044 §6. ' +
         'A critical review by an external expert or panel is recommended before this study is used ' +
-        'for public comparative assertions (ISO 14044 §5.3). The AlkaTera platform provides automated ' +
+        'for public comparative assertions (ISO 14044 §5.3). The alkatera platform provides automated ' +
         'compliance checks but these do not constitute a formal critical review.',
       recommendation: 'Engage a qualified independent reviewer with expertise in beverage product LCA ' +
         'to conduct a critical review per ISO 14044 §6.2 (external expert review) before publication.',

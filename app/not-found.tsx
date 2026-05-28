@@ -17,7 +17,7 @@ const SUSTAINABILITY_FACTS = [
   },
   {
     icon: <Wind className="text-[#ccff00]" />,
-    text: "By 2030, the drink industry aims to reduce carbon emissions by 50%. AlkaTera provides the operating system to get there."
+    text: "By 2030, the drink industry aims to reduce carbon emissions by 50%. alkatera provides the operating system to get there."
   },
   {
     icon: <Search className="text-[#ccff00]" />,
@@ -70,7 +70,7 @@ export default function NotFound() {
         >
           <img
             src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png"
-            alt="AlkaTera"
+            alt="alkatera"
             className="h-8 w-auto opacity-80"
           />
         </motion.div>
@@ -178,7 +178,7 @@ export default function NotFound() {
           className="mt-20 flex items-center gap-12 opacity-20 grayscale"
         >
           <div className="w-12 h-[1px] bg-white" />
-          <span className="text-[10px] font-mono uppercase tracking-[0.5em]">AlkaTera Ecosystem</span>
+          <span className="text-[10px] font-mono uppercase tracking-[0.5em]">alkatera Ecosystem</span>
           <div className="w-12 h-[1px] bg-white" />
         </motion.div>
       </div>

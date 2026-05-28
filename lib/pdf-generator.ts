@@ -772,7 +772,7 @@ function addModernFooter(doc: jsPDF, pageNum: number, colors: any): void {
   doc.setTextColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
-  doc.text('AlkaTera Carbon Management Platform', 20, pageHeight - 12);
+  doc.text('alkatera Carbon Management Platform', 20, pageHeight - 12);
 
   doc.setFont('helvetica', 'bold');
   doc.text(`${pageNum}`, pageWidth - 20, pageHeight - 12, { align: 'right' });

@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { Navigation } from '@/marketing/components/Navigation';
 import { Footer } from '@/marketing/components/Footer';
+import { Brand } from '@/components/shared/Brand';
 
 /* ═══════════════════════════════════════════
    Hero Section
@@ -45,7 +46,7 @@ const Hero = () => (
           <span className="italic text-[#ccff00]">Measured</span>
         </h1>
         <p className="text-gray-400 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-12">
-          The drinks industry accounts for a significant share of global water use, agricultural emissions, and packaging waste. Alkatera gives you the tools to measure, understand, and reduce your true environmental footprint.
+          The drinks industry accounts for a significant share of global water use, agricultural emissions, and packaging waste. <Brand /> gives you the tools to measure, understand, and reduce your true environmental footprint.
         </p>
         <Link
           href="/getaccess"
@@ -184,7 +185,7 @@ const MeasureSection = () => (
           <span className="text-[#ccff00] italic">true impact</span>
         </h2>
         <p className="text-gray-400 max-w-2xl mx-auto">
-          Most platforms stop at carbon. Alkatera measures the full spectrum of environmental, social, and governance impact — because sustainability is about more than emissions.
+          Most platforms stop at carbon. <Brand /> measures the full spectrum of environmental, social, and governance impact — because sustainability is about more than emissions.
         </p>
       </motion.div>
 
@@ -293,7 +294,7 @@ const BeyondCarbonSection = () => (
           <span className="text-[#ccff00] italic">beginning</span>
         </h2>
         <p className="text-gray-400 max-w-2xl mx-auto">
-          The Green Claims Directive demands evidence-based sustainability communication. Alkatera ensures every claim you make is defensible, verified, and backed by recognised standards.
+          The Green Claims Directive demands evidence-based sustainability communication. <Brand /> ensures every claim you make is defensible, verified, and backed by recognised standards.
         </p>
       </motion.div>
 

@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
 
     try {
       await resend.emails.send({
-        from: 'AlkaTera <sayhello@mail.alkatera.com>',
+        from: 'alkatera <sayhello@mail.alkatera.com>',
         to: ['hello@alkatera.com'],
         replyTo: email,
         subject: interest
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
               </tr>
             </table>
             <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #333; color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 2px;">
-              Sent via AlkaTera Contact Form
+              Sent via alka<strong>tera</strong> Contact Form
             </div>
           </div>
         `,

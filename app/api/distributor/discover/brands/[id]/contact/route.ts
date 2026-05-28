@@ -118,7 +118,7 @@ export async function POST(
       {
         error: 'no_contact_channel',
         detail:
-          "We don't have an email on file for this brand yet. Once they verify their alka**tera** profile or finding turns up a contact address, you'll be able to reach them.",
+          "We don't have an email on file for this brand yet. Once they verify their alkatera profile or finding turns up a contact address, you'll be able to reach them.",
       },
       { status: 422 },
     );

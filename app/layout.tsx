@@ -37,12 +37,12 @@ const playfairDisplay = Playfair_Display({
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://alkatera.com'),
-  title: 'Alkatera | Sustainability, Distilled',
+  title: 'alkatera | Sustainability, Distilled',
   description: 'The all-in-one operating system for drinks brands to automate impact data, ensure compliance, and fuel strategic growth.',
   keywords: ['sustainability', 'carbon footprint', 'drinks industry', 'brewery', 'distillery', 'winery', 'ESG', 'carbon accounting', 'GHG Protocol', 'ISO 14067', 'CSRD', 'B-Corp'],
-  authors: [{ name: 'Alkatera' }],
-  creator: 'Alkatera',
-  publisher: 'Alkatera',
+  authors: [{ name: 'alkatera' }],
+  creator: 'alkatera',
+  publisher: 'alkatera',
   alternates: {
     canonical: '/',
   },
@@ -50,21 +50,21 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'en_GB',
     url: 'https://alkatera.com',
-    siteName: 'Alkatera',
-    title: 'Alkatera | Sustainability, Distilled',
+    siteName: 'alkatera',
+    title: 'alkatera | Sustainability, Distilled',
     description: 'The all-in-one operating system for drinks brands to automate impact data, ensure compliance, and fuel strategic growth.',
     images: [
       {
         url: '/og-image.jpg',
         width: 1200,
         height: 630,
-        alt: 'Alkatera - Sustainability, Distilled',
+        alt: 'alkatera - Sustainability, Distilled',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Alkatera | Sustainability, Distilled',
+    title: 'alkatera | Sustainability, Distilled',
     description: 'The all-in-one operating system for drinks brands to automate impact data, ensure compliance, and fuel strategic growth.',
     images: ['/og-image.jpg'],
     creator: '@alkatera',
@@ -89,8 +89,8 @@ const jsonLd = {
     {
       "@type": "Organization",
       "@id": "https://alkatera.com/#organization",
-      "name": "Alkatera",
-      "legalName": "Avallen Solutions Ltd trading as Alkatera",
+      "name": "alkatera",
+      "legalName": "Avallen Solutions Ltd trading as alkatera",
       "url": "https://alkatera.com",
       "logo": "https://alkatera.com/logo.png",
       "email": "hello@alkatera.com",
@@ -103,8 +103,8 @@ const jsonLd = {
     {
       "@type": "SoftwareApplication",
       "@id": "https://alkatera.com/#software",
-      "name": "Alkatera",
-      "alternateName": ["AlkaTera"],
+      "name": "alkatera",
+      "alternateName": ["alkatera"],
       "description": "The all-in-one sustainability operating system for drinks brands. Automates impact data collection, ensures regulatory compliance (CSRD, GRI, ISO 14067), and enables strategic sustainability planning.",
       "url": "https://alkatera.com",
       "applicationCategory": "BusinessApplication",
@@ -133,7 +133,7 @@ const jsonLd = {
       "@type": "WebSite",
       "@id": "https://alkatera.com/#website",
       "url": "https://alkatera.com",
-      "name": "Alkatera",
+      "name": "alkatera",
       "description": "Sustainability, Distilled.",
       "publisher": { "@id": "https://alkatera.com/#organization" }
     }

@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useOrganization } from '@/lib/organizationContext'
 import { useRealtimeRefresh } from '@/lib/rosa/useRealtimeRefresh'
 import { ProgressTrackerSetup } from './ProgressTrackerSetup'
+import { RichText } from '@/components/shared/Brand'
 
 interface SeriesPoint {
   week_start: string
@@ -302,9 +303,11 @@ function ProgressTrackerCard({
                 </span>
               ) : null}
             </p>
-            <p className="mt-2 text-sm font-medium leading-snug">{read.headline}</p>
+            <p className="mt-2 text-sm font-medium leading-snug">
+              <RichText>{read.headline}</RichText>
+            </p>
             <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
-              {read.detail}
+              <RichText>{read.detail}</RichText>
             </p>
           </div>
           {read.next_move ? (
@@ -317,11 +320,15 @@ function ProgressTrackerCard({
                   href={read.next_move_href}
                   className="inline-flex items-start gap-1.5 text-xs text-foreground hover:text-[#ccff00] transition-colors group"
                 >
-                  <span className="leading-snug">{read.next_move}</span>
+                  <span className="leading-snug">
+                    <RichText>{read.next_move}</RichText>
+                  </span>
                   <ArrowUpRight className="h-3 w-3 mt-0.5 flex-shrink-0 opacity-60 group-hover:opacity-100" />
                 </Link>
               ) : (
-                <p className="text-xs leading-snug">{read.next_move}</p>
+                <p className="text-xs leading-snug">
+                  <RichText>{read.next_move}</RichText>
+                </p>
               )}
             </div>
           ) : null}

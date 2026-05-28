@@ -160,7 +160,7 @@ export default function PlatformDashboardPage() {
           <Shield className="h-4 w-4" />
           <AlertTitle>Access Denied</AlertTitle>
           <AlertDescription>
-            This page is only accessible to Alkatera platform administrators.
+            This page is only accessible to alkatera platform administrators.
           </AlertDescription>
         </Alert>
       </div>

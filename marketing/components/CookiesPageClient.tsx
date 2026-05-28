@@ -4,6 +4,7 @@ import { Navigation } from '@/marketing/components/Navigation';
 import { Footer } from '@/marketing/components/Footer';
 import { useState } from 'react';
 import { ContactModal } from '@/marketing/components/ContactModal';
+import { Brand } from '@/components/shared/Brand';
 
 export function CookiesPageClient() {
   const [isContactOpen, setIsContactOpen] = useState(false);
@@ -18,7 +19,7 @@ export function CookiesPageClient() {
 
         <div className="prose prose-invert prose-gray max-w-none space-y-8 text-gray-300 leading-relaxed">
           <p>
-            This Cookie Policy explains how Avallen Solutions Ltd trading as Alkatera (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;) uses cookies and similar technologies when you visit our website (https://alkatera.com) and use our platform.
+            This Cookie Policy explains how Avallen Solutions Ltd trading as <Brand /> (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;) uses cookies and similar technologies when you visit our website (https://alkatera.com) and use our platform.
           </p>
 
           <section>
@@ -147,7 +148,7 @@ export function CookiesPageClient() {
             <h2 className="text-xl font-semibold text-white mt-10 mb-4">9. Contact Us</h2>
             <p>If you have questions about our use of cookies:</p>
             <p className="mt-2">
-              Avallen Solutions Ltd trading as Alkatera<br />
+              Avallen Solutions Ltd trading as <Brand /><br />
               Email: <a href="mailto:hello@alkatera.com" className="text-[#ccff00] hover:underline">hello@alkatera.com</a><br />
               Website: <a href="https://alkatera.com" className="text-[#ccff00] hover:underline">https://alkatera.com</a>
             </p>

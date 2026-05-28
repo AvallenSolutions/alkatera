@@ -4,6 +4,7 @@ import { Navigation } from '@/marketing/components/Navigation';
 import { Footer } from '@/marketing/components/Footer';
 import { useState } from 'react';
 import { ContactModal } from '@/marketing/components/ContactModal';
+import { Brand } from '@/components/shared/Brand';
 
 export function PrivacyPageClient() {
   const [isContactOpen, setIsContactOpen] = useState(false);
@@ -18,7 +19,7 @@ export function PrivacyPageClient() {
 
         <div className="prose prose-invert prose-gray max-w-none space-y-8 text-gray-300 leading-relaxed">
           <p>
-            Avallen Solutions Ltd trading as Alkatera (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;) operates the Alkatera platform (https://alkatera.com), a sustainability management system for the drinks industry. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our platform.
+            Avallen Solutions Ltd trading as <Brand /> (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;) operates the <Brand /> platform (https://alkatera.com), a sustainability management system for the drinks industry. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our platform.
           </p>
 
           <section>
@@ -146,7 +147,7 @@ export function PrivacyPageClient() {
             <h2 className="text-xl font-semibold text-white mt-10 mb-4">11. Contact Us</h2>
             <p>If you have questions about this Privacy Policy or our data practices, please contact us:</p>
             <p className="mt-2">
-              Avallen Solutions Ltd trading as Alkatera<br />
+              Avallen Solutions Ltd trading as <Brand /><br />
               Email: <a href="mailto:hello@alkatera.com" className="text-[#ccff00] hover:underline">hello@alkatera.com</a><br />
               Website: <a href="https://alkatera.com" className="text-[#ccff00] hover:underline">https://alkatera.com</a>
             </p>

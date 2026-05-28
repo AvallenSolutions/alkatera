@@ -2,6 +2,7 @@
 
 import { Logo } from './Logo';
 import Link from 'next/link';
+import { Brand } from '@/components/shared/Brand';
 
 export const Footer = () => {
   return (
@@ -12,7 +13,7 @@ export const Footer = () => {
             <Logo />
           </div>
           <p className="text-gray-500 font-mono text-sm">
-            &copy; 2026 Alkatera Ltd
+            &copy; 2026 <Brand /> Ltd
           </p>
         </div>
 

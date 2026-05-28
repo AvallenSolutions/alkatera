@@ -104,7 +104,7 @@ export async function generateMetadata(
       title,
       description,
       url: postUrl,
-      siteName: 'Alkatera',
+      siteName: 'alkatera',
       locale: 'en_GB',
       type: 'article',
       publishedTime: post.published_at,
@@ -152,11 +152,11 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
     datePublished: post.published_at || undefined,
     author: {
       '@type': 'Person',
-      name: post.author_name || 'Alkatera',
+      name: post.author_name || 'alkatera',
     },
     publisher: {
       '@type': 'Organization',
-      name: 'Alkatera',
+      name: 'alkatera',
       url: siteUrl,
       logo: {
         '@type': 'ImageObject',

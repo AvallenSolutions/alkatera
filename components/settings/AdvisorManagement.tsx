@@ -320,7 +320,7 @@ export function AdvisorManagement() {
                 <DialogHeader>
                   <DialogTitle>Invite Sustainability Advisor</DialogTitle>
                   <DialogDescription>
-                    Invite an AlkaTera-accredited advisor to help with your sustainability journey.
+                    Invite an alkatera-accredited advisor to help with your sustainability journey.
                     They will receive full access to data, reports, and LCA features.
                   </DialogDescription>
                 </DialogHeader>

@@ -29,7 +29,7 @@ export default function UpdatePasswordPage() {
           <div className="mb-8 flex justify-center">
             <img
               src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png"
-              alt="AlkaTera"
+              alt="alkatera"
               className="h-12 md:h-14 w-auto object-contain"
             />
           </div>
