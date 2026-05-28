@@ -182,6 +182,13 @@ function CanopyOnboardingContent() {
       if (signUpError) throw signUpError
       if (!data.user) throw new Error('No user returned from sign-up')
 
+      void fetch('/api/integrations/sender/sync-current-user', {
+        method: 'POST',
+        credentials: 'same-origin',
+      }).catch((senderErr) => {
+        console.warn('Sender sync request failed:', senderErr)
+      })
+
       toast.success('Account created!')
       setCurrentStep('organization')
     } catch (err: any) {

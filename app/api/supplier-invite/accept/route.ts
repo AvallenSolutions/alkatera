@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { syncAlkateraCustomer } from '@/lib/sender'
 
 const allowedOrigin = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.alkatera.com'
 
@@ -175,6 +176,20 @@ export async function POST(request: NextRequest) {
         is_supplier: true,
       },
     })
+
+    if (userData.user.email) {
+      const fullName = typeof userData.user.user_metadata?.full_name === 'string'
+        ? userData.user.user_metadata.full_name
+        : null
+      try {
+        await syncAlkateraCustomer({
+          email: userData.user.email,
+          fullName,
+        })
+      } catch (senderErr) {
+        console.error('Sender sync failed for supplier invite accept:', senderErr)
+      }
+    }
 
     return NextResponse.json(
       {
