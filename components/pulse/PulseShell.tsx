@@ -2,14 +2,14 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, MessageSquare, PoundSterling, RefreshCw, Sparkles } from 'lucide-react';
+import { Activity, MessageSquare, PoundSterling, RefreshCw } from 'lucide-react';
 import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PulseGrid } from '@/components/pulse/PulseGrid';
 import { PulsePersonaGrid } from '@/components/pulse/PulsePersonaGrid';
 import { PulsePersonaToggle } from '@/components/pulse/PulsePersonaToggle';
+import { PulseVitalityHero } from '@/components/pulse/PulseVitalityHero';
 import { PERSONAS, DEFAULT_PERSONA, type PulseView } from '@/lib/pulse/layout';
 import {
   PulseRealtimeProvider,
@@ -122,7 +122,7 @@ function PulseShellBody() {
     <>
       <div className="space-y-6 pb-12">
         <PulseHeader view={view} onChangeView={setView} />
-        <PulseHero />
+        <PulseVitalityHero />
         {/* Full-width KPI strip sits above the grid -- doesn't fit the card metaphor. */}
         <LiveMetricsStrip />
         {view === 'advanced' ? <PulseGrid /> : <PulsePersonaGrid persona={view} />}
@@ -326,49 +326,5 @@ function ConnectionHeartbeat() {
       </span>
       <span className="font-data uppercase tracking-wider">{label}</span>
     </div>
-  );
-}
-
-function PulseHero() {
-  return (
-    <Card className="overflow-hidden border-border/60 bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-900/80 dark:via-slate-900 dark:to-slate-800/80">
-      <CardContent className="relative p-6 sm:p-8">
-        {/* Ambient glow */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 flex items-center justify-end"
-        >
-          <div className="h-56 w-56 -translate-y-12 translate-x-24 rounded-full bg-[#ccff00]/10 blur-3xl dark:bg-[#ccff00]/5" />
-        </div>
-
-        <div className="relative grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
-          <div className="space-y-3 max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#ccff00]/30 bg-[#ccff00]/5 px-3 py-1 text-xs uppercase tracking-wider text-[#ccff00]">
-              <Sparkles className="h-3 w-3" />
-              Living dashboard
-            </div>
-            <h2 className="text-xl font-semibold leading-tight text-foreground sm:text-2xl">
-              Sustainability isn&apos;t an annual ritual anymore.
-            </h2>
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              Pulse streams every emissions entry, supplier update, product change and target
-              shift into one living view. Spot anomalies before they become incidents. See
-              whether you&apos;re on track for 2030 at today&apos;s pace. Get a Claude-written
-              brief every morning explaining what changed and why.
-            </p>
-          </div>
-
-          {/* Concentric animated rings */}
-          <div className="relative mx-auto h-32 w-32 lg:h-40 lg:w-40">
-            <div className="absolute inset-0 animate-[spin_12s_linear_infinite] rounded-full border-2 border-dashed border-[#ccff00]/30" />
-            <div className="absolute inset-3 animate-[spin_8s_linear_infinite_reverse] rounded-full border-2 border-[#ccff00]/20" />
-            <div className="absolute inset-6 animate-[spin_2.5s_ease-in-out_infinite] rounded-full border-2 border-transparent border-t-[#ccff00] border-r-[#ccff00]/40" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="h-3.5 w-3.5 animate-pulse rounded-full bg-[#ccff00] shadow-[0_0_18px_rgba(204,255,0,0.55)]" />
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
