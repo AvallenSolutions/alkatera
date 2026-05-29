@@ -114,3 +114,25 @@
 
 [functions."app/api/cron/run-brand-matching/route"]
   schedule = "0 3 * * *"     # daily at 03:00 UTC (alkatera-sync sweep)
+
+# ============================================================
+# Scheduled functions (Pulse data pipeline)
+# ============================================================
+# These populate the live Pulse dashboard. Snapshots run nightly;
+# insights run after them so they read fresh snapshots. Anomalies
+# and grid-carbon are time-sensitive and run more frequently.
+
+[functions."app/api/cron/generate-snapshots/route"]
+  schedule = "0 2 * * *"          # nightly at 02:00 UTC — daily metric_snapshots
+
+[functions."app/api/cron/generate-insights/route"]
+  schedule = "0 6 * * *"          # daily at 06:00 UTC — after snapshots land
+
+[functions."app/api/cron/detect-anomalies/route"]
+  schedule = "0 * * * *"          # hourly — z-score anomaly detection + alerts
+
+[functions."app/api/cron/refresh-grid-carbon/route"]
+  schedule = "*/30 * * * *"       # every 30 min — UK grid intensity + forecast
+
+[functions."app/api/cron/refresh-shadow-prices/route"]
+  schedule = "0 8 1 1,4,7,10 *"   # quarterly at 08:00 UTC — global shadow prices
