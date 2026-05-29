@@ -16,6 +16,7 @@
 import { WIDGET_REGISTRY, type Footprint } from '@/lib/pulse/widget-registry';
 import { PERSONAS, type Persona } from '@/lib/pulse/layout';
 import { WIDGET_RENDERERS } from '@/components/pulse/widgetRenderers';
+import { WidgetCardProvider } from '@/components/pulse/WidgetCardContext';
 
 /** Footprint -> Tailwind span classes at the `sm`+ breakpoint (4-col grid). */
 function spanClass(footprint: Footprint): string {
@@ -44,7 +45,7 @@ export function PulsePersonaGrid({ persona }: { persona: Persona }) {
         if (!meta || !renderer) return null;
         return (
           <div key={id} className={spanClass(meta.footprint)}>
-            {renderer()}
+            <WidgetCardProvider id={id}>{renderer()}</WidgetCardProvider>
           </div>
         );
       })}

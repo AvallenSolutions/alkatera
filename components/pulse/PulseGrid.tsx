@@ -42,6 +42,7 @@ import { applyAdaptiveOrder } from '@/lib/pulse/ranking';
 import { usePulseEngagement } from '@/hooks/usePulseEngagement';
 import { PulseEditToolbar } from '@/components/pulse/PulseEditToolbar';
 import { WIDGET_RENDERERS } from '@/components/pulse/widgetRenderers';
+import { WidgetCardProvider } from '@/components/pulse/WidgetCardContext';
 
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
@@ -289,7 +290,9 @@ function WidgetCell({
           </Button>
         </div>
       )}
-      <div className={cn('h-full w-full', editMode ? 'pt-6' : '')}>{children}</div>
+      <div className={cn('h-full w-full', editMode ? 'pt-6' : '')}>
+        <WidgetCardProvider id={meta.id}>{children}</WidgetCardProvider>
+      </div>
     </div>
   );
 }
