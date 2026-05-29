@@ -1,13 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, MessageSquare, PoundSterling, RefreshCw, Sparkles } from 'lucide-react';
 import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PulseGrid } from '@/components/pulse/PulseGrid';
+import { PulsePersonaGrid } from '@/components/pulse/PulsePersonaGrid';
+import { PulsePersonaToggle } from '@/components/pulse/PulsePersonaToggle';
+import { PERSONAS, DEFAULT_PERSONA, type PulseView } from '@/lib/pulse/layout';
 import {
   PulseRealtimeProvider,
   usePulseRealtimeContext,
@@ -33,6 +36,10 @@ import { HarvestSeasonsExpandedSlot } from '@/components/pulse/widgets/harvest-s
 import { ProductEnvCostExpandedSlot } from '@/components/pulse/widgets/product-env-cost/expanded';
 import { SupplierHotspotsExpandedSlot } from '@/components/pulse/widgets/supplier-hotspots/expanded';
 import { LiveActivityExpandedSlot } from '@/components/pulse/widgets/live-activity/expanded';
+// Financial-only drill slots -- surfaced by the CFO persona view.
+import { CostIntensityExpandedSlot } from '@/components/pulse/widgets/cost-intensity/expanded';
+import { IssbDisclosureExpandedSlot } from '@/components/pulse/widgets/issb-disclosure/expanded';
+import { ImpactValuationExpandedSlot } from '@/components/pulse/widgets/impact-valuation/expanded';
 import { usePulseDrillUrl } from '@/hooks/usePulseDrillUrl';
 import { LiveMetricsStrip } from '@/components/pulse/widgets/LiveMetricsStrip';
 import { AskRosaWidget } from '@/components/pulse/widgets/AskRosaWidget';
@@ -57,6 +64,35 @@ export function PulseShell() {
   );
 }
 
+const VIEW_STORAGE_KEY = 'pulse:view';
+
+/** Persona/view preference, persisted per-browser in localStorage. */
+function usePulseView(): [PulseView, (next: PulseView) => void] {
+  const [view, setView] = useState<PulseView>(DEFAULT_PERSONA);
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(VIEW_STORAGE_KEY);
+      if (saved === 'advanced' || (saved && saved in PERSONAS)) {
+        setView(saved as PulseView);
+      }
+    } catch {
+      // localStorage unavailable -- fall back to the default persona.
+    }
+  }, []);
+
+  const update = useCallback((next: PulseView) => {
+    setView(next);
+    try {
+      window.localStorage.setItem(VIEW_STORAGE_KEY, next);
+    } catch {
+      // Ignore persistence failures -- the in-memory choice still applies.
+    }
+  }, []);
+
+  return [view, update];
+}
+
 /**
  * Inner shell body. Separated so we can call hooks that need the drill context
  * (URL sync) without moving the provider up a layer.
@@ -64,6 +100,8 @@ export function PulseShell() {
 function PulseShellBody() {
   // Two-way sync between ?drill= query param and drill context.
   usePulseDrillUrl();
+
+  const [view, setView] = usePulseView();
 
   const { activeTarget, open: drillOpen } = useWidgetDrill();
   const rosaSlice = useMemo(
@@ -73,21 +111,21 @@ function PulseShellBody() {
       priority: 6,
       data: {
         activeDrill: drillOpen && activeTarget ? activeTarget : null,
-        view: 'main',
+        view,
       },
     }),
-    [activeTarget, drillOpen],
+    [activeTarget, drillOpen, view],
   );
   useRosaPageContext(rosaSlice);
 
   return (
     <>
       <div className="space-y-6 pb-12">
-        <PulseHeader />
+        <PulseHeader view={view} onChangeView={setView} />
         <PulseHero />
         {/* Full-width KPI strip sits above the grid -- doesn't fit the card metaphor. */}
         <LiveMetricsStrip />
-        <PulseGrid />
+        {view === 'advanced' ? <PulseGrid /> : <PulsePersonaGrid persona={view} />}
         {/* Rosa chat sits below, full width -- also exempt from the grid. */}
         <AskRosaWidget />
       </div>
@@ -111,56 +149,71 @@ function PulseShellBody() {
       <ProductEnvCostExpandedSlot />
       <SupplierHotspotsExpandedSlot />
       <LiveActivityExpandedSlot />
+      <CostIntensityExpandedSlot />
+      <IssbDisclosureExpandedSlot />
+      <ImpactValuationExpandedSlot />
       {/* Full-page overlay. Mounted once at shell level. */}
       <WidgetDrillOverlay />
     </>
   );
 }
 
-function PulseHeader() {
+function PulseHeader({
+  view,
+  onChangeView,
+}: {
+  view: PulseView;
+  onChangeView: (next: PulseView) => void;
+}) {
+  const subtitle =
+    view === 'advanced'
+      ? 'Build your own view from every available metric. Drag, pin and customise.'
+      : PERSONAS[view].blurb;
+
   return (
-    <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <div className="flex items-center gap-2">
-          <Activity className="h-6 w-6 text-[#ccff00]" aria-hidden="true" />
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground">
-            Pulse
-          </h1>
-          <Badge
-            variant="outline"
-            className="border-[#ccff00]/40 bg-[#ccff00]/10 text-[10px] font-semibold uppercase tracking-wider text-[#ccff00]"
-          >
-            Beta
-          </Badge>
+    <header className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <Activity className="h-6 w-6 text-[#ccff00]" aria-hidden="true" />
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+              Pulse
+            </h1>
+            <Badge
+              variant="outline"
+              className="border-[#ccff00]/40 bg-[#ccff00]/10 text-[10px] font-semibold uppercase tracking-wider text-[#ccff00]"
+            >
+              Beta
+            </Badge>
+          </div>
+          <p className="mt-1 max-w-xl text-sm text-muted-foreground">{subtitle}</p>
         </div>
-        <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-          Your sustainability, live. Drag, resize and customise the widgets to match how
-          you work.
-        </p>
+
+        <div className="flex items-center gap-2">
+          <ConnectionHeartbeat />
+          <RefreshPulseButton />
+          <Button asChild variant="default" size="sm" className="bg-[#ccff00] text-black hover:bg-[#b8e600]">
+            <Link href="/pulse/financial/">
+              <PoundSterling className="mr-2 h-4 w-4" />
+              Financial view
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/pulse/settings/shadow-prices/">
+              <PoundSterling className="mr-2 h-4 w-4" />
+              Prices
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/settings/feedback/">
+              <MessageSquare className="mr-2 h-4 w-4" />
+              Beta feedback
+            </Link>
+          </Button>
+        </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <ConnectionHeartbeat />
-        <RefreshPulseButton />
-        <Button asChild variant="default" size="sm" className="bg-[#ccff00] text-black hover:bg-[#b8e600]">
-          <Link href="/pulse/financial/">
-            <PoundSterling className="mr-2 h-4 w-4" />
-            Financial view
-          </Link>
-        </Button>
-        <Button asChild variant="outline" size="sm">
-          <Link href="/pulse/settings/shadow-prices/">
-            <PoundSterling className="mr-2 h-4 w-4" />
-            Prices
-          </Link>
-        </Button>
-        <Button asChild variant="outline" size="sm">
-          <Link href="/settings/feedback/">
-            <MessageSquare className="mr-2 h-4 w-4" />
-            Beta feedback
-          </Link>
-        </Button>
-      </div>
+      <PulsePersonaToggle view={view} onChange={onChangeView} />
     </header>
   );
 }
