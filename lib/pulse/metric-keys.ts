@@ -51,10 +51,10 @@ export const METRIC_DEFINITIONS: Record<MetricKey, MetricDefinition> = {
   products_assessed: {
     key: 'products_assessed',
     label: 'Products assessed',
-    unit: 'LCAs',
+    unit: 'products',
     higherIsBetter: true,
     href: '/products/',
-    description: 'Cumulative completed product LCAs',
+    description: 'Products with at least one completed LCA',
   },
   lca_completeness_pct: {
     key: 'lca_completeness_pct',
