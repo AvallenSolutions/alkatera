@@ -23,6 +23,7 @@ import {
 } from '@/lib/pulse/abatement-costs';
 import { calculateRegulatoryExposure } from '@/lib/pulse/regulatory-exposure';
 import { renderBoardPackHtml, type BoardPackInput } from '@/lib/pulse/board-pack-template';
+import { latestValuePerMetric } from '@/lib/pulse/snapshot-latest';
 import { convertHtmlToPdf } from '@/lib/pdf/pdfshift-client';
 
 export const runtime = 'nodejs';
@@ -105,24 +106,27 @@ export async function POST(request: NextRequest) {
       .gte('snapshot_date', fmt(priorStart))
       .lte('snapshot_date', fmt(today));
 
+    // Snapshots are levels, not flows: take the latest value per metric in each
+    // window, not a sum of daily rows.
+    const startStr = fmt(start);
+    const mulOf = (k: string) =>
+      k === 'total_co2e' ? carbonMultiplier : k === 'water_consumption' ? waterMultiplier : 0;
+    const curLatest = latestValuePerMetric(
+      (snapshots ?? []).filter(r => (r.snapshot_date as string) >= startStr) as any[],
+    );
+    const priorLatest = latestValuePerMetric(
+      (snapshots ?? []).filter(r => (r.snapshot_date as string) < startStr) as any[],
+    );
     let trailing = 0;
-    let prior = 0;
     const byMetric: Record<string, number> = {};
-    for (const row of snapshots ?? []) {
-      const m =
-        row.metric_key === 'total_co2e'
-          ? carbonMultiplier
-          : row.metric_key === 'water_consumption'
-            ? waterMultiplier
-            : 0;
-      const gbp = Number(row.value ?? 0) * m;
-      const date = row.snapshot_date as string;
-      if (date >= fmt(start)) {
-        trailing += gbp;
-        byMetric[row.metric_key as string] = (byMetric[row.metric_key as string] ?? 0) + gbp;
-      } else {
-        prior += gbp;
-      }
+    for (const [k, v] of Array.from(curLatest.entries())) {
+      const gbp = v * mulOf(k);
+      trailing += gbp;
+      byMetric[k] = gbp;
+    }
+    let prior = 0;
+    for (const [k, v] of Array.from(priorLatest.entries())) {
+      prior += v * mulOf(k);
     }
     const totalTrailing = trailing || 1;
 

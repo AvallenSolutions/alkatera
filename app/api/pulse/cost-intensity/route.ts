@@ -27,6 +27,7 @@ import {
   computeCostIntensity,
   computeFinancialFootprint,
 } from '@/lib/pulse/cost-math';
+import { latestValuePerMetric } from '@/lib/pulse/snapshot-latest';
 import { loadShadowPrices } from '@/lib/pulse/shadow-prices';
 import type { MetricKey } from '@/lib/pulse/metric-keys';
 
@@ -82,16 +83,19 @@ export async function GET(request: NextRequest) {
 
     const { data: snapshots } = await svc
       .from('metric_snapshots')
-      .select('metric_key, value')
+      .select('metric_key, snapshot_date, value')
       .eq('organization_id', organizationId)
       .in('metric_key', FINANCIAL_METRICS)
       .gte('snapshot_date', fmt(start))
       .lte('snapshot_date', fmt(today));
 
+    // Snapshots are levels, not flows: collapse to the latest value per metric
+    // before monetising, so computeFinancialFootprint sums one row per metric.
+    const latestByMetric = latestValuePerMetric((snapshots ?? []) as any[]);
     const { total_gbp: totalCostGbp } = computeFinancialFootprint(
-      ((snapshots ?? []) as Array<{ metric_key: string; value: number }>).map(r => ({
-        metric_key: r.metric_key,
-        value: Number(r.value ?? 0),
+      Array.from(latestByMetric.entries()).map(([metric_key, value]) => ({
+        metric_key,
+        value,
       })),
       prices,
     );

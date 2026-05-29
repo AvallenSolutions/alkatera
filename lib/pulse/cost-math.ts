@@ -87,9 +87,10 @@ export interface FinancialFootprintResult {
 }
 
 /**
- * Sum daily snapshots × shadow price = org's monetised environmental footprint
- * for the period. Snapshots outside the passed list are not considered -- the
- * caller filters the time window upstream.
+ * Monetise snapshots × shadow price = org's environmental footprint in £.
+ * Snapshots are levels (annual/trailing totals), so the caller must pass ONE
+ * row per metric (the latest value, e.g. via latestValuePerMetric) -- this
+ * function sums the rows it is given and does not dedupe by date.
  *
  *   £total = Σ (snapshot.value × native_unit_multiplier × price_per_unit)
  *          = Σ (snapshot.value × shadowMultiplier(metric_key))
