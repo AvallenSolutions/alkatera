@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,9 +10,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get organization from query params or user's default
+    // Resolve and verify the organisation the caller may access
     const searchParams = request.nextUrl.searchParams;
-    const organizationId = searchParams.get('organization_id');
+    const organizationId = await resolveAccessibleOrg(supabase, user, searchParams.get('organization_id'));
+    if (!organizationId) {
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    }
     const status = searchParams.get('status');
     const policyType = searchParams.get('policy_type');
 
@@ -21,11 +25,8 @@ export async function GET(request: NextRequest) {
         *,
         versions:governance_policy_versions(*)
       `)
+      .eq('organization_id', organizationId)
       .order('created_at', { ascending: false });
-
-    if (organizationId) {
-      query = query.eq('organization_id', organizationId);
-    }
 
     if (status) {
       query = query.eq('status', status);
@@ -57,24 +58,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's current organization from metadata or first membership
-    let organizationId = user.user_metadata?.current_organization_id;
-
-    if (!organizationId) {
-      const { data: membership, error: memberError } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (memberError || !membership) {
-        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
-      }
-      organizationId = membership.organization_id;
-    }
-
     const body = await request.json();
+
+    // Verify the user has access to the target org (member or active advisor)
+    const organizationId = await resolveAccessibleOrg(supabase, user, body.organization_id);
+    if (!organizationId) {
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    }
 
     // Validate required fields
     if (!body.policy_name || !body.policy_type) {
@@ -88,7 +78,7 @@ export async function POST(request: NextRequest) {
     const { data: policy, error: policyError } = await supabase
       .from('governance_policies')
       .insert({
-        organization_id: body.organization_id || organizationId,
+        organization_id: organizationId,
         policy_name: body.policy_name,
         policy_code: body.policy_code,
         policy_type: body.policy_type,
@@ -150,6 +140,12 @@ export async function PUT(request: NextRequest) {
 
     const body = await request.json();
 
+    // Verify the user has access to an organisation before mutating
+    const organizationId = await resolveAccessibleOrg(supabase, user, body.organization_id);
+    if (!organizationId) {
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    }
+
     if (!body.id) {
       return NextResponse.json({ error: 'Policy id is required' }, { status: 400 });
     }
@@ -182,6 +178,7 @@ export async function PUT(request: NextRequest) {
       .from('governance_policies')
       .update(updateData)
       .eq('id', body.id)
+      .eq('organization_id', organizationId)
       .select()
       .single();
 

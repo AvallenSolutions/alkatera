@@ -13,6 +13,7 @@ import { createHash } from 'crypto'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { FunctionCallingMode } from '@google/generative-ai'
 import { getSupabaseServerClient } from '@/lib/supabase/server-client'
+import { rateLimit } from '@/lib/rate-limit'
 import {
   getGeminiClient,
   toGeminiFunctionDeclarations,
@@ -325,6 +326,11 @@ export async function GET(req: NextRequest) {
   const ctx = await resolveContext(req)
   if ('error' in ctx) return ctx.error
   const { userId, organizationId, service } = ctx
+
+  const rl = await rateLimit(`rosa-progress-tracker:${userId}`, 30, 60_000)
+  if (!rl.success) {
+    return NextResponse.json({ error: 'Rate limit exceeded. Please wait a moment and try again.' }, { status: 429 })
+  }
 
   const url = new URL(req.url)
   const fresh = url.searchParams.get('fresh') === '1'

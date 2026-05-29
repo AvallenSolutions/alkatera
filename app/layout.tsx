@@ -7,6 +7,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { Toaster as SonnerToaster } from '@/components/ui/sonner';
 import { ThemeProvider } from 'next-themes';
 import { GoogleAnalytics } from '@/components/GoogleAnalytics';
+import { CookieConsent } from '@/components/CookieConsent';
 import { PostHogProvider } from './providers';
 
 const inter = Inter({
@@ -172,6 +173,7 @@ export default function RootLayout({
             </AuthProvider>
           </ThemeProvider>
         </PostHogProvider>
+        <CookieConsent />
       </body>
     </html>
   );

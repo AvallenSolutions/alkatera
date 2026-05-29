@@ -47,6 +47,31 @@ interface OrganizationContextType {
 
 const OrganizationContext = createContext<OrganizationContextType | undefined>(undefined)
 
+/**
+ * Persist the active organisation to SERVER-ONLY app_metadata via the switch
+ * route (CRIT-2), then refresh the session so the new app_metadata lands in the
+ * JWT. Returns false on failure. user_metadata is no longer the source of truth
+ * for tenant context; it remains only as a validated legacy fallback.
+ */
+async function persistCurrentOrg(orgId: string): Promise<boolean> {
+  try {
+    const res = await fetch('/api/organizations/switch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ organization_id: orgId }),
+    })
+    if (!res.ok) {
+      console.error('❌ OrganizationContext: Failed to persist current organisation:', res.status)
+      return false
+    }
+    await supabase.auth.refreshSession()
+    return true
+  } catch (e) {
+    console.error('❌ OrganizationContext: Error persisting current organisation:', e)
+    return false
+  }
+}
+
 export function OrganizationProvider({ children }: { children: React.ReactNode }) {
   const [currentOrganization, setCurrentOrganization] = useState<Organization | null>(null)
   const [organizations, setOrganizations] = useState<Organization[]>([])
@@ -235,7 +260,8 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       setOrganizations(orgs || [])
 
       if (orgs && orgs.length > 0) {
-        const currentOrgIdFromSession = user.user_metadata?.current_organization_id
+        const currentOrgIdFromSession =
+          user.app_metadata?.current_organization_id ?? user.user_metadata?.current_organization_id
 
         const orgToSet = orgs.find((o: any) => o.id === currentOrgIdFromSession) || orgs[0]
         setCurrentOrganization(orgToSet)
@@ -243,6 +269,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         if (orgToSet.id !== currentOrgIdFromSession) {
             console.log('🔧 OrganizationContext: Syncing session with default organization.')
             await supabase.auth.updateUser({ data: { current_organization_id: orgToSet.id } })
+            await persistCurrentOrg(orgToSet.id)
         }
 
         // Set role from the already-fetched membership data (includes role name via join).
@@ -274,16 +301,14 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
 
     setCurrentOrganization(org)
 
-    const { error } = await supabase.auth.updateUser({
-        data: {
-            current_organization_id: orgId
-        }
-    });
-
+    // Write user_metadata (instant, and keeps working with the pre-migration RLS
+    // function) AND the server-only app_metadata source (preferred post-migration).
+    const { error } = await supabase.auth.updateUser({ data: { current_organization_id: orgId } })
     if (error) {
         console.error('❌ OrganizationContext: Error updating user metadata:', error)
         return;
     }
+    await persistCurrentOrg(orgId)
 
     // CRITICAL: Check if user is a supplier first (authoritative check)
     const { data: supplierCtx } = await supabase.rpc('get_supplier_context')
@@ -327,6 +352,8 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         setCurrentOrganization(organization);
         setUserRole(role);
 
+        // Keep user_metadata for instant UI on the new-user path, and also set
+        // the server-only app_metadata source (CRIT-2) via the switch route.
         const { error } = await supabase.auth.updateUser({
             data: {
                 current_organization_id: organization.id
@@ -336,6 +363,8 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         if (error) {
             console.error('❌ OrganizationContext: Error setting initial organization for new user:', error);
         }
+
+        await persistCurrentOrg(organization.id);
 
     } else {
         await fetchOrganizations();

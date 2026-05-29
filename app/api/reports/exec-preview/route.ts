@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { rateLimit } from '@/lib/rate-limit';
 
 /**
  * Executive Summary Preview
@@ -41,6 +42,11 @@ export async function POST(request: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
+    }
+
+    const rl = await rateLimit(`exec-preview:${user.id}`, 30, 60_000);
+    if (!rl.success) {
+      return NextResponse.json({ error: 'Rate limit exceeded. Please wait a moment and try again.' }, { status: 429 });
     }
 
     const body = await request.json();

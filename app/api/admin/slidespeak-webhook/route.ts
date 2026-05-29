@@ -72,9 +72,10 @@ export async function POST(request: NextRequest) {
   }
 
   const data = await response.json();
-  console.log('[SlideSpeak] Webhook subscribed:', callbackUrl);
+  // Do not log or return the callback URL - it embeds SLIDESPEAK_WEBHOOK_SECRET.
+  console.log('[SlideSpeak] Webhook subscribed');
 
-  return NextResponse.json({ success: true, callbackUrl, response: data });
+  return NextResponse.json({ success: true, response: data });
 }
 
 /**
@@ -118,7 +119,8 @@ export async function DELETE(request: NextRequest) {
   }
 
   const data = await response.json();
-  console.log('[SlideSpeak] Webhook unsubscribed:', callbackUrl);
+  // Do not log or return the callback URL - it embeds SLIDESPEAK_WEBHOOK_SECRET.
+  console.log('[SlideSpeak] Webhook unsubscribed');
 
-  return NextResponse.json({ success: true, callbackUrl, response: data });
+  return NextResponse.json({ success: true, response: data });
 }

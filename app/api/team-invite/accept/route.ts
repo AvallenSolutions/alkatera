@@ -219,6 +219,9 @@ export async function POST(request: NextRequest) {
 
     // Update user metadata with current organization
     await adminClient.auth.admin.updateUserById(userId, {
+      app_metadata: {
+        current_organization_id: invitation.organization_id,
+      },
       user_metadata: {
         current_organization_id: invitation.organization_id,
       },

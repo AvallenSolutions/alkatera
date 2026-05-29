@@ -29,6 +29,7 @@ import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { executeTool, ROSA_TOOLS, ACTION_TOOL_NAMES, type ToolContext } from '@/lib/rosa/tools';
 import { buildMemoryBlock } from '@/lib/rosa/memory';
 import { loadAttachment } from '@/lib/rosa/document-extraction';
+import { rateLimit } from '@/lib/rate-limit';
 import {
   getGeminiClient,
   toGeminiFunctionDeclarations,
@@ -128,6 +129,12 @@ export async function POST(request: NextRequest) {
   if (!membership) return errorResponse('No organisation membership', 403);
 
   const organizationId = membership.organization_id;
+
+  // Rate limit AI usage per user to cap cost-abuse (durable when Upstash is configured).
+  const rl = await rateLimit(`rosa-chat:${user.id}`, 30, 60_000);
+  if (!rl.success) {
+    return errorResponse('You are sending messages too quickly. Please wait a moment.', 429);
+  }
 
   let body: {
     conversation_id?: string;

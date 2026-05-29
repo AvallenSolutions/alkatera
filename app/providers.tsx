@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import dynamic from 'next/dynamic'
+import { useConsent } from '@/lib/consent'
 
 // Lazy-load PostHog to avoid blocking the critical rendering path.
 // PostHog JS (~100KB) is only used for auto-capture analytics (pageviews, clicks)
@@ -13,8 +14,13 @@ const PHProvider = dynamic(
 
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
   const [posthogClient, setPosthogClient] = useState<any>(null)
+  const consent = useConsent()
 
   useEffect(() => {
+    // Only initialise analytics after the user has explicitly accepted
+    // (PECR / UK GDPR). No init on 'rejected' or before a choice is made.
+    if (consent !== 'accepted' || posthogClient) return
+
     // Defer PostHog init to after hydration so it doesn't block first paint
     const initPostHog = async () => {
       const posthog = (await import('posthog-js')).default
@@ -33,7 +39,7 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
         setTimeout(initPostHog, 1000)
       }
     }
-  }, [])
+  }, [consent, posthogClient])
 
   if (!posthogClient) {
     // Render children immediately without PostHog — no blocking

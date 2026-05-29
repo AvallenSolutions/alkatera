@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,18 +11,18 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams;
-    const organizationId = searchParams.get('organization_id');
+    const organizationId = await resolveAccessibleOrg(supabase, user, searchParams.get('organization_id'));
+    if (!organizationId) {
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    }
     const activityType = searchParams.get('activity_type');
     const year = searchParams.get('year');
 
     let query = supabase
       .from('governance_lobbying')
       .select('*')
+      .eq('organization_id', organizationId)
       .order('activity_date', { ascending: false });
-
-    if (organizationId) {
-      query = query.eq('organization_id', organizationId);
-    }
 
     if (activityType) {
       query = query.eq('activity_type', activityType);
@@ -73,24 +74,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's current organization from metadata or first membership
-    let organizationId = user.user_metadata?.current_organization_id;
-
-    if (!organizationId) {
-      const { data: membership, error: memberError } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (memberError || !membership) {
-        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
-      }
-      organizationId = membership.organization_id;
-    }
-
     const body = await request.json();
+
+    // Verify the user has access to the target org (member or active advisor)
+    const organizationId = await resolveAccessibleOrg(supabase, user, body.organization_id);
+    if (!organizationId) {
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    }
 
     if (!body.activity_type || !body.activity_name) {
       return NextResponse.json(
@@ -102,7 +92,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('governance_lobbying')
       .insert({
-        organization_id: body.organization_id || organizationId,
+        organization_id: organizationId,
         activity_type: body.activity_type,
         activity_name: body.activity_name,
         description: body.description,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { rateLimit } from '@/lib/rate-limit'
 
 const allowedOrigin = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.alkatera.com'
 
@@ -7,28 +8,6 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': allowedOrigin,
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-}
-
-// Rate limiter: 5 requests per 15 minutes per IP
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
-const RATE_LIMIT_MAX = 5
-const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000
-
-function isRateLimited(ip: string): boolean {
-  const now = Date.now()
-  // Prune expired entries
-  if (rateLimitMap.size > 500) {
-    rateLimitMap.forEach((entry, key) => {
-      if (now > entry.resetAt) rateLimitMap.delete(key)
-    })
-  }
-  const entry = rateLimitMap.get(ip)
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS })
-    return false
-  }
-  entry.count++
-  return entry.count > RATE_LIMIT_MAX
 }
 
 export async function OPTIONS() {
@@ -42,7 +21,8 @@ export async function POST(request: NextRequest) {
       || request.headers.get('x-real-ip')
       || 'unknown'
 
-    if (isRateLimited(ip)) {
+    const { success: withinLimit } = await rateLimit(`password-reset:${ip}`, 5, 15 * 60 * 1000)
+    if (!withinLimit) {
       return NextResponse.json(
         { success: true }, // Don't reveal rate limiting to prevent enumeration
         { status: 200, headers: corsHeaders }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 
 // Mirrors app/api/vineyards/[id]/growing-profile/evidence/route.ts. The
 // orchard_soil_carbon_evidence table and orchard-soil-carbon-evidence
@@ -17,6 +18,20 @@ export async function GET(
     const { client: supabase, user, error: authError } = await getSupabaseAPIClient();
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
+    }
+
+    const organizationId = await resolveAccessibleOrg(supabase, user);
+    if (!organizationId) {
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    }
+
+    const { data: parent } = await supabase
+      .from('orchards')
+      .select('organization_id')
+      .eq('id', params.id)
+      .maybeSingle();
+    if (!parent || parent.organization_id !== organizationId) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
     const profileId = request.nextUrl.searchParams.get('profile_id');
@@ -76,18 +91,18 @@ export async function POST(
       return NextResponse.json({ error: 'File must be under 20 MB' }, { status: 400 });
     }
 
-    let organizationId = user.user_metadata?.current_organization_id;
+    const organizationId = await resolveAccessibleOrg(supabase, user);
     if (!organizationId) {
-      const { data: membership } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-      if (!membership) {
-        return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
-      }
-      organizationId = membership.organization_id;
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    }
+
+    const { data: parent } = await supabase
+      .from('orchards')
+      .select('organization_id')
+      .eq('id', params.id)
+      .maybeSingle();
+    if (!parent || parent.organization_id !== organizationId) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
     const fileExt = file.name.split('.').pop() || 'pdf';
@@ -140,6 +155,20 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
     }
 
+    const organizationId = await resolveAccessibleOrg(supabase, user);
+    if (!organizationId) {
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    }
+
+    const { data: parent } = await supabase
+      .from('orchards')
+      .select('organization_id')
+      .eq('id', params.id)
+      .maybeSingle();
+    if (!parent || parent.organization_id !== organizationId) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
     const evidenceId = request.nextUrl.searchParams.get('evidence_id');
     if (!evidenceId) {
       return NextResponse.json({ error: 'evidence_id is required' }, { status: 400 });
@@ -160,7 +189,8 @@ export async function DELETE(
     const { error: deleteError } = await supabase
       .from(TABLE)
       .delete()
-      .eq('id', evidenceId);
+      .eq('id', evidenceId)
+      .eq('orchard_id', params.id);
     if (deleteError) {
       return NextResponse.json({ error: deleteError.message }, { status: 500 });
     }

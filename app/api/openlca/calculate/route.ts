@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createOpenLCAClientForDatabase } from '@/lib/openlca/client';
 import { ProviderLinking, type ImpactResult } from '@/lib/openlca/schema';
+import { serverErrorResponse } from '@/lib/api/error-response';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120; // OpenLCA calculations can take 60-90s
@@ -514,11 +515,6 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('[OpenLCA API] Error:', error);
-    console.error('[OpenLCA API] Error stack:', error instanceof Error ? error.stack : 'No stack');
-    return NextResponse.json({
-      error: error instanceof Error ? error.message : 'Calculation failed',
-      details: error instanceof Error ? error.stack : undefined,
-    }, { status: 500 });
+    return serverErrorResponse('OpenLCA API', error, 'Calculation failed');
   }
 }

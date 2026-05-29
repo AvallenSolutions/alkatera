@@ -115,6 +115,9 @@
 [functions."app/api/cron/run-brand-matching/route"]
   schedule = "0 3 * * *"     # daily at 03:00 UTC (alkatera-sync sweep)
 
+[functions."app/api/cron/purge-public-greenwash-scans/route"]
+  schedule = "0 4 * * *"     # daily at 04:00 UTC — purge lead emails >24h (retention)
+
 # ============================================================
 # Scheduled functions (Pulse data pipeline)
 # ============================================================

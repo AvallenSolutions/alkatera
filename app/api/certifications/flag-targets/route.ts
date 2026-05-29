@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 
 /**
  * Compute whether a FLAG target meets SBTi minimum ambition.
@@ -33,7 +34,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
     }
 
-    const organizationId = user.user_metadata?.current_organization_id;
+    const organizationId = await resolveAccessibleOrg(supabase, user);
     if (!organizationId) {
       return NextResponse.json({ error: 'No organisation selected' }, { status: 400 });
     }
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
     }
 
-    const organizationId = user.user_metadata?.current_organization_id;
+    const organizationId = await resolveAccessibleOrg(supabase, user);
     if (!organizationId) {
       return NextResponse.json({ error: 'No organisation selected' }, { status: 400 });
     }
@@ -148,7 +149,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
     }
 
-    const organizationId = user.user_metadata?.current_organization_id;
+    const organizationId = await resolveAccessibleOrg(supabase, user);
     if (!organizationId) {
       return NextResponse.json({ error: 'No organisation selected' }, { status: 400 });
     }
@@ -222,7 +223,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
     }
 
-    const organizationId = user.user_metadata?.current_organization_id;
+    const organizationId = await resolveAccessibleOrg(supabase, user);
     if (!organizationId) {
       return NextResponse.json({ error: 'No organisation selected' }, { status: 400 });
     }

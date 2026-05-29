@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 
 type Recurrence = {
   frequency?: 'weekly' | 'biweekly' | 'monthly' | 'quarterly';
@@ -68,17 +69,19 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams;
-    const organizationId = searchParams.get('organization_id');
     const year = searchParams.get('year');
+
+    // Scope to an org the caller has access to (service-role bypasses RLS).
+    const organizationId = await resolveAccessibleOrg(supabase, user, searchParams.get('organization_id'));
+    if (!organizationId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     let query = supabase
       .from('community_volunteer_activities')
       .select('*')
+      .eq('organization_id', organizationId)
       .order('activity_date', { ascending: false });
-
-    if (organizationId) {
-      query = query.eq('organization_id', organizationId);
-    }
 
     if (year) {
       const startDate = `${year}-01-01`;
@@ -127,24 +130,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's current organization from metadata or first membership
-    let organizationId = user.user_metadata?.current_organization_id;
-
-    if (!organizationId) {
-      const { data: membership, error: memberError } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (memberError || !membership) {
-        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
-      }
-      organizationId = membership.organization_id;
-    }
-
     const body = await request.json();
+
+    // Resolve + verify the org to write to (never trust body.organization_id blindly).
+    const organizationId = await resolveAccessibleOrg(supabase, user, body.organization_id);
+    if (!organizationId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     if (!body.activity_name || !body.activity_type) {
       return NextResponse.json(
@@ -187,7 +179,7 @@ export async function POST(request: NextRequest) {
       : null;
 
     const baseRow = {
-      organization_id: body.organization_id || organizationId,
+      organization_id: organizationId,
       activity_name: body.activity_name,
       activity_type: body.activity_type,
       description: body.description || null,
@@ -248,7 +240,16 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'id or series_id is required' }, { status: 400 });
     }
 
-    let query = supabase.from('community_volunteer_activities').delete();
+    // Scope deletes to an org the caller has access to (service-role bypasses RLS).
+    const organizationId = await resolveAccessibleOrg(supabase, user, searchParams.get('organization_id'));
+    if (!organizationId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    let query = supabase
+      .from('community_volunteer_activities')
+      .delete()
+      .eq('organization_id', organizationId);
     if (seriesId) {
       query = query.eq('series_id', seriesId);
     } else if (id) {

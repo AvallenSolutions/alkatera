@@ -171,6 +171,9 @@ export async function POST(request: NextRequest) {
     // is_supplier is critical — OrganizationContext uses it as a fallback
     // when get_supplier_context() RPC hasn't propagated yet.
     await adminClient.auth.admin.updateUserById(user_id, {
+      app_metadata: {
+        current_organization_id: invitation.organization_id,
+      },
       user_metadata: {
         current_organization_id: invitation.organization_id,
         is_supplier: true,

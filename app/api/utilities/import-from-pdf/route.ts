@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
 import { createClient } from '@supabase/supabase-js'
+import { rateLimit } from '@/lib/rate-limit'
 import { BILL_TOOL_INPUT_SCHEMA } from '@/lib/claude/bill-schemas'
 
 /** Per-utility-type line on the bill. Electricity-specific fields (mpan,
@@ -60,6 +61,11 @@ export async function POST(request: NextRequest) {
     const { user, error: authError } = await getSupabaseAPIClient()
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const rl = await rateLimit(`import-from-pdf:${user.id}`, 10, 60_000)
+    if (!rl.success) {
+      return NextResponse.json({ error: 'Rate limit exceeded. Please wait a moment and try again.' }, { status: 429 })
     }
 
     const formData = await request.formData()

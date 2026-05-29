@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+import { resolveUserOrganization } from '@/lib/supabase/resolve-organization';
 
 /**
  * POST /api/lca/[id]/review/approve
@@ -14,6 +15,21 @@ export async function POST(
 
   if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Verify the caller's org owns this PCF before mutating its review.
+  // The service-role client bypasses RLS, so this app-level check is required.
+  const { organizationId, error: orgError } = await resolveUserOrganization(client, user);
+  if (orgError || !organizationId) {
+    return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+  }
+  const { data: pcf } = await client
+    .from('product_carbon_footprints')
+    .select('organization_id')
+    .eq('id', pcfId)
+    .single();
+  if (!pcf || pcf.organization_id !== organizationId) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
   // Get the active review

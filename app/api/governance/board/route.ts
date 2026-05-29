@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,17 +11,17 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams;
-    const organizationId = searchParams.get('organization_id');
+    const organizationId = await resolveAccessibleOrg(supabase, user, searchParams.get('organization_id'));
+    if (!organizationId) {
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    }
     const currentOnly = searchParams.get('current_only') !== 'false';
 
     let query = supabase
       .from('governance_board_members')
       .select('*')
+      .eq('organization_id', organizationId)
       .order('appointment_date', { ascending: false });
-
-    if (organizationId) {
-      query = query.eq('organization_id', organizationId);
-    }
 
     if (currentOnly) {
       query = query.eq('is_current', true);
@@ -69,24 +70,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's current organization from metadata or first membership
-    let organizationId = user.user_metadata?.current_organization_id;
-
-    if (!organizationId) {
-      const { data: membership, error: memberError } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (memberError || !membership) {
-        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
-      }
-      organizationId = membership.organization_id;
-    }
-
     const body = await request.json();
+
+    // Verify the user has access to the target org (member or active advisor)
+    const organizationId = await resolveAccessibleOrg(supabase, user, body.organization_id);
+    if (!organizationId) {
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    }
 
     if (!body.member_name || !body.role || !body.member_type) {
       return NextResponse.json(
@@ -98,7 +88,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('governance_board_members')
       .insert({
-        organization_id: body.organization_id || organizationId,
+        organization_id: organizationId,
         member_name: body.member_name,
         role: body.role,
         member_type: body.member_type,
@@ -141,6 +131,12 @@ export async function PUT(request: NextRequest) {
 
     const body = await request.json();
 
+    // Verify the user has access to an organisation before mutating
+    const organizationId = await resolveAccessibleOrg(supabase, user, body.organization_id);
+    if (!organizationId) {
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    }
+
     if (!body.id) {
       return NextResponse.json({ error: 'Board member id is required' }, { status: 400 });
     }
@@ -164,6 +160,7 @@ export async function PUT(request: NextRequest) {
       .from('governance_board_members')
       .update(updateData)
       .eq('id', body.id)
+      .eq('organization_id', organizationId)
       .select()
       .single();
 
@@ -187,6 +184,12 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Verify the user has access to an organisation before mutating
+    const organizationId = await resolveAccessibleOrg(supabase, user);
+    if (!organizationId) {
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const id = searchParams.get('id');
 
@@ -197,7 +200,8 @@ export async function DELETE(request: NextRequest) {
     const { error } = await supabase
       .from('governance_board_members')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('organization_id', organizationId);
 
     if (error) {
       console.error('Error deleting board member:', error);

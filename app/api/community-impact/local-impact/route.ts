@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,17 +11,19 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams;
-    const organizationId = searchParams.get('organization_id');
     const year = searchParams.get('year');
+
+    // Scope to an org the caller has access to (service-role bypasses RLS).
+    const organizationId = await resolveAccessibleOrg(supabase, user, searchParams.get('organization_id'));
+    if (!organizationId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     let query = supabase
       .from('community_local_impact')
       .select('*')
+      .eq('organization_id', organizationId)
       .order('reporting_year', { ascending: false });
-
-    if (organizationId) {
-      query = query.eq('organization_id', organizationId);
-    }
 
     if (year) {
       query = query.eq('reporting_year', parseInt(year));
@@ -67,24 +70,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's current organization from metadata or first membership
-    let organizationId = user.user_metadata?.current_organization_id;
-
-    if (!organizationId) {
-      const { data: membership, error: memberError } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (memberError || !membership) {
-        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
-      }
-      organizationId = membership.organization_id;
-    }
-
     const body = await request.json();
+
+    // Resolve + verify the org to write to (never trust body.organization_id blindly).
+    const organizationId = await resolveAccessibleOrg(supabase, user, body.organization_id);
+    if (!organizationId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     if (!body.reporting_year) {
       return NextResponse.json(
@@ -155,22 +147,13 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    let organizationId = user.user_metadata?.current_organization_id;
-    if (!organizationId) {
-      const { data: membership, error: memberError } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (memberError || !membership) {
-        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
-      }
-      organizationId = membership.organization_id;
-    }
-
     const body = await request.json();
+
+    // Resolve + verify the org to operate on (never trust body.organization_id blindly).
+    const organizationId = await resolveAccessibleOrg(supabase, user, body.organization_id);
+    if (!organizationId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     if (!body.id) {
       return NextResponse.json({ error: 'id is required' }, { status: 400 });
@@ -211,22 +194,13 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    let organizationId = user.user_metadata?.current_organization_id;
-    if (!organizationId) {
-      const { data: membership, error: memberError } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (memberError || !membership) {
-        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
-      }
-      organizationId = membership.organization_id;
-    }
-
     const body = await request.json();
+
+    // Resolve + verify the org to operate on (never trust body.organization_id blindly).
+    const organizationId = await resolveAccessibleOrg(supabase, user, body.organization_id);
+    if (!organizationId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     if (!body.id) {
       return NextResponse.json({ error: 'id is required' }, { status: 400 });

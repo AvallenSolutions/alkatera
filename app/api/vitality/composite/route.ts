@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { getSupabaseServerClient } from '@/lib/supabase/server-client'
+import { rateLimit } from '@/lib/rate-limit'
 import {
   composeVitality,
   computeEnvironmentalPillar,
@@ -1336,6 +1337,11 @@ export async function GET(req: NextRequest) {
   const ctx = await resolveContext(req)
   if ('error' in ctx) return ctx.error
   const { organizationId, service } = ctx
+
+  const rl = await rateLimit(`vitality-composite:${ctx.userId}`, 30, 60_000)
+  if (!rl.success) {
+    return NextResponse.json({ error: 'Rate limit exceeded. Please wait a moment and try again.' }, { status: 429 })
+  }
 
   // ?read=1 — opt in to the Claude-curated narrative. Default skips it so
   // the Rosa hub hero loads in ~DB-time (a few hundred ms). The breakdown

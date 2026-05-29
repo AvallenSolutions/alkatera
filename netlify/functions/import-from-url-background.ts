@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
 import { createHmac, timingSafeEqual } from 'crypto';
+import { lookup } from 'dns/promises';
 
 /**
  * Background Netlify Function for "Import products from website".
@@ -26,6 +27,76 @@ interface PageData {
   text: string;
   images: ImageCandidate[];
   links: string[];
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// SSRF protection.
+//
+// This function fetches user-supplied URLs server-side. The enqueue route
+// (app/api/products/import-from-url) validates the submitted host, but this
+// fetcher previously used redirect:'follow', so a clean public URL could 302
+// to an internal address (e.g. cloud metadata at 169.254.169.254). safeFetch
+// validates the host AND its resolved IPs, and follows redirects manually,
+// re-validating every hop. Use it for ALL fetches of the target site.
+// ───────────────────────────────────────────────────────────────────────────────
+
+function isPrivateIpv4(ip: string): boolean {
+  const parts = ip.split('.').map(Number);
+  if (parts.length !== 4 || parts.some((n) => Number.isNaN(n))) return false;
+  const [a, b] = parts;
+  return (
+    a === 0 || a === 10 || a === 127 ||
+    (a === 169 && b === 254) ||      // link-local / cloud metadata
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    a >= 224                          // multicast + reserved
+  );
+}
+
+function isBlockedHostname(hostname: string): boolean {
+  const h = hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  if (/^localhost$/.test(h) || h.endsWith('.localhost')) return true;
+  if (/^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(h)) return true;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return true;
+  if (h === '::1' || /^f[cde]/i.test(h)) return true; // ipv6 loopback / ULA / link-local
+  return false;
+}
+
+async function assertPublicUrl(rawUrl: string): Promise<void> {
+  const u = new URL(rawUrl);
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+    throw new Error(`SSRF: blocked protocol ${u.protocol}`);
+  }
+  if (isBlockedHostname(u.hostname)) {
+    throw new Error(`SSRF: blocked host ${u.hostname}`);
+  }
+  // Resolve DNS and reject if any record points at a private/reserved IP. This
+  // catches a public hostname deliberately pointing at an internal address.
+  const addresses = await lookup(u.hostname, { all: true });
+  for (const { address, family } of addresses) {
+    if (family === 4 && isPrivateIpv4(address)) {
+      throw new Error(`SSRF: host resolves to private IP ${address}`);
+    }
+    if (family === 6 && (address === '::1' || /^f[cde]/i.test(address))) {
+      throw new Error(`SSRF: host resolves to private IPv6 ${address}`);
+    }
+  }
+}
+
+async function safeFetch(rawUrl: string, init: RequestInit = {}, maxHops = 4): Promise<Response> {
+  let current = rawUrl;
+  for (let hop = 0; hop <= maxHops; hop++) {
+    await assertPublicUrl(current);
+    const res = await fetch(current, { ...init, redirect: 'manual' });
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get('location');
+      if (!location) return res;
+      current = new URL(location, current).href; // re-validated at top of next loop
+      continue;
+    }
+    return res;
+  }
+  throw new Error('SSRF: too many redirects');
 }
 
 // ───────────────────────────────────────────────────────────────────────────────
@@ -214,7 +285,7 @@ async function fetchShopifyProducts(
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10000);
-      const res = await fetch(target, {
+      const res = await safeFetch(target, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; alkatera/1.0; +https://alkatera.com)',
           Accept: 'application/json',
@@ -310,13 +381,12 @@ async function fetchPageData(url: string): Promise<PageData | null> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
 
-    const response = await fetch(url, {
+    const response = await safeFetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; alkatera/1.0; +https://alkatera.com)',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',
       },
-      redirect: 'follow',
       signal: controller.signal,
     });
 
@@ -467,9 +537,8 @@ export const handler = async (event: { body?: string | null; headers: Record<str
       // on sites that aren't Shopify (some platforms happen to return 200).
       const probeController = new AbortController();
       const probeTimeout = setTimeout(() => probeController.abort(), 10000);
-      const probeRes = await fetch(origin, {
+      const probeRes = await safeFetch(origin, {
         headers: { 'User-Agent': 'Mozilla/5.0 (compatible; alkatera/1.0; +https://alkatera.com)' },
-        redirect: 'follow',
         signal: probeController.signal,
       }).catch(() => null);
       clearTimeout(probeTimeout);

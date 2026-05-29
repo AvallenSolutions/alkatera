@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,13 +11,12 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams;
-    const organizationId = searchParams.get('organization_id');
+    const organizationId = await resolveAccessibleOrg(supabase, user, searchParams.get('organization_id'));
+    if (!organizationId) {
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    }
     const frameworkId = searchParams.get('framework_id');
     const currentYear = searchParams.get('current_year');
-
-    if (!organizationId) {
-      return NextResponse.json({ error: 'organization_id is required' }, { status: 400 });
-    }
 
     // Fetch gap analyses without PostgREST relationship joins
     let gapQuery = supabase
@@ -166,20 +166,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    let organizationId = user.user_metadata?.current_organization_id;
-
+    const organizationId = await resolveAccessibleOrg(supabase, user);
     if (!organizationId) {
-      const { data: membership, error: memberError } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (memberError || !membership) {
-        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
-      }
-      organizationId = membership.organization_id;
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -190,7 +179,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'framework_id is required' }, { status: 400 });
       }
 
-      const targetOrgId = body.organization_id || organizationId;
+      const targetOrgId = organizationId;
 
       // Delete any existing gap analyses for this org+framework to prevent duplicates
       const { error: deleteError } = await supabase
@@ -241,7 +230,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const targetOrgId = body.organization_id || organizationId;
+    const targetOrgId = organizationId;
 
     // Check if a record already exists for this org+framework+requirement
     const { data: existing } = await supabase
@@ -329,6 +318,12 @@ export async function PUT(request: NextRequest) {
 
     const body = await request.json();
 
+    // Verify the user has access to an organisation before mutating
+    const organizationId = await resolveAccessibleOrg(supabase, user, body.organization_id);
+    if (!organizationId) {
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    }
+
     if (!body.id) {
       return NextResponse.json({ error: 'Gap analysis id is required' }, { status: 400 });
     }
@@ -347,6 +342,7 @@ export async function PUT(request: NextRequest) {
         updated_at: new Date().toISOString(),
       })
       .eq('id', body.id)
+      .eq('organization_id', organizationId)
       .select()
       .single();
 
