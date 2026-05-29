@@ -39,7 +39,7 @@ interface FootprintResp {
   currency: string;
   trailing_12_months: { total_gbp: number };
   year_on_year: {
-    delta_pct: number;
+    delta_pct: number | null;
     direction: 'improving' | 'worsening' | 'flat';
   };
 }
@@ -182,11 +182,12 @@ export function PulseVitalityHero() {
                 <p className="mt-1 text-3xl font-semibold tabular-nums text-foreground">
                   {formatGbp(footprint.trailing_12_months.total_gbp)}
                 </p>
-                {yoy && (
-                  <YoyChip
-                    deltaPct={yoy.delta_pct}
-                    direction={yoy.direction}
-                  />
+                {yoy && yoy.delta_pct !== null ? (
+                  <YoyChip deltaPct={yoy.delta_pct} direction={yoy.direction} />
+                ) : (
+                  <span className="mt-1 inline-flex text-xs text-muted-foreground/70 lg:justify-end">
+                    Building year-on-year
+                  </span>
                 )}
               </>
             ) : (

@@ -33,6 +33,23 @@ export function latestValuePerMetric(rows: DatedSnapshot[]): Map<string, number>
   return latestValue;
 }
 
+/**
+ * Year-on-year % that is only returned when it can be trusted.
+ *
+ * Returns null when the prior figure is non-positive or the swing is
+ * implausibly large (>300%). A near-zero prior is the tell-tale of sparse or
+ * synthetically-backfilled history, which otherwise yields absurd percentages
+ * (e.g. 14502%). A real YoY becomes available once a full year of genuine
+ * daily snapshots has accumulated.
+ */
+export function reliableYoyPct(trailing: number, prior: number): number | null {
+  if (!(prior > 0)) return null;
+  const pct = ((trailing - prior) / prior) * 100;
+  if (!Number.isFinite(pct)) return null;
+  if (Math.abs(pct) > 300) return null;
+  return pct;
+}
+
 /** Latest single value across rows (ignoring metric_key), or 0 if none. */
 export function latestValue(rows: DatedSnapshot[]): number {
   let bestDate = '';

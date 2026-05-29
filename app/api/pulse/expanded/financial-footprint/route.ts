@@ -20,6 +20,7 @@ import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { loadShadowPrices, type ShadowPrice } from '@/lib/pulse/shadow-prices';
 import { METRIC_DEFINITIONS, type MetricKey } from '@/lib/pulse/metric-keys';
+import { reliableYoyPct } from '@/lib/pulse/snapshot-latest';
 
 export const runtime = 'nodejs';
 
@@ -283,8 +284,7 @@ export async function GET(request: NextRequest) {
           trailing_gbp: trailingTotal,
           prior_gbp: priorTotal,
           delta_gbp: trailingTotal - priorTotal,
-          delta_pct:
-            priorTotal > 0 ? ((trailingTotal - priorTotal) / priorTotal) * 100 : null,
+          delta_pct: reliableYoyPct(trailingTotal, priorTotal),
         },
         monthly,
         waterfall: waterfallSteps,

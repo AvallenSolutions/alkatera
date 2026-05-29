@@ -33,6 +33,7 @@ import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { loadShadowPrices, type ShadowPrice } from '@/lib/pulse/shadow-prices';
 import type { MetricKey } from '@/lib/pulse/metric-keys';
+import { reliableYoyPct } from '@/lib/pulse/snapshot-latest';
 
 export const runtime = 'nodejs';
 
@@ -176,11 +177,10 @@ export async function GET(request: NextRequest) {
       prior12Total += value * (gbpPerNativeUnit.get(metric) ?? 0);
     }
 
-    // Year-on-year change:
-    //   delta_gbp     = trailing - prior
-    //   delta_pct     = delta / prior   (null if prior is 0)
+    // Year-on-year change. delta_pct is suppressed (null) when the prior-year
+    // figure is unreliable -- see reliableYoyPct.
     const deltaGbp = trailing12Total - prior12Total;
-    const deltaPct = prior12Total > 0 ? (deltaGbp / prior12Total) * 100 : null;
+    const deltaPct = reliableYoyPct(trailing12Total, prior12Total);
 
     // Monthly trend: the annual liability as it stood each month (latest value
     // per metric in the month × price), sorted chronologically.

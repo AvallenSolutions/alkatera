@@ -23,7 +23,7 @@ import {
 } from '@/lib/pulse/abatement-costs';
 import { calculateRegulatoryExposure } from '@/lib/pulse/regulatory-exposure';
 import { renderBoardPackHtml, type BoardPackInput } from '@/lib/pulse/board-pack-template';
-import { latestValuePerMetric } from '@/lib/pulse/snapshot-latest';
+import { latestValuePerMetric, reliableYoyPct } from '@/lib/pulse/snapshot-latest';
 import { convertHtmlToPdf } from '@/lib/pdf/pdfshift-client';
 
 export const runtime = 'nodejs';
@@ -273,7 +273,7 @@ export async function POST(request: NextRequest) {
         total_gbp: trailing,
         prior_gbp: prior,
         delta_gbp: trailing - prior,
-        delta_pct: prior > 0 ? ((trailing - prior) / prior) * 100 : null,
+        delta_pct: reliableYoyPct(trailing, prior),
         by_metric: Object.entries(byMetric)
           .map(([metric, gbp]) => ({
             label: metric === 'total_co2e' ? 'Carbon emissions' : metric === 'water_consumption' ? 'Water consumption' : metric,
