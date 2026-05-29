@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
+
+// Both fields optional here; the enum validation + "at least one"
+// requirement stay in the handler to preserve their specific messages.
+const SubscriptionPatchSchema = z
+  .object({
+    subscription_tier: z.string().optional(),
+    subscription_status: z.string().optional(),
+  })
+  .strict();
 
 const ALLOWED_TIERS = ['seed', 'blossom', 'canopy'] as const;
 const ALLOWED_STATUSES = ['active', 'trial', 'pending', 'past_due', 'suspended', 'cancelled'] as const;
@@ -42,11 +52,14 @@ export async function PATCH(
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    const body = await request.json();
-    const { subscription_tier, subscription_status } = body as {
-      subscription_tier?: string;
-      subscription_status?: string;
-    };
+    const parsed = SubscriptionPatchSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Invalid request body', details: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+    const { subscription_tier, subscription_status } = parsed.data;
 
     if (!subscription_tier && !subscription_status) {
       return NextResponse.json(

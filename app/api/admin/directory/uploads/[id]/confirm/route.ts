@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { requireAlkateraAdmin } from '@/lib/admin/auth';
 import { parseCSV } from '@/lib/distributor/parsers/csv-parser';
@@ -14,21 +15,26 @@ import { processBulkProducts } from '@/lib/admin/directory/process-bulk-products
  * relevant bulk processor, and updates the upload row with the result
  * counts. Returns the same counts so the UI can render a summary.
  */
+const ConfirmSchema = z.object({
+  column_mapping: z.record(z.string()),
+});
+
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   const auth = await requireAlkateraAdmin();
   if (!auth.ok) return auth.response;
   const { service } = auth;
 
-  let body: { column_mapping?: unknown };
+  let raw: unknown;
   try {
-    body = await request.json();
+    raw = await request.json();
   } catch {
     return NextResponse.json({ error: 'invalid_json' }, { status: 400 });
   }
-  if (!body.column_mapping || typeof body.column_mapping !== 'object') {
+  const parsedBody = ConfirmSchema.safeParse(raw);
+  if (!parsedBody.success) {
     return NextResponse.json({ error: 'invalid_mapping' }, { status: 400 });
   }
-  const mapping = body.column_mapping as Record<string, string>;
+  const mapping = parsedBody.data.column_mapping;
 
   const { data: rowData } = await service
     .from('admin_directory_uploads')

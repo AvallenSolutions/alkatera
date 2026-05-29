@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sanitizePostgrestSearch } from '@/lib/utils/sanitize-search'
 import { getSupabaseServerClient } from '@/lib/supabase/server-client'
 import { getMemberRole } from '@/app/api/stripe/_helpers/get-member-role'
 import { generateTransactionCSV, type TransactionExportRow } from '@/lib/xero/csv-export'
@@ -65,9 +66,12 @@ export async function GET(request: NextRequest) {
       query = query.eq('upgrade_status', status)
     }
     if (search?.trim()) {
-      query = query.or(
-        `xero_contact_name.ilike.%${search.trim()}%,description.ilike.%${search.trim()}%`
-      )
+      const safeSearch = sanitizePostgrestSearch(search)
+      if (safeSearch) {
+        query = query.or(
+          `xero_contact_name.ilike.%${safeSearch}%,description.ilike.%${safeSearch}%`
+        )
+      }
     }
     if (dateFrom) {
       query = query.gte('transaction_date', dateFrom)

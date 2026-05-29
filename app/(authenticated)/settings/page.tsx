@@ -20,6 +20,7 @@ import { toast } from 'sonner'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
 import { ProfileSettings } from '@/components/settings/ProfileSettings'
+import { DataPrivacySettings } from '@/components/settings/DataPrivacySettings'
 import { TeamSettings } from '@/components/settings/TeamSettings'
 import { OrganisationSettings } from '@/components/settings/OrganisationSettings'
 import { SupportSettings } from '@/components/settings/SupportSettings'
@@ -1062,6 +1063,7 @@ export default function SettingsPage() {
 
         <TabsContent value="profile" className="space-y-4">
           <ProfileSettings showHeader={false} />
+          <DataPrivacySettings />
         </TabsContent>
 
         {isOrgAdmin && <TabsContent value="team" className="space-y-4">

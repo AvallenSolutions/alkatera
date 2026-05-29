@@ -17,6 +17,7 @@
  * explicit confirmation flow in the UI, not the tool-use loop.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { sanitizePostgrestSearch } from '@/lib/utils/sanitize-search';
 import { runSafeSql, SAFE_SQL_ALLOWED_TABLES } from './safe-sql';
 import { ALL_METRIC_KEYS, METRIC_DEFINITIONS, type MetricKey } from '@/lib/pulse/metric-keys';
 import { listMemories, saveMemory, type MemoryScope } from './memory';
@@ -1265,11 +1266,12 @@ async function toolSearchKnowledgeBank(
   }
   // Simple ilike search across title+content+tags. Good enough for Phase 1;
   // swap to embeddings later via lib/gaia/knowledge-search.ts.
+  const safeQuery = sanitizePostgrestSearch(query);
   let q = ctx.supabase
     .from('gaia_knowledge_base')
     .select('id, entry_type, title, content, category, tags, source_url, priority')
     .eq('is_active', true)
-    .or(`title.ilike.%${query}%,content.ilike.%${query}%`)
+    .or(`title.ilike.%${safeQuery}%,content.ilike.%${safeQuery}%`)
     .order('priority', { ascending: false })
     .limit(limit);
   if (input?.category) q = q.eq('category', input.category);
@@ -1303,11 +1305,12 @@ async function toolExplainMethodology(
   if (!term) {
     return { is_error: true, content: 'term is required', audit: { tool: 'explain_methodology', error: 'missing_term' } };
   }
+  const safeTerm = sanitizePostgrestSearch(term);
   const { data } = await ctx.supabase
     .from('gaia_knowledge_base')
     .select('id, title, content, category, source_url, priority')
     .eq('is_active', true)
-    .or(`title.ilike.%${term}%,content.ilike.%${term}%`)
+    .or(`title.ilike.%${safeTerm}%,content.ilike.%${safeTerm}%`)
     .order('priority', { ascending: false })
     .limit(3);
   if (!data || data.length === 0) {

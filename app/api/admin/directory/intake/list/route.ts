@@ -1,7 +1,14 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { requireAlkateraAdmin } from '@/lib/admin/auth';
 import { resolveOrCreateDirectoryEntry } from '@/lib/distributor/directory/matcher';
 import { queueDirectoryBrandsForScraping } from '@/lib/distributor/scraping/agent-dispatcher';
+
+// `lines` must be an array; non-string entries are filtered out by the
+// handler, so the element type stays permissive here.
+const IntakeListSchema = z.object({
+  lines: z.array(z.unknown()),
+});
 
 /**
  * POST /api/admin/directory/intake/list
@@ -37,21 +44,22 @@ export async function POST(request: Request) {
   const auth = await requireAlkateraAdmin();
   if (!auth.ok) return auth.response;
 
-  let body: { lines?: unknown };
+  let raw: unknown;
   try {
-    body = (await request.json()) as { lines?: unknown };
+    raw = await request.json();
   } catch {
     return NextResponse.json({ error: 'invalid_json' }, { status: 400 });
   }
 
-  if (!Array.isArray(body.lines)) {
+  const parsedBody = IntakeListSchema.safeParse(raw);
+  if (!parsedBody.success) {
     return NextResponse.json(
       { error: 'invalid_payload', detail: '`lines` must be a string array.' },
       { status: 400 },
     );
   }
 
-  const lines = (body.lines as unknown[])
+  const lines = parsedBody.data.lines
     .filter((l): l is string => typeof l === 'string')
     .map((l) => l.trim())
     .filter((l) => l.length > 0)

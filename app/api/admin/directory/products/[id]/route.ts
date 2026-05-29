@@ -1,6 +1,24 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { requireAlkateraAdmin } from '@/lib/admin/auth';
 import { recalculateCompleteness } from '@/lib/distributor/scoring/recalculate';
+
+// Shape-only schema: the handler does its own coercion + range checks
+// per field below. This rejects non-object bodies and unknown keys
+// (mass-assignment guard); numeric fields accept string or number
+// because the handler parses both.
+const ProductPatchSchema = z
+  .object({
+    name: z.string(),
+    gtin: z.union([z.string(), z.number()]).nullable(),
+    category: z.string().nullable(),
+    abv: z.union([z.string(), z.number()]).nullable(),
+    container_size_ml: z.union([z.string(), z.number()]).nullable(),
+    container_format: z.string().nullable(),
+    recipe_overview: z.string().nullable(),
+  })
+  .partial()
+  .strict();
 
 /**
  * Admin edit + delete for a directory product.
@@ -29,12 +47,20 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const auth = await requireAlkateraAdmin();
   if (!auth.ok) return auth.response;
 
-  let body: Record<string, unknown>;
+  let raw: unknown;
   try {
-    body = (await request.json()) as Record<string, unknown>;
+    raw = await request.json();
   } catch {
     return NextResponse.json({ error: 'invalid_json' }, { status: 400 });
   }
+  const parsedBody = ProductPatchSchema.safeParse(raw);
+  if (!parsedBody.success) {
+    return NextResponse.json(
+      { error: 'invalid_body', details: parsedBody.error.flatten() },
+      { status: 400 },
+    );
+  }
+  const body = parsedBody.data;
 
   const patch: Record<string, unknown> = {};
   const reject = (msg: string) => NextResponse.json({ error: msg }, { status: 400 });

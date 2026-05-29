@@ -16,11 +16,23 @@ import { randomBytes, createCipheriv, createDecipheriv } from 'crypto'
 const ALGORITHM = 'aes-256-gcm'
 const IV_LENGTH = 12
 
+let warnedWeakKey = false
+
 function getKey(): Buffer {
   const secret = process.env.INTEGRATION_CONFIG_KEY
   if (!secret) {
     throw new Error(
       'INTEGRATION_CONFIG_KEY is required for encrypting integration credentials',
+    )
+  }
+  // Security (LOW-6): a key shorter than 32 chars gets padded with '0', which
+  // weakens entropy. We keep the derivation stable (changing it would make
+  // existing ciphertext undecryptable) but warn once so the key can be rotated
+  // to a strong value, e.g. `openssl rand -hex 32`.
+  if (!warnedWeakKey && secret.length < 32) {
+    warnedWeakKey = true
+    console.warn(
+      '[config-encryption] INTEGRATION_CONFIG_KEY is shorter than 32 chars and is being padded; rotate to a 32+ byte secret (openssl rand -hex 32).',
     )
   }
   return Buffer.from(secret.padEnd(32, '0').slice(0, 32), 'utf-8')

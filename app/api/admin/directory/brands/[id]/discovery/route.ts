@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { requireAlkateraAdmin } from '@/lib/admin/auth';
+
+const DiscoveryPatchSchema = z.object({
+  discovery_opt_out: z.boolean(),
+});
 
 /**
  * PATCH /api/admin/directory/brands/[id]/discovery
@@ -14,15 +19,17 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const auth = await requireAlkateraAdmin();
   if (!auth.ok) return auth.response;
 
-  let body: { discovery_opt_out?: unknown };
+  let raw: unknown;
   try {
-    body = await request.json();
+    raw = await request.json();
   } catch {
     return NextResponse.json({ error: 'invalid_json' }, { status: 400 });
   }
-  if (typeof body.discovery_opt_out !== 'boolean') {
+  const parsed = DiscoveryPatchSchema.safeParse(raw);
+  if (!parsed.success) {
     return NextResponse.json({ error: 'invalid_body' }, { status: 400 });
   }
+  const body = parsed.data;
 
   const { error } = await auth.service
     .from('brand_directory')
