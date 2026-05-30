@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   Activity,
@@ -72,6 +72,7 @@ interface ResponsePayload {
   read: TrackerRead | null
   source: 'cache' | 'curator' | 'fallback' | 'no_tracker'
   generated_at: string
+  stale?: boolean
 }
 
 /**
@@ -90,16 +91,23 @@ export function ProgressTracker() {
   const [showSetup, setShowSetup] = useState(false)
 
   const load = useCallback(
-    async (opts: { fresh?: boolean } = {}) => {
-      if (!orgId) return
-      const params = opts.fresh ? '?fresh=1' : ''
+    async (opts: { fresh?: boolean; auto?: boolean } = {}): Promise<ResponsePayload | null> => {
+      if (!orgId) return null
+      const params = new URLSearchParams()
+      if (opts.fresh) params.set('fresh', '1')
+      // Background upgrades (mount-if-stale / realtime ticks) are budget-capped
+      // server-side; user-forced Re-pick omits auto so it bypasses the budget.
+      if (opts.fresh && opts.auto) params.set('auto', '1')
+      const qs = params.size > 0 ? `?${params.toString()}` : ''
       try {
-        const res = await fetch(`/api/rosa/progress-tracker${params}`, { credentials: 'include' })
-        if (!res.ok) return
+        const res = await fetch(`/api/rosa/progress-tracker${qs}`, { credentials: 'include' })
+        if (!res.ok) return null
         const json = (await res.json()) as ResponsePayload
         setData(json)
+        return json
       } catch {
         // keep last good state
+        return null
       } finally {
         setLoading(false)
       }
@@ -107,6 +115,20 @@ export function ProgressTracker() {
     [orgId],
   )
 
+  // Background upgrade to a freshly-curated read, guarded so overlapping
+  // triggers (mount-if-stale + a realtime tick) don't fire two Gemini calls.
+  const upgradingRef = useRef(false)
+  const maybeUpgrade = useCallback(async () => {
+    if (upgradingRef.current) return
+    upgradingRef.current = true
+    try {
+      await load({ fresh: true, auto: true })
+    } finally {
+      upgradingRef.current = false
+    }
+  }, [load])
+
+  // Re-pick: user-forced fresh read (bypasses the daily budget).
   const handleRefresh = useCallback(async () => {
     setRefreshing(true)
     try {
@@ -116,14 +138,27 @@ export function ProgressTracker() {
     }
   }, [load])
 
+  // Mount: render the instant cache/fallback, then upgrade in the background
+  // only if the server flagged it stale (or returned an uncurated fallback).
   useEffect(() => {
     if (!orgId) return
     setLoading(true)
-    void load()
-  }, [orgId, load])
+    let cancelled = false
+    void load().then(res => {
+      if (cancelled) return
+      if (res && res.status === 'ready' && (res.stale || res.source === 'fallback')) {
+        void maybeUpgrade()
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [orgId, load, maybeUpgrade])
 
-  // Live updates: when relevant tables change, the tracker should reflect
-  // the impact of the user's actions immediately.
+  // Live updates: a watched-table change means the tracker data moved, so
+  // upgrade to a fresh read. Debounced by RealtimeRefreshProvider so a write
+  // burst coalesces into one call, and budget-capped — this replaces the
+  // previous un-debounced force-fresh-on-every-event storm.
   useRealtimeRefresh(
     [
       'metric_snapshots',
@@ -133,7 +168,7 @@ export function ProgressTracker() {
       'rosa_memory',
     ],
     () => {
-      void load({ fresh: true })
+      void maybeUpgrade()
     },
   )
 
