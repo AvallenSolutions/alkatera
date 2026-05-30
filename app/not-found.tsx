@@ -5,6 +5,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, RefreshCw, Leaf, Search, Globe, Wind } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { Instrument_Sans, Instrument_Serif } from 'next/font/google';
+
+// Self-host these via next/font (build-time, preloaded, swap) instead of a
+// render-blocking third-party CSS @import to fonts.googleapis.com, which added
+// two extra DNS+TLS round-trips on the critical path of every 404 render.
+const instrumentSans = Instrument_Sans({ subsets: ['latin'], weight: ['400', '500', '600'], display: 'swap' });
+const instrumentSerif = Instrument_Serif({ subsets: ['latin'], weight: '400', style: ['normal', 'italic'], display: 'swap' });
 
 const SUSTAINABILITY_FACTS = [
   {
@@ -33,10 +40,8 @@ export default function NotFound() {
   };
 
   return (
-    <div className="relative min-h-screen w-full text-white overflow-hidden flex flex-col items-center justify-center p-6" style={{ fontFamily: "'Instrument Sans', sans-serif" }}>
+    <div className={`relative min-h-screen w-full text-white overflow-hidden flex flex-col items-center justify-center p-6 ${instrumentSans.className}`}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap');
-
         .glass-404 {
           background: rgba(255, 255, 255, 0.03);
           backdrop-filter: blur(12px);
@@ -82,7 +87,7 @@ export default function NotFound() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 1, ease: "easeOut" }}
             className="text-[180px] md:text-[240px] leading-none text-white/10 tracking-tighter"
-            style={{ fontFamily: "'Instrument Serif', serif" }}
+            style={{ fontFamily: instrumentSerif.style.fontFamily }}
           >
             404
           </motion.h1>
@@ -96,7 +101,7 @@ export default function NotFound() {
             <div className="text-center">
               <h2
                 className="text-4xl md:text-6xl text-white mb-4 text-glow italic"
-                style={{ fontFamily: "'Instrument Serif', serif" }}
+                style={{ fontFamily: instrumentSerif.style.fontFamily }}
               >
                 Lost in the ecosystem.
               </h2>

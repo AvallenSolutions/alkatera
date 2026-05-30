@@ -4,6 +4,11 @@ const nextConfig = {
     // Enable Next.js image optimisation (auto WebP/AVIF, responsive sizing, lazy loading).
     // Netlify's @netlify/plugin-nextjs handles the optimisation API in production.
     // Previously disabled with `unoptimized: true` which served all images at full resolution.
+    // AVIF first (≈20-30% smaller than WebP for the large hero JPEGs), WebP fallback.
+    // Cache optimised variants for 30 days (default 60s is far too short for our
+    // largely-static hero/marketing imagery).
+    formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 2592000,
     remotePatterns: [
       {
         protocol: 'https',
