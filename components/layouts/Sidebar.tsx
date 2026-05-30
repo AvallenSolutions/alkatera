@@ -58,6 +58,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
+import { peekBootstrapAdmin } from '@/lib/auth/bootstrap-cache'
 import { isViticultureEligible } from '@/lib/viticulture-utils'
 import { Badge } from '@/components/ui/badge'
 import { useSubscription } from '@/hooks/useSubscription'
@@ -443,6 +444,16 @@ export function Sidebar({ className }: SidebarProps) {
     if (!currentOrganization?.id) {
       setIsAlkateraAdmin(false)
       setPendingCount(0)
+      return
+    }
+
+    // On first load, OrganizationProvider's get_user_bootstrap() RPC has
+    // usually already resolved admin status + pending count and stashed them.
+    // Use that instead of firing two more RPCs. A miss falls through to live.
+    const cachedAdmin = peekBootstrapAdmin()
+    if (cachedAdmin) {
+      setIsAlkateraAdmin(cachedAdmin.isAlkateraAdmin)
+      if (isOrgAdmin) setPendingCount(cachedAdmin.pendingApprovalCount)
       return
     }
 

@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { supabase } from './supabaseClient'
 import { useAuth } from '@/hooks/useAuth'
+import { setBootstrapCache, clearBootstrapCache } from '@/lib/auth/bootstrap-cache'
 import type { User } from '@supabase/supabase-js'
 
 export interface Organization {
@@ -94,6 +95,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         setUserRole(null)
         setIsLoading(false)
         lastFetchedUserIdRef.current = null
+        clearBootstrapCache()
       }
     })
     return () => subscription.unsubscribe()
@@ -129,6 +131,90 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     isFetchingRef.current = true
     setIsLoading(true)
     try {
+      // ── Bootstrap fast-path (one round-trip) ─────────────────────────────
+      // Try the single get_user_bootstrap() RPC. On success it gives us orgs +
+      // role + subscription + admin in one call, replacing the membership →
+      // organizations → (downstream) usage/admin waterfall. On ANY failure we
+      // fall straight through to the legacy per-query path below, which is left
+      // completely intact — so a bad/missing RPC can never break login.
+      try {
+        const claimOrgId =
+          (user.app_metadata?.current_organization_id as string | undefined) ??
+          (user.user_metadata?.current_organization_id as string | undefined) ??
+          null
+        const { data: boot, error: bootError } = await supabase.rpc('get_user_bootstrap', {
+          p_current_org_id: claimOrgId,
+        })
+
+        // Strict validation — only commit if the shape is exactly what we expect.
+        if (
+          !bootError &&
+          boot &&
+          typeof boot === 'object' &&
+          !(boot as any).error &&
+          Array.isArray((boot as any).organizations)
+        ) {
+          const b = boot as any
+          const kind = b.kind as string
+
+          // Supplier: mirror the legacy supplier early-return.
+          if (kind === 'supplier') {
+            const orgs = b.organizations as Organization[]
+            if (orgs.length > 0) {
+              setOrganizations(orgs)
+              setCurrentOrganization(orgs[0])
+            }
+            setUserRole('supplier')
+            setIsLoading(false)
+            isFetchingRef.current = false
+            return
+          }
+
+          // 'none' (no memberships, not a supplier) — let the legacy path handle
+          // the is_supplier-metadata edge case + create-organization redirect.
+          if (kind === 'member' && b.organizations.length > 0) {
+            const orgs = b.organizations as Organization[]
+            const resolvedId = b.current_organization_id as string | null
+            const orgToSet = orgs.find(o => o.id === resolvedId) || orgs[0]
+
+            // Populate the hand-off cache BEFORE setting state, so the
+            // downstream useSubscription / Sidebar effects (which gate on the
+            // org id we're about to set) read it instead of firing their own RPCs.
+            // Only cache a subscription that looks valid (has a tier); anything
+            // else → null, so useSubscription falls through to its live fetch.
+            const sub = b.subscription as any
+            const validSub = sub && typeof sub === 'object' && sub.tier ? sub : null
+            setBootstrapCache(orgToSet.id, {
+              subscription: validSub,
+              isAlkateraAdmin: !!b.is_alkatera_admin,
+              pendingApprovalCount: Number(b.pending_approval_count) || 0,
+            })
+
+            setOrganizations(orgs)
+            setCurrentOrganization(orgToSet)
+            setUserRole((b.user_role as string | null) ?? null)
+
+            // Background the session-sync write (don't block first paint). Same
+            // effect as the legacy inline block, just not awaited.
+            if (orgToSet.id !== claimOrgId) {
+              void supabase.auth
+                .updateUser({ data: { current_organization_id: orgToSet.id } })
+                .then(() => persistCurrentOrg(orgToSet.id))
+                .catch(() => {})
+            }
+
+            setIsLoading(false)
+            isFetchingRef.current = false
+            return
+          }
+          // kind 'none'/'member'-with-no-orgs → fall through to legacy path.
+        }
+      } catch (bootErr) {
+        // Swallow and fall through to the legacy path — never let the bootstrap
+        // attempt itself break the boot.
+        console.warn('OrganizationContext: bootstrap RPC unavailable, using legacy path', bootErr)
+      }
+
       // Fast-path: if session metadata already flags this user as a supplier,
       // resolve immediately without waiting for membership + RPC queries.
       // This prevents the race condition where AppLayout redirects to
@@ -299,6 +385,9 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     const org = organizations.find(o => o.id === orgId)
     if (!org || !user) return
 
+    // The bootstrap hand-off cache is scoped to the previously-resolved org;
+    // clear it so post-switch subscription/admin reads go live for the new org.
+    clearBootstrapCache()
     setCurrentOrganization(org)
 
     // Write user_metadata (instant, and keeps working with the pre-migration RLS
