@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ArrowUpRight, RefreshCw, Loader2, Settings2, Sparkles, TrendingDown, TrendingUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -26,6 +26,7 @@ interface CompositeResponse {
   } | null
   source: 'curator' | 'fallback'
   generated_at: string
+  stale?: boolean
 }
 
 const BAND_TONE: Record<ScoreBand, string> = {
@@ -50,27 +51,47 @@ export function EsgVitalityScoreHero() {
   const [refreshing, setRefreshing] = useState(false)
   const [readUpgrading, setReadUpgrading] = useState(false)
 
-  const load = useCallback(async (opts: { withAiRead?: boolean } = {}) => {
-    if (!orgId) return
-    try {
-      const url = opts.withAiRead
-        ? '/api/vitality/composite?read=1'
-        : '/api/vitality/composite'
-      const res = await fetch(url, { credentials: 'include' })
-      if (!res.ok) return
-      const json = (await res.json()) as CompositeResponse
-      setData(json)
-    } catch {
-      // keep last good
-    } finally {
-      setLoading(false)
-    }
-  }, [orgId])
+  const load = useCallback(
+    async (opts: { fresh?: boolean; withAiRead?: boolean } = {}): Promise<CompositeResponse | null> => {
+      if (!orgId) return null
+      const params = new URLSearchParams()
+      if (opts.fresh) params.set('fresh', '1')
+      if (opts.withAiRead) params.set('read', '1')
+      const url = `/api/vitality/composite${params.size > 0 ? `?${params.toString()}` : ''}`
+      try {
+        const res = await fetch(url, { credentials: 'include' })
+        if (!res.ok) return null
+        const json = (await res.json()) as CompositeResponse
+        setData(json)
+        return json
+      } catch {
+        // keep last good
+        return null
+      } finally {
+        setLoading(false)
+      }
+    },
+    [orgId],
+  )
 
+  // Background recompute, guarded so mount-if-stale and a realtime tick don't
+  // fire two ~39-query recomputes at once.
+  const upgradingRef = useRef(false)
+  const maybeUpgrade = useCallback(async () => {
+    if (upgradingRef.current) return
+    upgradingRef.current = true
+    try {
+      await load({ fresh: true })
+    } finally {
+      upgradingRef.current = false
+    }
+  }, [load])
+
+  // Re-pick: user-forced recompute + AI read.
   const handleRefresh = useCallback(async () => {
     setRefreshing(true)
     try {
-      await load({ withAiRead: true })
+      await load({ fresh: true, withAiRead: true })
     } finally {
       setRefreshing(false)
     }
@@ -79,18 +100,28 @@ export function EsgVitalityScoreHero() {
   useEffect(() => {
     if (!orgId) return
     setLoading(true)
-    // Two-stage load: fast deterministic render first (~DB-time), then
-    // upgrade the read to Claude-curated in the background.
+    let cancelled = false
+    // Three-stage: instant cached composite → recompute if stale → AI read.
+    // read=1 serves off the latest snapshot (no rebuild), so the read is cheap
+    // and reflects the just-recomputed score.
     void (async () => {
-      await load()
+      const first = await load()
+      if (cancelled) return
+      if (first?.stale) {
+        await maybeUpgrade()
+        if (cancelled) return
+      }
       setReadUpgrading(true)
       try {
         await load({ withAiRead: true })
       } finally {
-        setReadUpgrading(false)
+        if (!cancelled) setReadUpgrading(false)
       }
     })()
-  }, [orgId, load])
+    return () => {
+      cancelled = true
+    }
+  }, [orgId, load, maybeUpgrade])
 
   useRealtimeRefresh(
     [
@@ -116,7 +147,10 @@ export function EsgVitalityScoreHero() {
       'organization_certifications',
     ],
     () => {
-      void load()
+      // Watched-table change → recompute in the background (debounced by the
+      // RealtimeRefreshProvider). Keeps /performance self-healing now that a
+      // plain load() only re-reads the cache.
+      void maybeUpgrade()
     },
   )
 

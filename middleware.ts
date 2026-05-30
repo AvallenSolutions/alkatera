@@ -2,6 +2,25 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  const path = request.nextUrl.pathname
+
+  // The ONLY decision this middleware makes is bouncing unauthenticated users
+  // away from the distributor portal. For every other route we previously called
+  // supabase.auth.getUser() — a network round-trip to Supabase Auth on the
+  // critical path of EVERY navigation — and then discarded the result. The
+  // authenticated app is fully client-rendered and the @supabase/ssr browser
+  // client refreshes the session into the same cookies the server reads, so no
+  // middleware-side token refresh is needed. Skip all of it for non-distributor
+  // paths so the rest of the app (Rosa, dashboard, products…) pays zero auth
+  // latency at the edge.
+  if (!path.startsWith('/distributor')) {
+    return NextResponse.next({
+      request: {
+        headers: request.headers,
+      },
+    })
+  }
+
   let response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -54,18 +73,15 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Refresh session if expired - required for Server Components
+  // Refresh the session and read the user — only needed for the distributor
+  // gate below (the (distributor)/layout.tsx still does the robust check
+  // including a distributor_members lookup; this is just the fast bounce).
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Distributor portal: bounce unauthenticated users to the distributor
-  // login page. The (distributor)/layout.tsx still does a robust check
-  // including a distributor_members lookup — this middleware bounce is just
-  // the fast path so unauth users never hit a server component first.
-  const path = request.nextUrl.pathname
   const isDistributorAuthPage = /^\/distributor\/(login|signup|password-reset|update-password)(\/|$)/.test(path)
-  if (path.startsWith('/distributor') && !isDistributorAuthPage && !user) {
+  if (!isDistributorAuthPage && !user) {
     const redirectUrl = new URL('/distributor/login', request.url)
     return NextResponse.redirect(redirectUrl)
   }

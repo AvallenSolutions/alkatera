@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { TrendingDown, TrendingUp, Activity } from 'lucide-react'
 import { useUserDisplayName } from '@/lib/rosa/useUserDisplayName'
 import { useOrganization } from '@/lib/organizationContext'
@@ -27,6 +27,7 @@ interface CompositeResponse {
   } | null
   source: 'curator' | 'fallback'
   generated_at: string
+  stale?: boolean
 }
 
 const BAND_VISUALS: Record<ScoreBand, {
@@ -108,19 +109,40 @@ export function VitalityHero() {
   const [readUpgrading, setReadUpgrading] = useState(false)
   const [readUpgraded, setReadUpgraded] = useState(false)
 
-  const load = useCallback(async () => {
-    if (!orgId) return
+  const load = useCallback(
+    async (opts: { fresh?: boolean } = {}): Promise<CompositeResponse | null> => {
+      if (!orgId) return null
+      try {
+        const res = await fetch(
+          `/api/vitality/composite${opts.fresh ? '?fresh=1' : ''}`,
+          { credentials: 'include' },
+        )
+        if (!res.ok) return null
+        const json = (await res.json()) as CompositeResponse
+        setData(json)
+        return json
+      } catch {
+        // keep last good
+        return null
+      } finally {
+        setLoading(false)
+      }
+    },
+    [orgId],
+  )
+
+  // Background recompute, guarded so mount-if-stale and a realtime tick don't
+  // fire two ~39-query recomputes at once.
+  const upgradingRef = useRef(false)
+  const maybeUpgrade = useCallback(async () => {
+    if (upgradingRef.current) return
+    upgradingRef.current = true
     try {
-      const res = await fetch('/api/vitality/composite', { credentials: 'include' })
-      if (!res.ok) return
-      const json = (await res.json()) as CompositeResponse
-      setData(json)
-    } catch {
-      // keep last good
+      await load({ fresh: true })
     } finally {
-      setLoading(false)
+      upgradingRef.current = false
     }
-  }, [orgId])
+  }, [load])
 
   // When the user opens the breakdown modal, fetch an AI-curated read in
   // the background. The hero's headline/copy is templated and renders
@@ -158,11 +180,21 @@ export function VitalityHero() {
     [upgradeReadIfNeeded, data?.composite?.composite, data?.composite?.band],
   )
 
+  // Mount: render the instant stored composite, then recompute in the
+  // background only if the server flagged it stale (older than the soft
+  // window or from a previous day).
   useEffect(() => {
     if (!orgId) return
     setLoading(true)
-    void load()
-  }, [orgId, load])
+    let cancelled = false
+    void load().then(res => {
+      if (cancelled) return
+      if (res?.stale) void maybeUpgrade()
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [orgId, load, maybeUpgrade])
 
   // Live updates: any of these tables changing should refresh the score.
   useRealtimeRefresh(
@@ -190,7 +222,10 @@ export function VitalityHero() {
       'organizations',
     ],
     () => {
-      void load()
+      // A watched-table change moved the underlying data → recompute in the
+      // background. Debounced by RealtimeRefreshProvider so a write burst
+      // coalesces into a single recompute.
+      void maybeUpgrade()
     },
   )
 
