@@ -1,43 +1,61 @@
-import { useQuery } from '@tanstack/react-query';
-import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
-import { useOrganization } from '@/lib/organizationContext';
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabaseClient'
 
-export interface ActivityStreamEntry {
-  id: string;
-  type: string;
-  description: string;
-  created_at: string;
-  actor: string | null;
+export interface ActivityEvent {
+  event_id: string
+  organization_id: string
+  event_type: string
+  event_timestamp: string
+  actor_name: string
+  actor_email: string | null
+  details: Record<string, any>
 }
 
-// Migrated to TanStack Query — see hooks/data/useProductSpotlight.ts for the recipe.
-async function fetchActivityStream(orgId: string, limit: number): Promise<ActivityStreamEntry[]> {
-  const supabase = getSupabaseBrowserClient();
-  const { data: rows, error } = await supabase
-    .from('activity_stream_view')
-    .select('*')
-    .eq('organization_id', orgId)
-    .order('created_at', { ascending: false })
-    .limit(limit);
-  if (error) throw error;
-  return (rows as ActivityStreamEntry[]) ?? [];
+interface UseActivityStreamResult {
+  data: ActivityEvent[] | null
+  isLoading: boolean
+  error: Error | null
+  refetch: () => Promise<void>
 }
 
-export function useActivityStream(limit = 10) {
-  const { currentOrganization } = useOrganization();
-  const orgId = currentOrganization?.id;
+export function useActivityStream(limit: number = 10): UseActivityStreamResult {
+  const [data, setData] = useState<ActivityEvent[] | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
 
-  const { data, isLoading, error, refetch } = useQuery<ActivityStreamEntry[]>({
-    queryKey: ['activity-stream', orgId, limit],
-    queryFn: () => fetchActivityStream(orgId as string, limit),
-    enabled: !!orgId,
-    staleTime: 60_000,
-  });
+  const fetchActivityStream = async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
+
+      const { data: activityData, error: activityError } = await supabase
+        .from('activity_stream_view')
+        .select('*')
+        .order('event_timestamp', { ascending: false })
+        .limit(limit)
+
+      if (activityError) {
+        throw new Error(activityError.message)
+      }
+
+      setData(activityData as ActivityEvent[])
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch activity stream'
+      setError(new Error(errorMessage))
+      console.error('Error fetching activity stream:', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchActivityStream()
+  }, [limit])
 
   return {
-    data: data ?? [],
+    data,
     isLoading,
-    error: error ? (error instanceof Error ? error.message : 'Failed to fetch activity') : null,
-    refetch,
-  };
+    error,
+    refetch: fetchActivityStream,
+  }
 }
