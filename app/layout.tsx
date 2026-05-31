@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { Inter, Lora, JetBrains_Mono, Playfair_Display } from 'next/font/google';
 import { AuthProvider } from '@/components/providers/AuthProvider';
+import { QueryProvider } from '@/components/providers/QueryProvider';
 import { OrganizationProvider } from '@/lib/organizationContext';
 import { Toaster } from '@/components/ui/toaster';
 import { Toaster as SonnerToaster } from '@/components/ui/sonner';
@@ -164,13 +165,15 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange={false}
           >
-            <AuthProvider>
-              <OrganizationProvider>
-                {children}
-                <Toaster />
-                <SonnerToaster />
-              </OrganizationProvider>
-            </AuthProvider>
+            <QueryProvider>
+              <AuthProvider>
+                <OrganizationProvider>
+                  {children}
+                  <Toaster />
+                  <SonnerToaster />
+                </OrganizationProvider>
+              </AuthProvider>
+            </QueryProvider>
           </ThemeProvider>
         </PostHogProvider>
         <CookieConsent />
