@@ -388,6 +388,82 @@ describe('calculateScope3', () => {
     expect(result.logistics).toBe(result.downstream_logistics);
     expect(result.marketing).toBe(result.marketing_materials);
   });
+
+  // ── Concurrency characterisation (locks the parallelised loops) ──────────
+  // These prove that running the per-product lookups via Promise.all (instead of
+  // a serial for-await loop) still accumulates every product's contribution and
+  // produces the exact same sum. Order-preserving: Promise.all resolves in array
+  // order, so the in-order sum is bit-identical to the previous sequential `+=`.
+
+  it('should sum products across MULTIPLE production logs (concurrent path)', async () => {
+    const mockSupabase = createMockSupabase({
+      production_logs: {
+        data: [
+          { product_id: 'p1', units_produced: 100 },
+          { product_id: 'p2', units_produced: 200 },
+          { product_id: 'p3', units_produced: 300 },
+        ],
+        error: null,
+      },
+      // Every per-product LCA lookup resolves to scope3 = 7 per unit.
+      product_carbon_footprints: {
+        data: {
+          aggregated_impacts: { breakdown: { by_scope: { scope3: 7 } } },
+        },
+        error: null,
+      },
+      corporate_reports: { data: null, error: null },
+      fleet_activities: { data: [], error: null },
+    });
+
+    const result = await calculateScope3(
+      mockSupabase as any,
+      'org-123',
+      2024,
+      '2024-01-01',
+      '2024-12-31'
+    );
+
+    // (100 + 200 + 300) units * 7 kgCO2e = 4200 — all three concurrent tasks
+    // must be accumulated, in order, for this to hold.
+    expect(result.products).toBe(4200);
+  });
+
+  it('should sum products across MULTIPLE fallback products, skipping zero-scope3 (concurrent path)', async () => {
+    const mockSupabase = createMockSupabase({
+      // Empty production logs forces the per-product fallback path.
+      production_logs: { data: [], error: null },
+      // allPEIs array: three distinct completed products with different scope3.
+      product_carbon_footprints: {
+        data: [
+          { id: 'lca-1', product_id: 'p1', status: 'completed', updated_at: '2024-03-01', aggregated_impacts: { breakdown: { by_scope: { scope3: 2 } } } },
+          { id: 'lca-2', product_id: 'p2', status: 'completed', updated_at: '2024-03-01', aggregated_impacts: { breakdown: { by_scope: { scope3: 5 } } } },
+          { id: 'lca-3', product_id: 'p3', status: 'completed', updated_at: '2024-03-01', aggregated_impacts: { breakdown: { by_scope: { scope3: 0 } } } },
+        ],
+        error: null,
+      },
+      // Each product's production-volume cascade resolves to 10 via prod sites.
+      product_carbon_footprint_production_sites: {
+        data: [{ production_volume: 10 }],
+        error: null,
+      },
+      corporate_reports: { data: null, error: null },
+      fleet_activities: { data: [], error: null },
+    });
+
+    const result = await calculateScope3(
+      mockSupabase as any,
+      'org-123',
+      2024,
+      '2024-01-01',
+      '2024-12-31'
+    );
+
+    // p1: 2 * 10 = 20, p2: 5 * 10 = 50, p3: scope3 = 0 → skipped (0).
+    // Total products = 70, proving concurrent fallback tasks accumulate in order
+    // and the scope3 <= 0 skip contributes nothing.
+    expect(result.products).toBe(70);
+  });
 });
 
 // ============================================================================
