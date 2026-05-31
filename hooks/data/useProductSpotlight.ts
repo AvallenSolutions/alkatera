@@ -18,9 +18,10 @@ export interface ProductSpotlightItem {
  *
  *   1. Extract the fetch body verbatim into a module-level async `queryFn`
  *      (orgId in, mapped data out) — identical queries, so output is unchanged.
- *   2. useQuery({ queryKey: ['<resource>', orgId, ...params], queryFn,
+ *   2. useQuery<T>({ queryKey: ['<resource>', orgId, ...params], queryFn,
  *      enabled: !!orgId, staleTime }). queryKey convention: resource name first,
- *      then the org id, then any other params (year, etc.).
+ *      then the org id, then any other params (year, etc.). ALWAYS pass the
+ *      explicit <T> generic — without it consumers see `data` as `any`.
  *   3. PRESERVE the hook's existing public return shape exactly (field names and
  *      types) so consumers don't change. Map react-query's {data,isLoading,error,
  *      refetch} back onto the legacy shape ({products,loading,error,refetch} here).
@@ -56,7 +57,7 @@ async function fetchProductSpotlight(organizationId: string): Promise<ProductSpo
 
   // 2. Fetch PCFs for those products (non-fatal — products show even without PCF data)
   // Table uses: functional_unit (not declared_unit), individual total_ghg_* phase columns (not total_co2e)
-  let pcfMap = new Map<string, { status: string; total_co2e: number; functional_unit: string | null }>();
+  const pcfMap = new Map<string, { status: string; total_co2e: number; functional_unit: string | null }>();
   try {
     const { data: pcfData, error: pcfError } = await supabase
       .from('product_carbon_footprints')
@@ -133,8 +134,10 @@ export function useProductSpotlight() {
   // Preserve the original public shape so consumers (ProductSpotlight.tsx) and
   // the realtime refresh wiring need no changes. isLoading is false when the
   // query is disabled (no org), matching the old "no org → loading false".
+  const products: ProductSpotlightItem[] = data ?? [];
+
   return {
-    products: data ?? [],
+    products,
     loading: isLoading,
     error: error ? (error instanceof Error ? error.message : 'Failed to fetch products') : null,
     refetch,
