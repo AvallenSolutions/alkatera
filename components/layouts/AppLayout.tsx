@@ -8,7 +8,7 @@ import { useSubscription } from '@/hooks/useSubscription'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { SupplierLayout } from './SupplierLayout'
-import { Loader2 } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { PaymentWarningBanner } from '@/components/subscription/PaymentWarningBanner'
 import { UnreadRepliesBanner } from '@/components/feedback/UnreadRepliesBanner'
@@ -18,6 +18,7 @@ import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard'
 import { SupplierOnboardingProvider } from '@/lib/supplier-onboarding'
 import { SupplierOnboardingWizard } from '@/components/supplier-onboarding/SupplierOnboardingWizard'
 import { RosaContextProvider } from '@/lib/rosa/RosaContextProvider'
+import { RealtimeRefreshProvider } from '@/lib/rosa/RealtimeRefreshProvider'
 import { RosaDrawer } from '@/components/rosa/RosaDrawer'
 import { RosaTrigger } from '@/components/rosa/RosaTrigger'
 
@@ -34,11 +35,61 @@ export function AppLayout({ children, requireOrganization = true }: AppLayoutPro
   return (
     <OnboardingProvider>
       <RosaContextProvider>
-        <AppLayoutInner requireOrganization={requireOrganization}>
-          {children}
-        </AppLayoutInner>
+        <RealtimeRefreshProvider>
+          <AppLayoutInner requireOrganization={requireOrganization}>
+            {children}
+          </AppLayoutInner>
+        </RealtimeRefreshProvider>
       </RosaContextProvider>
     </OnboardingProvider>
+  )
+}
+
+// Full app-shell skeleton shown while auth/org resolve. A skeleton that mirrors
+// the real layout (sidebar + header + content) reads as "the app is loading"
+// far better than a blank full-screen spinner, which is the single biggest
+// perceived-latency complaint on cold loads (Rosa is the landing page).
+function AppShellSkeleton() {
+  return (
+    <div className="flex h-screen overflow-hidden bg-background">
+      {/* Sidebar (hidden on mobile, where it's off-canvas) */}
+      <aside className="hidden lg:flex w-64 flex-col gap-2 border-r border-border bg-sidebar px-3 py-4">
+        <div className="mb-6 px-2">
+          <Skeleton className="h-10 w-32" />
+          <Skeleton className="mt-2 h-3 w-28" />
+        </div>
+        <div className="space-y-1.5">
+          {Array.from({ length: 11 }).map((_, i) => (
+            <Skeleton key={i} className="h-9 w-full rounded-md" />
+          ))}
+        </div>
+      </aside>
+
+      {/* Main column */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Header */}
+        <div className="flex h-16 shrink-0 items-center justify-between border-b border-border px-4 sm:px-6 lg:px-8">
+          <Skeleton className="h-8 w-44" />
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-9 w-9 rounded-full" />
+            <Skeleton className="h-9 w-9 rounded-full" />
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto bg-background">
+          <div className="container mx-auto space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+            <Skeleton className="h-9 w-64" />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-32 w-full rounded-xl" />
+              ))}
+            </div>
+            <Skeleton className="h-64 w-full rounded-xl" />
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -116,14 +167,7 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
   // --- Render gates: show loading spinner until we KNOW who the user is ---
 
   if (authLoading || isOrganizationLoading) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-12 w-12 animate-spin text-neon-lime" />
-          <p className="text-sm text-muted-foreground font-data">Loading...</p>
-        </div>
-      </main>
-    )
+    return <AppShellSkeleton />
   }
 
   if (!user) {

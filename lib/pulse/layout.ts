@@ -49,6 +49,86 @@ export function bucketForRole(role: Role): LayoutBucket {
 }
 
 /**
+ * Persona presets -- the default Pulse experience.
+ *
+ * Instead of asking every user to assemble a 24-widget grid, Pulse opens on a
+ * small, curated, read-only view tuned to one of three audiences. The full
+ * draggable grid still exists behind the "Advanced" toggle (see PulseGrid).
+ *
+ * Each preset is an ordered list of widget ids. The persona grid renders them
+ * as a static CSS grid (footprint drives col/row span), so order is the only
+ * layout concern here. Exempt widgets are allowed in a preset -- the persona
+ * grid renders any id with a registered renderer, not just grid widgets.
+ */
+export type Persona = 'founder' | 'cfo' | 'sustainability';
+
+/** A persona view, or the full customisable grid. */
+export type PulseView = Persona | 'advanced';
+
+export interface PersonaMeta {
+  id: Persona;
+  label: string;
+  /** One-line, plain-language framing shown under the header. */
+  blurb: string;
+  /** Ordered widget ids shown in this persona's curated grid. */
+  widgets: WidgetId[];
+}
+
+export const PERSONAS: Record<Persona, PersonaMeta> = {
+  founder: {
+    id: 'founder',
+    label: 'Founder',
+    blurb:
+      'The two-second view: how are we doing, what is it costing, and what needs attention.',
+    widgets: [
+      'insight-card',
+      'financial-footprint',
+      'target-trajectory',
+      'grid-carbon',
+      'alerts-inbox',
+      'peer-benchmark',
+      'supplier-hotspots',
+    ],
+  },
+  cfo: {
+    id: 'cfo',
+    label: 'CFO',
+    blurb:
+      'Your environmental footprint in pounds: liability, intensity, regulatory exposure and audit-ready disclosure.',
+    widgets: [
+      'financial-footprint',
+      'cost-intensity',
+      'regulatory-exposure',
+      'scenario-sensitivity',
+      'carbon-budgets',
+      'top-cost-drivers',
+      'issb-disclosure',
+      'impact-valuation',
+      'peer-benchmark',
+    ],
+  },
+  sustainability: {
+    id: 'sustainability',
+    label: 'Sustainability lead',
+    blurb:
+      'The operational picture: progress to target, anomalies, supplier hotspots and the cheapest ways to cut carbon.',
+    widgets: [
+      'target-trajectory',
+      'alerts-inbox',
+      'supplier-hotspots',
+      'facility-impact',
+      'csrd-gaps',
+      'macc',
+      'what-if',
+      'grid-carbon',
+      'regulatory-exposure',
+    ],
+  },
+};
+
+export const DEFAULT_PERSONA: Persona = 'founder';
+
+/**
  * Just the widget id + column position. Uniform-grid layouts are just an
  * ordered list; y/height/width are derived from the registry footprint.
  */

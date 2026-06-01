@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import pdfParse from 'pdf-parse';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+import { rateLimit } from '@/lib/rate-limit';
 import {
   buildExtractionRequest,
   detectMode,
@@ -51,6 +52,11 @@ export async function POST(request: NextRequest) {
     const { client, user, error: authError } = await getSupabaseAPIClient();
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const rl = await rateLimit(`smart-import:${user.id}`, 10, 60_000);
+    if (!rl.success) {
+      return NextResponse.json({ error: 'Rate limit exceeded. Please wait a moment and try again.' }, { status: 429 });
     }
 
     const formData = await request.formData();

@@ -219,7 +219,7 @@ export default function BlogDashboard() {
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            You don&apos;t have permission to access the blog dashboard. Only Alkatera administrators can manage blog posts.
+            You don&apos;t have permission to access the blog dashboard. Only alkatera administrators can manage blog posts.
           </AlertDescription>
         </Alert>
       </div>
@@ -245,7 +245,7 @@ export default function BlogDashboard() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Blog Management</h1>
-          <p className="text-muted-foreground">Manage blog posts for the AlkaTera Knowledge Hub</p>
+          <p className="text-muted-foreground">Manage blog posts for the alkatera Knowledge Hub</p>
         </div>
         <Button asChild>
           <Link href="/admin/blog/new">

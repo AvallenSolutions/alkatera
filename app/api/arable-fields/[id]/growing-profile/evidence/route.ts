@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
 
@@ -16,6 +17,20 @@ export async function GET(
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
+    }
+
+    const organizationId = await resolveAccessibleOrg(supabase, user);
+    if (!organizationId) {
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    }
+
+    const { data: parent } = await supabase
+      .from('arable_fields')
+      .select('organization_id')
+      .eq('id', params.id)
+      .maybeSingle();
+    if (!parent || parent.organization_id !== organizationId) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
     const profileId = request.nextUrl.searchParams.get('profile_id');
@@ -100,18 +115,19 @@ export async function POST(
     }
 
     // Look up org membership
-    let organizationId = user.user_metadata?.current_organization_id;
+    const organizationId = await resolveAccessibleOrg(supabase, user);
     if (!organizationId) {
-      const { data: membership } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-      if (!membership) {
-        return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
-      }
-      organizationId = membership.organization_id;
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    }
+
+    // Verify the parent field belongs to the caller's org
+    const { data: parent } = await supabase
+      .from('arable_fields')
+      .select('organization_id')
+      .eq('id', params.id)
+      .maybeSingle();
+    if (!parent || parent.organization_id !== organizationId) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
     // Generate unique storage path
@@ -176,6 +192,21 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
     }
 
+    const organizationId = await resolveAccessibleOrg(supabase, user);
+    if (!organizationId) {
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    }
+
+    // Verify the parent field belongs to the caller's org
+    const { data: parent } = await supabase
+      .from('arable_fields')
+      .select('organization_id')
+      .eq('id', params.id)
+      .maybeSingle();
+    if (!parent || parent.organization_id !== organizationId) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
     const evidenceId = request.nextUrl.searchParams.get('evidence_id');
     if (!evidenceId) {
       return NextResponse.json({ error: 'evidence_id is required' }, { status: 400 });
@@ -202,7 +233,8 @@ export async function DELETE(
     const { error: deleteError } = await supabase
       .from('arable_soil_carbon_evidence')
       .delete()
-      .eq('id', evidenceId);
+      .eq('id', evidenceId)
+      .eq('arable_field_id', params.id);
 
     if (deleteError) {
       console.error('[ArableSoilEvidence DELETE] Error:', deleteError);

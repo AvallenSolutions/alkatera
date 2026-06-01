@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { sanitizePostgrestSearch } from '@/lib/utils/sanitize-search';
 import { filterDrinksRelevantProcesses, searchWithAliases, filterAgribalyseProcesses, searchAgribalyseWithAliases } from '@/lib/openlca/drinks-process-filter';
 import { createOpenLCAClientForDatabase, isAgribalyseConfigured } from '@/lib/openlca/client';
 import { INGREDIENT_ALIASES, PACKAGING_ALIASES } from '@/lib/openlca/drinks-aliases';
@@ -560,10 +561,11 @@ export async function GET(request: NextRequest) {
 
       // SOURCE 3: Ecoinvent Material Proxies (pre-calculated)
       (async () => {
+        const safeQuery = sanitizePostgrestSearch(normalizedQuery);
         const { data: proxies, error } = await supabase
           .from('ecoinvent_material_proxies')
           .select('*')
-          .or(`material_name.ilike.%${normalizedQuery}%,ecoinvent_process_name.ilike.%${normalizedQuery}%`)
+          .or(`material_name.ilike.%${safeQuery}%,ecoinvent_process_name.ilike.%${safeQuery}%`)
           .order('material_name')
           .limit(10);
 

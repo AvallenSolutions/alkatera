@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { requireAlkateraAdmin } from '@/lib/admin/auth';
+
+const VerificationPatchSchema = z.object({
+  status: z.enum(['verified', 'rejected', 'pending']),
+  reason: z.string().optional().nullable(),
+});
 
 /**
  * PATCH /api/admin/directory/brands/[id]/verification
@@ -14,20 +20,21 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const auth = await requireAlkateraAdmin();
   if (!auth.ok) return auth.response;
 
-  let body: { status?: unknown; reason?: unknown };
+  let raw: unknown;
   try {
-    body = await request.json();
+    raw = await request.json();
   } catch {
     return NextResponse.json({ error: 'invalid_json' }, { status: 400 });
   }
-  const status = body.status;
-  if (status !== 'verified' && status !== 'rejected' && status !== 'pending') {
+  const parsed = VerificationPatchSchema.safeParse(raw);
+  if (!parsed.success) {
     return NextResponse.json(
       { error: 'invalid_status', detail: "status must be 'verified', 'rejected' or 'pending'" },
       { status: 400 },
     );
   }
-  const reason = typeof body.reason === 'string' ? body.reason.slice(0, 500) : null;
+  const { status } = parsed.data;
+  const reason = typeof parsed.data.reason === 'string' ? parsed.data.reason.slice(0, 500) : null;
 
   const now = new Date().toISOString();
   const brandPatch: Record<string, unknown> = {

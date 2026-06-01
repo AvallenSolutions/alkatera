@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useOrganization } from "@/lib/organizationContext";
+import { peekBootstrapSubscription } from "@/lib/auth/bootstrap-cache";
 
 // ── Module-level cache for subscription_tier_limits (static reference data) ──
 let _cachedTiers: TierLimits[] | null = null;
@@ -214,6 +215,21 @@ export function useSubscription() {
 
     async function fetchSubscriptionData() {
       try {
+        // On the very first load (refreshKey 0), OrganizationProvider's
+        // get_user_bootstrap() RPC has usually already fetched this org's usage
+        // and stashed it. Use it instead of firing a duplicate RPC. Explicit
+        // refresh() (refreshKey > 0) always goes live so post-mutation counts
+        // are fresh. A miss falls straight through to the live fetch.
+        if (refreshKey === 0) {
+          const cachedUsage = peekBootstrapSubscription(orgId!);
+          if (cachedUsage) {
+            const tiers = await getCachedTierLimits();
+            if (cancelled) return;
+            setState({ usage: cachedUsage, allTiers: tiers, isLoading: false, error: null });
+            return;
+          }
+        }
+
         // Tier limits are static reference data — use module-level cache.
         // Only the per-org usage RPC needs to run on every org switch.
         const [usageResult, tiers] = await Promise.all([

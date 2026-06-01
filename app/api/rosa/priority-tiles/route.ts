@@ -3,9 +3,9 @@
  *
  * GET /api/rosa/priority-tiles?fresh=1&snoozed=queue,deadline
  *
- * Builds a signal pack for the calling user's org, asks Claude to pick up
- * to three tiles via forced tool_use, validates the output, caches per
- * (org, user), and returns. On any failure the route returns a
+ * Builds a signal pack for the calling user's org, asks Gemini to pick up
+ * to three tiles via forced function-calling, validates the output, caches
+ * per (org, user), and returns. On any failure the route returns a
  * deterministic fallback computed from the same signals so the page
  * always renders.
  */
@@ -13,7 +13,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { FunctionCallingMode } from '@google/generative-ai'
 import { getSupabaseServerClient } from '@/lib/supabase/server-client'
+import { rateLimit } from '@/lib/rate-limit'
 import { buildOrgSignalPack, stableStringify, type OrgSignalPack } from '@/lib/rosa/priority-signals'
 import {
   buildCuratorSystemPrompt,
@@ -24,13 +26,21 @@ import {
   validateCuratedTiles,
   type CuratedTile,
 } from '@/lib/rosa/priority-tiles-validate'
+import {
+  getGeminiClient,
+  toGeminiFunctionDeclarations,
+  GEMINI_ROSA_MODEL,
+} from '@/lib/ai/gemini'
 
 export const runtime = 'nodejs'
 export const maxDuration = 30
 
-const MODEL = 'claude-sonnet-4-6'
 const MAX_OUTPUT_TOKENS = 1500
-const CACHE_TTL_MS = 60 * 60 * 1000 // 1 hour
+// Soft-stale window: a cached row older than this is still served INSTANTLY,
+// but flagged `stale` so the client kicks off a background ?fresh=1&auto=1
+// upgrade. Freshness bound for signals NOT in the client's realtime watch list
+// (watched-table changes upgrade immediately via a tick).
+const STALE_SOFT_MS = 5 * 60 * 1000
 const DAILY_BUDGET_PER_USER = 50
 
 interface ReadinessSummary {
@@ -45,6 +55,10 @@ interface ResponsePayload {
   source: 'cache' | 'curator' | 'fallback'
   generated_at: string
   signals_hash: string
+  // True when the client should kick off a background ?fresh=1&auto=1 to
+  // upgrade what it just rendered (cache older than STALE_SOFT_MS, or an
+  // uncurated deterministic fallback).
+  stale: boolean
   readiness?: ReadinessSummary
   drops?: Array<{ index: number; reason: string }>
 }
@@ -357,34 +371,46 @@ function fallbackTiles(
 }
 
 /**
- * Call Claude with the curator prompt + signal pack. Returns the raw
- * tool_use input (or null if the call fails / Claude doesn't call the
- * tool).
+ * Call Gemini with the curator prompt + signal pack. Returns the raw
+ * function-call args (or null if the call fails / the model doesn't call
+ * the function).
  */
-async function curateWithClaude(pack: OrgSignalPack): Promise<unknown | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+async function curateWithGemini(pack: OrgSignalPack): Promise<unknown | null> {
+  const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) return null
 
-  const Anthropic = (await import('@anthropic-ai/sdk')).default
-  const client = new Anthropic({ apiKey })
-
   try {
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: MAX_OUTPUT_TOKENS,
-      system: buildCuratorSystemPrompt(),
-      tools: [SET_PRIORITY_TILES_TOOL],
-      tool_choice: { type: 'tool', name: SET_PRIORITY_TILES_TOOL.name },
-      messages: [
+    const client = getGeminiClient(apiKey)
+    const model = client.getGenerativeModel({
+      model: GEMINI_ROSA_MODEL,
+      systemInstruction: buildCuratorSystemPrompt(),
+      tools: toGeminiFunctionDeclarations([SET_PRIORITY_TILES_TOOL]),
+      toolConfig: {
+        functionCallingConfig: {
+          mode: FunctionCallingMode.ANY,
+          allowedFunctionNames: [SET_PRIORITY_TILES_TOOL.name],
+        },
+      },
+      generationConfig: { maxOutputTokens: MAX_OUTPUT_TOKENS },
+    })
+
+    const result = await model.generateContent({
+      contents: [
         {
           role: 'user',
-          content: formatSignalPackForPrompt(pack),
+          parts: [{ text: formatSignalPackForPrompt(pack) }],
         },
       ],
     })
-    const toolUse = response.content.find(c => c.type === 'tool_use')
-    if (!toolUse || toolUse.type !== 'tool_use') return null
-    return toolUse.input
+
+    for (const cand of result.response.candidates ?? []) {
+      for (const part of cand.content?.parts ?? []) {
+        if ((part as any).functionCall?.name === SET_PRIORITY_TILES_TOOL.name) {
+          return (part as any).functionCall.args ?? null
+        }
+      }
+    }
+    return null
   } catch (err) {
     console.error('[priority-tiles] curator call failed:', err)
     return null
@@ -429,8 +455,17 @@ export async function GET(req: NextRequest) {
   if ('error' in ctx) return ctx.error
   const { userId, organizationId, service } = ctx
 
+  const rl = await rateLimit(`rosa-priority-tiles:${userId}`, 30, 60_000)
+  if (!rl.success) {
+    return NextResponse.json({ error: 'Rate limit exceeded. Please wait a moment and try again.' }, { status: 429 })
+  }
+
   const url = new URL(req.url)
   const fresh = url.searchParams.get('fresh') === '1'
+  // `auto` marks a background upgrade (mount-if-stale / realtime tick) vs a
+  // user-forced Re-pick. Auto upgrades respect the daily Gemini budget; a
+  // user-forced fresh bypasses it (as before).
+  const isAuto = url.searchParams.get('auto') === '1'
   const dump = url.searchParams.get('dump') === '1'
   const snoozedRaw = url.searchParams.get('snoozed') ?? ''
   const snoozedKinds = snoozedRaw
@@ -439,7 +474,45 @@ export async function GET(req: NextRequest) {
     .filter(Boolean)
     .slice(0, 16)
 
-  // Build the signal pack first so we can hash it for cache lookup.
+  // ── INSTANT READ PATH ──────────────────────────────────────────────────
+  // Serve cached tiles immediately WITHOUT building the ~31-query signal pack
+  // or calling Gemini. The client renders this instantly, then if `stale`
+  // issues a background ?fresh=1&auto=1. We drop the signals-hash gate here on
+  // purpose (computing it needs the pack, which defeats the point); freshness
+  // is bounded by STALE_SOFT_MS plus the client's realtime-tick upgrades.
+  if (!fresh && !dump) {
+    try {
+      const { data: cached } = await service
+        .from('rosa_priority_tile_cache')
+        .select('tiles_json, readiness_json, signals_hash, generated_at')
+        .eq('organization_id', organizationId)
+        .eq('user_id', userId)
+        .maybeSingle()
+      // Only short-circuit once readiness_json is populated; a legacy row
+      // (null readiness_json) falls through to a rebuild that upgrades it.
+      if (cached && cached.tiles_json && cached.readiness_json) {
+        const ageMs = Date.now() - new Date(cached.generated_at).getTime()
+        const payload: ResponsePayload = {
+          tiles: cached.tiles_json as CuratedTile[],
+          source: 'cache',
+          generated_at: cached.generated_at,
+          signals_hash: (cached.signals_hash as string) ?? '',
+          stale: ageMs > STALE_SOFT_MS,
+          readiness: cached.readiness_json as ReadinessSummary,
+        }
+        return NextResponse.json(payload, {
+          headers: { 'Cache-Control': 'no-store' },
+        })
+      }
+    } catch (err) {
+      // Cache table/column may not exist yet (migration not run). Continue.
+      console.warn('[priority-tiles] cache lookup failed:', err)
+    }
+  }
+
+  // ── BUILD PATH ─────────────────────────────────────────────────────────
+  // Reached on ?fresh=1, ?dump=1, a cold cache, or a legacy row missing
+  // readiness_json. Build the signal pack once.
   const pack = await buildOrgSignalPack(service, {
     organizationId,
     userId,
@@ -447,69 +520,87 @@ export async function GET(req: NextRequest) {
   })
   const signalsHash = hashSignalPack(pack)
 
-  // Debug: ?dump=1 returns the raw pack without calling Claude. Useful
-  // for verifying signal coverage during development.
+  // Debug: ?dump=1 returns the raw pack without calling Gemini.
   if (dump) {
     return NextResponse.json({ pack, signals_hash: signalsHash })
   }
 
-  // Cache lookup unless ?fresh=1
-  if (!fresh) {
+  const readiness: ReadinessSummary = {
+    next_layer: pack.readiness.next_layer_to_address,
+    facility_data: pack.readiness.foundation.facility_data,
+    recipes_status: pack.readiness.recipes.status,
+    why: pack.readiness.why_this_layer,
+  }
+
+  // Shared cache writer (tiles + readiness + hash).
+  const writeCache = async (tilesToCache: CuratedTile[]) => {
     try {
-      const { data: cached } = await service
-        .from('rosa_priority_tile_cache')
-        .select('tiles_json, signals_hash, generated_at')
-        .eq('organization_id', organizationId)
-        .eq('user_id', userId)
-        .maybeSingle()
-      if (cached) {
-        const ageMs = Date.now() - new Date(cached.generated_at).getTime()
-        const same = cached.signals_hash === signalsHash
-        if (same && ageMs < CACHE_TTL_MS) {
-          const payload: ResponsePayload = {
-            tiles: cached.tiles_json as CuratedTile[],
-            source: 'cache',
-            generated_at: cached.generated_at,
-            signals_hash: cached.signals_hash,
-            readiness: {
-              next_layer: pack.readiness.next_layer_to_address,
-              facility_data: pack.readiness.foundation.facility_data,
-              recipes_status: pack.readiness.recipes.status,
-              why: pack.readiness.why_this_layer,
-            },
-          }
-          return NextResponse.json(payload, {
-            headers: { 'Cache-Control': 'no-store' },
-          })
-        }
-      }
+      await service.from('rosa_priority_tile_cache').upsert(
+        {
+          organization_id: organizationId,
+          user_id: userId,
+          tiles_json: tilesToCache,
+          readiness_json: readiness,
+          signals_hash: signalsHash,
+          generated_at: new Date().toISOString(),
+        },
+        { onConflict: 'organization_id,user_id' },
+      )
     } catch (err) {
-      // Cache table may not exist yet (migration not run). Continue.
-      console.warn('[priority-tiles] cache lookup failed:', err)
+      console.warn('[priority-tiles] cache write failed:', err)
     }
   }
 
-  // Daily budget guard
-  const usedToday = await curationsToday(service, organizationId, userId)
-  if (!fresh && usedToday >= DAILY_BUDGET_PER_USER) {
+  // Non-fresh build (cold cache / legacy row): return the deterministic
+  // fallback INSTANTLY and seed the cache. No Gemini here — the client follows
+  // up with a background ?fresh=1&auto=1 to curate.
+  if (!fresh) {
     const tiles = fallbackTiles(pack, organizationId, userId)
+    await writeCache(tiles)
     await logTelemetry(service, organizationId, userId, 'tile.fallback', {
-      reason: 'daily_budget_exceeded',
-      used_today: usedToday,
+      reason: 'cold_cache_seed',
+      next_layer_to_address: pack.readiness.next_layer_to_address,
     })
     const payload: ResponsePayload = {
       tiles,
       source: 'fallback',
       generated_at: new Date().toISOString(),
       signals_hash: signalsHash,
+      stale: true,
+      readiness,
     }
     return NextResponse.json(payload, {
       headers: { 'Cache-Control': 'no-store' },
     })
   }
 
-  // Curate via Claude
-  const rawCurated = await curateWithClaude(pack)
+  // ── FRESH (CURATION) PATH ──────────────────────────────────────────────
+  // Auto upgrades respect the daily budget → over budget returns the fallback
+  // without calling Gemini (and without clobbering an existing curated cache).
+  if (isAuto) {
+    const usedToday = await curationsToday(service, organizationId, userId)
+    if (usedToday >= DAILY_BUDGET_PER_USER) {
+      const tiles = fallbackTiles(pack, organizationId, userId)
+      await logTelemetry(service, organizationId, userId, 'tile.fallback', {
+        reason: 'daily_budget_exceeded',
+        used_today: usedToday,
+      })
+      const payload: ResponsePayload = {
+        tiles,
+        source: 'fallback',
+        generated_at: new Date().toISOString(),
+        signals_hash: signalsHash,
+        stale: false,
+        readiness,
+      }
+      return NextResponse.json(payload, {
+        headers: { 'Cache-Control': 'no-store' },
+      })
+    }
+  }
+
+  // Curate via Gemini.
+  const rawCurated = await curateWithGemini(pack)
   let tiles: CuratedTile[] = []
   let drops: Array<{ index: number; reason: string }> = []
   let source: ResponsePayload['source'] = 'curator'
@@ -539,41 +630,21 @@ export async function GET(req: NextRequest) {
     await logTelemetry(service, organizationId, userId, 'tile.curated', {
       tile_count: tiles.length,
       drops,
-      source: fresh ? 'manual_refresh' : 'auto',
+      source: isAuto ? 'auto' : 'manual_refresh',
       kinds: tiles.map(t => t.kind),
       next_layer_to_address: nextLayer,
     })
   }
 
-  // Persist to cache (best-effort)
-  try {
-    await service
-      .from('rosa_priority_tile_cache')
-      .upsert(
-        {
-          organization_id: organizationId,
-          user_id: userId,
-          tiles_json: tiles,
-          signals_hash: signalsHash,
-          generated_at: new Date().toISOString(),
-        },
-        { onConflict: 'organization_id,user_id' },
-      )
-  } catch (err) {
-    console.warn('[priority-tiles] cache write failed:', err)
-  }
+  await writeCache(tiles)
 
   const payload: ResponsePayload = {
     tiles,
     source,
     generated_at: new Date().toISOString(),
     signals_hash: signalsHash,
-    readiness: {
-      next_layer: pack.readiness.next_layer_to_address,
-      facility_data: pack.readiness.foundation.facility_data,
-      recipes_status: pack.readiness.recipes.status,
-      why: pack.readiness.why_this_layer,
-    },
+    stale: false,
+    readiness,
     drops: drops.length > 0 ? drops : undefined,
   }
   return NextResponse.json(payload, {

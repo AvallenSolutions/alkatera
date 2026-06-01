@@ -2,6 +2,42 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  const path = request.nextUrl.pathname
+
+  // Demo / procurement-only dev port (e.g. 8890): anything that isn't the
+  // procurement portal redirects to it, so the dev server we hand to Foodbuy
+  // can't reach the marketing site or main app. Dev-only — gated on the :8890
+  // host, so it is inert in production (which uses path-prefix routing).
+  const host = request.headers.get('host') || ''
+  const procurementOnlyHost = host.endsWith(':8890') || host.includes('procurement.localhost')
+  if (
+    procurementOnlyHost &&
+    !path.startsWith('/procurement') &&
+    !path.startsWith('/foodbuy/') &&
+    !path.startsWith('/api/procurement') &&
+    !path.startsWith('/_next') &&
+    !path.startsWith('/favicon') &&
+    !path.startsWith('/icon')
+  ) {
+    return NextResponse.redirect(new URL('/procurement/foodbuy/login', request.url))
+  }
+
+  // Perf: the only edge decisions are bouncing unauthenticated users away from
+  // the distributor and procurement portals. For every other route we used to
+  // call supabase.auth.getUser() — a network round-trip to Supabase Auth on the
+  // critical path of EVERY navigation — and discard the result. The
+  // authenticated app is client-rendered and the @supabase/ssr browser client
+  // refreshes the session into the same cookies the server reads, so no
+  // middleware-side refresh is needed. Skip it for non-portal paths so the rest
+  // of the app (Rosa, dashboard, products…) pays zero auth latency at the edge.
+  if (!path.startsWith('/distributor') && !path.startsWith('/procurement')) {
+    return NextResponse.next({
+      request: {
+        headers: request.headers,
+      },
+    })
+  }
+
   let response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -54,36 +90,15 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Refresh session if expired - required for Server Components
+  // Refresh the session and read the user — only needed for the distributor /
+  // procurement gates below (the portal layouts still do the robust member
+  // lookups; this is just the fast bounce so unauth users never hit a server
+  // component first).
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const path = request.nextUrl.pathname
-
-  // Demo / procurement-only dev port (e.g. 8890): anything that isn't
-  // the procurement portal redirects to it. This stops the marketing
-  // site, main app /login, dashboard etc. from being reachable on the
-  // dev server we hand to Foodbuy. Production uses path-prefix routing
-  // on the main domain; this guard is dev-only.
-  const host = request.headers.get('host') || ''
-  const procurementOnlyHost = host.endsWith(':8890') || host.includes('procurement.localhost')
-  if (
-    procurementOnlyHost &&
-    !path.startsWith('/procurement') &&
-    !path.startsWith('/foodbuy/') &&
-    !path.startsWith('/api/procurement') &&
-    !path.startsWith('/_next') &&
-    !path.startsWith('/favicon') &&
-    !path.startsWith('/icon')
-  ) {
-    return NextResponse.redirect(new URL('/procurement/foodbuy/login', request.url))
-  }
-
-  // Distributor portal: bounce unauthenticated users to the distributor
-  // login page. The (distributor)/layout.tsx still does a robust check
-  // including a distributor_members lookup — this middleware bounce is just
-  // the fast path so unauth users never hit a server component first.
+  // Distributor portal: bounce unauthenticated users to the distributor login.
   const isDistributorAuthPage = /^\/distributor\/(login|signup|password-reset|update-password)(\/|$)/.test(path)
   if (path.startsWith('/distributor') && !isDistributorAuthPage && !user) {
     const redirectUrl = new URL('/distributor/login', request.url)

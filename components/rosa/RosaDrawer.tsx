@@ -51,8 +51,19 @@ const MAX_WIDTH = 600
  * to Rosa on every send so she can answer page-specific questions.
  */
 export function RosaDrawer() {
+  const { isOpen } = useRosaContext()
+  // Only mount the body (and therefore useRosaConversation, which fetches
+  // recent conversation history on mount) when the drawer is actually open.
+  // The drawer is mounted on every authenticated page, so gating here stops
+  // a /api/rosa/conversations/recent fetch firing on every page load while
+  // the drawer is invisible. Pinned implies isOpen=true (RosaContextProvider),
+  // so auto-open + auto-resume for pinned users is preserved.
+  if (!isOpen) return null
+  return <RosaDrawerBody />
+}
+
+function RosaDrawerBody() {
   const {
-    isOpen,
     isPinned,
     width,
     close,
@@ -132,8 +143,6 @@ export function RosaDrawer() {
     const sorted = [...slices].sort((a, b) => b.priority - a.priority)
     return sorted[0]
   }, [slices])
-
-  if (!isOpen) return null
 
   const isConversing = conv.turns.length > 0
 

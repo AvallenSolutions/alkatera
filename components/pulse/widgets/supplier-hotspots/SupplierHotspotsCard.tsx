@@ -13,8 +13,13 @@ interface SupplierRow {
 }
 
 interface ApiPayload {
-  totals: { supplier_coverage_pct: number; supplier_attributed_t_co2e: number };
+  totals: {
+    supplier_coverage_pct: number;
+    supplier_attributed_t_co2e: number;
+    product_count?: number;
+  };
   by_supplier: SupplierRow[];
+  empty_reason?: string;
 }
 
 export function SupplierHotspotsCard() {
@@ -83,8 +88,10 @@ export function SupplierHotspotsCard() {
           ))}
         </ul>
       ) : (
-        <div className="flex h-full items-center justify-center text-[10px] uppercase tracking-wider text-muted-foreground/50">
-          Need completed LCAs
+        <div className="flex h-full items-center justify-center px-2 text-center text-[10px] uppercase tracking-wider text-muted-foreground/50">
+          {(data?.totals.product_count ?? 0) > 0
+            ? 'Link materials to suppliers to attribute Scope 3'
+            : 'Add a completed product LCA to begin'}
         </div>
       )}
     </PulseCard>

@@ -39,6 +39,7 @@ import {
 import { Navigation } from '@/marketing/components/Navigation';
 import { Footer } from '@/marketing/components/Footer';
 import { cn } from '@/lib/utils';
+import { Brand } from '@/components/shared/Brand';
 
 /* ═══════════════════════════════════════════
    Hero
@@ -212,7 +213,7 @@ const SolutionOverview = () => (
         transition={{ delay: 0.1 }}
         className="text-gray-400 max-w-[640px] mx-auto leading-relaxed font-light mb-12"
       >
-        Alkatera replaces the spreadsheet chaos, the consultancy invoices, and
+        <Brand /> replaces the spreadsheet chaos, the consultancy invoices, and
         the reporting headaches with a single intelligent platform. We go far
         beyond carbon — measuring water, waste, land use, biodiversity, and
         circularity — so you can build a sustainability programme that&apos;s
@@ -536,7 +537,7 @@ const MeasureSection = () => (
           transition={{ delay: 0.1 }}
           className="text-gray-400 max-w-[640px] leading-relaxed font-light"
         >
-          While others count carbon alone, Alkatera quantifies the full picture
+          While others count carbon alone, <Brand /> quantifies the full picture
           — environmental, social, and governance — because genuine
           sustainability demands all three.
         </motion.p>
@@ -747,7 +748,7 @@ const FrameworksSection = () => (
         transition={{ delay: 0.1 }}
         className="text-gray-400 max-w-[640px] mx-auto leading-relaxed font-light mb-14"
       >
-        Stop juggling separate tools for each reporting standard. Alkatera maps
+        Stop juggling separate tools for each reporting standard. <Brand /> maps
         your data to every major framework automatically.
       </motion.p>
       <div className="flex flex-wrap justify-center gap-4">
@@ -831,7 +832,7 @@ const DrinksSection = () => (
             transition={{ delay: 0.1 }}
             className="text-gray-400 max-w-[540px] leading-relaxed font-light mb-10"
           >
-            This isn&apos;t a generic sustainability calculator. Alkatera is
+            This isn&apos;t a generic sustainability calculator. <Brand /> is
             engineered from the ground up for the unique science, supply chains,
             and processes of the drinks industry.
           </motion.p>

@@ -394,7 +394,7 @@ function MessageBubble({
           >
             <div className="flex items-center gap-2 mb-1">
               <span className="text-sm font-medium">
-                {isAdmin ? "Alkatera Support" : message.sender_name || "You"}
+                {isAdmin ? "alkatera Support" : message.sender_name || "You"}
               </span>
               {isAdmin && (
                 <Badge variant="secondary" className="text-xs">

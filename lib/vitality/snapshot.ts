@@ -58,6 +58,11 @@ function isoDate(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
+/** Today's date as YYYY-MM-DD in the server's local zone (UTC in prod). */
+export function todayIso(): string {
+  return isoDate(new Date())
+}
+
 function buildEmptyWeeks(): TrendPoint[] {
   const now = startOfWeek(new Date())
   const out: TrendPoint[] = []
@@ -76,8 +81,10 @@ export async function upsertSnapshot(
   service: SupabaseClient,
   organizationId: string,
   composite: VitalityComposite,
+  // Caller passes the same `today` it used for any read so reader/writer never
+  // disagree across a midnight boundary mid-request.
+  today: string = isoDate(new Date()),
 ): Promise<void> {
-  const today = isoDate(new Date())
   const row = {
     organization_id: organizationId,
     snapshot_date: today,
@@ -91,6 +98,10 @@ export async function upsertSnapshot(
       g: composite.g.sub,
     },
     weights: composite.weights,
+    // Full composite (incl. *_breakdown explainers) so the instant read path
+    // can serve this verbatim without re-running the pillar builders.
+    composite_json: composite,
+    composite_generated_at: composite.generated_at,
   }
   try {
     await service
@@ -99,6 +110,43 @@ export async function upsertSnapshot(
   } catch (err) {
     // Best-effort: never block the response on a snapshot write.
     console.warn('[esg snapshot] upsert failed:', err)
+  }
+}
+
+/**
+ * Load the most recent stored composite (today's if present, else the latest
+ * prior day). Returns null when there's no snapshot yet, or the row predates
+ * the composite_json column being populated (→ caller recomputes). Powers the
+ * instant read path so the hero never blocks on the ~39-query recompute except
+ * on a true cold start.
+ */
+export async function loadLatestSnapshot(
+  service: SupabaseClient,
+  organizationId: string,
+): Promise<{
+  composite: VitalityComposite
+  snapshot_date: string
+  composite_generated_at: string | null
+} | null> {
+  try {
+    const { data, error } = await service
+      .from('esg_score_snapshots')
+      .select('composite_json, composite_generated_at, snapshot_date')
+      .eq('organization_id', organizationId)
+      .order('snapshot_date', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (error || !data || !data.composite_json) return null
+    const composite = data.composite_json as VitalityComposite
+    return {
+      composite,
+      snapshot_date: data.snapshot_date as string,
+      composite_generated_at:
+        (data.composite_generated_at as string | null) ?? composite.generated_at ?? null,
+    }
+  } catch {
+    // Column may not exist yet (migration not run) — fall back to recompute.
+    return null
   }
 }
 

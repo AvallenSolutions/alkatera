@@ -14,6 +14,7 @@
 
 import { SupabaseClient } from '@supabase/supabase-js';
 import { GRID_FACTORS_BY_COUNTRY } from '@/lib/grid-emission-factors';
+import { getXeroResolvedEmissions } from '@/lib/xero/resolved-emissions';
 
 // ============================================================================
 // TYPES
@@ -309,23 +310,31 @@ export async function calculateScope3(
     .lte('date', yearEnd);
 
   if (productionData && productionData.length > 0) {
-    // Use production logs when available
-    for (const log of productionData) {
-      if (!log.units_produced || log.units_produced <= 0) continue;
+    // Use production logs when available.
+    // Each log's LCA lookup is independent, so run them concurrently instead of
+    // serially (was N sequential round-trips). Contributions are collected in
+    // array order and summed afterwards, so the accumulation is bit-identical to
+    // the previous sequential `breakdown.products += …` loop. Promise.all (not
+    // allSettled) preserves the original throw-on-error behaviour.
+    const productContributions = await Promise.all(
+      productionData.map(async (log) => {
+        if (!log.units_produced || log.units_produced <= 0) return 0;
 
-      const { data: lca } = await supabase
-        .from('product_carbon_footprints')
-        .select('aggregated_impacts')
-        .eq('product_id', log.product_id)
-        .eq('status', 'completed')
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        const { data: lca } = await supabase
+          .from('product_carbon_footprints')
+          .select('aggregated_impacts')
+          .eq('product_id', log.product_id)
+          .eq('status', 'completed')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      const scope3PerUnit = lca?.aggregated_impacts?.breakdown?.by_scope?.scope3 || 0;
-      if (scope3PerUnit > 0) {
-        breakdown.products += scope3PerUnit * log.units_produced;
-      }
+        const scope3PerUnit = lca?.aggregated_impacts?.breakdown?.by_scope?.scope3 || 0;
+        return scope3PerUnit > 0 ? scope3PerUnit * log.units_produced : 0;
+      })
+    );
+    for (const contribution of productContributions) {
+      breakdown.products += contribution;
     }
   } else {
     // Fallback: match Company Emissions page logic exactly
@@ -346,79 +355,92 @@ export async function calculateScope3(
         }
       }
 
-      for (const [productId, lca] of Array.from(latestByProduct.entries())) {
-        if (lca.status !== 'completed') continue;
+      // Each product's production-volume cascade is independent of the others,
+      // so resolve the per-product cascades concurrently (was up to 5 sequential
+      // round-trips × N products). The cascade INSIDE each product stays
+      // sequential and unchanged (prodSites → cmAllocs → assignments → fpv →
+      // sessions, each gated on the previous returning 0), preserving the exact
+      // unitsProduced resolution order. Contributions are summed in array order
+      // afterwards so accumulation is bit-identical to the previous loop, and
+      // Promise.all (not allSettled) preserves throw-on-error behaviour.
+      const fallbackContributions = await Promise.all(
+        Array.from(latestByProduct.entries()).map(async ([productId, lca]) => {
+          if (lca.status !== 'completed') return 0;
 
-        const scope3PerUnit = lca.aggregated_impacts?.breakdown?.by_scope?.scope3 || 0;
-        if (scope3PerUnit <= 0) continue;
+          const scope3PerUnit = lca.aggregated_impacts?.breakdown?.by_scope?.scope3 || 0;
+          if (scope3PerUnit <= 0) return 0;
 
-        // Get production volume from production sites (Facility Allocation)
-        const { data: prodSites } = await supabase
-          .from('product_carbon_footprint_production_sites')
-          .select('production_volume')
-          .eq('product_carbon_footprint_id', lca.id);
+          // Get production volume from production sites (Facility Allocation)
+          const { data: prodSites } = await supabase
+            .from('product_carbon_footprint_production_sites')
+            .select('production_volume')
+            .eq('product_carbon_footprint_id', lca.id);
 
-        let unitsProduced = 0;
-        if (prodSites && prodSites.length > 0) {
-          unitsProduced = Math.max(...prodSites.map((s: any) => Number(s.production_volume || 0)));
-        }
-
-        // Also check contract manufacturer allocations
-        if (unitsProduced === 0) {
-          const { data: cmAllocs } = await supabase
-            .from('contract_manufacturer_allocations')
-            .select('client_production_volume')
-            .eq('product_id', Number(productId) || productId)
-            .eq('organization_id', organizationId);
-
-          if (cmAllocs && cmAllocs.length > 0) {
-            const cmMax = Math.max(...cmAllocs.map((a: any) => Number(a.client_production_volume || 0)));
-            unitsProduced = Math.max(unitsProduced, cmMax);
+          let unitsProduced = 0;
+          if (prodSites && prodSites.length > 0) {
+            unitsProduced = Math.max(...prodSites.map((s: any) => Number(s.production_volume || 0)));
           }
-        }
 
-        // Fallback: check facility_production_volumes (new table), then sessions (legacy)
-        if (unitsProduced === 0) {
-          const { data: assignments } = await supabase
-            .from('facility_product_assignments')
-            .select('facility_id')
-            .eq('product_id', Number(productId) || productId)
-            .eq('assignment_status', 'active');
+          // Also check contract manufacturer allocations
+          if (unitsProduced === 0) {
+            const { data: cmAllocs } = await supabase
+              .from('contract_manufacturer_allocations')
+              .select('client_production_volume')
+              .eq('product_id', Number(productId) || productId)
+              .eq('organization_id', organizationId);
 
-          if (assignments && assignments.length > 0) {
-            const facilityIds = assignments.map((a: any) => a.facility_id);
-
-            // Try new facility_production_volumes table first
-            const { data: fpvRows } = await supabase
-              .from('facility_production_volumes')
-              .select('production_volume')
-              .in('facility_id', facilityIds)
-              .order('reporting_period_end', { ascending: false })
-              .limit(1);
-
-            if (fpvRows && fpvRows.length > 0) {
-              unitsProduced = Number(fpvRows[0].production_volume || 0);
+            if (cmAllocs && cmAllocs.length > 0) {
+              const cmMax = Math.max(...cmAllocs.map((a: any) => Number(a.client_production_volume || 0)));
+              unitsProduced = Math.max(unitsProduced, cmMax);
             }
+          }
 
-            // Legacy fallback: facility_reporting_sessions
-            if (unitsProduced === 0) {
-              const { data: sessions } = await supabase
-                .from('facility_reporting_sessions')
-                .select('total_production_volume')
+          // Fallback: check facility_production_volumes (new table), then sessions (legacy)
+          if (unitsProduced === 0) {
+            const { data: assignments } = await supabase
+              .from('facility_product_assignments')
+              .select('facility_id')
+              .eq('product_id', Number(productId) || productId)
+              .eq('assignment_status', 'active');
+
+            if (assignments && assignments.length > 0) {
+              const facilityIds = assignments.map((a: any) => a.facility_id);
+
+              // Try new facility_production_volumes table first
+              const { data: fpvRows } = await supabase
+                .from('facility_production_volumes')
+                .select('production_volume')
                 .in('facility_id', facilityIds)
                 .order('reporting_period_end', { ascending: false })
                 .limit(1);
 
-              if (sessions && sessions.length > 0) {
-                unitsProduced = Number(sessions[0].total_production_volume || 0);
+              if (fpvRows && fpvRows.length > 0) {
+                unitsProduced = Number(fpvRows[0].production_volume || 0);
+              }
+
+              // Legacy fallback: facility_reporting_sessions
+              if (unitsProduced === 0) {
+                const { data: sessions } = await supabase
+                  .from('facility_reporting_sessions')
+                  .select('total_production_volume')
+                  .in('facility_id', facilityIds)
+                  .order('reporting_period_end', { ascending: false })
+                  .limit(1);
+
+                if (sessions && sessions.length > 0) {
+                  unitsProduced = Number(sessions[0].total_production_volume || 0);
+                }
               }
             }
           }
-        }
 
-        if (unitsProduced === 0) unitsProduced = 1;
+          if (unitsProduced === 0) unitsProduced = 1;
 
-        breakdown.products += scope3PerUnit * unitsProduced;
+          return scope3PerUnit * unitsProduced;
+        })
+      );
+      for (const contribution of fallbackContributions) {
+        breakdown.products += contribution;
       }
     }
   }
@@ -592,13 +614,26 @@ export async function calculateCorporateEmissions(
   const yearEnd = `${year}-12-31`;
 
   // Calculate all scopes
-  const [scope1, scope2, scope3] = await Promise.all([
+  const [scope1Base, scope2Base, scope3Base, xero] = await Promise.all([
     calculateScope1(supabase, organizationId, yearStart, yearEnd),
     calculateScope2(supabase, organizationId, yearStart, yearEnd),
     calculateScope3(supabase, organizationId, year, yearStart, yearEnd),
+    getXeroResolvedEmissions(supabase, organizationId, yearStart, yearEnd),
   ]);
 
-  const total = scope1 + scope2 + scope3.total;
+  // Xero spend-based emissions, post coverage-resolver suppression. The
+  // resolver already drops any Xero row that overlaps a utility / overhead /
+  // LCA / inventory-ledger row for the same (scope slice, month), so adding
+  // these totals here is double-count-free by construction.
+  const scope1 = scope1Base + xero.totalScope1Kg;
+  const scope2 = scope2Base + xero.totalScope2Kg;
+  const scope3Total = scope3Base.total + xero.totalScope3Kg;
+  const scope3: Scope3Breakdown = {
+    ...scope3Base,
+    total: scope3Total,
+  };
+
+  const total = scope1 + scope2 + scope3Total;
 
   return {
     year,

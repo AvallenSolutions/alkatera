@@ -116,7 +116,7 @@ export default function BlogPage() {
             </p>
 
             <p className="text-gray-300 leading-relaxed mb-6">
-              Modern platforms like Alkatera are bridging this gap by automating data collection, applying industry-specific calculation methodologies, and providing audit trails that satisfy both regulators and retailers. The result is faster, cheaper, and more defensible reporting.
+              Modern platforms like alkatera are bridging this gap by automating data collection, applying industry-specific calculation methodologies, and providing audit trails that satisfy both regulators and retailers. The result is faster, cheaper, and more defensible reporting.
             </p>
 
             <h2 className="font-serif text-3xl md:text-4xl mt-16 mb-6 text-white">
@@ -153,7 +153,7 @@ export default function BlogPage() {
           >
             <h3 className="font-serif text-3xl mb-4">Ready to transform your sustainability reporting?</h3>
             <p className="text-gray-400 mb-8">
-              See how Alkatera can automate your carbon footprint calculation and turn compliance into a competitive advantage.
+              See how alkatera can automate your carbon footprint calculation and turn compliance into a competitive advantage.
             </p>
             <Link href="/getaccess" className="inline-block bg-[#ccff00] text-black px-8 py-4 rounded-full font-mono text-sm font-bold uppercase tracking-widest hover:bg-white transition-colors">
               Get Access

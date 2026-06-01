@@ -97,11 +97,16 @@ export function monetise(
   if (!Number.isFinite(amount)) return null;
 
   const locale = price.currency === 'GBP' ? 'en-GB' : price.currency === 'EUR' ? 'en-IE' : 'en-US';
+  // Use compact notation above £100k, keeping 1 decimal so £2,525,000 reads
+  // "£2.5M" rather than rounding to "£3M" (which looked inconsistent with the
+  // metric's own value, e.g. "1.0M m³ at £2.50"). Below that, whole pounds for
+  // £1k+ and pennies under £1k.
+  const compact = Math.abs(amount) >= 100_000;
   const formatted = amount.toLocaleString(locale, {
     style: 'currency',
     currency: price.currency,
-    maximumFractionDigits: Math.abs(amount) >= 1000 ? 0 : 2,
-    notation: Math.abs(amount) >= 100_000 ? 'compact' : 'standard',
+    notation: compact ? 'compact' : 'standard',
+    maximumFractionDigits: compact ? 1 : Math.abs(amount) >= 1000 ? 0 : 2,
   });
 
   const rateFormatted = price.price_per_unit.toLocaleString(locale, {

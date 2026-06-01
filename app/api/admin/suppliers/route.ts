@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { createClient } from '@supabase/supabase-js';
+
+const SupplierLookupSchema = z.object({
+  platform_supplier_id: z.string().min(1),
+});
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 /**
  * POST /api/admin/suppliers
@@ -33,12 +39,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
-    const platformSupplierId: string = body.platform_supplier_id;
+    // Gate to alka**tera** admins only. The service-role client bypasses RLS,
+    // so the admin check must be explicit. Use a token-scoped client so the
+    // is_alkatera_admin() RPC resolves auth.uid().
+    const userScoped = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { persistSession: false },
+    });
+    const { data: isAdmin } = await userScoped.rpc('is_alkatera_admin');
+    if (!isAdmin) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
-    if (!platformSupplierId) {
+    const parsed = SupplierLookupSchema.safeParse(await request.json());
+    if (!parsed.success) {
       return NextResponse.json({ error: 'platform_supplier_id is required' }, { status: 400 });
     }
+    const platformSupplierId = parsed.data.platform_supplier_id;
 
     // Step 1: Get the platform supplier's contact email and user_id
     const { data: platformSupplier, error: psError } = await adminClient

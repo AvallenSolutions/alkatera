@@ -466,7 +466,7 @@ export default function AdminFactorsPage() {
           <Shield className="h-4 w-4" />
           <AlertTitle>Access Denied</AlertTitle>
           <AlertDescription>
-            You need Alkatera admin privileges to access the factor management dashboard.
+            You need alkatera admin privileges to access the factor management dashboard.
           </AlertDescription>
         </Alert>
       </div>

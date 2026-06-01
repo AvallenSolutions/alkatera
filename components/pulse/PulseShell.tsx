@@ -1,13 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
-import { Activity, MessageSquare, PoundSterling, RefreshCw, Sparkles } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Activity, MessageSquare, PoundSterling, RefreshCw } from 'lucide-react';
 import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PulseGrid } from '@/components/pulse/PulseGrid';
+import { PulsePersonaGrid } from '@/components/pulse/PulsePersonaGrid';
+import { PulsePersonaToggle } from '@/components/pulse/PulsePersonaToggle';
+import { PulseVitalityHero } from '@/components/pulse/PulseVitalityHero';
+import { PERSONAS, DEFAULT_PERSONA, type PulseView } from '@/lib/pulse/layout';
 import {
   PulseRealtimeProvider,
   usePulseRealtimeContext,
@@ -33,6 +36,10 @@ import { HarvestSeasonsExpandedSlot } from '@/components/pulse/widgets/harvest-s
 import { ProductEnvCostExpandedSlot } from '@/components/pulse/widgets/product-env-cost/expanded';
 import { SupplierHotspotsExpandedSlot } from '@/components/pulse/widgets/supplier-hotspots/expanded';
 import { LiveActivityExpandedSlot } from '@/components/pulse/widgets/live-activity/expanded';
+// Financial-only drill slots -- surfaced by the CFO persona view.
+import { CostIntensityExpandedSlot } from '@/components/pulse/widgets/cost-intensity/expanded';
+import { IssbDisclosureExpandedSlot } from '@/components/pulse/widgets/issb-disclosure/expanded';
+import { ImpactValuationExpandedSlot } from '@/components/pulse/widgets/impact-valuation/expanded';
 import { usePulseDrillUrl } from '@/hooks/usePulseDrillUrl';
 import { LiveMetricsStrip } from '@/components/pulse/widgets/LiveMetricsStrip';
 import { AskRosaWidget } from '@/components/pulse/widgets/AskRosaWidget';
@@ -57,6 +64,35 @@ export function PulseShell() {
   );
 }
 
+const VIEW_STORAGE_KEY = 'pulse:view';
+
+/** Persona/view preference, persisted per-browser in localStorage. */
+function usePulseView(): [PulseView, (next: PulseView) => void] {
+  const [view, setView] = useState<PulseView>(DEFAULT_PERSONA);
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(VIEW_STORAGE_KEY);
+      if (saved === 'advanced' || (saved && saved in PERSONAS)) {
+        setView(saved as PulseView);
+      }
+    } catch {
+      // localStorage unavailable -- fall back to the default persona.
+    }
+  }, []);
+
+  const update = useCallback((next: PulseView) => {
+    setView(next);
+    try {
+      window.localStorage.setItem(VIEW_STORAGE_KEY, next);
+    } catch {
+      // Ignore persistence failures -- the in-memory choice still applies.
+    }
+  }, []);
+
+  return [view, update];
+}
+
 /**
  * Inner shell body. Separated so we can call hooks that need the drill context
  * (URL sync) without moving the provider up a layer.
@@ -64,6 +100,8 @@ export function PulseShell() {
 function PulseShellBody() {
   // Two-way sync between ?drill= query param and drill context.
   usePulseDrillUrl();
+
+  const [view, setView] = usePulseView();
 
   const { activeTarget, open: drillOpen } = useWidgetDrill();
   const rosaSlice = useMemo(
@@ -73,21 +111,21 @@ function PulseShellBody() {
       priority: 6,
       data: {
         activeDrill: drillOpen && activeTarget ? activeTarget : null,
-        view: 'main',
+        view,
       },
     }),
-    [activeTarget, drillOpen],
+    [activeTarget, drillOpen, view],
   );
   useRosaPageContext(rosaSlice);
 
   return (
     <>
       <div className="space-y-6 pb-12">
-        <PulseHeader />
-        <PulseHero />
+        <PulseHeader view={view} onChangeView={setView} />
+        <PulseVitalityHero />
         {/* Full-width KPI strip sits above the grid -- doesn't fit the card metaphor. */}
         <LiveMetricsStrip />
-        <PulseGrid />
+        {view === 'advanced' ? <PulseGrid /> : <PulsePersonaGrid persona={view} />}
         {/* Rosa chat sits below, full width -- also exempt from the grid. */}
         <AskRosaWidget />
       </div>
@@ -111,56 +149,71 @@ function PulseShellBody() {
       <ProductEnvCostExpandedSlot />
       <SupplierHotspotsExpandedSlot />
       <LiveActivityExpandedSlot />
+      <CostIntensityExpandedSlot />
+      <IssbDisclosureExpandedSlot />
+      <ImpactValuationExpandedSlot />
       {/* Full-page overlay. Mounted once at shell level. */}
       <WidgetDrillOverlay />
     </>
   );
 }
 
-function PulseHeader() {
+function PulseHeader({
+  view,
+  onChangeView,
+}: {
+  view: PulseView;
+  onChangeView: (next: PulseView) => void;
+}) {
+  const subtitle =
+    view === 'advanced'
+      ? 'Build your own view from every available metric. Drag, pin and customise.'
+      : PERSONAS[view].blurb;
+
   return (
-    <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <div className="flex items-center gap-2">
-          <Activity className="h-6 w-6 text-[#ccff00]" aria-hidden="true" />
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground">
-            Pulse
-          </h1>
-          <Badge
-            variant="outline"
-            className="border-[#ccff00]/40 bg-[#ccff00]/10 text-[10px] font-semibold uppercase tracking-wider text-[#ccff00]"
-          >
-            Beta
-          </Badge>
+    <header className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <Activity className="h-6 w-6 text-[#ccff00]" aria-hidden="true" />
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+              Pulse
+            </h1>
+            <Badge
+              variant="outline"
+              className="border-[#ccff00]/40 bg-[#ccff00]/10 text-[10px] font-semibold uppercase tracking-wider text-[#ccff00]"
+            >
+              Beta
+            </Badge>
+          </div>
+          <p className="mt-1 max-w-xl text-sm text-muted-foreground">{subtitle}</p>
         </div>
-        <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-          Your sustainability, live. Drag, resize and customise the widgets to match how
-          you work.
-        </p>
+
+        <div className="flex items-center gap-2">
+          <ConnectionHeartbeat />
+          <RefreshPulseButton />
+          <Button asChild variant="default" size="sm" className="bg-[#ccff00] text-black hover:bg-[#b8e600]">
+            <Link href="/pulse/financial/">
+              <PoundSterling className="mr-2 h-4 w-4" />
+              Financial view
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/pulse/settings/shadow-prices/">
+              <PoundSterling className="mr-2 h-4 w-4" />
+              Prices
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/settings/feedback/">
+              <MessageSquare className="mr-2 h-4 w-4" />
+              Beta feedback
+            </Link>
+          </Button>
+        </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <ConnectionHeartbeat />
-        <RefreshPulseButton />
-        <Button asChild variant="default" size="sm" className="bg-[#ccff00] text-black hover:bg-[#b8e600]">
-          <Link href="/pulse/financial/">
-            <PoundSterling className="mr-2 h-4 w-4" />
-            Financial view
-          </Link>
-        </Button>
-        <Button asChild variant="outline" size="sm">
-          <Link href="/pulse/settings/shadow-prices/">
-            <PoundSterling className="mr-2 h-4 w-4" />
-            Prices
-          </Link>
-        </Button>
-        <Button asChild variant="outline" size="sm">
-          <Link href="/settings/feedback/">
-            <MessageSquare className="mr-2 h-4 w-4" />
-            Beta feedback
-          </Link>
-        </Button>
-      </div>
+      <PulsePersonaToggle view={view} onChange={onChangeView} />
     </header>
   );
 }
@@ -273,49 +326,5 @@ function ConnectionHeartbeat() {
       </span>
       <span className="font-data uppercase tracking-wider">{label}</span>
     </div>
-  );
-}
-
-function PulseHero() {
-  return (
-    <Card className="overflow-hidden border-border/60 bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-900/80 dark:via-slate-900 dark:to-slate-800/80">
-      <CardContent className="relative p-6 sm:p-8">
-        {/* Ambient glow */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 flex items-center justify-end"
-        >
-          <div className="h-56 w-56 -translate-y-12 translate-x-24 rounded-full bg-[#ccff00]/10 blur-3xl dark:bg-[#ccff00]/5" />
-        </div>
-
-        <div className="relative grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
-          <div className="space-y-3 max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#ccff00]/30 bg-[#ccff00]/5 px-3 py-1 text-xs uppercase tracking-wider text-[#ccff00]">
-              <Sparkles className="h-3 w-3" />
-              Living dashboard
-            </div>
-            <h2 className="text-xl font-semibold leading-tight text-foreground sm:text-2xl">
-              Sustainability isn&apos;t an annual ritual anymore.
-            </h2>
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              Pulse streams every emissions entry, supplier update, product change and target
-              shift into one living view. Spot anomalies before they become incidents. See
-              whether you&apos;re on track for 2030 at today&apos;s pace. Get a Claude-written
-              brief every morning explaining what changed and why.
-            </p>
-          </div>
-
-          {/* Concentric animated rings */}
-          <div className="relative mx-auto h-32 w-32 lg:h-40 lg:w-40">
-            <div className="absolute inset-0 animate-[spin_12s_linear_infinite] rounded-full border-2 border-dashed border-[#ccff00]/30" />
-            <div className="absolute inset-3 animate-[spin_8s_linear_infinite_reverse] rounded-full border-2 border-[#ccff00]/20" />
-            <div className="absolute inset-6 animate-[spin_2.5s_ease-in-out_infinite] rounded-full border-2 border-transparent border-t-[#ccff00] border-r-[#ccff00]/40" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="h-3.5 w-3.5 animate-pulse rounded-full bg-[#ccff00] shadow-[0_0_18px_rgba(204,255,0,0.55)]" />
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
   );
 }

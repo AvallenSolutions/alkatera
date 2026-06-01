@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { safeCompare } from '@/lib/utils/safe-compare';
@@ -38,18 +39,34 @@ export const maxDuration = 300;
 
 const MAX_ROWS = 5000;
 
+// Rows are keyed directly by directory field names; unknown keys are
+// ignored downstream by the processors, so each row is a permissive
+// record. Values get coerced to strings via stringifyValues().
+const IngestSchema = z.object({
+  brands: z.array(z.record(z.unknown())).optional(),
+  products: z.array(z.record(z.unknown())).optional(),
+});
+
 export async function POST(request: Request) {
   const service = await resolveServiceClient(request);
   if (!service) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
-  let body: { brands?: unknown; products?: unknown };
+  let raw: unknown;
   try {
-    body = await request.json();
+    raw = await request.json();
   } catch {
     return NextResponse.json({ error: 'invalid_json' }, { status: 400 });
   }
+  const parsed = IngestSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'invalid_json', details: parsed.error.flatten() },
+      { status: 400 },
+    );
+  }
+  const body = parsed.data;
 
   const brands = Array.isArray(body.brands) ? body.brands : [];
   const products = Array.isArray(body.products) ? body.products : [];

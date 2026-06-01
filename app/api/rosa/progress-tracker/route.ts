@@ -4,14 +4,21 @@
  * GET /api/rosa/progress-tracker?fresh=1
  *
  * Reads the user's tracker config from rosa_memory, computes a 12-week
- * timeseries, calls Claude for the consultant read, caches per (org, user).
- * Falls back to a deterministic read if Claude is unavailable.
+ * timeseries, calls Gemini for the consultant read, caches per (org, user).
+ * Falls back to a deterministic read if Gemini is unavailable.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { FunctionCallingMode } from '@google/generative-ai'
 import { getSupabaseServerClient } from '@/lib/supabase/server-client'
+import { rateLimit } from '@/lib/rate-limit'
+import {
+  getGeminiClient,
+  toGeminiFunctionDeclarations,
+  GEMINI_ROSA_MODEL,
+} from '@/lib/ai/gemini'
 import {
   buildTrackerTimeseries,
   resolveCustomRosaTracker,
@@ -35,9 +42,12 @@ import { isOverDailyBudget, logRosaTelemetry } from '@/lib/rosa/budget'
 export const runtime = 'nodejs'
 export const maxDuration = 30
 
-const MODEL = 'claude-sonnet-4-6'
 const MAX_OUTPUT_TOKENS = 800
-const CACHE_TTL_MS = 60 * 60 * 1000 // 1 hour
+// Soft-stale window: a cached row older than this is still served INSTANTLY,
+// but flagged `stale` so the client kicks off a background ?fresh=1&auto=1
+// upgrade. Watched-table changes upgrade immediately via a realtime tick; this
+// bounds freshness for everything else.
+const STALE_SOFT_MS = 5 * 60 * 1000
 
 interface ReadPayload {
   headline: string
@@ -64,6 +74,10 @@ interface ResponsePayload {
   source: 'cache' | 'curator' | 'fallback' | 'no_tracker'
   generated_at: string
   signals_hash: string
+  // True when the client should kick off a background ?fresh=1&auto=1 to
+  // upgrade what it just rendered (cache older than STALE_SOFT_MS, or an
+  // uncurated deterministic fallback).
+  stale: boolean
 }
 
 function hashSignals(payload: unknown): string {
@@ -164,32 +178,43 @@ function fallbackRead(
   }
 }
 
-async function curateReadWithClaude(args: {
+async function curateReadWithGemini(args: {
   trackerId: ProgressTrackerId
   series: TrackerTimeseries
   org: PromptOrgContext
 }): Promise<ReadPayload | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) return null
-  const Anthropic = (await import('@anthropic-ai/sdk')).default
-  const client = new Anthropic({ apiKey })
   try {
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: MAX_OUTPUT_TOKENS,
-      system: buildTrackerReadSystemPrompt(),
-      tools: [PROGRESS_TRACKER_READ_TOOL],
-      tool_choice: { type: 'tool', name: PROGRESS_TRACKER_READ_TOOL.name },
-      messages: [
+    const client = getGeminiClient(apiKey)
+    const model = client.getGenerativeModel({
+      model: GEMINI_ROSA_MODEL,
+      systemInstruction: buildTrackerReadSystemPrompt(),
+      tools: toGeminiFunctionDeclarations([PROGRESS_TRACKER_READ_TOOL]),
+      toolConfig: {
+        functionCallingConfig: {
+          mode: FunctionCallingMode.ANY,
+          allowedFunctionNames: [PROGRESS_TRACKER_READ_TOOL.name],
+        },
+      },
+      generationConfig: { maxOutputTokens: MAX_OUTPUT_TOKENS },
+    })
+    const result = await model.generateContent({
+      contents: [
         {
           role: 'user',
-          content: formatTrackerForPrompt(args.trackerId, args.series, args.org),
+          parts: [{ text: formatTrackerForPrompt(args.trackerId, args.series, args.org) }],
         },
       ],
     })
-    const toolUse = response.content.find(c => c.type === 'tool_use')
-    if (!toolUse || toolUse.type !== 'tool_use') return null
-    return validateRead(toolUse.input, args.series)
+    for (const cand of result.response.candidates ?? []) {
+      for (const part of cand.content?.parts ?? []) {
+        if ((part as any).functionCall?.name === PROGRESS_TRACKER_READ_TOOL.name) {
+          return validateRead((part as any).functionCall.args ?? null, args.series)
+        }
+      }
+    }
+    return null
   } catch (err) {
     console.error('[progress-tracker] read curator failed:', err)
     return null
@@ -310,9 +335,46 @@ export async function GET(req: NextRequest) {
   if ('error' in ctx) return ctx.error
   const { userId, organizationId, service } = ctx
 
+  const rl = await rateLimit(`rosa-progress-tracker:${userId}`, 30, 60_000)
+  if (!rl.success) {
+    return NextResponse.json({ error: 'Rate limit exceeded. Please wait a moment and try again.' }, { status: 429 })
+  }
+
   const url = new URL(req.url)
   const fresh = url.searchParams.get('fresh') === '1'
+  // `auto` marks a background upgrade (mount-if-stale / realtime tick) vs a
+  // user-forced Re-pick. Auto upgrades respect the daily Gemini budget; a
+  // user-forced fresh bypasses it.
+  const isAuto = url.searchParams.get('auto') === '1'
 
+  // ── INSTANT READ PATH ──────────────────────────────────────────────────
+  // Serve the cached payload immediately WITHOUT building the (expensive)
+  // 12-week series or calling Gemini. The client renders this instantly, then
+  // if `stale` issues a background ?fresh=1&auto=1. The signals-hash gate is
+  // dropped here on purpose (computing it needs the series, which defeats the
+  // point); freshness is bounded by STALE_SOFT_MS plus realtime-tick upgrades.
+  // POST/DELETE bust this cache on tracker change, so a hit is always valid.
+  if (!fresh) {
+    try {
+      const { data: cached } = await service
+        .from('rosa_progress_tracker_cache')
+        .select('payload, generated_at')
+        .eq('organization_id', organizationId)
+        .eq('user_id', userId)
+        .maybeSingle()
+      if (cached && (cached as any).payload) {
+        const ageMs = Date.now() - new Date((cached as any).generated_at).getTime()
+        return NextResponse.json(
+          { ...((cached as any).payload as Record<string, unknown>), stale: ageMs > STALE_SOFT_MS },
+          { headers: { 'Cache-Control': 'no-store' } },
+        )
+      }
+    } catch {
+      // cache table may not exist; continue to build
+    }
+  }
+
+  // ── BUILD PATH ─────────────────────────────────────────────────────────
   const config = await loadTrackerConfig(service, organizationId, userId)
   if (!config) {
     const empty: ResponsePayload = {
@@ -323,6 +385,7 @@ export async function GET(req: NextRequest) {
       source: 'no_tracker',
       generated_at: new Date().toISOString(),
       signals_hash: '',
+      stale: false,
     }
     return NextResponse.json(empty, {
       headers: { 'Cache-Control': 'no-store' },
@@ -347,66 +410,17 @@ export async function GET(req: NextRequest) {
   }
 
   const signalsHash = hashSignals({ trackerId, target_id: config.target_id ?? null, series })
-
-  // Cache lookup
-  if (!fresh) {
-    try {
-      const { data: cached } = await service
-        .from('rosa_progress_tracker_cache')
-        .select('payload, signals_hash, generated_at, tracker_id')
-        .eq('organization_id', organizationId)
-        .eq('user_id', userId)
-        .maybeSingle()
-      if (cached) {
-        const ageMs = Date.now() - new Date((cached as any).generated_at).getTime()
-        const same = (cached as any).signals_hash === signalsHash
-        if (same && ageMs < CACHE_TTL_MS) {
-          return NextResponse.json(cached.payload, {
-            headers: { 'Cache-Control': 'no-store' },
-          })
-        }
-      }
-    } catch {
-      // cache table may not exist; continue
-    }
-  }
-
-  const orgCtx = await loadOrgContext(service, organizationId, userId)
   const resolvedTrackerId =
     series.resolved_tracker_id && trackerId === 'custom_rosa'
       ? series.resolved_tracker_id
       : trackerId
   const def = PROGRESS_TRACKERS[resolvedTrackerId]
 
-  // Curate the read via Claude, with fallback. Skipped when the user has
-  // already exhausted their daily budget for tracker reads.
-  let read: ReadPayload | null = null
-  let source: ResponsePayload['source'] = 'fallback'
-  const overBudget = await isOverDailyBudget(
-    service,
-    organizationId,
-    userId,
-    'tracker.read.curated',
-  )
-  if (overBudget) {
-    await logRosaTelemetry(service, organizationId, userId, 'tracker.read.budget_blocked', {
-      tracker_id: trackerId,
-    })
-  } else {
-    read = await curateReadWithClaude({ trackerId, series, org: orgCtx })
-    if (read) {
-      source = 'curator'
-      await logRosaTelemetry(service, organizationId, userId, 'tracker.read.curated', {
-        tracker_id: trackerId,
-      })
-    }
-  }
-  if (!read) {
-    read = fallbackRead(resolvedTrackerId, series)
-    source = 'fallback'
-  }
-
-  const payload: ResponsePayload = {
+  const makePayload = (
+    read: ReadPayload,
+    source: ResponsePayload['source'],
+    stale: boolean,
+  ): ResponsePayload => ({
     status: 'ready',
     tracker: {
       id: trackerId,
@@ -421,28 +435,72 @@ export async function GET(req: NextRequest) {
     source,
     generated_at: new Date().toISOString(),
     signals_hash: signalsHash,
-  }
-
-  // Cache (best-effort)
-  try {
-    await service.from('rosa_progress_tracker_cache').upsert(
-      {
-        organization_id: organizationId,
-        user_id: userId,
-        tracker_id: trackerId,
-        payload,
-        signals_hash: signalsHash,
-        generated_at: new Date().toISOString(),
-      },
-      { onConflict: 'organization_id,user_id' },
-    )
-  } catch (err) {
-    console.warn('[progress-tracker] cache write failed:', err)
-  }
-
-  return NextResponse.json(payload, {
-    headers: { 'Cache-Control': 'no-store' },
+    stale,
   })
+
+  const writeCache = async (payload: ResponsePayload) => {
+    try {
+      await service.from('rosa_progress_tracker_cache').upsert(
+        {
+          organization_id: organizationId,
+          user_id: userId,
+          tracker_id: trackerId,
+          payload,
+          signals_hash: signalsHash,
+          generated_at: new Date().toISOString(),
+        },
+        { onConflict: 'organization_id,user_id' },
+      )
+    } catch (err) {
+      console.warn('[progress-tracker] cache write failed:', err)
+    }
+  }
+
+  // Non-fresh build (cold cache): return the deterministic fallback read
+  // INSTANTLY and seed the cache. No Gemini here — the client follows up with a
+  // background ?fresh=1&auto=1 to curate the read.
+  if (!fresh) {
+    const payload = makePayload(fallbackRead(resolvedTrackerId, series), 'fallback', true)
+    await writeCache(payload)
+    return NextResponse.json(payload, { headers: { 'Cache-Control': 'no-store' } })
+  }
+
+  // ── FRESH (CURATION) PATH ──────────────────────────────────────────────
+  // Auto upgrades respect the daily budget → over budget returns the fallback
+  // read without calling Gemini.
+  if (isAuto) {
+    const overBudget = await isOverDailyBudget(
+      service,
+      organizationId,
+      userId,
+      'tracker.read.curated',
+    )
+    if (overBudget) {
+      await logRosaTelemetry(service, organizationId, userId, 'tracker.read.budget_blocked', {
+        tracker_id: trackerId,
+      })
+      const payload = makePayload(fallbackRead(resolvedTrackerId, series), 'fallback', false)
+      await writeCache(payload)
+      return NextResponse.json(payload, { headers: { 'Cache-Control': 'no-store' } })
+    }
+  }
+
+  // Curate the read via Gemini, with deterministic fallback.
+  const orgCtx = await loadOrgContext(service, organizationId, userId)
+  let read = await curateReadWithGemini({ trackerId, series, org: orgCtx })
+  let source: ResponsePayload['source'] = 'fallback'
+  if (read) {
+    source = 'curator'
+    await logRosaTelemetry(service, organizationId, userId, 'tracker.read.curated', {
+      tracker_id: trackerId,
+    })
+  } else {
+    read = fallbackRead(resolvedTrackerId, series)
+  }
+
+  const payload = makePayload(read, source, false)
+  await writeCache(payload)
+  return NextResponse.json(payload, { headers: { 'Cache-Control': 'no-store' } })
 }
 
 /**

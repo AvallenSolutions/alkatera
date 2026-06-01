@@ -1,7 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
+
+// Shape-only guard. Numeric fields accept string or number because the
+// handler parseFloat()s them; required-field checks stay in the handler
+// to preserve its specific error message. metadata is free-form jsonb.
+const factorInput = z.union([z.string(), z.number(), z.null()]).optional();
+const CreateFactorSchema = z
+  .object({
+    name: z.string().optional().nullable(),
+    category: z.string().optional().nullable(),
+    co2_factor: z.union([z.string(), z.number(), z.null()]).optional(),
+    reference_unit: factorInput,
+    source: factorInput,
+    geographic_scope: factorInput,
+    uncertainty_percent: factorInput,
+    metadata: z.record(z.unknown()).optional().nullable(),
+    water_factor: factorInput,
+    land_factor: factorInput,
+    waste_factor: factorInput,
+    co2_fossil_factor: factorInput,
+    co2_biogenic_factor: factorInput,
+    status: z.string().optional().nullable(),
+    confidence_score: factorInput,
+  })
+  .strict();
 
 /**
  * GET /api/admin/emission-factors
@@ -147,7 +172,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    const body = await request.json();
+    const parsedBody = CreateFactorSchema.safeParse(await request.json());
+    if (!parsedBody.success) {
+      return NextResponse.json(
+        { error: 'Invalid request body', details: parsedBody.error.flatten() },
+        { status: 400 }
+      );
+    }
+    const body: Record<string, any> = parsedBody.data;
     const {
       name,
       category,

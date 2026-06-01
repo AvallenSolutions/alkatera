@@ -1,9 +1,10 @@
 /**
  * Rosa -- Tool library.
  *
- * Anthropic tool-use definitions Rosa can call during a conversation, plus a
+ * Gemini function declarations Rosa can call during a conversation, plus a
  * dispatcher that executes each tool with an organisation-scoped service-role
- * client.
+ * client. Tool schemas are kept in JSON Schema form here and converted to
+ * Gemini's FunctionDeclarationSchema in lib/ai/gemini.ts.
  *
  * Security model
  * ==============
@@ -16,6 +17,7 @@
  * explicit confirmation flow in the UI, not the tool-use loop.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { sanitizePostgrestSearch } from '@/lib/utils/sanitize-search';
 import { runSafeSql, SAFE_SQL_ALLOWED_TABLES } from './safe-sql';
 import { ALL_METRIC_KEYS, METRIC_DEFINITIONS, type MetricKey } from '@/lib/pulse/metric-keys';
 import { listMemories, saveMemory, type MemoryScope } from './memory';
@@ -1264,11 +1266,12 @@ async function toolSearchKnowledgeBank(
   }
   // Simple ilike search across title+content+tags. Good enough for Phase 1;
   // swap to embeddings later via lib/gaia/knowledge-search.ts.
+  const safeQuery = sanitizePostgrestSearch(query);
   let q = ctx.supabase
     .from('gaia_knowledge_base')
     .select('id, entry_type, title, content, category, tags, source_url, priority')
     .eq('is_active', true)
-    .or(`title.ilike.%${query}%,content.ilike.%${query}%`)
+    .or(`title.ilike.%${safeQuery}%,content.ilike.%${safeQuery}%`)
     .order('priority', { ascending: false })
     .limit(limit);
   if (input?.category) q = q.eq('category', input.category);
@@ -1302,11 +1305,12 @@ async function toolExplainMethodology(
   if (!term) {
     return { is_error: true, content: 'term is required', audit: { tool: 'explain_methodology', error: 'missing_term' } };
   }
+  const safeTerm = sanitizePostgrestSearch(term);
   const { data } = await ctx.supabase
     .from('gaia_knowledge_base')
     .select('id, title, content, category, source_url, priority')
     .eq('is_active', true)
-    .or(`title.ilike.%${term}%,content.ilike.%${term}%`)
+    .or(`title.ilike.%${safeTerm}%,content.ilike.%${safeTerm}%`)
     .order('priority', { ascending: false })
     .limit(3);
   if (!data || data.length === 0) {
@@ -1571,9 +1575,9 @@ async function toolExtractFromDocument(
   if (!input?.file_id) {
     return { is_error: true, content: 'file_id is required', audit: { tool: 'extract_from_document', error: 'missing_file_id' } };
   }
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) {
-    return { is_error: true, content: 'Anthropic API key not configured', audit: { tool: 'extract_from_document', error: 'no_api_key' } };
+    return { is_error: true, content: 'Gemini API key not configured', audit: { tool: 'extract_from_document', error: 'no_api_key' } };
   }
   const attachment = await loadAttachment(ctx.supabase, input.file_id, ctx.organizationId, ctx.userId);
   if (!attachment) {

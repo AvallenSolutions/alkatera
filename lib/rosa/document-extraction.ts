@@ -2,8 +2,8 @@
  * Rosa — document intelligence helpers.
  *
  * Loads files from the `rosa-uploads` Supabase Storage bucket, builds the
- * Anthropic document/image block shape, and (optionally) runs a targeted
- * structured extraction via Sonnet 4.6 vision.
+ * Gemini inlineData part shape, and (optionally) runs a targeted structured
+ * extraction via Gemini vision.
  *
  * Ownership model:
  *   - Files are stored at `{organization_id}/{user_id}/{uuid}.{ext}`.
@@ -11,6 +11,11 @@
  *     matches the caller's org+user before returning the payload.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import {
+  extractStructured as extractStructuredGemini,
+  toGeminiInlineData,
+  type LoadedAttachmentLike,
+} from '@/lib/ai/gemini';
 
 export type AttachmentMediaType =
   | 'application/pdf'
@@ -62,7 +67,7 @@ export function ownsUploadPath(
 
 /**
  * Load a file out of storage and return it as a base64 attachment ready for
- * an Anthropic content block. Returns null if the file does not exist or the
+ * a Gemini inlineData part. Returns null if the file does not exist or the
  * caller does not own it.
  */
 export async function loadAttachment(
@@ -103,19 +108,10 @@ export function inferMediaType(
 }
 
 /**
- * Turn a loaded attachment into the Anthropic message content block.
+ * Turn a loaded attachment into a Gemini inlineData part.
  */
-export function toAnthropicBlock(a: LoadedAttachment): any {
-  if (a.media_type === 'application/pdf') {
-    return {
-      type: 'document',
-      source: { type: 'base64', media_type: 'application/pdf', data: a.base64 },
-    };
-  }
-  return {
-    type: 'image',
-    source: { type: 'base64', media_type: a.media_type, data: a.base64 },
-  };
+export function toGeminiPart(a: LoadedAttachment) {
+  return toGeminiInlineData(a as LoadedAttachmentLike);
 }
 
 export function isSupportedMediaType(mt: string): mt is AttachmentMediaType {
@@ -123,8 +119,8 @@ export function isSupportedMediaType(mt: string): mt is AttachmentMediaType {
 }
 
 /**
- * Run a targeted extraction pass. Calls Anthropic in tools-off mode with a
- * specific "return JSON with these keys" instruction. Returns a plain object.
+ * Run a targeted extraction pass against Gemini Flash with JSON-mode forced
+ * on. Returns a plain object on success.
  */
 export async function extractStructured(
   apiKey: string,
@@ -132,43 +128,10 @@ export async function extractStructured(
   fields: string[],
   documentKind?: string,
 ): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; error: string }> {
-  try {
-    const Anthropic = (await import('@anthropic-ai/sdk')).default;
-    const client = new Anthropic({ apiKey });
-
-    const keys = fields.length > 0 ? fields.join(', ') : 'any fields that look structured and relevant';
-    const kind = documentKind ?? 'document';
-    const instruction = `Look at the attached ${kind} and extract the following fields as a single flat JSON object: ${keys}.
-
-Rules:
-- Return ONLY valid JSON. No markdown, no explanation, no code fences.
-- If a field is missing, use null.
-- Use ISO 8601 for dates (YYYY-MM-DD).
-- Numeric values as numbers, not strings. Strip units; name the unit in a separate key when relevant (e.g. "quantity_value" + "quantity_unit").
-- Do not invent values. If uncertain, return null and add a key "uncertainty_notes" with a short reason.`;
-
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1500,
-      messages: [
-        {
-          role: 'user',
-          content: [toAnthropicBlock(attachment), { type: 'text', text: instruction }],
-        },
-      ],
-    });
-
-    const textBlock = response.content.find((b: any) => b.type === 'text') as any;
-    const raw = (textBlock?.text ?? '').trim();
-    // Strip accidental code fences just in case.
-    const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-    try {
-      const data = JSON.parse(cleaned);
-      return { ok: true, data };
-    } catch {
-      return { ok: false, error: 'Could not parse extraction response as JSON' };
-    }
-  } catch (err: any) {
-    return { ok: false, error: err?.message ?? 'Extraction failed' };
-  }
+  return extractStructuredGemini({
+    apiKey,
+    attachment: attachment as LoadedAttachmentLike,
+    fields,
+    documentKind,
+  });
 }

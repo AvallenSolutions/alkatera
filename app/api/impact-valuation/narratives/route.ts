@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 import {
   generateImpactValuationNarratives,
   type ImpactValuationNarrativeContext,
@@ -22,20 +23,9 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Resolve organisation ──────────────────────────────────────────────
-    let organizationId = user.user_metadata?.current_organization_id;
-
+    const organizationId = await resolveAccessibleOrg(supabase, user);
     if (!organizationId) {
-      const { data: membership, error: memberError } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (memberError || !membership) {
-        return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
-      }
-      organizationId = membership.organization_id;
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
     }
 
     // ── Feature gate ─────────────────────────────────────────────────────

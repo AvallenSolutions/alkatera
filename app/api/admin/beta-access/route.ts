@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { createClient } from '@supabase/supabase-js';
 import { INTEGRATION_BETA_FEATURES } from '@/lib/integrations/directory';
 
 export const dynamic = 'force-dynamic';
+
+const TogglePatchSchema = z.object({
+  organization_id: z.string().min(1),
+  feature_code: z.string().min(1),
+  enabled: z.boolean(),
+});
 
 /**
  * Whitelist of feature codes that admins can toggle per organisation.
@@ -109,15 +116,14 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    const body = await request.json();
-    const { organization_id, feature_code, enabled } = body;
-
-    if (!organization_id || !feature_code || typeof enabled !== 'boolean') {
+    const parsed = TogglePatchSchema.safeParse(await request.json());
+    if (!parsed.success) {
       return NextResponse.json(
         { error: 'Missing required fields: organization_id, feature_code, enabled' },
         { status: 400 }
       );
     }
+    const { organization_id, feature_code, enabled } = parsed.data;
 
     // Validate feature code is in the whitelist
     if (!ALLOWED_FEATURE_CODES.has(feature_code)) {

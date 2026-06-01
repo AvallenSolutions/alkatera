@@ -42,6 +42,7 @@ import type {
   WasteByFacilityItem,
   CircularityTarget,
 } from '@/hooks/data/useWasteMetrics';
+import { RelatableMetric } from '@/components/shared/RelatableMetric';
 
 interface WasteDeepDiveProps {
   wasteMetrics: WasteMetrics | null;
@@ -379,6 +380,14 @@ export function WasteDeepDive({ wasteMetrics, loading }: WasteDeepDiveProps) {
                 <p className="text-xs text-muted-foreground mt-2">
                   {wasteMetrics.waste_intensity_per_unit.toFixed(3)} kg per unit produced
                 </p>
+                {wasteMetrics.total_waste_kg > 0 && (
+                  <RelatableMetric
+                    kind="waste"
+                    valueKg={wasteMetrics.total_waste_kg}
+                    variant="light"
+                    className="mt-3"
+                  />
+                )}
               </CardContent>
             </Card>
 

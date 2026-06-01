@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,13 +11,12 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams;
-    const organizationId = searchParams.get('organization_id');
+    const organizationId = await resolveAccessibleOrg(supabase, user, searchParams.get('organization_id'));
+    if (!organizationId) {
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    }
     const frameworkId = searchParams.get('framework_id');
     const packageId = searchParams.get('package_id');
-
-    if (!organizationId) {
-      return NextResponse.json({ error: 'organization_id is required' }, { status: 400 });
-    }
 
     // Fetch without PostgREST relationship joins
     if (packageId) {
@@ -96,21 +96,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's current organization from metadata or first membership
-    let organizationId = user.user_metadata?.current_organization_id;
-
+    const organizationId = await resolveAccessibleOrg(supabase, user);
     if (!organizationId) {
-      const { data: membership, error: memberError } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (memberError || !membership) {
-        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
-      }
-      organizationId = membership.organization_id;
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -168,7 +156,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('certification_audit_packages')
       .insert({
-        organization_id: body.organization_id || organizationId,
+        organization_id: organizationId,
         framework_id: body.framework_id,
         package_name: body.package_name,
         package_type: body.package_type,
@@ -206,21 +194,9 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's current organization from metadata or first membership
-    let organizationId = user.user_metadata?.current_organization_id;
-
+    const organizationId = await resolveAccessibleOrg(supabase, user);
     if (!organizationId) {
-      const { data: membership, error: memberError } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (memberError || !membership) {
-        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
-      }
-      organizationId = membership.organization_id;
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -247,6 +223,7 @@ export async function PUT(request: NextRequest) {
         updated_at: new Date().toISOString(),
       })
       .eq('id', body.id)
+      .eq('organization_id', organizationId)
       .select()
       .single();
 
@@ -270,21 +247,9 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's current organization from metadata or first membership
-    let organizationId = user.user_metadata?.current_organization_id;
-
+    const organizationId = await resolveAccessibleOrg(supabase, user);
     if (!organizationId) {
-      const { data: membership, error: memberError } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (memberError || !membership) {
-        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
-      }
-      organizationId = membership.organization_id;
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
     }
 
     const searchParams = request.nextUrl.searchParams;
@@ -299,6 +264,7 @@ export async function DELETE(request: NextRequest) {
       .from('certification_audit_packages')
       .select('status')
       .eq('id', id)
+      .eq('organization_id', organizationId)
       .maybeSingle();
 
     if (existing?.status !== 'draft') {
@@ -311,7 +277,8 @@ export async function DELETE(request: NextRequest) {
     const { error } = await supabase
       .from('certification_audit_packages')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('organization_id', organizationId);
 
     if (error) {
       console.error('Error deleting audit package:', error);

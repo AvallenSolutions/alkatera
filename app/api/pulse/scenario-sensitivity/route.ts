@@ -22,6 +22,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { loadShadowPrices } from '@/lib/pulse/shadow-prices';
+import { latestValue } from '@/lib/pulse/snapshot-latest';
 
 export const runtime = 'nodejs';
 
@@ -100,17 +101,15 @@ export async function GET(request: NextRequest) {
 
     const { data: snapshots } = await svc
       .from('metric_snapshots')
-      .select('value, unit')
+      .select('snapshot_date, value')
       .eq('organization_id', organizationId)
       .eq('metric_key', 'total_co2e')
       .gte('snapshot_date', fmt(start))
       .lte('snapshot_date', fmt(today));
 
-    // Snapshots are stored in kg CO2e; convert to tonnes.
-    const annualKg = (snapshots ?? []).reduce(
-      (sum, row: any) => sum + Number(row.value ?? 0),
-      0,
-    );
+    // total_co2e snapshots are a level (calendar-year emissions), so take the
+    // latest value, not a sum of daily rows. Stored in kg; convert to tonnes.
+    const annualKg = latestValue((snapshots ?? []) as any[]);
     const annualTonnes = annualKg / 1000;
 
     // Org's current resolved carbon price. Fall back to £85 (UK ETS average)

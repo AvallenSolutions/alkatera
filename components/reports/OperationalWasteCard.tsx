@@ -31,6 +31,7 @@ import {
   getTreatmentMethodLabel,
   WASTE_EMISSION_FACTORS,
 } from "@/lib/calculations/waste-circularity";
+import { RelatableMetric } from "@/components/shared/RelatableMetric";
 
 interface WasteEntry {
   id: string;
@@ -159,14 +160,24 @@ export function OperationalWasteCard({ reportId, entries, xeroEntries, onUpdate,
         <CardContent className={`space-y-4${isNotApplicable ? ' opacity-40 pointer-events-none' : ''}`}>
           {(entries.length > 0 || xeroTotal > 0) ? (
             <>
-              <div className="text-center py-4 border-b">
-                <div className="text-3xl font-bold text-slate-900 dark:text-slate-100">
-                  {formatEmissions(combinedTotal)}
+              <div className="py-4 border-b space-y-3">
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-slate-900 dark:text-slate-100">
+                    {formatEmissions(combinedTotal)}
+                  </div>
+                  <div className="text-sm text-muted-foreground mt-1">
+                    {totalWeight.toLocaleString()}kg total waste
+                    {xeroEntries && xeroEntries.length > 0 && ` + ${xeroEntries.length} Xero entries`}
+                  </div>
                 </div>
-                <div className="text-sm text-muted-foreground mt-1">
-                  {totalWeight.toLocaleString()}kg total waste
-                  {xeroEntries && xeroEntries.length > 0 && ` + ${xeroEntries.length} Xero entries`}
-                </div>
+                {totalWeight > 0 && (
+                  <RelatableMetric
+                    kind="waste"
+                    valueKg={totalWeight}
+                    variant="light"
+                    className="justify-center"
+                  />
+                )}
               </div>
 
               <div className="space-y-2 max-h-48 overflow-y-auto">

@@ -331,7 +331,7 @@ export default function DataSourcesPage() {
         <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
           <Info className="h-4 w-4 text-blue-600" />
           <AlertDescription className="text-blue-800 dark:text-blue-200">
-            <strong>Why does this matter?</strong> When you log ingredients, packaging, or energy use elsewhere in Alkatera, we
+            <strong>Why does this matter?</strong> When you log ingredients, packaging, or energy use elsewhere in alkatera, we
             multiply your quantities by these numbers to calculate your carbon footprint. Better data here means more
             accurate results for your business. You don&apos;t need to edit anything — this page is here so you can see
             exactly where our numbers come from.

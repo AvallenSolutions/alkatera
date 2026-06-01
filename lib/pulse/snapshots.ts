@@ -17,15 +17,8 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { METRIC_DEFINITIONS, type MetricKey } from './metric-keys';
-import {
-  UTILITY_EMISSION_FACTORS,
-  normaliseEnergyToKwh,
-  normaliseToCubicMetres,
-} from '@/lib/calculations/utility-factors';
-import {
-  countryToLiveRegion,
-  getCountryAverageGridCarbon,
-} from '@/lib/calculations/grid-carbon-fallback';
+import { normaliseToCubicMetres } from '@/lib/calculations/utility-factors';
+import { calculateCorporateEmissions } from '@/lib/calculations/corporate-emissions';
 
 export interface SnapshotRow {
   organization_id: string;
@@ -69,69 +62,30 @@ export async function computeOrgSnapshots(
   const rows: SnapshotRow[] = [];
 
   // ── 1. total_co2e ────────────────────────────────────────────────────────
-  // Trailing-365-day sum from utility_data_entries (Scope 1 combustion +
-  // Scope 2 grid electricity), mirroring exactly how /api/pulse/facility-impact
-  // rolls up the monthly chart. Keeping these two paths aligned means the
-  // headline KPI and the drill-down can never disagree.
+  // Full corporate emissions for the calendar year containing `asOfDate`,
+  // computed via the single-source-of-truth `calculateCorporateEmissions`
+  // (the same function that drives the Company Emissions page hero number
+  // at /data/scope-1-2/). This snapshot value matches what the user sees
+  // on that page — earlier revisions of this writer only counted utility
+  // entries, which under-reported orgs whose footprint sits in Scope 3,
+  // fleet, refrigerants, or Xero-derived spend.
   //
-  // For electricity we use the facility's country-average grid factor (live
-  // grid intensity is only meaningful at monthly granularity, not across a
-  // 365-day window). For combustion we use the DEFRA 2024 factors in
-  // lib/calculations/utility-factors.ts.
-  //
-  // The table exposes organization_id indirectly via facilities; we resolve
-  // it with an explicit facility→country lookup instead of a PostgREST embed
-  // so we avoid the ambiguous-join pitfall we hit in an earlier revision.
-  const { data: facilities } = await supabase
-    .from('facilities')
-    .select('id, location_country_code, address_country')
-    .eq('organization_id', orgId);
-
-  const facilityIds = (facilities ?? []).map((f: any) => f.id as string);
-  const facilityCountry = new Map<string, string | null>();
-  for (const f of facilities ?? []) {
-    facilityCountry.set(
-      (f as any).id as string,
-      ((f as any).location_country_code ?? (f as any).address_country ?? null) as string | null,
-    );
-  }
-
+  // Semantic note: the snapshot is now "year-to-date corporate emissions
+  // for the year of asOfDate" rather than "trailing 365 days". All
+  // downstream readers (Rosa Progress Tracker, board pack, ISSB, CSRD,
+  // carbon budgets, scenario sensitivity) want this number to track the
+  // headline footprint, so the change benefits every consumer.
   let totalCo2eKg = 0;
-  if (facilityIds.length > 0) {
-    const { data: utilityRows, error: utilityErr } = await supabase
-      .from('utility_data_entries')
-      .select('facility_id, utility_type, quantity, unit, reporting_period_start')
-      .in('facility_id', facilityIds)
-      .gte('reporting_period_start', windowStart)
-      .lte('reporting_period_start', snapshotDate);
-
-    if (utilityErr) {
-      console.error(`[Pulse snapshots] utility query failed for org ${orgId}:`, utilityErr.message);
-    }
-
-    for (const u of (utilityRows ?? []) as Array<{
-      facility_id: string;
-      utility_type: string;
-      quantity: number;
-      unit: string;
-    }>) {
-      const quantity = Number(u.quantity) || 0;
-      if (u.utility_type === 'electricity_grid') {
-        const kwh = normaliseEnergyToKwh(quantity, u.unit);
-        const country = facilityCountry.get(u.facility_id) ?? null;
-        const factor = getCountryAverageGridCarbon(country).intensity; // g CO2e / kWh
-        totalCo2eKg += (kwh * factor) / 1000; // g → kg
-      } else {
-        const meta = UTILITY_EMISSION_FACTORS[u.utility_type];
-        if (!meta) continue; // unknown utility types contribute 0
-        totalCo2eKg += quantity * meta.factor; // already kg CO2e/native-unit
-      }
-    }
+  try {
+    const result = await calculateCorporateEmissions(
+      supabase,
+      orgId,
+      asOfDate.getUTCFullYear(),
+    );
+    totalCo2eKg = result.breakdown.total;
+  } catch (err) {
+    console.error(`[Pulse snapshots] calculateCorporateEmissions failed for org ${orgId}:`, err);
   }
-  // countryToLiveRegion is currently unused here (the annual KPI doesn't
-  // need live-grid seasonality) but we import it from the same module so
-  // this file stays aligned with the monthly widget's call surface.
-  void countryToLiveRegion;
 
   rows.push({
     organization_id: orgId,

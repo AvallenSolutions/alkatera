@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { createHmac } from 'crypto';
 import { requireAlkateraAdmin } from '@/lib/admin/auth';
 import {
@@ -27,20 +28,37 @@ export const maxDuration = 26;
 
 const TRIGGER_TIMEOUT_MS = 4000;
 
-interface SourcingPayload extends SourcingFilters {
-  target_count?: number;
-}
+const SourcingPayloadSchema = z
+  .object({
+    category: z.string().nullable().optional(),
+    country: z.string().nullable().optional(),
+    certifications: z.array(z.string()).optional(),
+    keywords: z.string().nullable().optional(),
+    query: z.string().nullable().optional(),
+    limit: z.number().optional(),
+    excludeNames: z.array(z.string()).optional(),
+    target_count: z.number().optional(),
+  })
+  .strict();
 
 export async function POST(request: Request) {
   const auth = await requireAlkateraAdmin();
   if (!auth.ok) return auth.response;
 
-  let body: SourcingPayload;
+  let raw: unknown;
   try {
-    body = (await request.json()) as SourcingPayload;
+    raw = await request.json();
   } catch {
     return NextResponse.json({ error: 'invalid_json' }, { status: 400 });
   }
+  const parsed = SourcingPayloadSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'invalid_json', details: parsed.error.flatten() },
+      { status: 400 },
+    );
+  }
+  const body = parsed.data;
 
   const hasCriteria =
     !!body.query?.trim() ||

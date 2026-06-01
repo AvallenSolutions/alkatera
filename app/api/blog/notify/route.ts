@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     const resend = new Resend(resendApiKey);
 
     const { data, error: emailError } = await resend.emails.send({
-      from: 'AlkaTera <sayhello@mail.alkatera.com>',
+      from: 'alkatera <sayhello@mail.alkatera.com>',
       to: ['hello@alkatera.com'],
       subject: `New Blog Post Published: ${postTitle}`,
       html: `
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
             <a href="${postUrl}" style="display: inline-block; background: #ccff00; color: #000; font-family: 'Courier New', monospace; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 3px; padding: 16px 32px; text-decoration: none;">Read Post</a>
           </div>
           <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #333; color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 2px;">
-            Sent via AlkaTera Blog
+            Sent via alka<strong>tera</strong> Blog
           </div>
         </div>
       `,

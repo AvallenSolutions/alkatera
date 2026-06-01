@@ -5,6 +5,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, RefreshCw, Leaf, Search, Globe, Wind } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { Instrument_Sans, Instrument_Serif } from 'next/font/google';
+
+// Self-host these via next/font (build-time, preloaded, swap) instead of a
+// render-blocking third-party CSS @import to fonts.googleapis.com, which added
+// two extra DNS+TLS round-trips on the critical path of every 404 render.
+const instrumentSans = Instrument_Sans({ subsets: ['latin'], weight: ['400', '500', '600'], display: 'swap' });
+const instrumentSerif = Instrument_Serif({ subsets: ['latin'], weight: '400', style: ['normal', 'italic'], display: 'swap' });
 
 const SUSTAINABILITY_FACTS = [
   {
@@ -17,7 +24,7 @@ const SUSTAINABILITY_FACTS = [
   },
   {
     icon: <Wind className="text-[#ccff00]" />,
-    text: "By 2030, the drink industry aims to reduce carbon emissions by 50%. AlkaTera provides the operating system to get there."
+    text: "By 2030, the drink industry aims to reduce carbon emissions by 50%. alkatera provides the operating system to get there."
   },
   {
     icon: <Search className="text-[#ccff00]" />,
@@ -33,10 +40,8 @@ export default function NotFound() {
   };
 
   return (
-    <div className="relative min-h-screen w-full text-white overflow-hidden flex flex-col items-center justify-center p-6" style={{ fontFamily: "'Instrument Sans', sans-serif" }}>
+    <div className={`relative min-h-screen w-full text-white overflow-hidden flex flex-col items-center justify-center p-6 ${instrumentSans.className}`}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap');
-
         .glass-404 {
           background: rgba(255, 255, 255, 0.03);
           backdrop-filter: blur(12px);
@@ -70,7 +75,7 @@ export default function NotFound() {
         >
           <img
             src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png"
-            alt="AlkaTera"
+            alt="alkatera"
             className="h-8 w-auto opacity-80"
           />
         </motion.div>
@@ -82,7 +87,7 @@ export default function NotFound() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 1, ease: "easeOut" }}
             className="text-[180px] md:text-[240px] leading-none text-white/10 tracking-tighter"
-            style={{ fontFamily: "'Instrument Serif', serif" }}
+            style={{ fontFamily: instrumentSerif.style.fontFamily }}
           >
             404
           </motion.h1>
@@ -96,7 +101,7 @@ export default function NotFound() {
             <div className="text-center">
               <h2
                 className="text-4xl md:text-6xl text-white mb-4 text-glow italic"
-                style={{ fontFamily: "'Instrument Serif', serif" }}
+                style={{ fontFamily: instrumentSerif.style.fontFamily }}
               >
                 Lost in the ecosystem.
               </h2>
@@ -178,7 +183,7 @@ export default function NotFound() {
           className="mt-20 flex items-center gap-12 opacity-20 grayscale"
         >
           <div className="w-12 h-[1px] bg-white" />
-          <span className="text-[10px] font-mono uppercase tracking-[0.5em]">AlkaTera Ecosystem</span>
+          <span className="text-[10px] font-mono uppercase tracking-[0.5em]">alkatera Ecosystem</span>
           <div className="w-12 h-[1px] bg-white" />
         </motion.div>
       </div>

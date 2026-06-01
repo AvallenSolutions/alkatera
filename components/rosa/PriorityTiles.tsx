@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   CheckCircle2,
@@ -30,6 +30,7 @@ import { useOrganization } from '@/lib/organizationContext'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useRealtimeRefresh } from '@/lib/rosa/useRealtimeRefresh'
 import { trackRosa } from '@/lib/rosa/track'
+import { RichText } from '@/components/shared/Brand'
 
 /**
  * Map of icon names (as emitted by the curator and validated server-side)
@@ -80,6 +81,7 @@ interface CuratorResponse {
   source: 'cache' | 'curator' | 'fallback'
   generated_at: string
   signals_hash: string
+  stale?: boolean
   readiness?: ReadinessSummary
 }
 
@@ -148,21 +150,26 @@ export function PriorityTiles({ onOpenQueue }: Props) {
   }, [])
 
   const load = useCallback(
-    async (opts: { fresh?: boolean } = {}) => {
-      if (!orgId) return
+    async (opts: { fresh?: boolean; auto?: boolean } = {}): Promise<CuratorResponse | null> => {
+      if (!orgId) return null
       const params = new URLSearchParams()
       if (opts.fresh) params.set('fresh', '1')
+      // Background upgrades (mount-if-stale / realtime ticks) are budget-capped
+      // server-side; user-forced Re-pick omits auto so it bypasses the budget.
+      if (opts.fresh && opts.auto) params.set('auto', '1')
       const snoozed = readSnoozedKinds()
       if (snoozed.length > 0) params.set('snoozed', snoozed.join(','))
       const url = `/api/rosa/priority-tiles${params.size > 0 ? `?${params.toString()}` : ''}`
       try {
         const res = await fetch(url, { credentials: 'include' })
-        if (!res.ok) return
+        if (!res.ok) return null
         const json = (await res.json()) as CuratorResponse
         setData(json)
+        return json
       } catch {
         // Network failure — keep last good state. Fallback rendering will
         // show the existing tiles or skeleton until the next attempt.
+        return null
       } finally {
         setLoading(false)
       }
@@ -170,6 +177,20 @@ export function PriorityTiles({ onOpenQueue }: Props) {
     [orgId],
   )
 
+  // Background upgrade to a freshly-curated set, guarded so overlapping
+  // triggers (mount-if-stale + a realtime tick) don't fire two Gemini calls.
+  const upgradingRef = useRef(false)
+  const maybeUpgrade = useCallback(async () => {
+    if (upgradingRef.current) return
+    upgradingRef.current = true
+    try {
+      await load({ fresh: true, auto: true })
+    } finally {
+      upgradingRef.current = false
+    }
+  }, [load])
+
+  // Re-pick: user-forced fresh curation (bypasses the daily budget).
   const handleRefresh = useCallback(async () => {
     setRefreshing(true)
     try {
@@ -179,22 +200,33 @@ export function PriorityTiles({ onOpenQueue }: Props) {
     }
   }, [load])
 
+  // Mount: render the instant cache/fallback, then upgrade in the background
+  // only if the server flagged it stale (or returned an uncurated fallback).
   useEffect(() => {
     if (!orgId) return
     setLoading(true)
-    void load()
-  }, [orgId, load])
+    let cancelled = false
+    void load().then(res => {
+      if (cancelled) return
+      if (res && (res.stale || res.source === 'fallback')) void maybeUpgrade()
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [orgId, load, maybeUpgrade])
 
-  // After a document import (or any other client-side data change), force
-  // a fresh curation so the tiles reflect the new state immediately.
+  // After a document import (or any other client-side data change), upgrade to
+  // a fresh curation so the tiles reflect the new state (budget-capped).
   useEffect(() => {
-    const handler = () => void load({ fresh: true })
+    const handler = () => void maybeUpgrade()
     window.addEventListener('rosa:data-updated', handler)
     return () => window.removeEventListener('rosa:data-updated', handler)
-  }, [load])
+  }, [maybeUpgrade])
 
-  // Live updates: when any signal-relevant table changes, force a
-  // regeneration so the user sees Rosa react to their action.
+  // Live updates: a watched-table change means the signals moved, so upgrade
+  // to a fresh curation. Debounced by RealtimeRefreshProvider so a write burst
+  // coalesces into one call, and budget-capped — this replaces the previous
+  // un-debounced force-fresh-on-every-event storm.
   useRealtimeRefresh(
     [
       'agent_exceptions',
@@ -204,7 +236,7 @@ export function PriorityTiles({ onOpenQueue }: Props) {
       'supplier_esg_assessments',
     ],
     () => {
-      void load({ fresh: true })
+      void maybeUpgrade()
     },
   )
 
@@ -328,8 +360,12 @@ function PriorityTile({
             <span className="text-sm text-muted-foreground">{tile.unit}</span>
           )}
         </div>
-        <p className="mt-2 text-sm font-medium leading-snug">{tile.title}</p>
-        <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{tile.hint}</p>
+        <p className="mt-2 text-sm font-medium leading-snug">
+          <RichText>{tile.title}</RichText>
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
+          <RichText>{tile.hint}</RichText>
+        </p>
         {tile.recommendation && (
           <p
             className={cn(
@@ -338,7 +374,7 @@ function PriorityTile({
             )}
           >
             <Sparkles className="inline h-3 w-3 mr-1 -mt-0.5" />
-            Rosa: {tile.recommendation}
+            Rosa: <RichText>{tile.recommendation}</RichText>
           </p>
         )}
       </div>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { userHasOrgAccess } from '@/lib/supabase/verify-org-access';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -39,6 +40,13 @@ export async function POST(request: NextRequest) {
 
     if (!organizationId) {
       return NextResponse.json({ error: 'organization_id is required' }, { status: 400 });
+    }
+
+    // Verify the caller belongs to (or advises) the org they're requesting
+    // data for. The service-role client bypasses RLS, so this is the only
+    // guard preventing cross-tenant supplier enumeration.
+    if (!(await userHasOrgAccess(adminClient, user.id, organizationId))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Step 1: Get platform_supplier_ids linked to this brand org

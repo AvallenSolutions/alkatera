@@ -1,6 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+
+const CreatePostSchema = z.object({
+  title: z.string(),
+  slug: z.string().optional().nullable(),
+  excerpt: z.string().optional().nullable(),
+  content: z.string().optional().nullable(),
+  featured_image_url: z.string().optional().nullable(),
+  tags: z.array(z.string()).optional().nullable(),
+  content_type: z.string().optional().nullable(),
+  status: z.string().optional().nullable(),
+  read_time: z.number().optional().nullable(),
+  meta_title: z.string().optional().nullable(),
+  meta_description: z.string().optional().nullable(),
+  og_image_url: z.string().optional().nullable(),
+  author_name: z.string().optional().nullable(),
+  video_url: z.string().optional().nullable(),
+  video_duration: z.string().optional().nullable(),
+});
 
 // GET /api/blog - List blog posts
 export async function GET(request: NextRequest) {
@@ -102,7 +121,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    const parsed = CreatePostSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Invalid request body', details: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+    const body = parsed.data;
     const {
       title,
       slug,
@@ -175,7 +201,7 @@ export async function POST(request: NextRequest) {
         .eq('id', user.id)
         .single();
 
-      finalAuthorName = profile?.full_name || user.email?.split('@')[0] || 'AlkaTera Team';
+      finalAuthorName = profile?.full_name || user.email?.split('@')[0] || 'alkatera Team';
     }
 
     // Prepare blog post data (with all optional new columns)

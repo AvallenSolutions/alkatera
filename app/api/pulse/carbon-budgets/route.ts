@@ -7,7 +7,8 @@
  *
  * Variance maths:
  *   For each budget, find the most recent full period that has started and
- *   sum metric_snapshots.total_co2e (kg -> tonnes) within that window.
+ *   take the latest metric_snapshots.total_co2e (kg -> tonnes) in that window
+ *   (snapshots are calendar-year levels, not summable daily flows).
  *   variance_pct = (actual - budget) / budget * 100
  *   status       = 'on_track' (<= 0%), 'at_risk' (0-10%), 'over' (>10%)
  *
@@ -18,6 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { getMemberRole } from '@/app/api/stripe/_helpers/get-member-role';
+import { latestValue } from '@/lib/pulse/snapshot-latest';
 
 export const runtime = 'nodejs';
 
@@ -105,9 +107,11 @@ export async function GET(request: NextRequest) {
   // Compute variance per budget.
   const rows = (budgets ?? []).map(b => {
     const periodStart = currentPeriodStart(b.period).toISOString().slice(0, 10);
-    const actualKg = (snapshots ?? [])
-      .filter(s => (s.snapshot_date as string) >= periodStart)
-      .reduce((sum, s) => sum + Number(s.value ?? 0), 0);
+    // total_co2e is a calendar-year level: the period's actual is the latest
+    // snapshot in the period, not a sum of daily rows.
+    const actualKg = latestValue(
+      (snapshots ?? []).filter(s => (s.snapshot_date as string) >= periodStart) as any[],
+    );
     const actualT = actualKg / 1000;
     const variancePct =
       b.budget_tco2e > 0 ? ((actualT - b.budget_tco2e) / b.budget_tco2e) * 100 : 0;

@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { requireAlkateraAdmin } from '@/lib/admin/auth';
+
+const LinkAlkateraSchema = z.object({
+  organization_id: z.string().min(1),
+});
 
 /**
  * POST /api/admin/directory/brands/[id]/link-alkatera
@@ -26,22 +31,20 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const auth = await requireAlkateraAdmin();
   if (!auth.ok) return auth.response;
 
-  let body: { organization_id?: unknown };
+  let raw: unknown;
   try {
-    body = (await request.json()) as { organization_id?: unknown };
+    raw = await request.json();
   } catch {
     return NextResponse.json({ error: 'invalid_json' }, { status: 400 });
   }
-  const orgId =
-    typeof body.organization_id === 'string' && body.organization_id.length > 0
-      ? body.organization_id
-      : null;
-  if (!orgId) {
+  const parsed = LinkAlkateraSchema.safeParse(raw);
+  if (!parsed.success) {
     return NextResponse.json(
       { error: 'invalid_payload', detail: '`organization_id` required.' },
       { status: 400 },
     );
   }
+  const orgId = parsed.data.organization_id;
 
   // Verify the directory row exists and isn't already claimed.
   const { data: dirRow } = await auth.service

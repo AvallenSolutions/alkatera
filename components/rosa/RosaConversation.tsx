@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import React, { Fragment, useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import { Dog, RotateCcw, AlertTriangle, Download, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -307,6 +307,10 @@ const MD_LINK_RE = /(?<!!)\[([^\]]+)\]\((https?:\/\/[^\s)]+|\/[^\s)]+)\)/g
 const URL_RE = /https?:\/\/[^\s)]+/g
 const BOLD_RE = /\*\*([^*]+)\*\*/g
 const ITALIC_RE = /\*([^*]+)\*/g
+// Brand auto-styling: any case-insensitive "alkatera" mention outside another
+// matched token gets `tera` bolded so the brand reads correctly even when the
+// AI emits plain lowercase text.
+const BRAND_RE = /alkatera/gi
 
 interface Token {
   start: number
@@ -341,6 +345,17 @@ function renderInline(text: string): React.ReactNode {
   collect(URL_RE, m => <RosaLink key={key++} href={m[0]}>{m[0]}</RosaLink>)
   collect(BOLD_RE, m => <strong key={key++}>{m[1]}</strong>)
   collect(ITALIC_RE, m => <em key={key++}>{m[1]}</em>)
+  collect(BRAND_RE, m => {
+    const matched = m[0]
+    const head = matched.slice(0, 4)
+    const tail = matched.slice(4)
+    return (
+      <Fragment key={key++}>
+        {head}
+        <strong>{tail}</strong>
+      </Fragment>
+    )
+  })
 
   if (tokens.length === 0) return text
 

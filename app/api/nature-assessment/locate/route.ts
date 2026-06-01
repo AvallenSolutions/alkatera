@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 
 /**
  * GET /api/nature-assessment/locate
@@ -19,8 +20,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
     }
 
-    // Get org from user metadata
-    const orgId = user.user_metadata?.current_organization_id;
+    // Get the org the user genuinely has access to (member or active advisor)
+    const orgId = await resolveAccessibleOrg(supabase, user);
     if (!orgId) {
       return NextResponse.json({ error: 'No organisation selected' }, { status: 400 });
     }

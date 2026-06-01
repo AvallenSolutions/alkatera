@@ -224,7 +224,7 @@ function buildPrompt(args: DeepEnrichArgs): string {
     ? args.existingProducts.map((p) => `  - id "${p.id}": ${p.name}`).join('\n')
     : '  (none — we have no products on file yet)';
 
-  return `You are completing alka**tera**'s sustainability profile for the drinks brand below. Use the web_search tool extensively. Cite a URL for every fact you return.
+  return `You are completing alkatera's sustainability profile for the drinks brand below. Use the web_search tool extensively. Cite a URL for every fact you return.
 
 ${ctx.join('\n')}
 

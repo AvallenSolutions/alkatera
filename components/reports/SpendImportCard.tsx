@@ -20,7 +20,8 @@ import {
 } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { toast } from "sonner";
-import * as XLSX from "xlsx";
+// xlsx (~7MB) is loaded on demand inside the two handlers that need it, so it
+// never ships in the synchronous bundle of every page that embeds this card.
 
 interface SpendImportCardProps {
   reportId: string;
@@ -164,6 +165,7 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
 
       const supabase = getSupabaseBrowserClient();
 
+      const XLSX = await import("xlsx");
       const arrayBuffer = await file.arrayBuffer();
       const workbook = XLSX.read(arrayBuffer, { type: "array" });
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -382,7 +384,8 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
     }
   };
 
-  const downloadTemplate = () => {
+  const downloadTemplate = async () => {
+    const XLSX = await import("xlsx");
     const template = [
       {
         description: "Example: Flight to New York",

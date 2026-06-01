@@ -105,6 +105,14 @@ export function SignupForm({ redirectTo }: { redirectTo?: string }) {
         }
 
         setSuccess(true)
+
+        void fetch('/api/integrations/sender/sync-current-user', {
+          method: 'POST',
+          credentials: 'same-origin',
+        }).catch((senderErr) => {
+          console.warn('⚠️ SignupForm: Sender sync request failed:', senderErr)
+        })
+
         setTimeout(async () => {
           const destination = redirectTo || "/create-organization"
           console.log(`🚀 SignupForm: Redirecting to ${destination}...`)

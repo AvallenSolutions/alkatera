@@ -1,7 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
+
+// id is the only strictly-required field; the "at least one of
+// proxy_value / source / label" rule stays in the handler to preserve
+// its specific message. proxy_value is forwarded to the DB untouched.
+const ProxyPatchSchema = z.object({
+  id: z.string().optional().nullable(),
+  proxy_value: z.union([z.number(), z.string(), z.null()]).optional(),
+  source: z.string().optional().nullable(),
+  label: z.string().optional().nullable(),
+});
 
 /**
  * GET /api/admin/impact-proxy-values
@@ -102,8 +113,14 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    const body = await request.json();
-    const { id, proxy_value, source, label } = body;
+    const parsed = ProxyPatchSchema.safeParse(await request.json());
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Invalid request body', details: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+    const { id, proxy_value, source, label } = parsed.data;
 
     if (!id) {
       return NextResponse.json({ error: 'id is required' }, { status: 400 });

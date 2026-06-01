@@ -7,6 +7,7 @@ import { Navigation } from '@/marketing/components/Navigation';
 import { Footer } from '@/marketing/components/Footer';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { Brand } from '@/components/shared/Brand';
 
 const OrganicBackground = () => {
   return (
@@ -209,7 +210,7 @@ export function ManifestoPageClient() {
               Legacy is a long-term game
             </h3>
             <p className="font-mono text-sm md:text-base text-gray-400 max-w-2xl mx-auto">
-              The best brands are built to last for generations. Alkatera is the operating system for those who intend to be here in fifty years&apos; time. Don&apos;t just make a drink for today. Engineer a future for your craft.
+              The best brands are built to last for generations. <Brand /> is the operating system for those who intend to be here in fifty years&apos; time. Don&apos;t just make a drink for today. Engineer a future for your craft.
             </p>
           </div>
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { syncAlkateraCustomer } from '@/lib/sender'
 
 const allowedOrigin = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.alkatera.com'
 
@@ -136,6 +137,23 @@ export async function POST(request: NextRequest) {
         is_supplier: true,
       },
     })
+
+    if (userData.user.email) {
+      const fullName =
+        contact_name?.trim() ||
+        (typeof userData.user.user_metadata?.full_name === 'string'
+          ? userData.user.user_metadata.full_name
+          : null)
+      try {
+        await syncAlkateraCustomer({
+          email: userData.user.email,
+          fullName,
+          company: supplier_name?.trim() || null,
+        })
+      } catch (senderErr) {
+        console.error('Sender sync failed for supplier registration:', senderErr)
+      }
+    }
 
     return NextResponse.json(
       {

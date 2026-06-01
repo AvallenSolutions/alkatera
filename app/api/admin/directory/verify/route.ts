@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { requireAlkateraAdmin } from '@/lib/admin/auth';
 
 /**
@@ -11,26 +12,34 @@ import { requireAlkateraAdmin } from '@/lib/admin/auth';
  */
 const MAX_IDS = 500;
 
+// brand_ids is permissive (handler filters non-strings); status is the
+// constrained field, so a schema failure maps to invalid_status below.
+const VerifySchema = z.object({
+  brand_ids: z.array(z.unknown()).optional(),
+  status: z.enum(['verified', 'rejected']),
+});
+
 export async function POST(request: Request) {
   const auth = await requireAlkateraAdmin();
   if (!auth.ok) return auth.response;
 
-  let body: { brand_ids?: unknown; status?: unknown };
+  let raw: unknown;
   try {
-    body = await request.json();
+    raw = await request.json();
   } catch {
     return NextResponse.json({ error: 'invalid_json' }, { status: 400 });
   }
-  const ids = Array.isArray(body.brand_ids)
-    ? body.brand_ids.filter((x): x is string => typeof x === 'string')
-    : [];
-  const status = body.status;
-  if (status !== 'verified' && status !== 'rejected') {
+  const parsed = VerifySchema.safeParse(raw);
+  if (!parsed.success) {
     return NextResponse.json(
       { error: 'invalid_status', detail: "status must be 'verified' or 'rejected'" },
       { status: 400 },
     );
   }
+  const ids = Array.isArray(parsed.data.brand_ids)
+    ? parsed.data.brand_ids.filter((x): x is string => typeof x === 'string')
+    : [];
+  const status = parsed.data.status;
   if (ids.length === 0) {
     return NextResponse.json({ error: 'no_ids' }, { status: 400 });
   }

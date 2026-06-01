@@ -6,12 +6,14 @@
  *   - label + desc    human-readable metadata
  *   - footprint       size class on the uniform grid: '1x1' | '2x1' | '2x2'
  *   - exempt          optional: widget renders outside the grid (full-width band)
+ *   - explainer       plain-language "what / why / what to do" surfaced via the
+ *                     info affordance on each card (see PulseExplainer)
  *
  * Adding a new widget? Append a row here, write the component, and reference
- * it in components/pulse/PulseGrid.tsx renderer map. Layout migration is
- * automatic -- unrecognised entries in a saved layout are ignored, and
- * unknown width/height fields on saved items are overwritten from the
- * current registry footprint on read.
+ * it in components/pulse/widgetRenderers.tsx. Layout migration is automatic --
+ * unrecognised entries in a saved layout are ignored, and unknown width/height
+ * fields on saved items are overwritten from the current registry footprint on
+ * read.
  */
 
 export type WidgetId =
@@ -43,6 +45,23 @@ export type WidgetId =
 
 export type Footprint = '1x1' | '2x1' | '2x2';
 
+/**
+ * Plain-language help shown in the card's info popover. No jargon -- the reader
+ * may be a founder or CFO, not a sustainability specialist.
+ */
+export interface WidgetExplainer {
+  /** What this card shows, in one sentence. */
+  what: string;
+  /** Why it matters to the reader, in one sentence. */
+  why: string;
+  /** One concrete next step. Optional. */
+  todo?: string;
+  /** Where the number comes from, in plain terms. Optional. */
+  source?: string;
+  /** True when the figure is modelled / estimated rather than measured. */
+  isEstimate?: boolean;
+}
+
 export interface WidgetMeta {
   id: WidgetId;
   label: string;
@@ -57,6 +76,8 @@ export interface WidgetMeta {
   exempt?: boolean;
   /** Phase that introduced this widget -- shown in the "Add widget" sheet. */
   phase: number;
+  /** Plain-language help for the card's info affordance. */
+  explainer?: WidgetExplainer;
   /**
    * Back-compat: derived width / height / min dimensions for react-grid-layout.
    * Don't set these by hand -- call `footprintToLayout()` instead.
@@ -108,6 +129,12 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
     description: 'Claude-written brief explaining what changed and why.',
     footprint: '2x1',
     phase: 3,
+    explainer: {
+      what: 'A short brief, written fresh each morning, explaining what changed in your data and why.',
+      why: "It surfaces the one or two things worth your attention so you don't have to read every chart.",
+      todo: 'Read it each morning, or open it for the full write-up.',
+      source: 'Generated daily from your latest metrics, anomalies and targets.',
+    },
   }),
   'live-metrics-strip': withLayout({
     id: 'live-metrics-strip',
@@ -116,6 +143,11 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
     footprint: '2x1',
     exempt: true,
     phase: 1,
+    explainer: {
+      what: 'Your headline numbers, each updated as new data lands.',
+      why: 'A two-second read on where your key metrics sit today and which way they are moving.',
+      source: 'Your daily metric snapshots, with the pound value from your shadow prices.',
+    },
   }),
   'target-trajectory': withLayout({
     id: 'target-trajectory',
@@ -123,6 +155,12 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
     description: 'Forecast vs target with on-track / at-risk pill.',
     footprint: '2x1',
     phase: 4,
+    explainer: {
+      what: "Your progress towards a target, with a forecast of where today's pace lands you.",
+      why: "Shows whether you'll hit a commitment while there's still time to change course.",
+      todo: 'Set or adjust targets in Pulse > Targets.',
+      source: 'Your active targets compared against your metric history.',
+    },
   }),
   'alerts-inbox': withLayout({
     id: 'alerts-inbox',
@@ -130,6 +168,12 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
     description: 'Anomaly detector output. Acknowledge or dismiss.',
     footprint: '1x1',
     phase: 5,
+    explainer: {
+      what: 'Unusual movements in your data that have been flagged automatically.',
+      why: 'Catches data-entry errors and real changes early, before they reach a report.',
+      todo: 'Open an alert to see the likely cause, then acknowledge or dismiss it.',
+      source: 'Statistical checks run against your daily metric history.',
+    },
   }),
   'grid-carbon': withLayout({
     id: 'grid-carbon',
@@ -137,6 +181,12 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
     description: 'Live g CO₂/kWh + cleanest production window.',
     footprint: '1x1',
     phase: 6,
+    explainer: {
+      what: 'How clean the electricity grid is right now, and when it will be cleanest today.',
+      why: 'Running energy-heavy work in a greener window cuts your carbon for no extra cost.',
+      todo: 'Shift flexible, energy-intensive tasks into the cleanest window shown.',
+      source: 'Live national grid carbon-intensity data (UK today; EU coming next).',
+    },
   }),
   'peer-benchmark': withLayout({
     id: 'peer-benchmark',
@@ -144,6 +194,11 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
     description: 'Anonymised percentile vs your industry segment.',
     footprint: '1x1',
     phase: 7,
+    explainer: {
+      what: 'Where you sit against anonymised peers in your part of the industry.',
+      why: 'Tells you whether a number is good or bad relative to similar businesses.',
+      source: 'Aggregated, anonymised data from comparable organisations (minimum five).',
+    },
   }),
   'live-activity': withLayout({
     id: 'live-activity',
@@ -151,6 +206,11 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
     description: 'Chronological stream of every live event in the org.',
     footprint: '2x2',
     phase: 2,
+    explainer: {
+      what: 'A running feed of changes happening across your organisation.',
+      why: 'A live pulse of activity, handy for spotting what is moving right now.',
+      source: 'Real-time events from your emissions, product and supplier data.',
+    },
   }),
   'facility-impact': withLayout({
     id: 'facility-impact',
@@ -159,6 +219,11 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
       'Scope 1 & 2 utilities, water and waste over 12 months with live grid-carbon overlay.',
     footprint: '2x2',
     phase: 8,
+    explainer: {
+      what: 'Emissions, water and waste broken down by site over the last 12 months.',
+      why: 'Shows which facilities drive your footprint, so you know where to focus effort.',
+      source: 'Your facility utility, water and waste entries, with a live grid-carbon overlay.',
+    },
   }),
   'csrd-gaps': withLayout({
     id: 'csrd-gaps',
@@ -167,6 +232,12 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
       'ESRS disclosure points evaluated against your live data. Each gap has a one-click fix.',
     footprint: '1x1',
     phase: 9,
+    explainer: {
+      what: "How ready you are to report against the EU's sustainability disclosure rules.",
+      why: "Highlights exactly which data points you're still missing for compliance.",
+      todo: 'Work through each gap; many have a one-click fix.',
+      source: 'EU ESRS disclosure points checked against your live data.',
+    },
   }),
   'ask-rosa': withLayout({
     id: 'ask-rosa',
@@ -176,6 +247,10 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
     footprint: '2x2',
     exempt: true,
     phase: 10,
+    explainer: {
+      what: 'Ask questions about your sustainability data in plain language.',
+      why: 'Get answers without building a report or leaving the dashboard.',
+    },
   }),
   'supplier-hotspots': withLayout({
     id: 'supplier-hotspots',
@@ -184,6 +259,11 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
       'Top Scope 3 contributors with concentration risk and category split.',
     footprint: '2x1',
     phase: 11,
+    explainer: {
+      what: 'The suppliers contributing most to your supply-chain (Scope 3) emissions.',
+      why: 'Your biggest reduction opportunities usually sit with a handful of suppliers.',
+      source: 'Your completed product footprints, grouped by supplier.',
+    },
   }),
   'what-if': withLayout({
     id: 'what-if',
@@ -192,6 +272,11 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
       'Decarbonisation levers: renewables, heat pumps, HVO. Instant emissions and £-saving impact.',
     footprint: '2x1',
     phase: 12,
+    explainer: {
+      what: 'A playground to test decarbonisation moves like renewables, heat pumps or HVO.',
+      why: 'See the emissions and cost impact of a change before you commit to it.',
+      source: 'Modelled against your last 12 months of emissions.',
+    },
   }),
   'harvest-seasons': withLayout({
     id: 'harvest-seasons',
@@ -200,6 +285,12 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
       'Annual harvest windows for your crops. Anticipate seasonal supply and emissions spikes.',
     footprint: '2x1',
     phase: 13,
+    explainer: {
+      what: 'When your key crops are typically harvested through the year.',
+      why: 'Helps you anticipate seasonal swings in supply and emissions.',
+      source: 'A general crop calendar matched to your product ingredients.',
+      isEstimate: true,
+    },
   }),
   'financial-footprint': withLayout({
     id: 'financial-footprint',
@@ -207,6 +298,11 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
     description: 'Environmental cost of the last 12 months with year-on-year delta.',
     footprint: '2x2',
     phase: 14,
+    explainer: {
+      what: 'The cost of your environmental impact over the last 12 months, in pounds.',
+      why: 'Turns emissions and resource use into a number the whole business understands.',
+      source: 'Your live impact data multiplied by your shadow prices.',
+    },
   }),
   'scenario-sensitivity': withLayout({
     id: 'scenario-sensitivity',
@@ -215,6 +311,12 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
       'What happens to your annual carbon bill if UK ETS moves.',
     footprint: '2x1',
     phase: 15,
+    explainer: {
+      what: 'How your annual carbon bill changes if the carbon price moves.',
+      why: 'Shows how exposed you are to rising carbon costs.',
+      source: 'Your annual emissions priced at a range of illustrative carbon prices.',
+      isEstimate: true,
+    },
   }),
   'product-env-cost': withLayout({
     id: 'product-env-cost',
@@ -223,6 +325,11 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
       'Embedded £/unit for every product with a completed LCA.',
     footprint: '2x1',
     phase: 16,
+    explainer: {
+      what: 'The embedded environmental cost, in pounds, of each product you make.',
+      why: 'Reveals which products carry the most impact per unit sold.',
+      source: 'Your completed product life-cycle assessments, priced with shadow prices.',
+    },
   }),
   'regulatory-exposure': withLayout({
     id: 'regulatory-exposure',
@@ -231,6 +338,11 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
       'Annual £ liability under UK ETS, EU CBAM, Plastic Packaging Tax and Packaging EPR.',
     footprint: '2x1',
     phase: 17,
+    explainer: {
+      what: 'Your estimated annual liability under carbon and packaging regulations.',
+      why: "Quantifies the regulatory cost you're carrying so it isn't a surprise.",
+      source: 'Your emissions and packaging data assessed against UK ETS, EU CBAM, Plastic Packaging Tax and Packaging EPR.',
+    },
   }),
   macc: withLayout({
     id: 'macc',
@@ -239,6 +351,11 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
       'Decarbonisation levers plotted by tCO₂e abated vs £/t cost.',
     footprint: '2x2',
     phase: 18,
+    explainer: {
+      what: 'Your decarbonisation options ranked by cost per tonne of carbon saved.',
+      why: 'Shows the cheapest ways to cut carbon first, so your budget goes furthest.',
+      source: 'Modelled abatement levers applied to your emissions mix.',
+    },
   }),
   'carbon-budgets': withLayout({
     id: 'carbon-budgets',
@@ -247,6 +364,12 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
       'Monthly, quarterly or annual carbon budgets with traffic-light variance.',
     footprint: '2x1',
     phase: 19,
+    explainer: {
+      what: 'Your carbon budgets and how actual emissions are tracking against them.',
+      why: 'Keeps emissions on plan with a clear over-or-under signal.',
+      todo: 'Set budgets from this card if you have none yet.',
+      source: 'Budgets you set, compared against your metric history.',
+    },
   }),
   'cost-intensity': withLayout({
     id: 'cost-intensity',
@@ -256,6 +379,11 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
     footprint: '2x1',
     exempt: true,
     phase: 14,
+    explainer: {
+      what: 'Your environmental cost relative to revenue, headcount and units produced.',
+      why: 'Normalises impact so you can compare it fairly as the business grows.',
+      source: 'Your financial footprint divided by revenue, employees and production volumes.',
+    },
   }),
   'top-cost-drivers': withLayout({
     id: 'top-cost-drivers',
@@ -265,6 +393,11 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
     footprint: '2x2',
     exempt: true,
     phase: 14,
+    explainer: {
+      what: 'Your biggest environmental cost line items, ranked.',
+      why: 'Points straight at where the money and impact are concentrated.',
+      source: 'Your facility activity, priced and ranked by shadow-price cost.',
+    },
   }),
   'issb-disclosure': withLayout({
     id: 'issb-disclosure',
@@ -274,6 +407,12 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
     footprint: '1x1',
     exempt: true,
     phase: 14,
+    explainer: {
+      what: 'An auto-filled draft of the IFRS S2 climate financial disclosure.',
+      why: 'Gives you a head start on investor-ready and audit-ready climate reporting.',
+      source: 'Your emissions data mapped to IFRS S2 fields; some regulatory inputs use placeholder values until you enter them.',
+      isEstimate: true,
+    },
   }),
   'impact-valuation': withLayout({
     id: 'impact-valuation',
@@ -283,6 +422,11 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
     footprint: '2x1',
     exempt: true, // rendered inside FinancialGrid, not on the main Pulse grid
     phase: 20,
+    explainer: {
+      what: 'Your total impact across nature, people, society and governance, valued in pounds.',
+      why: 'A single, comparable figure for your full impact, useful for boards and tenders.',
+      source: 'The four-capital impact model applied to your data.',
+    },
   }),
 };
 

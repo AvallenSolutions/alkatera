@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 
 /**
  * Check arable beta access for the given organisation.
@@ -38,18 +39,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
     }
 
-    let organizationId = user.user_metadata?.current_organization_id;
+    const organizationId = await resolveAccessibleOrg(supabase, user);
     if (!organizationId) {
-      const { data: membership } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-      if (!membership) {
-        return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
-      }
-      organizationId = membership.organization_id;
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
     }
 
     const gateResponse = await checkArableAccess(supabase, organizationId);
@@ -86,18 +78,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 });
     }
 
-    let organizationId = user.user_metadata?.current_organization_id;
+    const organizationId = await resolveAccessibleOrg(supabase, user);
     if (!organizationId) {
-      const { data: membership } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-      if (!membership) {
-        return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
-      }
-      organizationId = membership.organization_id;
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
     }
 
     const gateResponse = await checkArableAccess(supabase, organizationId);

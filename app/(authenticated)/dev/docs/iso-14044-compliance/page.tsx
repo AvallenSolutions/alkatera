@@ -4,7 +4,7 @@ import { MarkdownDoc } from "@/components/dev/MarkdownDoc";
 
 const markdownContent = `# ISO 14044:2006 Compliance Analysis Report
 
-**Project**: Alkatera LCA Platform
+**Project**: alkatera LCA Platform
 **Analysis Date**: 26 November 2025
 **Standard**: ISO 14044:2006 Environmental management — Life cycle assessment — Requirements and guidelines
 **Objective**: Assess platform readiness to produce LCAs that meet ISO 14044 certification standards
@@ -13,7 +13,7 @@ const markdownContent = `# ISO 14044:2006 Compliance Analysis Report
 
 ## Executive Summary
 
-This document provides a comprehensive analysis of the Alkatera LCA platform against ISO 14044:2006 requirements. The platform demonstrates strong foundational compliance in workflow management, data provenance, and goal/scope definition, whilst requiring enhancements in interpretation phase documentation, uncertainty quantification, and critical review preparation.
+This document provides a comprehensive analysis of the alkatera LCA platform against ISO 14044:2006 requirements. The platform demonstrates strong foundational compliance in workflow management, data provenance, and goal/scope definition, whilst requiring enhancements in interpretation phase documentation, uncertainty quantification, and critical review preparation.
 
 **Compliance Status Overview:**
 - ✅ **COMPLIANT**: Goal and Scope Definition (Section 4.2)
@@ -924,7 +924,7 @@ productImpact = intensityFactor * volumePerUnit;
 
 ## 12. Conclusion
 
-The Alkatera LCA platform demonstrates **strong foundational compliance** with ISO 14044 in goal/scope definition, data collection, and data provenance. The implementation shows sophisticated understanding of LCA principles with excellent workflow management and security.
+The alkatera LCA platform demonstrates **strong foundational compliance** with ISO 14044 in goal/scope definition, data collection, and data provenance. The implementation shows sophisticated understanding of LCA principles with excellent workflow management and security.
 
 **Critical Gap**: The **Life Cycle Interpretation phase (Section 4.5) is non-compliant** and represents a blocking issue for any ISO 14044 certification claims. This is the highest priority for development.
 
@@ -948,7 +948,7 @@ export default function ISO14044CompliancePage() {
   return (
     <MarkdownDoc
       title="ISO 14044:2006 Compliance Analysis"
-      description="Comprehensive analysis of the Alkatera LCA platform against ISO 14044:2006 requirements for Life Cycle Assessment"
+      description="Comprehensive analysis of the alkatera LCA platform against ISO 14044:2006 requirements for Life Cycle Assessment"
       content={markdownContent}
       badge="Version 1.0"
     />

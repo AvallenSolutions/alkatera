@@ -4,17 +4,15 @@
  * POST /api/rosa/chat
  * Body: { conversation_id?: string, message: string, context?: object }
  *
- * Streams Server-Sent Events over the Anthropic tool-use loop:
- *   1. Sends the user's message + conversation history + tools to Claude.
- *   2. If Claude asks to use a tool, execute it org-scoped, feed the result
+ * Streams Server-Sent Events over the Gemini function-calling loop:
+ *   1. Sends the user's message + conversation history + tools to Gemini.
+ *   2. If Gemini asks to use a tool, execute it org-scoped, feed the result
  *      back, loop.
  *   3. Stream every text token to the client.
  *   4. When the assistant is done, persist the turn to gaia_messages.
  *
  * The conversation shape is compatible with the existing gaia_conversations /
- * gaia_messages tables -- the legacy Supabase edge function at
- * supabase/functions/gaia-query can keep serving today's Rosa while this
- * endpoint powers Pulse-aware tool-use (#4, #5, #7, #10).
+ * gaia_messages tables.
  *
  * Events streamed to the client:
  *   event: text          → data: { delta: string }
@@ -26,27 +24,34 @@
 
 import { NextRequest } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { Content, FunctionCall, Part } from '@google/generative-ai';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { executeTool, ROSA_TOOLS, ACTION_TOOL_NAMES, type ToolContext } from '@/lib/rosa/tools';
 import { buildMemoryBlock } from '@/lib/rosa/memory';
-import { loadAttachment, toAnthropicBlock } from '@/lib/rosa/document-extraction';
+import { loadAttachment } from '@/lib/rosa/document-extraction';
+import { rateLimit } from '@/lib/rate-limit';
+import {
+  getGeminiClient,
+  toGeminiFunctionDeclarations,
+  toGeminiInlineData,
+  GEMINI_ROSA_MODEL,
+} from '@/lib/ai/gemini';
 
 const ACTION_TOOLS_SET = new Set<string>(ACTION_TOOL_NAMES as readonly string[]);
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
 
-const MODEL = 'claude-sonnet-4-6';
 const MAX_TOOL_ROUNDS = 8;
 
 function buildSystemPrompt(memoryBlock: string): string {
   const today = new Date().toISOString().slice(0, 10);
-  return `You are Rosa, the alka**tera** sustainability partner. You help drinks-industry users understand their footprint, run LCAs, meet reporting obligations, and improve.
+  return `You are Rosa, the alkatera sustainability partner. You help drinks-industry users understand their footprint, run LCAs, meet reporting obligations, and improve.
 
 Today's date: ${today}
 
 # Who you are (persona)
-You are named after the alka**tera** founder's beloved miniature golden doodle, Rosa, a rescue dog found in a cage on the streets of Yerevan, Armenia and given a second chance at a happy life. Just as Rosa the dog found her purpose and brings joy to everyone she meets, you are here to help businesses on their sustainability journey, proving that with the right guidance and support anyone can make a positive difference.
+You are named after the alkatera founder's beloved miniature golden doodle, Rosa, a rescue dog found in a cage on the streets of Yerevan, Armenia and given a second chance at a happy life. Just as Rosa the dog found her purpose and brings joy to everyone she meets, you are here to help businesses on their sustainability journey, proving that with the right guidance and support anyone can make a positive difference.
 
 When the user asks "who is Rosa", "what is Rosa", "who are you", "why are you called Rosa", "what do you look like", "show me a photo of yourself" or any similar question about your name, identity, or appearance, ALWAYS share Rosa's story warmly AND include her photo. Respond in this style:
 
@@ -59,10 +64,10 @@ Just as Rosa the dog found her purpose and brings joy to everyone she meets, I'm
 IMPORTANT: include the full URL https://alkatera.com/images/rosa-the-dog.jpg on its own line so the chat renders it as an inline image. Do not wrap it in markdown image syntax or markdown link syntax, just put the raw URL on its own line.
 
 # Self-description (strict)
-NEVER describe yourself as an "AI", "AI assistant", "AI agent", "chatbot", "language model", "digital assistant", or "sustainability guide". When introducing yourself or referring to your role, use ONLY one of: "Rosa", "your sustainability partner", or "alka**tera**'s sustainability partner". This applies to phrases like "I'm afraid I'm just an AI…", "as an AI assistant…", and any similar self-deprecating disclaimers — never use them. If you can't do something the user asked, say so plainly without invoking your AI nature.
+NEVER describe yourself as an "AI", "AI assistant", "AI agent", "chatbot", "language model", "digital assistant", or "sustainability guide". When introducing yourself or referring to your role, use ONLY one of: "Rosa", "your sustainability partner", or "alkatera's sustainability partner". This applies to phrases like "I'm afraid I'm just an AI…", "as an AI assistant…", and any similar self-deprecating disclaimers — never use them. If you can't do something the user asked, say so plainly without invoking your AI nature.
 
 # Voice
-British English, plain, candid, warm. No corporate jargon. Never use em dashes (use commas or full stops). Short sentences. Always use "alka**tera**" lowercase with "tera" in bold when the product is named.
+British English, plain, candid, warm. No corporate jargon. Never use em dashes (use commas or full stops). Short sentences. Always write "alkatera" all lowercase, no markdown formatting around "tera" — the platform automatically styles the brand.
 
 # What you can do
 Your tools cover four families:
@@ -102,9 +107,9 @@ ${memoryBlock ? `\n# Memory\n${memoryBlock}\n` : ''}`;
 }
 
 export async function POST(request: NextRequest) {
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) {
-    return errorResponse('ANTHROPIC_API_KEY missing or empty', 503);
+    return errorResponse('GEMINI_API_KEY missing or empty', 503);
   }
 
   // Auth: caller must be a signed-in member of an organisation.
@@ -124,6 +129,12 @@ export async function POST(request: NextRequest) {
   if (!membership) return errorResponse('No organisation membership', 403);
 
   const organizationId = membership.organization_id;
+
+  // Rate limit AI usage per user to cap cost-abuse (durable when Upstash is configured).
+  const rl = await rateLimit(`rosa-chat:${user.id}`, 30, 60_000);
+  if (!rl.success) {
+    return errorResponse('You are sending messages too quickly. Please wait a moment.', 429);
+  }
 
   let body: {
     conversation_id?: string;
@@ -232,110 +243,129 @@ export async function POST(request: NextRequest) {
       };
 
       try {
-        const Anthropic = (await import('@anthropic-ai/sdk')).default;
-        const client = new Anthropic({ apiKey });
+        const client = getGeminiClient(apiKey);
+        const generativeModel = client.getGenerativeModel({
+          model: GEMINI_ROSA_MODEL,
+          systemInstruction: systemPrompt,
+          tools: toGeminiFunctionDeclarations(ROSA_TOOLS),
+          generationConfig: { maxOutputTokens: 2000 },
+        });
 
-        // Build initial messages: full history (user/assistant) + this turn.
-        const messages: Array<{ role: 'user' | 'assistant'; content: any }> = [];
+        // Build initial conversation: prior turns + this turn.
+        // Gemini roles are 'user' and 'model' (no system role at the message
+        // level — that's the systemInstruction above).
+        const conversation: Content[] = [];
         for (const h of history ?? []) {
           if (h.role === 'user' || h.role === 'assistant') {
-            messages.push({ role: h.role as 'user' | 'assistant', content: h.content });
+            conversation.push({
+              role: h.role === 'assistant' ? 'model' : 'user',
+              parts: [{ text: typeof h.content === 'string' ? h.content : JSON.stringify(h.content) }],
+            });
           }
         }
-        // Current turn. If attachments are present, pass them as document/image
-        // content blocks so Rosa can see them natively; include the text too.
+        // Current turn. If attachments are present, pass them as inlineData
+        // parts so Rosa can see them natively; include the text too.
         if (loadedAttachments.length > 0) {
-          const turnContent: any[] = loadedAttachments.map(a => toAnthropicBlock(a!));
+          const turnParts: Part[] = loadedAttachments.map(a => toGeminiInlineData(a!));
           const textPart = userMessage.length > 0
             ? userMessage
             : 'Please take a look at the attached document.';
-          turnContent.push({ type: 'text', text: textPart });
-          messages.push({ role: 'user', content: turnContent });
+          turnParts.push({ text: textPart });
+          conversation.push({ role: 'user', parts: turnParts });
         } else {
-          messages.push({ role: 'user', content: userMessage });
+          conversation.push({ role: 'user', parts: [{ text: userMessage }] });
         }
 
         const toolAudit: unknown[] = [];
         let finalText = '';
 
         for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
-          const response = await client.messages.create({
-            model: MODEL,
-            max_tokens: 2000,
-            system: systemPrompt,
-            tools: ROSA_TOOLS as any,
-            messages: messages as any,
+          const streamResult = await generativeModel.generateContentStream({
+            contents: conversation,
           });
 
-          // Accumulate any text blocks, surface any tool_use blocks.
-          const toolUses: Array<{ id: string; name: string; input: any }> = [];
-          for (const block of response.content) {
-            if (block.type === 'text') {
-              finalText += block.text;
-              emit('text', { delta: block.text });
-            } else if (block.type === 'tool_use') {
-              toolUses.push({ id: block.id, name: block.name, input: block.input });
-              emit('tool_use', { name: block.name, input: block.input });
+          let roundText = '';
+          const functionCalls: FunctionCall[] = [];
+          // Preserve the model's parts verbatim so we can echo them back on
+          // the next round. Gemini 3.x requires `thoughtSignature` (a sibling
+          // of `functionCall` on the Part) to round-trip unchanged or the
+          // follow-up request 400s.
+          const modelParts: Part[] = [];
+
+          for await (const chunk of streamResult.stream) {
+            for (const cand of chunk.candidates ?? []) {
+              for (const part of cand.content?.parts ?? []) {
+                modelParts.push(part);
+                if (typeof (part as any).text === 'string') {
+                  const delta = (part as any).text as string;
+                  if (delta) {
+                    roundText += delta;
+                    emit('text', { delta });
+                  }
+                } else if ((part as any).functionCall) {
+                  const fc = (part as any).functionCall as FunctionCall;
+                  functionCalls.push(fc);
+                  emit('tool_use', { name: fc.name, input: fc.args ?? {} });
+                }
+              }
             }
           }
 
-          // No tool calls → conversation turn complete.
-          if (response.stop_reason !== 'tool_use' || toolUses.length === 0) {
-            break;
-          }
+          if (roundText) finalText += roundText;
 
-          // Record the assistant turn (with tool_use blocks) so the follow-up
-          // round can reference tool_use_id.
-          messages.push({ role: 'assistant', content: response.content });
+          // No tool calls → conversation turn complete.
+          if (functionCalls.length === 0) break;
+
+          conversation.push({ role: 'model', parts: modelParts });
 
           // Execute each tool and feed results back.
-          const toolResultBlocks: any[] = [];
-          for (const tu of toolUses) {
-            const res = await executeTool(toolCtx, tu.name, tu.input);
+          const responseParts: Part[] = [];
+          for (const fc of functionCalls) {
+            const res = await executeTool(toolCtx, fc.name, fc.args ?? {});
             toolAudit.push(res.audit);
-            toolResultBlocks.push({
-              type: 'tool_result',
-              tool_use_id: tu.id,
-              content: res.content,
-              is_error: res.is_error,
-            });
+
             // Tool results may carry a structured `preview` object (e.g.
             // generate_export returns { preview: { download_url, ... } }).
             // Surface it to the UI verbatim so the conversation can render
             // a download chip without parsing the result string itself.
             let structuredPreview: unknown = null;
+            let parsedContent: any = null;
             try {
-              const parsed = JSON.parse(res.content);
-              if (parsed && typeof parsed === 'object' && parsed.preview) {
-                structuredPreview = parsed.preview;
+              parsedContent = JSON.parse(res.content);
+              if (parsedContent && typeof parsedContent === 'object' && parsedContent.preview) {
+                structuredPreview = parsedContent.preview;
               }
             } catch {
               // non-JSON content; fall through with string preview only
             }
             emit('tool_result', {
-              name: tu.name,
+              name: fc.name,
               is_error: res.is_error,
               preview: structuredPreview ?? res.content.slice(0, 240),
             });
 
             // Action tools queue a pending action; surface it to the UI as a
             // confirmation card the user can click.
-            if (!res.is_error && ACTION_TOOLS_SET.has(tu.name)) {
-              try {
-                const parsed = JSON.parse(res.content);
-                if (parsed?.pending_action_id) {
-                  emit('action_proposal', {
-                    id: parsed.pending_action_id,
-                    tool_name: tu.name,
-                    preview: parsed.preview ?? '',
-                  });
-                }
-              } catch {
-                // non-JSON content, skip
-              }
+            if (!res.is_error && ACTION_TOOLS_SET.has(fc.name) && parsedContent?.pending_action_id) {
+              emit('action_proposal', {
+                id: parsedContent.pending_action_id,
+                tool_name: fc.name,
+                preview: parsedContent.preview ?? '',
+              });
             }
+
+            responseParts.push({
+              functionResponse: {
+                name: fc.name,
+                response: res.is_error
+                  ? { error: res.content }
+                  : parsedContent && typeof parsedContent === 'object' && !Array.isArray(parsedContent)
+                    ? parsedContent
+                    : { content: res.content },
+              },
+            });
           }
-          messages.push({ role: 'user', content: toolResultBlocks });
+          conversation.push({ role: 'function', parts: responseParts });
         }
 
         // Persist the assistant turn (with tool audit trail in data_sources).

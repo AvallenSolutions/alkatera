@@ -13,11 +13,17 @@
  *       × shadow_price.price_per_unit          (e.g. £85 / tonne)
  *       = £ cost on that day
  *
+ * Snapshot semantics: each metric snapshot is a *level*, not a daily flow.
+ * total_co2e is the calendar-year corporate emissions as of that day;
+ * water_consumption is the trailing-12-month intake. So the annual cost is the
+ * LATEST snapshot value × price, never a sum of daily rows (summing 365 daily
+ * snapshots would multiply the real figure by ~365).
+ *
  * Aggregations:
- *   - trailing_12_months: sum of daily costs for the last 365 days
- *   - prior_12_months:    sum of daily costs for days 366-730 ago (for YoY)
- *   - by_metric:          breakdown of trailing_12 cost per metric
- *   - monthly:            12 monthly buckets, each summing daily costs
+ *   - trailing_12_months: latest snapshot value per metric × price
+ *   - prior_12_months:    latest value per metric ~12 months ago (for YoY)
+ *   - by_metric:          trailing cost per metric
+ *   - monthly:            for each month, the latest value per metric × price
  *
  * Currency: assumed GBP (matches our reference prices).
  */
@@ -27,6 +33,7 @@ import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { loadShadowPrices, type ShadowPrice } from '@/lib/pulse/shadow-prices';
 import type { MetricKey } from '@/lib/pulse/metric-keys';
+import { reliableYoyPct } from '@/lib/pulse/snapshot-latest';
 
 export const runtime = 'nodejs';
 
@@ -125,56 +132,70 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Reduce snapshots into:
-    //  1. monthly buckets (last 12 calendar months for the trend)
-    //  2. trailing-12 + prior-12 sums for the YoY delta
-    //  3. by-metric breakdown for the stacked bar
+    // Snapshots are levels, not flows, so we take the LATEST value per metric
+    // in each window rather than summing daily rows. Rows arrive ascending by
+    // date, so the last write per key is the most recent.
     const trailingCutoff = new Date(today);
     trailingCutoff.setDate(trailingCutoff.getDate() - 365);
     const priorCutoff = new Date(today);
     priorCutoff.setDate(priorCutoff.getDate() - 730);
 
-    let trailing12Total = 0;
-    let prior12Total = 0;
-    const trailingByMetric: Record<string, number> = {};
-    const monthlyMap = new Map<string, MonthlyBucket>();
+    const trailingLatest = new Map<string, number>();          // metric -> latest value (trailing 12m)
+    const priorLatest = new Map<string, number>();             // metric -> latest value (prior 12m)
+    const monthlyLatest = new Map<string, Map<string, number>>(); // month -> metric -> latest value
 
     for (const row of (snapshots ?? []) as DailySnapshot[]) {
-      const multiplier = gbpPerNativeUnit.get(row.metric_key);
-      if (multiplier === undefined) continue;
+      if (!gbpPerNativeUnit.has(row.metric_key)) continue;
       const value = Number(row.value ?? 0);
       if (!Number.isFinite(value)) continue;
-      const gbp = value * multiplier;
       const dateMs = new Date(row.snapshot_date).getTime();
 
       if (dateMs >= trailingCutoff.getTime()) {
-        trailing12Total += gbp;
-        trailingByMetric[row.metric_key] = (trailingByMetric[row.metric_key] ?? 0) + gbp;
-
-        // Bucket into the calendar month for the trend chart.
+        trailingLatest.set(row.metric_key, value);
         const monthKey = row.snapshot_date.slice(0, 7);
-        let bucket = monthlyMap.get(monthKey);
-        if (!bucket) {
-          bucket = { month: monthKey, total_gbp: 0, by_metric: {} };
-          monthlyMap.set(monthKey, bucket);
+        let mm = monthlyLatest.get(monthKey);
+        if (!mm) {
+          mm = new Map();
+          monthlyLatest.set(monthKey, mm);
         }
-        bucket.total_gbp += gbp;
-        bucket.by_metric[row.metric_key] = (bucket.by_metric[row.metric_key] ?? 0) + gbp;
+        mm.set(row.metric_key, value);
       } else if (dateMs >= priorCutoff.getTime()) {
-        prior12Total += gbp;
+        priorLatest.set(row.metric_key, value);
       }
     }
 
-    // Year-on-year change:
-    //   delta_gbp     = trailing - prior
-    //   delta_pct     = delta / prior   (null if prior is 0)
-    const deltaGbp = trailing12Total - prior12Total;
-    const deltaPct = prior12Total > 0 ? (deltaGbp / prior12Total) * 100 : null;
+    let trailing12Total = 0;
+    const trailingByMetric: Record<string, number> = {};
+    for (const [metric, value] of Array.from(trailingLatest.entries())) {
+      const gbp = value * (gbpPerNativeUnit.get(metric) ?? 0);
+      trailing12Total += gbp;
+      trailingByMetric[metric] = gbp;
+    }
 
-    // Sort the monthly buckets chronologically for the chart.
-    const monthly = Array.from(monthlyMap.values()).sort((a, b) =>
-      a.month.localeCompare(b.month),
-    );
+    let prior12Total = 0;
+    for (const [metric, value] of Array.from(priorLatest.entries())) {
+      prior12Total += value * (gbpPerNativeUnit.get(metric) ?? 0);
+    }
+
+    // Year-on-year change. delta_pct is suppressed (null) when the prior-year
+    // figure is unreliable -- see reliableYoyPct.
+    const deltaGbp = trailing12Total - prior12Total;
+    const deltaPct = reliableYoyPct(trailing12Total, prior12Total);
+
+    // Monthly trend: the annual liability as it stood each month (latest value
+    // per metric in the month × price), sorted chronologically.
+    const monthly: MonthlyBucket[] = Array.from(monthlyLatest.entries())
+      .map(([month, metricMap]) => {
+        const by_metric: Record<string, number> = {};
+        let total_gbp = 0;
+        for (const [metric, value] of Array.from(metricMap.entries())) {
+          const gbp = value * (gbpPerNativeUnit.get(metric) ?? 0);
+          by_metric[metric] = gbp;
+          total_gbp += gbp;
+        }
+        return { month, total_gbp, by_metric };
+      })
+      .sort((a, b) => a.month.localeCompare(b.month));
 
     return NextResponse.json({
       ok: true,

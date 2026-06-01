@@ -1,7 +1,7 @@
 import MethodologyPageContent from '../MethodologyPageContent';
 
 export const metadata = {
-  title: 'LCA Methodology - Blossom Tier | Alkatera',
+  title: 'LCA Methodology - Blossom Tier | alkatera',
   description: 'Standard methodology documentation for Blossom tier product passports.',
 };
 

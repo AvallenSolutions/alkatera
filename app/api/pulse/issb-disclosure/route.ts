@@ -21,6 +21,7 @@ import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { loadShadowPrices } from '@/lib/pulse/shadow-prices';
 import { calculateRegulatoryExposure } from '@/lib/pulse/regulatory-exposure';
 import { buildIssbDisclosure } from '@/lib/pulse/issb-disclosure';
+import { latestValue } from '@/lib/pulse/snapshot-latest';
 
 export const runtime = 'nodejs';
 
@@ -85,15 +86,15 @@ export async function GET(request: NextRequest) {
       .gte('snapshot_date', fmt(priorStart))
       .lte('snapshot_date', fmt(today));
 
-    let currentKg = 0;
-    let priorKg = 0;
-    for (const row of snaps ?? []) {
-      const date = row.snapshot_date as string;
-      const v = Number(row.value ?? 0);
-      if (!Number.isFinite(v)) continue;
-      if (date >= fmt(start)) currentKg += v;
-      else priorKg += v;
-    }
+    // total_co2e is a level (calendar-year emissions): take the latest value in
+    // each window, not a sum of daily snapshots.
+    const startStr = fmt(start);
+    const currentKg = latestValue(
+      (snaps ?? []).filter(r => (r.snapshot_date as string) >= startStr) as any[],
+    );
+    const priorKg = latestValue(
+      (snaps ?? []).filter(r => (r.snapshot_date as string) < startStr) as any[],
+    );
     const currentTonnes = currentKg / 1000;
     const priorTonnes = priorKg / 1000;
 

@@ -314,7 +314,7 @@ export default function TeamInvitePage() {
             <div className="mb-8 flex justify-center">
               <img
                 src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png"
-                alt="AlkaTera"
+                alt="alkatera"
                 className="h-12 md:h-14 w-auto object-contain"
               />
             </div>
@@ -368,7 +368,7 @@ export default function TeamInvitePage() {
             <div className="mb-8 flex justify-center">
               <img
                 src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png"
-                alt="AlkaTera"
+                alt="alkatera"
                 className="h-12 md:h-14 w-auto object-contain"
               />
             </div>
@@ -425,7 +425,7 @@ export default function TeamInvitePage() {
           <div className="mb-8 flex justify-center">
             <img
               src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png"
-              alt="AlkaTera"
+              alt="alkatera"
               className="h-12 md:h-14 w-auto object-contain"
             />
           </div>
@@ -435,7 +435,7 @@ export default function TeamInvitePage() {
             You&apos;re invited.
           </h1>
           <p className="text-white/50 text-center mb-8">
-            Join {invitation.organization_name} on AlkaTera
+            Join {invitation.organization_name} on alkatera
           </p>
 
           {/* Glassmorphism Card */}
@@ -495,7 +495,7 @@ export default function TeamInvitePage() {
                 <div className="flex items-start gap-3 p-4 bg-[#ccff00]/10 border border-[#ccff00]/20 rounded-xl">
                   <CheckCircle2 className="h-5 w-5 text-[#ccff00] flex-shrink-0 mt-0.5" />
                   <p className="text-sm text-white/80">
-                    You already have an AlkaTera account. Click below to join the team.
+                    You already have an alkatera account. Click below to join the team.
                   </p>
                 </div>
 

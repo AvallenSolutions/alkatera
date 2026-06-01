@@ -39,6 +39,7 @@ import type {
 import { WaterConsumptionChart } from '@/components/water/WaterConsumptionChart';
 import { WaterSourceBreakdownChart } from '@/components/water/WaterSourceBreakdownChart';
 import { WaterIntensityComparisonChart } from '@/components/water/WaterIntensityComparisonChart';
+import { RelatableMetric } from '@/components/shared/RelatableMetric';
 
 const FacilityWaterRiskMap = dynamic(
   () => import('@/components/water/FacilityWaterRiskMap').then(mod => mod.FacilityWaterRiskMap),
@@ -289,6 +290,14 @@ export function WaterDeepDive({
           subtitle={!hasOperationalWaterData ? 'No facility data' : undefined}
         />
       </div>
+
+      {displayTotalConsumption > 0 && (
+        <RelatableMetric
+          kind="water"
+          valueM3={displayTotalConsumption}
+          variant="light"
+        />
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-4">

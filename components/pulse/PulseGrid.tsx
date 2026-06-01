@@ -41,53 +41,11 @@ import type { LayoutItem } from '@/lib/pulse/layout';
 import { applyAdaptiveOrder } from '@/lib/pulse/ranking';
 import { usePulseEngagement } from '@/hooks/usePulseEngagement';
 import { PulseEditToolbar } from '@/components/pulse/PulseEditToolbar';
-import { FinancialFootprintCard } from '@/components/pulse/widgets/financial-footprint/FinancialFootprintCard';
-import { ScenarioSensitivityCard } from '@/components/pulse/widgets/scenario-sensitivity/ScenarioSensitivityCard';
-import { MaccCard } from '@/components/pulse/widgets/macc/MaccCard';
-import { CarbonBudgetsCard } from '@/components/pulse/widgets/carbon-budgets/CarbonBudgetsCard';
-import { RegulatoryExposureCard } from '@/components/pulse/widgets/regulatory-exposure/RegulatoryExposureCard';
-import { TargetTrajectoryCard } from '@/components/pulse/widgets/target-trajectory/TargetTrajectoryCard';
-import { FacilityImpactCard } from '@/components/pulse/widgets/facility-impact/FacilityImpactCard';
-// Phase U3 compact cards.
-import { AlertsInboxCard } from '@/components/pulse/widgets/alerts-inbox/AlertsInboxCard';
-import { GridCarbonCard } from '@/components/pulse/widgets/grid-carbon/GridCarbonCard';
-import { PeerBenchmarkCard } from '@/components/pulse/widgets/peer-benchmark/PeerBenchmarkCard';
-import { CsrdGapsCard } from '@/components/pulse/widgets/csrd-gaps/CsrdGapsCard';
-import { InsightCardCompact } from '@/components/pulse/widgets/insight-card/InsightCardCompact';
-import { WhatIfCard } from '@/components/pulse/widgets/what-if/WhatIfCard';
-import { HarvestSeasonsCard } from '@/components/pulse/widgets/harvest-seasons/HarvestSeasonsCard';
-import { ProductEnvCostCard } from '@/components/pulse/widgets/product-env-cost/ProductEnvCostCard';
-import { SupplierHotspotsCard } from '@/components/pulse/widgets/supplier-hotspots/SupplierHotspotsCard';
-import { LiveActivityCard } from '@/components/pulse/widgets/live-activity/LiveActivityCard';
+import { WIDGET_RENDERERS } from '@/components/pulse/widgetRenderers';
+import { WidgetCardProvider } from '@/components/pulse/WidgetCardContext';
 
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
-
-// Renderers for each widget id. `live-metrics-strip` and `ask-rosa` are exempt
-// (rendered by PulseShell as full-width bands) and don't appear here.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const RENDERERS: Partial<Record<WidgetId, () => ReactNode>> = {
-  // Phase U2 compact PulseCard variants. Click any of these and the drill
-  // overlay opens with the rich expanded view registered via expanded.tsx.
-  'financial-footprint': () => <FinancialFootprintCard />,
-  'scenario-sensitivity': () => <ScenarioSensitivityCard />,
-  macc: () => <MaccCard />,
-  'carbon-budgets': () => <CarbonBudgetsCard />,
-  'regulatory-exposure': () => <RegulatoryExposureCard />,
-  'target-trajectory': () => <TargetTrajectoryCard />,
-  'facility-impact': () => <FacilityImpactCard />,
-  // Phase U3 compact cards.
-  'insight-card': () => <InsightCardCompact />,
-  'alerts-inbox': () => <AlertsInboxCard />,
-  'grid-carbon': () => <GridCarbonCard />,
-  'peer-benchmark': () => <PeerBenchmarkCard />,
-  'live-activity': () => <LiveActivityCard />,
-  'csrd-gaps': () => <CsrdGapsCard />,
-  'supplier-hotspots': () => <SupplierHotspotsCard />,
-  'what-if': () => <WhatIfCard />,
-  'harvest-seasons': () => <HarvestSeasonsCard />,
-  'product-env-cost': () => <ProductEnvCostCard />,
-};
 
 /**
  * Grid geometry -- fixed. `1x1` footprint = 10 row units = 200px visible:
@@ -248,7 +206,7 @@ export function PulseGrid() {
       >
         {items.map(item => {
           const meta = WIDGET_REGISTRY[item.i];
-          const renderer = RENDERERS[item.i];
+          const renderer = WIDGET_RENDERERS[item.i];
           if (!meta || !renderer) return <div key={item.i} />;
           return (
             <div key={item.i} className="h-full overflow-hidden">
@@ -332,7 +290,9 @@ function WidgetCell({
           </Button>
         </div>
       )}
-      <div className={cn('h-full w-full', editMode ? 'pt-6' : '')}>{children}</div>
+      <div className={cn('h-full w-full', editMode ? 'pt-6' : '')}>
+        <WidgetCardProvider id={meta.id}>{children}</WidgetCardProvider>
+      </div>
     </div>
   );
 }

@@ -263,7 +263,7 @@ export default function NewBlogPost() {
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            You don&apos;t have permission to create blog posts. Only Alkatera administrators can manage blog content.
+            You don&apos;t have permission to create blog posts. Only alkatera administrators can manage blog content.
           </AlertDescription>
         </Alert>
       </div>

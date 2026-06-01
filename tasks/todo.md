@@ -1,208 +1,176 @@
-# Viticulture Improvements + Multi-Vintage Tracking
+# Performance — Quick Wins Bundle (2026-05-30)
 
-## Context
+Goal: make the platform (especially the Rosa landing page) feel faster. This
+bundle is the low-risk, boot-path subset of the 10-item performance audit.
 
-Research against global best practices (OIV GHGAP, EU PEFCR, IPCC 2019,
-SBTi FLAG, AWRI, SWNZ, SWGB) identified gaps in the viticulture calculator
-and an opportunity to add year-on-year vintage tracking.
+## Plan
+- [x] **#1 Hot-path DB indexes** — migration `supabase/migrations/20262702600000_perf_hot_path_indexes.sql`
+  - `organization_members(user_id)` — hottest query in the app, currently seq-scans
+  - `products(organization_id, created_at DESC)` — products had no org index at all
+  - `product_carbon_footprints(organization_id, status)` — ~6 Rosa hub queries/load
+  - [ ] **Tim to run the SQL in Supabase SQL editor (prod)** — see chat for CONCURRENTLY version
+- [x] **#2 Middleware auth scoping** — `middleware.ts`
+  - `getUser()` (a network round-trip to Supabase Auth) ran on every request but
+    was only used for the distributor redirect. Now early-returns for all
+    non-distributor paths. Safe: browser client refreshes session into cookies.
+- [x] **#6 Instant shell skeleton** — `components/layouts/AppLayout.tsx`
+  - Replaced the blank full-screen spinner with an `AppShellSkeleton` that mirrors
+    the real sidebar + header + content layout.
+- [x] **#10 (partial) Sidebar nav memoisation** — `components/layouts/Sidebar.tsx`
+  - The recursive nav tree (~40 items) rebuilt on every render. Now `useMemo`'d on
+    org/tier/feature deps; hoisted `TIER_DISPLAY_NAMES` to module scope.
 
-The codebase already has: AWARE water scarcity factors (`lib/calculations/water-risk.ts`),
-all 18 ReCiPe 2016 impact categories in `WaterfallResult`, a mature reporting-year
-system with fiscal year support (`hooks/useReportingPeriod.ts`, `hooks/usePersistedYear.ts`),
-and Recharts for charting.
+## Verification
+- [x] `pnpm typecheck` passes (exit 0, zero errors)
+- [x] Main-repo dev server compiles + serves all critical-path routes:
+      `/login` → 200, `/rosa` → 200, `/` → 200, no error output in build logs.
+      `/rosa` exercises the AppLayout skeleton + memoised Sidebar (SSR, no crash);
+      every route runs the new middleware (no 500).
+- [x] Distributor redirect preserved by construction — the distributor branch
+      logic is byte-for-byte unchanged; only a non-distributor early-return was
+      added above it.
+- [~] Logged-in visual (skeleton flash, nav gating) NOT captured: the skeleton is
+      a transient loading state and local login hits production. The nav memo
+      returns identical output to before (pure caching), so behaviour is unchanged.
 
----
-
-## Phase 1: Calculator Scientific Improvements
-
-### 1.1 Add crop residue N2O emissions
-**Why:** IPCC Chapter 11 requires N2O from crop residues returned to soil.
-Vine prunings are a significant nitrogen source that we currently ignore.
-**What:**
-- Add `pruning_residue_returned: boolean` field to `VineyardGrowingProfile` type
-  and questionnaire (Step 1: Soil & Land)
-- Add IPCC crop residue N2O calculation to `viticulture-calculator.ts`:
-  - Default pruning biomass: ~2.5 t DM/ha/yr for established vines
-  - N content of vine prunings: ~0.8% (IPCC Table 11.2)
-  - Apply EF1 by climate zone (same as fertiliser N)
-- Classify as FLAG emissions (field-level N2O)
-- Add migration to extend `vineyard_growing_profiles` column
-- Update unit tests
-
-### 1.2 Integrate AWARE water scarcity weighting
-**Why:** We track irrigation volume (m3) but don't apply scarcity weighting.
-A vineyard in Kent using 500 m3 has a very different real-world impact to one
-in Mendoza using 500 m3. The AWARE methodology is already in our codebase.
-**What:**
-- Import `getAwareFactor()` from `lib/calculations/water-risk.ts` in the
-  viticulture calculator
-- Use the vineyard's `location_country_code` to look up the AWARE factor
-- Populate `impact_water_scarcity` on the synthetic irrigation row
-  (currently only `impact_water` is set)
-- The aggregator and reports already handle `impact_water_scarcity`, so
-  no downstream changes needed
-- Update unit tests with scarcity-weighted assertions
-
-### 1.3 Expand pesticide impact beyond production emissions
-**Why:** Vineyards are among the most treated crops globally. We only capture
-the embodied carbon of manufacturing pesticides, missing ecotoxicity, human
-toxicity, and freshwater eutrophication from application. The WaterfallResult
-already has fields for all these categories.
-**What:**
-- Add characterisation factors for common vineyard pesticides:
-  - Copper fungicide (organic/conventional): freshwater ecotoxicity,
-    terrestrial ecotoxicity
-  - Sulfur: lower toxicity profile
-  - Synthetic fungicides (mancozeb, folpet): human toxicity, ecotoxicity
-  - Herbicides (glyphosate): freshwater eutrophication, ecotoxicity
-- Add `pesticide_type` enum: `copper_fungicide`, `sulfur`, `synthetic_fungicide`,
-  `generic` (current default)
-- Populate `impact_terrestrial_ecotoxicity`, `impact_freshwater_ecotoxicity`,
-  `impact_human_toxicity_non_carcinogenic`, `impact_freshwater_eutrophication`
-  on the synthetic pesticide row
-- Source factors from USEtox 2.0 / PestLCI consensus values
-- Add to questionnaire Step 2 (Inputs) as optional detail level
-- Update unit tests
-
-### 1.4 Add soil management options
-**Why:** Missing biochar and integrated practices. The research shows biochar-compost
-can increase sequestration from 0.156 to 0.356 Mg C/ha/yr.
-**What:**
-- Add to `SoilManagement` enum: `biochar_compost`, `regenerative_integrated`
-- Add corresponding defaults to `SOIL_CARBON_REMOVAL_DEFAULTS` in ghg-constants.ts:
-  - `biochar_compost`: 700 kg CO2e/ha/yr
-  - `regenerative_integrated`: 600 kg CO2e/ha/yr
-- Update questionnaire radio buttons
-- Update unit tests
+## Review
+- 4 changes shipped, all low-risk and on the boot path:
+  1. **Indexes** — migration file written; **SQL still needs running in prod** (chat).
+  2. **Middleware** — removed a Supabase Auth network round-trip from every
+     non-distributor request. Safe because the @supabase/ssr browser client
+     refreshes the session into the same cookies the server reads, and the
+     authenticated layout is a pass-through to the client `AppLayout` (no
+     server-side session gate).
+  3. **AppShellSkeleton** — blank spinner → layout-shaped skeleton (perceived perf).
+  4. **Sidebar memo** — nav tree no longer rebuilt on every render; only on
+     org/tier/feature changes. `hasFeature` (useCallback) + `usage` confirmed
+     stable, `completedMilestones`/`viticultureVisible` memoised, deps verified.
+- No behavioural changes intended; outputs identical, just fewer round-trips and
+  fewer recomputations.
 
 ---
 
-## Phase 2: Multi-Vintage Data Model + Year-on-Year Tracking
+# Performance — Rosa Deep Fix (#3 + #4) (2026-05-30)
 
-### 2.1 Add vintage year to growing profiles
-**Why:** Growing practices change year to year (different fertiliser amounts,
-weather-driven irrigation differences, yield variation). Best practice (AWRI)
-is to collect 3+ years and use median values. Users also want to track their
-improvement over time.
-**What:**
-- Add `vintage_year integer NOT NULL DEFAULT EXTRACT(YEAR FROM NOW())`
-  column to `vineyard_growing_profiles`
-- Change UNIQUE constraint from `(vineyard_id)` to `(vineyard_id, vintage_year)`
-- Update API routes to accept `vintage_year` parameter
-- Update questionnaire to show year selector at the top
-- Pre-populate new vintage from previous year's data (copy-forward)
-- Migration to backfill existing profiles with current year
+Plan: `~/.claude/plans/elegant-splashing-stream.md`. Pattern: instant cache +
+client-driven background refresh (serverless kills post-response promises, so
+the upgrade is client-driven, mirroring EsgVitalityScoreHero's two-stage load).
 
-### 2.2 Multi-vintage averaging in calculator
-**Why:** Single-year data is noisy (drought year vs wet year). The OIV and
-AWRI both recommend multi-year averaging.
-**What:**
-- Add `calculateMultiVintageImpacts()` function that:
-  - Accepts an array of `ViticultureCalculatorInput` (one per vintage)
-  - Calculates impacts for each vintage independently
-  - Returns median values across vintages (more robust than mean for outliers)
-  - Includes per-vintage breakdown for transparency
-  - Flags data quality as HIGH only when 3+ vintages available
-- Update `product-lca-calculator.ts` section 5c to query all vintage
-  profiles for a vineyard and use multi-vintage averaging
-- Add `vintages_used: number` and `vintage_years: number[]` to the
-  methodology notes
+## Done
+- [x] **#4a Closed-drawer fetch** — `components/rosa/RosaDrawer.tsx`
+  - Split into thin `RosaDrawer` (reads `isOpen`, `if (!isOpen) return null`) +
+    `RosaDrawerBody` (holds `useRosaConversation` + consume-effects). The recent-
+    conversations fetch no longer fires while the drawer is closed. Pinned forces
+    isOpen=true so auto-open/auto-resume preserved.
+- [x] **#4b Realtime consolidation** — new `lib/rosa/RealtimeRefreshProvider.tsx`,
+    rewrote `lib/rosa/useRealtimeRefresh.ts` (same signature), mounted provider in
+    `AppLayout`. ONE `rosa-live-${orgId}` channel over a hardcoded ~25-table union
+    (was ~7 per-card channels), 250ms trailing debounce per subscriber, latest-
+    callback ref (no resubscribe churn), org-switch teardown + timer clear.
+- [x] **#3b priority-tiles instant cache** — migration `..._priority_tile_cache_readiness.sql`
+    (+`readiness_json`). Route: cache SELECT first, return instantly without
+    building the ~31-query pack (TTL-only read, hash dropped from read path);
+    cold/legacy → fallback + seed cache; `?fresh=1` curates + writes cache;
+    `?fresh=1&auto=1` (background) respects daily budget, user Re-pick bypasses it.
+    Client `PriorityTiles.tsx`: instant render → background `fresh+auto` if stale;
+    realtime tick → guarded `maybeUpgrade` (replaces un-debounced fresh storm).
+- [x] **#3a vitality/composite instant cache** — migration `..._esg_snapshot_composite_json.sql`
+    (+`composite_json`, `composite_generated_at`). `snapshot.ts`: write full
+    composite + `loadLatestSnapshot`. Route: serve stored composite instantly
+    (skips the ~39-query rebuild), `?fresh=1` recomputes; `stale` flag from
+    age/day. Clients `VitalityHero` + `EsgVitalityScoreHero`: instant render →
+    background fresh if stale; ticks → guarded recompute (so /performance still
+    self-heals). `composite_json` carries the *_breakdown explainers /performance
+    + the modal read, so no parity loss.
 
-### 2.3 Vineyard dashboard page
-**Why:** Users need a dedicated place to see their vineyard's environmental
-performance over time, not just buried in product LCA results.
-**What:**
-- Create `/app/(authenticated)/vineyards/page.tsx` - vineyard list page
-  (replaces Settings-only access)
-- Create `/app/(authenticated)/vineyards/[id]/page.tsx` - single vineyard
-  detail page with:
-  - **Header:** Vineyard name, location, hectares, certification badge
-  - **Vintage selector:** Year dropdown (matching existing usePersistedYear pattern)
-  - **Growing profile summary card:** Key inputs for selected vintage
-  - **Impact breakdown card:** Climate, water, land, ecotoxicity for selected vintage
-  - **Year-on-year trend charts** (Recharts):
-    - Total emissions per hectare (line chart, all vintages)
-    - Emissions by source (stacked area: fertiliser, fuel, irrigation, pesticides)
-    - Water consumption + scarcity-weighted impact (dual axis)
-    - Soil carbon removals trend (bar chart)
-  - **Benchmark comparison:** How this vineyard compares to sector averages
-    (research found 0.9-1.9 kg CO2e/bottle 90% CI)
-  - **Improvement indicators:** Green/red arrows showing YoY change per category
-- Gate behind `viticulture_beta` FeatureGate
-- Add to sidebar under "Capture Data" (replace current Settings-only link)
+## Verification (Rosa deep fix)
+- [x] `pnpm typecheck` clean (exit 0, whole repo)
+- [x] rosa + vitality test suites: 160 files / 4760 tests pass. The only main-repo
+      failure is `lib/rosa/__tests__/actions.test.ts` ("expose the three action tool
+      names": expects 3, code has 10) — PRE-EXISTING + unrelated; it tests
+      `ACTION_TOOL_NAMES` in `lib/rosa/tools.ts`, which this work never touched.
+      The other 11 failures are `.claude/worktrees/*` copies of that same stale test
+      (vitest `exclude` omits `.claude/worktrees`).
+- [x] All changed routes compile + respond on :8888 — `/rosa` 200, `/performance`
+      200, `/api/rosa/priority-tiles` 401, `/api/vitality/composite` 401, plus the
+      `?fresh=1` / `?fresh=1&auto=1` variants. No 500s, no compile errors in logs.
+- [ ] **Tim to run BOTH new migrations in Supabase SQL editor (prod) — RUN FIRST,
+      before deploy.** Additive nullable columns (safe early); the snapshot/cache
+      writes include the new columns, so writing before they exist would fail the
+      whole upsert. Each ends with `NOTIFY pgrst, 'reload schema'`. SQL in chat.
+- [~] Authenticated runtime (1 websocket vs 7, no closed-drawer fetch, cache-hit
+      timing) NOT captured — local login hits prod and needs a real session.
+      Logic verified by construction + compile + tests; behaviour-preserving by design.
 
-### 2.4 Vintage history table
-**Why:** Users need to see all their vintages at a glance and manage them.
-**What:**
-- Add vintage history table component to vineyard detail page
-- Columns: Year, Yield (t/ha), Total Emissions (kg CO2e/ha), Water (m3/ha),
-  Soil Carbon (kg CO2e/ha), Data Quality grade, Actions (edit/copy/delete)
-- "Add New Vintage" button that copies forward from most recent year
-- Inline status badges: Complete (all fields filled) vs Incomplete
+## Pre-existing issues spotted (separate, not perf items)
+- `lib/rosa/__tests__/actions.test.ts` asserts exactly 3 action tool names but
+  `ACTION_TOOL_NAMES` now has 10 — stale test, update or delete.
+- vitest `exclude` doesn't list `.claude/worktrees`, so stale worktree test copies
+  run in the suite and add noise. Consider adding `.claude` to `exclude`.
 
 ---
 
-## Phase 3: Integration Polish
+# Performance — Bundle + config wins (2026-05-30)
 
-### 3.1 Product LCA vintage context
-**Why:** When a product LCA runs, the user should see which vintage data
-was used and how multi-vintage averaging affected the result.
-**What:**
-- Add viticulture methodology note to LCA results showing:
-  "Based on N vintages (2023, 2024, 2025) using median averaging"
-- Show per-vintage contribution in the LCA detail view
-- Flag if only 1 vintage available with recommendation to add more
+## Done & committed (2290aa6e)
+- [x] **#9 (partial) xlsx lazy-load** — `SpendImportCard.tsx` imports xlsx (~7MB)
+      on demand in the two handlers, not at module top. Off the scope-1-2 bundle.
+- [x] **#10 next.config images** — `formats: [avif, webp]` + `minimumCacheTTL` 30d.
+- [x] **#10 not-found font** — render-blocking Google Fonts `@import` → `next/font`.
+- [x] **#9 maps** — VERIFIED already dynamic-imported at call sites (OverviewTab,
+      WaterDeepDive). No change needed.
 
-### 3.2 Questionnaire improvements
-**Why:** Make data entry faster and more intuitive.
-**What:**
-- Auto-populate vineyard's country code and climate zone from vineyard record
-- Add "Copy from previous vintage" button
-- Add inline help tooltips explaining each field's purpose
-- Add validation warnings (e.g. yield >25 t/ha is unusually high)
-- Show sector benchmarks inline (e.g. "UK average: 5-8 t/ha")
+## Deferred (each needs its own focused session — NOT safe to rush)
+- **#9 framer-motion LazyMotion** — only pays off if ALL rendered landing files
+  stop importing full `motion`. That's 16 files in `marketing/` (incl. Navigation,
+  ContactModal, 8 landing sections) + `Showcase.tsx` uses `layoutId` (needs
+  `domMax`, not `domAnimation`). Requires a `LazyMotion` wrapper + converting every
+  `motion.`→`m.` across all 16, then visual QA of the public homepage. A naive
+  partial conversion throws at runtime. Scope it as a marketing-wide task.
+- **#9 recharts shared dynamic wrapper** — ~27 client components import recharts
+  eagerly; needs one `LazyChart` wrapper adopted across all + the 2,671-line
+  scope-1-2 page split. Mechanical but broad; own pass.
+- **#5 auth/org/subscription bootstrap RPC** — ✅ DONE & committed. New
+  `get_user_bootstrap()` (migration 20262702800000) composes get_organization_usage
+  + is_alkatera_admin + get_pending_approval_count; org context tries it then falls
+  back to the intact legacy path on any error (login can't break); subscription +
+  admin handed off via `lib/auth/bootstrap-cache.ts`. VOLATILE (self-healing UPDATE).
+  - [ ] **Tim: run migration 20262702800000 in Supabase SQL editor** (order-
+        independent for safety; only unlocks the speedup). Then verify per the plan:
+        SQL-in-isolation, equivalence (`get_user_bootstrap('org')->'subscription' =
+        get_organization_usage('org')`), one-round-trip in Network tab, and the
+        fallback drill (force the fn to return {error} → login still works via legacy).
+- **#8 calculateScope3 N+1** — ✅ DONE & committed (15db542b, parallelise-only).
+  The two serial per-product loops in `lib/calculations/corporate-emissions.ts` now
+  use `Promise.all` with order-preserving in-order sums → bit-identical output. The
+  frozen 24-case oracle (corporate-emissions + cross-surface-consistency) passes
+  UNCHANGED + 2 new concurrency cases (26 total). NO migration / NO prod action —
+  pure code change, safe to deploy. Full `.in()` batching (query-count cut) deferred
+  to its own pass with a real-prod before/after numeric diff (changes query shape +
+  oracle mocks).
+- **#7 client query cache** — ✅ FOUNDATION DONE & committed (3f8d2e1a). Added
+  @tanstack/react-query v5 + `components/providers/QueryProvider.tsx` (SSR-safe,
+  mounted between ThemeProvider and AuthProvider) + migrated `useProductSpotlight`
+  as the shape-preserving template (consumer unchanged). No prod action needed.
 
-### 3.3 Export and reporting
-**Why:** Wineries need to report their vineyard impacts externally.
-**What:**
-- Add vineyard impact data to the sustainability report generator
-- Include vintage trend charts in PDF/PPTX exports
-- Add OIV GHGAP-aligned summary format option
+  ### TanStack migration — remaining ~98 hooks (incremental, mechanical)
+  Recipe (documented in the header of `hooks/data/useProductSpotlight.ts`):
+  1. Extract the fetch body verbatim into a module-level `queryFn(orgId, ...)`.
+  2. `useQuery<T>({ queryKey: ['<resource>', orgId, ...params], queryFn,
+     enabled: !!orgId, staleTime: 60_000 })` — note the explicit `<T>` generic
+     (without it, consumers see `data` as `any`).
+  3. Map react-query's `{data,isLoading,error,refetch}` back onto the hook's
+     EXISTING public shape so consumers don't change.
+  Two legacy return-shape conventions to preserve per hook: `loading` (~67 files)
+  vs `isLoading` (~27). Port one hook (or a small related group) per PR, verify
+  against its consumer. Good next candidates: `useKpiSummary` (simplest),
+  `useSuppliers`, `useCompanyFootprint`. Leave realtime-subscription hooks
+  (`useNotifications`) and the 1378-line `useCompanyMetrics` for last.
+  Genuine multi-day migration: add lib + provider, port hooks incrementally with
+  per-hook testing. Biggest structural win but the largest effort; schedule it.
 
----
-
-## Implementation Order
-
-1. **Phase 1.1** - Crop residue N2O (quick win, ~1 hour)
-2. **Phase 1.4** - Soil management options (quick win, ~30 mins)
-3. **Phase 1.2** - AWARE water scarcity (moderate, ~1 hour, already have the code)
-4. **Phase 2.1** - Vintage year data model (foundation for everything else)
-5. **Phase 2.2** - Multi-vintage averaging (builds on 2.1)
-6. **Phase 2.3** - Vineyard dashboard page (biggest UX impact)
-7. **Phase 2.4** - Vintage history table (part of dashboard)
-8. **Phase 1.3** - Pesticide ecotoxicity (highest effort, can run in parallel)
-9. **Phase 3.1-3.3** - Integration polish (after core is solid)
-
----
-
-## Files Affected
-
-### New Files
-- `app/(authenticated)/vineyards/page.tsx`
-- `app/(authenticated)/vineyards/[id]/page.tsx`
-- `components/vineyards/VineyardDashboard.tsx`
-- `components/vineyards/VintageHistoryTable.tsx`
-- `components/vineyards/VineyardTrendCharts.tsx`
-- `components/vineyards/VineyardBenchmark.tsx`
-- `supabase/migrations/YYYYMMDD_viticulture_vintage_support.sql`
-- `supabase/migrations/YYYYMMDD_viticulture_crop_residue.sql`
-
-### Modified Files
-- `lib/viticulture-calculator.ts` - crop residue, AWARE, pesticide ecotox, multi-vintage
-- `lib/types/viticulture.ts` - new fields, enums, multi-vintage types
-- `lib/ghg-constants.ts` - crop residue constants, new soil management defaults
-- `lib/product-lca-calculator.ts` - multi-vintage query + averaging
-- `lib/__tests__/viticulture-calculator.test.ts` - new test cases
-- `components/vineyards/VineyardGrowingQuestionnaire.tsx` - new fields, vintage selector
-- `components/layouts/Sidebar.tsx` - update vineyards link to /vineyards/
-- `app/api/vineyards/[id]/growing-profile/route.ts` - vintage year support
+## Why deferred rather than half-shipped
+#5/#7/#8 all need real-session or golden-value verification that isn't possible
+from this environment (local `.env.local` points at prod; auth needs a live
+session). Landing them unverified would fail the "would a staff engineer approve"
+bar. Better to scope them precisely (above) and do each properly.

@@ -1,6 +1,14 @@
+'use client';
+
 import Script from 'next/script';
+import { useConsent } from '@/lib/consent';
 
 export function GoogleAnalytics() {
+  const consent = useConsent();
+
+  // Only load Google Analytics after explicit opt-in (PECR / UK GDPR).
+  if (consent !== 'accepted') return null;
+
   return (
     <>
       <Script

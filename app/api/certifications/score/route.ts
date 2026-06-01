@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 import { resolveUserOrganization } from '@/lib/supabase/resolve-organization';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 
 export async function GET(request: NextRequest) {
   try {
@@ -116,21 +117,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's current organization from metadata or first membership
-    let organizationId = user.user_metadata?.current_organization_id;
-
+    const organizationId = await resolveAccessibleOrg(supabase, user);
     if (!organizationId) {
-      const { data: membership, error: memberError } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (memberError || !membership) {
-        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
-      }
-      organizationId = membership.organization_id;
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
     }
 
     const body = await request.json();

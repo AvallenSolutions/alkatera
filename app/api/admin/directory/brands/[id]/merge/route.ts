@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { requireAlkateraAdmin } from '@/lib/admin/auth';
+
+const MergeSchema = z.object({
+  dupe_id: z.string().min(1),
+});
 
 /**
  * POST /api/admin/directory/brands/[id]/merge
@@ -16,20 +21,20 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const auth = await requireAlkateraAdmin();
   if (!auth.ok) return auth.response;
 
-  let body: { dupe_id?: unknown };
+  let raw: unknown;
   try {
-    body = (await request.json()) as { dupe_id?: unknown };
+    raw = await request.json();
   } catch {
     return NextResponse.json({ error: 'invalid_json' }, { status: 400 });
   }
-  const dupeId =
-    typeof body.dupe_id === 'string' && body.dupe_id.length > 0 ? body.dupe_id : null;
-  if (!dupeId) {
+  const parsed = MergeSchema.safeParse(raw);
+  if (!parsed.success) {
     return NextResponse.json(
       { error: 'invalid_payload', detail: '`dupe_id` required.' },
       { status: 400 },
     );
   }
+  const dupeId = parsed.data.dupe_id;
   if (dupeId === params.id) {
     return NextResponse.json(
       { error: 'invalid_payload', detail: 'Canonical and duplicate must differ.' },

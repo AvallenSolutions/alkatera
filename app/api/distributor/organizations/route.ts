@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 import { buildOrgSlug } from '@/lib/distributor/brand-normalizer';
 import { requireDistributor } from '@/lib/distributor/auth';
+import { syncAlkateraCustomer } from '@/lib/sender';
 
 const DISTRIBUTOR_ROLE_OWNER = 'owner';
 
@@ -110,6 +111,21 @@ export async function POST(request: Request) {
       { error: 'create_member_failed', detail: memberError?.message },
       { status: 500 },
     );
+  }
+
+  if (user.email) {
+    const fullName = typeof user.user_metadata?.full_name === 'string'
+      ? user.user_metadata.full_name
+      : null;
+    try {
+      await syncAlkateraCustomer({
+        email: user.email,
+        fullName,
+        company: name,
+      });
+    } catch (senderErr) {
+      console.error('Sender sync failed for distributor signup:', senderErr);
+    }
   }
 
   return NextResponse.json({ organization: org, member }, { status: 201 });

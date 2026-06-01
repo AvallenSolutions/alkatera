@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createClient } from '@supabase/supabase-js'
+import { syncAlkateraCustomer } from '@/lib/sender'
+
+const AcceptInviteSchema = z.object({
+  token: z.string().min(1),
+  user_id: z.string().min(1),
+})
 
 const allowedOrigin = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.alkatera.com'
 
@@ -58,14 +65,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { token, user_id } = await request.json()
-
-    if (!token || !user_id) {
+    const parsed = AcceptInviteSchema.safeParse(await request.json())
+    if (!parsed.success) {
       return NextResponse.json(
         { error: 'Invitation token and user_id are required' },
         { status: 400, headers: corsHeaders }
       )
     }
+    const { token, user_id } = parsed.data
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -170,11 +177,28 @@ export async function POST(request: NextRequest) {
     // is_supplier is critical — OrganizationContext uses it as a fallback
     // when get_supplier_context() RPC hasn't propagated yet.
     await adminClient.auth.admin.updateUserById(user_id, {
+      app_metadata: {
+        current_organization_id: invitation.organization_id,
+      },
       user_metadata: {
         current_organization_id: invitation.organization_id,
         is_supplier: true,
       },
     })
+
+    if (userData.user.email) {
+      const fullName = typeof userData.user.user_metadata?.full_name === 'string'
+        ? userData.user.user_metadata.full_name
+        : null
+      try {
+        await syncAlkateraCustomer({
+          email: userData.user.email,
+          fullName,
+        })
+      } catch (senderErr) {
+        console.error('Sender sync failed for supplier invite accept:', senderErr)
+      }
+    }
 
     return NextResponse.json(
       {

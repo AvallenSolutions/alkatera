@@ -20,6 +20,7 @@ import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { loadShadowPrices, type ShadowPrice } from '@/lib/pulse/shadow-prices';
 import { METRIC_DEFINITIONS, type MetricKey } from '@/lib/pulse/metric-keys';
+import { reliableYoyPct } from '@/lib/pulse/snapshot-latest';
 
 export const runtime = 'nodejs';
 
@@ -107,50 +108,66 @@ export async function GET(request: NextRequest) {
       tonnes_co2e: number;
       m3_water: number;
     }
-    const monthMap = new Map<string, MonthBucket>();
-
     // Also accumulate trailing-12 and prior-12 totals for the waterfall.
     const trailingByMetric: Record<string, number> = {};
     const priorByMetric: Record<string, number> = {};
 
+    // Snapshots are levels, not flows: take the LATEST value per metric in each
+    // window/month rather than summing daily rows (summing would multiply the
+    // real annual figure by the number of snapshots in the window).
+    const trailingLatest = new Map<string, number>();
+    const priorLatest = new Map<string, number>();
+    const monthlyLatest = new Map<string, Map<string, number>>();
+
     for (const row of snapshots ?? []) {
-      const mul = gbpMultiplier.get(row.metric_key as MetricKey);
-      if (mul === undefined) continue;
+      if (gbpMultiplier.get(row.metric_key as MetricKey) === undefined) continue;
       const v = Number(row.value ?? 0);
       if (!Number.isFinite(v)) continue;
-      const gbp = v * mul;
       const dateStr = row.snapshot_date as string;
       const dateMs = new Date(dateStr).getTime();
-      const inTrailing = dateMs >= start12.getTime();
 
-      if (inTrailing) {
-        trailingByMetric[row.metric_key as string] =
-          (trailingByMetric[row.metric_key as string] ?? 0) + gbp;
-
+      if (dateMs >= start12.getTime()) {
+        trailingLatest.set(row.metric_key as string, v);
         const monthKey = dateStr.slice(0, 7);
-        let bucket = monthMap.get(monthKey);
-        if (!bucket) {
-          bucket = {
-            month: monthKey,
-            total_gbp: 0,
-            by_metric_gbp: {},
-            tonnes_co2e: 0,
-            m3_water: 0,
-          };
-          monthMap.set(monthKey, bucket);
+        let mm = monthlyLatest.get(monthKey);
+        if (!mm) {
+          mm = new Map();
+          monthlyLatest.set(monthKey, mm);
         }
-        bucket.total_gbp += gbp;
-        bucket.by_metric_gbp[row.metric_key as string] =
-          (bucket.by_metric_gbp[row.metric_key as string] ?? 0) + gbp;
-        if (row.metric_key === 'total_co2e') bucket.tonnes_co2e += v / 1000;
-        else if (row.metric_key === 'water_consumption') bucket.m3_water += v;
+        mm.set(row.metric_key as string, v);
       } else {
-        priorByMetric[row.metric_key as string] =
-          (priorByMetric[row.metric_key as string] ?? 0) + gbp;
+        priorLatest.set(row.metric_key as string, v);
       }
     }
 
-    const monthly = Array.from(monthMap.values())
+    const gbpOf = (metric: string, v: number) =>
+      v * (gbpMultiplier.get(metric as MetricKey) ?? 0);
+
+    for (const [metric, v] of Array.from(trailingLatest.entries())) {
+      trailingByMetric[metric] = gbpOf(metric, v);
+    }
+    for (const [metric, v] of Array.from(priorLatest.entries())) {
+      priorByMetric[metric] = gbpOf(metric, v);
+    }
+
+    const monthly = Array.from(monthlyLatest.entries())
+      .map(([month, metricMap]) => {
+        const bucket: MonthBucket = {
+          month,
+          total_gbp: 0,
+          by_metric_gbp: {},
+          tonnes_co2e: 0,
+          m3_water: 0,
+        };
+        for (const [metric, v] of Array.from(metricMap.entries())) {
+          const gbp = gbpOf(metric, v);
+          bucket.total_gbp += gbp;
+          bucket.by_metric_gbp[metric] = gbp;
+          if (metric === 'total_co2e') bucket.tonnes_co2e = v / 1000;
+          else if (metric === 'water_consumption') bucket.m3_water = v;
+        }
+        return bucket;
+      })
       .sort((a, b) => a.month.localeCompare(b.month))
       .map(b => ({
         ...b,
@@ -267,8 +284,7 @@ export async function GET(request: NextRequest) {
           trailing_gbp: trailingTotal,
           prior_gbp: priorTotal,
           delta_gbp: trailingTotal - priorTotal,
-          delta_pct:
-            priorTotal > 0 ? ((trailingTotal - priorTotal) / priorTotal) * 100 : null,
+          delta_pct: reliableYoyPct(trailingTotal, priorTotal),
         },
         monthly,
         waterfall: waterfallSteps,

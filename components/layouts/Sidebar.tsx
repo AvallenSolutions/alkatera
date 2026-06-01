@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -58,6 +58,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
+import { peekBootstrapAdmin } from '@/lib/auth/bootstrap-cache'
 import { isViticultureEligible } from '@/lib/viticulture-utils'
 import { Badge } from '@/components/ui/badge'
 import { useSubscription } from '@/hooks/useSubscription'
@@ -336,6 +337,10 @@ const developmentStructure: NavItem[] = [
   },
 ]
 
+// Tier level → display name. Module-level constant so it's stable and never
+// needs to be a dependency of the memoised navigation tree below.
+const TIER_DISPLAY_NAMES: Record<number, string> = { 1: 'Seed', 2: 'Blossom', 3: 'Canopy' }
+
 interface SidebarProps {
   className?: string
 }
@@ -347,7 +352,7 @@ export function Sidebar({ className }: SidebarProps) {
   const [isAlkateraAdmin, setIsAlkateraAdmin] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
   const { usage, tierName, tierLevel, hasFeature, isLoading: subscriptionLoading } = useSubscription()
-  const completedMilestones = getCompletedMilestones(usage)
+  const completedMilestones = useMemo(() => getCompletedMilestones(usage), [usage])
 
   const [isCollapsed, setIsCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -366,62 +371,71 @@ export function Sidebar({ className }: SidebarProps) {
 
   const isOrgAdmin = userRole === 'owner' || userRole === 'admin'
 
-  const tierDisplayNames: Record<number, string> = { 1: 'Seed', 2: 'Blossom', 3: 'Canopy' }
+  const viticultureVisible = useMemo(
+    () => isViticultureEligible(currentOrganization, isAlkateraAdmin),
+    [currentOrganization, isAlkateraAdmin]
+  )
 
-  const viticultureVisible = isViticultureEligible(currentOrganization, isAlkateraAdmin)
-
-  // Mark navigation items as locked instead of hiding them
-  const filterNavItems = (items: NavItem[]): NavItem[] => {
-    return items
-      .filter((item) => {
-        // Completely hide viticulture-only items for non-wine orgs
-        if (item.viticultureOnly && !viticultureVisible) return false
-        // Hide items that require any of a set of features (none enabled = hidden)
-        if (item.requireAnyFeature && !item.requireAnyFeature.some(f => hasFeature(f as any))) return false
-        // Hide beta/feature-flagged items when the feature is not enabled
-        if (item.featureCode && !hasFeature(item.featureCode as any)) return false
-        // Hide items restricted to specific orgs
-        if (item.allowedOrgs && currentOrganization?.id && !item.allowedOrgs.includes(currentOrganization.id)) return false
-        return true
-      })
-      .map((item) => {
-        // Dividers pass through unchanged
-        if (item.type === 'divider') return item
-
-        const tierLocked = !!(item.minTier && tierLevel < item.minTier)
-        const featureLocked = !!(item.featureCode && !hasFeature(item.featureCode as any))
-        const milestoneLocked = !!(
-          item.requiresMilestone && !completedMilestones.has(item.requiresMilestone)
-        )
-        const isLocked = tierLocked || featureLocked || milestoneLocked
-        const requiredTierName = item.minTier ? tierDisplayNames[item.minTier] : undefined
-        // Tier/feature gates take priority over milestone (upgrade is the real blocker)
-        const lockReason: 'tier' | 'milestone' | undefined = isLocked
-          ? (tierLocked || featureLocked ? 'tier' : 'milestone')
-          : undefined
-        const unlockHint = milestoneLocked && item.requiresMilestone
-          ? MILESTONE_META[item.requiresMilestone].unlockHint
-          : undefined
-
-        return {
-          ...item,
-          locked: isLocked,
-          requiredTierName,
-          lockReason,
-          unlockHint,
-          // Recursively process children (but keep them even if locked)
-          children: item.children ? filterNavItems(item.children) : undefined,
-        }
-      })
-  }
-
-  // Build final navigation structure (all items are now in the main array)
   const isAdvisor = userRole === 'advisor'
-  const filteredNavigation = filterNavItems(navigationStructure).filter(item => {
-    // Hide Settings & Support from advisors — they don't manage org settings
-    if (isAdvisor && item.href === '/settings/') return false
-    return true
-  })
+
+  // Build + memoise the navigation tree. This recursive filter/map allocates a
+  // whole new tree (~40 items with children/grandchildren) and previously ran on
+  // EVERY render — every navigation, every menu expand/collapse, every org or
+  // subscription tick. It only actually depends on org/tier/feature state, so
+  // memoise on those and skip the rebuild for unrelated UI-state re-renders.
+  const filteredNavigation = useMemo(() => {
+    // Mark navigation items as locked instead of hiding them
+    const filterNavItems = (items: NavItem[]): NavItem[] => {
+      return items
+        .filter((item) => {
+          // Completely hide viticulture-only items for non-wine orgs
+          if (item.viticultureOnly && !viticultureVisible) return false
+          // Hide items that require any of a set of features (none enabled = hidden)
+          if (item.requireAnyFeature && !item.requireAnyFeature.some(f => hasFeature(f as any))) return false
+          // Hide beta/feature-flagged items when the feature is not enabled
+          if (item.featureCode && !hasFeature(item.featureCode as any)) return false
+          // Hide items restricted to specific orgs
+          if (item.allowedOrgs && currentOrganization?.id && !item.allowedOrgs.includes(currentOrganization.id)) return false
+          return true
+        })
+        .map((item) => {
+          // Dividers pass through unchanged
+          if (item.type === 'divider') return item
+
+          const tierLocked = !!(item.minTier && tierLevel < item.minTier)
+          const featureLocked = !!(item.featureCode && !hasFeature(item.featureCode as any))
+          const milestoneLocked = !!(
+            item.requiresMilestone && !completedMilestones.has(item.requiresMilestone)
+          )
+          const isLocked = tierLocked || featureLocked || milestoneLocked
+          const requiredTierName = item.minTier ? TIER_DISPLAY_NAMES[item.minTier] : undefined
+          // Tier/feature gates take priority over milestone (upgrade is the real blocker)
+          const lockReason: 'tier' | 'milestone' | undefined = isLocked
+            ? (tierLocked || featureLocked ? 'tier' : 'milestone')
+            : undefined
+          const unlockHint = milestoneLocked && item.requiresMilestone
+            ? MILESTONE_META[item.requiresMilestone].unlockHint
+            : undefined
+
+          return {
+            ...item,
+            locked: isLocked,
+            requiredTierName,
+            lockReason,
+            unlockHint,
+            // Recursively process children (but keep them even if locked)
+            children: item.children ? filterNavItems(item.children) : undefined,
+          }
+        })
+    }
+
+    // Build final navigation structure (all items are now in the main array)
+    return filterNavItems(navigationStructure).filter(item => {
+      // Hide Settings & Support from advisors — they don't manage org settings
+      if (isAdvisor && item.href === '/settings/') return false
+      return true
+    })
+  }, [viticultureVisible, hasFeature, currentOrganization, tierLevel, completedMilestones, isAdvisor])
 
   // Fetch admin status and pending approvals in parallel.
   // No need for a separate getUser() call — the user is already in context.
@@ -430,6 +444,16 @@ export function Sidebar({ className }: SidebarProps) {
     if (!currentOrganization?.id) {
       setIsAlkateraAdmin(false)
       setPendingCount(0)
+      return
+    }
+
+    // On first load, OrganizationProvider's get_user_bootstrap() RPC has
+    // usually already resolved admin status + pending count and stashed them.
+    // Use that instead of firing two more RPCs. A miss falls through to live.
+    const cachedAdmin = peekBootstrapAdmin()
+    if (cachedAdmin) {
+      setIsAlkateraAdmin(cachedAdmin.isAlkateraAdmin)
+      if (isOrgAdmin) setPendingCount(cachedAdmin.pendingApprovalCount)
       return
     }
 

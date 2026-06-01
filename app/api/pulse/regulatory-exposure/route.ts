@@ -25,6 +25,7 @@ import {
   calculateRegulatoryExposure,
   type RegulatoryInput,
 } from '@/lib/pulse/regulatory-exposure';
+import { latestValue } from '@/lib/pulse/snapshot-latest';
 
 export const runtime = 'nodejs';
 
@@ -71,15 +72,14 @@ export async function GET(request: NextRequest) {
 
     const { data: snapshots } = await svc
       .from('metric_snapshots')
-      .select('value')
+      .select('snapshot_date, value')
       .eq('organization_id', organizationId)
       .eq('metric_key', 'total_co2e')
       .gte('snapshot_date', fmt(start))
       .lte('snapshot_date', fmt(today));
-    const annualKg = (snapshots ?? []).reduce(
-      (sum, row: any) => sum + Number(row.value ?? 0),
-      0,
-    );
+    // total_co2e is a level (calendar-year emissions): take the latest value,
+    // not a sum of daily snapshots.
+    const annualKg = latestValue((snapshots ?? []) as any[]);
     const annualTonnes = annualKg / 1000;
 
     // Packaging tonnage + material breakdown. Try to pull from BOM data if

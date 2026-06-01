@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { safeCompare } from '@/lib/utils/safe-compare';
 
 interface WebhookPayload {
   task_id: string;
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 });
   }
 
-  if (secret !== expectedSecret) {
+  if (!secret || !safeCompare(secret, expectedSecret)) {
     console.warn('[SlideSpeak Webhook] Invalid secret received');
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

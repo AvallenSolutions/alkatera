@@ -20,8 +20,9 @@ export async function resolveUserOrganization(
   supabase: SupabaseClient<Database>,
   user: User,
 ): Promise<Result> {
+  // Prefer server-only app_metadata (CRIT-2), fall back to legacy user_metadata.
   const metadataOrgId: string | undefined =
-    user.user_metadata?.current_organization_id
+    user.app_metadata?.current_organization_id ?? user.user_metadata?.current_organization_id
 
   if (metadataOrgId) {
     // Verify the user is actually a member of this org

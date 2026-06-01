@@ -87,7 +87,10 @@ export async function detectAnomaliesForOrg(
     anomalies.push({
       organization_id: orgId,
       metric_key: metricKey as MetricKey,
-      detected_at: new Date().toISOString(),
+      // Day-granular so the (org, metric_key, detected_at) unique key dedupes
+      // per day. A full timestamp here meant every (e.g. hourly) run inserted
+      // a fresh row, flooding the alerts inbox with duplicates.
+      detected_at: `${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`,
       severity,
       observed: latest.value,
       expected: mean,

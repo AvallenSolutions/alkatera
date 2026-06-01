@@ -17,6 +17,9 @@
 import type { ComponentType, ReactNode } from 'react';
 import { Maximize2, Pin, PinOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { WIDGET_REGISTRY } from '@/lib/pulse/widget-registry';
+import { useWidgetCardId } from '@/components/pulse/WidgetCardContext';
+import { PulseExplainer } from '@/components/pulse/PulseExplainer';
 
 export type PulseCardFootprint = '1x1' | '2x1' | '2x2';
 
@@ -89,6 +92,9 @@ export function PulseCard({
   error,
   className,
 }: PulseCardProps) {
+  const widgetId = useWidgetCardId();
+  const explainer = widgetId ? WIDGET_REGISTRY[widgetId]?.explainer : undefined;
+
   return (
     <div
       className={cn(
@@ -133,6 +139,7 @@ export function PulseCard({
                 {status.label}
               </span>
             )}
+            {explainer && <PulseExplainer label={label} explainer={explainer} />}
             {onTogglePin && (
               <button
                 type="button"

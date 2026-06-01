@@ -4,6 +4,7 @@ import { Navigation } from '@/marketing/components/Navigation';
 import { Footer } from '@/marketing/components/Footer';
 import { useState } from 'react';
 import { ContactModal } from '@/marketing/components/ContactModal';
+import { Brand } from '@/components/shared/Brand';
 
 export function PrivacyPageClient() {
   const [isContactOpen, setIsContactOpen] = useState(false);
@@ -18,7 +19,7 @@ export function PrivacyPageClient() {
 
         <div className="prose prose-invert prose-gray max-w-none space-y-8 text-gray-300 leading-relaxed">
           <p>
-            Avallen Solutions Ltd trading as Alkatera (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;) operates the Alkatera platform (https://alkatera.com), a sustainability management system for the drinks industry. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our platform.
+            Avallen Solutions Ltd trading as <Brand /> (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;our&rdquo;) operates the <Brand /> platform (https://alkatera.com), a sustainability management system for the drinks industry. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our platform.
           </p>
 
           <section>
@@ -82,14 +83,31 @@ export function PrivacyPageClient() {
 
           <section>
             <h2 className="text-xl font-semibold text-white mt-10 mb-4">4. Data Sharing and Disclosure</h2>
-            <p>We may share your information with:</p>
+            <p>We share your information with the following categories of recipients:</p>
             <ul className="list-disc pl-6 space-y-1">
-              <li><strong className="text-white">Service Providers:</strong> Third parties who assist us in operating our platform (hosting, payment processing, analytics)</li>
+              <li><strong className="text-white">Sub-processors:</strong> Vetted third parties who process data on our behalf to operate the platform (listed below)</li>
               <li><strong className="text-white">Business Partners:</strong> With your consent, partners who provide complementary sustainability services</li>
               <li><strong className="text-white">Legal Requirements:</strong> When required by law, court order, or governmental authority</li>
               <li><strong className="text-white">Business Transfers:</strong> In connection with a merger, acquisition, or sale of assets</li>
             </ul>
             <p>We do not sell your personal information to third parties.</p>
+
+            <h3 className="text-lg font-semibold text-white mt-6 mb-3">Our sub-processors</h3>
+            <p>We use the following sub-processors, each bound by a data-processing agreement and processing data only on our instructions:</p>
+            <ul className="list-disc pl-6 space-y-1">
+              <li><strong className="text-white">Supabase</strong> and <strong className="text-white">Netlify</strong>: application hosting, database and file storage</li>
+              <li><strong className="text-white">Stripe</strong>: subscription and payment processing</li>
+              <li><strong className="text-white">Resend</strong> and <strong className="text-white">Sender</strong>: transactional and marketing email</li>
+              <li><strong className="text-white">Google Analytics</strong> and <strong className="text-white">PostHog</strong>: optional product and website analytics (only with your cookie consent)</li>
+              <li><strong className="text-white">Google (Gemini)</strong> and <strong className="text-white">Anthropic (Claude)</strong>: the AI models behind Rosa and our report and data-extraction features</li>
+              <li><strong className="text-white">SlideSpeak</strong> and <strong className="text-white">PDFShift</strong>: generating presentation and PDF reports</li>
+              <li><strong className="text-white">Google Maps</strong>: mapping and geocoding of facility locations</li>
+            </ul>
+
+            <h3 className="text-lg font-semibold text-white mt-6 mb-3">Processing by AI providers</h3>
+            <p>
+              Some features (our sustainability partner Rosa, automated report drafting, and document and website data extraction) send the relevant business and sustainability content you provide, together with limited account context, to the AI providers named above so they can generate a response. These providers act as our processors and return the generated output to us. We do not send special-category personal data to these providers.
+            </p>
           </section>
 
           <section>
@@ -146,7 +164,7 @@ export function PrivacyPageClient() {
             <h2 className="text-xl font-semibold text-white mt-10 mb-4">11. Contact Us</h2>
             <p>If you have questions about this Privacy Policy or our data practices, please contact us:</p>
             <p className="mt-2">
-              Avallen Solutions Ltd trading as Alkatera<br />
+              Avallen Solutions Ltd trading as <Brand /><br />
               Email: <a href="mailto:hello@alkatera.com" className="text-[#ccff00] hover:underline">hello@alkatera.com</a><br />
               Website: <a href="https://alkatera.com" className="text-[#ccff00] hover:underline">https://alkatera.com</a>
             </p>

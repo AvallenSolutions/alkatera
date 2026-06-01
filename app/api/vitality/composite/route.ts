@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { getSupabaseServerClient } from '@/lib/supabase/server-client'
+import { rateLimit } from '@/lib/rate-limit'
 import {
   composeVitality,
   computeEnvironmentalPillar,
@@ -31,8 +32,10 @@ import {
 } from '@/lib/vitality/composite'
 import {
   loadTrend,
+  loadLatestSnapshot,
   trendDelta,
   upsertSnapshot,
+  todayIso,
   type TrendPoint,
 } from '@/lib/vitality/snapshot'
 import {
@@ -103,6 +106,13 @@ export const maxDuration = 30
 const MODEL = 'claude-sonnet-4-6'
 const MAX_OUTPUT_TOKENS = 800
 
+// A stored composite older than this (or from a previous day) is still served
+// INSTANTLY but flagged `stale` so the client triggers a background ?fresh=1.
+// Generous because the composite is a heavy recompute that moves slowly;
+// intraday data changes are covered by the hero's realtime subscription, which
+// drives an immediate background refresh regardless of this window.
+const STALE_SOFT_MS = 30 * 60 * 1000
+
 interface ResponsePayload {
   composite: VitalityComposite
   trend: TrendPoint[]
@@ -111,6 +121,9 @@ interface ResponsePayload {
   read: VitalityRead | null
   source: 'curator' | 'fallback'
   generated_at: string
+  // True when the client should kick off a background ?fresh=1 recompute
+  // (served composite is older than STALE_SOFT_MS or from a previous day).
+  stale: boolean
 }
 
 async function resolveContext(req: NextRequest) {
@@ -1337,34 +1350,72 @@ export async function GET(req: NextRequest) {
   if ('error' in ctx) return ctx.error
   const { organizationId, service } = ctx
 
+  const rl = await rateLimit(`vitality-composite:${ctx.userId}`, 30, 60_000)
+  if (!rl.success) {
+    return NextResponse.json({ error: 'Rate limit exceeded. Please wait a moment and try again.' }, { status: 429 })
+  }
+
   // ?read=1 — opt in to the Claude-curated narrative. Default skips it so
   // the Rosa hub hero loads in ~DB-time (a few hundred ms). The breakdown
   // modal opts in once the user clicks through to view the deeper read.
   const url = new URL(req.url)
   const wantsAiRead = url.searchParams.get('read') === '1'
+  const forceFresh = url.searchParams.get('fresh') === '1'
+  const today = todayIso()
 
-  const [envInputs, socialInputs, govInputs, weights] = await Promise.all([
-    buildEnvironmentalInputs(service, organizationId),
-    buildSocialInputs(service, organizationId),
-    buildGovernanceInputs(service, organizationId),
-    loadOrgWeights(service, organizationId),
-  ])
+  // ── INSTANT READ PATH ──────────────────────────────────────────────────
+  // Serve the most recent stored composite without re-running the 4 pillar
+  // builders (~39 queries). composite_json carries the full object incl. the
+  // *_breakdown explainers /performance reads, so it's a complete substitute.
+  // Only a cold start (no snapshot / pre-migration row) or ?fresh=1 recomputes.
+  // The AI read (?read=1) curates from composite + trend, so it stays cheap on
+  // this path too — no rebuild needed to feed Claude.
+  let composite: VitalityComposite
+  let trend: TrendPoint[]
+  let compositeGeneratedAt: string | null = null
+  let snapshotDate: string | null = null
 
-  const composite = composeVitality({
-    e: computeEnvironmentalPillar(envInputs),
-    s: computeSocialPillar(socialInputs),
-    g: computeGovernancePillar(govInputs),
-    weights,
-  })
+  const cachedSnapshot = forceFresh
+    ? null
+    : await loadLatestSnapshot(service, organizationId)
 
-  // Run the snapshot write and the trend read in parallel — the trend
-  // read can include yesterday's row even before today's write commits,
-  // so this is safe and shaves a round-trip.
-  const [, trend] = await Promise.all([
-    upsertSnapshot(service, organizationId, composite),
-    loadTrend(service, organizationId),
-  ])
+  if (cachedSnapshot) {
+    composite = cachedSnapshot.composite
+    compositeGeneratedAt = cachedSnapshot.composite_generated_at
+    snapshotDate = cachedSnapshot.snapshot_date
+    trend = await loadTrend(service, organizationId)
+  } else {
+    const [envInputs, socialInputs, govInputs, weights] = await Promise.all([
+      buildEnvironmentalInputs(service, organizationId),
+      buildSocialInputs(service, organizationId),
+      buildGovernanceInputs(service, organizationId),
+      loadOrgWeights(service, organizationId),
+    ])
+
+    composite = composeVitality({
+      e: computeEnvironmentalPillar(envInputs),
+      s: computeSocialPillar(socialInputs),
+      g: computeGovernancePillar(govInputs),
+      weights,
+    })
+
+    // Run the snapshot write and the trend read in parallel — the trend
+    // read can include yesterday's row even before today's write commits,
+    // so this is safe and shaves a round-trip.
+    const [, tp] = await Promise.all([
+      upsertSnapshot(service, organizationId, composite, today),
+      loadTrend(service, organizationId),
+    ])
+    trend = tp
+    compositeGeneratedAt = composite.generated_at
+    snapshotDate = today
+  }
+
   const delta = trendDelta(trend)
+  const ageMs = compositeGeneratedAt
+    ? Date.now() - new Date(compositeGeneratedAt).getTime()
+    : Infinity
+  const stale = !forceFresh && (ageMs > STALE_SOFT_MS || snapshotDate !== today)
 
   // Curate via Claude only when requested AND the user is under their
   // daily budget; otherwise the deterministic fallback gives a usable
@@ -1402,7 +1453,8 @@ export async function GET(req: NextRequest) {
     band_description: BAND_DESCRIPTIONS[composite.band],
     read,
     source,
-    generated_at: new Date().toISOString(),
+    generated_at: compositeGeneratedAt ?? new Date().toISOString(),
+    stale,
   }
   return NextResponse.json(payload, {
     headers: { 'Cache-Control': 'no-store' },
