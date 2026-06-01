@@ -119,20 +119,50 @@ export default function UploadPage() {
     setStep('processing');
     setError(null);
     try {
+      // The import now runs in a background function (real catalogues are too
+      // big for a synchronous request — they 504'd). Kick it off, then poll
+      // the row until it lands on 'complete' or 'error'.
       const res = await fetch(`/api/distributor/sku-lists/${skuListId}/confirm`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ column_mapping: mapping }),
       });
-      if (!res.ok) {
+      if (!res.ok && res.status !== 202) {
         const json = (await res.json().catch(() => ({}))) as { error?: string; detail?: string };
         setError(`Import failed (${json.error ?? res.status}${json.detail ? `: ${json.detail}` : ''})`);
         setStep('error');
         return;
       }
-      const json = (await res.json()) as UploadResult;
-      setResult(json);
-      setStep('complete');
+
+      // Poll for up to ~10 minutes (2s interval). The background function
+      // writes status + import_result (or error_message) onto the row.
+      const deadline = Date.now() + 10 * 60 * 1000;
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const pollRes = await fetch(`/api/distributor/sku-lists/${skuListId}`, {
+          cache: 'no-store',
+        });
+        if (!pollRes.ok) continue;
+        const { sku_list } = (await pollRes.json()) as {
+          sku_list: {
+            status: string;
+            import_result: UploadResult | null;
+            error_message: string | null;
+          };
+        };
+        if (sku_list.status === 'complete' && sku_list.import_result) {
+          setResult(sku_list.import_result);
+          setStep('complete');
+          return;
+        }
+        if (sku_list.status === 'error') {
+          setError(`Import failed${sku_list.error_message ? `: ${sku_list.error_message}` : ''}`);
+          setStep('error');
+          return;
+        }
+      }
+      setError('Import is taking longer than expected. It may still be running — check your SKU lists shortly.');
+      setStep('error');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Import failed');
       setStep('error');
