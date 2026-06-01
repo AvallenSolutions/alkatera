@@ -33,7 +33,7 @@ const ORG_COLUMNS = `
  * by the verified `member.procurement_org_id`.
  */
 export async function requireProcurement(slug: string): Promise<ProcurementAuthResult> {
-  const { client, user, error } = await getSupabaseAPIClient();
+  const { client, user, error } = await getSupabaseAPIClient({ portalCookie: true });
   if (error || !user) {
     return { ok: false, status: 401, reason: 'unauthenticated' };
   }

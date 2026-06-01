@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getSupabasePortalServerClient } from '@/lib/supabase/portal-server-client';
 import { Button } from '@/components/ui/button';
 import { Building2, Upload } from 'lucide-react';
 import { BrandTable, type BrandTableRow } from '@/components/distributor/brand-list/brand-table';
@@ -9,7 +9,7 @@ import type { BrandProfile } from '@/types/distributor';
 export const dynamic = 'force-dynamic';
 
 export default async function DistributorBrandsPage() {
-  const supabase = getSupabaseServerClient() as unknown as SupabaseClient;
+  const supabase = getSupabasePortalServerClient() as unknown as SupabaseClient;
 
   const { data: user } = await supabase.auth.getUser();
   const userId = user.user?.id;

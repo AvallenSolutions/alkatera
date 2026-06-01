@@ -12,7 +12,7 @@ import {
   Package,
   ExternalLink,
 } from 'lucide-react';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getSupabasePortalServerClient } from '@/lib/supabase/portal-server-client';
 import {
   readMergedBrandData,
   pickActivePerField,
@@ -60,7 +60,7 @@ export default async function DiscoverBrandDetailPage({
 }: {
   params: { id: string };
 }) {
-  const supabase = getSupabaseServerClient() as unknown as SupabaseClient;
+  const supabase = getSupabasePortalServerClient() as unknown as SupabaseClient;
 
   const { data: userData } = await supabase.auth.getUser();
   const userId = userData.user?.id;

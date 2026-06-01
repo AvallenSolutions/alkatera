@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
+import { getSupabasePortalBrowserClient } from '@/lib/supabase/portal-browser-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function DistributorLoginPage() {
   const router = useRouter();
-  const supabase = getSupabaseBrowserClient();
+  const supabase = getSupabasePortalBrowserClient();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -46,19 +46,13 @@ export default function DistributorLoginPage() {
       return;
     }
 
-    // Not a distributor member. Before rejecting, check whether this is
-    // an alka**tera** staff account — admins reach the directory admin
-    // panel through the same login form (their alka**tera** session
-    // works here too), so route them to /admin rather than erroring.
-    const { data: isAdmin } = await supabase.rpc('is_alkatera_admin');
-    if (isAdmin) {
-      router.push('/admin');
-      router.refresh();
-      return;
-    }
-
+    // Not a distributor member. The portal session is separate from the main
+    // alka**tera** session now, so staff can't reach the admin panel from here
+    // (that lives on the main app). Clear the portal session and reject.
     await supabase.auth.signOut();
-    setError('No distributor account found for this email address.');
+    setError(
+      'No distributor account found for this email address. alkatera staff: sign in on the main app to reach the admin panel.',
+    );
     setLoading(false);
   }
 

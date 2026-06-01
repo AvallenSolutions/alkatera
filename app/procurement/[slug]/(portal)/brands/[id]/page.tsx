@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Building2 } from 'lucide-react';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getSupabasePortalServerClient } from '@/lib/supabase/portal-server-client';
 import { PageHeader } from '@/components/procurement/layout/page-header';
 import { SectionCard } from '@/components/procurement/layout/section-card';
 import { PillarBreakdown } from '@/components/sustainability/pillar-breakdown';
@@ -28,7 +28,7 @@ export default async function ProcurementBrandPage({
 }: {
   params: { slug: string; id: string };
 }) {
-  const supabase = getSupabaseServerClient() as unknown as SupabaseClient;
+  const supabase = getSupabasePortalServerClient() as unknown as SupabaseClient;
 
   const { data: org } = await supabase
     .from('procurement_organizations')

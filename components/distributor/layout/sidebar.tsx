@@ -14,7 +14,7 @@ import {
   Lock,
   type LucideIcon,
 } from 'lucide-react';
-import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
+import { getSupabasePortalBrowserClient } from '@/lib/supabase/portal-browser-client';
 import { useDistributor } from '@/lib/distributor/context';
 import { distributorCan } from '@/lib/distributor/capabilities';
 import { NotificationBell } from '@/components/distributor/notifications/notification-bell';
@@ -72,7 +72,7 @@ export function DistributorSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { organization, member, partnerProcurement } = useDistributor();
-  const supabase = getSupabaseBrowserClient();
+  const supabase = getSupabasePortalBrowserClient();
   const isPartnerMode = !!partnerProcurement;
 
   // Flag Discover + Reports as gated when in procurement-partner mode,

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { headers } from 'next/headers'
 import type { Database } from '@/types/db_types'
 import { getSupabaseServerClient } from './server-client'
+import { getSupabasePortalServerClient } from './portal-server-client'
 
 /**
  * Create a Supabase admin client using the service role key.
@@ -52,7 +53,7 @@ export function getSupabaseAdminClient() {
  * level using resolveUserOrganization(). The service role client is never returned
  * without a verified user.
  */
-export async function getSupabaseAPIClient() {
+export async function getSupabaseAPIClient(opts?: { portalCookie?: boolean }) {
   const headersList = headers()
   const authHeader = headersList.get('authorization')
 
@@ -112,8 +113,12 @@ export async function getSupabaseAPIClient() {
     };
   }
 
-  // Otherwise, use cookie-based authentication
-  const cookieClient = getSupabaseServerClient();
+  // Otherwise, use cookie-based authentication. Portal routes
+  // (distributor / procurement) read the separate portal auth cookie so
+  // their session is independent of the main app session.
+  const cookieClient = opts?.portalCookie
+    ? getSupabasePortalServerClient()
+    : getSupabaseServerClient();
   const { data: { user }, error } = await cookieClient.auth.getUser();
 
   // Return service role client for DB operations if available

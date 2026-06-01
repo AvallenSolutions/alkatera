@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
+import { getSupabasePortalBrowserClient } from '@/lib/supabase/portal-browser-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function DistributorUpdatePasswordPage() {
   const router = useRouter();
-  const supabase = getSupabaseBrowserClient();
+  const supabase = getSupabasePortalBrowserClient();
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

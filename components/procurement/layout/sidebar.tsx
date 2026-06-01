@@ -12,7 +12,7 @@ import {
   LogOut,
   type LucideIcon,
 } from 'lucide-react';
-import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
+import { getSupabasePortalBrowserClient } from '@/lib/supabase/portal-browser-client';
 import { useProcurement } from '@/lib/procurement/context';
 import { AlkaTeraIcon, AlkaTeraWordmark } from '@/components/lca-report/Logo';
 
@@ -67,7 +67,7 @@ export function ProcurementSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { organization, member } = useProcurement();
-  const supabase = getSupabaseBrowserClient();
+  const supabase = getSupabasePortalBrowserClient();
 
   const NAV_SECTIONS = buildNav(organization.slug);
 

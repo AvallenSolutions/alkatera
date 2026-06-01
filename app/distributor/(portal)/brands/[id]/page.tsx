@@ -9,7 +9,7 @@ import {
   Tag,
   ArrowRight,
 } from 'lucide-react';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getSupabasePortalServerClient } from '@/lib/supabase/portal-server-client';
 import { Button } from '@/components/ui/button';
 import { WebsiteEditor } from '@/components/distributor/brand-detail/website-editor';
 import { FindingStatus } from '@/components/distributor/brand-detail/finding-status';
@@ -33,7 +33,7 @@ const FIELD_LABEL = new Map(FIELD_DEFINITIONS.map((f) => [f.key, f.label]));
  * header + tab nav; this page is just the Overview content.
  */
 export default async function BrandOverviewPage({ params }: PageProps) {
-  const supabase = getSupabaseServerClient() as unknown as SupabaseClient;
+  const supabase = getSupabasePortalServerClient() as unknown as SupabaseClient;
   const { data: user } = await supabase.auth.getUser();
   const userId = user.user?.id;
   if (!userId) return null;

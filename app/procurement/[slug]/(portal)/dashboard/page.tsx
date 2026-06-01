@@ -8,7 +8,7 @@ import {
   Trophy,
   Gauge,
 } from 'lucide-react';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getSupabasePortalServerClient } from '@/lib/supabase/portal-server-client';
 import { loadProcurementDashboard } from '@/lib/procurement/dashboard';
 import { PageHeader } from '@/components/procurement/layout/page-header';
 import { SectionCard } from '@/components/procurement/layout/section-card';
@@ -28,7 +28,7 @@ export default async function ProcurementDashboardPage({
 }: {
   params: { slug: string };
 }) {
-  const supabase = getSupabaseServerClient();
+  const supabase = getSupabasePortalServerClient();
   const sb = supabase as unknown as SupabaseClient;
 
   const { data: orgRow } = await sb

@@ -10,7 +10,7 @@ import {
   Bell,
   type LucideIcon,
 } from 'lucide-react';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getSupabasePortalServerClient } from '@/lib/supabase/portal-server-client';
 import { Badge } from '@/components/ui/badge';
 
 export const dynamic = 'force-dynamic';
@@ -75,7 +75,7 @@ const ICONS: Record<
 };
 
 export default async function NotificationsPage() {
-  const supabase = getSupabaseServerClient() as unknown as SupabaseClient;
+  const supabase = getSupabasePortalServerClient() as unknown as SupabaseClient;
   const { data: user } = await supabase.auth.getUser();
   const userId = user.user?.id;
   if (!userId) return null;

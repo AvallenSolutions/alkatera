@@ -1,14 +1,14 @@
 import Link from 'next/link';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Bell, Mail } from 'lucide-react';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getSupabasePortalServerClient } from '@/lib/supabase/portal-server-client';
 import { Button } from '@/components/ui/button';
 import { OutreachTable, type OutreachBrandRow } from '@/components/distributor/outreach/outreach-table';
 
 export const dynamic = 'force-dynamic';
 
 export default async function OutreachPage() {
-  const supabase = getSupabaseServerClient() as unknown as SupabaseClient;
+  const supabase = getSupabasePortalServerClient() as unknown as SupabaseClient;
   const { data: user } = await supabase.auth.getUser();
   const userId = user.user?.id;
   if (!userId) return null;

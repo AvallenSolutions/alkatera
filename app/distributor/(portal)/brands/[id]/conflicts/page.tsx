@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ChevronLeft, AlertTriangle } from 'lucide-react';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getSupabasePortalServerClient } from '@/lib/supabase/portal-server-client';
 import { ConflictResolverUI, type ConflictRow } from '@/components/distributor/documents/conflict-resolver-ui';
 
 export const dynamic = 'force-dynamic';
@@ -11,7 +11,7 @@ interface PageProps {
 }
 
 export default async function BrandConflictsPage({ params }: PageProps) {
-  const supabase = getSupabaseServerClient() as unknown as SupabaseClient;
+  const supabase = getSupabasePortalServerClient() as unknown as SupabaseClient;
   const { data: user } = await supabase.auth.getUser();
   const userId = user.user?.id;
   if (!userId) return null;

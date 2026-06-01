@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
+import { getSupabasePortalBrowserClient } from '@/lib/supabase/portal-browser-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,7 +14,7 @@ export default function ProcurementLoginPage() {
   const router = useRouter();
   const params = useParams<{ slug: string }>();
   const slug = params?.slug ?? '';
-  const supabase = getSupabaseBrowserClient();
+  const supabase = getSupabasePortalBrowserClient();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

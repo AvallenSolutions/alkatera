@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { FileDown, FileSpreadsheet, BarChart3 } from 'lucide-react';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getSupabasePortalServerClient } from '@/lib/supabase/portal-server-client';
 import { Button } from '@/components/ui/button';
 import { UpgradePrompt } from '@/components/distributor/upgrade/upgrade-prompt';
 import { distributorCan } from '@/lib/distributor/capabilities';
@@ -9,7 +9,7 @@ import type { DistributorOrganization } from '@/types/distributor';
 export const dynamic = 'force-dynamic';
 
 export default async function ReportsPage() {
-  const supabase = getSupabaseServerClient() as unknown as SupabaseClient;
+  const supabase = getSupabasePortalServerClient() as unknown as SupabaseClient;
   const { data: user } = await supabase.auth.getUser();
   const userId = user.user?.id;
   if (!userId) return null;

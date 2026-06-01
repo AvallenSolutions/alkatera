@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getSupabasePortalServerClient } from '@/lib/supabase/portal-server-client';
 import { ProcurementProvider } from '@/lib/procurement/context';
 import { brandThemeCss } from '@/lib/procurement/branding';
 import { ProcurementSidebar } from '@/components/procurement/layout/sidebar';
@@ -24,7 +24,7 @@ export default async function ProcurementPortalLayout({
   params: { slug: string };
 }) {
   const slug = params.slug;
-  const supabase = getSupabaseServerClient();
+  const supabase = getSupabasePortalServerClient();
 
   const {
     data: { user },

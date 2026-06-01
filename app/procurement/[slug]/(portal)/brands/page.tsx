@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Building2 } from 'lucide-react';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getSupabasePortalServerClient } from '@/lib/supabase/portal-server-client';
 import { loadProcurementDashboard } from '@/lib/procurement/dashboard';
 import { BrandList } from '@/components/procurement/dashboard/brand-list';
 import { PageHeader } from '@/components/procurement/layout/page-header';
@@ -16,7 +16,7 @@ export default async function ProcurementBrandsPage({
 }: {
   params: { slug: string };
 }) {
-  const supabase = getSupabaseServerClient() as unknown as SupabaseClient;
+  const supabase = getSupabasePortalServerClient() as unknown as SupabaseClient;
 
   const { data: org } = await supabase
     .from('procurement_organizations')

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getSupabasePortalServerClient } from '@/lib/supabase/portal-server-client';
 import { Button } from '@/components/ui/button';
 import {
   Upload,
@@ -21,7 +21,7 @@ import { FindingActivityPill } from '@/components/distributor/dashboard/finding-
 export const dynamic = 'force-dynamic';
 
 export default async function DistributorDashboardPage() {
-  const supabase = getSupabaseServerClient() as unknown as SupabaseClient;
+  const supabase = getSupabasePortalServerClient() as unknown as SupabaseClient;
   const { data: user } = await supabase.auth.getUser();
   const userId = user.user?.id;
   if (!userId) return null;

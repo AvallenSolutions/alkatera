@@ -26,7 +26,7 @@ export type DistributorAuthResult = DistributorAuthSuccess | DistributorAuthFail
  * writes; never trust client-supplied org IDs.
  */
 export async function requireDistributor(): Promise<DistributorAuthResult> {
-  const { client, user, error } = await getSupabaseAPIClient();
+  const { client, user, error } = await getSupabaseAPIClient({ portalCookie: true });
   if (error || !user) {
     return { ok: false, status: 401, reason: 'unauthenticated' };
   }

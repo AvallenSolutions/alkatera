@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Upload, Inbox, FileSpreadsheet } from 'lucide-react';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getSupabasePortalServerClient } from '@/lib/supabase/portal-server-client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/procurement/layout/page-header';
@@ -22,7 +22,7 @@ export default async function ProcurementSkuListsPage({
 }: {
   params: { slug: string };
 }) {
-  const supabase = getSupabaseServerClient() as unknown as SupabaseClient;
+  const supabase = getSupabasePortalServerClient() as unknown as SupabaseClient;
 
   const { data: org } = await supabase
     .from('procurement_organizations')

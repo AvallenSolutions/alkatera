@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { AlertTriangle, ArrowRight } from 'lucide-react';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getSupabasePortalServerClient } from '@/lib/supabase/portal-server-client';
 import { PillarBreakdown } from '@/components/sustainability/pillar-breakdown';
 import { groupByPillar } from '@/lib/sustainability/pillars';
 import { readMergedBrandData, pickActivePerField } from '@/lib/distributor/integration/data-merger';
@@ -13,7 +13,7 @@ interface PageProps {
 }
 
 export default async function BrandDataTabPage({ params }: PageProps) {
-  const supabase = getSupabaseServerClient() as unknown as SupabaseClient;
+  const supabase = getSupabasePortalServerClient() as unknown as SupabaseClient;
   const { data: user } = await supabase.auth.getUser();
   const userId = user.user?.id;
   if (!userId) return null;

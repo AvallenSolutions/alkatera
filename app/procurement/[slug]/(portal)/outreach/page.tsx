@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Mail, Check, Clock, AlertCircle } from 'lucide-react';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getSupabasePortalServerClient } from '@/lib/supabase/portal-server-client';
 import { PageHeader } from '@/components/procurement/layout/page-header';
 
 export const dynamic = 'force-dynamic';
@@ -16,7 +16,7 @@ export default async function ProcurementOutreachPage({
 }: {
   params: { slug: string };
 }) {
-  const supabase = getSupabaseServerClient() as unknown as SupabaseClient;
+  const supabase = getSupabasePortalServerClient() as unknown as SupabaseClient;
 
   const { data: org } = await supabase
     .from('procurement_organizations')

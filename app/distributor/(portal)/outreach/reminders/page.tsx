@@ -1,13 +1,13 @@
 import Link from 'next/link';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ChevronLeft, Bell } from 'lucide-react';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getSupabasePortalServerClient } from '@/lib/supabase/portal-server-client';
 import { ReminderSchedulesUI, type ReminderScheduleRow } from '@/components/distributor/outreach/reminder-schedules-ui';
 
 export const dynamic = 'force-dynamic';
 
 export default async function ReminderSchedulesPage() {
-  const supabase = getSupabaseServerClient() as unknown as SupabaseClient;
+  const supabase = getSupabasePortalServerClient() as unknown as SupabaseClient;
   const { data: user } = await supabase.auth.getUser();
   const userId = user.user?.id;
   if (!userId) return null;

@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Mail, MailX, History } from 'lucide-react';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getSupabasePortalServerClient } from '@/lib/supabase/portal-server-client';
 import { Badge } from '@/components/ui/badge';
 import { BrandOutreachCard } from '@/components/distributor/outreach/brand-outreach-card';
 import type { BrandProfile } from '@/types/distributor';
@@ -20,7 +20,7 @@ const STATUS_COLOURS: Record<string, string> = {
 };
 
 export default async function BrandOutreachTabPage({ params }: PageProps) {
-  const supabase = getSupabaseServerClient() as unknown as SupabaseClient;
+  const supabase = getSupabasePortalServerClient() as unknown as SupabaseClient;
   const { data: user } = await supabase.auth.getUser();
   const userId = user.user?.id;
   if (!userId) return null;

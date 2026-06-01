@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ChevronLeft, Building2, MapPin } from 'lucide-react';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getSupabasePortalServerClient } from '@/lib/supabase/portal-server-client';
 import { Badge } from '@/components/ui/badge';
 import { BrandTabs } from '@/components/distributor/brand-detail/brand-tabs';
 
@@ -29,7 +29,7 @@ interface LayoutProps {
  * back-button-friendly, and Suspense-streaming-compatible.
  */
 export default async function BrandDetailLayout({ params, children }: LayoutProps) {
-  const supabase = getSupabaseServerClient() as unknown as SupabaseClient;
+  const supabase = getSupabasePortalServerClient() as unknown as SupabaseClient;
   const { data: user } = await supabase.auth.getUser();
   const userId = user.user?.id;
   if (!userId) return null;

@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getSupabasePortalServerClient } from '@/lib/supabase/portal-server-client';
 import { DistributorProvider } from '@/lib/distributor/context';
 import { DistributorSidebar } from '@/components/distributor/layout/sidebar';
 import { DistributorHeader } from '@/components/distributor/layout/header';
@@ -15,7 +15,7 @@ import type {
 export const dynamic = 'force-dynamic';
 
 export default async function DistributorLayout({ children }: { children: React.ReactNode }) {
-  const supabase = getSupabaseServerClient();
+  const supabase = getSupabasePortalServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

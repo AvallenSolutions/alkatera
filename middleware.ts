@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { PORTAL_AUTH_COOKIE } from '@/lib/supabase/portal-cookie'
 
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname
@@ -44,10 +45,13 @@ export async function middleware(request: NextRequest) {
     },
   })
 
+  // Portal paths (distributor / procurement) read the separate portal auth
+  // cookie so the portal session is independent of the main app session.
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: { name: PORTAL_AUTH_COOKIE },
       cookies: {
         get(name: string) {
           return request.cookies.get(name)?.value
