@@ -1,17 +1,7 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { runGroundedSearch, GEMINI_FAST_MODEL } from '@/lib/ai/gemini';
 
-const MODEL = 'claude-sonnet-4-6';
+const MODEL = GEMINI_FAST_MODEL;
 const MAX_TOKENS = 8000;
-const WEB_SEARCH_MAX_USES = 8;
-
-let cachedClient: Anthropic | null = null;
-function getClient(): Anthropic | null {
-  if (cachedClient) return cachedClient;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-  cachedClient = new Anthropic({ apiKey });
-  return cachedClient;
-}
 
 export interface SourcingFilters {
   /** spirits | wine | beer | non_alc | other */
@@ -205,16 +195,16 @@ export async function findBrandsBatched(opts: BatchOptions): Promise<FindBrandsR
 }
 
 /**
- * Use Claude with the web_search server tool to find real drinks
- * brands matching the filters (or a specific brand for a manual
- * query), and return them structured in the directory schema. The
- * caller ingests these as `pending` so they pass through the admin
- * review queue before going live.
+ * Use Gemini with Google Search grounding to find real drinks brands
+ * matching the filters (or a specific brand for a manual query), and
+ * return them structured in the directory schema. The caller ingests
+ * these as `pending` so they pass through the admin review queue before
+ * going live.
  */
 export async function findBrands(filters: SourcingFilters): Promise<FindBrandsResult> {
-  const client = getClient();
-  if (!client) {
-    return { brands: [], products: [], error: 'ANTHROPIC_API_KEY not configured' };
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return { brands: [], products: [], error: 'GEMINI_API_KEY not configured' };
   }
 
   const limit = Math.min(MAX_LIMIT, Math.max(1, filters.limit ?? 12));
@@ -222,24 +212,15 @@ export async function findBrands(filters: SourcingFilters): Promise<FindBrandsRe
 
   let combinedText = '';
   try {
-    const response = await client.messages.create({
+    combinedText = await runGroundedSearch({
+      apiKey,
       model: MODEL,
-      max_tokens: MAX_TOKENS,
-      tools: [
-        {
-          type: 'web_search_20250305',
-          name: 'web_search',
-          max_uses: WEB_SEARCH_MAX_USES,
-        } as unknown as Anthropic.Tool,
-      ],
-      messages: [{ role: 'user', content: prompt }],
+      prompt,
+      maxTokens: MAX_TOKENS,
     });
-    for (const block of response.content) {
-      if (block.type === 'text') combinedText += block.text + '\n';
-    }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    return { brands: [], products: [], error: `anthropic_error: ${message}` };
+    return { brands: [], products: [], error: `gemini_error: ${message}` };
   }
 
   const parsed = extractJson(combinedText);
