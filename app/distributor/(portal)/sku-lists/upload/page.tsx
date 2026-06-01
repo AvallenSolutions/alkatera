@@ -136,9 +136,10 @@ export default function UploadPage() {
         return;
       }
 
-      // Poll for up to ~10 minutes (2s interval). The background function
-      // writes status + import_result (or error_message) onto the row.
-      const deadline = Date.now() + 10 * 60 * 1000;
+      // Poll until just past the background function's 15-minute ceiling
+      // (2s interval). Stopping sooner risks showing a false "timed out"
+      // error while the background job is still legitimately running.
+      const deadline = Date.now() + 16 * 60 * 1000;
       while (Date.now() < deadline) {
         await new Promise((r) => setTimeout(r, 2000));
         const pollRes = await fetch(`/api/distributor/sku-lists/${skuListId}`, {
