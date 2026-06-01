@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireDistributor } from '@/lib/distributor/auth';
+import { distributorCan } from '@/lib/distributor/capabilities';
 import { buildPortfolioCsv, type PortfolioSkuRow } from '@/lib/distributor/exports/portfolio-csv';
 import type { FieldKey } from '@/lib/distributor/scraping/field-definitions';
 
@@ -16,6 +17,12 @@ export async function GET() {
   const auth = await requireDistributor();
   if (!auth.ok) {
     return NextResponse.json({ error: auth.reason }, { status: auth.status });
+  }
+  if (!distributorCan(auth.organization, 'export_portfolio_reports')) {
+    return NextResponse.json(
+      { error: 'upgrade_required', capability: 'export_portfolio_reports' },
+      { status: 402 },
+    );
   }
 
   // Brands in scope.

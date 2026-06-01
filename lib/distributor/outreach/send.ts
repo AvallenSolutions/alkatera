@@ -6,6 +6,7 @@ import {
   renderReminderEmail,
   renderSubmissionReceiptEmail,
   renderDistributorNotificationEmail,
+  type EmailCoBrand,
   type InitialOutreachArgs,
   type SubmissionReceiptArgs,
   type DistributorNotificationArgs,
@@ -17,6 +18,8 @@ export interface SendOutreachArgs extends InitialOutreachArgs {
   /** Reply-to lets brand replies route back to the distributor. */
   replyTo?: string | null;
 }
+
+export type { EmailCoBrand };
 
 export interface SendOutreachResult {
   ok: boolean;

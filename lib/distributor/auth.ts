@@ -36,7 +36,8 @@ export async function requireDistributor(): Promise<DistributorAuthResult> {
     .select(
       `id, distributor_org_id, user_id, role, brand_scope, category_scope, invited_by, joined_at,
        distributor_organizations:distributor_org_id (
-         id, name, slug, logo_url, website, primary_market, subscription_tier, created_at, updated_at
+         id, name, slug, logo_url, website, primary_market, subscription_tier,
+         is_procurement_partner, procurement_partner_since, created_at, updated_at
        )`,
     )
     .eq('user_id', user.id)

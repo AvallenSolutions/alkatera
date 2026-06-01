@@ -18,6 +18,15 @@
 
 @layer base {
   :root {
+    /* Tenant brand tokens (whitelabel layer). Default values match the
+       distributor portal's sky-400 / sky-500 accent so existing pages
+       are visually unchanged. Procurement / themed-distributor layouts
+       override these via an inline <style> block injected from the
+       server layout using the tenant's primary_color / accent_color. */
+    --brand-primary-rgb: 56 189 248;   /* sky-400 */
+    --brand-accent-rgb: 14 165 233;    /* sky-500 */
+    --brand-on-primary-rgb: 0 0 0;     /* foreground text on brand fill */
+
     /* Light Mode - AlkaTera Theme */
     --background: 0 0% 100%;
     --foreground: 0 0% 4%;
@@ -107,6 +116,47 @@
   /* Override body background for pages with full-page backgrounds */
   body:has([data-auth-page]) {
     background: transparent !important;
+  }
+
+  /* Procurement portal opts into a forced light theme regardless of the
+     html-level dark class, because each procurement tenant brings its
+     own brand backdrop (Foodbuy is white + teal). The CSS variables are
+     mirrors of the :root light-mode values from earlier in this file,
+     with a Foodbuy-tuned foreground (their dark navy #22223a). They
+     cascade to every Tailwind utility that reads --background,
+     --foreground, --card, etc. — so shadcn primitives render light
+     without next-themes intervention. */
+  .procurement-light {
+    --background: 220 20% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 222 47% 11%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 220 14% 94%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 222 47% 11%;
+    --sidebar: 0 0% 100%;
+    --sidebar-foreground: 222 47% 11%;
+    background-color: hsl(220 20% 98%);
+    color: hsl(222 47% 11%);
+    color-scheme: light;
+    font-feature-settings: "cv11", "ss01", "ss03";
+  }
+  .procurement-light h1,
+  .procurement-light h2,
+  .procurement-light h3 {
+    letter-spacing: -0.011em;
   }
 }
 

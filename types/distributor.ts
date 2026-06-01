@@ -10,6 +10,22 @@ export type ScoreTier = 'leader' | 'progressing' | 'developing' | 'insufficient'
 
 export type ListingStatus = 'active' | 'delisted';
 
+/**
+ * The procurement client a distributor is operating on behalf of, when
+ * they're a procurement-partner-tier distributor. The portal swaps to
+ * the procurement client's branding when this is set. Null for normal
+ * paying distributor customers.
+ */
+export interface PartnerProcurementBranding {
+  id: string;
+  name: string;
+  display_name: string | null;
+  parent_company: string | null;
+  logo_url: string | null;
+  primary_color: string | null;
+  accent_color: string | null;
+}
+
 export interface DistributorOrganization {
   id: string;
   name: string;
@@ -18,6 +34,10 @@ export interface DistributorOrganization {
   website: string | null;
   primary_market: string | null;
   subscription_tier: SubscriptionTier;
+  /** Free tier granted when a procurement client lists this distributor as a channel. Gates SKU upload, Discover, report export. */
+  is_procurement_partner: boolean;
+  /** When this distributor became a procurement partner. Null for direct paying customers. */
+  procurement_partner_since: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -143,4 +163,6 @@ export interface SkuListParseResult {
 export interface DistributorContextValue {
   organization: DistributorOrganization;
   member: DistributorMember;
+  /** The procurement client the distributor is operating on behalf of (if procurement-partner tier). */
+  partnerProcurement: PartnerProcurementBranding | null;
 }

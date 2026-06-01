@@ -1,17 +1,17 @@
 import {
-  Leaf,
+  Cloud,
   Droplets,
-  Package,
-  Sprout,
+  Recycle,
+  Leaf,
+  Users,
   ShieldCheck,
-  Building2,
   type LucideIcon,
 } from 'lucide-react';
 import {
   FIELD_DEFINITIONS,
   type FieldKey,
-  type Pillar,
 } from '@/lib/distributor/scraping/field-definitions';
+import { pillarForField, type PillarKey } from '@/lib/sustainability/pillars';
 import { Badge } from '@/components/ui/badge';
 
 export interface DataStatusRow {
@@ -27,22 +27,23 @@ interface Props {
   rows: DataStatusRow[];
 }
 
-const PILLAR_ORDER: Pillar[] = [
-  'carbon',
+// Six canonical ESG pillars, shared with the procurement portal.
+const PILLAR_ORDER: PillarKey[] = [
+  'climate',
   'water',
-  'packaging',
-  'agriculture',
+  'circularity',
+  'nature',
+  'social',
   'governance',
-  'corporate',
 ];
 
 const PILLAR_META: Record<
-  Pillar,
+  PillarKey,
   { label: string; icon: LucideIcon; chipBg: string; chipText: string; chipBorder: string; bar: string }
 > = {
-  carbon: {
-    label: 'Carbon',
-    icon: Leaf,
+  climate: {
+    label: 'Climate',
+    icon: Cloud,
     chipBg: 'bg-emerald-500/10',
     chipText: 'text-emerald-300',
     chipBorder: 'border-emerald-400/30',
@@ -56,37 +57,37 @@ const PILLAR_META: Record<
     chipBorder: 'border-cyan-400/30',
     bar: 'bg-gradient-to-b from-cyan-400 to-cyan-500/40',
   },
-  packaging: {
-    label: 'Packaging',
-    icon: Package,
+  circularity: {
+    label: 'Circularity',
+    icon: Recycle,
     chipBg: 'bg-amber-500/10',
     chipText: 'text-amber-300',
     chipBorder: 'border-amber-400/30',
     bar: 'bg-gradient-to-b from-amber-400 to-amber-500/40',
   },
-  agriculture: {
-    label: 'Agriculture & ingredients',
-    icon: Sprout,
+  nature: {
+    label: 'Nature',
+    icon: Leaf,
     chipBg: 'bg-teal-500/10',
     chipText: 'text-teal-300',
     chipBorder: 'border-teal-400/30',
     bar: 'bg-gradient-to-b from-teal-400 to-teal-500/40',
   },
+  social: {
+    label: 'Social',
+    icon: Users,
+    chipBg: 'bg-rose-500/10',
+    chipText: 'text-rose-300',
+    chipBorder: 'border-rose-400/30',
+    bar: 'bg-gradient-to-b from-rose-400 to-rose-500/40',
+  },
   governance: {
-    label: 'Governance & certification',
+    label: 'Governance',
     icon: ShieldCheck,
     chipBg: 'bg-indigo-500/10',
     chipText: 'text-indigo-300',
     chipBorder: 'border-indigo-400/30',
     bar: 'bg-gradient-to-b from-indigo-400 to-indigo-500/40',
-  },
-  corporate: {
-    label: 'Corporate',
-    icon: Building2,
-    chipBg: 'bg-slate-500/15',
-    chipText: 'text-slate-200',
-    chipBorder: 'border-slate-400/30',
-    bar: 'bg-gradient-to-b from-slate-300 to-slate-500/40',
   },
 };
 
@@ -101,7 +102,7 @@ export function DataStatusTable({ rows }: Props) {
   return (
     <div className="space-y-5">
       {PILLAR_ORDER.map((pillar) => {
-        const pillarFields = FIELD_DEFINITIONS.filter((f) => f.pillar === pillar);
+        const pillarFields = FIELD_DEFINITIONS.filter((f) => pillarForField(f.key) === pillar);
         if (pillarFields.length === 0) return null;
         const meta = PILLAR_META[pillar];
         const Icon = meta.icon;

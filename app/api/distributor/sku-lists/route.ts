@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireDistributor } from '@/lib/distributor/auth';
+import { distributorCan } from '@/lib/distributor/capabilities';
 
 const ALLOWED_EXT = ['csv', 'xlsx', 'pdf'] as const;
 type AllowedExt = (typeof ALLOWED_EXT)[number];
@@ -41,6 +42,22 @@ export async function POST(request: Request) {
   }
   if (auth.member.role === 'viewer') {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+  }
+  // Procurement partners (free tier) can manage procurement-routed
+  // brands but cannot upload their OWN SKU lists. The procurement
+  // pipeline still creates synthetic distributor_sku_lists rows via
+  // the service-role client; this guard only blocks interactive
+  // distributor uploads.
+  if (!distributorCan(auth.organization, 'upload_own_sku_lists')) {
+    return NextResponse.json(
+      {
+        error: 'upgrade_required',
+        capability: 'upload_own_sku_lists',
+        message:
+          'Uploading your own SKU lists is unlocked when you become a full alka**tera** customer.',
+      },
+      { status: 402 },
+    );
   }
 
   const formData = await request.formData();

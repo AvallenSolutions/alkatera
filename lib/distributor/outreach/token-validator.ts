@@ -15,6 +15,8 @@ export type TokenValidationResult =
         category: string | null;
         country_of_origin: string | null;
         upload_token_expires_at: string | null;
+        /** Set when the outreach was dispatched on behalf of a procurement org. The brand-upload page reads this to co-brand the header. */
+        procurement_origin_org_id: string | null;
       };
     }
   | { ok: false; reason: TokenInvalidReason };
@@ -43,7 +45,9 @@ export async function validateUploadToken(
 
   const { data: brand } = await supabase
     .from('brand_profiles')
-    .select('id, brand_directory_id, distributor_org_id, name, category, country_of_origin, upload_token_expires_at')
+    .select(
+      'id, brand_directory_id, distributor_org_id, name, category, country_of_origin, upload_token_expires_at, procurement_origin_org_id',
+    )
     .eq('upload_token', token)
     .maybeSingle();
 

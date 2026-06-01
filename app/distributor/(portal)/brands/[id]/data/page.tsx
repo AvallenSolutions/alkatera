@@ -2,8 +2,8 @@ import Link from 'next/link';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { AlertTriangle, ArrowRight } from 'lucide-react';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
-import { DataStatusTable, type DataStatusRow } from '@/components/distributor/brand-detail/data-status-table';
-import type { FieldKey } from '@/lib/distributor/scraping/field-definitions';
+import { PillarBreakdown } from '@/components/sustainability/pillar-breakdown';
+import { groupByPillar } from '@/lib/sustainability/pillars';
 import { readMergedBrandData, pickActivePerField } from '@/lib/distributor/integration/data-merger';
 
 export const dynamic = 'force-dynamic';
@@ -45,21 +45,20 @@ export default async function BrandDataTabPage({ params }: PageProps) {
 
   // Apply the canonical precedence (brand_verified > alkatera_live >
   // confidence) so alka**tera**-customer data always wins over a
-  // higher-confidence scrape.
+  // higher-confidence scrape, then present it in the shared six-pillar
+  // card layout — identical to the procurement portal.
   const active = pickActivePerField(
     findings.filter((f) => f.field_key && !(f as { brand_sku_id?: unknown }).brand_sku_id),
   );
-  const byField = new Map<FieldKey, DataStatusRow>();
-  for (const [field, row] of Array.from(active.entries())) {
-    byField.set(field, {
-      field_key: field,
-      value: row.field_value,
-      numeric: row.field_value_numeric,
-      source: row.source,
-      confidence: row.confidence,
-      updated_at: row.scraped_at,
-    });
-  }
+  const groups = groupByPillar(
+    Array.from(active.entries())
+      .filter(([, row]) => row.field_value != null && row.field_value !== '')
+      .map(([field, row]) => ({
+        field_key: field,
+        field_value: row.field_value,
+        source_name: row.source,
+      })),
+  );
 
   return (
     <div className="space-y-6">
@@ -84,7 +83,7 @@ export default async function BrandDataTabPage({ params }: PageProps) {
         </Link>
       )}
 
-      <DataStatusTable rows={Array.from(byField.values())} />
+      <PillarBreakdown groups={groups} />
     </div>
   );
 }

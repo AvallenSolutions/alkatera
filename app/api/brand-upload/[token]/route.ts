@@ -83,6 +83,34 @@ export async function GET(request: Request, { params }: { params: { token: strin
     return NextResponse.json({ error: 'distributor_not_found' }, { status: 404 });
   }
 
+  // Procurement co-brand: when the outreach was dispatched on behalf
+  // of a procurement org (Foodbuy in the trial), surface the
+  // procurement identity here so the brand-upload page can render a
+  // co-branded header. Defensive try/catch — schema may not exist on
+  // older environments.
+  type ProcurementCoBrand = {
+    name: string;
+    display_name: string | null;
+    parent_company: string | null;
+    logo_url: string | null;
+    primary_color: string | null;
+  };
+  let procurement: ProcurementCoBrand | null = null;
+  if (brand.procurement_origin_org_id) {
+    try {
+      const { data: procRow } = await supabase
+        .from('procurement_organizations')
+        .select('name, display_name, parent_company, logo_url, primary_color')
+        .eq('id', brand.procurement_origin_org_id)
+        .maybeSingle();
+      if (procRow) {
+        procurement = procRow as unknown as ProcurementCoBrand;
+      }
+    } catch {
+      // procurement schema not applied — fall through to alkatera default
+    }
+  }
+
   const { data: skus } = await supabase
     .from('brand_skus')
     .select('id, product_name, sku_code, category, country_of_origin')
@@ -119,6 +147,14 @@ export async function GET(request: Request, { params }: { params: { token: strin
       name: distributor.name,
       logo_url: distributor.logo_url,
     },
+    procurement: procurement
+      ? {
+          name: procurement.display_name ?? procurement.name,
+          parent_company: procurement.parent_company,
+          logo_url: procurement.logo_url,
+          primary_color: procurement.primary_color,
+        }
+      : null,
     listing_count: listingCount ?? 1,
     skus: skus ?? [],
     field_states: fieldStates,

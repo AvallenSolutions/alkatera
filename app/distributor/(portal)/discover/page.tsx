@@ -5,6 +5,9 @@ import Link from 'next/link';
 import { Search, ShieldCheck, Sparkles, Globe2, Tag, CheckCircle2, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { UpgradePrompt } from '@/components/distributor/upgrade/upgrade-prompt';
+import { useDistributor } from '@/lib/distributor/context';
+import { distributorCan } from '@/lib/distributor/capabilities';
 import {
   Select,
   SelectContent,
@@ -38,6 +41,7 @@ interface DiscoverResponse {
 const NONE = '__any__';
 
 export default function DiscoverPage() {
+  const { organization } = useDistributor();
   const [q, setQ] = useState('');
   const [category, setCategory] = useState<string>(NONE);
   const [tier, setTier] = useState<string>(NONE);
@@ -48,6 +52,17 @@ export default function DiscoverPage() {
   const [data, setData] = useState<DiscoverResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  if (!distributorCan(organization, 'browse_discover')) {
+    return (
+      <UpgradePrompt
+        capability="browse_discover"
+        backHref="/distributor/dashboard"
+        backLabel="Back to dashboard"
+        intro="Discover is the prospecting surface for the full brand directory. Available with a full alka<strong>tera</strong> subscription."
+      />
+    );
+  }
 
   useEffect(() => {
     let cancelled = false;

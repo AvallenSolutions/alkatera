@@ -1,0 +1,17 @@
+brand_name,product_name,sku_code,distributor_channel,category,country_of_origin,vintage,volume_per_year_liters,list_price_gbp
+Domaine Drouhin,Beaune Clos des Mouches Blanc,DRO-BCM-W,Hallgarten,White wine,France,2021,2400,52.50
+Domaine Drouhin,Beaune Clos des Mouches Rouge,DRO-BCM-R,Hallgarten,Red wine,France,2020,1800,55.00
+Penfolds,Bin 389 Cabernet Shiraz,PEN-389,Hallgarten & Novum,Red wine,Australia,2019,3600,42.80
+Penfolds,Grange,PEN-GR,Hallgarten,Red wine,Australia,2018,400,895.00
+Cloudy Bay,Sauvignon Blanc,CB-SB,Hallgarten,White wine,New Zealand,2023,9600,21.50
+Chapel Down,Rose Brut NV,CDN-RB,Hallgarten,Sparkling wine,United Kingdom,,2400,28.90
+Antinori,Tignanello,ANT-TIG,Enotria,Red wine,Italy,2020,2400,89.00
+Antinori,Solaia,ANT-SOL,Enotria&Coe,Red wine,Italy,2019,600,245.00
+Tenuta San Guido,Sassicaia,SAS-SAS,Enotria,Red wine,Italy,2020,800,285.00
+Bodegas Vega Sicilia,Unico,VS-UN,Enotria,Red wine,Spain,2012,360,420.00
+Bodegas Vega Sicilia,Valbuena 5,VS-V5,Enotria & Coe,Red wine,Spain,2018,600,135.00
+Bollinger,Special Cuvee Brut NV,BOL-SC,Enotria,Champagne,France,,4800,58.00
+Bollinger,La Grande Annee,BOL-LGA,Enotria,Champagne,France,2015,720,165.00
+Avallen,Calvados,AVA-CAL,Hallgarten,Spirits,France,,2400,38.50
+Two Drifters,Pure White Rum,TD-PWR,Hallgarten,Spirits,United Kingdom,,1200,32.00
+Penderyn,Madeira Single Malt,PEN-MAD,Enotria,Spirits,United Kingdom,,3600,52.00

@@ -16,6 +16,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { UploadDropzone } from '@/components/distributor/sku-upload/upload-dropzone';
 import { ColumnMapper } from '@/components/distributor/sku-upload/column-mapper';
 import { UploadProgress } from '@/components/distributor/sku-upload/upload-progress';
+import { UpgradePrompt } from '@/components/distributor/upgrade/upgrade-prompt';
+import { useDistributor } from '@/lib/distributor/context';
+import { distributorCan } from '@/lib/distributor/capabilities';
 import type { ColumnMapping, SkuListParseResult } from '@/types/distributor';
 
 type Step = 'choose' | 'uploading' | 'parsing' | 'mapping' | 'processing' | 'complete' | 'error';
@@ -53,11 +56,28 @@ interface UploadResult {
 
 export default function UploadPage() {
   const router = useRouter();
+  const { organization } = useDistributor();
   const [step, setStep] = useState<Step>('choose');
   const [error, setError] = useState<string | null>(null);
   const [skuListId, setSkuListId] = useState<string | null>(null);
   const [parse, setParse] = useState<SkuListParseResult | null>(null);
   const [result, setResult] = useState<UploadResult | null>(null);
+
+  // Procurement-partner-tier distributors can't upload their own SKU
+  // lists. The procurement pipeline still creates synthetic lists in
+  // their tenant via the service-role client (the Foodbuy CSV split);
+  // this guard only blocks the interactive upload UI. The conditional
+  // sits AFTER the hook calls to keep the rules-of-hooks order valid.
+  if (!distributorCan(organization, 'upload_own_sku_lists')) {
+    return (
+      <UpgradePrompt
+        capability="upload_own_sku_lists"
+        backHref="/distributor/sku-lists"
+        backLabel="Back to SKU lists"
+        intro="Procurement-routed SKU lists land in your tenant automatically. To add your own portfolio, become a full alka<strong>tera</strong> customer."
+      />
+    );
+  }
 
   async function handleFile(file: File) {
     setError(null);

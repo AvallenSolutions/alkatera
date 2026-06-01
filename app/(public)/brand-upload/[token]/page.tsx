@@ -14,6 +14,13 @@ interface PageProps {
 interface BrandUploadDetails {
   brand: { name: string; category: string | null; country_of_origin: string | null };
   distributor: { name: string; logo_url: string | null };
+  /** Optional procurement co-brand when outreach originated from a procurement org. */
+  procurement: {
+    name: string;
+    parent_company: string | null;
+    logo_url: string | null;
+    primary_color: string | null;
+  } | null;
   /** How many distributors list this brand. Verifications flow to all of them. */
   listing_count: number;
   skus: Array<{
@@ -75,21 +82,51 @@ export default async function BrandUploadPage({ params }: PageProps) {
 
   const details = (await res.json()) as BrandUploadDetails;
 
+  const procurement = details.procurement;
+
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border/60 backdrop-blur-sm">
-        <div className="max-w-3xl mx-auto px-6 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.7)]" />
-            <span className="text-xs uppercase tracking-wider text-sky-300 font-semibold">
-              Sustainability Data Review
+      {procurement ? (
+        <header className="border-b border-border bg-white">
+          <div className="max-w-3xl mx-auto px-6 py-5 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="text-xs uppercase tracking-wider text-stone-500 font-semibold whitespace-nowrap">
+                Sustainability Data Review
+              </span>
+            </div>
+            <div className="flex items-center gap-4 min-w-0">
+              {procurement.logo_url ? (
+                <img
+                  src={procurement.logo_url}
+                  alt={procurement.name}
+                  className="h-9 max-w-[180px] object-contain"
+                />
+              ) : (
+                <span className="text-sm font-semibold text-stone-900 truncate">
+                  {procurement.name}
+                </span>
+              )}
+              <span className="text-xs text-stone-500 whitespace-nowrap">
+                via alka<strong>tera</strong>
+              </span>
+            </div>
+          </div>
+        </header>
+      ) : (
+        <header className="border-b border-border/60 backdrop-blur-sm">
+          <div className="max-w-3xl mx-auto px-6 py-5 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.7)]" />
+              <span className="text-xs uppercase tracking-wider text-sky-300 font-semibold">
+                Sustainability Data Review
+              </span>
+            </div>
+            <span className="text-xs text-muted-foreground">
+              via alka<strong>tera</strong>
             </span>
           </div>
-          <span className="text-xs text-muted-foreground">
-            via alka<strong>tera</strong>
-          </span>
-        </div>
-      </header>
+        </header>
+      )}
 
       <main className="max-w-3xl mx-auto px-6 py-12 space-y-12">
         <Hero

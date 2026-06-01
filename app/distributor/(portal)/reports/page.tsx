@@ -2,6 +2,9 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { FileDown, FileSpreadsheet, BarChart3 } from 'lucide-react';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { Button } from '@/components/ui/button';
+import { UpgradePrompt } from '@/components/distributor/upgrade/upgrade-prompt';
+import { distributorCan } from '@/lib/distributor/capabilities';
+import type { DistributorOrganization } from '@/types/distributor';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +20,24 @@ export default async function ReportsPage() {
     .eq('user_id', userId)
     .maybeSingle();
   if (!member) return null;
+
+  // Procurement-partner-tier distributors don't get portfolio reports.
+  const { data: orgRow } = await supabase
+    .from('distributor_organizations')
+    .select('is_procurement_partner')
+    .eq('id', member.distributor_org_id)
+    .maybeSingle();
+  const org = orgRow as Pick<DistributorOrganization, 'is_procurement_partner'> | null;
+  if (org && !distributorCan(org, 'export_portfolio_reports')) {
+    return (
+      <UpgradePrompt
+        capability="export_portfolio_reports"
+        backHref="/distributor/dashboard"
+        backLabel="Back to dashboard"
+        intro="Portfolio reports are unlocked with a full alka<strong>tera</strong> subscription. Procurement reports for your linked procurement clients are produced from their portal."
+      />
+    );
+  }
 
   const [{ count: brandCount }, { count: skuCount }] = await Promise.all([
     supabase

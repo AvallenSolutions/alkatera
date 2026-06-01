@@ -9,6 +9,28 @@ const SITE_URL =
   process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://www.alkatera.com';
 
 /**
+ * Optional co-brand block layered on top of the alka**tera** default
+ * email identity. When a procurement org is the originator of the
+ * outreach, the dispatcher fills this in and the email renders with
+ * alka**tera** + procurement logos in the header and the procurement's
+ * accent colour on the CTA.
+ *
+ * Keeping it optional means every existing distributor outreach call
+ * (which passes nothing) continues to render the standard
+ * alka**tera** dark + neon-lime identity it always has.
+ */
+export interface EmailCoBrand {
+  /** Display name shown in copy (e.g. "Foodbuy"). */
+  name: string;
+  /** Public URL of the co-brand's logo. Should read well on a white background. */
+  logoUrl: string;
+  /** Hex accent colour for the CTA button. Falls back to the alka**tera** neon-lime when unset. */
+  accentColor?: string;
+  /** Parent / display copy for the footer (e.g. "Levy / Compass Group"). */
+  footerLine?: string;
+}
+
+/**
  * Resolve a stable site URL for use in email bodies. We don't trust
  * `window.location` here because emails are rendered server-side and
  * users click the link from a different origin.
@@ -36,6 +58,8 @@ export interface InitialOutreachArgs {
   uploadToken: string;
   /** Optional reply-to address for the email — falls back to a generic alkatera contact. */
   distributorContactEmail?: string | null;
+  /** Optional procurement co-brand block — when set, the email is rendered with the procurement org's identity. */
+  coBrand?: EmailCoBrand | null;
 }
 
 export interface RenderedEmail {
@@ -48,45 +72,56 @@ export function renderInitialOutreachEmail(args: InitialOutreachArgs): RenderedE
   const safeBrand = escapeHtml(args.brandName);
   const safeDistributor = escapeHtml(args.distributorName);
   const safeContact = args.distributorContactEmail ? escapeHtml(args.distributorContactEmail) : '';
+  const theme = themeForCoBrand(args.coBrand);
 
   const visibleSkus = args.skuNames.slice(0, 5);
   const overflow = Math.max(0, args.totalSkuCount - visibleSkus.length);
   const skuListHtml = visibleSkus
     .map(
       (n) =>
-        `<li style="color: #ccc; font-size: 13px; line-height: 1.8; margin: 0;">${escapeHtml(n)}</li>`,
+        `<li style="color: ${theme.body}; font-size: 13px; line-height: 1.8; margin: 0;">${escapeHtml(n)}</li>`,
     )
     .join('');
   const overflowHtml =
     overflow > 0
-      ? `<li style="color: #888; font-size: 12px; font-style: italic; margin-top: 4px;">+ ${overflow} more</li>`
+      ? `<li style="color: ${theme.muted}; font-size: 12px; font-style: italic; margin-top: 4px;">+ ${overflow} more</li>`
       : '';
 
-  const subject = `${args.distributorName} is requesting your sustainability data`;
+  const subject = args.coBrand
+    ? `${args.distributorName} is collecting sustainability data on behalf of ${args.coBrand.name}`
+    : `${args.distributorName} is requesting your sustainability data`;
+
+  const onBehalf = args.coBrand
+    ? `<p style="color: ${theme.body}; font-size: 14px; line-height: 1.8;">
+        <strong style="color: ${theme.strong};">${safeDistributor}</strong> distributes your products to <strong style="color: ${theme.strong};">${escapeHtml(args.coBrand.name)}</strong>${args.coBrand.footerLine ? ` (${escapeHtml(args.coBrand.footerLine)})` : ''} and is collecting sustainability data on their behalf.
+      </p>`
+    : `<p style="color: ${theme.body}; font-size: 14px; line-height: 1.8;">
+        <strong style="color: ${theme.strong};">${safeDistributor}</strong> distributes your products and needs to collect sustainability data to meet reporting requirements from their retail partners.
+      </p>`;
+
   const html = wrap(
     'Sustainability Data Request',
     `
-      <p style="color: #ccc; font-size: 14px; line-height: 1.8;">Hi there,</p>
-      <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
-        <strong style="color: #fff;">${safeDistributor}</strong> distributes your products and needs to collect sustainability data to meet reporting requirements from their retail partners.
-      </p>
-      <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
+      <p style="color: ${theme.body}; font-size: 14px; line-height: 1.8;">Hi there,</p>
+      ${onBehalf}
+      <p style="color: ${theme.body}; font-size: 14px; line-height: 1.8;">
         This is a straightforward, one-time upload. There is no account to create.
       </p>
-      <div style="margin: 24px 0; padding: 20px; background: #111; border: 1px solid #222; border-radius: 4px;">
-        <p style="color: #ccff00; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 12px 0;">${safeBrand} products in ${safeDistributor}'s portfolio</p>
+      <div style="margin: 24px 0; padding: 20px; background: ${theme.box}; border: 1px solid ${theme.border}; border-radius: 4px;">
+        <p style="color: ${theme.accent}; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 12px 0;">${safeBrand} products in ${safeDistributor}'s portfolio</p>
         <ul style="margin: 0; padding: 0 0 0 18px;">${skuListHtml}${overflowHtml}</ul>
       </div>
-      <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
+      <p style="color: ${theme.body}; font-size: 14px; line-height: 1.8;">
         Click below to upload your sustainability documents, certifications, or reports. The whole process takes around 10 minutes.
       </p>
-      ${renderCta(link, 'Upload your data')}
-      <p style="color: #888; font-size: 12px; line-height: 1.8;">
+      ${renderCta(link, 'Upload your data', theme)}
+      <p style="color: ${theme.muted}; font-size: 12px; line-height: 1.8;">
         The link is valid for 90 days.
       </p>
-      ${safeContact ? `<p style="color: #888; font-size: 12px; line-height: 1.8;">Questions? Contact <a href="mailto:${safeContact}" style="color: #ccff00; text-decoration: none;">${safeContact}</a>.</p>` : ''}
+      ${safeContact ? `<p style="color: ${theme.muted}; font-size: 12px; line-height: 1.8;">Questions? Contact <a href="mailto:${safeContact}" style="color: ${theme.accent}; text-decoration: none;">${safeContact}</a>.</p>` : ''}
     `,
     args.distributorName,
+    args.coBrand,
   );
   return { subject, html };
 }
@@ -98,21 +133,26 @@ export function renderInitialOutreachEmail(args: InitialOutreachArgs): RenderedE
 export function renderReminderEmail(args: InitialOutreachArgs): RenderedEmail {
   const link = brandUploadLink(args.uploadToken);
   const safeDistributor = escapeHtml(args.distributorName);
+  const theme = themeForCoBrand(args.coBrand);
 
-  const subject = `Reminder: ${args.distributorName} is still waiting for your sustainability data`;
+  const subject = args.coBrand
+    ? `Reminder: ${args.distributorName} (on behalf of ${args.coBrand.name}) is still waiting for your sustainability data`
+    : `Reminder: ${args.distributorName} is still waiting for your sustainability data`;
+  const reminderLine = args.coBrand
+    ? `Quick reminder that <strong style="color: ${theme.strong};">${safeDistributor}</strong> is still waiting for your sustainability documents on behalf of <strong style="color: ${theme.strong};">${escapeHtml(args.coBrand.name)}</strong>.`
+    : `Quick reminder that <strong style="color: ${theme.strong};">${safeDistributor}</strong> is still waiting for your sustainability documents.`;
   const html = wrap(
     'Reminder · Sustainability Data Request',
     `
-      <p style="color: #ccc; font-size: 14px; line-height: 1.8;">Hi there,</p>
-      <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
-        Quick reminder that <strong style="color: #fff;">${safeDistributor}</strong> is still waiting for your sustainability documents.
-      </p>
-      ${renderCta(link, 'Upload your data')}
-      <p style="color: #888; font-size: 12px; line-height: 1.8;">
+      <p style="color: ${theme.body}; font-size: 14px; line-height: 1.8;">Hi there,</p>
+      <p style="color: ${theme.body}; font-size: 14px; line-height: 1.8;">${reminderLine}</p>
+      ${renderCta(link, 'Upload your data', theme)}
+      <p style="color: ${theme.muted}; font-size: 12px; line-height: 1.8;">
         If you have already submitted, please ignore this message.
       </p>
     `,
     args.distributorName,
+    args.coBrand,
   );
   return { subject, html };
 }
@@ -153,6 +193,7 @@ export function renderSubmissionReceiptEmail(args: SubmissionReceiptArgs): Rende
       </p>
     `,
     args.distributorName,
+    null,
   );
   return { subject, html };
 }
@@ -194,9 +235,10 @@ export function renderDistributorNotificationEmail(
           <td style="padding: 10px 0; color: #fff; font-size: 14px;">${safeEmail}</td>
         </tr>` : ''}
       </table>
-      ${renderCta(args.brandDetailUrl, 'View brand')}
+      ${renderCta(args.brandDetailUrl, 'View brand', ALKATERA_THEME)}
     `,
     args.distributorName,
+    null,
   );
   return { subject, html };
 }
@@ -244,6 +286,7 @@ export function renderDirectoryContactEmail(args: DirectoryContactArgs): Rendere
       </p>
     `,
     args.distributorName,
+    null,
   );
   return { subject, html };
 }
@@ -252,26 +295,105 @@ export function renderDirectoryContactEmail(args: DirectoryContactArgs): Rendere
 // Shared layout helpers
 // ============================================================
 
-function wrap(headerLabel: string, inner: string, distributorName: string): string {
+interface EmailTheme {
+  /** Outer card background. */
+  card: string;
+  /** Body text colour. */
+  body: string;
+  /** Stronger body text (headings, callouts). */
+  strong: string;
+  /** Subdued / footer text. */
+  muted: string;
+  /** Card border colour. */
+  border: string;
+  /** SKU-list / pull-quote box background. */
+  box: string;
+  /** Accent / CTA background colour. */
+  accent: string;
+  /** Text colour for content rendered on top of the accent. */
+  accentText: string;
+  /** Header bar divider colour. */
+  divider: string;
+  /** Plain text wrapper background — what email clients show before the card. */
+  outerBg: string;
+}
+
+const ALKATERA_THEME: EmailTheme = {
+  card: '#0a0a0a',
+  body: '#ccc',
+  strong: '#fff',
+  muted: '#888',
+  border: '#222',
+  box: '#111',
+  accent: '#ccff00',
+  accentText: '#000',
+  divider: '#333',
+  outerBg: '#0a0a0a',
+};
+
+const COBRAND_THEME: EmailTheme = {
+  card: '#ffffff',
+  body: '#475569',
+  strong: '#0f172a',
+  muted: '#94a3b8',
+  border: '#e5e7eb',
+  box: '#f8fafc',
+  accent: '#3dbac6',
+  accentText: '#ffffff',
+  divider: '#e5e7eb',
+  outerBg: '#f1f5f9',
+};
+
+function themeForCoBrand(coBrand: EmailCoBrand | null | undefined): EmailTheme {
+  if (!coBrand) return ALKATERA_THEME;
+  return { ...COBRAND_THEME, accent: coBrand.accentColor ?? COBRAND_THEME.accent };
+}
+
+function wrap(
+  headerLabel: string,
+  inner: string,
+  distributorName: string,
+  coBrand: EmailCoBrand | null | undefined,
+): string {
+  const theme = themeForCoBrand(coBrand);
   const safeDistributor = escapeHtml(distributorName);
+  const headerLogos = coBrand
+    ? `
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 20px;">
+          <tr>
+            <td style="text-align: left;">
+              <img src="${LOGO_URL}" alt="alkatera" height="28" style="display: inline-block;" />
+            </td>
+            <td style="text-align: right;">
+              <img src="${escapeHtml(coBrand.logoUrl)}" alt="${escapeHtml(coBrand.name)}" height="36" style="display: inline-block; max-width: 200px;" />
+            </td>
+          </tr>
+        </table>
+      `
+    : `<img src="${LOGO_URL}" alt="alkatera" width="160" height="auto" style="display: block; margin: 0 auto 16px auto;" />`;
+  const footerLine = coBrand
+    ? `Sent via alka<strong>tera</strong> on behalf of ${escapeHtml(coBrand.name)}${coBrand.footerLine ? ` (${escapeHtml(coBrand.footerLine)})` : ''}`
+    : `Sent via alka<strong>tera</strong> on behalf of ${safeDistributor}`;
   return `
-    <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #e0e0e0; padding: 40px; border: 1px solid #222;">
-      <div style="border-bottom: 1px solid #333; padding-bottom: 20px; margin-bottom: 30px; text-align: center;">
-        <img src="${LOGO_URL}" alt="alkatera" width="160" height="auto" style="display: block; margin: 0 auto 16px auto;" />
-        <h1 style="color: #ccff00; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; margin: 0;">${escapeHtml(headerLabel)}</h1>
-      </div>
-      ${inner}
-      <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #333; color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 2px; text-align: center;">
-        Sent via alka<strong>tera</strong> on behalf of ${safeDistributor}
+    <div style="background: ${theme.outerBg}; padding: 24px 12px;">
+      <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: ${theme.card}; color: ${theme.body}; padding: 40px; border: 1px solid ${theme.border}; border-radius: 8px;">
+        <div style="border-bottom: 1px solid ${theme.divider}; padding-bottom: 20px; margin-bottom: 30px; ${coBrand ? '' : 'text-align: center;'}">
+          ${headerLogos}
+          <h1 style="color: ${theme.accent}; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; margin: 8px 0 0 0; ${coBrand ? '' : 'text-align: center;'}">${escapeHtml(headerLabel)}</h1>
+        </div>
+        ${inner}
+        <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid ${theme.divider}; color: ${theme.muted}; font-size: 10px; text-transform: uppercase; letter-spacing: 2px; text-align: center;">
+          ${footerLine}
+        </div>
       </div>
     </div>
   `;
 }
 
-function renderCta(url: string, label: string): string {
+function renderCta(url: string, label: string, theme: EmailTheme): string {
   return `
     <div style="margin: 32px 0; text-align: center;">
-      <a href="${url}" style="display: inline-block; background: #ccff00; color: #000; font-family: 'Courier New', monospace; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 3px; padding: 16px 32px; text-decoration: none;">${escapeHtml(label)} →</a>
+      <a href="${url}" style="display: inline-block; background: ${theme.accent}; color: ${theme.accentText}; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 3px; padding: 16px 32px; text-decoration: none; border-radius: 4px;">${escapeHtml(label)} &rarr;</a>
     </div>
   `;
 }

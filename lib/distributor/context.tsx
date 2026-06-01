@@ -10,13 +10,19 @@ interface ProviderProps extends DistributorContextValue {
 }
 
 /**
- * The distributor portal loads { organization, member } in the server layout
- * (app/(distributor)/layout.tsx) and hydrates this provider with the result.
- * No client-side fetching is needed — refresh of state happens on navigation.
+ * The distributor portal loads { organization, member, partnerProcurement }
+ * in the server layout (app/(distributor)/layout.tsx) and hydrates this
+ * provider with the result. No client-side fetching is needed; state
+ * refreshes on navigation.
  */
-export function DistributorProvider({ organization, member, children }: ProviderProps) {
+export function DistributorProvider({
+  organization,
+  member,
+  partnerProcurement,
+  children,
+}: ProviderProps) {
   return (
-    <DistributorContext.Provider value={{ organization, member }}>
+    <DistributorContext.Provider value={{ organization, member, partnerProcurement }}>
       {children}
     </DistributorContext.Provider>
   );

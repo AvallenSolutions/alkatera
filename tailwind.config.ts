@@ -104,6 +104,13 @@ const config: Config = {
           950: '#1a2e05',
         },
         'brand-accent': '#ccff00',
+        /* Whitelabel tenant tokens. Resolved from CSS variables so the
+           server layout can override them per procurement / distributor
+           organisation. Defaults (see app/globals.css) match the
+           distributor portal's sky-400 / sky-500 accent. */
+        'brand-primary': 'rgb(var(--brand-primary-rgb) / <alpha-value>)',
+        'brand-strong': 'rgb(var(--brand-accent-rgb) / <alpha-value>)',
+        'brand-on': 'rgb(var(--brand-on-primary-rgb) / <alpha-value>)',
       },
       keyframes: {
         'accordion-down': {

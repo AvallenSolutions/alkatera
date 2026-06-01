@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Allow a second dev server (e.g. the distributor portal on 8889) to run from
+  // the same checkout as the procurement portal (8890) without both processes
+  // clobbering a shared .next directory. Override with NEXT_DIST_DIR per server.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   images: {
     // Enable Next.js image optimisation (auto WebP/AVIF, responsive sizing, lazy loading).
     // Netlify's @netlify/plugin-nextjs handles the optimisation API in production.
