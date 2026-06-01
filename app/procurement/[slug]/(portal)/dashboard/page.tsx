@@ -14,6 +14,7 @@ import { PageHeader } from '@/components/procurement/layout/page-header';
 import { SectionCard } from '@/components/procurement/layout/section-card';
 import { StatCard } from '@/components/procurement/dashboard/stat-card';
 import { ChannelPie } from '@/components/procurement/dashboard/channel-pie';
+import { CHANNEL_COLOURS as SLICE_COLOURS } from '@/lib/procurement/channel-colours';
 import { TierBar } from '@/components/procurement/dashboard/tier-bar';
 import { HorizontalBar } from '@/components/procurement/dashboard/horizontal-bar';
 import { CompletenessBands } from '@/components/procurement/dashboard/completeness-bands';
@@ -186,14 +187,13 @@ function ChannelLegend({
 }: {
   channels: Array<{ channel: string; sku_count: number; volume_liters: number }>;
 }) {
-  const COLOURS = ['rgb(var(--brand-primary-rgb))', 'rgb(var(--brand-accent-rgb))', '#94a3b8'];
   return (
     <ul className="space-y-1.5 text-xs mt-4 pt-4 border-t border-border/60">
       {channels.map((c, i) => (
         <li key={c.channel} className="flex items-center gap-2">
           <span
             className="inline-block h-2 w-2 rounded-sm shrink-0"
-            style={{ background: COLOURS[i % COLOURS.length] }}
+            style={{ background: SLICE_COLOURS[i % SLICE_COLOURS.length] }}
           />
           <span className="flex-1 truncate text-foreground/80 font-medium">{c.channel}</span>
           <span className="tabular-nums text-muted-foreground">

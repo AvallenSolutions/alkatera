@@ -2,8 +2,7 @@
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import type { ChannelBreakdown } from '@/lib/procurement/dashboard';
-
-const SLICE_COLOURS = ['rgb(var(--brand-primary-rgb))', 'rgb(var(--brand-accent-rgb))', '#94a3b8', '#cbd5e1', '#e2e8f0'];
+import { CHANNEL_COLOURS as SLICE_COLOURS } from '@/lib/procurement/channel-colours';
 
 interface Props {
   channels: ChannelBreakdown[];
