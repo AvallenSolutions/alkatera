@@ -34,6 +34,15 @@ export function getSupabasePortalBrowserClient() {
   const inIframe = isInIframe()
 
   client = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
+    // @supabase/ssr keeps ONE module-level singleton across every
+    // createBrowserClient call when isSingleton is unset. The main app client
+    // (default cookie name) is created first by AuthProvider, so without this
+    // flag the portal call just returns that cached main client and silently
+    // ignores cookieOptions.name — the portal session ends up in the main
+    // cookie and the portal server client never sees it (login spins forever).
+    // isSingleton:false gives the portal its own independent client; this
+    // module's own `client` variable still keeps it a singleton for the portal.
+    isSingleton: false,
     cookieOptions: { name: PORTAL_AUTH_COOKIE },
     cookies: {
       get(name) {
