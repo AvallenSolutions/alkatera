@@ -53,6 +53,14 @@ export function ColumnMapper<Key extends string>({
   );
   const [submitting, setSubmitting] = useState(false);
 
+  // Real-world spreadsheets often carry blank / unnamed trailing columns.
+  // An empty header would render <SelectItem value="" />, which Radix rejects
+  // (empty string is reserved for clearing the selection) and crashes the page.
+  // A blank-named column isn't mappable anyway, so drop it from the options.
+  const mappableColumns = parse.detected_columns.filter(
+    (col) => typeof col === 'string' && col.trim().length > 0,
+  );
+
   const canSubmit = fields
     .filter((f) => f.required)
     .every((f) => Boolean(mapping[f.key]));
@@ -75,9 +83,9 @@ export function ColumnMapper<Key extends string>({
           <table className="w-full text-xs">
             <thead className="bg-muted/40">
               <tr>
-                {parse.detected_columns.map((col) => (
-                  <th key={col} className="text-left px-3 py-2 font-medium whitespace-nowrap">
-                    {col}
+                {parse.detected_columns.map((col, idx) => (
+                  <th key={`${col}-${idx}`} className="text-left px-3 py-2 font-medium whitespace-nowrap">
+                    {col?.trim() ? col : <span className="text-muted-foreground/50 italic">(unnamed)</span>}
                   </th>
                 ))}
               </tr>
@@ -85,8 +93,8 @@ export function ColumnMapper<Key extends string>({
             <tbody>
               {parse.preview.map((row, i) => (
                 <tr key={i} className="border-t border-border">
-                  {parse.detected_columns.map((col) => (
-                    <td key={col} className="px-3 py-2 whitespace-nowrap text-muted-foreground">
+                  {parse.detected_columns.map((col, idx) => (
+                    <td key={`${col}-${idx}`} className="px-3 py-2 whitespace-nowrap text-muted-foreground">
                       {row[col] ?? ''}
                     </td>
                   ))}
@@ -136,7 +144,7 @@ export function ColumnMapper<Key extends string>({
                       {!field.required && (
                         <SelectItem value={NONE}>— Not in file —</SelectItem>
                       )}
-                      {parse.detected_columns.map((col) => (
+                      {mappableColumns.map((col) => (
                         <SelectItem key={col} value={col}>
                           {col}
                         </SelectItem>
