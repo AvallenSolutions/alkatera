@@ -62,6 +62,7 @@ export default function UploadPage() {
   const [skuListId, setSkuListId] = useState<string | null>(null);
   const [parse, setParse] = useState<SkuListParseResult | null>(null);
   const [result, setResult] = useState<UploadResult | null>(null);
+  const [progress, setProgress] = useState<{ label: string; percent: number } | null>(null);
 
   // Procurement-partner-tier distributors can't upload their own SKU
   // lists. The procurement pipeline still creates synthetic lists in
@@ -118,6 +119,7 @@ export default function UploadPage() {
     if (!skuListId) return;
     setStep('processing');
     setError(null);
+    setProgress(null);
     try {
       // The import now runs in a background function (real catalogues are too
       // big for a synchronous request — they 504'd). Kick it off, then poll
@@ -146,12 +148,15 @@ export default function UploadPage() {
         const { sku_list } = (await pollRes.json()) as {
           sku_list: {
             status: string;
-            import_result: UploadResult | null;
+            import_result:
+              | UploadResult
+              | { kind: 'progress'; label: string; percent: number }
+              | null;
             error_message: string | null;
           };
         };
         if (sku_list.status === 'complete' && sku_list.import_result) {
-          setResult(sku_list.import_result);
+          setResult(sku_list.import_result as UploadResult);
           setStep('complete');
           return;
         }
@@ -159,6 +164,12 @@ export default function UploadPage() {
           setError(`Import failed${sku_list.error_message ? `: ${sku_list.error_message}` : ''}`);
           setStep('error');
           return;
+        }
+        // Still processing — surface live progress for the bar.
+        const r = sku_list.import_result;
+        if (r && (r as { kind?: string }).kind === 'progress') {
+          const p = r as { label: string; percent: number };
+          setProgress({ label: p.label, percent: p.percent });
         }
       }
       setError('Import is taking longer than expected. It may still be running — check your SKU lists shortly.');
@@ -218,7 +229,26 @@ export default function UploadPage() {
             <ColumnMapper parse={parse} onConfirm={handleConfirm} />
           )}
           {step === 'processing' && (
-            <UploadProgress message="Creating brand profiles and SKUs…" />
+            <div className="space-y-3 py-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">
+                  {progress?.label ?? 'Starting import…'}
+                </span>
+                <span className="font-semibold tabular-nums text-sky-300">
+                  {progress?.percent ?? 0}%
+                </span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-sky-500/10 border border-sky-500/20">
+                <div
+                  className="h-full rounded-full bg-sky-400 transition-[width] duration-500 ease-out"
+                  style={{ width: `${Math.max(3, progress?.percent ?? 0)}%` }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Large lists can take a minute or two. You can leave this page open — we&apos;ll
+                show the results here when it&apos;s done.
+              </p>
+            </div>
           )}
           {step === 'complete' && result && (
             <div className="space-y-5">

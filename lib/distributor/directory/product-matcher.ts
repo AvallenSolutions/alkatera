@@ -157,20 +157,31 @@ export async function resolveProductsToDirectory(
   supabase: SupabaseClient,
   products: Array<ProductMatchInput>,
   discoveredByDistributorOrgId: string,
+  onProgress?: (current: number, total: number) => Promise<void> | void,
 ): Promise<Map<string, ProductMatchResult>> {
   const resolved = new Map<string, ProductMatchResult>();
+  const total = products.length;
+  let done = 0;
   for (const product of products) {
+    done += 1;
     const normalized = normalizeProductName(product.displayName);
     const gtin = normalizeGtin(product.gtin ?? null);
-    if (!normalized && !gtin) continue;
+    if (!normalized && !gtin) {
+      await onProgress?.(done, total);
+      continue;
+    }
     const key = `${gtin ?? ''}|${normalized}|${product.brandDirectoryId}`;
-    if (resolved.has(key)) continue;
+    if (resolved.has(key)) {
+      await onProgress?.(done, total);
+      continue;
+    }
     const result = await resolveOrCreateProductEntry(supabase, {
       ...product,
       gtin,
       discoveredByDistributorOrgId,
     });
     resolved.set(key, result);
+    await onProgress?.(done, total);
   }
   return resolved;
 }

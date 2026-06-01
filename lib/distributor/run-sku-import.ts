@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { parseCSV } from './parsers/csv-parser';
 import { parseExcel } from './parsers/excel-parser';
 import { parsePdf } from './parsers/pdf-parser';
-import { processSkuList } from './sku-list-processor';
+import { processSkuList, type ImportProgressPhase } from './sku-list-processor';
 import { queueBrandsForScraping } from './scraping/agent-dispatcher';
 import type { ColumnMapping, SkuListFileType } from '@/types/distributor';
 
@@ -90,13 +90,53 @@ export async function runSkuImport(args: {
     throw new Error(parsed.error);
   }
 
+  // Throttled progress reporter. processSkuList calls this from inside its
+  // serial loops (~one call per brand/product); we coalesce those into at most
+  // one row write every ~700ms so the wizard's progress bar moves smoothly
+  // without hammering the DB with hundreds of updates.
+  let lastWriteAt = 0;
+  let lastPhase = '';
+  async function reportProgress(phase: ImportProgressPhase, current: number, total: number) {
+    const { label, percent } = describeProgress(phase, current, total);
+    const now = Date.now();
+    const phaseChanged = phase !== lastPhase;
+    const atEnd = total > 0 && current >= total;
+    if (!phaseChanged && !atEnd && now - lastWriteAt < 700) return;
+    lastWriteAt = now;
+    lastPhase = phase;
+    await supabase
+      .from('distributor_sku_lists')
+      .update({
+        import_result: { kind: 'progress', phase, label, current, total, percent },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', skuListId);
+  }
+
   const result = await processSkuList({
     supabase,
     distributorOrgId,
     skuListId,
     rows: parsed.rows,
     mapping,
+    onProgress: reportProgress,
   });
+
+  // Finishing phase: scraping queue + directory enrichment.
+  await supabase
+    .from('distributor_sku_lists')
+    .update({
+      import_result: {
+        kind: 'progress',
+        phase: 'finishing',
+        label: 'Finishing up…',
+        current: 0,
+        total: 0,
+        percent: 97,
+      },
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', skuListId);
 
   // Kick off Phase 2 scraping for every touched brand. Best-effort —
   // failure here must not fail the import (the cron retries).
@@ -174,6 +214,32 @@ export async function runSkuImport(args: {
     .eq('id', skuListId);
 
   return importResult;
+}
+
+/**
+ * Map a processing phase + its in-phase counter to an overall 0-100 percent
+ * and a human label. Phases get weighted bands roughly proportional to how
+ * long they take (brand + product matching are the serial-RPC heavy hitters).
+ */
+function describeProgress(
+  phase: ImportProgressPhase,
+  current: number,
+  total: number,
+): { label: string; percent: number } {
+  const frac = total > 0 ? Math.min(1, current / total) : 0;
+  const band = (start: number, end: number) => Math.round(start + frac * (end - start));
+  switch (phase) {
+    case 'matching_brands':
+      return { label: `Matching brands to the directory… (${current}/${total})`, percent: band(5, 45) };
+    case 'saving_brands':
+      return { label: `Saving brand profiles… (${current}/${total})`, percent: band(45, 60) };
+    case 'matching_products':
+      return { label: `Matching products to the catalogue… (${current}/${total})`, percent: band(60, 88) };
+    case 'saving_skus':
+      return { label: 'Saving SKUs…', percent: band(88, 96) };
+    default:
+      return { label: 'Working…', percent: 5 };
+  }
 }
 
 async function markError(supabase: SupabaseClient, id: string, message: string) {

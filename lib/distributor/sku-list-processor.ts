@@ -46,12 +46,24 @@ export interface ProcessResult {
   product_directory_stats: ProductDirectoryStats;
 }
 
+export type ImportProgressPhase =
+  | 'matching_brands'
+  | 'saving_brands'
+  | 'matching_products'
+  | 'saving_skus';
+
 interface ProcessArgs {
   supabase: SupabaseClient;
   distributorOrgId: string;
   skuListId: string;
   rows: Record<string, string>[];
   mapping: ColumnMapping;
+  /**
+   * Progress reporter, called from inside the heavy serial loops so the
+   * upload wizard can render a real progress bar instead of a spinner.
+   * Best-effort: throttling/persistence is the caller's concern.
+   */
+  onProgress?: (phase: ImportProgressPhase, current: number, total: number) => Promise<void> | void;
 }
 
 /**
@@ -68,7 +80,7 @@ interface ProcessArgs {
  * cross-row reads while upserting.
  */
 export async function processSkuList(args: ProcessArgs): Promise<ProcessResult> {
-  const { supabase, distributorOrgId, skuListId, rows, mapping } = args;
+  const { supabase, distributorOrgId, skuListId, rows, mapping, onProgress } = args;
   const errors: string[] = [];
 
   // Bucket parsed rows by normalised brand name so we issue one brand-profile
@@ -137,6 +149,7 @@ export async function processSkuList(args: ProcessArgs): Promise<ProcessResult> 
       supabase,
       brandsToResolve,
       distributorOrgId,
+      (current, total) => onProgress?.('matching_brands', current, total),
     );
   } catch (err) {
     errors.push(`Directory matching failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -153,7 +166,11 @@ export async function processSkuList(args: ProcessArgs): Promise<ProcessResult> 
   const directoryMatchSummaries: DirectoryMatchSummary[] = [];
   const profileIdByNormalized = new Map<string, string>();
 
+  let savedBrands = 0;
+  const totalBrands = brandToRows.size;
   for (const [normalized, bucket] of Array.from(brandToRows.entries())) {
+    savedBrands += 1;
+    await onProgress?.('saving_brands', savedBrands, totalBrands);
     const match = directoryMatches.get(normalized);
     if (!match) {
       errors.push(`Brand "${bucket.displayName}": no directory match resolved`);
@@ -292,6 +309,7 @@ export async function processSkuList(args: ProcessArgs): Promise<ProcessResult> 
       supabase,
       rowsWithMeta.map((r) => r.productInput),
       distributorOrgId,
+      (current, total) => onProgress?.('matching_products', current, total),
     );
   } catch (err) {
     errors.push(
@@ -351,10 +369,12 @@ export async function processSkuList(args: ProcessArgs): Promise<ProcessResult> 
   }
 
   if (skuInserts.length > 0) {
+    await onProgress?.('saving_skus', 0, skuInserts.length);
     const { error: skuError } = await supabase.from('brand_skus').insert(skuInserts);
     if (skuError) {
       errors.push(`Inserting SKUs: ${skuError.message}`);
     }
+    await onProgress?.('saving_skus', skuInserts.length, skuInserts.length);
   }
 
   return {

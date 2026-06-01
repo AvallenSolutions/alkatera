@@ -245,9 +245,12 @@ export async function resolveBrandsToDirectory(
   supabase: SupabaseClient,
   brands: Array<DirectoryMatchInput & { normalizedName: string }>,
   discoveredByDistributorOrgId: string,
+  onProgress?: (current: number, total: number) => Promise<void> | void,
 ): Promise<Map<string, DirectoryMatchResult>> {
   const resolved = new Map<string, DirectoryMatchResult>();
   const seen = new Set<string>();
+  const total = new Set(brands.map((b) => b.normalizedName)).size;
+  let done = 0;
   for (const brand of brands) {
     if (seen.has(brand.normalizedName)) continue;
     seen.add(brand.normalizedName);
@@ -256,6 +259,8 @@ export async function resolveBrandsToDirectory(
       discoveredByDistributorOrgId,
     });
     resolved.set(brand.normalizedName, result);
+    done += 1;
+    await onProgress?.(done, total);
   }
   return resolved;
 }
