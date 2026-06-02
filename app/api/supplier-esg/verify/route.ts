@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { recalculateBcorpForSupplier } from '@/lib/certifications/recalculate'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest) {
     // Validate assessment exists and is in the correct state before acting
     const { data: assessment, error: fetchErr } = await supabase
       .from('supplier_esg_assessments')
-      .select('id, submitted, is_verified')
+      .select('id, supplier_id, submitted, is_verified')
       .eq('id', assessment_id)
       .single()
 
@@ -99,6 +100,8 @@ export async function POST(request: NextRequest) {
 
       if (error) throw error
 
+      await recalculateBcorpForSupplier(supabase, assessment.supplier_id)
+
       return NextResponse.json({ success: true })
     }
 
@@ -121,6 +124,9 @@ export async function POST(request: NextRequest) {
         .eq('id', assessment_id)
 
       if (error) throw error
+
+      // Revision un-submits the assessment, which removes it from coverage.
+      await recalculateBcorpForSupplier(supabase, assessment.supplier_id)
 
       return NextResponse.json({ success: true })
     }

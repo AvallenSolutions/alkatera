@@ -2,6 +2,7 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   calculateCertificationReadiness,
+  getBcorpFrameworkId,
   persistScoreHistory,
 } from './readiness';
 import { renderReadinessEmail } from './readiness-email';
@@ -81,6 +82,44 @@ export async function recalculateAndNotify(
   }
 
   return readiness;
+}
+
+/**
+ * Best-effort: when a supplier's ESG assessment changes (submit / verify /
+ * revision), refresh the buying organisation's B Corp readiness so supply-chain
+ * coverage is reflected immediately rather than waiting for the nightly cron.
+ * Resolves the org from the supplier record and its active B Corp certification.
+ * Never throws — callers should still not depend on it.
+ */
+export async function recalculateBcorpForSupplier(
+  supabase: SupabaseClient,
+  supplierId: string,
+): Promise<void> {
+  try {
+    const { data: sup } = await supabase
+      .from('suppliers')
+      .select('organization_id')
+      .eq('id', supplierId)
+      .maybeSingle();
+    const organizationId = sup?.organization_id as string | undefined;
+    if (!organizationId) return;
+
+    const frameworkId = await getBcorpFrameworkId(supabase);
+    if (!frameworkId) return;
+
+    const { data: cert } = await supabase
+      .from('organization_certifications')
+      .select('id')
+      .eq('framework_id', frameworkId)
+      .eq('organization_id', organizationId)
+      .neq('status', 'not_started')
+      .maybeSingle();
+    if (!cert?.id) return;
+
+    await recalculateAndNotify(supabase, organizationId, cert.id as string);
+  } catch (err) {
+    console.error('recalculateBcorpForSupplier failed:', err);
+  }
 }
 
 async function notifyOwners(

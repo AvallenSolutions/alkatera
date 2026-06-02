@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { isReadyToSubmit } from '@/lib/supplier-esg/scoring'
+import { recalculateBcorpForSupplier } from '@/lib/certifications/recalculate'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -93,6 +94,10 @@ export async function POST() {
       .eq('id', assessment.id)
 
     if (updateError) throw updateError
+
+    // Submitting flips this supplier into the buyer's B Corp supply-chain coverage.
+    // Refresh the buyer's readiness now rather than waiting for the nightly cron.
+    await recalculateBcorpForSupplier(supabase, supplier.id)
 
     return NextResponse.json({ success: true })
   } catch (err) {

@@ -52,6 +52,7 @@ import { PreAuditChecklist } from '@/components/certifications/PreAuditChecklist
 import { AuditTimeline } from '@/components/certifications/AuditTimeline';
 import { ClarificationRequests } from '@/components/certifications/ClarificationRequests';
 import { UpcomingRequirements } from '@/components/certifications/UpcomingRequirements';
+import { SupplyChainEsgCard } from '@/components/certifications/SupplyChainEsgCard';
 import { StandardsBanner } from '@/components/certifications/StandardsBanner';
 import { RecertBanner } from '@/components/certifications/RecertBanner';
 import { useCertificationFrameworks } from '@/hooks/data/useCertificationFrameworks';
@@ -277,6 +278,7 @@ export function BcorpExperience() {
                 }}
                 blockingSignal={blockingSignal}
               />
+              <SupplyChainEsgCard />
             </div>
           ) : (
             <Card>

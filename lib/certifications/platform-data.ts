@@ -1,5 +1,11 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import {
+  getSupplierEsgCoverage,
+  getSupplierClimateCoverage,
+  DUE_DILIGENCE_QUESTION_IDS,
+  type SupplierEsgCoverage,
+} from './supplier-esg-evidence';
 
 // Maps B Corp 2026 requirements to the alkatera modules that already hold
 // relevant data. Only modules confirmed to exist in the schema are mapped;
@@ -46,6 +52,41 @@ function summariseCount(
     };
   }
   return { found: true, completeness: 'complete', completenessNote: null };
+}
+
+/**
+ * Build a platform-evidence result from supplier ESG coverage: an aggregate
+ * headline item plus one traceable item per assessed supplier (so an auditor can
+ * click through to each supplier's assessment).
+ */
+function esgCoverageResult(
+  cov: SupplierEsgCoverage,
+  aggregateLabel: string,
+): Omit<PlatformEvidenceResult, 'module' | 'moduleLabel' | 'moduleLink'> {
+  if (cov.assessed === 0) {
+    return {
+      found: false,
+      completeness: cov.completeness,
+      completenessNote: cov.note,
+      items: [],
+    };
+  }
+  return {
+    found: true,
+    completeness: cov.completeness,
+    completenessNote: cov.note,
+    items: [
+      { sourceRecordId: 'aggregate', label: aggregateLabel, summary: cov.note ?? '' },
+      ...cov.assessedSuppliers.slice(0, 20).map((s) => ({
+        sourceRecordId: s.assessmentId,
+        label: s.name,
+        summary:
+          `ESG self-assessment ${s.verified ? 'verified' : 'submitted'}` +
+          (s.labour != null ? `, labour ${s.labour}` : '') +
+          (s.ethics != null ? `, ethics ${s.ethics}` : ''),
+      })),
+    ],
+  };
 }
 
 const MAPPINGS: Record<string, ModuleMapping> = {
@@ -97,6 +138,49 @@ const MAPPINGS: Record<string, ModuleMapping> = {
           label: r.metric_key,
           summary: `Target ${r.target_value} by ${r.target_date} (${r.status})`,
         })),
+      };
+    },
+  },
+  // Climate Action — Scope 3 / value-chain emissions (Year 3).
+  // Supplementary supplier-sourced signal: direct suppliers who report measuring
+  // Scope 3 (env_11) and/or holding a science-based target (env_12). This supports
+  // the brand's value-chain story; the brand's own emissions data drives the core
+  // climate requirements (IT5-Y0-001 / IT5-Y0-002).
+  'IT5-Y3-001': {
+    module: 'suppliers',
+    moduleLabel: 'Suppliers',
+    moduleLink: '/suppliers',
+    async query(supabase, orgId) {
+      const cov = await getSupplierClimateCoverage(supabase, orgId);
+      if (cov.engaged === 0) {
+        return {
+          found: false,
+          completeness: cov.completeness,
+          completenessNote: cov.note,
+          items: [],
+        };
+      }
+      return {
+        found: true,
+        completeness: cov.completeness,
+        completenessNote: cov.note,
+        items: [
+          {
+            sourceRecordId: 'aggregate',
+            label: 'Supplier value-chain climate engagement',
+            summary: cov.note ?? '',
+          },
+          ...cov.engagedSuppliers.slice(0, 20).map((s) => ({
+            sourceRecordId: s.assessmentId,
+            label: s.name,
+            summary: [
+              s.measuresScope3 ? 'measures Scope 3' : null,
+              s.hasScienceTarget ? 'science-based target' : null,
+            ]
+              .filter(Boolean)
+              .join(', '),
+          })),
+        ],
       };
     },
   },
@@ -192,50 +276,32 @@ const MAPPINGS: Record<string, ModuleMapping> = {
       };
     },
   },
-  // Human Rights — forced & child labour / supply chain due diligence
+  // Human Rights — forced & child labour / supply chain due diligence.
+  // Backed by the supplier ESG self-assessment: coverage of direct (Tier 1)
+  // suppliers who have completed the survey, with their labour & ethics scores.
   'IT4-Y0-002': {
     module: 'suppliers',
     moduleLabel: 'Suppliers',
     moduleLink: '/suppliers',
     async query(supabase, orgId) {
-      const { data } = await supabase
-        .from('suppliers')
-        .select('id, name, country, industry_sector')
-        .eq('organization_id', orgId)
-        .limit(10);
-      const rows = data ?? [];
-      const base = summariseCount(rows.length, 'supplier records');
-      return {
-        ...base,
-        items: rows.slice(0, 5).map((r: any) => ({
-          sourceRecordId: r.id,
-          label: r.name,
-          summary: `${r.industry_sector ?? 'Unknown sector'} · ${r.country ?? 'Unknown country'}`,
-        })),
-      };
+      const cov = await getSupplierEsgCoverage(supabase, orgId);
+      return esgCoverageResult(cov, 'Supplier ESG self-assessment coverage');
     },
   },
-  // Human Rights — due diligence (Year 3)
+  // Human Rights — due diligence (Year 3). Deeper bar than Y0: counts only suppliers
+  // who report human-rights due-diligence practices (living income / country-level
+  // risk — the lhr_11/lhr_12 questions tagged to this requirement).
   'IT4-Y3-001': {
     module: 'suppliers',
     moduleLabel: 'Suppliers',
     moduleLink: '/suppliers',
     async query(supabase, orgId) {
-      const { data } = await supabase
-        .from('suppliers')
-        .select('id, name')
-        .eq('organization_id', orgId)
-        .limit(10);
-      const rows = data ?? [];
-      const base = summariseCount(rows.length, 'supplier records');
-      return {
-        ...base,
-        items: rows.slice(0, 5).map((r: any) => ({
-          sourceRecordId: r.id,
-          label: r.name,
-          summary: 'Supplier on record for due diligence',
-        })),
-      };
+      const cov = await getSupplierEsgCoverage(supabase, orgId, {
+        requireAnyAffirmed: DUE_DILIGENCE_QUESTION_IDS,
+        coverageLabel:
+          'report human-rights due-diligence practices (living income or country-level risk assessment)',
+      });
+      return esgCoverageResult(cov, 'Supply-chain human-rights due diligence');
     },
   },
   // Environmental Stewardship — resource use / waste

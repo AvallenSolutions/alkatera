@@ -14,6 +14,17 @@ export interface EsgQuestion {
   text: string
   guidanceNote?: string
   allowNA?: boolean
+  /**
+   * B Corp 2026 requirement this question helps a buying organisation evidence,
+   * when the supplier answers it affirmatively. Drives the supply-chain mappings
+   * in lib/certifications/platform-data.ts.
+   */
+  bcorpRequirement?: string
+}
+
+/** Question ids tagged as evidence for a given B Corp requirement code. */
+export function getBcorpQuestionIds(requirementCode: string): string[] {
+  return ESG_QUESTIONS.filter((q) => q.bcorpRequirement === requirementCode).map((q) => q.id)
 }
 
 export const ESG_SECTIONS: { key: EsgSection; label: string }[] = [
@@ -96,6 +107,7 @@ export const ESG_QUESTIONS: EsgQuestion[] = [
     sectionLabel: 'Labour & Human Rights',
     text: 'For any agricultural or commodity raw materials you supply, do you take action to support a living income for farmers and growers in your supply chain?',
     allowNA: true,
+    bcorpRequirement: 'IT4-Y3-001',
     guidanceNote:
       'Living income is the net income a household needs for a decent standard of living. It is distinct from a living wage, which applies to employed workers. Examples of action include price premiums, long-term contracts, or Fairtrade/Fair for Life certification. Select N/A if you do not supply agricultural or commodity raw materials.',
   },
@@ -104,6 +116,7 @@ export const ESG_QUESTIONS: EsgQuestion[] = [
     section: 'labour_human_rights',
     sectionLabel: 'Labour & Human Rights',
     text: 'Do you assess human rights and living wage risk by the specific countries and sites where you and your suppliers operate?',
+    bcorpRequirement: 'IT4-Y3-001',
     guidanceNote:
       'Living wage benchmarks and human rights risk are location-dependent. Partial = some operating locations assessed but not all, or only your own sites and not your suppliers.',
   },
@@ -132,6 +145,7 @@ export const ESG_QUESTIONS: EsgQuestion[] = [
     section: 'environment',
     sectionLabel: 'Environment',
     text: 'Do you measure and track your Scope 3 (value chain) greenhouse gas emissions?',
+    bcorpRequirement: 'IT5-Y3-001',
     guidanceNote:
       'Scope 3 covers indirect emissions across your value chain, including purchased goods and services, transport, and use of sold products. Partial = some Scope 3 categories measured but not a full inventory.',
   },
@@ -140,6 +154,7 @@ export const ESG_QUESTIONS: EsgQuestion[] = [
     section: 'environment',
     sectionLabel: 'Environment',
     text: 'Do you have a science-based emissions reduction target aligned with limiting global warming to 1.5°C?',
+    bcorpRequirement: 'IT5-Y3-001',
     guidanceNote:
       'For example, a target validated by the Science Based Targets initiative (SBTi). Partial = a target is set but not yet validated, or aligned to well-below 2°C rather than 1.5°C.',
   },
