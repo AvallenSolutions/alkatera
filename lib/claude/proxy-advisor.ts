@@ -1,4 +1,4 @@
-import { CLAUDE_DEFAULT_MODEL } from './models'
+import { runTextPrompt } from '@/lib/ai/gemini'
 /**
  * Claude Proxy Advisor
  *
@@ -12,19 +12,6 @@ import { CLAUDE_DEFAULT_MODEL } from './models'
  * - In-memory caching (30 min TTL)
  * - JSON response parsing
  */
-
-// Lazy-loaded Anthropic SDK to avoid bundling in client code and handle missing dependency
-let Anthropic: any = null;
-async function getAnthropic() {
-  if (!Anthropic) {
-    try {
-      Anthropic = (await import('@anthropic-ai/sdk')).default;
-    } catch {
-      console.warn('[Proxy Advisor] @anthropic-ai/sdk not installed. Proxy suggestions will use fallbacks.');
-    }
-  }
-  return Anthropic;
-}
 
 // ============================================================================
 // TYPES
@@ -124,22 +111,7 @@ Respond ONLY with valid JSON (no markdown, no explanation outside JSON). Suggest
 // CLIENT INITIALIZATION
 // ============================================================================
 
-let anthropicClient: any = null;
-
-async function getClient(): Promise<any> {
-  const AnthropicSDK = await getAnthropic();
-  if (!AnthropicSDK) {
-    throw new Error('@anthropic-ai/sdk is not installed');
-  }
-  if (!anthropicClient) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      throw new Error('ANTHROPIC_API_KEY environment variable is not set');
-    }
-    anthropicClient = new AnthropicSDK({ apiKey });
-  }
-  return anthropicClient;
-}
+// Gemini handles client creation + key checks inside runTextPrompt.
 
 // ============================================================================
 // CACHING
@@ -339,8 +311,7 @@ export async function suggestProxy(input: ProxyAdvisorInput): Promise<ProxySugge
   if (cached) return cached;
 
   // Check if API is configured
-  const AnthropicSDK = await getAnthropic();
-  if (!process.env.ANTHROPIC_API_KEY || !AnthropicSDK) {
+  if (!process.env.GEMINI_API_KEY) {
     const fallbackResult: ProxySuggestionResult = {
       suggestions: getStaticFallback(input.ingredient_name, input.ingredient_type),
       cached: false,
@@ -351,8 +322,6 @@ export async function suggestProxy(input: ProxyAdvisorInput): Promise<ProxySugge
   }
 
   try {
-    const client = await getClient();
-
     const userPrompt = `Suggest proxy emission factors for this unmatched ${input.ingredient_type}:
 
 Ingredient name: "${input.ingredient_name}"
@@ -361,25 +330,15 @@ ${input.product_context ? `Product context: ${input.product_context}` : ''}
 
 What is this ingredient, what category does it belong to, and what would be the best LCA proxy from our available databases? Consider the production process, material composition, and agricultural/industrial context.`;
 
-    const response = await client.messages.create({
-      model: CLAUDE_DEFAULT_MODEL,
-      max_tokens: 1024,
-      system: PROXY_ADVISOR_SYSTEM_PROMPT,
-      messages: [
-        {
-          role: 'user',
-          content: userPrompt,
-        },
-      ],
+    const text = await runTextPrompt({
+      apiKey: process.env.GEMINI_API_KEY,
+      prompt: `${PROXY_ADVISOR_SYSTEM_PROMPT}\n\n${userPrompt}`,
+      maxTokens: 1024,
+      op: 'proxy_advisor',
     });
 
-    const content = response.content[0];
-    if (content.type !== 'text') {
-      throw new Error('Unexpected response type');
-    }
-
     // Parse JSON from response
-    const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       throw new Error('No JSON found in response');
     }
