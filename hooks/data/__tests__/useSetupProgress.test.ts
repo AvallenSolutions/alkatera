@@ -38,18 +38,12 @@ function setupSupabaseMocks(counts: {
   suppliers?: number
   members?: number
 }) {
-  // Build a thenable chain so multiple chained .eq() calls work correctly.
-  // Each method (select/eq) returns the chain itself; await-ing the chain
-  // resolves via .then() with the mocked count.
   const queryBuilder = (resolvedCount: number) => {
     const chain: Record<string, any> = {}
-    const response = { count: resolvedCount, data: null, error: null }
     chain.select = vi.fn().mockReturnValue(chain)
-    chain.eq = vi.fn().mockReturnValue(chain)
-    chain.then = (resolve: (r: typeof response) => void, _reject?: (e: unknown) => void) => {
-      resolve(response)
-      return Promise.resolve(response)
-    }
+    chain.eq = vi.fn().mockImplementation(() => {
+      return Promise.resolve({ count: resolvedCount, data: null, error: null })
+    })
     return chain
   }
 
@@ -58,7 +52,6 @@ function setupSupabaseMocks(counts: {
     products: counts.products ?? 0,
     organization_suppliers: counts.suppliers ?? 0,
     organization_members: counts.members ?? 1,
-    team_invitations: 0,
   }
 
   mockSupabaseClient.from.mockImplementation((table: string) => {
@@ -71,8 +64,7 @@ function setupSupabaseMocks(counts: {
 describe('useSetupProgress', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    // jsdom provides localStorage but may not expose .clear() in all environments
-    try { localStorage.clear() } catch { /* ignore */ }
+    localStorage.clear()
     vi.spyOn(console, 'error').mockImplementation(() => {})
   })
 
@@ -80,12 +72,10 @@ describe('useSetupProgress', () => {
     vi.restoreAllMocks()
   })
 
-  it('should finish in non-loading state after fetch', async () => {
+  it('should start in loading state', () => {
     setupSupabaseMocks({})
     const { result } = renderHook(() => useSetupProgress())
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false)
-    })
+    expect(result.current.isLoading).toBe(true)
   })
 
   it('should return 0% progress when nothing is set up', async () => {

@@ -58,22 +58,7 @@ The P0 (cross-tenant) items were fixed in code on the review date. **Two databas
 
 **Verification:** full project typecheck passes (0 errors) after every batch. The affected routes have no unit tests (a coverage gap, see MED-2); changes were reviewed and the migration logic validated against `user_has_organization_access()`. **Org switching could not be live-tested** (prod-only env), so it should be smoke-tested after deploy; the design dual-writes user + app metadata so it works both before and after the migrations are applied. Live exploit verification was not run (see Appendix B).
 
-### P2 remediation (same session)
-
-| Item | Fix | Status |
-|---|---|---|
-| MED-2 (validation) | zod schemas on 22 admin/blog/invite write handlers (type + mass-assignment). | Code complete |
-| MED-3 (PostgREST `.or()`) | `sanitizePostgrestSearch()` applied to the 4 free-text search sites. | Code complete |
-| HIGH-5 (DSR) | Self-serve data export + account erasure (with a sole-owner guard) in Profile settings (`/api/account/export`, `/api/account/delete`). | Code complete |
-| MED-7 (sub-processors) | Named sub-processor list + AI-processing disclosure added to the privacy policy. | Drafted, **needs legal review** |
-| MED-8 (retention) | `purge-stale-invitations` cron (90-day, resolved/expired invites); `public_greenwash_scans` purge shipped in P0.3; `epr_audit_log` retained 7 years by regulatory design. | Code complete |
-| LOW-1 | `ef_selection_log` reads scoped to own rows (migration `20262702540000`). | Code complete, **migration pending apply** |
-| LOW-3 | CSP `frame-ancestors 'none'`. | Code complete |
-| LOW-6 | `INTEGRATION_CONFIG_KEY` weak-key warning (derivation unchanged to preserve ciphertext). | Code complete |
-
-**Deferred to a later pass:** CSP nonce refactor / dropping `unsafe-eval` (MED-4, risky, needs live testing) and the full `error.message` sweep (MED-6 remainder).
-
-Commits: `46b76b37` (P0+P1), `9686132f` (P2). DSR account-deletion was not live-tested (prod-only env); smoke-test before relying on it.
+P2 items (full `error.message` sweep, zod input validation, CSP nonces, DSR tooling, sub-processor disclosure, retention) remain open per Section 4.
 
 ---
 
