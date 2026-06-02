@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { BrandActions } from '@/components/distributor/brand-detail/brand-actions';
 import type { BrandProfile } from '@/types/distributor';
 
 export interface BrandTableRow extends BrandProfile {
@@ -35,6 +36,8 @@ export interface BrandTableRow extends BrandProfile {
 
 interface Props {
   brands: BrandTableRow[];
+  /** Owner/data_manager get an inline edit/delete menu per row. */
+  canEdit?: boolean;
 }
 
 const TIER_COLOURS: Record<number, string> = {
@@ -47,7 +50,7 @@ const TIER_COLOURS: Record<number, string> = {
 type SortKey = 'name' | 'completeness' | 'vitality' | 'sku_count' | 'last_activity';
 type SortDir = 'asc' | 'desc';
 
-export function BrandTable({ brands }: Props) {
+export function BrandTable({ brands, canEdit }: Props) {
   const [query, setQuery] = useState('');
   const [tier, setTier] = useState<string>('all');
   const [category, setCategory] = useState<string>('all');
@@ -204,6 +207,7 @@ export function BrandTable({ brands }: Props) {
                 current={sort}
                 onSort={toggleSort}
               />
+              {canEdit && <th className="px-4 py-3.5 w-10" aria-label="Actions" />}
             </tr>
           </thead>
           <tbody>
@@ -248,11 +252,26 @@ export function BrandTable({ brands }: Props) {
                 <td className="px-4 py-3.5 text-xs text-muted-foreground">
                   {brand.last_activity ? new Date(brand.last_activity).toLocaleDateString() : '—'}
                 </td>
+                {canEdit && (
+                  <td className="px-4 py-3.5 text-right">
+                    <BrandActions
+                      compact
+                      canEdit
+                      brand={{
+                        id: brand.id,
+                        name: brand.name,
+                        website: brand.website ?? null,
+                        category: brand.category ?? null,
+                        country_of_origin: brand.country_of_origin ?? null,
+                      }}
+                    />
+                  </td>
+                )}
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-4 py-12 text-center">
+                <td colSpan={canEdit ? 11 : 10} className="px-4 py-12 text-center">
                   <div className="flex flex-col items-center gap-2 text-sm text-muted-foreground">
                     <Inbox className="h-5 w-5" />
                     No brands match the current filters.

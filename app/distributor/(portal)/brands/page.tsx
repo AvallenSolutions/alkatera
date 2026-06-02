@@ -219,7 +219,7 @@ export default async function DistributorBrandsPage() {
           </div>
         </div>
       ) : (
-        <BrandTable brands={rows} />
+        <BrandTable brands={rows} canEdit={member.role !== 'viewer'} />
       )}
     </div>
   );

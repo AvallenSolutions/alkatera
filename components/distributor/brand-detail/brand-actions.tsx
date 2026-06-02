@@ -41,9 +41,12 @@ interface BrandActionsProps {
     country_of_origin: string | null;
   };
   canEdit: boolean;
+  /** Compact ghost trigger for dense table rows (vs the outline button used
+   *  in the brand-detail header). */
+  compact?: boolean;
 }
 
-export function BrandActions({ brand, canEdit }: BrandActionsProps) {
+export function BrandActions({ brand, canEdit, compact }: BrandActionsProps) {
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -112,9 +115,15 @@ export function BrandActions({ brand, canEdit }: BrandActionsProps) {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="icon" className="shrink-0" aria-label="Brand actions">
-            <MoreVertical className="h-4 w-4" />
-          </Button>
+          {compact ? (
+            <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Brand actions">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button variant="outline" size="icon" className="shrink-0" aria-label="Brand actions">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          )}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onSelect={() => setEditOpen(true)}>
