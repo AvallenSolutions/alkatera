@@ -51,7 +51,8 @@ export type ImportProgressPhase =
   | 'matching_brands'
   | 'saving_brands'
   | 'matching_products'
-  | 'saving_skus';
+  | 'saving_skus'
+  | 'finding_websites';
 
 interface ProcessArgs {
   supabase: SupabaseClient;

@@ -4,6 +4,8 @@ import { parseExcel } from './parsers/excel-parser';
 import { parsePdf } from './parsers/pdf-parser';
 import { processSkuList, type ImportProgressPhase } from './sku-list-processor';
 import { extractBrandsFromProductNames } from './brand-extractor';
+import { findBrandWebsites } from './website-finder';
+import { mapWithConcurrency } from './concurrent-map';
 import { queueBrandsForScraping } from './scraping/agent-dispatcher';
 import type { ColumnMapping, SkuListFileType } from '@/types/distributor';
 
@@ -150,6 +152,41 @@ export async function runSkuImport(args: {
     onProgress: reportProgress,
   });
 
+  // Auto-find official websites for any touched brand that doesn't have one.
+  // The scraping pipeline skips brands with no website, so without this an
+  // import like Mangrove's (no website column) would never get scraped. Once
+  // a website lands here, queueBrandsForScraping below picks the brand up.
+  if (result.brand_profile_ids.length > 0) {
+    const { data: needWebsite } = await supabase
+      .from('brand_profiles')
+      .select('id, name, country_of_origin')
+      .in('id', result.brand_profile_ids)
+      .is('website', null);
+    const candidates = (needWebsite ?? []) as Array<{
+      id: string;
+      name: string;
+      country_of_origin: string | null;
+    }>;
+    if (candidates.length > 0) {
+      try {
+        const websites = await findBrandWebsites(candidates, {
+          onProgress: (done, total) => reportProgress('finding_websites', done, total),
+        });
+        const updates = Array.from(websites.entries());
+        await mapWithConcurrency(updates, 8, async ([id, website]) => {
+          await supabase
+            .from('brand_profiles')
+            .update({ website })
+            .eq('id', id)
+            .eq('distributor_org_id', distributorOrgId)
+            .is('website', null);
+        });
+      } catch {
+        // Best-effort — a website-discovery failure must not fail the import.
+      }
+    }
+  }
+
   // Finishing phase: scraping queue + directory enrichment.
   await supabase
     .from('distributor_sku_lists')
@@ -258,15 +295,17 @@ function describeProgress(
   const band = (start: number, end: number) => Math.round(start + frac * (end - start));
   switch (phase) {
     case 'detecting_brands':
-      return { label: `Detecting brands from product names… (${current}/${total})`, percent: band(3, 22) };
+      return { label: `Detecting brands from product names… (${current}/${total})`, percent: band(2, 15) };
     case 'matching_brands':
-      return { label: `Matching brands to the directory… (${current}/${total})`, percent: band(22, 45) };
+      return { label: `Matching brands to the directory… (${current}/${total})`, percent: band(15, 32) };
     case 'saving_brands':
-      return { label: `Saving brand profiles… (${current}/${total})`, percent: band(45, 60) };
+      return { label: `Saving brand profiles… (${current}/${total})`, percent: band(32, 40) };
     case 'matching_products':
-      return { label: `Matching products to the catalogue… (${current}/${total})`, percent: band(60, 88) };
+      return { label: `Matching products to the catalogue… (${current}/${total})`, percent: band(40, 58) };
     case 'saving_skus':
-      return { label: 'Saving SKUs…', percent: band(88, 96) };
+      return { label: 'Saving SKUs…', percent: band(58, 64) };
+    case 'finding_websites':
+      return { label: `Finding brand websites… (${current}/${total})`, percent: band(64, 95) };
     default:
       return { label: 'Working…', percent: 5 };
   }
