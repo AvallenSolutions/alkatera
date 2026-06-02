@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { normalizeGtin, normalizeProductName } from '../brand-normalizer';
+import { mapWithConcurrency } from '../concurrent-map';
+import { MATCH_CONCURRENCY } from './matcher';
 
 export interface ProductMatchInput {
   /** Required: the canonical brand the product belongs under. */
@@ -160,29 +162,41 @@ export async function resolveProductsToDirectory(
   onProgress?: (current: number, total: number) => Promise<void> | void,
 ): Promise<Map<string, ProductMatchResult>> {
   const resolved = new Map<string, ProductMatchResult>();
-  const total = products.length;
-  let done = 0;
+
+  // Dedupe by canonical key FIRST so concurrent tasks don't contend on the
+  // same product. product_directory's only uniqueness is the partial index
+  // on gtin, so distinct keys can't collide on insert (and the rare
+  // same-gtin/different-name race is caught per-item below).
+  const seen = new Set<string>();
+  const unique: Array<{ product: ProductMatchInput; key: string; gtin: string | null }> = [];
   for (const product of products) {
-    done += 1;
     const normalized = normalizeProductName(product.displayName);
     const gtin = normalizeGtin(product.gtin ?? null);
-    if (!normalized && !gtin) {
-      await onProgress?.(done, total);
-      continue;
-    }
-    const key = `${gtin ?? ''}|${normalized}|${product.brandDirectoryId}`;
-    if (resolved.has(key)) {
-      await onProgress?.(done, total);
-      continue;
-    }
-    const result = await resolveOrCreateProductEntry(supabase, {
-      ...product,
-      gtin,
-      discoveredByDistributorOrgId,
-    });
-    resolved.set(key, result);
-    await onProgress?.(done, total);
+    if (!normalized && !gtin) continue;
+    const key = productMatchKey(product.brandDirectoryId, product.displayName, gtin);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push({ product, key, gtin });
   }
+
+  const total = unique.length;
+  let done = 0;
+  await mapWithConcurrency(unique, MATCH_CONCURRENCY, async ({ product, key, gtin }) => {
+    try {
+      const result = await resolveOrCreateProductEntry(supabase, {
+        ...product,
+        gtin,
+        discoveredByDistributorOrgId,
+      });
+      resolved.set(key, result);
+    } catch {
+      // Skip the canonical link for this product on race/failure — the SKU
+      // still imports with product_directory_id = null.
+    } finally {
+      done += 1;
+      await onProgress?.(done, total);
+    }
+  });
   return resolved;
 }
 

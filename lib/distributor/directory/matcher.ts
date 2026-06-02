@@ -1,5 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { normalizeBrandName } from '../brand-normalizer';
+import { mapWithConcurrency } from '../concurrent-map';
+
+/**
+ * How many brand/product resolutions run concurrently during a SKU import.
+ * Each is a Supabase RPC + occasional insert; 8 keeps a large catalogue's
+ * wall-clock low without overwhelming the connection pool.
+ */
+export const MATCH_CONCURRENCY = 8;
 
 export interface DirectoryMatchInput {
   /** User-facing display name as it appeared in the upload. */
@@ -248,19 +256,37 @@ export async function resolveBrandsToDirectory(
   onProgress?: (current: number, total: number) => Promise<void> | void,
 ): Promise<Map<string, DirectoryMatchResult>> {
   const resolved = new Map<string, DirectoryMatchResult>();
+
+  // Dedupe by normalised name FIRST so no two concurrent tasks resolve the
+  // same brand (two upload rows for "Avallen" share one directory entry).
+  // With distinct names, parallel creates can't collide on a unique
+  // constraint — brand_directory's only uniqueness is the partial index on
+  // alkatera_org_id, and resolveOrCreateDirectoryEntry already falls back to
+  // a fresh entry if that org-mint races.
   const seen = new Set<string>();
-  const total = new Set(brands.map((b) => b.normalizedName)).size;
-  let done = 0;
+  const unique: typeof brands = [];
   for (const brand of brands) {
     if (seen.has(brand.normalizedName)) continue;
     seen.add(brand.normalizedName);
-    const result = await resolveOrCreateDirectoryEntry(supabase, {
-      ...brand,
-      discoveredByDistributorOrgId,
-    });
-    resolved.set(brand.normalizedName, result);
-    done += 1;
-    await onProgress?.(done, total);
+    unique.push(brand);
   }
+
+  const total = unique.length;
+  let done = 0;
+  await mapWithConcurrency(unique, MATCH_CONCURRENCY, async (brand) => {
+    try {
+      const result = await resolveOrCreateDirectoryEntry(supabase, {
+        ...brand,
+        discoveredByDistributorOrgId,
+      });
+      resolved.set(brand.normalizedName, result);
+    } catch {
+      // Leave unresolved — processSkuList reports a per-brand warning and
+      // skips it rather than failing the whole import.
+    } finally {
+      done += 1;
+      await onProgress?.(done, total);
+    }
+  });
   return resolved;
 }

@@ -166,11 +166,26 @@ export async function processSkuList(args: ProcessArgs): Promise<ProcessResult> 
   const directoryMatchSummaries: DirectoryMatchSummary[] = [];
   const profileIdByNormalized = new Map<string, string>();
 
-  let savedBrands = 0;
-  const totalBrands = brandToRows.size;
+  await onProgress?.('saving_brands', 0, brandToRows.size);
+
+  // Collapse buckets onto their resolved directory entry. Several spellings
+  // can map to the same canonical brand, and brand_profiles is unique on
+  // (distributor_org_id, brand_directory_id), so we persist ONE row per
+  // directory id. Keep the first spelling's display fields for that row, but
+  // remember every normalised name that points at it so SKUs key correctly.
+  type BrandUpsert = {
+    distributor_org_id: string;
+    brand_directory_id: string;
+    name: string;
+    normalized_name: string;
+    category: string | null;
+    country_of_origin: string | null;
+  };
+  const upsertByDir = new Map<string, BrandUpsert>();
+  const websiteByDir = new Map<string, string | null>();
+  const normalizedByDir = new Map<string, string[]>();
+
   for (const [normalized, bucket] of Array.from(brandToRows.entries())) {
-    savedBrands += 1;
-    await onProgress?.('saving_brands', savedBrands, totalBrands);
     const match = directoryMatches.get(normalized);
     if (!match) {
       errors.push(`Brand "${bucket.displayName}": no directory match resolved`);
@@ -184,76 +199,60 @@ export async function processSkuList(args: ProcessArgs): Promise<ProcessResult> 
       similarity: match.similarity,
       match_via: match.matchVia,
     });
-
-    // Phase 4: dedupe by (distributor_org_id, brand_directory_id) before
-    // we touch brand_profiles. The directory matcher may have collapsed
-    // a slightly-different spelling of this brand onto an existing
-    // canonical entry — in which case we have to update the existing
-    // listing rather than insert a fresh row, otherwise the unique
-    // constraint added in migration 20262607000000 rejects us. Look
-    // first, then branch.
-    const { data: existing } = await supabase
-      .from('brand_profiles')
-      .select('id, website')
-      .eq('distributor_org_id', distributorOrgId)
-      .eq('brand_directory_id', match.directoryId)
-      .maybeSingle();
-
-    let row: { id: string; website: string | null } | null;
-    if (existing) {
-      const { data: updated, error: updateError } = await supabase
-        .from('brand_profiles')
-        .update({
-          name: bucket.displayName,
-          normalized_name: normalized,
-          category: bucket.category,
-          country_of_origin: bucket.country,
-        })
-        .eq('id', (existing as { id: string }).id)
-        .select('id, website')
-        .single();
-      row = (updated as { id: string; website: string | null } | null) ?? null;
-      if (updateError || !row) {
-        errors.push(`Brand "${bucket.displayName}": ${updateError?.message ?? 'no row returned'}`);
-        continue;
-      }
-    } else {
-      const { data: inserted, error: insertError } = await supabase
-        .from('brand_profiles')
-        .insert({
-          distributor_org_id: distributorOrgId,
-          brand_directory_id: match.directoryId,
-          name: bucket.displayName,
-          normalized_name: normalized,
-          category: bucket.category,
-          country_of_origin: bucket.country,
-        })
-        .select('id, website')
-        .single();
-      row = (inserted as { id: string; website: string | null } | null) ?? null;
-      if (insertError || !row) {
-        errors.push(`Brand "${bucket.displayName}": ${insertError?.message ?? 'no row returned'}`);
-        continue;
-      }
+    const existingList = normalizedByDir.get(match.directoryId);
+    if (existingList) existingList.push(normalized);
+    else normalizedByDir.set(match.directoryId, [normalized]);
+    if (!upsertByDir.has(match.directoryId)) {
+      upsertByDir.set(match.directoryId, {
+        distributor_org_id: distributorOrgId,
+        brand_directory_id: match.directoryId,
+        name: bucket.displayName,
+        normalized_name: normalized,
+        category: bucket.category,
+        country_of_origin: bucket.country,
+      });
+      websiteByDir.set(match.directoryId, bucket.website ? normaliseWebsite(bucket.website) : null);
     }
-    const data = row;
-    profileIdByNormalized.set(normalized, data.id);
+  }
 
-    // If the CSV/XLSX provided a website AND the existing brand_profile
-    // row has none, seed it. Never overwrite a curated website with a
-    // CSV value — the user may have edited it manually since the
-    // previous import.
-    if (bucket.website && !(data as { website: string | null }).website) {
-      const normalisedWebsite = normaliseWebsite(bucket.website);
-      if (normalisedWebsite) {
-        await supabase
-          .from('brand_profiles')
-          .update({ website: normalisedWebsite })
-          .eq('id', data.id)
-          .is('website', null);
+  const dirIds = Array.from(upsertByDir.keys());
+  if (dirIds.length > 0) {
+    // One round-trip to learn which listings already exist (and their
+    // curated websites) instead of a SELECT per brand.
+    const existingByDir = new Map<string, { id: string; website: string | null }>();
+    const { data: existingRows } = await supabase
+      .from('brand_profiles')
+      .select('id, brand_directory_id, website')
+      .eq('distributor_org_id', distributorOrgId)
+      .in('brand_directory_id', dirIds);
+    for (const r of (existingRows ?? []) as Array<{ id: string; brand_directory_id: string; website: string | null }>) {
+      existingByDir.set(r.brand_directory_id, { id: r.id, website: r.website });
+    }
+
+    // Never overwrite a curated website with a CSV value: keep the existing
+    // one when present, otherwise seed from the upload.
+    const payload = dirIds.map((dirId) => ({
+      ...upsertByDir.get(dirId)!,
+      website: existingByDir.get(dirId)?.website ?? websiteByDir.get(dirId) ?? null,
+    }));
+
+    // One bulk upsert keyed on the Phase-4 unique constraint, replacing the
+    // per-brand insert/update (~1-2k round-trips on a real catalogue).
+    const { data: upserted, error: upsertError } = await supabase
+      .from('brand_profiles')
+      .upsert(payload, { onConflict: 'distributor_org_id,brand_directory_id' })
+      .select('id, brand_directory_id');
+    if (upsertError) {
+      errors.push(`Saving brand profiles: ${upsertError.message}`);
+    }
+    for (const r of (upserted ?? []) as Array<{ id: string; brand_directory_id: string }>) {
+      for (const normalized of normalizedByDir.get(r.brand_directory_id) ?? []) {
+        profileIdByNormalized.set(normalized, r.id);
       }
     }
   }
+
+  await onProgress?.('saving_brands', brandToRows.size, brandToRows.size);
 
   // Resolve every upload row against the canonical product_directory
   // before we insert SKUs. GTIN takes precedence over name. This is
