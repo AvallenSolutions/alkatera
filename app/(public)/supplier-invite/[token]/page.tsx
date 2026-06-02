@@ -50,6 +50,10 @@ export default function SupplierInvitePage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [existingUser, setExistingUser] = useState(false);
   const [showSignIn, setShowSignIn] = useState(false);
+  // Email of a *different* account already signed in this browser. We surface a
+  // switch-account prompt rather than silently signing them out (which would log
+  // a brand user out of the main app in the same browser).
+  const [mismatchedUserEmail, setMismatchedUserEmail] = useState<string | null>(null);
 
   // Form fields
   const [fullName, setFullName] = useState('');
@@ -90,13 +94,15 @@ export default function SupplierInvitePage() {
           return;
         }
 
-        // If user is logged in, check if their email matches
+        // If user is logged in, check if their email matches the invitation.
         if (user) {
           if (user.email?.toLowerCase() === data.supplier_email.toLowerCase()) {
             setExistingUser(true);
           } else {
-            // Different user logged in — sign them out
-            await supabase.auth.signOut();
+            // A different account is signed in (e.g. the inviting brand, who is
+            // CC'd on the email). Do NOT auto sign them out — that would clear
+            // their main-app session in this browser. Offer an explicit choice.
+            setMismatchedUserEmail(user.email ?? 'another account');
           }
         }
 
@@ -111,6 +117,22 @@ export default function SupplierInvitePage() {
 
     loadInvitation();
   }, [token]);
+
+  // Explicitly sign out the currently-signed-in (different) account so the
+  // supplier can sign up / sign in with the invitation email. Only runs when
+  // the user clicks the button, never automatically.
+  const handleSwitchAccount = async () => {
+    setIsSubmitting(true);
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error('Error signing out:', err);
+    } finally {
+      setMismatchedUserEmail(null);
+      setExistingUser(false);
+      setIsSubmitting(false);
+    }
+  };
 
   const handleAcceptAsExistingUser = async () => {
     if (!invitation) return;
@@ -506,7 +528,32 @@ export default function SupplierInvitePage() {
             )}
 
             {/* Auth section */}
-            {existingUser ? (
+            {mismatchedUserEmail ? (
+              /* A different account is signed in this browser — let the user choose. */
+              <div className="space-y-4">
+                <div className="flex items-start gap-3 p-4 bg-white/5 border border-white/10 rounded-xl">
+                  <AlertCircle className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-white/70">
+                    You&apos;re signed in as <strong className="text-white">{mismatchedUserEmail}</strong>.
+                    This invitation is for <strong className="text-white">{invitation?.supplier_email}</strong>.
+                  </p>
+                </div>
+                <button
+                  onClick={handleSwitchAccount}
+                  disabled={isSubmitting}
+                  className="w-full py-4 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:bg-[#b8e600] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>Sign out &amp; continue as {invitation?.supplier_email} <ArrowRight className="h-4 w-4" /></>
+                  )}
+                </button>
+                <p className="text-xs text-white/40 text-center leading-relaxed">
+                  Prefer to stay signed in? Open this link in a private or incognito window instead.
+                </p>
+              </div>
+            ) : existingUser ? (
               /* Already logged in with matching email */
               <div className="space-y-4">
                 <p className="text-sm text-white/60 text-center">

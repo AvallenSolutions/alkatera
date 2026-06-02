@@ -436,7 +436,8 @@ describe('Group D: Waterfall priority — supplier product resolution', () => {
 
     const result = await resolveImpactFactors(makeMaterial(), 10);
     expect(result.data_priority).toBe(1);
-    expect(result.supplier_lca_id).toBe('sp-001');
+    // supplier_lca_id is reserved for Priority 1c PCF records; for 1a use resolved_factor_id
+    expect(result.resolved_factor_id).toBe('sp-001');
   });
 
   it('D2: supplier product with NO data → falls through (throws when no fallback)', async () => {

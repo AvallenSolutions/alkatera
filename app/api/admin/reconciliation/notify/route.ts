@@ -1,24 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
-import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-interface NotifyBody {
-  snapshotId: string
-  recipientEmail?: string
-}
+const NotifyBodySchema = z.object({
+  snapshotId: z.string().min(1),
+  recipientEmail: z.string().optional(),
+})
 
-async function assertAdmin(): Promise<
-  | { ok: true }
-  | { ok: false; status: number; error: string }
-> {
-  const { client, user, error: authError } = await getSupabaseAPIClient()
-  if (authError || !user) return { ok: false, status: 401, error: 'Unauthorised' }
-  const { data } = await client.rpc('is_alkatera_admin')
-  if (data !== true) return { ok: false, status: 403, error: 'Admin only' }
+async function assertAdmin(
+  request: Request,
+): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+  const token = request.headers.get('authorization')?.replace('Bearer ', '')
+  if (!token) return { ok: false, status: 401, error: 'Unauthorised' }
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  const userClient = createClient(url, anon, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  })
+  const { data: userData } = await userClient.auth.getUser()
+  if (!userData?.user) return { ok: false, status: 401, error: 'Unauthorised' }
+  const { data: isAdmin } = await userClient.rpc('is_alkatera_admin')
+  if (isAdmin !== true) return { ok: false, status: 403, error: 'Admin only' }
   return { ok: true }
 }
 
@@ -38,13 +44,15 @@ function escapeHtml(input: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await assertAdmin()
+  const auth = await assertAdmin(request)
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
-  const body = (await request.json().catch(() => null)) as Partial<NotifyBody> | null
-  if (!body?.snapshotId) {
+  const raw = await request.json().catch(() => null)
+  const parsed = NotifyBodySchema.safeParse(raw)
+  if (!parsed.success) {
     return NextResponse.json({ error: 'Missing snapshotId' }, { status: 400 })
   }
+  const body = parsed.data
 
   const svc = serviceClient()
 

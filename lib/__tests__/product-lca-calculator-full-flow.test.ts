@@ -444,7 +444,9 @@ describe('calculateProductCarbonFootprint', () => {
 
   describe('Error recovery', () => {
     it('cleans up LCA record when material resolution fails', async () => {
-      mockResolveImpactFactors.mockRejectedValueOnce(new Error('Factor not found'));
+      // Use mockRejectedValue (not Once) so both the parallel pre-resolution phase
+      // and the serial fallback loop both reject — preventing the fallback from succeeding.
+      mockResolveImpactFactors.mockRejectedValue(new Error('Factor not found'));
 
       const result = await calculateProductCarbonFootprint({ productId: 'prod-001' });
       expect(result.success).toBe(false);
