@@ -75,8 +75,18 @@ export async function POST() {
       return NextResponse.json({ error: 'Assessment already submitted' }, { status: 400 })
     }
 
-    // Validate all questions answered
-    if (!isReadyToSubmit(assessment.answers || {})) {
+    // Deforestation questions only apply to suppliers with commodity products;
+    // mirror the UI's applicability rule so the server doesn't require hidden ones.
+    const { data: commodityProducts } = await supabase
+      .from('supplier_products')
+      .select('id')
+      .eq('supplier_id', supplier.id)
+      .neq('commodity_type', 'none')
+      .limit(1)
+    const hasCommodityProducts = !!(commodityProducts && commodityProducts.length > 0)
+
+    // Validate all applicable questions answered
+    if (!isReadyToSubmit(assessment.answers || {}, { hasCommodityProducts })) {
       return NextResponse.json(
         { error: 'All questions must be answered before submitting.' },
         { status: 400 }

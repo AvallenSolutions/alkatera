@@ -37,16 +37,12 @@ import { useSupplierEsgAssessment } from '@/hooks/data/useSupplierEsgAssessment'
 import { useSupplierEsgEvidence } from '@/hooks/data/useSupplierEsgEvidence'
 import {
   ESG_SECTIONS,
-  ESG_QUESTIONS,
-  getQuestionsBySection,
   type EsgResponse,
   type EsgSection,
 } from '@/lib/supplier-esg/questions'
-import { isReadyToSubmit, getRatingLabel } from '@/lib/supplier-esg/scoring'
+import { isReadyToSubmit, getApplicableQuestions, getRatingLabel } from '@/lib/supplier-esg/scoring'
 import { EsgQuestionEvidenceUpload } from '@/components/suppliers/EsgQuestionEvidenceUpload'
 import type { SupplierEsgEvidence } from '@/lib/types/supplier-esg'
-
-const DEFORESTATION_QUESTION_IDS = ['env_09', 'env_10']
 
 const DEFORESTATION_STANDARD_OPTIONS = [
   { value: 'ndpe', label: 'NDPE (No Deforestation, No Peat, No Exploitation)' },
@@ -116,6 +112,11 @@ export default function SupplierEsgAssessmentPage() {
   const isSubmitted = assessment?.submitted === true
   const isVerified = assessment?.is_verified === true
 
+  // The questions that actually require an answer, given conditional visibility
+  // (deforestation questions only apply to commodity suppliers). Drives the
+  // counts and the submit gate so hidden questions never block submission.
+  const applicableQuestions = getApplicableQuestions(answers, { hasCommodityProducts })
+
   const handleAnswer = async (questionId: string, value: EsgResponse) => {
     if (isSubmitted) return
 
@@ -129,28 +130,30 @@ export default function SupplierEsgAssessmentPage() {
   }
 
   const handleSubmit = async () => {
-    if (!isReadyToSubmit(answers)) return
+    if (!isReadyToSubmit(answers, { hasCommodityProducts })) return
     await submitAssessment()
   }
 
-  // Count completed sections
-  const completedSections = ESG_SECTIONS.filter((s) => {
-    const qs = getQuestionsBySection(s.key)
-    return qs.every((q) => answers[q.id] != null)
-  }).length
+  // Count completed sections (over applicable questions only)
+  const completedSections = ESG_SECTIONS.filter((s) =>
+    applicableQuestions
+      .filter((q) => q.section === s.key)
+      .every((q) => answers[q.id] != null)
+  ).length
 
-  const totalQuestions = ESG_QUESTIONS.length
-  const answeredQuestions = ESG_QUESTIONS.filter((q) => answers[q.id] != null).length
+  const totalQuestions = applicableQuestions.length
+  const answeredQuestions = applicableQuestions.filter((q) => answers[q.id] != null).length
   const completionPercent = totalQuestions > 0 ? Math.round((answeredQuestions / totalQuestions) * 100) : 0
   const totalEvidenceFiles = Object.values(evidenceByQuestion).reduce((sum, items) => sum + items.length, 0)
 
   const pendingSections = useMemo(
-    () =>
-      ESG_SECTIONS.filter((s) => {
-        const qs = getQuestionsBySection(s.key)
-        return qs.some((q) => answers[q.id] == null)
-      }).map((s) => s.key),
-    [answers],
+    () => {
+      const applicable = getApplicableQuestions(answers, { hasCommodityProducts })
+      return ESG_SECTIONS.filter((s) =>
+        applicable.filter((q) => q.section === s.key).some((q) => answers[q.id] == null)
+      ).map((s) => s.key)
+    },
+    [answers, hasCommodityProducts],
   )
 
   const rosaSlice = useMemo(
@@ -280,11 +283,9 @@ export default function SupplierEsgAssessmentPage() {
       {/* Section Accordions */}
       <Accordion type="multiple" defaultValue={[ESG_SECTIONS[0].key]}>
         {ESG_SECTIONS.map((section) => {
-          // Filter out deforestation questions if supplier has no commodity products
-          const allQuestions = getQuestionsBySection(section.key)
-          const questions = hasCommodityProducts
-            ? allQuestions
-            : allQuestions.filter((q) => !DEFORESTATION_QUESTION_IDS.includes(q.id))
+          // Only the questions that apply (deforestation questions are hidden for
+          // non-commodity suppliers, and env_10 only when env_09 is yes/partial).
+          const questions = applicableQuestions.filter((q) => q.section === section.key)
           const sectionAnswered = questions.filter((q) => answers[q.id] != null).length
           const sectionComplete = sectionAnswered === questions.length
 
@@ -381,14 +382,14 @@ export default function SupplierEsgAssessmentPage() {
               <div>
                 <p className="font-medium">Ready to submit?</p>
                 <p className="text-sm text-muted-foreground">
-                  {isReadyToSubmit(answers)
+                  {isReadyToSubmit(answers, { hasCommodityProducts })
                     ? 'All questions answered. You can now submit for verification.'
                     : `Answer all ${totalQuestions} questions to submit. ${totalQuestions - answeredQuestions} remaining.`}
                 </p>
               </div>
               <Button
                 onClick={handleSubmit}
-                disabled={!isReadyToSubmit(answers) || saving}
+                disabled={!isReadyToSubmit(answers, { hasCommodityProducts }) || saving}
                 className="bg-emerald-600 hover:bg-emerald-700"
               >
                 {saving ? (

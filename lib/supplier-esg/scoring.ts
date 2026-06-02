@@ -1,4 +1,34 @@
-import { ESG_QUESTIONS, type EsgResponse, type EsgSection } from './questions'
+import { ESG_QUESTIONS, type EsgQuestion, type EsgResponse, type EsgSection } from './questions'
+
+/** Deforestation questions, only shown to suppliers with commodity products. */
+export const DEFORESTATION_QUESTION_IDS = ['env_09', 'env_10']
+
+export interface EsgApplicabilityContext {
+  /** True if the supplier has products with a deforestation-linked commodity. */
+  hasCommodityProducts?: boolean
+}
+
+/**
+ * The questions that actually require an answer, given conditional visibility:
+ *  - env_09 (deforestation) only applies to suppliers with commodity products
+ *  - env_10 only applies when env_09 is answered yes/partial (and commodity)
+ * Keep this the single source of truth used by both the UI and the submit route,
+ * so a hidden question is never treated as "unanswered".
+ */
+export function getApplicableQuestions(
+  answers: Record<string, EsgResponse>,
+  ctx?: EsgApplicabilityContext
+): EsgQuestion[] {
+  const hasCommodity = ctx?.hasCommodityProducts ?? false
+  return ESG_QUESTIONS.filter((q) => {
+    if (q.id === 'env_09') return hasCommodity
+    if (q.id === 'env_10') {
+      const env09 = answers['env_09']
+      return hasCommodity && (env09 === 'yes' || env09 === 'partial')
+    }
+    return true
+  })
+}
 
 const POINTS: Record<EsgResponse, number | null> = {
   yes: 2,
@@ -93,7 +123,8 @@ export function calculateScores(answers: Record<string, EsgResponse>): EsgScores
  * Determine which sections are completed (all questions answered).
  */
 export function getSectionCompletion(
-  answers: Record<string, EsgResponse>
+  answers: Record<string, EsgResponse>,
+  ctx?: EsgApplicabilityContext
 ): Record<EsgSection, boolean> {
   const sections: EsgSection[] = [
     'labour_human_rights',
@@ -105,17 +136,23 @@ export function getSectionCompletion(
 
   const result = {} as Record<EsgSection, boolean>
   for (const section of sections) {
-    const questions = ESG_QUESTIONS.filter((q) => q.section === section)
+    const questions = getApplicableQuestions(answers, ctx).filter((q) => q.section === section)
     result[section] = questions.every((q) => answers[q.id] != null)
   }
   return result
 }
 
 /**
- * Check if all required questions have been answered (for submission validation).
+ * Check if all required (applicable) questions have been answered, for submission
+ * validation. Conditionally-hidden questions (see getApplicableQuestions) are not
+ * required, so a supplier without commodity products is not blocked on the
+ * deforestation questions they can never see.
  */
-export function isReadyToSubmit(answers: Record<string, EsgResponse>): boolean {
-  return ESG_QUESTIONS.every((q) => answers[q.id] != null)
+export function isReadyToSubmit(
+  answers: Record<string, EsgResponse>,
+  ctx?: EsgApplicabilityContext
+): boolean {
+  return getApplicableQuestions(answers, ctx).every((q) => answers[q.id] != null)
 }
 
 /**
