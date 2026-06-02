@@ -1,17 +1,8 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { FIELD_DEFINITIONS, type FieldKey } from '../../scraping/field-definitions';
+import { getGeminiClient, toGeminiInlineData } from '@/lib/ai/gemini';
+import { GEMINI_FAST_MODEL } from '@/lib/ai/models';
 
-const MODEL = 'claude-sonnet-4-6';
 const MAX_TOKENS = 1024;
-
-let cachedClient: Anthropic | null = null;
-function getClient(): Anthropic | null {
-  if (cachedClient) return cachedClient;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-  cachedClient = new Anthropic({ apiKey });
-  return cachedClient;
-}
 
 const SUPPORTED_IMAGE_MIME = new Set([
   'image/jpeg',
@@ -26,13 +17,13 @@ export interface ImageExtractResult {
 }
 
 /**
- * Use Claude's vision capability to extract sustainability data from an
+ * Use Gemini's vision capability to extract sustainability data from an
  * image — typically a scanned certificate (B Corp, Carbon Trust, ISO)
  * or a screenshot of a sustainability report page.
  *
  * Returns only fields the model claims to have evidence for. Unknown
- * media types are rejected up front so we don't burn an Anthropic call
- * on something Sonnet won't accept.
+ * media types are rejected up front so we don't burn a model call
+ * on something the model won't accept.
  */
 export async function extractFromImage(
   imageBuffer: Buffer,
@@ -42,9 +33,9 @@ export async function extractFromImage(
   if (!SUPPORTED_IMAGE_MIME.has(mimeType)) {
     return { values: {}, error: `unsupported_image_mime: ${mimeType}` };
   }
-  const client = getClient();
-  if (!client) {
-    return { values: {}, error: 'ANTHROPIC_API_KEY not configured' };
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return { values: {}, error: 'GEMINI_API_KEY not configured' };
   }
 
   const fieldList = FIELD_DEFINITIONS.map(
@@ -66,28 +57,23 @@ Rules:
 
   let raw: string;
   try {
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      messages: [
+    const client = getGeminiClient(apiKey);
+    const generativeModel = client.getGenerativeModel({
+      model: GEMINI_FAST_MODEL,
+      generationConfig: { maxOutputTokens: MAX_TOKENS },
+    });
+    const result = await generativeModel.generateContent({
+      contents: [
         {
           role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: mimeType as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif',
-                data: imageBuffer.toString('base64'),
-              },
-            },
-            { type: 'text', text: prompt },
+          parts: [
+            toGeminiInlineData({ base64: imageBuffer.toString('base64'), media_type: mimeType }),
+            { text: prompt },
           ],
         },
       ],
     });
-    const first = response.content[0];
-    raw = first && first.type === 'text' ? first.text : '';
+    raw = result.response.text();
   } catch (err: unknown) {
     return { values: {}, error: err instanceof Error ? err.message : String(err) };
   }

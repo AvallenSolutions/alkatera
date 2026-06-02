@@ -2,11 +2,13 @@
 // Processes uploaded documents, chunks them, and generates embeddings for RAG
 //
 // AI Model Usage:
-// - Anthropic Claude: PDF and DOCX text extraction (vision/document processing)
-// - Google Gemini: Embedding generation only (text-embedding-004) - Anthropic has no embedding model
+// - Google Gemini: PDF text extraction (vision/document processing)
+// - Google Gemini: Embedding generation (text-embedding-004)
 
 import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getGeminiClient, toGeminiInlineData } from '@/lib/ai/gemini';
+import { GEMINI_FAST_MODEL } from '@/lib/ai/models';
 import mammoth from 'mammoth';
 
 type SupabaseClient = ReturnType<typeof createClient>;
@@ -72,13 +74,9 @@ export interface ProcessingResult {
 const MAX_CHUNK_SIZE = 1500; // Maximum chunk size
 const CHUNK_OVERLAP = 200; // Token overlap between chunks
 const EMBEDDING_MODEL = 'text-embedding-004'; // Google's embedding model (kept for embeddings)
-const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
-const ANTHROPIC_VERSION = '2023-06-01';
-const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 
 /**
- * Initialize the Google AI client for embeddings ONLY
- * Note: All LLM text generation/extraction now uses Anthropic Claude
+ * Initialize the Google AI client for embeddings
  */
 function getGoogleEmbeddingClient(): GoogleGenerativeAI {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -86,17 +84,6 @@ function getGoogleEmbeddingClient(): GoogleGenerativeAI {
     throw new Error('GEMINI_API_KEY environment variable is not set (required for embeddings)');
   }
   return new GoogleGenerativeAI(apiKey);
-}
-
-/**
- * Get the Anthropic API key for text extraction
- */
-function getAnthropicApiKey(): string {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    throw new Error('ANTHROPIC_API_KEY environment variable is not set');
-  }
-  return apiKey;
 }
 
 /**
@@ -225,13 +212,13 @@ async function downloadAndExtractText(fileUrl: string, fileType: string): Promis
   }
 
   if (contentType === 'pdf') {
-    // Use Claude for PDF text extraction (supports PDF document type natively)
+    // Use Gemini for PDF text extraction (supports PDF document input natively)
     const arrayBuffer = await response.arrayBuffer();
     return await extractTextFromPdf(arrayBuffer);
   }
 
   if (contentType === 'docx') {
-    // Use Claude for DOCX text extraction via image-based approach
+    // Extract DOCX text via mammoth.js (parses the ZIP/XML structure)
     const arrayBuffer = await response.arrayBuffer();
     return await extractTextFromDocx(arrayBuffer);
   }
@@ -253,54 +240,31 @@ function extractTextFromHtml(html: string): string {
 }
 
 /**
- * Extract text from PDF using Anthropic Claude
- * Claude natively supports PDF documents via the document content type
+ * Extract text from PDF using Google Gemini
+ * Gemini natively supports PDF documents via inline data input
  */
 async function extractTextFromPdf(pdfBuffer: ArrayBuffer): Promise<string> {
-  const apiKey = getAnthropicApiKey();
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY environment variable is not set');
+  }
   const base64 = Buffer.from(pdfBuffer).toString('base64');
 
-  const response = await fetch(ANTHROPIC_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': ANTHROPIC_VERSION,
-    },
-    body: JSON.stringify({
-      model: ANTHROPIC_MODEL,
-      max_tokens: 8192,
+  const client = getGeminiClient(apiKey);
+  const model = client.getGenerativeModel({
+    model: GEMINI_FAST_MODEL,
+    generationConfig: {
+      maxOutputTokens: 8192,
       temperature: 0,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'document',
-              source: {
-                type: 'base64',
-                media_type: 'application/pdf',
-                data: base64,
-              },
-            },
-            {
-              type: 'text',
-              text: 'Extract all text content from this PDF document. Preserve section headings and structure. Output only the text content, no commentary.',
-            },
-          ],
-        },
-      ],
-    }),
+    },
   });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Claude PDF extraction error:', errorText);
-    throw new Error(`Claude API error during PDF extraction: ${response.status}`);
-  }
+  const result = await model.generateContent([
+    toGeminiInlineData({ base64, media_type: 'application/pdf' }),
+    { text: 'Extract all text content from this PDF document. Preserve section headings and structure. Output only the text content, no commentary.' },
+  ]);
 
-  const data = await response.json();
-  return data.content?.[0]?.text || '';
+  return result.response.text() || '';
 }
 
 /**
@@ -429,7 +393,7 @@ function getOverlapText(text: string, targetTokens: number): string {
 
 /**
  * Generate embeddings for chunks using Google's embedding model
- * Note: Google's text-embedding-004 is used here because Anthropic does not offer an embedding model
+ * Note: Google's text-embedding-004 is used here for embedding generation
  */
 async function generateEmbeddings(chunks: ChunkMetadata[]): Promise<ChunkMetadata[]> {
   const genAI = getGoogleEmbeddingClient();
@@ -677,7 +641,7 @@ export async function createKnowledgeDocument(
 
 /**
  * Generate embedding for a query (for semantic search)
- * Uses Google's text-embedding-004 model (Anthropic has no embedding model)
+ * Uses Google's text-embedding-004 model
  */
 export async function generateQueryEmbedding(query: string): Promise<number[]> {
   const genAI = getGoogleEmbeddingClient();
@@ -692,7 +656,7 @@ export async function generateQueryEmbedding(query: string): Promise<number[]> {
 
 /**
  * Index curated knowledge entries with embeddings
- * Uses Google's text-embedding-004 model (Anthropic has no embedding model)
+ * Uses Google's text-embedding-004 model
  */
 export async function indexCuratedKnowledge(
   supabase: SupabaseClient

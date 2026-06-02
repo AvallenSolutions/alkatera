@@ -1,6 +1,5 @@
 import 'server-only'
-
-const CLASSIFIER_MODEL = 'claude-haiku-4-5-20251001'
+import { runTextPrompt } from '@/lib/ai/gemini'
 
 export interface AIClassifyResult {
   transactionId: string
@@ -54,37 +53,26 @@ Respond with a JSON array. Each item must have:
 Return ONLY the JSON array, no markdown fences.`
 
 /**
- * Classify transactions using AI (Claude). Returns empty array if
- * the Anthropic SDK is not installed or ANTHROPIC_API_KEY is not set.
+ * Classify transactions using AI (Gemini). Returns empty array if
+ * GEMINI_API_KEY is not set.
  */
 const BATCH_SIZE = 25
 
 export async function classifyWithAI(
   transactions: Array<{ id: string; contactName: string | null; description: string | null; amount: number }>
 ): Promise<AIClassifyResult[]> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
-    console.warn('[AIClassifier] ANTHROPIC_API_KEY not set, skipping AI classification')
+    console.warn('[AIClassifier] GEMINI_API_KEY not set, skipping AI classification')
     return []
   }
-
-  let Anthropic: any
-  try {
-    const mod = await import('@anthropic-ai/sdk')
-    Anthropic = mod.default
-  } catch {
-    console.warn('[AIClassifier] @anthropic-ai/sdk not installed, skipping AI classification')
-    return []
-  }
-
-  const client = new Anthropic({ apiKey })
 
   const batches: typeof transactions[] = []
   for (let i = 0; i < transactions.length; i += BATCH_SIZE) {
     batches.push(transactions.slice(i, i + BATCH_SIZE))
   }
 
-  const batchResults = await Promise.all(batches.map(batch => classifyBatch(client, batch)))
+  const batchResults = await Promise.all(batches.map(batch => classifyBatch(apiKey, batch)))
   const allResults: AIClassifyResult[] = batchResults.flat()
 
   return allResults.map(r => ({
@@ -97,29 +85,21 @@ export async function classifyWithAI(
 }
 
 async function classifyBatch(
-  client: any,
+  apiKey: string,
   transactions: Array<{ id: string; contactName: string | null; description: string | null; amount: number }>
 ): Promise<AIClassifyResult[]> {
   const txList = transactions.map(tx =>
     `ID: ${tx.id} | Supplier: ${tx.contactName || 'Unknown'} | Description: ${tx.description || 'N/A'} | Amount: £${Math.abs(tx.amount).toFixed(2)}`
   ).join('\n')
 
-  const response = await client.messages.create({
-    model: CLASSIFIER_MODEL,
-    max_tokens: 8000,
-    system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: 'user',
-        content: `Classify these ${transactions.length} transactions:\n\n${txList}`,
-      },
-    ],
-  })
+  const userPrompt = `Classify these ${transactions.length} transactions:\n\n${txList}`
 
-  const responseText = response.content
-    .filter((block: { type: string }) => block.type === 'text')
-    .map((block: { text: string }) => block.text)
-    .join('')
+  const responseText = await runTextPrompt({
+    apiKey,
+    prompt: `${SYSTEM_PROMPT}\n\n${userPrompt}`,
+    maxTokens: 8000,
+    op: 'xero_classify',
+  })
 
   try {
     return JSON.parse(responseText)

@@ -2,7 +2,7 @@
  * Orchard Spray Diary Parser
  *
  * Converts any orchard spray diary xlsx into structured chemical application data.
- * Uses the xlsx package for spreadsheet parsing and the Claude API for format-agnostic
+ * Uses the xlsx package for spreadsheet parsing and the Gemini API for format-agnostic
  * data extraction — handles any column layout, merged cells, or naming convention.
  *
  * Adapted from the arable/vineyard parsers with orchard-specific chemical
@@ -11,6 +11,7 @@
  * Called only from API routes — never from client code.
  */
 
+import { runTextPrompt } from '@/lib/ai/gemini';
 import type { OrchardSprayChemicalDraft } from '@/lib/types/orchard';
 
 // Lazy-load xlsx to avoid bundling issues
@@ -19,17 +20,8 @@ async function readWorkbook(buffer: Buffer) {
   return XLSX.read(buffer, { type: 'buffer', cellDates: true });
 }
 
-// Lazy-load Anthropic SDK
-let AnthropicSdk: any = null;
-async function getAnthropic() {
-  if (!AnthropicSdk) {
-    AnthropicSdk = (await import('@anthropic-ai/sdk')).default;
-  }
-  return AnthropicSdk;
-}
-
 /**
- * Convert a workbook to a concise text representation for Claude.
+ * Convert a workbook to a concise text representation for the model.
  * Skips sheets that are clearly reference/lookup tables.
  */
 async function workbookToText(buffer: Buffer): Promise<string> {
@@ -65,21 +57,16 @@ async function workbookToText(buffer: Buffer): Promise<string> {
 export async function parseOrchardSprayDiary(fileBuffer: Buffer): Promise<OrchardSprayChemicalDraft[]> {
   const sheetText = await workbookToText(fileBuffer);
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error('ANTHROPIC_API_KEY environment variable is not set');
+    throw new Error('GEMINI_API_KEY environment variable is not set');
   }
 
-  const Anthropic = await getAnthropic();
-  const client = new Anthropic({ apiKey });
-
-  const response = await client.messages.create({
-    model: 'claude-opus-4-6',
-    max_tokens: 4096,
-    messages: [
-      {
-        role: 'user',
-        content: `You are analysing a fruit orchard spray diary spreadsheet (apples, pears, cherries, stone fruit, citrus). Extract all chemical/product applications and return structured JSON.
+  const raw = (await runTextPrompt({
+    apiKey,
+    maxTokens: 4096,
+    op: 'orchard_spray_diary',
+    prompt: `You are analysing a fruit orchard spray diary spreadsheet (apples, pears, cherries, stone fruit, citrus). Extract all chemical/product applications and return structured JSON.
 
 CRITICAL: Classify each chemical by what the PRODUCT ACTUALLY IS, not by the spray round type it appeared in.
 Growers often tank-mix foliar fertilisers with fungicide sprays — these are still "fertiliser" even though they appear in a fungicide round.
@@ -171,13 +158,9 @@ ${sheetText}
 
 Return ONLY a valid JSON array with no markdown fences, no explanation:
 [{"chemical_name":"...","chemical_type":"...","unit":"...","rate_per_ha":0,"water_rate_l_per_ha":null,"total_ha_sprayed":0,"total_amount_used":0,"applications_count":1,"n_content_percent":0,"fertiliser_subtype":null}]`,
-      },
-    ],
-  });
+  })).trim() || '[]';
 
-  const raw = response.content[0].type === 'text' ? response.content[0].text.trim() : '[]';
-
-  // Strip markdown fences if Claude included them despite instructions
+  // Strip markdown fences if the model included them despite instructions
   const cleaned = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
 
   const parsed = JSON.parse(cleaned) as OrchardSprayChemicalDraft[];

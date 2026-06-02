@@ -1,9 +1,9 @@
 import 'server-only'
-import { CLAUDE_DEFAULT_MODEL } from '../claude/models'
+import { runTextPrompt } from '@/lib/ai/gemini'
 
 /**
  * AI-powered account mapping suggestions.
- * Server-only - uses Anthropic SDK to suggest emission categories
+ * Server-only - uses Gemini to suggest emission categories
  * for unmapped Xero expense accounts.
  *
  * Separated from account-suggestions.ts because that file is
@@ -94,44 +94,25 @@ export async function suggestCategoryWithAI(
 
   if (accounts.length === 0) return results
 
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
-    console.warn('[AccountSuggestions] ANTHROPIC_API_KEY not set')
-    return results
-  }
-
-  let Anthropic: any
-  try {
-    const mod = await import('@anthropic-ai/sdk')
-    Anthropic = mod.default
-  } catch {
-    console.warn('[AccountSuggestions] @anthropic-ai/sdk not installed')
+    console.warn('[AccountSuggestions] GEMINI_API_KEY not set')
     return results
   }
 
   try {
-    const client = new Anthropic({ apiKey })
-
     const accountList = accounts.map(a =>
       `ID: ${a.accountId} | Code: ${a.accountCode || 'N/A'} | Name: ${a.accountName}`
     ).join('\n')
 
-    const response = await client.messages.create({
-      model: CLAUDE_DEFAULT_MODEL,
-      max_tokens: 4000,
-      system: ACCOUNT_MAPPING_PROMPT,
-      messages: [
-        {
-          role: 'user',
-          content: `Suggest emission categories for these ${accounts.length} Xero expense accounts:\n\n${accountList}`,
-        },
-      ],
-    })
+    const userPrompt = `Suggest emission categories for these ${accounts.length} Xero expense accounts:\n\n${accountList}`
 
-    const responseText = response.content
-      .filter((block: { type: string }) => block.type === 'text')
-      .map((block: { text: string }) => block.text)
-      .join('')
+    const responseText = await runTextPrompt({
+      apiKey,
+      prompt: `${ACCOUNT_MAPPING_PROMPT}\n\n${userPrompt}`,
+      maxTokens: 4000,
+      op: 'xero_account_suggestions',
+    })
 
     let parsed: Array<{ accountId: string; category: string | null; confidence: number; reasoning: string }>
     try {

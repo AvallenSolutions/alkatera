@@ -1,4 +1,4 @@
-import { CLAUDE_DEFAULT_MODEL } from './models'
+import { runTextPrompt } from '@/lib/ai/gemini'
 /**
  * Section Narrative Assistant
  *
@@ -6,23 +6,10 @@ import { CLAUDE_DEFAULT_MODEL } from './models'
  * report. Produces insight, not description — interprets data in context.
  *
  * Follows the same pattern as lib/claude/key-findings-assistant.ts:
- * dynamic SDK import, in-memory 30-min cache, graceful fallback.
+ * in-memory 30-min cache, graceful fallback.
  *
  * Called only from API routes — never from client code.
  */
-
-// Lazy-loaded Anthropic SDK to avoid bundling in client code
-let Anthropic: any = null;
-async function getAnthropic() {
-  if (!Anthropic) {
-    try {
-      Anthropic = (await import('@anthropic-ai/sdk')).default;
-    } catch {
-      console.warn('[Section Narrative Assistant] @anthropic-ai/sdk not installed. AI features will use fallbacks.');
-    }
-  }
-  return Anthropic;
-}
 
 // ============================================================================
 // TYPES
@@ -124,18 +111,7 @@ function setCache(key: string, result: SectionNarrative): void {
 // CLIENT
 // ============================================================================
 
-let anthropicClient: any = null;
-
-async function getClient(): Promise<any> {
-  const AnthropicSDK = await getAnthropic();
-  if (!AnthropicSDK) throw new Error('@anthropic-ai/sdk is not installed');
-  if (!anthropicClient) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) throw new Error('ANTHROPIC_API_KEY environment variable is not set');
-    anthropicClient = new AnthropicSDK({ apiKey });
-  }
-  return anthropicClient;
-}
+// Gemini handles client creation + key checks inside runTextPrompt.
 
 // ============================================================================
 // AUDIENCE DESCRIPTIONS
@@ -295,16 +271,16 @@ export async function generateSectionNarrative(
   const fallback = buildFallbackNarrative(context);
 
   try {
-    const client = await getClient();
+    if (!process.env.GEMINI_API_KEY) {
+      throw new Error('GEMINI_API_KEY environment variable is not set');
+    }
 
-    const response = await client.messages.create({
-      model: CLAUDE_DEFAULT_MODEL,
-      max_tokens: 512,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: buildUserPrompt(context) }],
+    const rawText = await runTextPrompt({
+      apiKey: process.env.GEMINI_API_KEY,
+      prompt: `${SYSTEM_PROMPT}\n\n${buildUserPrompt(context)}`,
+      maxTokens: 512,
+      op: 'section_narrative',
     });
-
-    const rawText = response.content[0]?.type === 'text' ? response.content[0].text : '{}';
 
     let parsed: { headlineInsight?: string; contextParagraph?: string; nextStepPrompt?: string };
     try {

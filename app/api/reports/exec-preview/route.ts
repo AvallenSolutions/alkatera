@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { rateLimit } from '@/lib/rate-limit';
+import { runTextPrompt } from '@/lib/ai/gemini';
 
 /**
  * Executive Summary Preview
@@ -185,19 +186,17 @@ Rules: British English, no em dashes, factual, audience-specific tone.`;
     let preview = { preview: '', primaryMessage: '' };
 
     try {
-      const AnthropicSDK = (await import('@anthropic-ai/sdk')).default;
-      const apiKey = process.env.ANTHROPIC_API_KEY;
-      if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) throw new Error('GEMINI_API_KEY not set');
 
-      const anthropic = new AnthropicSDK({ apiKey });
-      const response = await anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 256,
-        messages: [{ role: 'user', content: prompt }],
+      const rawText = await runTextPrompt({
+        apiKey,
+        prompt,
+        maxTokens: 256,
+        op: 'exec_preview',
       });
 
-      const rawText = response.content[0]?.type === 'text' ? response.content[0].text : '{}';
-      const cleaned = rawText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+      const cleaned = (rawText || '{}').replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
       const parsed = JSON.parse(cleaned);
       preview = {
         preview: parsed.preview || '',

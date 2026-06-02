@@ -1,4 +1,4 @@
-import { CLAUDE_DEFAULT_MODEL } from './models'
+import { runJsonPrompt } from '@/lib/ai/gemini'
 /**
  * Executive Summary Narrative Assistant
  *
@@ -7,25 +7,12 @@ import { CLAUDE_DEFAULT_MODEL } from './models'
  * synthesise the 3-5 most important findings across the whole report.
  *
  * Follows the same pattern as lib/claude/key-findings-assistant.ts:
- * dynamic SDK import, in-memory 30-min cache, graceful fallback.
+ * shared Gemini helper, in-memory 30-min cache, graceful fallback.
  *
  * Called only from API routes — never from client code.
  */
 
 import type { ReportNarratives } from './section-narrative-assistant';
-
-// Lazy-loaded Anthropic SDK
-let Anthropic: any = null;
-async function getAnthropic() {
-  if (!Anthropic) {
-    try {
-      Anthropic = (await import('@anthropic-ai/sdk')).default;
-    } catch {
-      console.warn('[Executive Summary Assistant] @anthropic-ai/sdk not installed. AI features will use fallbacks.');
-    }
-  }
-  return Anthropic;
-}
 
 // ============================================================================
 // TYPES
@@ -104,18 +91,7 @@ function setCache(key: string, result: ExecutiveSummaryNarrative): void {
 // CLIENT
 // ============================================================================
 
-let anthropicClient: any = null;
-
-async function getClient(): Promise<any> {
-  const AnthropicSDK = await getAnthropic();
-  if (!AnthropicSDK) throw new Error('@anthropic-ai/sdk is not installed');
-  if (!anthropicClient) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) throw new Error('ANTHROPIC_API_KEY environment variable is not set');
-    anthropicClient = new AnthropicSDK({ apiKey });
-  }
-  return anthropicClient;
-}
+// Gemini handles client creation + key checks inside runJsonPrompt.
 
 // ============================================================================
 // PROMPTS
@@ -230,24 +206,20 @@ export async function generateExecutiveSummaryNarrative(
 
   const fallback = buildFallbackSummary(context);
 
-  try {
-    const client = await getClient();
+  if (!process.env.GEMINI_API_KEY) {
+    return fallback;
+  }
 
-    const response = await client.messages.create({
-      model: CLAUDE_DEFAULT_MODEL,
-      max_tokens: 768,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: buildUserPrompt(context) }],
+  try {
+    const parsed = await runJsonPrompt<{ primaryMessage?: string; summaryText?: string }>({
+      apiKey: process.env.GEMINI_API_KEY,
+      prompt: `${SYSTEM_PROMPT}\n\n${buildUserPrompt(context)}`,
+      maxTokens: 768,
+      op: 'executive_summary',
     });
 
-    const rawText = response.content[0]?.type === 'text' ? response.content[0].text : '{}';
-
-    let parsed: { primaryMessage?: string; summaryText?: string };
-    try {
-      const cleaned = rawText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-      parsed = JSON.parse(cleaned);
-    } catch {
-      console.error('[Executive Summary Assistant] Failed to parse JSON:', rawText);
+    if (!parsed) {
+      console.error('[Executive Summary Assistant] Failed to parse JSON');
       return fallback;
     }
 

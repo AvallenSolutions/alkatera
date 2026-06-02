@@ -1,4 +1,4 @@
-import { CLAUDE_DEFAULT_MODEL } from './models'
+import { runTextPrompt } from '@/lib/ai/gemini'
 /**
  * Transition Risks and Opportunities Generator
  *
@@ -7,25 +7,12 @@ import { CLAUDE_DEFAULT_MODEL } from './models'
  * Produces structured RiskOpportunity objects marked aiGenerated: true.
  *
  * Follows the same pattern as key-findings-assistant.ts:
- * lazy-loaded SDK, 30-min in-memory cache, graceful fallback.
+ * shared Gemini helper, 30-min in-memory cache, graceful fallback.
  *
  * Called only from API routes — never from client code.
  */
 
 import type { ReductionTarget, TransitionMilestone, RiskOpportunity } from '@/lib/transition-plan/types';
-
-// Lazy-loaded Anthropic SDK
-let Anthropic: any = null;
-async function getAnthropic() {
-  if (!Anthropic) {
-    try {
-      Anthropic = (await import('@anthropic-ai/sdk')).default;
-    } catch {
-      console.warn('[Transition Risks Assistant] @anthropic-ai/sdk not installed. AI features will use fallbacks.');
-    }
-  }
-  return Anthropic;
-}
 
 // ============================================================================
 // TYPES
@@ -82,18 +69,7 @@ function setCache(key: string, result: TransitionRisksResult): void {
 // CLIENT
 // ============================================================================
 
-let anthropicClient: any = null;
-
-async function getClient(): Promise<any> {
-  const AnthropicSDK = await getAnthropic();
-  if (!AnthropicSDK) throw new Error('@anthropic-ai/sdk is not installed');
-  if (!anthropicClient) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) throw new Error('ANTHROPIC_API_KEY environment variable is not set');
-    anthropicClient = new AnthropicSDK({ apiKey });
-  }
-  return anthropicClient;
-}
+// Gemini handles client creation + key checks inside runTextPrompt.
 
 // ============================================================================
 // PROMPTS
@@ -186,16 +162,15 @@ export async function generateRisksAndOpportunities(
   }
 
   try {
-    const client = await getClient();
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error('GEMINI_API_KEY environment variable is not set');
 
-    const response = await client.messages.create({
-      model: CLAUDE_DEFAULT_MODEL,
-      max_tokens: 2048,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: buildUserPrompt(context) }],
+    const rawText = await runTextPrompt({
+      apiKey,
+      prompt: `${SYSTEM_PROMPT}\n\n${buildUserPrompt(context)}`,
+      maxTokens: 2048,
+      op: 'transition_risks',
     });
-
-    const rawText = response.content[0]?.type === 'text' ? response.content[0].text : '[]';
 
     let rawItems: Omit<RiskOpportunity, 'id' | 'aiGenerated'>[];
     try {

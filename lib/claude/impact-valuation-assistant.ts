@@ -1,26 +1,13 @@
-import { CLAUDE_DEFAULT_MODEL } from './models'
+import { runTextPrompt } from '@/lib/ai/gemini'
 /**
  * Impact Valuation Narrative Generator
  *
  * Generates AI-powered narratives for board summaries and retail tender inserts
- * using Claude. Follows the same pattern as lib/claude/lca-assistant.ts:
- * dynamic SDK import, in-memory 30-min cache, graceful fallback.
+ * using Gemini. Follows the same pattern as lib/claude/lca-assistant.ts:
+ * in-memory 30-min cache, graceful fallback.
  *
  * Called only from API routes — never from client code.
  */
-
-// Lazy-loaded Anthropic SDK to avoid bundling in client code and handle missing dependency
-let Anthropic: any = null;
-async function getAnthropic() {
-  if (!Anthropic) {
-    try {
-      Anthropic = (await import('@anthropic-ai/sdk')).default;
-    } catch {
-      console.warn('[Impact Valuation Assistant] @anthropic-ai/sdk not installed. AI features will use fallbacks.');
-    }
-  }
-  return Anthropic;
-}
 
 // ============================================================================
 // TYPES
@@ -89,22 +76,7 @@ function setCache(key: string, result: ImpactValuationNarratives): void {
 // CLIENT
 // ============================================================================
 
-let anthropicClient: any = null;
-
-async function getClient(): Promise<any> {
-  const AnthropicSDK = await getAnthropic();
-  if (!AnthropicSDK) {
-    throw new Error('@anthropic-ai/sdk is not installed');
-  }
-  if (!anthropicClient) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      throw new Error('ANTHROPIC_API_KEY environment variable is not set');
-    }
-    anthropicClient = new AnthropicSDK({ apiKey });
-  }
-  return anthropicClient;
-}
+// Gemini handles client creation + key checks inside runTextPrompt.
 
 // ============================================================================
 // PROMPTS
@@ -152,33 +124,34 @@ export async function generateImpactValuationNarratives(
   }
 
   try {
-    const client = await getClient();
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('GEMINI_API_KEY environment variable is not set');
+    }
 
     // Run both narrative requests in parallel
-    const [boardResponse, tenderResponse] = await Promise.all([
-      client.messages.create({
-        model: CLAUDE_DEFAULT_MODEL,
-        max_tokens: 512,
-        system: BOARD_SUMMARY_SYSTEM,
-        messages: [{ role: 'user', content: buildBoardSummaryUserPrompt(context) }],
+    const [boardSummaryText, retailTenderText] = await Promise.all([
+      runTextPrompt({
+        apiKey,
+        prompt: `${BOARD_SUMMARY_SYSTEM}\n\n${buildBoardSummaryUserPrompt(context)}`,
+        maxTokens: 512,
+        op: 'impact_valuation_board_summary',
       }),
-      client.messages.create({
-        model: CLAUDE_DEFAULT_MODEL,
-        max_tokens: 384,
-        system: RETAIL_TENDER_SYSTEM,
-        messages: [{ role: 'user', content: buildRetailTenderUserPrompt(context) }],
+      runTextPrompt({
+        apiKey,
+        prompt: `${RETAIL_TENDER_SYSTEM}\n\n${buildRetailTenderUserPrompt(context)}`,
+        maxTokens: 384,
+        op: 'impact_valuation_retail_tender',
       }),
     ]);
 
-    const boardSummary =
-      boardResponse.content[0]?.type === 'text'
-        ? boardResponse.content[0].text
-        : 'Board summary unavailable — please retry.';
+    const boardSummary = boardSummaryText?.trim()
+      ? boardSummaryText
+      : 'Board summary unavailable — please retry.';
 
-    const retailTenderInsert =
-      tenderResponse.content[0]?.type === 'text'
-        ? tenderResponse.content[0].text
-        : 'Retail tender insert unavailable — please retry.';
+    const retailTenderInsert = retailTenderText?.trim()
+      ? retailTenderText
+      : 'Retail tender insert unavailable — please retry.';
 
     const result: ImpactValuationNarratives = {
       boardSummary,

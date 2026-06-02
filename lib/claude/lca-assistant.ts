@@ -1,27 +1,10 @@
-import { CLAUDE_DEFAULT_MODEL } from './models'
+import { runTextPrompt } from '@/lib/ai/gemini'
 /**
- * Claude LCA Assistant
+ * LCA Assistant
  *
- * AI-powered assistance for LCA compliance, using Claude API to generate
+ * AI-powered assistance for LCA compliance, using Gemini to generate
  * plain-English explanations, content suggestions, and report narratives.
- *
- * Model Strategy:
- * - Claude 3.5 Sonnet for wizard suggestions (fast, cost-effective)
- * - Claude Opus 4 for final PDF narratives (highest quality)
  */
-
-// Lazy-loaded Anthropic SDK to avoid bundling in client code and handle missing dependency
-let Anthropic: any = null;
-async function getAnthropic() {
-  if (!Anthropic) {
-    try {
-      Anthropic = (await import('@anthropic-ai/sdk')).default;
-    } catch {
-      console.warn('[Claude LCA Assistant] @anthropic-ai/sdk not installed. AI features will use fallbacks.');
-    }
-  }
-  return Anthropic;
-}
 
 // ============================================================================
 // TYPES
@@ -136,36 +119,24 @@ Always respond in valid JSON format with 'explanation' and optionally 'example' 
 // CLIENT INITIALIZATION
 // ============================================================================
 
-let anthropicClient: any = null;
-
-async function getClient(): Promise<any> {
-  const AnthropicSDK = await getAnthropic();
-  if (!AnthropicSDK) {
-    throw new Error('@anthropic-ai/sdk is not installed. Run: npm install @anthropic-ai/sdk');
-  }
-  if (!anthropicClient) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      throw new Error('ANTHROPIC_API_KEY environment variable is not set');
-    }
-    anthropicClient = new AnthropicSDK({ apiKey });
-  }
-  return anthropicClient;
-}
+// Gemini handles client creation + key checks inside runTextPrompt.
 
 // ============================================================================
-// SUGGESTION GENERATION (Sonnet - Fast & Cheap)
+// SUGGESTION GENERATION (Fast & Cheap)
 // ============================================================================
 
 /**
- * Generate a content suggestion for a specific LCA compliance field
- * Uses Claude 3.5 Sonnet for fast, cost-effective responses
+ * Generate a content suggestion for a specific LCA compliance field.
+ * Uses the fast Gemini model for cost-effective responses.
  */
 export async function generateSuggestion(
   field: SuggestionField,
   context: LcaContext
 ): Promise<SuggestionResult> {
-  const client = await getClient();
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY environment variable is not set');
+  }
 
   const fieldPrompts: Record<SuggestionField, string> = {
     intended_application: `Generate a concise "intended application" statement for an LCA study of "${context.productName}".
@@ -216,14 +187,11 @@ Focus on practical, actionable improvements.`,
   const userPrompt = fieldPrompts[field];
 
   try {
-    const response = await client.messages.create({
-      model: CLAUDE_DEFAULT_MODEL,
-      max_tokens: 1024,
-      system: SUGGESTION_SYSTEM_PROMPT,
-      messages: [
-        {
-          role: 'user',
-          content: `${userPrompt}
+    const text = await runTextPrompt({
+      apiKey,
+      prompt: `${SUGGESTION_SYSTEM_PROMPT}
+
+${userPrompt}
 
 Respond with JSON in this format:
 {
@@ -231,17 +199,12 @@ Respond with JSON in this format:
   "reasoning": "Brief explanation of why this is appropriate (optional)",
   "alternatives": ["Alternative 1", "Alternative 2"] (optional, for fields with multiple valid options)
 }`,
-        },
-      ],
+      maxTokens: 1024,
+      op: 'lca_suggestion',
     });
 
-    const content = response.content[0];
-    if (content.type !== 'text') {
-      throw new Error('Unexpected response type');
-    }
-
     // Parse JSON from response
-    const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       throw new Error('No JSON found in response');
     }
@@ -249,24 +212,23 @@ Respond with JSON in this format:
     const parsed = JSON.parse(jsonMatch[0]);
 
     return {
-      suggestion: parsed.suggestion || parsed.text || content.text,
+      suggestion: parsed.suggestion || parsed.text || text,
       reasoning: parsed.reasoning,
       alternatives: parsed.alternatives,
       cached: false,
     };
   } catch (error) {
-    console.error('[Claude LCA Assistant] Suggestion generation failed:', error);
+    console.error('[LCA Assistant] Suggestion generation failed:', error);
     throw error;
   }
 }
 
 // ============================================================================
-// NARRATIVE GENERATION (Opus - High Quality)
+// NARRATIVE GENERATION (High Quality)
 // ============================================================================
 
 /**
- * Generate full narrative sections for an LCA PDF report
- * Uses Claude Opus 4 for highest quality formal writing
+ * Generate full narrative sections for an LCA PDF report.
  */
 export async function generateNarratives(
   context: LcaContext,
@@ -277,7 +239,10 @@ export async function generateNarratives(
     staleMaterialCount: number;
   }
 ): Promise<NarrativeResult> {
-  const client = await getClient();
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY environment variable is not set');
+  }
 
   const prompt = `Generate formal narrative sections for an ISO 14044 compliant LCA report.
 
@@ -314,25 +279,15 @@ Respond with JSON in this exact format:
 }`;
 
   try {
-    const response = await client.messages.create({
-      model: CLAUDE_DEFAULT_MODEL, // Using Sonnet for now, can upgrade to Opus when needed
-      max_tokens: 2048,
-      system: NARRATIVE_SYSTEM_PROMPT,
-      messages: [
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
+    const text = await runTextPrompt({
+      apiKey,
+      prompt: `${NARRATIVE_SYSTEM_PROMPT}\n\n${prompt}`,
+      maxTokens: 2048,
+      op: 'lca_narratives',
     });
 
-    const content = response.content[0];
-    if (content.type !== 'text') {
-      throw new Error('Unexpected response type');
-    }
-
     // Parse JSON from response
-    const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       throw new Error('No JSON found in response');
     }
@@ -348,7 +303,7 @@ Respond with JSON in this exact format:
       cached: false,
     };
   } catch (error) {
-    console.error('[Claude LCA Assistant] Narrative generation failed:', error);
+    console.error('[LCA Assistant] Narrative generation failed:', error);
     throw error;
   }
 }
@@ -358,37 +313,32 @@ Respond with JSON in this exact format:
 // ============================================================================
 
 /**
- * Explain an LCA term in plain English
- * Uses Claude 3.5 Sonnet for fast responses
+ * Explain an LCA term in plain English.
+ * Uses the fast Gemini model for quick responses.
  */
 export async function explainTerm(term: string): Promise<PlainEnglishExplanation> {
-  const client = await getClient();
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY environment variable is not set');
+  }
 
   try {
-    const response = await client.messages.create({
-      model: CLAUDE_DEFAULT_MODEL,
-      max_tokens: 256,
-      system: PLAIN_ENGLISH_SYSTEM_PROMPT,
-      messages: [
-        {
-          role: 'user',
-          content: `Explain this LCA term in plain English: "${term}"
+    const text = await runTextPrompt({
+      apiKey,
+      prompt: `${PLAIN_ENGLISH_SYSTEM_PROMPT}
+
+Explain this LCA term in plain English: "${term}"
 
 Respond with JSON:
 {
   "explanation": "Simple explanation in 2-3 sentences",
   "example": "Optional real-world example or analogy"
 }`,
-        },
-      ],
+      maxTokens: 256,
+      op: 'lca_explain_term',
     });
 
-    const content = response.content[0];
-    if (content.type !== 'text') {
-      throw new Error('Unexpected response type');
-    }
-
-    const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       throw new Error('No JSON found in response');
     }
@@ -401,7 +351,7 @@ Respond with JSON:
       example: parsed.example,
     };
   } catch (error) {
-    console.error('[Claude LCA Assistant] Term explanation failed:', error);
+    console.error('[LCA Assistant] Term explanation failed:', error);
     // Return a fallback
     return {
       term,
@@ -415,7 +365,7 @@ Respond with JSON:
 // ============================================================================
 
 /**
- * Get a static fallback suggestion when Claude API is unavailable
+ * Get a static fallback suggestion when the AI API is unavailable
  */
 export function getStaticFallback(field: SuggestionField, context: LcaContext): string {
   const fallbacks: Record<SuggestionField, string> = {
@@ -501,7 +451,7 @@ export const TERM_DICTIONARY: Record<string, PlainEnglishExplanation> = {
 };
 
 /**
- * Get a plain English explanation, using dictionary first, then Claude if needed
+ * Get a plain English explanation, using dictionary first, then Gemini if needed
  */
 export async function getExplanation(term: string): Promise<PlainEnglishExplanation> {
   const normalizedTerm = term.toLowerCase().trim();
@@ -511,6 +461,6 @@ export async function getExplanation(term: string): Promise<PlainEnglishExplanat
     return TERM_DICTIONARY[normalizedTerm];
   }
 
-  // Fall back to Claude API
+  // Fall back to the AI API
   return explainTerm(term);
 }

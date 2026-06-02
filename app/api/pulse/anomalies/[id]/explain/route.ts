@@ -22,12 +22,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { runToolLoop } from '@/lib/rosa/run-tool-loop';
+import { GEMINI_ROSA_MODEL } from '@/lib/ai/models';
 import { METRIC_DEFINITIONS, type MetricKey } from '@/lib/pulse/metric-keys';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const MODEL = 'claude-sonnet-4-6';
+const MODEL = GEMINI_ROSA_MODEL;
 
 const SYSTEM_PROMPT = `You are Rosa, the alkatera sustainability AI, investigating an anomaly that the platform has flagged.
 
@@ -56,9 +57,9 @@ export async function POST(
     const { data: { user } } = await userSupabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
 
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+    const apiKey = process.env.GEMINI_API_KEY?.trim();
     if (!apiKey) {
-      return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 503 });
+      return NextResponse.json({ error: 'GEMINI_API_KEY not configured' }, { status: 503 });
     }
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;

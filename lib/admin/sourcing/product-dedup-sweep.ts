@@ -1,16 +1,6 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { runTextPrompt } from '@/lib/ai/gemini';
 
-const MODEL = 'claude-sonnet-4-6';
 const MAX_TOKENS = 4000;
-
-let cachedClient: Anthropic | null = null;
-function getClient(): Anthropic | null {
-  if (cachedClient) return cachedClient;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-  cachedClient = new Anthropic({ apiKey });
-  return cachedClient;
-}
 
 export interface ProductRow {
   id: string;
@@ -41,7 +31,7 @@ export interface ProductDedupSweepResult {
 }
 
 /**
- * Ask Claude Sonnet to identify duplicate-product groups within a
+ * Ask Gemini to identify duplicate-product groups within a
  * single brand. Returns 0..N groups; each group's canonical_id is the
  * row we keep, with the others folded into it.
  *
@@ -55,8 +45,8 @@ export async function sweepProductDupes(
   products: ProductRow[],
 ): Promise<ProductDedupSweepResult> {
   if (products.length < 2) return { groups: [] };
-  const client = getClient();
-  if (!client) return { groups: [], error: 'ANTHROPIC_API_KEY not configured' };
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return { groups: [], error: 'GEMINI_API_KEY not configured' };
 
   const lines = products.map((p) => formatLine(p)).join('\n');
 
@@ -91,17 +81,10 @@ Rules:
 
   let text = '';
   try {
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      messages: [{ role: 'user', content: prompt }],
-    });
-    for (const block of response.content) {
-      if (block.type === 'text') text += block.text + '\n';
-    }
+    text = await runTextPrompt({ apiKey, prompt, maxTokens: MAX_TOKENS, op: 'product_dedup_sweep' });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    return { groups: [], error: `anthropic_error: ${message}` };
+    return { groups: [], error: `gemini_error: ${message}` };
   }
 
   const parsed = extractJson(text);

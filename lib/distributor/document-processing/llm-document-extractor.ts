@@ -1,17 +1,7 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { FIELD_DEFINITIONS, type FieldKey } from '../scraping/field-definitions';
+import { runTextPrompt } from '@/lib/ai/gemini';
 
-const MODEL = 'claude-sonnet-4-6';
 const MAX_TOKENS = 1024;
-
-let cachedClient: Anthropic | null = null;
-function getClient(): Anthropic | null {
-  if (cachedClient) return cachedClient;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-  cachedClient = new Anthropic({ apiKey });
-  return cachedClient;
-}
 
 const SYSTEM_PROMPT = `You are a sustainability data analyst. Extract structured sustainability data from drinks industry documents. Return only valid JSON with field names exactly as specified. Use null (or omit) for fields not found. Do not invent or estimate values not present in the document.`;
 
@@ -29,17 +19,17 @@ export interface DocumentExtractResult {
 }
 
 /**
- * Run Claude Sonnet over a document's extracted text to pull out
- * structured sustainability fields. Uses claude-sonnet-4-6 because
- * documents are richer and more ambiguous than the small web snippets
- * the Phase 2 scraper handles — the quality bump justifies the cost.
+ * Run Gemini over a document's extracted text to pull out structured
+ * sustainability fields. Documents are richer and more ambiguous than the
+ * small web snippets the Phase 2 scraper handles, so we feed the whole
+ * document text in one pass.
  */
 export async function extractFieldsFromDocument(
   args: DocumentExtractArgs,
 ): Promise<DocumentExtractResult> {
-  const client = getClient();
-  if (!client) {
-    return { values: {}, error: 'ANTHROPIC_API_KEY not configured' };
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return { values: {}, error: 'GEMINI_API_KEY not configured' };
   }
   if (!args.text || !args.text.trim()) {
     return { values: {}, error: 'no_text_to_extract' };
@@ -77,14 +67,12 @@ Return ONLY a JSON object with the fields you found. Omit any field with no expl
 
   let raw: string;
   try {
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userPrompt }],
+    raw = await runTextPrompt({
+      apiKey,
+      prompt: `${SYSTEM_PROMPT}\n\n${userPrompt}`,
+      maxTokens: MAX_TOKENS,
+      op: 'document_extract',
     });
-    const first = response.content[0];
-    raw = first && first.type === 'text' ? first.text : '';
   } catch (err: unknown) {
     return { values: {}, error: err instanceof Error ? err.message : String(err) };
   }

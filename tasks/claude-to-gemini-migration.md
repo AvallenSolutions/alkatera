@@ -18,27 +18,27 @@ with `runTextPrompt`/`runJsonPrompt`, keep the existing prompt + JSON parsing/fa
 - [x] `lib/distributor/directory/product-dedup.ts`
 
 ## Phase 2 — Report narratives + simple text→JSON (EASY)
-- [ ] `lib/claude/proxy-advisor.ts`
-- [ ] `lib/claude/transition-risks-assistant.ts`
-- [ ] `lib/claude/executive-summary-assistant.ts`
-- [ ] `lib/claude/section-narrative-assistant.ts`
-- [ ] `lib/claude/lca-assistant.ts` (Sonnet wizard + Opus PDF narrative → Gemini fast/pro)
-- [ ] `lib/claude/key-findings-assistant.ts`
-- [ ] `lib/claude/impact-valuation-assistant.ts`
-- [ ] `app/api/reports/exec-preview/route.ts`
-- [ ] `lib/pulse/insights.ts` (+ `app/api/pulse/anomalies/[id]/explain/route.ts`)
-- [ ] `lib/xero/account-suggestions-ai.ts`, `lib/xero/ai-classifier.ts`
-- [ ] `lib/orchard|arable|viticulture/spray-diary-parser.ts` (×3, Opus → Gemini)
-- [ ] `lib/admin/sourcing/deep-enrich.ts`, `product-dedup-sweep.ts`
+- [x] `lib/claude/proxy-advisor.ts`
+- [x] `lib/claude/transition-risks-assistant.ts`
+- [x] `lib/claude/executive-summary-assistant.ts`
+- [x] `lib/claude/section-narrative-assistant.ts`
+- [x] `lib/claude/lca-assistant.ts` (Sonnet wizard + Opus PDF narrative → Gemini fast/pro)
+- [x] `lib/claude/key-findings-assistant.ts`
+- [x] `lib/claude/impact-valuation-assistant.ts`
+- [x] `app/api/reports/exec-preview/route.ts`
+- [x] `lib/pulse/insights.ts` (+ `app/api/pulse/anomalies/[id]/explain/route.ts`)
+- [x] `lib/xero/account-suggestions-ai.ts`, `lib/xero/ai-classifier.ts`
+- [x] `lib/orchard|arable|viticulture/spray-diary-parser.ts` (×3, Opus → Gemini)
+- [x] `lib/admin/sourcing/deep-enrich.ts`, `product-dedup-sweep.ts`
       (+ `netlify/functions/deep-enrich-background.ts`, `directory-sourcing-background.ts`)
-- [ ] Retire `lib/claude/models.ts` (`CLAUDE_DEFAULT_MODEL`)
+- [x] Retire `lib/claude/models.ts` (`CLAUDE_DEFAULT_MODEL`)
 
 ## Phase 3 — Document/vision (MEDIUM) → `extractStructured` + `toGeminiInlineData`
-- [ ] `lib/distributor/document-processing/llm-document-extractor.ts`
-- [ ] `lib/distributor/document-processing/extractors/image-extractor.ts` (vision)
+- [x] `lib/distributor/document-processing/llm-document-extractor.ts`
+- [x] `lib/distributor/document-processing/extractors/image-extractor.ts` (vision)
 - [ ] `lib/distributor/document-processing/processor.ts`
 - [ ] `netlify/functions/process-document-queue.ts`
-- [ ] `lib/gaia/document-extraction.ts` (direct REST call → Gemini), `knowledge-indexing.ts`
+- [x] `lib/gaia/document-extraction.ts` (direct REST call → Gemini), `knowledge-indexing.ts`
 - [ ] `lib/extraction/supplier-product-extractor.ts` (+ `app/api/supplier-products/smart-import/route.ts`)
       — also update `__tests__/supplier-product-extractor.test.ts` (asserts claude model)
 - [ ] `app/api/utilities/import-from-pdf/route.ts`, `app/api/facilities/import-bill/route.ts`

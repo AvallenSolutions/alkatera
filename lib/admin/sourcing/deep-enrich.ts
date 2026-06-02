@@ -1,28 +1,17 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { runGroundedSearch } from '@/lib/ai/gemini';
 import type {
   CrawledDocument,
   CrawledDocumentKind,
   CrawledProduct,
 } from '@/lib/distributor/scraping/sources';
 
-const MODEL = 'claude-sonnet-4-6';
-// Sonnet supports much higher output; we kept this conservative
+// The model supports much higher output; we kept this conservative
 // initially but every iteration adds another structured section
 // (credentials, products, documents, awards, notable_facts, brand
-// metadata) and 6000 tokens was visibly being hit — Claude's response
+// metadata) and 6000 tokens was visibly being hit; the model's response
 // silently dropped the credentials block on at least one Two Drifters
 // run. 12000 leaves comfortable headroom.
 const MAX_TOKENS = 12000;
-const WEB_SEARCH_MAX_USES = 10;
-
-let cachedClient: Anthropic | null = null;
-function getClient(): Anthropic | null {
-  if (cachedClient) return cachedClient;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-  cachedClient = new Anthropic({ apiKey });
-  return cachedClient;
-}
 
 export interface ExistingProductRef {
   id: string;
@@ -41,7 +30,7 @@ export interface DeepEnrichArgs {
     founding_year?: number | null;
     parent_company?: string | null;
   };
-  /** Products already on file for this brand. Claude maps any new findings
+  /** Products already on file for this brand. The model maps any new findings
    *  to these where they refer to the same SKU, so we never insert a
    *  duplicate row. */
   existingProducts: ExistingProductRef[];
@@ -65,7 +54,7 @@ export interface EnrichedCredential {
 }
 
 export interface EnrichedProduct extends CrawledProduct {
-  /** Set when Claude maps this finding to an existing product_directory
+  /** Set when the model maps this finding to an existing product_directory
    *  row. The endpoint skips creating a new row in that case. */
   matches_existing_id: string | null;
 }
@@ -131,8 +120,8 @@ const VALID_MEDALS = new Set<AwardMedalTier>([
 ]);
 
 /**
- * Comprehensive single-brand enrichment using Claude with the
- * web_search tool. The prompt names authoritative sources for each
+ * Comprehensive single-brand enrichment using Gemini with Google
+ * Search grounding. The prompt names authoritative sources for each
  * credential class (B Corp directory, Soil Association / USDA / OFG
  * for organic, Fairtrade / Rainforest Alliance / Carbon Trust, IWCA,
  * Porto Protocol, Ethical Consumer, Companies House, the brand's own
@@ -151,33 +140,23 @@ const VALID_MEDALS = new Set<AwardMedalTier>([
  *   - documents: PDFs the caller feeds into the existing pdf-ingester
  */
 export async function deepEnrichBrand(args: DeepEnrichArgs): Promise<DeepEnrichResult> {
-  const client = getClient();
-  if (!client) {
-    return EMPTY_RESULT({ error: 'ANTHROPIC_API_KEY not configured' });
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return EMPTY_RESULT({ error: 'GEMINI_API_KEY not configured' });
   }
 
   const prompt = buildPrompt(args);
 
   let text = '';
   try {
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      tools: [
-        {
-          type: 'web_search_20250305',
-          name: 'web_search',
-          max_uses: WEB_SEARCH_MAX_USES,
-        } as unknown as Anthropic.Tool,
-      ],
-      messages: [{ role: 'user', content: prompt }],
+    text = await runGroundedSearch({
+      apiKey,
+      prompt,
+      maxTokens: MAX_TOKENS,
     });
-    for (const block of response.content) {
-      if (block.type === 'text') text += block.text + '\n';
-    }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    return EMPTY_RESULT({ error: `anthropic_error: ${message}` });
+    return EMPTY_RESULT({ error: `gemini_error: ${message}` });
   }
 
   const parsed = extractJson(text);
@@ -224,7 +203,7 @@ function buildPrompt(args: DeepEnrichArgs): string {
     ? args.existingProducts.map((p) => `  - id "${p.id}": ${p.name}`).join('\n')
     : '  (none — we have no products on file yet)';
 
-  return `You are completing alkatera's sustainability profile for the drinks brand below. Use the web_search tool extensively. Cite a URL for every fact you return.
+  return `You are completing alkatera's sustainability profile for the drinks brand below. Use web search extensively. Cite a URL for every fact you return.
 
 ${ctx.join('\n')}
 

@@ -1,7 +1,8 @@
 // Rosa Document Extraction Module
-// Feature 4: Smart Document Data Extraction using AI (Anthropic Claude)
+// Feature 4: Smart Document Data Extraction using AI (Google Gemini Vision)
 
 import { createClient } from '@supabase/supabase-js';
+import { extractStructured } from '@/lib/ai/gemini';
 import type {
   RosaDocumentExtraction,
   RosaDocumentType,
@@ -10,10 +11,6 @@ import type {
 } from '@/lib/types/gaia';
 
 type SupabaseClient = ReturnType<typeof createClient>;
-
-const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
-const ANTHROPIC_VERSION = '2023-06-01';
-const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 
 // Field mapping patterns for different document types
 const DOCUMENT_FIELD_PATTERNS: Record<RosaDocumentType, {
@@ -182,14 +179,19 @@ export async function createDocumentExtraction(
 }
 
 /**
- * Process a document for extraction using Anthropic Claude Vision
+ * Process a document for extraction using Google Gemini Vision
  * This function would be called from an edge function or background job
  */
 export async function processDocumentExtraction(
   supabase: SupabaseClient,
   extractionId: string,
-  anthropicApiKey: string
+  apiKey?: string
 ): Promise<RosaDocumentExtraction> {
+  const geminiApiKey = apiKey || process.env.GEMINI_API_KEY || '';
+  if (!geminiApiKey) {
+    throw new Error('GEMINI_API_KEY not configured');
+  }
+
   // Fetch the extraction record
   const { data: extractionData, error: fetchError } = await supabase
     .from('rosa_document_extractions')
@@ -215,11 +217,13 @@ export async function processDocumentExtraction(
     const prompt = EXTRACTION_PROMPTS[documentType];
     const fieldPatterns = DOCUMENT_FIELD_PATTERNS[documentType];
 
-    // Call Claude Vision API for extraction
-    const extractedData = await callClaudeVision(
+    // Call Gemini Vision for extraction
+    const extractedData = await callGeminiVision(
       extraction.file_url,
       prompt,
-      anthropicApiKey
+      fieldPatterns.fields,
+      documentType,
+      geminiApiKey
     );
 
     // Parse and validate extracted fields
@@ -287,63 +291,32 @@ export async function processDocumentExtraction(
 }
 
 /**
- * Call Anthropic Claude Vision API for document extraction
+ * Call Gemini Vision for document extraction. The `prompt` argument is
+ * retained for context but the shared `extractStructured` helper builds its
+ * own JSON-mode instruction from the requested field list.
  */
-async function callClaudeVision(
+async function callGeminiVision(
   imageUrl: string,
-  prompt: string,
+  _prompt: string,
+  fields: string[],
+  documentType: RosaDocumentType,
   apiKey: string
 ): Promise<Record<string, unknown>> {
   const base64Data = await fetchImageAsBase64(imageUrl);
 
-  const response = await fetch(ANTHROPIC_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': ANTHROPIC_VERSION,
-    },
-    body: JSON.stringify({
-      model: ANTHROPIC_MODEL,
-      max_tokens: 2048,
-      temperature: 0.1,
-      system: 'You are a document data extraction specialist. Extract structured data from documents and return ONLY valid JSON with no additional text or markdown.',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: 'image/jpeg',
-                data: base64Data,
-              },
-            },
-            {
-              type: 'text',
-              text: prompt,
-            },
-          ],
-        },
-      ],
-    }),
+  const result = await extractStructured({
+    apiKey,
+    attachment: { base64: base64Data, media_type: 'image/jpeg' },
+    fields,
+    documentKind: documentType.replace(/_/g, ' '),
+    maxTokens: 2048,
   });
 
-  if (!response.ok) {
-    throw new Error(`Anthropic API error: ${response.status}`);
+  if (!result.ok) {
+    throw new Error(`Could not parse JSON from Gemini response: ${result.error}`);
   }
 
-  const data = await response.json();
-  const text = data.content?.[0]?.text || '';
-
-  // Extract JSON from the response
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new Error('Could not parse JSON from Claude response');
-  }
-
-  return JSON.parse(jsonMatch[0]);
+  return result.data;
 }
 
 /**
@@ -375,7 +348,7 @@ function parseExtractedFields(
         value: value as string | number,
         // Default confidence 0.85 for expected fields: the LLM was specifically asked
         // to extract these fields, so high base confidence. Actual model logprobs are
-        // not available from the Claude API, so we use this heuristic default.
+        // not available from the Gemini API, so we use this heuristic default.
         confidence: 0.85,
         needsReview: false,
         suggestedMapping: fieldName,

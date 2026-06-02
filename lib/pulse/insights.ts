@@ -2,14 +2,13 @@
  * Pulse — AI insight generator.
  *
  * Builds a structured prompt from the org's snapshot deltas + open anomalies
- * + at-risk targets, sends it to Claude, and returns a parsed insight ready
+ * + at-risk targets, sends it to Gemini, and returns a parsed insight ready
  * for dashboard_insights.
- *
- * Cost discipline: we use Sonnet 4.6 by default (the cheaper, fast model) and
- * Opus 4.6 only for the weekly deep-dive period.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { runTextPrompt } from '@/lib/ai/gemini';
+import { GEMINI_FAST_MODEL } from '@/lib/ai/models';
 import { METRIC_DEFINITIONS, type MetricKey } from './metric-keys';
 
 export interface GeneratedInsight {
@@ -19,9 +18,6 @@ export interface GeneratedInsight {
   confidence: number | null;
   model: string;
 }
-
-const SONNET = 'claude-sonnet-4-6';
-const OPUS = 'claude-opus-4-6';
 
 const SYSTEM_PROMPT = `You are the alkatera Pulse insight writer. You read a snapshot of an organisation's sustainability data and write a concise, evidence-backed brief explaining what changed and what to do about it.
 
@@ -57,7 +53,7 @@ interface TargetInput {
   status: 'on_track' | 'at_risk' | 'off_track' | 'unknown';
 }
 
-/** Pull the data needed to brief Claude. */
+/** Pull the data needed to brief Gemini. */
 export async function gatherInsightContext(
   supabase: SupabaseClient,
   orgId: string,
@@ -135,55 +131,43 @@ export async function gatherInsightContext(
 }
 
 export interface GenerateInsightOptions {
-  /** 'daily' uses Sonnet; 'weekly' uses Opus. */
+  /** 'daily' produces a 24-hour brief; 'weekly' produces a deep-dive brief. */
   period?: 'daily' | 'weekly';
 }
 
-/** Call Claude and parse the JSON response. */
+/** Call Gemini and parse the JSON response. */
 export async function generateInsight(
   context: Awaited<ReturnType<typeof gatherInsightContext>>,
   options: GenerateInsightOptions = {},
 ): Promise<GeneratedInsight | null> {
   // Trim because Claude Code (and some other parent processes) inject an
-  // empty ANTHROPIC_API_KEY="" for security; Next.js's dotenv then skips
+  // empty GEMINI_API_KEY="" for security; Next.js's dotenv then skips
   // loading the real key from .env.local because the env var "exists".
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) {
     console.warn(
-      '[Pulse insights] ANTHROPIC_API_KEY missing or empty; skipping generation. ' +
-        'For local dev, ensure your shell does not export an empty ANTHROPIC_API_KEY ' +
-        'before starting the dev server (Claude Code sets it to "" by default).',
+      '[Pulse insights] GEMINI_API_KEY missing or empty; skipping generation. ' +
+        'For local dev, ensure your shell does not export an empty GEMINI_API_KEY ' +
+        'before starting the dev server.',
     );
     return null;
   }
 
   const period = options.period ?? 'daily';
-  const model = period === 'weekly' ? OPUS : SONNET;
-
-  // Lazy-import to keep client bundle small.
-  const Anthropic = (await import('@anthropic-ai/sdk')).default;
-  const client = new Anthropic({ apiKey });
+  const model = GEMINI_FAST_MODEL;
 
   const userPrompt = buildPrompt(context, period);
 
-  const response = await client.messages.create({
-    model,
-    max_tokens: 800,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: userPrompt }],
-  });
+  const raw = (
+    await runTextPrompt({
+      apiKey,
+      prompt: `${SYSTEM_PROMPT}\n\n${userPrompt}`,
+      maxTokens: 800,
+      op: 'pulse_insight',
+    })
+  ).trim();
 
-  const block = response.content.find(b => b.type === 'text');
-  if (!block || block.type !== 'text') {
-    console.error('[Pulse insights] no text block in response', {
-      model,
-      content_types: response.content.map(b => b.type),
-    });
-    return null;
-  }
-  const raw = block.text.trim();
-
-  // Some Sonnet outputs wrap JSON in fenced code blocks, sometimes preceded
+  // Some model outputs wrap JSON in fenced code blocks, sometimes preceded
   // by a short preamble ("Here is the JSON: ```json {…} ```"). Be liberal in
   // what we accept: try a fenced extraction first, fall back to extracting
   // the first {…} substring, and only then attempt the raw text.
@@ -208,7 +192,7 @@ export async function generateInsight(
     }
   }
   if (!parsed) {
-    console.error('[Pulse insights] failed to parse JSON from Claude', {
+    console.error('[Pulse insights] failed to parse JSON from Gemini', {
       model,
       raw_preview: raw.slice(0, 400),
       parse_error: lastErr instanceof Error ? lastErr.message : String(lastErr),
