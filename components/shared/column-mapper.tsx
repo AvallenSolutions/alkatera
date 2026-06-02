@@ -29,6 +29,12 @@ interface Props<Key extends string> {
   onConfirm: (mapping: Partial<Record<Key, string>>) => Promise<void> | void;
   disabled?: boolean;
   submitLabel?: string;
+  /** Fired whenever the user changes a column selection. Lets the host
+   *  surface context-aware help (e.g. "no brand column — detect with AI"). */
+  onMappingChange?: (mapping: Partial<Record<Key, string>>) => void;
+  /** Optional content rendered just above the submit button — used to slot
+   *  in the AI brand-detection panel without forking this component. */
+  footer?: React.ReactNode;
 }
 
 const NONE = '__none__';
@@ -47,6 +53,8 @@ export function ColumnMapper<Key extends string>({
   onConfirm,
   disabled,
   submitLabel = 'Confirm mapping & import',
+  onMappingChange,
+  footer,
 }: Props<Key>) {
   const [mapping, setMapping] = useState<Partial<Record<Key, string>>>(
     parse.suggestions as Partial<Record<Key, string>>,
@@ -130,10 +138,11 @@ export function ColumnMapper<Key extends string>({
                   <Select
                     value={value}
                     onValueChange={(v) =>
-                      setMapping((prev) => ({
-                        ...prev,
-                        [field.key]: v === NONE ? undefined : v,
-                      }))
+                      setMapping((prev) => {
+                        const next = { ...prev, [field.key]: v === NONE ? undefined : v };
+                        onMappingChange?.(next);
+                        return next;
+                      })
                     }
                     disabled={disabled || submitting}
                   >
@@ -157,6 +166,8 @@ export function ColumnMapper<Key extends string>({
           })}
         </div>
       </div>
+
+      {footer}
 
       <div className="flex justify-end">
         <Button

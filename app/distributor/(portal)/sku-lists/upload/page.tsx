@@ -226,8 +226,8 @@ export default function UploadPage() {
           {step === 'choose' && <UploadDropzone onFileSelected={handleFile} />}
           {step === 'uploading' && <UploadProgress message="Uploading your file…" />}
           {step === 'parsing' && <UploadProgress message="Reading rows and detecting columns…" />}
-          {step === 'mapping' && parse && (
-            <ColumnMapper parse={parse} onConfirm={handleConfirm} />
+          {step === 'mapping' && parse && skuListId && (
+            <ColumnMapper parse={parse} skuListId={skuListId} onConfirm={handleConfirm} />
           )}
           {step === 'processing' && (
             <div className="space-y-3 py-2">

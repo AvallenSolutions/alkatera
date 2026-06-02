@@ -47,6 +47,7 @@ export interface ProcessResult {
 }
 
 export type ImportProgressPhase =
+  | 'detecting_brands'
   | 'matching_brands'
   | 'saving_brands'
   | 'matching_products'
@@ -83,6 +84,20 @@ export async function processSkuList(args: ProcessArgs): Promise<ProcessResult> 
   const { supabase, distributorOrgId, skuListId, rows, mapping, onProgress } = args;
   const errors: string[] = [];
 
+  // brand_name is optional on the type (AI mode supplies a synthetic column),
+  // but by the time we run it is always resolved to a concrete column.
+  const brandCol = mapping.brand_name;
+  if (!brandCol) {
+    return {
+      brand_count: 0,
+      sku_count: 0,
+      brand_profile_ids: [],
+      errors: ['No brand column resolved for this import'],
+      directory_matches: [],
+      product_directory_stats: { resolved: 0, matched_existing: 0, created_new: 0 },
+    };
+  }
+
   // Bucket parsed rows by normalised brand name so we issue one brand-profile
   // upsert per unique brand, not per row.
   const brandToRows = new Map<
@@ -97,7 +112,7 @@ export async function processSkuList(args: ProcessArgs): Promise<ProcessResult> 
   >();
 
   rows.forEach((row, index) => {
-    const brandName = (row[mapping.brand_name] ?? '').trim();
+    const brandName = (row[brandCol] ?? '').trim();
     const productName = (row[mapping.product_name] ?? '').trim();
     if (!brandName) {
       errors.push(`Row ${index + 2}: missing brand name`);

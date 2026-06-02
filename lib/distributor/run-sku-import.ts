@@ -3,6 +3,7 @@ import { parseCSV } from './parsers/csv-parser';
 import { parseExcel } from './parsers/excel-parser';
 import { parsePdf } from './parsers/pdf-parser';
 import { processSkuList, type ImportProgressPhase } from './sku-list-processor';
+import { extractBrandsFromProductNames } from './brand-extractor';
 import { queueBrandsForScraping } from './scraping/agent-dispatcher';
 import type { ColumnMapping, SkuListFileType } from '@/types/distributor';
 
@@ -113,12 +114,39 @@ export async function runSkuImport(args: {
       .eq('id', skuListId);
   }
 
+  // When the file has no brand column, the brand is baked into the product
+  // name (e.g. Mangrove). Detect it with Gemini, drop category-header rows,
+  // and rewrite each row with synthetic brand/product columns so the rest of
+  // the pipeline is unchanged.
+  let rows = parsed.rows;
+  let effectiveMapping = mapping;
+  if (mapping.brand_source === 'ai' || !mapping.brand_name) {
+    const productCol = mapping.product_name;
+    const names = parsed.rows.map((r) => (r[productCol] ?? '').trim());
+    const extraction = await extractBrandsFromProductNames(names, {
+      onProgress: (done, total) => reportProgress('detecting_brands', done, total),
+    });
+    rows = parsed.rows
+      .map((r) => {
+        const name = (r[productCol] ?? '').trim();
+        const e = extraction.get(name);
+        return {
+          ...r,
+          __ai_is_product__: e ? (e.is_product ? '1' : '') : '1',
+          __ai_brand__: (e?.brand ?? name) || name,
+          __ai_product__: (e?.product ?? name) || name,
+        };
+      })
+      .filter((r) => r.__ai_is_product__ === '1');
+    effectiveMapping = { ...mapping, brand_name: '__ai_brand__', product_name: '__ai_product__' };
+  }
+
   const result = await processSkuList({
     supabase,
     distributorOrgId,
     skuListId,
-    rows: parsed.rows,
-    mapping,
+    rows,
+    mapping: effectiveMapping,
     onProgress: reportProgress,
   });
 
@@ -229,8 +257,10 @@ function describeProgress(
   const frac = total > 0 ? Math.min(1, current / total) : 0;
   const band = (start: number, end: number) => Math.round(start + frac * (end - start));
   switch (phase) {
+    case 'detecting_brands':
+      return { label: `Detecting brands from product names… (${current}/${total})`, percent: band(3, 22) };
     case 'matching_brands':
-      return { label: `Matching brands to the directory… (${current}/${total})`, percent: band(5, 45) };
+      return { label: `Matching brands to the directory… (${current}/${total})`, percent: band(22, 45) };
     case 'saving_brands':
       return { label: `Saving brand profiles… (${current}/${total})`, percent: band(45, 60) };
     case 'matching_products':

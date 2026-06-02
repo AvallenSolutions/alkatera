@@ -119,12 +119,17 @@ export async function POST(request: Request, { params }: { params: { id: string 
 function validateMapping(input: unknown): ColumnMapping | null {
   if (!input || typeof input !== 'object') return null;
   const obj = input as Record<string, unknown>;
-  if (typeof obj.brand_name !== 'string' || !obj.brand_name) return null;
   if (typeof obj.product_name !== 'string' || !obj.product_name) return null;
+  const aiBrand = obj.brand_source === 'ai';
+  // brand_name is required unless we're detecting brands from product names.
+  if (!aiBrand && (typeof obj.brand_name !== 'string' || !obj.brand_name)) return null;
   const mapping: ColumnMapping = {
-    brand_name: obj.brand_name,
     product_name: obj.product_name,
+    brand_source: aiBrand ? 'ai' : 'column',
   };
+  if (typeof obj.brand_name === 'string' && obj.brand_name) {
+    mapping.brand_name = obj.brand_name;
+  }
   for (const field of [
     'sku_code',
     'gtin',

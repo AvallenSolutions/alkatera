@@ -140,8 +140,19 @@ export type ColumnMappingField =
   | 'website';
 
 export interface ColumnMapping {
-  brand_name: string;
+  /**
+   * Column holding the brand name. Optional when `brand_source` is 'ai' —
+   * many distributor catalogues (e.g. Mangrove) bake the brand into the
+   * product name and have no separate brand column, so we detect it.
+   */
+  brand_name?: string;
   product_name: string;
+  /**
+   * Where brand names come from. 'column' (default): read brand_name column.
+   * 'ai': no brand column — extract the brand from each product name with
+   * Gemini at import time (category-header rows are dropped automatically).
+   */
+  brand_source?: 'column' | 'ai';
   sku_code?: string;
   /** GTIN/EAN/UPC barcode. Strong signal for product canonicalisation
    *  during SKU upload — exact GTIN match wins over fuzzy name match. */
