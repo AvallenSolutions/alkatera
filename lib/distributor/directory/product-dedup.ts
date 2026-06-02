@@ -1,5 +1,5 @@
-import Anthropic from '@anthropic-ai/sdk';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { runTextPrompt } from '@/lib/ai/gemini';
 import {
   findProductMatch,
   resolveOrCreateProductEntry,
@@ -8,18 +8,8 @@ import {
 } from './product-matcher';
 import { normalizeProductName } from '../brand-normalizer';
 
-const MODEL = 'claude-haiku-4-5-20251001';
 const MAX_TOKENS = 400;
 const LLM_CHECK_THRESHOLD_PRODUCTS = 100; // Skip LLM if a brand has more products than this — would balloon prompts.
-
-let cachedClient: Anthropic | null = null;
-function getClient(): Anthropic | null {
-  if (cachedClient) return cachedClient;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-  cachedClient = new Anthropic({ apiKey });
-  return cachedClient;
-}
 
 export interface SmartMatchInput extends ProductMatchInput {
   /** Used to strip the brand prefix from candidate + existing names
@@ -187,8 +177,8 @@ interface LlmCheckResult {
 }
 
 async function llmCheckProductMatch(args: LlmCheckArgs): Promise<LlmCheckResult | null> {
-  const client = getClient();
-  if (!client) return null;
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
 
   const candidateNorm = normalizeProductName(args.candidate.name);
   // Pre-filter: if the candidate's normalised name (after the existing
@@ -248,14 +238,7 @@ Rules:
 
   let text = '';
   try {
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      messages: [{ role: 'user', content: prompt }],
-    });
-    for (const block of response.content) {
-      if (block.type === 'text') text += block.text + '\n';
-    }
+    text = await runTextPrompt({ apiKey, prompt, maxTokens: MAX_TOKENS, op: 'product_dedup_check' });
   } catch {
     return null;
   }

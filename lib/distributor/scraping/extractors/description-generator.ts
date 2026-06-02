@@ -1,17 +1,6 @@
-import Anthropic from '@anthropic-ai/sdk';
-import { logClaudeUsage } from '@/lib/ai/usage-log';
+import { runTextPrompt } from '@/lib/ai/gemini';
 
-const MODEL = 'claude-haiku-4-5-20251001';
 const MAX_TOKENS = 600;
-
-let cachedClient: Anthropic | null = null;
-function getClient(): Anthropic | null {
-  if (cachedClient) return cachedClient;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-  cachedClient = new Anthropic({ apiKey });
-  return cachedClient;
-}
 
 export interface DescriptionArgs {
   brandName: string;
@@ -40,8 +29,8 @@ export interface DescriptionResult {
 export async function generateCompanyDescription(
   args: DescriptionArgs,
 ): Promise<DescriptionResult> {
-  const client = getClient();
-  if (!client) return { description: null, error: 'ANTHROPIC_API_KEY not configured' };
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return { description: null, error: 'GEMINI_API_KEY not configured' };
 
   const trimmed = args.corpus.trim();
   if (!trimmed) return { description: null, error: 'no_corpus' };
@@ -65,14 +54,9 @@ Write a 2–3 paragraph overview of this brand, with these rules:
 - If the source text doesn't have enough material for a credible overview (e.g. it's only nav/footer scraps), respond with exactly the single word INSUFFICIENT_DATA and nothing else.`;
 
   try {
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      messages: [{ role: 'user', content: prompt }],
-    });
-    logClaudeUsage('description_generate', MODEL, response);
-    const first = response.content[0];
-    const raw = first && first.type === 'text' ? first.text.trim() : '';
+    const raw = (
+      await runTextPrompt({ apiKey, prompt, maxTokens: MAX_TOKENS, op: 'description_generate' })
+    ).trim();
     if (!raw) return { description: null, error: 'empty_response' };
     if (raw === 'INSUFFICIENT_DATA' || raw.startsWith('INSUFFICIENT_DATA')) {
       return { description: null, error: 'insufficient_data' };

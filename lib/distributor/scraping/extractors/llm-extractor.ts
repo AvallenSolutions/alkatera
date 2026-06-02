@@ -1,19 +1,8 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { htmlToText } from './html-to-text';
 import { FIELD_DEFINITIONS, type FieldKey } from '../field-definitions';
-import { logClaudeUsage } from '@/lib/ai/usage-log';
+import { runTextPrompt } from '@/lib/ai/gemini';
 
-const MODEL = 'claude-haiku-4-5-20251001';
 const MAX_TOKENS = 768;
-
-let cachedClient: Anthropic | null = null;
-function getClient(): Anthropic | null {
-  if (cachedClient) return cachedClient;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-  cachedClient = new Anthropic({ apiKey });
-  return cachedClient;
-}
 
 export interface ExtractArgs {
   /** Raw HTML or plain text from the page. */
@@ -41,9 +30,9 @@ export interface ExtractResult {
  * "no value" row.
  */
 export async function extractFieldsFromContent(args: ExtractArgs): Promise<ExtractResult> {
-  const client = getClient();
-  if (!client) {
-    return { values: {}, error: 'ANTHROPIC_API_KEY not configured' };
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return { values: {}, error: 'GEMINI_API_KEY not configured' };
   }
 
   const text = args.isPlainText ? args.content : htmlToText(args.content);
@@ -85,17 +74,10 @@ Rules:
 
   let raw: string;
   try {
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      messages: [{ role: 'user', content: prompt }],
-    });
-    logClaudeUsage('source_extract', MODEL, response);
-    const first = response.content[0];
-    raw = first && first.type === 'text' ? first.text : '';
+    raw = await runTextPrompt({ apiKey, prompt, maxTokens: MAX_TOKENS, op: 'source_extract' });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    return { values: {}, error: `anthropic_error: ${message}` };
+    return { values: {}, error: `gemini_error: ${message}` };
   }
 
   const parsed = safeParseJson(raw);

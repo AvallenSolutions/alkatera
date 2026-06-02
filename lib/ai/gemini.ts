@@ -454,6 +454,77 @@ export async function runGroundedSearch({
   return result.response.text();
 }
 
+/**
+ * Single-shot text→text prompt. The migration workhorse for everything that
+ * used `anthropic.messages.create({ messages:[{role:'user',content}] })` and
+ * read `response.content[0].text`. Logs token usage.
+ */
+export async function runTextPrompt({
+  apiKey,
+  model = GEMINI_FAST_MODEL,
+  prompt,
+  maxTokens = 1024,
+  temperature,
+  op = 'text',
+}: {
+  apiKey: string;
+  model?: string;
+  prompt: string;
+  maxTokens?: number;
+  temperature?: number;
+  op?: string;
+}): Promise<string> {
+  const client = getGeminiClient(apiKey);
+  const generativeModel = client.getGenerativeModel({
+    model,
+    generationConfig: {
+      maxOutputTokens: maxTokens,
+      ...(temperature != null ? { temperature } : {}),
+    },
+  });
+  const result = await generativeModel.generateContent(prompt);
+  logGeminiUsage(op, model, result);
+  return result.response.text();
+}
+
+/**
+ * Single-shot text→JSON prompt with `responseMimeType: application/json`.
+ * Strips stray code fences and parses; returns null on parse failure so
+ * callers keep their existing fallback behaviour. Logs token usage.
+ */
+export async function runJsonPrompt<T = Record<string, unknown>>({
+  apiKey,
+  model = GEMINI_FAST_MODEL,
+  prompt,
+  maxTokens = 2048,
+  op = 'json',
+}: {
+  apiKey: string;
+  model?: string;
+  prompt: string;
+  maxTokens?: number;
+  op?: string;
+}): Promise<T | null> {
+  const client = getGeminiClient(apiKey);
+  const generativeModel = client.getGenerativeModel({
+    model,
+    generationConfig: { maxOutputTokens: maxTokens, responseMimeType: 'application/json' },
+  });
+  const result = await generativeModel.generateContent(prompt);
+  logGeminiUsage(op, model, result);
+  const text = result.response
+    .text()
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
+
 function safeParseJson(s: string): Record<string, unknown> | null {
   try {
     const v = JSON.parse(s);

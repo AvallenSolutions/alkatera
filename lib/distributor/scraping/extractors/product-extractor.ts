@@ -1,18 +1,7 @@
-import Anthropic from '@anthropic-ai/sdk';
 import type { CrawledProduct } from '../sources/types';
-import { logClaudeUsage } from '@/lib/ai/usage-log';
+import { runTextPrompt } from '@/lib/ai/gemini';
 
-const MODEL = 'claude-haiku-4-5-20251001';
 const MAX_TOKENS = 1500;
-
-let cachedClient: Anthropic | null = null;
-function getClient(): Anthropic | null {
-  if (cachedClient) return cachedClient;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-  cachedClient = new Anthropic({ apiKey });
-  return cachedClient;
-}
 
 export interface ExtractProductsArgs {
   /** Plain-text content from a brand's product-listing or product-detail page. */
@@ -43,9 +32,9 @@ const VALID_FORMAT = new Set(['bottle', 'can', 'keg', 'bag_in_box', 'other']);
 export async function extractProductsFromPage(
   args: ExtractProductsArgs,
 ): Promise<ExtractProductsResult> {
-  const client = getClient();
-  if (!client) {
-    return { products: [], error: 'ANTHROPIC_API_KEY not configured' };
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return { products: [], error: 'GEMINI_API_KEY not configured' };
   }
   const text = args.text.trim();
   if (!text) return { products: [] };
@@ -79,18 +68,10 @@ Rules:
 
   let text_out = '';
   try {
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      messages: [{ role: 'user', content: prompt }],
-    });
-    logClaudeUsage('product_extract', MODEL, response);
-    for (const block of response.content) {
-      if (block.type === 'text') text_out += block.text + '\n';
-    }
+    text_out = await runTextPrompt({ apiKey, prompt, maxTokens: MAX_TOKENS, op: 'product_extract' });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    return { products: [], error: `anthropic_error: ${message}` };
+    return { products: [], error: `gemini_error: ${message}` };
   }
 
   const parsed = extractJson(text_out);
