@@ -476,7 +476,7 @@ export default function SupplierInvitePage() {
               <div className="p-4 rounded-xl bg-white/5 border border-white/10">
                 <p className="text-xs text-[#ccff00] uppercase tracking-wider font-bold mb-1">What to expect</p>
                 <p className="text-xs text-white/50 leading-relaxed">
-                  The survey covers labour &amp; human rights, environment, ethics, health &amp; safety and management systems. You can upload supporting evidence and save your progress as you go.
+                  Two quick steps, around 10 minutes, and it&apos;s free: first confirm a few details about your business, then a short survey covering labour &amp; human rights, environment, ethics, health &amp; safety and management systems. You can upload supporting evidence and save your progress as you go.
                 </p>
               </div>
             )}

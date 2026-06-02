@@ -18,6 +18,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Save, ArrowLeft, AlertCircle } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useOrganization } from "@/lib/organizationContext";
+import { INDUSTRY_SECTORS } from "@/lib/suppliers/industry-sectors";
 import { toast } from "sonner";
 import Link from "next/link";
 import { COUNTRIES } from "@/lib/countries";
@@ -39,21 +40,6 @@ const SUPPLIER_TIERS = [
   { value: "tier_1", label: "Tier 1: Direct supplier" },
   { value: "tier_2", label: "Tier 2: Supplier's supplier" },
   { value: "tier_3", label: "Tier 3: Further upstream" },
-];
-
-const INDUSTRY_SECTORS = [
-  "Food & Beverage",
-  "Packaging & Materials",
-  "Logistics & Transportation",
-  "Manufacturing",
-  "Agriculture",
-  "Energy & Utilities",
-  "Chemicals",
-  "Textiles",
-  "Construction",
-  "Technology",
-  "Services",
-  "Other",
 ];
 
 const CURRENCIES = [

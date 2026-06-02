@@ -41,6 +41,7 @@ import {
 } from '@/lib/supplier-esg/questions'
 import { isReadyToSubmit, getApplicableQuestions, getRatingLabel } from '@/lib/supplier-esg/scoring'
 import { EsgQuestionEvidenceUpload } from '@/components/suppliers/EsgQuestionEvidenceUpload'
+import { SupplierProfileStep } from '@/components/suppliers/SupplierProfileStep'
 import type { SupplierEsgEvidence } from '@/lib/types/supplier-esg'
 
 const DEFORESTATION_STANDARD_OPTIONS = [
@@ -57,6 +58,9 @@ export default function SupplierEsgAssessmentPage() {
   const [supplierId, setSupplierId] = useState<string | undefined>()
   const [loadingSupplier, setLoadingSupplier] = useState(true)
   const [hasCommodityProducts, setHasCommodityProducts] = useState(false)
+  // Step 1 ("About your business") gates the survey: it must have the required
+  // basics before the questionnaire is shown.
+  const [profileComplete, setProfileComplete] = useState(false)
 
   const {
     assessment,
@@ -115,6 +119,10 @@ export default function SupplierEsgAssessmentPage() {
   // (deforestation questions only apply to commodity suppliers). Drives the
   // counts and the submit gate so hidden questions never block submission.
   const applicableQuestions = getApplicableQuestions(answers, { hasCommodityProducts })
+
+  // Show the survey once the profile basics are done, or if it's already
+  // submitted/verified (so existing assessments are never hidden behind the step).
+  const showSurvey = profileComplete || isSubmitted || isVerified
 
   const handleAnswer = async (questionId: string, value: EsgResponse) => {
     if (isSubmitted) return
@@ -245,6 +253,13 @@ export default function SupplierEsgAssessmentPage() {
         </Alert>
       )}
 
+      {/* Step 1 of 2: About your business — gates the survey */}
+      {!isSubmitted && !isVerified && (
+        <SupplierProfileStep onCompleteChange={setProfileComplete} />
+      )}
+
+      {showSurvey ? (
+        <>
       {/* Progress Header */}
       <Card>
         <CardContent className="pt-6">
@@ -404,6 +419,14 @@ export default function SupplierEsgAssessmentPage() {
                 )}
               </Button>
             </div>
+          </CardContent>
+        </Card>
+      )}
+        </>
+      ) : (
+        <Card>
+          <CardContent className="py-10 text-center text-muted-foreground">
+            Complete the short step above to unlock the sustainability survey.
           </CardContent>
         </Card>
       )}
