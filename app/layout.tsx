@@ -96,11 +96,18 @@ const jsonLd = {
       "url": "https://alkatera.com",
       "logo": "https://alkatera.com/logo.png",
       "email": "hello@alkatera.com",
-      "description": "Sustainability SaaS platform for the drinks industry. Generates Life Cycle Assessments, carbon footprint analysis, and compliance reporting for breweries, distilleries, and wineries.",
+      "description": "Sustainability and carbon accounting platform built for the drinks industry. Provides carbon footprint analysis, Life Cycle Assessment (LCA), water stewardship, greenwashing protection, and compliance reporting for breweries, distilleries, and wineries.",
       "sameAs": [
         "https://www.linkedin.com/company/alkatera"
       ],
-      "foundingDate": "2025"
+      "foundingDate": "2025",
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "email": "hello@alkatera.com",
+        "contactType": "sales",
+        "areaServed": "Worldwide",
+        "availableLanguage": "English"
+      }
     },
     {
       "@type": "SoftwareApplication",

@@ -1,7 +1,7 @@
 # Alkatera: Full Technical Specification & Feature Deep-Dive
 
 ## 1. Vision: Sustainability, Distilled
-Alkatera is the first "Ecological Intelligence Engine" built exclusively for the global drinks industry. Unlike generic carbon calculators, Alkatera treats the beverage as a product of its environment—integrating data from soil, water, and sky to create a full-spectrum impact profile.
+Alkatera is the sustainability and carbon accounting platform built exclusively for the global drinks industry. It is carbon accounting and Life Cycle Assessment (LCA) software for breweries, distilleries, wineries, and soft drink producers, and a drinks-native alternative to generic carbon accounting tools. Unlike general-purpose carbon calculators, Alkatera treats the beverage as a product of its environment, integrating data from soil, water, and sky to create a full-spectrum impact profile.
 
 ## 2. Core Methodologies & Compliance
 Alkatera operates to the highest global standards for environmental accounting and legal protection:
@@ -39,8 +39,9 @@ Alkatera is designed for seamless integration:
 - **Audit Logs:** Every calculation is traceable to the source data, providing "investor-grade" assurance.
 - **Output formats:** High-resolution JSON data, CSV exports, and pre-formatted PDF Sustainability Reports.
 
-## 6. Development Status
-- **Current Version:** Pre-Launch Beta.
-- **Public Launch:** Scheduled Q1 2026.
+## 6. Availability
+- **Status:** Live and available now.
+- **Company:** Founded 2025, platform launched February 2026.
+- **Access:** Self-serve sign-up with Founding Partner pricing.
 - **Contact:** [hello@alkatera.com](mailto:hello@alkatera.com)
 - **Web:** [https://alkatera.com](https://alkatera.com)
