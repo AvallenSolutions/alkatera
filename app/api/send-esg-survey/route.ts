@@ -261,7 +261,11 @@ export async function POST(request: NextRequest) {
           </div>
         `;
 
-        const ccList = [user.email, 'hello@alkatera.com'].filter(Boolean) as string[];
+        // Do not CC the inviter: they're often signed in to the main app, and
+        // opening their own copy of the link could disrupt their session. The
+        // supplier's replies still reach them via replyTo, and we keep an
+        // internal copy on hello@alkatera.com.
+        const ccList = ['hello@alkatera.com'];
 
         await resend.emails.send({
           from: 'alkatera <sayhello@mail.alkatera.com>',
