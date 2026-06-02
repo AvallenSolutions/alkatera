@@ -90,6 +90,23 @@ export const ESG_QUESTIONS: EsgQuestion[] = [
     allowNA: true,
     guidanceNote: 'Required by law in some jurisdictions (e.g. UK Modern Slavery Act for businesses with turnover above £36m).',
   },
+  {
+    id: 'lhr_11',
+    section: 'labour_human_rights',
+    sectionLabel: 'Labour & Human Rights',
+    text: 'For any agricultural or commodity raw materials you supply, do you take action to support a living income for farmers and growers in your supply chain?',
+    allowNA: true,
+    guidanceNote:
+      'Living income is the net income a household needs for a decent standard of living. It is distinct from a living wage, which applies to employed workers. Examples of action include price premiums, long-term contracts, or Fairtrade/Fair for Life certification. Select N/A if you do not supply agricultural or commodity raw materials.',
+  },
+  {
+    id: 'lhr_12',
+    section: 'labour_human_rights',
+    sectionLabel: 'Labour & Human Rights',
+    text: 'Do you assess human rights and living wage risk by the specific countries and sites where you and your suppliers operate?',
+    guidanceNote:
+      'Living wage benchmarks and human rights risk are location-dependent. Partial = some operating locations assessed but not all, or only your own sites and not your suppliers.',
+  },
 
   // Environment (8 questions)
   {
@@ -109,6 +126,22 @@ export const ESG_QUESTIONS: EsgQuestion[] = [
     section: 'environment',
     sectionLabel: 'Environment',
     text: 'Do you have targets to reduce your carbon emissions?',
+  },
+  {
+    id: 'env_11',
+    section: 'environment',
+    sectionLabel: 'Environment',
+    text: 'Do you measure and track your Scope 3 (value chain) greenhouse gas emissions?',
+    guidanceNote:
+      'Scope 3 covers indirect emissions across your value chain, including purchased goods and services, transport, and use of sold products. Partial = some Scope 3 categories measured but not a full inventory.',
+  },
+  {
+    id: 'env_12',
+    section: 'environment',
+    sectionLabel: 'Environment',
+    text: 'Do you have a science-based emissions reduction target aligned with limiting global warming to 1.5°C?',
+    guidanceNote:
+      'For example, a target validated by the Science Based Targets initiative (SBTi). Partial = a target is set but not yet validated, or aligned to well-below 2°C rather than 1.5°C.',
   },
   {
     id: 'env_04',

@@ -33,6 +33,7 @@ interface InvitationDetails {
   invited_at: string;
   expires_at: string;
   is_valid: boolean;
+  request_kind?: string;
 }
 
 export default function SupplierInvitePage() {
@@ -57,6 +58,13 @@ export default function SupplierInvitePage() {
   const [signInPassword, setSignInPassword] = useState('');
 
   const logoUrl = 'https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png';
+
+  // Where to land the supplier after accepting. An ESG survey invitation deep-links
+  // straight into the assessment; everything else lands on the portal home.
+  const destinationFor = (result: { request_kind?: string } | null | undefined): string =>
+    result?.request_kind === 'esg_assessment'
+      ? '/supplier-portal/esg-assessment'
+      : '/supplier-portal';
 
   useEffect(() => {
     async function loadInvitation() {
@@ -137,7 +145,7 @@ export default function SupplierInvitePage() {
 
       setSuccess(true);
       setTimeout(() => {
-        window.location.href = '/supplier-portal';
+        window.location.href = destinationFor(result);
       }, 2000);
     } catch (err) {
       console.error('Error accepting invitation:', err);
@@ -187,7 +195,7 @@ export default function SupplierInvitePage() {
 
       setSuccess(true);
       setTimeout(() => {
-        window.location.href = '/supplier-portal';
+        window.location.href = destinationFor(result);
       }, 2000);
     } catch (err) {
       console.error('Error signing in:', err);
@@ -281,7 +289,7 @@ export default function SupplierInvitePage() {
 
       setSuccess(true);
       setTimeout(() => {
-        window.location.href = '/supplier-portal';
+        window.location.href = destinationFor(result);
       }, 2000);
     } catch (err) {
       console.error('Error creating account:', err);
@@ -294,6 +302,12 @@ export default function SupplierInvitePage() {
   const daysUntilExpiry = invitation
     ? Math.ceil((new Date(invitation.expires_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     : 0;
+
+  // ESG survey invitations get tailored copy and CTA labels.
+  const isEsgSurvey = invitation?.request_kind === 'esg_assessment';
+  const acceptLabel = isEsgSurvey ? 'Accept & start survey' : 'Accept & Join';
+  const signInLabel = isEsgSurvey ? 'Sign in & start survey' : 'Sign In & Accept';
+  const createLabel = isEsgSurvey ? 'Create account & start survey' : 'Create Account & Accept';
 
   // ── Loading ──────────────────────────────────────────────────
   if (isLoading) {
@@ -394,7 +408,15 @@ export default function SupplierInvitePage() {
             <div className="text-center space-y-2">
               <h1 className="font-serif text-3xl text-white">You&apos;re Invited</h1>
               <p className="text-white/60 text-sm">
-                <strong className="text-white">{invitation?.organization_name}</strong> has invited you to join alkatera and share your sustainability data
+                {isEsgSurvey ? (
+                  <>
+                    <strong className="text-white">{invitation?.organization_name}</strong> has invited you to complete a short sustainability survey (ESG self-assessment) on alka<strong className="text-white">tera</strong>
+                  </>
+                ) : (
+                  <>
+                    <strong className="text-white">{invitation?.organization_name}</strong> has invited you to join alkatera and share your sustainability data
+                  </>
+                )}
               </p>
             </div>
 
@@ -426,6 +448,16 @@ export default function SupplierInvitePage() {
                 </div>
               )}
             </div>
+
+            {/* ESG survey: what to expect */}
+            {isEsgSurvey && (
+              <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                <p className="text-xs text-[#ccff00] uppercase tracking-wider font-bold mb-1">What to expect</p>
+                <p className="text-xs text-white/50 leading-relaxed">
+                  The survey covers labour &amp; human rights, environment, ethics, health &amp; safety and management systems. You can upload supporting evidence and save your progress as you go.
+                </p>
+              </div>
+            )}
 
             {/* Personal message */}
             {invitation?.personal_message && (
@@ -488,7 +520,7 @@ export default function SupplierInvitePage() {
                   {isSubmitting ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <>Accept & Join <ArrowRight className="h-4 w-4" /></>
+                    <>{acceptLabel} <ArrowRight className="h-4 w-4" /></>
                   )}
                 </button>
               </div>
@@ -519,7 +551,7 @@ export default function SupplierInvitePage() {
                   disabled={isSubmitting}
                   className="w-full py-4 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:bg-[#b8e600] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Sign In & Accept <ArrowRight className="h-4 w-4" /></>}
+                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <>{signInLabel} <ArrowRight className="h-4 w-4" /></>}
                 </button>
 
                 <button type="button" onClick={() => setShowSignIn(false)} className="w-full text-center text-xs text-white/40 hover:text-white/60">
@@ -586,7 +618,7 @@ export default function SupplierInvitePage() {
                   disabled={isSubmitting}
                   className="w-full py-4 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:bg-[#b8e600] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Create Account & Accept <ArrowRight className="h-4 w-4" /></>}
+                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <>{createLabel} <ArrowRight className="h-4 w-4" /></>}
                 </button>
 
                 <button type="button" onClick={() => setShowSignIn(true)} className="w-full text-center text-xs text-white/40 hover:text-white/60">

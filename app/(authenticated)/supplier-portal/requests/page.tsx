@@ -26,11 +26,14 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import Link from 'next/link';
+import { ClipboardCheck, ArrowRight } from 'lucide-react';
 
 interface DataRequest {
   id: string;
   material_name: string;
   material_type: string;
+  request_kind: string;
   organization_name?: string;
   status: string;
   invited_at: string;
@@ -68,6 +71,7 @@ export default function SupplierRequestsPage() {
         id: inv.id,
         material_name: inv.material_name,
         material_type: inv.material_type,
+        request_kind: inv.request_kind || 'data',
         organization_name: inv.organization_name,
         status: inv.status,
         invited_at: inv.invited_at,
@@ -152,11 +156,13 @@ export default function SupplierRequestsPage() {
     completed: { label: 'Completed', variant: 'secondary', icon: CheckCircle2, colour: 'text-blue-400' },
   };
 
-  // Split requests into categories
-  const pendingRequests = requests.filter(r => r.request_status === 'pending' && r.status === 'accepted' && r.material_type !== 'general');
-  const acceptedRequests = requests.filter(r => r.request_status === 'accepted' && r.material_type !== 'general');
-  const declinedRequests = requests.filter(r => r.request_status === 'declined');
-  const generalInvitations = requests.filter(r => r.material_type === 'general');
+  // Split requests into categories. ESG survey requests are handled separately.
+  const esgSurveys = requests.filter(r => r.request_kind === 'esg_assessment');
+  const isData = (r: DataRequest) => r.request_kind !== 'esg_assessment';
+  const pendingRequests = requests.filter(r => isData(r) && r.request_status === 'pending' && r.status === 'accepted' && r.material_type !== 'general');
+  const acceptedRequests = requests.filter(r => isData(r) && r.request_status === 'accepted' && r.material_type !== 'general');
+  const declinedRequests = requests.filter(r => isData(r) && r.request_status === 'declined');
+  const generalInvitations = requests.filter(r => isData(r) && r.material_type === 'general');
 
   if (loading) {
     return (
@@ -208,6 +214,66 @@ export default function SupplierRequestsPage() {
         </div>
       ) : (
         <>
+          {/* ESG survey requests */}
+          {esgSurveys.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="p-1 rounded bg-emerald-500/10">
+                  <ClipboardCheck className="h-4 w-4 text-emerald-400" />
+                </div>
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                  Sustainability Surveys ({esgSurveys.length})
+                </h2>
+              </div>
+
+              {esgSurveys.map((req) => (
+                <Link
+                  key={req.id}
+                  href="/supplier-portal/esg-assessment"
+                  className="block rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-5 transition-colors hover:bg-emerald-500/10"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-4 min-w-0">
+                      <div className="p-2.5 rounded-lg flex-shrink-0 bg-emerald-500/10">
+                        <ClipboardCheck className="h-5 w-5 text-emerald-400" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-foreground">ESG Self-Assessment</p>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          {req.organization_name && (
+                            <span className="text-xs text-muted-foreground">
+                              Requested by {req.organization_name}
+                            </span>
+                          )}
+                          <span className="text-xs text-muted-foreground">&middot;</span>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(req.invited_at).toLocaleDateString('en-GB', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })}
+                          </span>
+                        </div>
+                        {req.personal_message && (
+                          <div className="mt-2 flex items-start gap-2 p-2 rounded-lg bg-muted/50 border border-border">
+                            <MessageSquare className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                            <p className="text-xs text-muted-foreground leading-relaxed">
+                              {req.personal_message}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0 text-sm font-medium text-emerald-400">
+                      Complete survey
+                      <ArrowRight className="h-4 w-4" />
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+
           {/* Pending requests - needs action */}
           {pendingRequests.length > 0 && (
             <div className="space-y-3">

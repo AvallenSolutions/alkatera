@@ -32,11 +32,13 @@ import {
   CheckCircle2,
   Phone,
   Link2,
+  ClipboardCheck,
 } from "lucide-react";
 import { useOrganizationSupplierDetail } from "@/hooks/data/useOrganizationSupplierDetail";
 import { Progress } from "@/components/ui/progress";
 import { ESG_SECTIONS, getQuestionsBySection, type EsgResponse } from "@/lib/supplier-esg/questions";
 import { getRatingLabel } from "@/lib/supplier-esg/scoring";
+import { SendEsgSurveyDialog } from "@/components/suppliers/SendEsgSurveyDialog";
 
 export default function SupplierDetailPage() {
   const params = useParams();
@@ -48,11 +50,13 @@ export default function SupplierDetailPage() {
     resolvedSupplierId,
     products,
     esgAssessment,
+    esgInvitationStatus,
     loading,
     error,
   } = useOrganizationSupplierDetail(orgSupplierId);
 
   const [activeTab, setActiveTab] = useState("overview");
+  const [esgSurveyOpen, setEsgSurveyOpen] = useState(false);
 
   // Tell Rosa about this supplier so questions like "should we follow up?",
   // "what data are we still waiting on?", or "how does this supplier
@@ -743,21 +747,50 @@ export default function SupplierDetailPage() {
                 );
               })}
             </>
+          ) : esgInvitationStatus === "pending" || esgInvitationStatus === "accepted" ? (
+            <Card>
+              <CardContent className="py-12">
+                <div className="text-center">
+                  <ClipboardCheck className="h-12 w-12 text-amber-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Survey sent, awaiting completion</h3>
+                  <p className="text-muted-foreground mb-4 max-w-md mx-auto">
+                    You&apos;ve invited this supplier to complete the ESG self-assessment.
+                    Their scores will appear here once they submit it.
+                  </p>
+                  <Button variant="outline" onClick={() => setEsgSurveyOpen(true)}>
+                    <ClipboardCheck className="h-4 w-4 mr-2" />
+                    Resend survey
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           ) : (
             <Card>
               <CardContent className="py-12">
                 <div className="text-center">
                   <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <h3 className="text-lg font-semibold mb-2">No ESG Assessment</h3>
-                  <p className="text-muted-foreground">
+                  <p className="text-muted-foreground mb-4">
                     This supplier has not yet completed an ESG assessment.
                   </p>
+                  <Button onClick={() => setEsgSurveyOpen(true)}>
+                    <ClipboardCheck className="h-4 w-4 mr-2" />
+                    Send ESG Survey
+                  </Button>
                 </div>
               </CardContent>
             </Card>
           )}
         </TabsContent>
       </Tabs>
+
+      <SendEsgSurveyDialog
+        open={esgSurveyOpen}
+        onOpenChange={setEsgSurveyOpen}
+        defaultEmail={(supplierProfile as any)?.contact_email || ""}
+        defaultSupplierName={(supplierProfile as any)?.name || ""}
+        defaultContactName={(supplierProfile as any)?.contact_name || ""}
+      />
     </div>
   );
 }

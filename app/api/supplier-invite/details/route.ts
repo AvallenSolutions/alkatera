@@ -93,6 +93,14 @@ export async function GET(request: NextRequest) {
 
     const invitation = data[0]
 
+    // The validation RPC doesn't expose request_kind, so fetch it directly. This
+    // lets the invite page tailor its copy for ESG survey requests.
+    const { data: kindRow } = await adminClient
+      .from('supplier_invitations')
+      .select('request_kind')
+      .eq('invitation_token', token)
+      .maybeSingle()
+
     // Return only display-safe fields
     return NextResponse.json({
       invitation_id: invitation.invitation_id,
@@ -107,6 +115,7 @@ export async function GET(request: NextRequest) {
       invited_at: invitation.invited_at,
       expires_at: invitation.expires_at,
       is_valid: invitation.is_valid,
+      request_kind: kindRow?.request_kind ?? 'data',
     })
   } catch (error: any) {
     console.error('Error in supplier-invite details:', error)

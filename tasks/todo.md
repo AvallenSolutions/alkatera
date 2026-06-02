@@ -1,3 +1,46 @@
+# Send ESG Survey to supplier — finish & ship (2026-06-02)
+
+## 1. Schema assumptions — ALL VERIFIED against migrations
+- [x] `supplier_engagements` UNIQUE (supplier_id) — exists (20260219130000). `ON CONFLICT (supplier_id)` valid.
+- [x] `organization_suppliers.engagement_status` accepts 'invited' — plain `text` (default 'active'), no enum. OK.
+- [x] `supplier_engagements.created_by` — exists (uuid FK profiles).
+- [x] `suppliers` insert with null user_id + org/name/email/contact_name — OK (only org_id+name NOT NULL; user_id added 20260219120000; email regex allows it).
+- [x] `accept_supplier_invitation` rewrite is purely additive on supplier resolution; engagement upsert flips 'invited'->'active' via the confirmed unique constraint. `unique_org_supplier` confirmed for the org-link ON CONFLICT.
+
+## 2. Migrations applied cleanly — VERIFIED (targeted local test)
+- Full `supabase db reset` is blocked by TWO pre-existing, unrelated migration bugs:
+  1. duplicate version `20260327000000` (community tables + epr_hmrc) -> schema_migrations PK clash
+  2. `20260330000000_add_vineyard_luc_fields` alters `vineyards` before it's created (created in `20260425000000`)
+- Worked around for testing: built a faithful minimal scratch DB (exact real column defs for
+  the objects the migrations/functions touch), applied BOTH new migration files on top -> both
+  applied cleanly (ALTER/INDEX/CREATE FUNCTION/GRANT all OK).
+
+## 3. Checks
+- [x] `npm run typecheck` — passes (exit 0)
+- [x] `npm run lint` — no issues in any file I touched (remaining errors/warnings are all pre-existing, unrelated files)
+- [ ] `npm run build` — running
+
+## 4. End-to-end critical path — ALL 4 CASES PASS (SQL against scratch DB)
+- [x] A: send -> 1 supplier, 1 platform_suppliers, 1 org-link(invited), 1 invitation(esg_assessment, pending)
+- [x] B: accept (signup, same email) -> SAME records adopted (no dupes), suppliers.user_id set, engagement->active, invitation accepted, platform user_id linked, NOT added to org_members
+- [x] C: resend to existing supplier email -> no duplicate supplier/platform/org-link records
+- [x] D: get_supplier_invitations returns the esg_assessment row(s) for the supplier (portal Data Requests page links to /supplier-portal/esg-assessment — code-verified)
+
+## 5. Polish (both done)
+- [x] Deep-link: accept route now returns `request_kind`; invite page routes esg_assessment -> `/supplier-portal/esg-assessment` (helper `destinationFor`, all 3 accept paths)
+- [x] Brand ESG tab: "Survey sent, awaiting completion" state when an esg invitation is pending OR accepted-not-submitted; wired via `esgInvitationStatus` on `useOrganizationSupplierDetail` (fed by `/api/suppliers/detail` -> latest org-scoped esg invitation status)
+
+## 6. Follow-up refinements (requested after flow walkthrough)
+- [x] ESG-aware invite landing page: `/api/supplier-invite/details` now returns `request_kind`; `/supplier-invite/[token]` shows ESG-specific intro copy, a "what to expect" note, and ESG CTA labels ("...start survey")
+- [x] `accept_supplier_invitation` now promotes the `organization_suppliers` link from `invited` to `active` on acceptance (`ON CONFLICT (organization_id, platform_supplier_id) DO UPDATE`). Verified via scratch-DB test (org-link status = active after accept). Edited migration 20262703000000 in place since it's un-applied.
+
+## Pre-existing issues spotted (out of scope, NOT fixed)
+- Duplicate migration version `20260327000000` (two files). Should be renamed to a unique version.
+- `20260330000000_add_vineyard_luc_fields` ordered before `vineyards` table creation (`20260425000000`).
+- These block a clean `supabase db reset` locally (prod was migrated incrementally so never hit them).
+
+---
+
 # Performance — Quick Wins Bundle (2026-05-30)
 
 Goal: make the platform (especially the Rosa landing page) feel faster. This

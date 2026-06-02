@@ -54,11 +54,21 @@ export async function POST(request: NextRequest) {
     }
 
     if (!supplierRecord) {
-      return NextResponse.json({ supplier: null, products: [], esg_assessment: null });
+      return NextResponse.json({ supplier: null, products: [], esg_assessment: null, esg_invitation: null });
     }
 
-    // Fetch products and ESG assessment in parallel
-    const [productsResult, esgResult] = await Promise.all([
+    // Resolve the caller's organisation so the ESG survey invitation lookup is
+    // scoped to the brand that's viewing the supplier.
+    const { data: membership } = await adminClient
+      .from('organization_members')
+      .select('organization_id')
+      .eq('user_id', user.id)
+      .limit(1)
+      .maybeSingle();
+    const organizationId = membership?.organization_id;
+
+    // Fetch products, ESG assessment, and the latest ESG survey invitation in parallel
+    const [productsResult, esgResult, esgInvitationResult] = await Promise.all([
       adminClient
         .from('supplier_products')
         .select('*')
@@ -70,6 +80,17 @@ export async function POST(request: NextRequest) {
         .select('*')
         .eq('supplier_id', supplierRecord.id)
         .maybeSingle(),
+      organizationId
+        ? adminClient
+            .from('supplier_invitations')
+            .select('status, invited_at')
+            .eq('organization_id', organizationId)
+            .eq('request_kind', 'esg_assessment')
+            .ilike('supplier_email', email)
+            .order('invited_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
     ]);
 
     return NextResponse.json({
@@ -93,6 +114,7 @@ export async function POST(request: NextRequest) {
       },
       products: productsResult.data || [],
       esg_assessment: esgResult.data || null,
+      esg_invitation: esgInvitationResult.data || null,
     });
   } catch (error: any) {
     console.error('Error in supplier detail:', error);

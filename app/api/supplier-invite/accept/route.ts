@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     // Validate invitation
     const { data: invitation, error: invError } = await adminClient
       .from('supplier_invitations')
-      .select('id, supplier_email, status, expires_at, organization_id')
+      .select('id, supplier_email, status, expires_at, organization_id, request_kind')
       .eq('invitation_token', token)
       .single()
 
@@ -205,6 +205,7 @@ export async function POST(request: NextRequest) {
         success: true,
         message: 'Successfully joined as a supplier',
         organization_id: invitation.organization_id,
+        request_kind: invitation.request_kind ?? 'data',
       },
       { status: 200, headers: corsHeaders }
     )

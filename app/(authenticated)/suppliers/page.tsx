@@ -58,6 +58,7 @@ import {
   ArrowLeft,
   ChevronRight,
   X,
+  ClipboardCheck,
 } from 'lucide-react';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabaseClient';
@@ -66,6 +67,7 @@ import { useOrganization } from '@/lib/organizationContext';
 import { useSupplierPermissions } from '@/hooks/useSupplierPermissions';
 import { useSupplierLimit } from '@/hooks/useSubscription';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { SendEsgSurveyDialog } from '@/components/suppliers/SendEsgSurveyDialog';
 import { toast } from 'sonner';
 
 interface OrganizationSupplier {
@@ -117,6 +119,9 @@ export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<OrganizationSupplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // ESG survey dialog state
+  const [esgSurveyOpen, setEsgSurveyOpen] = useState(false);
 
   // Directory sheet state
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -823,6 +828,12 @@ export default function SuppliersPage() {
         </div>
         {hasSuppliers && (
           <div className="flex items-center gap-3">
+            {(canCreateSuppliers || canInviteSuppliers) && (
+              <Button size="lg" variant="outline" onClick={() => setEsgSurveyOpen(true)}>
+                <ClipboardCheck className="h-5 w-5 mr-2" />
+                Send ESG Survey
+              </Button>
+            )}
             {(canCreateSuppliers || canInviteSuppliers) ? (
               <Button size="lg" onClick={handleOpenSheet}>
                 <Search className="h-5 w-5 mr-2" />
@@ -1176,6 +1187,13 @@ export default function SuppliersPage() {
           )}
         </>
       )}
+
+      {/* ── Send ESG Survey Dialog ── */}
+      <SendEsgSurveyDialog
+        open={esgSurveyOpen}
+        onOpenChange={setEsgSurveyOpen}
+        onSent={fetchSuppliers}
+      />
 
       {/* ── Supplier Directory Sheet ── */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>

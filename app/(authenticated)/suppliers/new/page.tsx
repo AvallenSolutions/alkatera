@@ -29,10 +29,17 @@ interface SupplierFormData {
   website: string;
   industry_sector: string;
   country: string;
+  supplier_tier: string;
   annual_spend: string;
   spend_currency: string;
   notes: string;
 }
+
+const SUPPLIER_TIERS = [
+  { value: "tier_1", label: "Tier 1: Direct supplier" },
+  { value: "tier_2", label: "Tier 2: Supplier's supplier" },
+  { value: "tier_3", label: "Tier 3: Further upstream" },
+];
 
 const INDUSTRY_SECTORS = [
   "Food & Beverage",
@@ -72,6 +79,7 @@ export default function NewSupplierPage() {
     website: "",
     industry_sector: "",
     country: "",
+    supplier_tier: "",
     annual_spend: "",
     spend_currency: "GBP",
     notes: "",
@@ -140,6 +148,7 @@ export default function NewSupplierPage() {
         website: formData.website || null,
         industry_sector: formData.industry_sector || null,
         country: formData.country || null,
+        supplier_tier: formData.supplier_tier || null,
         annual_spend: formData.annual_spend ? parseFloat(formData.annual_spend) : null,
         spend_currency: formData.spend_currency,
         notes: formData.notes || null,
@@ -283,6 +292,29 @@ export default function NewSupplierPage() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="supplier_tier">Supply Chain Tier</Label>
+            <Select
+              value={formData.supplier_tier}
+              onValueChange={(value) => handleInputChange("supplier_tier", value)}
+              disabled={isSubmitting}
+            >
+              <SelectTrigger id="supplier_tier">
+                <SelectValue placeholder="Select tier" />
+              </SelectTrigger>
+              <SelectContent>
+                {SUPPLIER_TIERS.map((tier) => (
+                  <SelectItem key={tier.value} value={tier.value}>
+                    {tier.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Used to prioritise due diligence on your most direct, highest-risk suppliers first.
+            </p>
           </div>
         </CardContent>
       </Card>

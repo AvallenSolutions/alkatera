@@ -65,6 +65,9 @@ export interface OrganizationSupplierDetail {
   resolvedSupplierId: string | null;
   products: SupplierProduct[];
   esgAssessment: SupplierEsgAssessment | null;
+  /** Status of the latest ESG survey invitation this org sent the supplier
+   *  ('pending' | 'accepted' | 'expired' | 'declined'), or null if none sent. */
+  esgInvitationStatus: string | null;
   loading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
@@ -78,6 +81,7 @@ export function useOrganizationSupplierDetail(
   const [resolvedSupplierId, setResolvedSupplierId] = useState<string | null>(null);
   const [products, setProducts] = useState<SupplierProduct[]>([]);
   const [esgAssessment, setEsgAssessment] = useState<SupplierEsgAssessment | null>(null);
+  const [esgInvitationStatus, setEsgInvitationStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -121,6 +125,7 @@ export function useOrganizationSupplierDetail(
       let supplierRecord: any = null;
       let fetchedProducts: SupplierProduct[] = [];
       let fetchedEsg: SupplierEsgAssessment | null = null;
+      let fetchedEsgInvitationStatus: string | null = null;
 
       if (viewData.contact_email) {
         try {
@@ -146,6 +151,7 @@ export function useOrganizationSupplierDetail(
                 fetchedProducts = detail.products || [];
                 fetchedEsg = detail.esg_assessment || null;
               }
+              fetchedEsgInvitationStatus = detail.esg_invitation?.status ?? null;
             }
           }
         } catch (enrichErr) {
@@ -156,6 +162,7 @@ export function useOrganizationSupplierDetail(
       setResolvedSupplierId(supplierId);
       setProducts(fetchedProducts);
       setEsgAssessment(fetchedEsg);
+      setEsgInvitationStatus(fetchedEsgInvitationStatus);
 
       // Build the profile: prefer suppliers table data (supplier-managed)
       // over platform_suppliers data (invite stub). Use a simple "first
@@ -202,6 +209,7 @@ export function useOrganizationSupplierDetail(
     resolvedSupplierId,
     products,
     esgAssessment,
+    esgInvitationStatus,
     loading,
     error,
     refetch: fetchDetail,
