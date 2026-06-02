@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { htmlToText } from './html-to-text';
 import { FIELD_DEFINITIONS, type FieldKey } from '../field-definitions';
+import { logClaudeUsage } from '@/lib/ai/usage-log';
 
 const MODEL = 'claude-haiku-4-5-20251001';
 const MAX_TOKENS = 768;
@@ -89,6 +90,7 @@ Rules:
       max_tokens: MAX_TOKENS,
       messages: [{ role: 'user', content: prompt }],
     });
+    logClaudeUsage('source_extract', MODEL, response);
     const first = response.content[0];
     raw = first && first.type === 'text' ? first.text : '';
   } catch (err: unknown) {

@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { logClaudeUsage } from '@/lib/ai/usage-log';
 
 const MODEL = 'claude-haiku-4-5-20251001';
 const MAX_TOKENS = 600;
@@ -69,6 +70,7 @@ Write a 2–3 paragraph overview of this brand, with these rules:
       max_tokens: MAX_TOKENS,
       messages: [{ role: 'user', content: prompt }],
     });
+    logClaudeUsage('description_generate', MODEL, response);
     const first = response.content[0];
     const raw = first && first.type === 'text' ? first.text.trim() : '';
     if (!raw) return { description: null, error: 'empty_response' };

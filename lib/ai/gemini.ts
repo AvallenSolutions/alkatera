@@ -23,6 +23,7 @@ import {
   type Tool,
 } from '@google/generative-ai';
 import { GEMINI_FAST_MODEL, GEMINI_ROSA_MODEL } from './models';
+import { logGeminiUsage } from './usage-log';
 
 export { GEMINI_FAST_MODEL, GEMINI_ROSA_MODEL };
 
@@ -405,6 +406,7 @@ Rules:
       ],
     });
 
+    logGeminiUsage('extract_structured', model, result);
     const text = result.response.text().trim();
     const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
     try {
@@ -448,6 +450,7 @@ export async function runGroundedSearch({
     generationConfig: { maxOutputTokens: maxTokens, temperature },
   });
   const result = await generativeModel.generateContent(prompt);
+  logGeminiUsage('grounded_search', model, result);
   return result.response.text();
 }
 

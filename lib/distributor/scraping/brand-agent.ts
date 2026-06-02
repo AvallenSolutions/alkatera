@@ -8,15 +8,12 @@ import {
 } from './sources';
 import { scoreConfidence } from './confidence-scorer';
 import { coerceFieldValue, type FieldKey } from './field-definitions';
-import { delay } from './http';
 import { recalculateCompleteness } from '../scoring/recalculate';
 import {
   resolveOrCreateProductEntrySmart,
   clearProductDedupCache,
 } from '../directory/product-dedup';
 import { ingestDiscoveredPdf } from './pdf-ingester';
-
-const DELAY_BETWEEN_SOURCES_MS = 2_000;
 
 export interface RunBrandAgentArgs {
   supabase: SupabaseClient;
@@ -132,44 +129,51 @@ export async function runBrandAgent(args: RunBrandAgentArgs): Promise<RunBrandAg
   let documentsIngested = 0;
   let documentsSkipped = 0;
 
-  for (let i = 0; i < ALL_SOURCES.length; i++) {
-    const source = ALL_SOURCES[i];
-    attempted += 1;
-    try {
-      const result = await source.run(snapshot);
-      if (result.skipped) {
-        // Skips are intentional and not errors — just no data here. We
-        // do still record the reason so the job log explains why this
-        // source produced nothing (the brand has no website, the
-        // Wikipedia page is a disambiguation, etc.).
-        skipped += 1;
-        skipReasons.push(`${source.name}: skipped (${result.reason ?? 'no_reason'})`);
-      } else if (!result.ok) {
-        errors.push(`${source.name}: ${result.reason ?? 'unknown_error'}`);
-      } else {
-        succeeded += 1;
-        const newCount = await persistFindings(supabase, {
-          brandDirectoryId,
-          jobId,
-          sourceName: source.name,
-          sourceType: source.source_type,
-          findings: result.findings,
-        });
-        written += newCount;
-        if (result.products && result.products.length > 0) {
-          crawledProducts.push(...result.products);
-        }
-        if (result.documents && result.documents.length > 0) {
-          crawledDocuments.push(...result.documents);
-        }
+  // Fetch every source CONCURRENTLY — each hits a different domain (the
+  // brand's own site, wikipedia.org, bcorporation.net), so there's no
+  // single-host flooding, and the cron scrapes brands one at a time so a
+  // shared host (Wikipedia/B Corp) sees at most one request at once. This
+  // overlaps the network I/O (the slow part) instead of running it serially
+  // with 2s gaps between sources — the biggest per-brand speed lever.
+  const sourceOutcomes = await Promise.all(
+    ALL_SOURCES.map(async (source) => {
+      try {
+        return { source, result: await source.run(snapshot), error: null as string | null };
+      } catch (err: unknown) {
+        return { source, result: null, error: err instanceof Error ? err.message : String(err) };
       }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      errors.push(`${source.name}: threw ${message}`);
+    }),
+  );
+
+  // Persist sequentially so per-(brand,field,source) supersede logic never
+  // races. DB writes are fast; the network fetches above were the slow bit.
+  for (const { source, result, error } of sourceOutcomes) {
+    attempted += 1;
+    if (error || !result) {
+      errors.push(`${source.name}: threw ${error ?? 'unknown_error'}`);
+      continue;
     }
-    // Be polite — even on skip — so we don't flood a single source.
-    if (i < ALL_SOURCES.length - 1) {
-      await delay(DELAY_BETWEEN_SOURCES_MS);
+    if (result.skipped) {
+      skipped += 1;
+      skipReasons.push(`${source.name}: skipped (${result.reason ?? 'no_reason'})`);
+    } else if (!result.ok) {
+      errors.push(`${source.name}: ${result.reason ?? 'unknown_error'}`);
+    } else {
+      succeeded += 1;
+      const newCount = await persistFindings(supabase, {
+        brandDirectoryId,
+        jobId,
+        sourceName: source.name,
+        sourceType: source.source_type,
+        findings: result.findings,
+      });
+      written += newCount;
+      if (result.products && result.products.length > 0) {
+        crawledProducts.push(...result.products);
+      }
+      if (result.documents && result.documents.length > 0) {
+        crawledDocuments.push(...result.documents);
+      }
     }
   }
 

@@ -24,7 +24,11 @@ import { queueBrandsForScraping } from '@/lib/distributor/scraping/agent-dispatc
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
-const MAX_JOBS_PER_RUN = 3;
+// Sources for each brand now run concurrently (see brand-agent), so a single
+// brand finishes in ~15-20s instead of ~40s. That lets us clear more jobs per
+// 5-min tick within the 300s budget. With the cron also firing every 2 min,
+// a ~460-brand catalogue scrapes in ~2h instead of ~13h.
+const MAX_JOBS_PER_RUN = 8;
 
 interface JobRow {
   id: string;

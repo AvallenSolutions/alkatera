@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { CrawledProduct } from '../sources/types';
+import { logClaudeUsage } from '@/lib/ai/usage-log';
 
 const MODEL = 'claude-haiku-4-5-20251001';
 const MAX_TOKENS = 1500;
@@ -83,6 +84,7 @@ Rules:
       max_tokens: MAX_TOKENS,
       messages: [{ role: 'user', content: prompt }],
     });
+    logClaudeUsage('product_extract', MODEL, response);
     for (const block of response.content) {
       if (block.type === 'text') text_out += block.text + '\n';
     }

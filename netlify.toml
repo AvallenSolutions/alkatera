@@ -104,7 +104,7 @@
   schedule = "*/1 * * * *"   # every 1 minute — real-time directory sync
 
 [functions."app/api/cron/process-scraping-queue/route"]
-  schedule = "*/5 * * * *"   # every 5 minutes
+  schedule = "*/2 * * * *"   # every 2 minutes — 8 brands/run clears a catalogue in ~2h
 
 [functions."app/api/cron/process-document-queue/route"]
   schedule = "*/2 * * * *"   # every 2 minutes

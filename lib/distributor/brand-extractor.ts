@@ -1,5 +1,6 @@
 import { getGeminiClient } from '@/lib/ai/gemini';
 import { GEMINI_FAST_MODEL } from '@/lib/ai/models';
+import { logGeminiUsage } from '@/lib/ai/usage-log';
 import { mapWithConcurrency } from './concurrent-map';
 
 export interface BrandExtraction {
@@ -37,6 +38,7 @@ async function extractBatch(
   const result = await model.generateContent({
     contents: [{ role: 'user', parts: [{ text: `${SYSTEM}\n\nLines:\n${numbered}` }] }],
   });
+  logGeminiUsage('brand_detection', GEMINI_FAST_MODEL, result);
   const text = result.response.text().trim();
   const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
   let parsed: unknown;

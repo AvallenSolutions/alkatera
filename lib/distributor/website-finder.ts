@@ -7,8 +7,11 @@ export interface BrandWebsiteInput {
   country_of_origin?: string | null;
 }
 
-const BATCH_SIZE = 8;
-const BATCH_CONCURRENCY = 4;
+// Larger batches mean fewer (billed) grounded-search requests — ~460 brands
+// drops from ~58 grounded calls to ~24 — and higher concurrency halves the
+// wall-clock of the "finding websites" phase.
+const BATCH_SIZE = 16;
+const BATCH_CONCURRENCY = 8;
 
 /**
  * Turn a model-returned URL into a canonical https:// origin, or null if it
