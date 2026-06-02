@@ -149,6 +149,16 @@ which also strengthens the B Corp supply-chain evidence and the supplier directo
   unescaped apostrophe in the supplier detail page.)
 - Phase 3 still deferred: prefill website/country from distributor/scraped data.
 
+## STATUS: Phase 3 BUILT & verified (2026-06-02)
+- The prefill route now enriches STILL-EMPTY fields (website, country, description, logo) from the
+  canonical `brand_directory` + `scraped_brand_data` we already hold.
+- Match is high-confidence only: EXACT normalised name (reusing `normalizeBrandName`) or EXACT
+  website/email domain (generic mailbox domains excluded). No fuzzy matching, to keep false
+  positives near zero. Never overrides data we already have; supplier still confirms everything.
+- Best-effort (wrapped in try/catch) so the prefill never breaks if the directory is unavailable.
+- Verified: typecheck + eslint + build green. No UI change needed (directory values appear as
+  confirmable defaults in the step).
+
 ## Decisions (confirmed, Tim)
 1. Placement: inline lead-in on the ESG page (Step 1 of 2).
 2. Friction: require the core few (description, sector, location) before the survey unlocks.
