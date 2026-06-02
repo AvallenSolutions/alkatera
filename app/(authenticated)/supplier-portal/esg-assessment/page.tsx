@@ -27,7 +27,6 @@ import { Label } from '@/components/ui/label'
 import {
   Shield,
   ShieldCheck,
-  Clock,
   CheckCircle2,
   Info,
   Loader2,
@@ -216,7 +215,7 @@ export default function SupplierEsgAssessmentPage() {
         <Alert className="bg-emerald-50 border-emerald-200 dark:bg-emerald-950 dark:border-emerald-800">
           <ShieldCheck className="h-4 w-4 text-emerald-600" />
           <AlertDescription className="text-emerald-800 dark:text-emerald-100">
-            <strong>ESG Verified</strong> — Your assessment was verified on{' '}
+            <strong>ESG Verified.</strong> Your assessment was verified on{' '}
             {new Date(assessment!.verified_at!).toLocaleDateString('en-GB', {
               day: 'numeric',
               month: 'long',
@@ -228,10 +227,10 @@ export default function SupplierEsgAssessmentPage() {
       )}
 
       {isSubmitted && !isVerified && (
-        <Alert className="bg-amber-50 border-amber-200 dark:bg-amber-950 dark:border-amber-800">
-          <Clock className="h-4 w-4 text-amber-600" />
-          <AlertDescription className="text-amber-800 dark:text-amber-100">
-            <strong>Pending verification</strong> — Your assessment has been submitted and is awaiting review by the alka<strong>tera</strong> team.
+        <Alert className="bg-sky-50 border-sky-200 dark:bg-sky-950 dark:border-sky-800">
+          <CheckCircle2 className="h-4 w-4 text-sky-600" />
+          <AlertDescription className="text-sky-800 dark:text-sky-100">
+            <strong>Assessment submitted.</strong> Thanks for completing it. Your responses are now shared with the buying organisations that requested them. The alka<strong>tera</strong> team may review your answers and add a verified badge; there is nothing more you need to do.
           </AlertDescription>
         </Alert>
       )}
