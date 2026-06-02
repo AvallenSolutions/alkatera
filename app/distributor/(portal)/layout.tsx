@@ -135,10 +135,12 @@ export default async function DistributorLayout({ children }: { children: React.
         <div className="min-h-screen bg-background">
           <DistributorSidebar />
           <DistributorHeader />
-          <main className="md:pl-64 px-6 py-8 max-w-6xl mx-auto md:mx-0">
-            <UpgradeBanner />
-            {children}
-          </main>
+          <div className="md:pl-64">
+            <main className="px-6 sm:px-10 lg:px-12 py-8 max-w-[1600px] mx-auto">
+              <UpgradeBanner />
+              {children}
+            </main>
+          </div>
         </div>
       )}
     </DistributorProvider>
