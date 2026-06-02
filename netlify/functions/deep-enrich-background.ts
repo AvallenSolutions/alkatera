@@ -2,14 +2,14 @@ import { createClient } from '@supabase/supabase-js';
 import { createHmac, timingSafeEqual } from 'crypto';
 // Relative imports only — Netlify's lambda zipper bundles via esbuild
 // and doesn't honour the tsconfig `@/` alias reliably. deep-enrich.ts
-// only imports from @anthropic-ai/sdk + ./sources type-only, so the
+// only imports from the Gemini helper + ./sources type-only, so the
 // bundle stays small.
 import { deepEnrichBrand } from '../../lib/admin/sourcing/deep-enrich';
 
 /**
  * Background runner for admin deep-enrich. The Netlify -background
  * suffix gives a 15-minute window so the comprehensive multi-source
- * Claude + web_search call doesn't hit the ~30s synchronous ceiling
+ * Gemini + web_search call doesn't hit the ~30s synchronous ceiling
  * the regular Next.js route was 504-ing on.
  *
  * The POST /api/admin/directory/brands/[id]/deep-enrich route inserts
@@ -43,14 +43,14 @@ export const handler = async (event: {
   const secret = process.env.INTERNAL_JOB_HMAC_SECRET;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY;
 
-  if (!secret || !supabaseUrl || !serviceKey || !anthropicKey) {
+  if (!secret || !supabaseUrl || !serviceKey || !geminiKey) {
     console.error('[deep-enrich-background] missing env', {
       hasSecret: !!secret,
       hasSupabaseUrl: !!supabaseUrl,
       hasServiceKey: !!serviceKey,
-      hasAnthropicKey: !!anthropicKey,
+      hasGeminiKey: !!geminiKey,
     });
     return { statusCode: 500, body: 'misconfigured' };
   }

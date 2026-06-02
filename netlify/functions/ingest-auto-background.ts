@@ -40,14 +40,14 @@ export const handler = async (event: { body?: string | null; headers: Record<str
   const secret = process.env.INTERNAL_JOB_HMAC_SECRET;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY;
 
-  if (!secret || !supabaseUrl || !serviceKey || !anthropicKey) {
+  if (!secret || !supabaseUrl || !serviceKey || !geminiKey) {
     console.error('[ingest-auto-background] Missing required env vars', {
       hasSecret: !!secret,
       hasSupabaseUrl: !!supabaseUrl,
       hasServiceKey: !!serviceKey,
-      hasAnthropicKey: !!anthropicKey,
+      hasGeminiKey: !!geminiKey,
     });
     return { statusCode: 500, body: 'misconfigured' };
   }

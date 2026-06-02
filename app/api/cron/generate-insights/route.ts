@@ -13,10 +13,10 @@ import {
  * POST /api/cron/generate-insights
  *
  * Iterates every organisation, builds a structured prompt from their latest
- * snapshots / anomalies / targets, asks Claude for a fresh narrative, and
+ * snapshots / anomalies / targets, asks Gemini for a fresh narrative, and
  * writes it to dashboard_insights. Schedule daily ~06:00.
  *
- * Falls back gracefully if ANTHROPIC_API_KEY is missing — logs and skips.
+ * Falls back gracefully if GEMINI_API_KEY is missing — logs and skips.
  */
 
 export const runtime = 'nodejs';
@@ -37,17 +37,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing Supabase config' }, { status: 500 });
     }
 
-    // Distinguish "API key not configured" from "Claude call failed for org X".
-    // Claude Code injects an empty ANTHROPIC_API_KEY into child processes for
+    // Distinguish "API key not configured" from "Gemini call failed for org X".
+    // Claude Code injects an empty GEMINI_API_KEY into child processes for
     // security, so we trim and treat empty as missing.
-    const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim();
-    if (!anthropicKey) {
+    const geminiKey = process.env.GEMINI_API_KEY?.trim();
+    if (!geminiKey) {
       return NextResponse.json(
         {
-          error: 'ANTHROPIC_API_KEY missing or empty',
+          error: 'GEMINI_API_KEY missing or empty',
           hint:
-            'Set ANTHROPIC_API_KEY in your environment. For local dev, ensure your ' +
-            'shell does not export an empty ANTHROPIC_API_KEY (Claude Code does this ' +
+            'Set GEMINI_API_KEY in your environment. For local dev, ensure your ' +
+            'shell does not export an empty GEMINI_API_KEY (Claude Code does this ' +
             'by default — start the dev server in a terminal where the var is unset).',
         },
         { status: 503 },

@@ -56,10 +56,10 @@ Rules:
 
 export async function POST(request: NextRequest) {
   try {
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+    const apiKey = process.env.GEMINI_API_KEY?.trim();
     if (!apiKey) {
       return NextResponse.json(
-        { error: 'ANTHROPIC_API_KEY missing' },
+        { error: 'GEMINI_API_KEY missing' },
         { status: 503 },
       );
     }

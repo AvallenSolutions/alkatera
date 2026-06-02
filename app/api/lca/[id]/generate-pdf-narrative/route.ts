@@ -162,8 +162,8 @@ export async function POST(
       assumptions: pcf.assumptions_limitations,
     };
 
-    // Check if Claude API is configured
-    if (!process.env.ANTHROPIC_API_KEY) {
+    // Check if the AI provider is configured
+    if (!process.env.GEMINI_API_KEY) {
       // Return static fallback narratives
       const fallbackNarratives = generateFallbackNarratives(context);
       return NextResponse.json({
@@ -253,7 +253,7 @@ export async function GET(
   const cachedEntry = cacheKeys.length > 0 ? narrativeCache.get(cacheKeys[0]) : null;
 
   return NextResponse.json({
-    available: !!process.env.ANTHROPIC_API_KEY,
+    available: !!process.env.GEMINI_API_KEY,
     cached: !!cachedEntry,
     cachedAt: cachedEntry ? new Date(cachedEntry.timestamp).toISOString() : null,
     cacheExpiry: cachedEntry

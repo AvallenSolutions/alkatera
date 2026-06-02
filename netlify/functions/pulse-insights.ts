@@ -5,16 +5,16 @@ import { schedule } from '@netlify/functions';
  *
  * Runs every day at 06:00 UTC. Hits /api/cron/generate-insights, which
  * iterates every org, gathers their latest snapshots / anomalies / targets,
- * asks Claude (Sonnet 4.6) for a fresh narrative, and writes it to
+ * asks Gemini for a fresh narrative, and writes it to
  * dashboard_insights. The InsightCard widget on /pulse reads from there.
  *
- * Cost note: ~one Sonnet call per org per day. Skips orgs with no snapshot
+ * Cost note: ~one Gemini call per org per day. Skips orgs with no snapshot
  * data, so cost scales with active orgs only.
  *
  * Required env vars:
- *   - URL                (auto-provided by Netlify)
- *   - CRON_SECRET        (matched against the API route)
- *   - ANTHROPIC_API_KEY  (read by the API route, not this function)
+ *   - URL               (auto-provided by Netlify)
+ *   - CRON_SECRET       (matched against the API route)
+ *   - GEMINI_API_KEY    (read by the API route, not this function)
  */
 export const handler = schedule('0 6 * * *', async () => {
   const baseUrl = process.env.URL;

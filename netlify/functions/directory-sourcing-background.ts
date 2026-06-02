@@ -1,9 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import { createHmac, timingSafeEqual } from 'crypto';
 // Relative import (not `@/`) — Netlify's lambda zipper bundles via esbuild
-// without honouring tsconfig path aliases reliably. find-brands.ts imports
-// ONLY @anthropic-ai/sdk, so it bundles cleanly here. We deliberately do NOT
-// import the bulk processors (they use the `@/` alias) — the ingest happens
+// without honouring tsconfig path aliases reliably. find-brands.ts reaches the
+// model via the Gemini helpers, so it bundles cleanly here. We deliberately do
+// NOT import the bulk processors (they use the `@/` alias) — the ingest happens
 // in the Next.js route once this function writes the raw results back.
 import {
   findBrandsBatched,
@@ -47,14 +47,14 @@ export const handler = async (event: {
   const secret = process.env.INTERNAL_JOB_HMAC_SECRET;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY;
 
-  if (!secret || !supabaseUrl || !serviceKey || !anthropicKey) {
+  if (!secret || !supabaseUrl || !serviceKey || !geminiKey) {
     console.error('[directory-sourcing-background] missing env', {
       hasSecret: !!secret,
       hasSupabaseUrl: !!supabaseUrl,
       hasServiceKey: !!serviceKey,
-      hasAnthropicKey: !!anthropicKey,
+      hasGeminiKey: !!geminiKey,
     });
     return { statusCode: 500, body: 'misconfigured' };
   }

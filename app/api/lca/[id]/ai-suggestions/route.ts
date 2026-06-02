@@ -3,7 +3,7 @@
  *
  * POST /api/lca/[id]/ai-suggestions
  *
- * Generates AI-powered suggestions for LCA compliance fields using Claude.
+ * Generates AI-powered suggestions for LCA compliance fields using Gemini.
  * Falls back to static defaults if the API is unavailable.
  */
 
@@ -208,8 +208,8 @@ export async function POST(
       ...context,
     };
 
-    // Check if Claude API is configured
-    if (!process.env.ANTHROPIC_API_KEY) {
+    // Check if the AI API is configured
+    if (!process.env.GEMINI_API_KEY) {
       // Fall back to static suggestions
       const fallback = getStaticFallback(field, fullContext);
       return NextResponse.json({
@@ -234,7 +234,7 @@ export async function POST(
         remaining: rateLimit.remaining,
       });
     } catch (aiError) {
-      console.error('[AI Suggestions] Claude API error:', aiError);
+      console.error('[AI Suggestions] Gemini API error:', aiError);
 
       // Fall back to static suggestions
       const fallback = getStaticFallback(field, fullContext);
@@ -317,7 +317,7 @@ export async function GET(
   }
 
   return NextResponse.json({
-    available: !!process.env.ANTHROPIC_API_KEY,
+    available: !!process.env.GEMINI_API_KEY,
     rateLimit: RATE_LIMIT,
     remaining,
     resetIn: record && now < record.resetTime
