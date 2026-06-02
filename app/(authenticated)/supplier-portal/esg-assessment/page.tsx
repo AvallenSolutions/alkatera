@@ -255,7 +255,7 @@ export default function SupplierEsgAssessmentPage() {
 
       {/* Step 1 of 2: About your business — gates the survey */}
       {!isSubmitted && !isVerified && (
-        <SupplierProfileStep onCompleteChange={setProfileComplete} />
+        <SupplierProfileStep supplierId={supplierId} onCompleteChange={setProfileComplete} />
       )}
 
       {showSurvey ? (

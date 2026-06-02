@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getProfileCompleteness } from "@/lib/suppliers/profile-completeness";
 import { PageLoader } from "@/components/ui/page-loader";
 import {
   ArrowLeft,
@@ -256,7 +257,12 @@ export default function SupplierDetailPage() {
             {/* Company Details */}
             <Card>
               <CardHeader>
-                <CardTitle>Company Details</CardTitle>
+                <CardTitle className="flex items-center justify-between gap-2">
+                  <span>Company Details</span>
+                  <span className="text-xs font-normal text-muted-foreground">
+                    Profile {getProfileCompleteness(supplierProfile as any).percent}% complete
+                  </span>
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {supplierProfile.description && (
@@ -391,7 +397,7 @@ export default function SupplierDetailPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Your Relationship</CardTitle>
-                <CardDescription>Your organisation's relationship with this supplier</CardDescription>
+                <CardDescription>Your organisation&apos;s relationship with this supplier</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">

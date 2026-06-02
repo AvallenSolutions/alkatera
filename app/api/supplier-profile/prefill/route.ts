@@ -32,7 +32,7 @@ export async function GET() {
   const { data: rows } = await supabase
     .from('suppliers')
     .select(
-      'name, contact_name, contact_email, description, industry_sector, country, country_code, city, address, lat, lng, website, updated_at',
+      'name, contact_name, contact_email, description, industry_sector, country, country_code, city, address, lat, lng, website, logo_url, updated_at',
     )
     .eq('user_id', user.id)
     .order('updated_at', { ascending: false });
@@ -43,7 +43,7 @@ export async function GET() {
   const { data: platform } = email
     ? await supabase
         .from('platform_suppliers')
-        .select('name, contact_name, contact_email, description, industry_sector, country, website')
+        .select('name, contact_name, contact_email, description, industry_sector, country, website, logo_url')
         .ilike('contact_email', email)
         .maybeSingle()
     : { data: null as any };
@@ -81,6 +81,7 @@ export async function GET() {
     lat: fromRows('lat'),
     lng: fromRows('lng'),
     website: firstNonEmpty(fromRows('website'), platform?.website),
+    logo_url: firstNonEmpty(fromRows('logo_url'), platform?.logo_url),
   };
 
   // The required basics are present (and the name isn't just an email placeholder).

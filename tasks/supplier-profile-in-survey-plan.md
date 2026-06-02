@@ -136,6 +136,19 @@ which also strengthens the B Corp supply-chain evidence and the supplier directo
 - Deferred to Phase 2: logo/catalogue upload; dashboard + brand-card "profile X% complete" nudge;
   prefilling website/country from distributor/scraped data.
 
+## STATUS: Phase 2 BUILT & verified (2026-06-02)
+- Logo upload added to the "About your business" step (optional): uploads to the existing
+  `supplier-logos` bucket, preview + replace, persisted via the save route (logo_url now accepted
+  by save + returned by prefill).
+- `lib/suppliers/profile-completeness.ts` — shared % over name/description/sector/country/website/logo.
+- `components/suppliers/ProfileCompletenessCard.tsx` — supplier dashboard nudge ("Your profile is
+  X% complete", lists what's missing, CTA to /supplier-portal/profile; hidden at 100%). Wired into
+  the supplier dashboard (extended its supplier query to load the needed fields).
+- Brand side: a compact "Profile X% complete" indicator on the supplier detail Company Details card.
+- Verified: typecheck + eslint (touched files, 0 errors) + build green. (Also fixed a pre-existing
+  unescaped apostrophe in the supplier detail page.)
+- Phase 3 still deferred: prefill website/country from distributor/scraped data.
+
 ## Decisions (confirmed, Tim)
 1. Placement: inline lead-in on the ESG page (Step 1 of 2).
 2. Friction: require the core few (description, sector, location) before the survey unlocks.

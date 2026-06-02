@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
   setStr('city', body.city);
   setStr('address', body.address);
   setStr('website', body.website);
+  setStr('logo_url', body.logo_url);
   const lat = num(body.lat);
   if (lat !== undefined) update.lat = lat;
   const lng = num(body.lng);

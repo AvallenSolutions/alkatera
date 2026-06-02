@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import {
   Card,
   CardContent,
@@ -30,9 +31,12 @@ import {
   ArrowRight,
   AlertCircle,
   MapPin,
+  Upload,
 } from 'lucide-react';
 
 interface Props {
+  /** The supplier's record id, used as the storage path prefix for the logo. */
+  supplierId?: string;
   /** Called whenever the required basics are satisfied (or not), to gate the survey. */
   onCompleteChange: (complete: boolean) => void;
 }
@@ -41,12 +45,15 @@ function looksLikeEmail(s: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
 }
 
-export function SupplierProfileStep({ onCompleteChange }: Props) {
+export function SupplierProfileStep({ supplierId, onCompleteChange }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [complete, setComplete] = useState(false);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState('');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState('');
   const [contactName, setContactName] = useState('');
@@ -79,6 +86,7 @@ export function SupplierProfileStep({ onCompleteChange }: Props) {
         setLat(typeof d.lat === 'number' ? d.lat : null);
         setLng(typeof d.lng === 'number' ? d.lng : null);
         setWebsite(d.website || '');
+        setLogoUrl(d.logo_url || '');
         const isComplete = !!d.complete;
         setComplete(isComplete);
         setEditing(!isComplete);
@@ -94,6 +102,40 @@ export function SupplierProfileStep({ onCompleteChange }: Props) {
       active = false;
     };
   }, [onCompleteChange]);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Please choose an image file for your logo.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Logo must be under 5MB.');
+      return;
+    }
+    setUploadingLogo(true);
+    setError(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const ext = file.name.split('.').pop() || 'png';
+      const prefix = supplierId || 'pending';
+      const path = `${prefix}/logo-${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('supplier-logos')
+        .upload(path, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from('supplier-logos').getPublicUrl(path);
+      setLogoUrl(publicUrl);
+    } catch (err: any) {
+      setError(err.message || 'Failed to upload logo.');
+    } finally {
+      setUploadingLogo(false);
+      if (logoInputRef.current) logoInputRef.current.value = '';
+    }
+  };
 
   const handleSave = async () => {
     setError(null);
@@ -132,6 +174,7 @@ export function SupplierProfileStep({ onCompleteChange }: Props) {
           lat,
           lng,
           website,
+          logo_url: logoUrl,
         }),
       });
       if (!res.ok) {
@@ -294,6 +337,54 @@ export function SupplierProfileStep({ onCompleteChange }: Props) {
               {[city, country].filter(Boolean).join(', ')}
             </p>
           )}
+        </div>
+
+        <div className="space-y-2">
+          <Label>Logo (optional)</Label>
+          <div className="flex items-center gap-3">
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={logoUrl}
+                alt="Your logo"
+                className="h-12 w-12 rounded-md border border-border object-contain bg-white"
+              />
+            ) : (
+              <div className="flex h-12 w-12 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground">
+                <Building2 className="h-5 w-5" />
+              </div>
+            )}
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleLogoUpload}
+              disabled={saving || uploadingLogo}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => logoInputRef.current?.click()}
+              disabled={saving || uploadingLogo}
+            >
+              {uploadingLogo ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  Uploading…
+                </>
+              ) : (
+                <>
+                  <Upload className="h-3.5 w-3.5 mr-1.5" />
+                  {logoUrl ? 'Replace logo' : 'Upload logo'}
+                </>
+              )}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Helps buyers recognise you in their supplier list.
+          </p>
         </div>
 
         <div className="flex justify-end gap-3 pt-2">

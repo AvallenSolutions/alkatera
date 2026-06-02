@@ -18,6 +18,7 @@ import { useSupplierOnboarding } from '@/lib/supplier-onboarding';
 import { DataCompletenessCard } from '@/components/suppliers/DataCompletenessCard';
 import { SupplierActionItems } from '@/components/suppliers/SupplierActionItems';
 import { SupplierActivityTimeline } from '@/components/suppliers/SupplierActivityTimeline';
+import { ProfileCompletenessCard } from '@/components/suppliers/ProfileCompletenessCard';
 import { getRatingLabel } from '@/lib/supplier-esg/scoring';
 import { ESG_QUESTIONS } from '@/lib/supplier-esg/questions';
 
@@ -28,6 +29,11 @@ interface SupplierInfo {
   contact_name: string | null;
   address: string | null;
   phone: string | null;
+  description: string | null;
+  industry_sector: string | null;
+  country: string | null;
+  website: string | null;
+  logo_url: string | null;
 }
 
 interface PendingRequest {
@@ -95,7 +101,7 @@ export default function SupplierPortalDashboard() {
       // Load supplier record (expanded fields for action items)
       const { data: supplierData, error: supplierError } = await supabase
         .from('suppliers')
-        .select('id, name, contact_email, contact_name, address, phone')
+        .select('id, name, contact_email, contact_name, address, phone, description, industry_sector, country, website, logo_url')
         .eq('user_id', user.id)
         .limit(1)
         .maybeSingle();
@@ -347,6 +353,9 @@ export default function SupplierPortalDashboard() {
           )}
         </Link>
       </div>
+
+      {/* Profile completeness nudge */}
+      {supplier && <ProfileCompletenessCard profile={supplier} />}
 
       {/* Data Completeness */}
       <DataCompletenessCard summary={impactSummary} />
