@@ -4,6 +4,7 @@ import { ChevronLeft, Building2, MapPin } from 'lucide-react';
 import { getSupabasePortalServerClient } from '@/lib/supabase/portal-server-client';
 import { Badge } from '@/components/ui/badge';
 import { BrandTabs } from '@/components/distributor/brand-detail/brand-tabs';
+import { BrandActions } from '@/components/distributor/brand-detail/brand-actions';
 
 const TIER_BADGE: Record<number, string> = {
   1: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30',
@@ -36,14 +37,15 @@ export default async function BrandDetailLayout({ params, children }: LayoutProp
 
   const { data: member } = await supabase
     .from('distributor_members')
-    .select('distributor_org_id')
+    .select('distributor_org_id, role')
     .eq('user_id', userId)
     .maybeSingle();
   if (!member) return null;
+  const canEdit = member.role !== 'viewer';
 
   const { data: brand } = await supabase
     .from('brand_profiles')
-    .select('id, brand_directory_id, name, alkatera_tier, category, country_of_origin')
+    .select('id, brand_directory_id, name, alkatera_tier, category, country_of_origin, website')
     .eq('id', params.id)
     .eq('distributor_org_id', member.distributor_org_id)
     .maybeSingle();
@@ -113,6 +115,16 @@ export default async function BrandDetailLayout({ params, children }: LayoutProp
               )}
             </div>
           </div>
+          <BrandActions
+            brand={{
+              id: brand.id,
+              name: brand.name,
+              website: (brand as { website: string | null }).website ?? null,
+              category: brand.category ?? null,
+              country_of_origin: brand.country_of_origin ?? null,
+            }}
+            canEdit={canEdit}
+          />
         </div>
       </div>
 

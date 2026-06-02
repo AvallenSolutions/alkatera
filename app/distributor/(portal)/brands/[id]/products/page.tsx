@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { Package, ChevronRight, Inbox } from 'lucide-react';
 import { getSupabasePortalServerClient } from '@/lib/supabase/portal-server-client';
 import { Badge } from '@/components/ui/badge';
+import { SkuRowActions } from '@/components/distributor/brand-detail/sku-row-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,10 +24,11 @@ export default async function BrandProductsTabPage({ params }: PageProps) {
 
   const { data: member } = await supabase
     .from('distributor_members')
-    .select('distributor_org_id')
+    .select('distributor_org_id, role')
     .eq('user_id', userId)
     .maybeSingle();
   if (!member) return null;
+  const canEdit = member.role !== 'viewer';
 
   const { data: brand } = await supabase
     .from('brand_profiles')
@@ -39,12 +41,13 @@ export default async function BrandProductsTabPage({ params }: PageProps) {
 
   const { data: skus } = await supabase
     .from('brand_skus')
-    .select('id, sku_code, product_name, category, country_of_origin, listing_status, updated_at')
+    .select('id, sku_code, gtin, product_name, category, country_of_origin, listing_status, updated_at')
     .eq('brand_profile_id', brand.id)
     .order('product_name');
   type SkuRow = {
     id: string;
     sku_code: string | null;
+    gtin: string | null;
     product_name: string;
     category: string | null;
     country_of_origin: string | null;
@@ -179,7 +182,28 @@ export default async function BrandProductsTabPage({ params }: PageProps) {
                     )}
                   </td>
                   <td className="px-4 py-3.5 text-muted-foreground">
-                    <ChevronRight className="h-4 w-4 group-hover:translate-x-0.5 group-hover:text-sky-300 transition" />
+                    <div className="flex items-center justify-end gap-1">
+                      {canEdit && (
+                        <SkuRowActions
+                          brandId={params.id}
+                          sku={{
+                            id: sku.id,
+                            product_name: sku.product_name,
+                            sku_code: sku.sku_code,
+                            gtin: sku.gtin,
+                            category: sku.category,
+                            country_of_origin: sku.country_of_origin,
+                            listing_status: sku.listing_status,
+                          }}
+                        />
+                      )}
+                      <Link
+                        href={`/distributor/brands/${params.id}/skus/${sku.id}`}
+                        aria-label="Open product"
+                      >
+                        <ChevronRight className="h-4 w-4 group-hover:translate-x-0.5 group-hover:text-sky-300 transition" />
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               );
