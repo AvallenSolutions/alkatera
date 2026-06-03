@@ -53,12 +53,27 @@ export async function POST(request: NextRequest) {
     auth: { autoRefreshToken: false, persistSession: false },
   }) as SupabaseClient;
 
-  // 1. Monthly refresh sweep — re-queue brands not scraped in 30 days.
+  // 1. Stale-running recovery. Netlify functions get killed at the
+  //    300s ceiling and the scrape-pipeline has no rollback step, so
+  //    any job that was claimed and marked 'running' by a previous
+  //    invocation that timed out gets stranded forever. Reset anything
+  //    'running' for > 5 min so the next claim can pick it back up. 5
+  //    min is well past the longest healthy job (~30s).
+  const staleCutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  const { data: recovered } = await supabase
+    .from('scraping_jobs')
+    .update({ status: 'queued', started_at: null })
+    .eq('status', 'running')
+    .lt('started_at', staleCutoff)
+    .select('id');
+  const recoveredCount = (recovered ?? []).length;
+
+  // 2. Monthly refresh sweep — re-queue brands not scraped in 30 days.
   //    Cheap to run on every tick because dispatcher dedupes against
   //    queued/running jobs already in flight.
   await sweepStaleBrands(supabase);
 
-  // 2. Claim up to N queued jobs.
+  // 3. Claim up to N queued jobs.
   const { data: claimed } = await supabase
     .from('scraping_jobs')
     .select('id, brand_profile_id, distributor_org_id, brand_directory_id')
@@ -67,7 +82,11 @@ export async function POST(request: NextRequest) {
     .limit(MAX_JOBS_PER_RUN);
 
   if (!claimed || claimed.length === 0) {
-    return NextResponse.json({ processed: 0, message: 'no_jobs_queued' });
+    return NextResponse.json({
+      processed: 0,
+      recovered_stale: recoveredCount,
+      message: 'no_jobs_queued',
+    });
   }
 
   const startedAt = new Date().toISOString();
@@ -170,6 +189,7 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     processed: summaries.length,
+    recovered_stale: recoveredCount,
     jobs: summaries,
   });
 }
