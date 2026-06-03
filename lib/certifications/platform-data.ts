@@ -6,6 +6,7 @@ import {
   DUE_DILIGENCE_QUESTION_IDS,
   type SupplierEsgCoverage,
 } from './supplier-esg-evidence';
+import { calculateCorporateEmissions } from '@/lib/calculations/corporate-emissions';
 
 // Maps B Corp 2026 requirements to the alkatera modules that already hold
 // relevant data. Only modules confirmed to exist in the schema are mapped;
@@ -96,21 +97,57 @@ const MAPPINGS: Record<string, ModuleMapping> = {
     moduleLabel: 'Emissions',
     moduleLink: '/data',
     async query(supabase, orgId) {
-      const { data } = await supabase
-        .from('ghg_emissions')
-        .select('id, reporting_period, total_emissions, recorded_date')
+      // The app never writes to the legacy `ghg_emissions` table. Real GHG data
+      // lives across the utility / fleet / overhead / LCA tables and is
+      // aggregated by the single-source-of-truth `calculateCorporateEmissions`
+      // — the same path the Emissions dashboard uses. Candidate reporting years
+      // come from `corporate_reports` (newest first), with the current year as
+      // a fallback so freshly-entered data still counts.
+      const { data: reports } = await supabase
+        .from('corporate_reports')
+        .select('year')
         .eq('organization_id', orgId)
-        .order('recorded_date', { ascending: false })
-        .limit(5);
-      const rows = data ?? [];
-      const base = summariseCount(rows.length, 'emissions data');
+        .order('year', { ascending: false });
+      const currentYear = new Date().getUTCFullYear();
+      const years = Array.from(
+        new Set<number>([
+          currentYear,
+          ...(reports ?? []).map((r: any) => Number(r.year)),
+        ]),
+      )
+        .filter((y) => Number.isFinite(y))
+        .sort((a, b) => b - a)
+        .slice(0, 6);
+
+      const toTonnes = (kg: number) => (kg / 1000).toFixed(2);
+      for (const year of years) {
+        const result = await calculateCorporateEmissions(supabase, orgId, year);
+        if (result.hasData) {
+          const b = result.breakdown;
+          return {
+            found: true,
+            completeness: 'complete' as Completeness,
+            completenessNote: null,
+            items: [
+              {
+                sourceRecordId: `emissions-${year}`,
+                label: `GHG inventory ${year}`,
+                summary:
+                  `${toTonnes(b.total)} tCO2e total. ` +
+                  `Scope 1 ${toTonnes(b.scope1)}, ` +
+                  `Scope 2 ${toTonnes(b.scope2)}, ` +
+                  `Scope 3 ${toTonnes(b.scope3.total)} (tCO2e)`,
+              },
+            ],
+          };
+        }
+      }
+
       return {
-        ...base,
-        items: rows.map((r: any) => ({
-          sourceRecordId: r.id,
-          label: `Emissions ${r.reporting_period}`,
-          summary: `${Number(r.total_emissions).toFixed(2)} kg CO2e recorded ${r.recorded_date}`,
-        })),
+        found: false,
+        completeness: 'missing' as Completeness,
+        completenessNote: 'No emissions data found on alkatera.',
+        items: [],
       };
     },
   },
@@ -120,11 +157,14 @@ const MAPPINGS: Record<string, ModuleMapping> = {
     moduleLabel: 'Sustainability targets',
     moduleLink: '/pulse',
     async query(supabase, orgId) {
+      // Fetch the org's targets and filter for emissions-related ones in JS.
+      // Don't cap the query before filtering — a small `.limit()` here could
+      // drop the only CO2 target if it isn't among the first rows returned.
       const { data } = await supabase
         .from('sustainability_targets')
         .select('id, metric_key, target_value, target_date, scope, status')
         .eq('organization_id', orgId)
-        .limit(5);
+        .order('target_date', { ascending: false });
       const rows = (data ?? []).filter((r: any) =>
         /co2|carbon|emission|ghg|scope/i.test(
           `${r.metric_key} ${r.scope ?? ''}`,
@@ -133,7 +173,7 @@ const MAPPINGS: Record<string, ModuleMapping> = {
       const base = summariseCount(rows.length, 'emissions reduction targets');
       return {
         ...base,
-        items: rows.map((r: any) => ({
+        items: rows.slice(0, 5).map((r: any) => ({
           sourceRecordId: r.id,
           label: r.metric_key,
           summary: `Target ${r.target_value} by ${r.target_date} (${r.status})`,
