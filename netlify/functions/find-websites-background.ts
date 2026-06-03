@@ -59,13 +59,13 @@ export const handler = async (event: {
     return { statusCode: 401, body: 'unauthorized' };
   }
 
-  let payload: { distributorOrgId?: string; brandProfileId?: string };
+  let payload: { distributorOrgId?: string; brandProfileId?: string; runId?: string };
   try {
     payload = JSON.parse(rawBody);
   } catch {
     return { statusCode: 400, body: 'invalid json' };
   }
-  const { distributorOrgId, brandProfileId } = payload;
+  const { distributorOrgId, brandProfileId, runId } = payload;
   if (!distributorOrgId) {
     return { statusCode: 400, body: 'missing distributorOrgId' };
   }
@@ -73,6 +73,17 @@ export const handler = async (event: {
   const supabase = createClient(supabaseUrl, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+
+  // Record progress/outcome onto the run row the route created, so the portal
+  // can show WHY a run found nothing instead of a silent 0.
+  const finishRun = async (fields: Record<string, unknown>) => {
+    if (!runId) return;
+    await supabase
+      .from('distributor_backfill_runs')
+      .update({ ...fields, finished_at: new Date().toISOString() })
+      .eq('id', runId);
+  };
+  const geminiConfigured = !!process.env.GEMINI_API_KEY;
 
   // Load the brands still missing a website (or the one requested).
   let query = supabase
@@ -87,11 +98,13 @@ export const handler = async (event: {
   const { data: rows, error: loadErr } = await query;
   if (loadErr) {
     console.error('[find-websites-bg] load failed:', loadErr.message);
+    await finishRun({ status: 'error', message: `load_failed: ${loadErr.message}`, gemini_configured: geminiConfigured });
     return { statusCode: 200, body: 'load-error' };
   }
   const candidates = (rows ?? []) as Array<BrandWebsiteInput & { id: string }>;
   if (candidates.length === 0) {
     console.log('[find-websites-bg] nothing to do', { org: distributorOrgId });
+    await finishRun({ status: 'done', message: 'nothing-to-do', gemini_configured: geminiConfigured });
     return { statusCode: 200, body: 'nothing-to-do' };
   }
 
@@ -139,6 +152,15 @@ export const handler = async (event: {
     found: saved,
     queued,
     errors: result.errors,
+  });
+  await finishRun({
+    status: 'done',
+    total: result.attempted,
+    found: saved,
+    queued,
+    gemini_configured: geminiConfigured,
+    errors: result.errors,
+    samples: result.samples,
   });
   return { statusCode: 200, body: 'ok' };
 };

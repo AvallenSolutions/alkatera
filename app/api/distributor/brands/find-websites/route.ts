@@ -20,12 +20,24 @@ import { requireDistributor } from '@/lib/distributor/auth';
  * Owner / data_manager only.
  */
 
-export async function GET() {
+export async function GET(request: Request) {
   const auth = await requireDistributor();
   if (!auth.ok) {
     return NextResponse.json({ error: auth.reason }, { status: auth.status });
   }
   const orgId = auth.organization.id;
+
+  // Poll a specific run for its outcome (found count + grounded-search errors).
+  const runId = new URL(request.url).searchParams.get('run_id');
+  if (runId) {
+    const { data: run } = await auth.supabase
+      .from('distributor_backfill_runs')
+      .select('id, status, total, found, queued, gemini_configured, errors, samples, message')
+      .eq('id', runId)
+      .eq('distributor_org_id', orgId)
+      .maybeSingle();
+    return NextResponse.json({ run: run ?? null });
+  }
 
   const { count: total } = await auth.supabase
     .from('brand_profiles')
@@ -93,9 +105,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'not_configured' }, { status: 500 });
   }
 
+  // Create a run row the background function will write its outcome onto.
+  const { data: run } = await auth.supabase
+    .from('distributor_backfill_runs')
+    .insert({
+      distributor_org_id: orgId,
+      kind: 'find_websites',
+      status: 'running',
+      total,
+    })
+    .select('id')
+    .single();
+  const runId = run?.id ?? null;
+
   const payload = JSON.stringify({
     distributorOrgId: orgId,
     brandProfileId: singleBrandId ?? undefined,
+    runId: runId ?? undefined,
   });
   const signature = createHmac('sha256', hmacSecret).update(payload).digest('hex');
 
@@ -127,7 +153,7 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json(
-    { status: 'processing', total, mode: singleBrandId ? 'single' : 'bulk' },
+    { status: 'processing', total, runId, mode: singleBrandId ? 'single' : 'bulk' },
     { status: 202 },
   );
 }
