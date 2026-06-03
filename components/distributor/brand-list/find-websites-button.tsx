@@ -10,35 +10,37 @@ interface Props {
   missingCount: number;
 }
 
-interface FindResult {
-  attempted: number;
-  found: number;
-  queued: number;
-  missingApiKey?: boolean;
-  errors?: string[];
-  samples?: string[];
-  nextCursor?: string | null;
-  hasMore?: boolean;
+const POLL_MS = 4000;
+const MAX_POLLS = 90; // ~6 minutes — comfortably covers the 15-min bg window's useful span
+const PLATEAU_POLLS = 4; // stop once the count hasn't moved for this many polls
+
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
-// A whole-page Gemini failure — no point looping through the rest of the
-// portfolio if grounded search itself is down or unconfigured.
-function isHardFailure(r: FindResult): boolean {
-  if (r.missingApiKey) return true;
-  return (r.errors ?? []).some((e) => e.startsWith('grounded_search_error') || e === 'missing_api_key');
+async function fetchWithout(): Promise<number | null> {
+  try {
+    const res = await fetch('/api/distributor/brands/find-websites', { method: 'GET' });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { without_website?: number };
+    return typeof body.without_website === 'number' ? body.without_website : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
  * Portfolio-wide "Find websites & data" action. Brands with no website can't be
  * scraped (the brand-website source has nothing to fetch), and website discovery
  * otherwise only runs once at import time — so brands imported before it worked
- * stay empty forever. This button backfills them on demand.
+ * stay empty forever. This button kicks off a background backfill and then polls
+ * the website-less count, reporting progress as websites land.
  */
 export function FindWebsitesButton({ missingCount }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<FindResult | null>(null);
-  const [progress, setProgress] = useState<{ scanned: number; found: number } | null>(null);
+  const [result, setResult] = useState<{ found: number; baseline: number } | null>(null);
+  const [progress, setProgress] = useState<{ found: number; baseline: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   if (missingCount === 0 && !result) return null;
@@ -49,46 +51,55 @@ export function FindWebsitesButton({ missingCount }: Props) {
     setResult(null);
     setProgress(null);
 
-    let cursor: string | null = null;
-    let totalFound = 0;
-    let totalQueued = 0;
-    let totalScanned = 0;
-    let last: FindResult | null = null;
-
     try {
-      // Loop one page at a time, advancing the cursor, so no single request
-      // runs long enough to hit the function timeout.
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
-        const res: Response = await fetch('/api/distributor/brands/find-websites', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(cursor ? { after_id: cursor } : {}),
-        });
-        const body = (await res.json().catch(() => ({}))) as FindResult & { error?: string };
-        if (!res.ok) {
-          setError(`Could not run (${body.error ?? res.status}).`);
-          return;
-        }
-        last = body;
-        totalFound += body.found ?? 0;
-        totalQueued += body.queued ?? 0;
-        totalScanned += body.attempted ?? 0;
-        setProgress({ scanned: totalScanned, found: totalFound });
-
-        if (isHardFailure(body)) break;
-        if (!body.hasMore || !body.nextCursor) break;
-        cursor = body.nextCursor;
+      // Kick off the background backfill.
+      const res = await fetch('/api/distributor/brands/find-websites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        status?: string;
+        total?: number;
+        error?: string;
+      };
+      if (!res.ok && res.status !== 202) {
+        setError(`Could not start (${body.error ?? res.status}).`);
+        return;
+      }
+      if (body.status === 'noop' || !body.total) {
+        setResult({ found: 0, baseline: 0 });
+        return;
       }
 
-      setResult({
-        attempted: totalScanned,
-        found: totalFound,
-        queued: totalQueued,
-        missingApiKey: last?.missingApiKey,
-        errors: last?.errors,
-        samples: last?.samples,
-      });
+      // Poll the website-less count and watch it fall. The background run saves
+      // websites as it finds them, so `baseline - without` is websites found.
+      const baseline = body.total;
+      let prev = baseline;
+      let stable = 0;
+
+      for (let i = 0; i < MAX_POLLS; i++) {
+        await sleep(POLL_MS);
+        const without = await fetchWithout();
+        if (without === null) continue;
+
+        const found = Math.max(0, baseline - without);
+        setProgress({ found, baseline });
+
+        if (without === 0) {
+          prev = without;
+          break;
+        }
+        if (without === prev) {
+          stable += 1;
+          if (stable >= PLATEAU_POLLS) break; // finder finished; the rest had no findable site
+        } else {
+          stable = 0;
+          prev = without;
+        }
+      }
+
+      setResult({ found: Math.max(0, baseline - prev), baseline });
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unexpected error.');
@@ -110,8 +121,8 @@ export function FindWebsitesButton({ missingCount }: Props) {
           <>
             <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
             {progress
-              ? `Finding… ${progress.found} found / ${progress.scanned} scanned`
-              : 'Finding websites…'}
+              ? `Finding… ${progress.found} of ${progress.baseline} found`
+              : 'Starting…'}
           </>
         ) : (
           <>
@@ -127,18 +138,15 @@ export function FindWebsitesButton({ missingCount }: Props) {
           {result.found > 0 ? (
             <span className="text-emerald-300">
               <Sparkles className="inline h-3 w-3 mr-0.5" />
-              Found {result.found} website{result.found === 1 ? '' : 's'}, queued {result.queued} for
-              data finding. Watch the Finding column.
+              Found {result.found} website{result.found === 1 ? '' : 's'} and queued them for data
+              finding. Watch the Finding column.
             </span>
           ) : (
             <span className="text-amber-300">
-              Found no new websites across {result.attempted} brand
-              {result.attempted === 1 ? '' : 's'}.
-              {result.missingApiKey
-                ? ' Website finding is not configured (GEMINI_API_KEY missing).'
-                : result.errors && result.errors.length > 0
-                  ? ` Reason: ${result.errors.join('; ')}`
-                  : ''}
+              No new websites found across {result.baseline} brand
+              {result.baseline === 1 ? '' : 's'}. They may not have a discoverable official site —
+              try pasting a URL on the brand page. (Check the Netlify <code>[find-websites-bg]</code>{' '}
+              logs if you expected results.)
             </span>
           )}
         </div>

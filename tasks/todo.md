@@ -54,6 +54,47 @@ The cron and pipeline are HEALTHY. The blocker is upstream: no websites.
 
 ## Review
 
+### ROOT CAUSE FOUND (prod run, 2026-06-03)
+The instrumented `Find websites & data` button returned the true error:
+`grounded_search_error: [GoogleGenerativeAI Error] ... [403 Forbidden] Lightning
+dunning decision is deny for project: projects/38601711506`.
+
+**It is a Google billing problem, NOT a code bug.** "Dunning deny" = Google Cloud is
+refusing to serve the project due to overdue payment / declined card / suspended billing
+account. The API key authenticates fine (403, not 401) — billing is the block.
+
+Blast radius: the ENTIRE pipeline runs on this one Gemini project — website-finder
+(grounded search) AND all scraping extractors (`llm-extractor`, `product-extractor`,
+`description-generator` all call `runTextPrompt` from `@/lib/ai/gemini`). So every Gemini
+call 403'd, which is why 245 jobs completed having found ~nothing. The pre-existing
+`catch {}` hid all of it; the new instrumentation surfaced it.
+
+ACTION (Tim, Google Cloud Console, project 38601711506): fix billing — settle overdue
+invoice / update payment method / re-enable billing account. Then re-click the button.
+
+Follow-up (optional): llm-extractor.ts:27 comment says "claude-haiku" but code uses
+Gemini. Moving extraction to Claude Haiku would keep field/product extraction alive
+through a future Gemini billing outage (website-finding would still need Gemini grounding).
+
+### Round 2: billing fixed -> 504 on the backfill button
+After Tim fixed Google billing, the button no longer 403'd but returned **504**.
+Cause: a single Gemini grounded-search call reliably takes 40-60s (confirmed by the
+directory-sourcing-background comment), so NO synchronous page size fits Netlify's ~26s
+cap. Fix = move the work to a background function (the same pattern the SKU import uses).
+
+Shipped (typecheck clean):
+- `netlify/functions/find-websites-background.ts` — HMAC-verified, service-role, 15-min
+  window. Finds websites for the org's website-less brands (or one brand), saves, queues
+  forced scrape. Mirrors process-sku-import-background; relative imports for bundling.
+- `app/api/distributor/brands/find-websites/route.ts` — POST now HMAC-fires the bg
+  function and returns 202 (no synchronous work); added GET returning
+  `{ total_brands, without_website }` for progress polling. Inline-runs the handler in dev.
+- `find-websites-button.tsx` — starts the job, then polls GET and watches `without_website`
+  fall; reports "N of M found"; stops on zero / plateau / 6-min cap.
+- `website-editor.tsx` — single-brand "Find website & data" handles the async 202 (shows
+  "looking up… auto-refreshes" instead of expecting a synchronous `found`).
+- No migration needed (count-polling instead of a job table — simplest path now billing works).
+
 ### Correction to diagnosis
 P0 hypothesis was WRONG: Tim confirms `GEMINI_API_KEY` is set and works across alkatera.
 So the website-finder's 0/245 is NOT a missing key. The real cause is hidden because the

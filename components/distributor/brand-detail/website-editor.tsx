@@ -100,32 +100,31 @@ export function WebsiteEditor({ brandId, initialWebsite, canEdit }: Props) {
         body: JSON.stringify({ brand_profile_id: brandId }),
       });
       const body = (await res.json().catch(() => ({}))) as {
-        found?: number;
-        queued?: number;
-        missingApiKey?: boolean;
-        errors?: string[];
+        status?: string;
+        total?: number;
         error?: string;
       };
-      if (!res.ok) {
+      if (!res.ok && res.status !== 202) {
         setFeedback({ type: 'err', text: `Could not run (${body.error ?? res.status}).` });
         return;
       }
-      if (body.found && body.found > 0) {
+      if (body.status === 'noop') {
         setFeedback({
           type: 'ok',
-          text: 'Found a website and queued data finding. Findings appear within a few minutes.',
+          text: 'This brand already has a website on file.',
         });
         router.refresh();
-      } else {
-        setFeedback({
-          type: 'err',
-          text: body.missingApiKey
-            ? 'Website finding is not configured (GEMINI_API_KEY missing).'
-            : `Could not find an official website automatically${
-                body.errors && body.errors.length > 0 ? ` (${body.errors.join('; ')})` : ''
-              }. Paste it above and hit Save.`,
-        });
+        return;
       }
+      // The lookup runs in a background function (grounded search is too slow for
+      // a synchronous request). Tell the user and refresh shortly so the saved
+      // website + queued scrape surface once it lands.
+      setFeedback({
+        type: 'ok',
+        text: "Looking up this brand's official website now — if we find one it'll save and start data finding within a couple of minutes. This panel refreshes automatically.",
+      });
+      setTimeout(() => router.refresh(), 12000);
+      setTimeout(() => router.refresh(), 30000);
     } finally {
       setBusy(null);
     }
