@@ -95,97 +95,102 @@ export async function POST(request: NextRequest) {
     .update({ status: 'running', started_at: startedAt })
     .in('id', (claimed as JobRow[]).map((j) => j.id));
 
-  // 3. Run brand-agent against each job sequentially. Sequential is safe
-  //    here because each job already sleeps 2s between sources; running
-  //    them in parallel doesn't save much wall-clock and would blow our
-  //    Anthropic rate budget.
-  const summaries = [];
-  for (const job of claimed as JobRow[]) {
-    let result;
-    let errorMessage: string | null = null;
-    try {
-      result = await runBrandAgent({
-        supabase,
-        brandProfileId: job.brand_profile_id ?? undefined,
-        brandDirectoryId: job.brand_directory_id ?? undefined,
-        jobId: job.id,
-      });
-    } catch (err: unknown) {
-      errorMessage = err instanceof Error ? err.message : String(err);
-      result = {
-        sources_attempted: 0,
-        sources_succeeded: 0,
-        sources_skipped: 0,
-        findings_written: 0,
-        products_created: 0,
-        products_linked: 0,
-        documents_ingested: 0,
-        documents_skipped: 0,
-        errors: [errorMessage],
-        skip_reasons: [] as string[],
-      };
-    }
+  // 3. Run brand-agent against each job in parallel. Sequential was
+  //    safe under the old Anthropic-rate-budget concern but we migrated
+  //    to Gemini, whose quotas are an order of magnitude higher; and
+  //    each brand's bottleneck is the per-source HTTP fetch (different
+  //    domains, no shared host), so parallelising compresses the tick
+  //    from ~8 × 30s = 4 min to ~30s, well clear of the 300s timeout.
+  //    This is the biggest single throughput lever — 68 brands now
+  //    clear in ~5 ticks instead of ~50.
+  const summaries = await Promise.all(
+    (claimed as JobRow[]).map(async (job) => {
+      let result;
+      let errorMessage: string | null = null;
+      try {
+        result = await runBrandAgent({
+          supabase,
+          brandProfileId: job.brand_profile_id ?? undefined,
+          brandDirectoryId: job.brand_directory_id ?? undefined,
+          jobId: job.id,
+        });
+      } catch (err: unknown) {
+        errorMessage = err instanceof Error ? err.message : String(err);
+        result = {
+          sources_attempted: 0,
+          sources_succeeded: 0,
+          sources_skipped: 0,
+          findings_written: 0,
+          products_created: 0,
+          products_linked: 0,
+          documents_ingested: 0,
+          documents_skipped: 0,
+          errors: [errorMessage],
+          skip_reasons: [] as string[],
+        };
+      }
 
-    // Status rules:
-    //   - Brand-agent threw outright → 'error'
-    //   - Otherwise the job ran to completion. We only mark 'error' if
-    //     real source errors were collected. "All sources skipped"
-    //     (e.g. no website on file, Wikipedia 404) is 'complete' with
-    //     0 findings — the skip reasons go into error_message so the
-    //     user can see why.
-    let finalStatus: 'complete' | 'error';
-    if (errorMessage) finalStatus = 'error';
-    else if (result.errors.length > 0 && result.sources_succeeded === 0) finalStatus = 'error';
-    else finalStatus = 'complete';
+      // Status rules:
+      //   - Brand-agent threw outright → 'error'
+      //   - Otherwise the job ran to completion. We only mark 'error' if
+      //     real source errors were collected. "All sources skipped"
+      //     (e.g. no website on file, Wikipedia 404) is 'complete' with
+      //     0 findings — the skip reasons go into error_message so the
+      //     user can see why.
+      let finalStatus: 'complete' | 'error';
+      if (errorMessage) finalStatus = 'error';
+      else if (result.errors.length > 0 && result.sources_succeeded === 0) finalStatus = 'error';
+      else finalStatus = 'complete';
 
-    const messageLines: string[] = [];
-    if (result.errors.length > 0) messageLines.push(...result.errors.slice(0, 5));
-    if (result.skip_reasons.length > 0) messageLines.push(...result.skip_reasons.slice(0, 5));
-    const trimmedMessage = messageLines.join('\n');
+      const messageLines: string[] = [];
+      if (result.errors.length > 0) messageLines.push(...result.errors.slice(0, 5));
+      if (result.skip_reasons.length > 0) messageLines.push(...result.skip_reasons.slice(0, 5));
+      const trimmedMessage = messageLines.join('\n');
 
-    await supabase
-      .from('scraping_jobs')
-      .update({
+      await supabase
+        .from('scraping_jobs')
+        .update({
+          status: finalStatus,
+          completed_at: new Date().toISOString(),
+          sources_attempted: result.sources_attempted,
+          sources_succeeded: result.sources_succeeded,
+          error_message: trimmedMessage || null,
+        })
+        .eq('id', job.id);
+
+      // Bump the brand profile (listing-driven jobs) or directory entry
+      // (admin-intake jobs) so the "last activity" column in the UI
+      // reflects this scrape even if nothing was found.
+      if (job.brand_profile_id) {
+        await supabase
+          .from('brand_profiles')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', job.brand_profile_id);
+      } else if (job.brand_directory_id) {
+        await supabase
+          .from('brand_directory')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', job.brand_directory_id);
+      }
+
+      return {
+        job_id: job.id,
+        brand_profile_id: job.brand_profile_id,
+        brand_directory_id: job.brand_directory_id,
         status: finalStatus,
-        completed_at: new Date().toISOString(),
         sources_attempted: result.sources_attempted,
         sources_succeeded: result.sources_succeeded,
-        error_message: trimmedMessage || null,
-      })
-      .eq('id', job.id);
-
-    // Bump the brand profile (listing-driven jobs) or directory entry
-    // (admin-intake jobs) so the "last activity" column in the UI
-    // reflects this scrape even if nothing was found.
-    if (job.brand_profile_id) {
-      await supabase
-        .from('brand_profiles')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', job.brand_profile_id);
-    } else if (job.brand_directory_id) {
-      await supabase
-        .from('brand_directory')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', job.brand_directory_id);
-    }
-
-    summaries.push({
-      job_id: job.id,
-      brand_profile_id: job.brand_profile_id,
-      brand_directory_id: job.brand_directory_id,
-      status: finalStatus,
-      sources_attempted: result.sources_attempted,
-      sources_succeeded: result.sources_succeeded,
-      sources_skipped: result.sources_skipped,
-      findings_written: result.findings_written,
-      products_created: result.products_created,
-      products_linked: result.products_linked,
-      documents_ingested: result.documents_ingested,
-      documents_skipped: result.documents_skipped,
-      errors: result.errors,
-      skip_reasons: result.skip_reasons,
-    });
-  }
+        sources_skipped: result.sources_skipped,
+        findings_written: result.findings_written,
+        products_created: result.products_created,
+        products_linked: result.products_linked,
+        documents_ingested: result.documents_ingested,
+        documents_skipped: result.documents_skipped,
+        errors: result.errors,
+        skip_reasons: result.skip_reasons,
+      };
+    }),
+  );
 
   return NextResponse.json({
     processed: summaries.length,
