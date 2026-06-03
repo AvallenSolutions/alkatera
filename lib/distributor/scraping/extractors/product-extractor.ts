@@ -1,7 +1,10 @@
 import type { CrawledProduct } from '../sources/types';
 import { runTextPrompt } from '@/lib/ai/gemini';
 
-const MAX_TOKENS = 1500;
+// Bumped from 1500 to 8000 to leave room for Gemini 3.5 Flash thinking
+// + the full product-list JSON. See description-generator for the same
+// fix and the SDK-version context.
+const MAX_TOKENS = 8000;
 
 export interface ExtractProductsArgs {
   /** Plain-text content from a brand's product-listing or product-detail page. */

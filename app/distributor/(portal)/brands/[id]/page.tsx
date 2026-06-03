@@ -120,7 +120,7 @@ export default async function BrandOverviewPage({ params }: PageProps) {
       .is('superseded_by', null),
     supabase
       .from('brand_directory')
-      .select('sustainability_score, score_tier, completeness_score, last_synced_at, notable_facts, alkatera_org_id')
+      .select('sustainability_score, score_tier, completeness_score, last_synced_at, notable_facts, alkatera_org_id, category, country_of_origin')
       .eq('id', directoryId)
       .maybeSingle(),
     supabase
@@ -159,6 +159,8 @@ export default async function BrandOverviewPage({ params }: PageProps) {
         last_synced_at: string | null;
         notable_facts: string[] | null;
         alkatera_org_id: string | null;
+        category: string | null;
+        country_of_origin: string | null;
       }
     | null;
   const scores = directoryRow;
@@ -166,6 +168,16 @@ export default async function BrandOverviewPage({ params }: PageProps) {
 
   const populated = new Set((scrapedRows ?? []).map((r) => r.field_key));
   const missingRequired = REQUIRED_FIELDS.filter((key) => !populated.has(key));
+
+  // Display fallback chain for category + country: per-distributor
+  // listing → canonical directory → scraped hq_country finding. Lots
+  // of imports skip mapping the CSV columns, so the per-listing value
+  // is often null even when the canonical brand_directory or the
+  // brand-website scraper knows the answer.
+  const scrapedHqCountry = (scrapedRows ?? []).find((r) => r.field_key === 'hq_country')?.field_value ?? null;
+  const displayCategory = brand.category ?? directoryRow?.category ?? null;
+  const displayCountry =
+    brand.country_of_origin ?? directoryRow?.country_of_origin ?? scrapedHqCountry;
 
   // ── Score breakdown + certifications panels. Mirror the admin
   //    panel: re-run the calculator on the live findings so what's
@@ -339,11 +351,11 @@ export default async function BrandOverviewPage({ params }: PageProps) {
         </div>
         <div className="px-5 pb-5">
           <dl className="grid grid-cols-2 sm:grid-cols-4 gap-y-4 gap-x-6 text-sm">
-            <Detail icon={<Building className="h-3.5 w-3.5" />} label="Category" value={brand.category} />
+            <Detail icon={<Building className="h-3.5 w-3.5" />} label="Category" value={displayCategory} />
             <Detail
               icon={<Globe2 className="h-3.5 w-3.5" />}
               label="Country of origin"
-              value={brand.country_of_origin}
+              value={displayCountry}
             />
             <Detail
               icon={<Package className="h-3.5 w-3.5" />}

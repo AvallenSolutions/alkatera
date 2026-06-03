@@ -1,6 +1,12 @@
 import { runTextPrompt } from '@/lib/ai/gemini';
 
-const MAX_TOKENS = 600;
+// Gemini 3.5 Flash bills internal "thinking" tokens against the same
+// maxOutputTokens budget as the actual response, and @google/generative-ai
+// 0.24.x doesn't expose thinkingConfig to turn it off. A 600-token budget
+// got entirely consumed by thinking on most brand-site descriptions —
+// the stored value would be ~100 chars cut off mid-sentence. 8000 leaves
+// plenty of headroom for thinking AND the 100-250 word overview.
+const MAX_TOKENS = 8000;
 
 export interface DescriptionArgs {
   brandName: string;

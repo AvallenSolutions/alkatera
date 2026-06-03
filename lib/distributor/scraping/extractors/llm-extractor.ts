@@ -2,7 +2,12 @@ import { htmlToText } from './html-to-text';
 import { FIELD_DEFINITIONS, type FieldKey } from '../field-definitions';
 import { runTextPrompt } from '@/lib/ai/gemini';
 
-const MAX_TOKENS = 768;
+// 768 was eaten by Gemini 3.5 Flash's thinking budget on most brand
+// sites, so the structured-field JSON came back truncated and most
+// fields silently dropped. 8000 leaves headroom for thinking + the
+// full JSON payload across all TARGET_FIELDS. See description-generator
+// for the same fix and the SDK-version context.
+const MAX_TOKENS = 8000;
 
 export interface ExtractArgs {
   /** Raw HTML or plain text from the page. */
