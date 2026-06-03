@@ -180,21 +180,22 @@ export default function AdminSupplierDetailPage() {
     if (!platformSupplier) return;
     try {
       setDeleting(true);
-      const { error } = await supabase
-        .from('platform_suppliers')
-        .delete()
-        .eq('id', platformSupplier.id);
-
-      if (error) throw error;
-      toast.success('Supplier deleted successfully');
+      // Use the service-role admin route: the previous client-side delete was
+      // silently blocked by RLS, leaving "deleted" suppliers behind.
+      const { data: { session } } = await getSupabaseBrowserClient().auth.getSession();
+      const res = await fetch(`/api/admin/suppliers/${platformSupplier.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${session?.access_token ?? ''}` },
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.error || 'Failed to delete supplier');
+      }
+      toast.success('Supplier deleted');
       router.push('/admin/suppliers');
     } catch (error: any) {
       console.error('Error deleting supplier:', error);
-      if (error.code === '23503') {
-        toast.error('Cannot delete supplier that is used by organisations');
-      } else {
-        toast.error('Failed to delete supplier');
-      }
+      toast.error(error.message || 'Failed to delete supplier');
       setDeleting(false);
     }
   };
@@ -413,8 +414,10 @@ export default function AdminSupplierDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete supplier?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will delete <strong>{platformSupplier.name}</strong> from the platform directory.
-              Organisations using this supplier will lose the connection.
+              This permanently removes <strong>{platformSupplier.name}</strong>: the directory
+              entry, every organisation&apos;s link to them, and the supplier&apos;s own records
+              (profile, products, ESG assessment and invitations). Their login account is left
+              intact. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
