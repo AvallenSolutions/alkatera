@@ -17,7 +17,24 @@ import { CompanyDescription } from '@/components/distributor/brand-detail/compan
 import { VitalityCard } from '@/components/distributor/brand-detail/vitality-card';
 import { AlkateraRefreshButton } from '@/components/distributor/brand-detail/alkatera-refresh-button';
 import { REQUIRED_FIELDS } from '@/lib/distributor/scoring/completeness-calculator';
-import { FIELD_DEFINITIONS } from '@/lib/distributor/scraping/field-definitions';
+import {
+  FIELD_DEFINITIONS,
+  type FieldKey,
+} from '@/lib/distributor/scraping/field-definitions';
+import { calculateScrapedVitality } from '@/lib/distributor/scoring/scraped-vitality';
+import {
+  BrandScoreBreakdownPanel,
+  type PillarSignalsSummary,
+} from '@/components/admin/directory/brand-score-breakdown-panel';
+import {
+  BrandCertificationsPanel,
+  type CertificationFinding,
+} from '@/components/admin/directory/brand-certifications-panel';
+import {
+  BrandAwardsPanel,
+  type AwardRow,
+} from '@/components/admin/directory/brand-awards-panel';
+import { BrandNotableFactsPanel } from '@/components/admin/directory/brand-notable-facts-panel';
 import type { BrandProfile } from '@/types/distributor';
 
 export const dynamic = 'force-dynamic';
@@ -63,18 +80,23 @@ export default async function BrandOverviewPage({ params }: PageProps) {
   const directoryId = brand.brand_directory_id;
 
   const [
-    { data: scrapedRows },
+    { data: scrapedRowsFull },
     { count: skuCount },
     { count: unresolvedConflicts },
     { data: descriptionRow },
     { data: directoryScores },
     { count: listingCount },
+    { data: awardsRaw },
   ] = await Promise.all([
+    // All brand-level findings — we need value + source for the
+    // signal-count score breakdown and the certifications panel, not
+    // just the key list used for completeness.
     supabase
       .from('scraped_brand_data')
-      .select('field_key')
+      .select('field_key, field_value, field_value_numeric, source_name, source_url, confidence')
       .eq('brand_directory_id', directoryId)
-      .is('superseded_by', null),
+      .is('superseded_by', null)
+      .is('brand_sku_id', null),
     supabase
       .from('brand_skus')
       .select('id', { count: 'exact', head: true })
@@ -98,14 +120,27 @@ export default async function BrandOverviewPage({ params }: PageProps) {
       .is('superseded_by', null),
     supabase
       .from('brand_directory')
-      .select('sustainability_score, score_tier, completeness_score, last_synced_at')
+      .select('sustainability_score, score_tier, completeness_score, last_synced_at, notable_facts, alkatera_org_id')
       .eq('id', directoryId)
       .maybeSingle(),
     supabase
       .from('brand_profiles')
       .select('id', { count: 'exact', head: true })
       .eq('brand_directory_id', directoryId),
+    supabase
+      .from('brand_awards')
+      .select('id, awarding_body, award_name, medal_tier, year, source_url, notes, product_directory_id')
+      .eq('brand_directory_id', directoryId)
+      .order('year', { ascending: false, nullsFirst: false }),
   ]);
+  const scrapedRows = scrapedRowsFull as Array<{
+    field_key: string;
+    field_value: string | null;
+    field_value_numeric: number | null;
+    source_name: string;
+    source_url: string | null;
+    confidence: number;
+  }> | null;
 
   const description = pickActiveDescription(
     (descriptionRow ?? []) as Array<{
@@ -116,16 +151,115 @@ export default async function BrandOverviewPage({ params }: PageProps) {
       confidence: number;
     }>,
   );
-  const scores = (directoryScores as {
-    sustainability_score: number | null;
-    score_tier: 'leader' | 'progressing' | 'developing' | 'insufficient' | null;
-    completeness_score: number | null;
-    last_synced_at: string | null;
-  } | null) ?? null;
+  const directoryRow = directoryScores as
+    | {
+        sustainability_score: number | null;
+        score_tier: 'leader' | 'progressing' | 'developing' | 'insufficient' | null;
+        completeness_score: number | null;
+        last_synced_at: string | null;
+        notable_facts: string[] | null;
+        alkatera_org_id: string | null;
+      }
+    | null;
+  const scores = directoryRow;
   const otherListings = Math.max(0, (listingCount ?? 1) - 1);
 
-  const populated = new Set(((scrapedRows ?? []) as Array<{ field_key: string }>).map((r) => r.field_key));
+  const populated = new Set((scrapedRows ?? []).map((r) => r.field_key));
   const missingRequired = REQUIRED_FIELDS.filter((key) => !populated.has(key));
+
+  // ── Score breakdown + certifications panels. Mirror the admin
+  //    panel: re-run the calculator on the live findings so what's
+  //    shown matches the DB right now, even if the persisted score
+  //    is a few seconds stale.
+  const activeByField = pickActivePerFieldServer(scrapedRows ?? []);
+  const valuesMap = new Map<FieldKey, { field_key: FieldKey; text: string; numeric: number | null }>();
+  for (const [key, row] of Array.from(activeByField.entries())) {
+    valuesMap.set(key, {
+      field_key: key,
+      text: row.field_value ?? '',
+      numeric: row.field_value_numeric,
+    });
+  }
+  // For now the distributor portal only renders the scraped (signal-
+  // count) view. alka**tera**-customer brands use the same calculator
+  // here; we can split to the 6-pillar alka**tera** scorer when there's
+  // an obvious need.
+  const vitality = calculateScrapedVitality(valuesMap);
+  const signalsByPillar: Record<string, PillarSignalsSummary> = {
+    environment: {
+      count: vitality.signals_by_pillar.environment.count,
+      signals: vitality.signals_by_pillar.environment.signals,
+    },
+    social: {
+      count: vitality.signals_by_pillar.social.count,
+      signals: vitality.signals_by_pillar.social.signals,
+    },
+    governance: {
+      count: vitality.signals_by_pillar.governance.count,
+      signals: vitality.signals_by_pillar.governance.signals,
+    },
+  };
+
+  // ── Certifications panel: every boolean cert + leadership signal
+  //    FieldKey, with active status + source URL.
+  const CERT_KEYS: FieldKey[] = [
+    'bcorp_certified',
+    'carbon_trust_certified',
+    'iso_14001_certified',
+    'iso_50001_certified',
+    'fairtrade_certified',
+    'rainforest_alliance_certified',
+    'organic_certified',
+    'iwca_member',
+    'porto_protocol_signatory',
+    'epd_published',
+    'carbon_negative_claim',
+    'cdr_partnership',
+  ];
+  const certifications: CertificationFinding[] = CERT_KEYS.map((key) => {
+    const row = activeByField.get(key);
+    const label = FIELD_DEFINITIONS.find((f) => f.key === key)?.label ?? key;
+    let isCertified: boolean | null = null;
+    if (row) {
+      const numeric = row.field_value_numeric;
+      const text = (row.field_value ?? '').toLowerCase();
+      if (numeric === 1 || text === 'true') isCertified = true;
+      else if (numeric === 0 || text === 'false') isCertified = false;
+    }
+    return { field_key: key, label, is_certified: isCertified, source_url: row?.source_url ?? null };
+  });
+
+  // ── Awards. Hydrate product names for product-level awards so the
+  //    chip shows the SKU.
+  type AwardRowDb = {
+    id: string;
+    awarding_body: string;
+    award_name: string;
+    medal_tier: AwardRow['medal_tier'];
+    year: number | null;
+    source_url: string | null;
+    notes: string | null;
+    product_directory_id: string | null;
+  };
+  const awardRowsTyped = ((awardsRaw ?? []) as AwardRowDb[]);
+  const productIdsForAwards = Array.from(
+    new Set(awardRowsTyped.map((a) => a.product_directory_id).filter((id): id is string => !!id)),
+  );
+  const productNameById = new Map<string, string>();
+  if (productIdsForAwards.length > 0) {
+    const { data: productRows } = await supabase
+      .from('product_directory')
+      .select('id, name')
+      .in('id', productIdsForAwards);
+    for (const p of (productRows ?? []) as Array<{ id: string; name: string }>) {
+      productNameById.set(p.id, p.name);
+    }
+  }
+  const awards: AwardRow[] = awardRowsTyped.map((a) => ({
+    ...a,
+    product_name: a.product_directory_id ? productNameById.get(a.product_directory_id) ?? null : null,
+  }));
+  const notableFacts = directoryRow?.notable_facts ?? [];
 
   return (
     <div className="space-y-6">
@@ -168,6 +302,21 @@ export default async function BrandOverviewPage({ params }: PageProps) {
         tier={scores?.score_tier ?? null}
         completeness={scores?.completeness_score ?? null}
       />
+
+      <BrandScoreBreakdownPanel
+        overall={vitality.overall}
+        tier={vitality.tier}
+        byPillar={vitality.by_pillar as Record<string, number>}
+        signalsByPillar={signalsByPillar}
+        missingRequired={[]}
+        scoringMode="scraped"
+      />
+
+      <BrandNotableFactsPanel facts={notableFacts} />
+
+      <BrandCertificationsPanel brandName={brand.name} certifications={certifications} />
+
+      <BrandAwardsPanel awards={awards} />
 
       {otherListings > 0 && (
         <div className="rounded-xl border border-sky-500/30 bg-gradient-to-r from-sky-500/10 via-sky-500/5 to-transparent px-4 py-3 text-sm flex items-center gap-3">
@@ -326,6 +475,43 @@ function pickActiveDescription(
     }
   }
   return best;
+}
+
+interface FindingForActive {
+  field_key: string;
+  field_value: string | null;
+  field_value_numeric: number | null;
+  source_name: string;
+  source_url: string | null;
+  confidence: number;
+}
+
+/** Pick the active row per field. Mirrors data-merger's
+ *  pickActivePerField precedence (brand_verified > alkatera_live >
+ *  highest confidence) so the panel scores agree with the brand
+ *  Data tab + admin panel + cron-persisted score. */
+function pickActivePerFieldServer(rows: FindingForActive[]): Map<FieldKey, FindingForActive> {
+  const byField = new Map<FieldKey, FindingForActive>();
+  for (const row of rows) {
+    const key = row.field_key as FieldKey;
+    const existing = byField.get(key);
+    if (!existing) {
+      byField.set(key, row);
+      continue;
+    }
+    if (row.source_name === 'brand_verified' && existing.source_name !== 'brand_verified') {
+      byField.set(key, row);
+      continue;
+    }
+    if (existing.source_name === 'brand_verified') continue;
+    if (row.source_name === 'alkatera_live' && existing.source_name !== 'alkatera_live') {
+      byField.set(key, row);
+      continue;
+    }
+    if (existing.source_name === 'alkatera_live') continue;
+    if (row.confidence > existing.confidence) byField.set(key, row);
+  }
+  return byField;
 }
 
 function Detail({
