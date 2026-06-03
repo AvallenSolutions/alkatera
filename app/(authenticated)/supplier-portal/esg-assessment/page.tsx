@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSupplierOnboarding } from '@/lib/supplier-onboarding'
 import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider'
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -110,6 +111,21 @@ export default function SupplierEsgAssessmentPage() {
     }
     loadSupplier()
   }, [])
+
+  // Reaching the survey IS this supplier's onboarding, so mark the legacy welcome
+  // wizard complete (once) — survey invitees never see it, and it won't reappear
+  // on other pages.
+  const {
+    state: onboardingState,
+    isLoading: onboardingLoading,
+    completeOnboarding,
+  } = useSupplierOnboarding()
+  const onboardingMarkedRef = useRef(false)
+  useEffect(() => {
+    if (onboardingMarkedRef.current || onboardingLoading || onboardingState.completed) return
+    onboardingMarkedRef.current = true
+    void completeOnboarding()
+  }, [onboardingLoading, onboardingState.completed, completeOnboarding])
 
   const answers: Record<string, EsgResponse> = (assessment?.answers as Record<string, EsgResponse>) || {}
   const isSubmitted = assessment?.submitted === true

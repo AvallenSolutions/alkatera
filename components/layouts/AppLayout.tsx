@@ -16,6 +16,7 @@ import { IntegrationHealthBanner } from '@/components/layouts/IntegrationHealthB
 import { OnboardingProvider } from '@/lib/onboarding'
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard'
 import { SupplierOnboardingProvider } from '@/lib/supplier-onboarding'
+import { SupplierOnboardingWizard } from '@/components/supplier-onboarding/SupplierOnboardingWizard'
 import { RosaContextProvider } from '@/lib/rosa/RosaContextProvider'
 import { RealtimeRefreshProvider } from '@/lib/rosa/RealtimeRefreshProvider'
 import { RosaDrawer } from '@/components/rosa/RosaDrawer'
@@ -185,11 +186,12 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
 
   // Supplier users get a minimal, isolated layout — no sidebar, no subscription gate
   if (isSupplier && isSupplierRoute) {
-    // The legacy welcome wizard no longer auto-opens — supplier onboarding now
-    // happens inside the ESG survey's "About your business" step plus the
-    // dashboard profile-completeness nudge. Provider kept for state consumers.
     return (
       <SupplierOnboardingProvider>
+        {/* Welcome wizard for regular supplier invites. It self-suppresses on the
+            ESG survey route, and the survey marks onboarding complete, so survey
+            invitees go straight to the survey and the wizard never reappears. */}
+        <SupplierOnboardingWizard />
         <SupplierLayout>{children}</SupplierLayout>
       </SupplierOnboardingProvider>
     )

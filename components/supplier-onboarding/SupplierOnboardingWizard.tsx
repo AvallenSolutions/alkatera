@@ -1,6 +1,7 @@
 'use client'
 
 import Image from 'next/image'
+import { usePathname } from 'next/navigation'
 import {
   useSupplierOnboarding,
   SUPPLIER_ONBOARDING_STEPS,
@@ -33,8 +34,16 @@ const STEP_COMPONENTS: Record<string, React.ComponentType> = {
 
 export function SupplierOnboardingWizard() {
   const { state, shouldShowOnboarding, isLoading, progress, dismissOnboarding } = useSupplierOnboarding()
+  const pathname = usePathname()
 
   if (isLoading || !shouldShowOnboarding) {
+    return null
+  }
+
+  // ESG survey invitees go straight to the survey — its "About your business" step
+  // is their onboarding. Don't overlay the welcome wizard on that route (the survey
+  // page also marks onboarding complete, so it won't reappear elsewhere).
+  if (pathname?.startsWith('/supplier-portal/esg-assessment')) {
     return null
   }
 
