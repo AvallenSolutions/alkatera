@@ -111,8 +111,16 @@ export const handler = async (event: {
   console.log('[find-websites-bg] start', { org: distributorOrgId, total: candidates.length });
 
   const result = await findBrandWebsites(candidates, {
-    onProgress: (done, total) => {
-      console.log(`[find-websites-bg] looked up ${done}/${total}`);
+    onProgress: async (done, total, found) => {
+      console.log(`[find-websites-bg] looked up ${done}/${total}, ${found} found`);
+      // Write live progress onto the run row so the portal shows movement
+      // instead of sitting at 0 for the whole run.
+      if (runId) {
+        await supabase
+          .from('distributor_backfill_runs')
+          .update({ found })
+          .eq('id', runId);
+      }
     },
   });
   const updates = Array.from(result.found.entries());

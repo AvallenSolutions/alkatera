@@ -22,8 +22,8 @@ interface BackfillRun {
   message: string | null;
 }
 
-const POLL_MS = 4000;
-const MAX_POLLS = 120; // ~8 minutes
+const POLL_MS = 2500;
+const MAX_POLLS = 200; // ~8 minutes
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -130,7 +130,7 @@ export function FindWebsitesButton({ missingCount }: Props) {
           <>
             <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
             {run && run.status === 'running'
-              ? `Finding… (${run.total} brand${run.total === 1 ? '' : 's'})`
+              ? `Finding… ${run.found} of ${run.total} found`
               : 'Starting…'}
           </>
         ) : (

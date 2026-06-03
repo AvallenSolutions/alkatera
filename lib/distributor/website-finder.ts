@@ -7,11 +7,22 @@ export interface BrandWebsiteInput {
   country_of_origin?: string | null;
 }
 
-// Larger batches mean fewer (billed) grounded-search requests — ~460 brands
-// drops from ~58 grounded calls to ~24 — and higher concurrency halves the
-// wall-clock of the "finding websites" phase.
-const BATCH_SIZE = 16;
-const BATCH_CONCURRENCY = 8;
+// Each grounded-search call (Google Search tool) reliably takes 40-60s, so
+// wall-clock is dominated by how many *waves* of calls we run, not the work
+// itself. Bigger batches = fewer (billed) requests AND fewer waves; higher
+// concurrency collapses those waves. 245 brands at 24/batch = ~11 batches, all
+// in flight at once with CONCURRENCY 12 — one wave (~1 min) instead of two.
+// Retries (see findBatch) make the higher concurrency safe against rate limits.
+const BATCH_SIZE = 24;
+const BATCH_CONCURRENCY = 12;
+// Each grounded call only needs a small JSON array back; cap output low so a
+// chatty response can't stretch a call (and to keep output-token cost down).
+const GROUNDED_MAX_TOKENS = 2048;
+const MAX_ATTEMPTS = 3;
+
+function delay(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
 /**
  * Turn a model-returned URL into a canonical https:// origin, or null if it
@@ -56,13 +67,25 @@ async function findBatch(
   const lines = brands
     .map((b, i) => `${i + 1}. ${b.name}${b.country_of_origin ? ` (${b.country_of_origin})` : ''}`)
     .join('\n');
-  let text: string;
-  try {
-    text = await runGroundedSearch({ apiKey, prompt: `${PROMPT_HEAD}\n${lines}` });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('[website-finder] grounded search threw:', message);
-    return { websites: brands.map(() => null), error: `grounded_search_error: ${message}` };
+  const prompt = `${PROMPT_HEAD}\n${lines}`;
+  // Retry transient grounded-search failures (rate limits, timeouts) with a
+  // short backoff so a single hiccup doesn't silently drop a whole batch of
+  // brands to "no website" — which matters more now that we run more calls
+  // concurrently.
+  let text: string | null = null;
+  let lastError = '';
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+    try {
+      text = await runGroundedSearch({ apiKey, prompt, maxTokens: GROUNDED_MAX_TOKENS });
+      break;
+    } catch (err: unknown) {
+      lastError = err instanceof Error ? err.message : String(err);
+      console.error(`[website-finder] grounded search attempt ${attempt}/${MAX_ATTEMPTS} failed:`, lastError);
+      if (attempt < MAX_ATTEMPTS) await delay(attempt * 1500);
+    }
+  }
+  if (text === null) {
+    return { websites: brands.map(() => null), error: `grounded_search_error: ${lastError}` };
   }
   const rawSample = text.trim().slice(0, 400);
   const cleaned = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
@@ -113,7 +136,9 @@ export interface WebsiteFindResult {
 
 export async function findBrandWebsites(
   brands: BrandWebsiteInput[],
-  opts?: { onProgress?: (done: number, total: number) => Promise<void> | void },
+  opts?: {
+    onProgress?: (done: number, total: number, found: number) => Promise<void> | void;
+  },
 ): Promise<WebsiteFindResult> {
   const found = new Map<string, string>();
   const errors = new Set<string>();
@@ -142,7 +167,7 @@ export async function findBrandWebsites(
     if (result.error) errors.add(result.error);
     if (result.rawSample && samples.length < 3) samples.push(result.rawSample);
     done += batch.length;
-    await opts?.onProgress?.(done, brands.length);
+    await opts?.onProgress?.(done, brands.length, found.size);
   });
 
   return {
