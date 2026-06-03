@@ -4,6 +4,7 @@ import { getSupabasePortalServerClient } from '@/lib/supabase/portal-server-clie
 import { Button } from '@/components/ui/button';
 import { Building2, Upload } from 'lucide-react';
 import { BrandTable, type BrandTableRow } from '@/components/distributor/brand-list/brand-table';
+import { FindWebsitesButton } from '@/components/distributor/brand-list/find-websites-button';
 import type { BrandProfile } from '@/types/distributor';
 
 export const dynamic = 'force-dynamic';
@@ -173,12 +174,15 @@ export default async function DistributorBrandsPage() {
             </p>
           </div>
           {member.role !== 'viewer' && (
-            <Button
-              asChild
-              className="bg-sky-400 hover:bg-sky-300 text-black font-semibold shrink-0"
-            >
-              <Link href="/distributor/sku-lists/upload">Upload product list</Link>
-            </Button>
+            <div className="flex flex-col items-end gap-2 shrink-0">
+              <Button
+                asChild
+                className="bg-sky-400 hover:bg-sky-300 text-black font-semibold"
+              >
+                <Link href="/distributor/sku-lists/upload">Upload product list</Link>
+              </Button>
+              <FindWebsitesButton missingCount={rows.filter((r) => !r.website).length} />
+            </div>
           )}
         </div>
       </div>

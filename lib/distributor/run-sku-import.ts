@@ -169,10 +169,10 @@ export async function runSkuImport(args: {
     }>;
     if (candidates.length > 0) {
       try {
-        const websites = await findBrandWebsites(candidates, {
+        const result = await findBrandWebsites(candidates, {
           onProgress: (done, total) => reportProgress('finding_websites', done, total),
         });
-        const updates = Array.from(websites.entries());
+        const updates = Array.from(result.found.entries());
         await mapWithConcurrency(updates, 8, async ([id, website]) => {
           await supabase
             .from('brand_profiles')
@@ -181,8 +181,19 @@ export async function runSkuImport(args: {
             .eq('distributor_org_id', distributorOrgId)
             .is('website', null);
         });
-      } catch {
-        // Best-effort — a website-discovery failure must not fail the import.
+        // Surface (don't swallow) a run that found nothing — otherwise a
+        // broken website-finder leaves every brand un-scrapeable silently.
+        if (updates.length === 0 || result.errors.length > 0) {
+          console.error(
+            `[website-finder] import ${skuListId}: found ${updates.length}/${candidates.length} websites.` +
+              (result.errors.length ? ` errors=${result.errors.join('; ')}` : '') +
+              (result.samples.length ? ` sample="${result.samples[0]}"` : ''),
+          );
+        }
+      } catch (err: unknown) {
+        // A website-discovery failure must not fail the import, but it must
+        // be visible in the function logs.
+        console.error('[website-finder] import-time discovery threw:', err);
       }
     }
   }

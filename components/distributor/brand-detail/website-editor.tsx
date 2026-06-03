@@ -24,7 +24,7 @@ export function WebsiteEditor({ brandId, initialWebsite, canEdit }: Props) {
   const router = useRouter();
   const [website, setWebsite] = useState(initialWebsite ?? '');
   const [savedWebsite, setSavedWebsite] = useState(initialWebsite ?? '');
-  const [busy, setBusy] = useState<'save' | 'find' | null>(null);
+  const [busy, setBusy] = useState<'save' | 'find' | 'findweb' | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
   const dirty = website.trim() !== savedWebsite;
@@ -85,6 +85,47 @@ export function WebsiteEditor({ brandId, initialWebsite, canEdit }: Props) {
         });
       }
       router.refresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function findWebsiteAndData() {
+    setBusy('findweb');
+    setFeedback(null);
+    try {
+      const res = await fetch('/api/distributor/brands/find-websites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brand_profile_id: brandId }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        found?: number;
+        queued?: number;
+        missingApiKey?: boolean;
+        errors?: string[];
+        error?: string;
+      };
+      if (!res.ok) {
+        setFeedback({ type: 'err', text: `Could not run (${body.error ?? res.status}).` });
+        return;
+      }
+      if (body.found && body.found > 0) {
+        setFeedback({
+          type: 'ok',
+          text: 'Found a website and queued data finding. Findings appear within a few minutes.',
+        });
+        router.refresh();
+      } else {
+        setFeedback({
+          type: 'err',
+          text: body.missingApiKey
+            ? 'Website finding is not configured (GEMINI_API_KEY missing).'
+            : `Could not find an official website automatically${
+                body.errors && body.errors.length > 0 ? ` (${body.errors.join('; ')})` : ''
+              }. Paste it above and hit Save.`,
+        });
+      }
     } finally {
       setBusy(null);
     }
@@ -160,6 +201,25 @@ export function WebsiteEditor({ brandId, initialWebsite, canEdit }: Props) {
           ) : (
             <>
               <Sparkles className="h-3.5 w-3.5 mr-1.5" /> Find data now
+            </>
+          )}
+        </Button>
+      )}
+      {canEdit && !savedWebsite && !dirty && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={findWebsiteAndData}
+          disabled={busy !== null}
+          className="border-sky-500/40 text-sky-200 hover:bg-sky-500/10 hover:text-sky-100"
+        >
+          {busy === 'findweb' ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Finding website…
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-3.5 w-3.5 mr-1.5" /> Find website &amp; data
             </>
           )}
         </Button>
