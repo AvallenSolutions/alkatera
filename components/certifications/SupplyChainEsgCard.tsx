@@ -19,6 +19,7 @@ import {
   ArrowRight,
   Loader2,
   Users,
+  FileDown,
 } from 'lucide-react';
 import { SendEsgSurveyDialog } from '@/components/suppliers/SendEsgSurveyDialog';
 
@@ -74,6 +75,32 @@ export function SupplyChainEsgCard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [surveyOpen, setSurveyOpen] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  const downloadReport = async () => {
+    setDownloading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/certifications/supplier-esg-report', { method: 'POST' });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.error || 'Could not generate the report');
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'supply-chain-esg-due-diligence.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not generate the report');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const fetchCoverage = useCallback(async () => {
     try {
@@ -260,6 +287,16 @@ export function SupplyChainEsgCard() {
             <Send className="mr-2 h-4 w-4" />
             Send ESG survey
           </Button>
+          {esg.assessed > 0 && (
+            <Button variant="outline" onClick={downloadReport} disabled={downloading}>
+              {downloading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <FileDown className="mr-2 h-4 w-4" />
+              )}
+              Download due-diligence report
+            </Button>
+          )}
           <Button variant="outline" asChild>
             <Link href="/suppliers">
               Manage suppliers

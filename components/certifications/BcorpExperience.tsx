@@ -42,6 +42,7 @@ import {
   XCircle,
   Trash2,
   Loader2,
+  FileDown,
 } from 'lucide-react';
 import { GapAnalysisView } from '@/components/certifications/GapAnalysisView';
 import { ReadinessBanner } from '@/components/certifications/ReadinessBanner';
@@ -107,6 +108,35 @@ export function BcorpExperience() {
   const [newPackageFramework, setNewPackageFramework] = useState('');
   const [newPackageDescription, setNewPackageDescription] = useState('');
   const [creatingPackage, setCreatingPackage] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState(false);
+
+  // Generate the supply-chain ESG due-diligence PDF. The route also auto-links it
+  // as an evidence item, so we refetch the evidence list afterwards.
+  const handleGenerateSupplierReport = async () => {
+    setGeneratingReport(true);
+    try {
+      const res = await fetch('/api/certifications/supplier-esg-report', { method: 'POST' });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.error || 'Could not generate the report');
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'supply-chain-esg-due-diligence.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success('Report generated and added to your evidence');
+      await refetchEvidence();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not generate the report');
+    } finally {
+      setGeneratingReport(false);
+    }
+  };
 
   const bcorpFrameworkId =
     readiness?.frameworkId ||
@@ -324,17 +354,32 @@ export function BcorpExperience() {
                     {verificationSummary.pending} pending
                   </CardDescription>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={refetchEvidence}
-                  disabled={evidenceLoading}
-                >
-                  <RefreshCw
-                    className={`mr-2 h-4 w-4 ${evidenceLoading ? 'animate-spin' : ''}`}
-                  />
-                  Refresh
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleGenerateSupplierReport}
+                    disabled={generatingReport}
+                  >
+                    {generatingReport ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <FileDown className="mr-2 h-4 w-4" />
+                    )}
+                    Supply-chain ESG report
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={refetchEvidence}
+                    disabled={evidenceLoading}
+                  >
+                    <RefreshCw
+                      className={`mr-2 h-4 w-4 ${evidenceLoading ? 'animate-spin' : ''}`}
+                    />
+                    Refresh
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
