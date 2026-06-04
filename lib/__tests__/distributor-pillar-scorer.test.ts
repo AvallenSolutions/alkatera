@@ -90,16 +90,50 @@ describe('scoreFromScrapedFields — unified pillar model', () => {
     expect(r.confidence).toBe('medium');
   });
 
-  it('missing pillars redistribute rather than scoring zero', () => {
-    // Strong climate only, nothing else. Overall should track climate,
-    // not be dragged toward zero by the five empty pillars.
+  it('a single strong pillar cannot become a Leader (coverage cap)', () => {
+    // One data point — a perfect climate signal and nothing else. The
+    // pillar math still reads 100, but the headline is capped because a
+    // brand assessed on one dimension hasn't earned a tier.
     const r = scoreFromScrapedFields(
       build({ carbon_negative_claim: bool(true) }),
       ctx('Gin', 'detected'),
     );
     expect(r.by_pillar.climate).toBe(100);
-    expect(r.environment).toBe(100);
-    expect(r.overall).toBe(100);
+    expect(r.environment).toBe(100); // pillar quality is unchanged…
+    expect(r.overall).toBeLessThanOrEqual(29); // …but the headline is capped
+    expect(r.tier).toBe('insufficient');
+  });
+
+  it('comprehensive evidence outranks a single strong data point', () => {
+    // The Cincoro vs Nc'Nean case: one packaging field must not beat a
+    // brand with data across five pillars.
+    const onePoint = scoreFromScrapedFields(
+      build({ packaging_primary_material: { text: 'glass', numeric: null } }),
+      ctx('Tequila', 'detected'),
+    );
+    const comprehensive = scoreFromScrapedFields(
+      build({
+        bcorp_certified: bool(true),
+        organic_certified: bool(true),
+        renewable_energy_percentage: n(100),
+        recycled_packaging_percentage: n(100),
+        packaging_primary_material: { text: 'glass', numeric: null },
+        sustainability_report_url: { text: 'https://x.com/r', numeric: null },
+      }),
+      ctx('Whisky', 'detected'),
+    );
+    expect(comprehensive.overall).toBeGreaterThan(onePoint.overall);
+    expect(onePoint.tier).toBe('insufficient'); // 1 pillar → capped
+  });
+
+  it('Leader requires breadth: 2–3 pillars caps at progressing', () => {
+    // Two strong pillars, nothing else → can't exceed the progressing band.
+    const r = scoreFromScrapedFields(
+      build({ carbon_negative_claim: bool(true), bcorp_certified: bool(true) }),
+      ctx('Gin', 'detected'),
+    );
+    expect(r.overall).toBeLessThanOrEqual(69);
+    expect(r.tier).not.toBe('leader');
   });
 });
 

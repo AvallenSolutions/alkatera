@@ -391,11 +391,27 @@ function assemble(
     { v: byPillar.social, w: TOP_WEIGHTS.social },
     { v: byPillar.governance, w: TOP_WEIGHTS.governance },
   ]);
-  const overall = overallRaw == null ? 0 : round2(overallRaw);
 
   const pillarsWithData = (Object.values(byPillar) as Array<number | null>).filter(
     (v) => v != null,
   ).length;
+
+  // Coverage cap — leadership must be earned across the breadth of the
+  // model, not inferred from a single strong data point. Without this,
+  // a brand assessed on one pillar (e.g. only "glass packaging") has
+  // every empty pillar dropped from the mean and that lone pillar
+  // becomes the whole score — outranking a brand with comprehensive but
+  // imperfect evidence. So we ceiling the headline by how many pillars
+  // actually carry data:
+  //   ≤1 pillar  → a single data point can't establish any tier
+  //   2–3 pillars → solid, but Leader needs ≥4 of 6 dimensions
+  //   no environmental data at all → can't lead on a drinks footprint
+  let scoreCap = 100;
+  if (pillarsWithData <= 1) scoreCap = 29;
+  else if (pillarsWithData <= 3) scoreCap = 69;
+  if (environment == null) scoreCap = Math.min(scoreCap, 49);
+
+  const overall = overallRaw == null ? 0 : Math.min(round2(overallRaw), scoreCap);
 
   let confidence: ScoreConfidence;
   if (source === 'alkatera') {
