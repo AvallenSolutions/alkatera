@@ -35,6 +35,7 @@ export type FieldKey =
   // operating with renewable energy and shipping EPDs.
   | 'epd_published'
   | 'carbon_negative_claim'
+  | 'carbon_neutral_operations'
   | 'renewable_energy_percentage'
   | 'cdr_partnership'
   // Enriched reduction-target fields — capture an interim target on top
@@ -98,6 +99,8 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     description: "Brand has published at least one Environmental Product Declaration (third-party verified product LCA). A strong leadership signal: very few drinks brands have done this." },
   { key: 'carbon_negative_claim',          label: 'Carbon Negative',                   type: 'boolean', pillar: 'carbon',
     description: "Brand publicly claims carbon-negative operations (removes more CO2 than it emits) and the claim is supported by published evidence (sustainability page, EPD, third-party verification)." },
+  { key: 'carbon_neutral_operations',      label: 'Carbon Neutral / Net Zero (operations)', type: 'boolean', pillar: 'carbon',
+    description: "Brand has ALREADY achieved carbon-neutral or net-zero operational emissions (typically Scope 1 & 2), as a current verified status rather than a future target. Set true for claims like 'verified net zero carbon emissions from our operations'. Distinct from carbon_negative (removes more than it emits) and net_zero_target_year (a future commitment)." },
   { key: 'renewable_energy_percentage',    label: 'Renewable Energy %',                type: 'number',  pillar: 'carbon',
     description: "Percentage of energy from renewable sources. 100 = fully renewable." },
   { key: 'cdr_partnership',                label: 'CDR Partnership',                   type: 'boolean', pillar: 'carbon',

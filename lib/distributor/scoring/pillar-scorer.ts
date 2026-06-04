@@ -122,6 +122,7 @@ export const FIELD_TO_SCORE_PILLAR: Partial<Record<FieldKey, ScorePillar>> = {
   carbon_trust_certified: 'climate',
   epd_published: 'climate',
   carbon_negative_claim: 'climate',
+  carbon_neutral_operations: 'climate',
   renewable_energy_percentage: 'climate',
   cdr_partnership: 'climate',
   iwca_member: 'climate',
@@ -215,6 +216,14 @@ export function scoreFromScrapedFields(
   if (isTrue('carbon_negative_claim')) {
     climateBase = 100;
     add('climate', 'Carbon-negative operations');
+  } else if (isTrue('carbon_neutral_operations')) {
+    // Already operationally net zero (verified status, not a target) —
+    // a very strong climate position, just below carbon-negative. If a
+    // measured intensity is also on file, take the better of the two so
+    // a great disclosed number can still push above the floor.
+    const benchmark = getBenchmarkForCategory(ctx.category).kgCO2ePerLitre;
+    climateBase = ci != null ? Math.max(90, climateIntensitySubScore(ci / benchmark)) : 90;
+    add('climate', 'Carbon-neutral / net-zero operations');
   } else if (ci != null) {
     const benchmark = getBenchmarkForCategory(ctx.category).kgCO2ePerLitre;
     climateBase = climateIntensitySubScore(ci / benchmark);

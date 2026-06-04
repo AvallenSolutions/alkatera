@@ -150,6 +150,18 @@ export const FIELD_LABELS: FieldLabel[] = [
     evidenceDocumentType: 'certification',
   },
   {
+    key: 'carbon_neutral_operations',
+    label: 'Carbon neutral / net zero operations',
+    helpText: 'You have already achieved carbon-neutral or net-zero operational emissions (usually Scope 1 and 2) — a current, verified status, not a future target.',
+    inputType: 'boolean',
+    scope: 'brand',
+    pillar: 'carbon',
+    required: false,
+    acceptsEvidence: true,
+    evidenceLabel: 'Your net-zero / carbon-neutral verification (PDF)',
+    evidenceDocumentType: 'certification',
+  },
+  {
     key: 'carbon_trust_certified',
     label: 'Carbon Trust certified',
     helpText: 'Carbon Trust has independently verified your product or brand carbon footprint.',

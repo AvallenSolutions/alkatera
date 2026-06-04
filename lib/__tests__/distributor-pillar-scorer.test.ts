@@ -63,6 +63,29 @@ describe('scoreFromScrapedFields — unified pillar model', () => {
     expect(r.confidence).toBe('high'); // ≥4 pillars + category resolved
   });
 
+  it('credits verified carbon-neutral / net-zero operations on climate', () => {
+    // Nc'Nean case: "verified net zero (scope 1&2)" with no carbon-negative
+    // claim and no future target year. Should score climate strongly.
+    const r = scoreFromScrapedFields(
+      build({
+        carbon_neutral_operations: bool(true),
+        organic_certified: bool(true),
+        renewable_energy_percentage: n(100),
+        recycled_packaging_percentage: n(100),
+        bcorp_certified: bool(true),
+      }),
+      ctx('Whisky', 'detected'),
+    );
+    expect(r.by_pillar.climate).toBeGreaterThanOrEqual(90); // net-zero floor
+    // Lower than a carbon-negative brand's 100.
+    const negative = scoreFromScrapedFields(
+      build({ carbon_negative_claim: bool(true) }),
+      ctx('Whisky', 'detected'),
+    );
+    expect(negative.by_pillar.climate).toBe(100);
+    expect(r.by_pillar.climate!).toBeLessThan(negative.by_pillar.climate!);
+  });
+
   it('category adjustment: same intensity diverges by category', () => {
     const fields = build({ carbon_intensity_kgco2e_per_litre: n(2.0) });
     const asWhisky = scoreFromScrapedFields(fields, ctx('Whisky', 'declared'));

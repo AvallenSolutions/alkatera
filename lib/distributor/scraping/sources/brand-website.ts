@@ -30,43 +30,48 @@ import type {
  *      Claude Haiku LLM pass over the combined corpus. One LLM call per
  *      brand instead of one per page keeps the bill predictable.
  */
+// Crawl budget is small (MAX_CRAWL_PAGES) and we walk this list in order,
+// so the HIGHEST-signal pages must come first. Drinks brands split roughly
+// 50/50 between root-level paths and Shopify /pages/* paths, so we
+// interleave both conventions for each theme rather than listing all root
+// paths first (which previously buried /pages/sustainability ~18th and
+// let the budget run out before a Shopify brand's real content was read —
+// e.g. Nc'Nean's "verified net zero" claim lives on /pages/sustainability).
 const CRAWL_PATHS = [
   // Homepage is fetched separately, listed here so the dedupe set is
   // complete and we never re-fetch it.
   '/',
-  // Sustainability-themed
+  // Sustainability-themed — highest value, both conventions first.
   '/sustainability',
+  '/pages/sustainability',
   '/our-sustainability',
-  '/responsibility',
-  '/about/sustainability',
+  '/pages/our-sustainability',
+  '/sustainability-report',
+  '/pages/sustainability-report',
   '/impact',
-  '/esg',
-  '/environment',
+  '/pages/impact',
   '/our-impact',
-  // About / story — where B Corp and similar credentials usually live
+  '/pages/our-impact',
+  '/responsibility',
+  '/pages/responsibility',
+  '/esg',
+  '/pages/esg',
+  '/environment',
+  '/pages/environment',
+  '/about/sustainability',
+  '/pages/carbon-negative',
+  '/pages/carbon-neutral',
+  // About / story — where B Corp and similar credentials usually live.
   '/about',
+  '/pages/about',
   '/about-us',
+  '/pages/about-us',
   '/our-story',
   '/story',
   '/values',
   '/our-values',
   '/mission',
   '/who-we-are',
-  // Shopify-themed: drinks brands on Shopify usually host these under
-  // /pages/* rather than at the root. Two Drifters' EPD library lives
-  // at /pages/sustainability-report — without these we miss the docs.
-  '/pages/sustainability',
-  '/pages/sustainability-report',
-  '/pages/our-sustainability',
-  '/pages/responsibility',
-  '/pages/impact',
-  '/pages/our-impact',
-  '/pages/esg',
-  '/pages/carbon-negative',
-  '/pages/carbon-neutral',
-  '/pages/environment',
-  '/pages/about',
-  '/pages/about-us',
 ];
 
 // Product / shop / range paths. Crawled separately from the corpus
@@ -151,6 +156,7 @@ const TARGET_FIELDS: FieldKey[] = [
   // (Nc'nean carbon neutral, Avallen B Corp with published LCAs).
   'epd_published',
   'carbon_negative_claim',
+  'carbon_neutral_operations',
   'renewable_energy_percentage',
   'cdr_partnership',
   'iwca_member',

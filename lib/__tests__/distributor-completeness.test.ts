@@ -46,6 +46,7 @@ describe('calculateCompleteness', () => {
       'porto_protocol_signatory',
       'epd_published',
       'carbon_negative_claim',
+      'carbon_neutral_operations',
       'renewable_energy_percentage',
       'cdr_partnership',
     ]);
