@@ -133,7 +133,25 @@ const ENV_SIGNALS: Signal[] = [
   { id: 'epd_published',
     label: 'Environmental Product Declaration published',
     source_field_keys: ['epd_published', 'sustainability_report_url'],
-    test: (v) => isTrue(v.get('epd_published')) },
+    test: (v) => {
+      if (isTrue(v.get('epd_published'))) return true;
+      // Fallback: if the brand has a sustainability_report_url whose
+      // URL pattern strongly suggests an EPD / LCA document (the
+      // filename or path contains "lca", "epd", or
+      // "environmental product declaration"), credit the signal
+      // even when the explicit boolean wasn't set. Stops a brand
+      // from being undercounted just because the document processor
+      // failed to ingest their PDF or Gemini didn't see fit to set
+      // the boolean during the LLM extraction pass.
+      const url = v.get('sustainability_report_url');
+      if (!url?.text) return false;
+      const t = url.text.toLowerCase();
+      return (
+        /\blca\b/i.test(t) ||
+        /\bepd\b/i.test(t) ||
+        /environmental[- ]product[- ]declaration/i.test(t)
+      );
+    } },
   { id: 'renewable_energy',
     label: '100% renewable energy',
     source_field_keys: ['renewable_energy_percentage'],

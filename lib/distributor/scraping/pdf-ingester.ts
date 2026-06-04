@@ -159,17 +159,25 @@ async function downloadPdf(url: string): Promise<Buffer> {
       throw new Error(`http_${res.status}`);
     }
     const contentType = (res.headers.get('content-type') ?? '').toLowerCase();
-    const looksPdf =
-      contentType.includes('pdf') || contentType.includes('octet-stream') || !contentType;
-    if (!looksPdf) {
-      throw new Error(`unexpected_content_type:${contentType}`);
-    }
+    // Trust the magic bytes over the header: Dropbox serves Avallen's
+    // LCA with `application/binary`, some self-hosted servers send no
+    // Content-Type at all, and a few send `application/x-pdf`. All
+    // are real PDFs at the byte level. Reject on the explicit
+    // negatives only — text/html (preview / login page) or unknown
+    // formats without the magic-byte fallback rescue.
     const arrayBuf = await res.arrayBuffer();
     const buf = Buffer.from(arrayBuf);
-    // Belt-and-braces: when the Content-Type isn't set explicitly,
-    // sniff the magic bytes. A PDF file starts with %PDF-.
-    if (!contentType && !buf.subarray(0, 5).toString('ascii').startsWith('%PDF-')) {
-      throw new Error('magic_bytes_not_pdf');
+    const startsWithPdfMagic = buf.subarray(0, 5).toString('ascii').startsWith('%PDF-');
+    if (startsWithPdfMagic) return buf;
+    // Past this point we don't have the PDF magic bytes — fall back
+    // to the Content-Type signal. Only accept if the header is
+    // unambiguous PDF; everything else (HTML, JSON, plain text, etc.)
+    // is a preview / wall page / login redirect.
+    const looksPdf =
+      contentType.includes('pdf') ||
+      contentType.includes('octet-stream');
+    if (!looksPdf) {
+      throw new Error(`unexpected_content_type:${contentType || 'unknown'}`);
     }
     return buf;
   } finally {
