@@ -259,6 +259,63 @@ export async function processDocument(args: ProcessArgs): Promise<ProcessResult>
     }
   }
 
+  // Step 2.5: auto-light the epd_published signal.
+  //
+  // The scoring model has `epd_published` as a high-weight Environment
+  // signal (a brand that publishes EPDs is doing materially harder
+  // sustainability work than one that just publishes Scope 1/2/3
+  // numbers), but until now nothing wrote that boolean. The crawler
+  // would discover and ingest EPD PDFs via SUSTAINABILITY_PDF_KEYWORDS,
+  // the doc processor would extract their fields, and the signal would
+  // STAY DARK — because the boolean had no setter. When a submission
+  // typed 'lca_report' completes processing successfully we now set
+  // epd_published=true on the brand directly, so the signal-count
+  // model can see it.
+  //
+  // Confidence 0.95 (above scraped 0.55-0.85, below alkatera_live
+  // 0.99 and brand_verified 1.0). source_url points at the document
+  // path so the breakdown panel can link through to the evidence.
+  if (sub.document_type === 'lca_report' && written > 0) {
+    const { data: existingEpd } = await supabase
+      .from('scraped_brand_data')
+      .select('id, field_value')
+      .eq('brand_directory_id', sub.brand_directory_id)
+      .eq('field_key', 'epd_published')
+      .is('brand_sku_id', null)
+      .is('superseded_by', null)
+      .order('confidence', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const alreadyTrue =
+      existingEpd && (existingEpd as { field_value: string | null }).field_value === 'true';
+    if (!alreadyTrue) {
+      const { data: insertedEpd } = await supabase
+        .from('scraped_brand_data')
+        .insert({
+          brand_directory_id: sub.brand_directory_id,
+          brand_sku_id: null,
+          scraping_job_id: null,
+          field_key: 'epd_published',
+          field_value: 'true',
+          field_value_numeric: 1,
+          source_name: 'document_processor',
+          source_url: sub.file_path,
+          confidence: 0.95,
+          extraction_method: 'llm_extract',
+        })
+        .select('id')
+        .single();
+      if (insertedEpd && existingEpd) {
+        // Supersede the prior false / missing-evidence row so the
+        // merger picks the new positive one.
+        await supabase
+          .from('scraped_brand_data')
+          .update({ superseded_by: (insertedEpd as { id: string }).id })
+          .eq('id', (existingEpd as { id: string }).id);
+      }
+    }
+  }
+
   // Step 3: stamp the submission with a summary so the brand-detail
   // page can show "5 fields extracted" without a join. extracted_data
   // is intentionally small — it's a summary, not the full payload.

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Building2, Users } from 'lucide-react';
 import { getSupabaseAdminClient } from '@/lib/supabase/api-client';
+import { MatchNowButton } from '@/components/admin/distributors/match-now-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -60,6 +61,8 @@ export default async function AdminDistributorsPage() {
           Every distributor organisation on the platform, with portfolio + activity summary.
         </p>
       </div>
+
+      <MatchNowButton />
 
       {list.length === 0 ? (
         <div className="rounded-xl border border-border/60 bg-card/40 p-10 text-center text-sm">

@@ -1,7 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { coerceFieldValue, type FieldKey } from '../scraping/field-definitions';
 import { recalculateCompleteness } from '../scoring/recalculate';
-import { tierForScore } from '../scoring/vitality-calculator';
 
 /**
  * Sync an alka**tera** brand's live sustainability data into the
@@ -450,16 +449,25 @@ export async function syncAlkateraDataForBrand(
     skipped.push('recalc_after_sync');
   }
 
-  // 7. Override sustainability_score AND completeness_score with the
-  //    authoritative alka**tera** ESG composite. The Rosa hub computes
-  //    a far richer score from facility data, anomalies, B Corp
-  //    evidence, targets and more — cached daily into
-  //    esg_score_snapshots by the /api/vitality/composite handler.
+  // 7. Persist the latest alka**tera** ESG composite as supplementary
+  //    context, NOT as the headline. Previously this block
+  //    unconditionally overwrote sustainability_score + score_tier
+  //    with snap.composite, which meant a brand whose platform data
+  //    was thin (composite = 8, say) would see its distributor-visible
+  //    headline drop even when open-web evidence + the field-level
+  //    merge had already produced a much higher vitality (e.g. 75)
+  //    via calculateVitality(). That punished brands for joining
+  //    alka**tera** before fully populating their profile.
   //
-  //    For completeness we derive a distributor-meaningful signal:
-  //    the fraction of E/S/G sub-pillars that have non-zero data in
-  //    the latest snapshot breakdown. A brand with 8/9 sub-pillars
-  //    populated shows 89%; a brand with only climate data shows ~11%.
+  //    The fix: leave sustainability_score + score_tier as recalculate
+  //    wrote them at step 6 (already incorporates the merged scraped +
+  //    alkatera_live fields, and calculateVitality already folds the
+  //    composite in as a heavy Governance signal). Only record the
+  //    raw composite on brand_directory.platform_esg_composite for
+  //    audit / breakdown display. Completeness_score derived from
+  //    sub-pillar breakdown stays — that's a coverage metric, not a
+  //    quality metric, and is genuinely more meaningful than the
+  //    field-count completeness when the brand is on platform.
   try {
     const { data: snapshot } = await supabase
       .from('esg_score_snapshots')
@@ -480,12 +488,9 @@ export async function syncAlkateraDataForBrand(
     } | null;
 
     if (snap) {
-      const update: Record<string, unknown> = {
-        score_updated_at: new Date().toISOString(),
-      };
+      const update: Record<string, unknown> = {};
       if (snap.composite != null && Number.isFinite(snap.composite)) {
-        update.sustainability_score = snap.composite;
-        update.score_tier = tierForScore(snap.composite);
+        update.platform_esg_composite = snap.composite;
       }
       if (snap.breakdown) {
         const pillarsWithData = countPopulatedSubPillars(snap.breakdown);
@@ -495,7 +500,7 @@ export async function syncAlkateraDataForBrand(
             100;
         }
       }
-      if (Object.keys(update).length > 1) {
+      if (Object.keys(update).length > 0) {
         await supabase
           .from('brand_directory')
           .update(update)
@@ -503,7 +508,7 @@ export async function syncAlkateraDataForBrand(
       }
     }
   } catch {
-    skipped.push('alkatera_vitality_override');
+    skipped.push('platform_composite_persist');
   }
 
   return {

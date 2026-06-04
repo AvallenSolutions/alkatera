@@ -134,13 +134,33 @@ export async function recalculateCompleteness(
     }
   }
 
-  // Dispatch by scoring mode. Both scorers are credit-based now, so
-  // the difference is structural: alka**tera** uses 6 pillars + verified-
-  // source weight bonus + ESG composite, scraped uses 3 pillars.
-  const vitality: { overall: number; tier: ScoreTier } =
+  // Score by the friendlier of the two calculators — monotone-merge
+  // guarantee. Joining alka**tera** must NEVER drop a brand's
+  // distributor-visible score; it can only raise or hold.
+  //
+  // The two calculators measure the same evidence differently:
+  //   - scraped (3-pillar signal-count): a small number of leadership
+  //     signals firing is enough to clear Leader. Friendly to brands
+  //     with great certifications but sparse quantitative data.
+  //   - alka**tera** (6-pillar credit-based): rewards platform-
+  //     verified rows with a 1.25× weight bonus and folds in the
+  //     ESG composite as a heavy Governance signal. Better when the
+  //     platform has comprehensive coverage.
+  //
+  // We run BOTH for alka**tera**-linked brands and take the higher.
+  // For unlinked brands the alkatera calculator is meaningless
+  // (no composite, no verified-source bonus to capture) so we just
+  // use scraped. Either way the brand can never be punished for the
+  // alka**tera** path producing a lower number on partial data.
+  const scrapedVitality = calculateScrapedVitality(valuesForVitality);
+  const alkateraVitality =
     scoringMode === 'alkatera'
       ? calculateVitality(valuesForVitality, { esgComposite })
-      : calculateScrapedVitality(valuesForVitality);
+      : null;
+  const vitality: { overall: number; tier: ScoreTier } =
+    alkateraVitality && alkateraVitality.overall > scrapedVitality.overall
+      ? alkateraVitality
+      : scrapedVitality;
 
   const snapshotRow: Record<string, unknown> = {
     brand_directory_id: brandDirectoryId,

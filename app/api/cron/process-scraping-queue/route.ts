@@ -57,9 +57,14 @@ export async function POST(request: NextRequest) {
   //    300s ceiling and the scrape-pipeline has no rollback step, so
   //    any job that was claimed and marked 'running' by a previous
   //    invocation that timed out gets stranded forever. Reset anything
-  //    'running' for > 5 min so the next claim can pick it back up. 5
-  //    min is well past the longest healthy job (~30s).
-  const staleCutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  //    'running' for > 2 min so the next claim can pick it back up.
+  //    Threshold tightened from 5 → 2 min: Netlify schedules the cron
+  //    on a 5-min cadence (with retries clustering tighter), so a 5-min
+  //    threshold meant each tick could see "recently-stuck" jobs as
+  //    "not stale yet" and leave them stranded for a full extra cycle.
+  //    Healthy jobs finish in 30-60s (and run in parallel within a
+  //    tick post-832cf3a5), so 2 min still can't race a live worker.
+  const staleCutoff = new Date(Date.now() - 2 * 60 * 1000).toISOString();
   const { data: recovered } = await supabase
     .from('scraping_jobs')
     .update({ status: 'queued', started_at: null })

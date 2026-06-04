@@ -63,6 +63,18 @@ Source: ${args.sourceName}
 Fields to extract (use exactly these JSON keys, only include keys you found explicit evidence for):
 ${fieldList}
 
+Evidence guide for the trickier signals (only use when you can quote supporting text — never guess):
+
+- "epd_published": true if the page links to OR describes a published Environmental Product Declaration, Life Cycle Assessment, EPD, LCA, ISO 14025, or ISO 14044 document for the brand's product(s). The presence of a downloadable EPD/LCA PDF, or an explicit reference to having one, is enough.
+- "carbon_negative_claim": true if the brand states they are carbon negative, climate positive, carbon-neutral net-negative, or similar. The claim needs to be the brand's own positioning (not aspirational language about a future target).
+- "renewable_energy_percentage": a number 0-100. Look for "100% renewable", "all-electric distillery powered by solar/wind", "X% of energy from renewables". If the page says fully renewable / 100% renewable / all renewable without a number, use 100.
+- "cdr_partnership": true if the brand has a named partnership with a permanent carbon-removal provider (Climeworks, Carbfix, Charm Industrial, Heirloom, Running Tide, Lithos, Equatic, or similar). Carbon-offset / forestry / reforestation purchases do NOT count.
+- "sbt_status": "committed" if SBTi committed, "targets_set" if approved targets, "none" if explicitly disclaims, otherwise omit.
+- "carbon_negative_claim" + "carbon_intensity_kgco2e_per_litre": if the page quotes a per-litre carbon intensity ≤ 0, fire both.
+- "iwca_member": true ONLY for wine brands that name themselves as International Wineries for Climate Action members. Distillers / brewers should omit.
+- "porto_protocol_signatory": same — wine industry only.
+- "bcorp_certified": true if the page mentions B Corp / B Corporation / Certified B Corporation, including B Impact score, B Corp Month, etc.
+
 Page text:
 """
 ${text}

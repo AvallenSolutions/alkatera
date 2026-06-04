@@ -141,6 +141,16 @@ const TARGET_FIELDS: FieldKey[] = [
   'hq_country',
   'founding_year',
   'contact_email',
+  // Leadership signals (added 2026-06): the scoring model rewards
+  // these heavily but the extractor wasn't asking Gemini to find
+  // them, so they never landed even for famously-leading brands
+  // (Nc'nean carbon neutral, Avallen B Corp with published LCAs).
+  'epd_published',
+  'carbon_negative_claim',
+  'renewable_energy_percentage',
+  'cdr_partnership',
+  'iwca_member',
+  'porto_protocol_signatory',
 ];
 
 export const brandWebsiteSource: SourceScraper = {
