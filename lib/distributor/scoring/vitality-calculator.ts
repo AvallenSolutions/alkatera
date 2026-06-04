@@ -17,6 +17,11 @@ export interface FieldValue {
    *  fields where the source is platform-verified (alkatera_live or
    *  brand_verified). Omit when not known. */
   source?: string | null;
+  /** Optional source URL — passed through from
+   *  scraped_brand_data.source_url so the scraped vitality calculator
+   *  can attribute each fired signal to a clickable evidence link in
+   *  the breakdown panel. */
+  source_url?: string | null;
 }
 
 /** Sources that earn the alka**tera** "verified" weight multiplier. */

@@ -169,6 +169,8 @@ export default async function AdminBrandDetailPage({
       field_key: key,
       text: row.field_value ?? '',
       numeric: row.field_value_numeric,
+      source_url: row.source_url,
+      source: row.source_name,
     });
   }
   // Two-tier scoring: derive the mode from the alka**tera** link so

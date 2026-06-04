@@ -7,6 +7,7 @@ import { extractBrandsFromProductNames } from './brand-extractor';
 import { findBrandWebsites } from './website-finder';
 import { mapWithConcurrency } from './concurrent-map';
 import { queueBrandsForScraping } from './scraping/agent-dispatcher';
+import { autoEnrichBrands } from './enrichment/auto-enrich';
 import type { ColumnMapping, SkuListFileType } from '@/types/distributor';
 
 /**
@@ -20,6 +21,13 @@ export interface SkuImportResult {
   row_count: number;
   scraping_queued: number;
   scraping_skipped_directory_hit: number;
+  /** Phase B: deep-enrich auto-queue counters. enrich_queued is how
+   *  many brands got a fresh Gemini-grounded-search job dispatched;
+   *  the two skip counts cover the throttling cases (already in
+   *  flight, or done within the 30-day refresh window). */
+  enrich_queued: number;
+  enrich_skipped_recent: number;
+  enrich_skipped_in_flight: number;
   warnings: string[];
   directory_matches: Array<Record<string, unknown>>;
   product_directory_stats: { resolved: number; matched_existing: number; created_new: number };
@@ -233,6 +241,34 @@ export async function runSkuImport(args: {
     }
   }
 
+  // Phase B: auto-queue deep-enrich for every brand_directory entry
+  // touched by this upload. The fast 3-source scrape captures the
+  // public-website surface; deep-enrich (Gemini grounded search +
+  // landing-page PDF crawl + authoritative-source lookups) captures
+  // the leadership signals (carbon-negative claims, EPDs published,
+  // CDR partnerships, etc.) that move brands into Leader tier.
+  // Best-effort like scraping; never blocks import.
+  let enrich_queued = 0;
+  let enrich_skipped_recent = 0;
+  let enrich_skipped_in_flight = 0;
+  const touchedDirectoryIds = Array.from(
+    new Set(result.directory_matches.map((m) => m.directory_id)),
+  );
+  if (touchedDirectoryIds.length > 0) {
+    try {
+      const enrichResult = await autoEnrichBrands(
+        supabase,
+        touchedDirectoryIds,
+        'sku_import',
+      );
+      enrich_queued = enrichResult.queued.length;
+      enrich_skipped_recent = enrichResult.skipped_recent.length;
+      enrich_skipped_in_flight = enrichResult.skipped_in_flight.length;
+    } catch {
+      // swallow — Inngest not configured in some envs.
+    }
+  }
+
   // Enrich each directory match with the signals the wizard surfaces
   // ("already has data on file", "on alkatera"). Single query, small N.
   const directoryIds = Array.from(new Set(result.directory_matches.map((m) => m.directory_id)));
@@ -272,6 +308,9 @@ export async function runSkuImport(args: {
     row_count: parsed.rows.length,
     scraping_queued,
     scraping_skipped_directory_hit,
+    enrich_queued,
+    enrich_skipped_recent,
+    enrich_skipped_in_flight,
     warnings: result.errors,
     directory_matches: enrichedMatches,
     product_directory_stats: result.product_directory_stats,

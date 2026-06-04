@@ -1,10 +1,19 @@
-import { Info, CheckCircle2 } from 'lucide-react';
+import { Info, CheckCircle2, ExternalLink } from 'lucide-react';
 
 export type ScoringMode = 'scraped' | 'alkatera';
 
+export interface PillarSignalEvidence {
+  id: string;
+  label: string;
+  source_url: string | null;
+}
+
 export interface PillarSignalsSummary {
   count: number;
-  signals: string[];
+  /** Either the new SignalEvidence-shaped records (preferred) or
+   *  legacy string labels (older callers that haven't been updated).
+   *  The renderer normalises both shapes. */
+  signals: PillarSignalEvidence[] | string[];
 }
 
 interface Props {
@@ -132,15 +141,34 @@ export function BrandScoreBreakdownPanel({
                 </div>
                 {pillarSignals && pillarSignals.signals.length > 0 && (
                   <ul className="pt-1 space-y-0.5">
-                    {pillarSignals.signals.map((s) => (
-                      <li
-                        key={s}
-                        className="flex items-center gap-1.5 text-[11px] text-emerald-200"
-                      >
-                        <CheckCircle2 className="h-3 w-3 shrink-0" />
-                        <span>{s}</span>
-                      </li>
-                    ))}
+                    {pillarSignals.signals.map((s, idx) => {
+                      // Normalise legacy string shape to evidence shape
+                      // so older callers keep rendering.
+                      const evidence: PillarSignalEvidence =
+                        typeof s === 'string'
+                          ? { id: `${idx}`, label: s, source_url: null }
+                          : s;
+                      return (
+                        <li
+                          key={evidence.id ?? idx}
+                          className="flex items-center gap-1.5 text-[11px] text-emerald-200"
+                        >
+                          <CheckCircle2 className="h-3 w-3 shrink-0" />
+                          <span>{evidence.label}</span>
+                          {evidence.source_url && (
+                            <a
+                              href={evidence.source_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center text-muted-foreground hover:text-emerald-200 transition-colors"
+                              title="Open source evidence in a new tab"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </li>

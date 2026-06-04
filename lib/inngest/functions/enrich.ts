@@ -2,6 +2,7 @@ import 'server-only';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { inngest } from '../client';
 import { deepEnrichBrand } from '@/lib/admin/sourcing/deep-enrich';
+import { persistEnriched } from '@/lib/distributor/enrichment/persist';
 
 /**
  * Deep-enrich, on Inngest. Replaces the
@@ -112,7 +113,7 @@ export const enrichBrandRun = inngest.createFunction(
       return result;
     });
 
-    await step.run('persist-enriched', async () => {
+    const stashed = await step.run('stash-enriched-payload', async () => {
       if (
         enriched.error &&
         enriched.products.length === 0 &&
@@ -129,7 +130,7 @@ export const enrichBrandRun = inngest.createFunction(
             updated_at: new Date().toISOString(),
           })
           .eq('id', job_id);
-        return { result: 'error' };
+        return { stage: 'errored' as const };
       }
       await supabase
         .from('deep_enrich_jobs')
@@ -140,9 +141,42 @@ export const enrichBrandRun = inngest.createFunction(
           updated_at: new Date().toISOString(),
         })
         .eq('id', job_id);
-      return { result: 'searched' };
+      return { stage: 'searched' as const };
     });
 
-    return { job_id, brand_directory_id };
+    if (stashed.stage === 'errored') {
+      return { job_id, brand_directory_id, persisted: false };
+    }
+
+    // Persistence step. Runs in the same Inngest function (rather than
+    // waiting for an admin poll on the GET route) so auto-enrich
+    // completes end-to-end without anyone watching. The admin GET
+    // route still owns the manual-button persistence path.
+    await step.run('persist-findings', async () => {
+      // Atomic claim: don't double-persist if an admin happens to
+      // poll the GET route at the same moment.
+      const { data: claimed } = await supabase
+        .from('deep_enrich_jobs')
+        .update({ status: 'ingesting', phase_message: 'Persisting findings…' })
+        .eq('id', job_id)
+        .eq('status', 'searched')
+        .select('id');
+      if (!Array.isArray(claimed) || claimed.length !== 1) {
+        return { skipped: 'claimed_by_another_handler' };
+      }
+      const result = await persistEnriched(supabase, brand_directory_id, enriched);
+      await supabase
+        .from('deep_enrich_jobs')
+        .update({
+          status: 'done',
+          phase_message: null,
+          result,
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', job_id);
+      return { persisted: true };
+    });
+
+    return { job_id, brand_directory_id, persisted: true };
   },
 );
