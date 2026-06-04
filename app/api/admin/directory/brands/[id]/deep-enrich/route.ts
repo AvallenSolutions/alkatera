@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createHmac } from 'crypto';
 import { requireAlkateraAdmin } from '@/lib/admin/auth';
+import { inngest } from '@/lib/inngest/client';
 
 /**
  * POST /api/admin/directory/brands/[id]/deep-enrich
@@ -49,8 +50,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
   }
   const jobId = (job as { id: string }).id;
 
-  // Fire the background fn. Local dev / missing secret → inline floating
-  // fallback so the polling flow still completes.
+  // Prefer Inngest in production; fall back to the legacy HMAC →
+  // Netlify-background path when INNGEST_EVENT_KEY isn't set yet, and
+  // to a floating inline run when neither is configured (local dev).
+  const inngestKey = process.env.INNGEST_EVENT_KEY;
   const hmacSecret = process.env.INTERNAL_JOB_HMAC_SECRET;
   const baseUrl =
     process.env.URL ||
@@ -59,7 +62,18 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const target = `${baseUrl}/.netlify/functions/deep-enrich-background`;
 
   let triggered = false;
-  if (hmacSecret) {
+  if (inngestKey) {
+    try {
+      await inngest.send({
+        name: 'enrich/brand.run',
+        data: { brand_directory_id: params.id, job_id: jobId },
+      });
+      triggered = true;
+    } catch {
+      triggered = false;
+    }
+  }
+  if (!triggered && hmacSecret) {
     triggered = await triggerBackground(target, hmacSecret, jobId).catch(() => false);
   }
   if (!triggered) {

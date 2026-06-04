@@ -1,46 +1,30 @@
 import { schedule } from '@netlify/functions';
 
 /**
- * Distributor portal — daily alkatera brand-matching sweep
+ * Distributor portal — daily alka**tera** brand-matching tick
  * (Netlify Scheduled Function).
  *
- * Runs every day at 03:00 UTC, just after the pulse snapshot cron at
- * 02:00 UTC so it doesn't fight for compute budget. Hits
- * /api/cron/run-brand-matching, which walks unlinked brand_profiles +
- * re-syncs tiers for already-linked ones.
+ * Runs every day at 03:00 UTC. Dispatches an Inngest event
+ * `matching/sweep.run` which the `matchingSweepRun` function consumes
+ * (walks unlinked brand_profiles + re-syncs already-linked ones).
  *
- * Required env vars: URL (auto), CRON_SECRET.
+ * Previously this hit the synchronous /api/cron/run-brand-matching
+ * route which was 300s-ceiling-bound. Now actual processing happens
+ * on Inngest with step-level retries and no timeout pressure.
+ *
+ * Required env vars: INNGEST_EVENT_KEY + INNGEST_SIGNING_KEY.
+ *
+ * The /api/cron/run-brand-matching + /api/admin/run-brand-matching
+ * routes still exist as manual-trigger fallbacks.
  */
 export const handler = schedule('0 3 * * *', async () => {
-  const baseUrl = process.env.URL;
-  const cronSecret = process.env.CRON_SECRET;
-
-  if (!baseUrl) {
-    return { statusCode: 500, body: JSON.stringify({ error: 'URL env var missing' }) };
-  }
-  if (!cronSecret) {
-    return { statusCode: 500, body: JSON.stringify({ error: 'CRON_SECRET env var missing' }) };
-  }
-
-  const target = `${baseUrl}/api/cron/run-brand-matching`;
   try {
-    const res = await fetch(target, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${cronSecret}`,
-        'Content-Type': 'application/json',
-      },
-    });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      console.error('Brand matching cron failed:', res.status, body);
-    } else {
-      console.log('Brand matching cron success:', body);
-    }
-    return { statusCode: res.status, body: JSON.stringify(body) };
+    const { inngest } = await import('../../lib/inngest/client');
+    await inngest.send({ name: 'matching/sweep.run', data: {} });
+    return { statusCode: 200, body: 'ok' };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error('Brand matching cron threw:', message);
-    return { statusCode: 500, body: JSON.stringify({ error: message }) };
+    console.error('[run-brand-matching] inngest.send threw:', message);
+    return { statusCode: 500, body: message };
   }
 });

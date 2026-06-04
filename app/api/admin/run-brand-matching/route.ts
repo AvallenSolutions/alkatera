@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAlkateraAdmin } from '@/lib/admin/auth';
 import { attemptAutoMatch, syncBrandTier } from '@/lib/distributor/integration/linker';
 import { syncAlkateraDataForBrand } from '@/lib/distributor/integration/alkatera-sync';
+import { inngest } from '@/lib/inngest/client';
 
 /**
  * Admin-triggered alka**tera** brand matching sweep.
@@ -37,6 +38,28 @@ interface RunSummary {
 export async function POST() {
   const auth = await requireAlkateraAdmin();
   if (!auth.ok) return auth.response;
+
+  // Prefer Inngest in production: fire-and-forget event, the
+  // matchingSweepRun function takes it from here. The UI just shows
+  // "queued" — the actual scanned/linked/synced counts will surface
+  // in the Inngest dashboard. When INNGEST_EVENT_KEY isn't set we
+  // fall back to the inline sweep below (works on local dev).
+  const inngestKey = process.env.INNGEST_EVENT_KEY;
+  if (inngestKey) {
+    try {
+      await inngest.send({ name: 'matching/sweep.run', data: {} });
+      return NextResponse.json({
+        queued: true,
+        message: 'Dispatched to Inngest; see dashboard for run results.',
+      });
+    } catch (err: unknown) {
+      // Fall through to inline run.
+      console.error(
+        '[admin-run-brand-matching] inngest.send failed, running inline:',
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
 
   const supabase = auth.service;
   const errors: string[] = [];

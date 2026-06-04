@@ -9,8 +9,15 @@ import type { InngestFunction } from 'inngest';
 
 // Add new functions here as they're built.
 import { scrapingQueueTick, scrapingBrandRun } from './scraping';
+import { enrichBrandRun } from './enrich';
+import { documentsQueueTick, documentsProcessOne } from './documents';
+import { matchingSweepRun } from './matching';
 
 export const allFunctions: InngestFunction.Any[] = [
   scrapingQueueTick,
   scrapingBrandRun,
+  enrichBrandRun,
+  documentsQueueTick,
+  documentsProcessOne,
+  matchingSweepRun,
 ];
