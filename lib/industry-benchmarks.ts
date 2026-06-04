@@ -255,6 +255,18 @@ const CATEGORY_TO_GROUP: Record<string, string> = {
 };
 
 /**
+ * Every specific product category we recognise, sorted. Exposed so the
+ * distributor category-detector can constrain the LLM to a closed set
+ * (and validate its answer) rather than inventing free-text categories.
+ */
+export const KNOWN_PRODUCT_CATEGORIES: string[] = Object.keys(CATEGORY_TO_GROUP).sort();
+
+/** True when `category` is a recognised specific product category. */
+export function isKnownCategory(category: string | null | undefined): boolean {
+  return !!category && Object.prototype.hasOwnProperty.call(CATEGORY_TO_GROUP, category);
+}
+
+/**
  * Get the industry benchmark for a given product category.
  * Returns category-specific override if available, otherwise group benchmark, otherwise default.
  */

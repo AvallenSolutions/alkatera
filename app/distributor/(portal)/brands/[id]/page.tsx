@@ -21,7 +21,11 @@ import {
   FIELD_DEFINITIONS,
   type FieldKey,
 } from '@/lib/distributor/scraping/field-definitions';
-import { calculateScrapedVitality } from '@/lib/distributor/scoring/scraped-vitality';
+import {
+  scoreFromScrapedFields,
+  type FieldValue,
+  type CategoryConfidence,
+} from '@/lib/distributor/scoring/pillar-scorer';
 import {
   BrandScoreBreakdownPanel,
   type PillarSignalsSummary,
@@ -87,6 +91,7 @@ export default async function BrandOverviewPage({ params }: PageProps) {
     { data: directoryScores },
     { count: listingCount },
     { data: awardsRaw },
+    { data: pillarSnapshot },
   ] = await Promise.all([
     // All brand-level findings — we need value + source for the
     // signal-count score breakdown and the certifications panel, not
@@ -120,7 +125,11 @@ export default async function BrandOverviewPage({ params }: PageProps) {
       .is('superseded_by', null),
     supabase
       .from('brand_directory')
-      .select('sustainability_score, score_tier, completeness_score, last_synced_at, notable_facts, alkatera_org_id, category, country_of_origin')
+      .select(
+        'sustainability_score, score_tier, completeness_score, last_synced_at, ' +
+          'notable_facts, alkatera_org_id, category, country_of_origin, ' +
+          'score_confidence, category_source',
+      )
       .eq('id', directoryId)
       .maybeSingle(),
     supabase
@@ -132,6 +141,15 @@ export default async function BrandOverviewPage({ params }: PageProps) {
       .select('id, awarding_body, award_name, medal_tier, year, source_url, notes, product_directory_id')
       .eq('brand_directory_id', directoryId)
       .order('year', { ascending: false, nullsFirst: false }),
+    supabase
+      .from('brand_completeness_snapshots')
+      .select(
+        'climate_score, nature_score, water_score, circularity_score, social_score, governance_score',
+      )
+      .eq('brand_directory_id', directoryId)
+      .order('calculated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
   const scrapedRows = scrapedRowsFull as Array<{
     field_key: string;
@@ -161,9 +179,19 @@ export default async function BrandOverviewPage({ params }: PageProps) {
         alkatera_org_id: string | null;
         category: string | null;
         country_of_origin: string | null;
+        score_confidence: 'high' | 'medium' | 'low' | null;
+        category_source: 'declared' | 'detected' | 'default' | null;
       }
     | null;
   const scores = directoryRow;
+  const pillars = (pillarSnapshot as {
+    climate_score: number | null;
+    nature_score: number | null;
+    water_score: number | null;
+    circularity_score: number | null;
+    social_score: number | null;
+    governance_score: number | null;
+  } | null) ?? null;
   const otherListings = Math.max(0, (listingCount ?? 1) - 1);
 
   const populated = new Set((scrapedRows ?? []).map((r) => r.field_key));
@@ -184,33 +212,35 @@ export default async function BrandOverviewPage({ params }: PageProps) {
   //    shown matches the DB right now, even if the persisted score
   //    is a few seconds stale.
   const activeByField = pickActivePerFieldServer(scrapedRows ?? []);
-  const valuesMap = new Map<FieldKey, { field_key: FieldKey; text: string; numeric: number | null }>();
+  const valuesMap = new Map<FieldKey, FieldValue>();
   for (const [key, row] of Array.from(activeByField.entries())) {
     valuesMap.set(key, {
       field_key: key,
       text: row.field_value ?? '',
       numeric: row.field_value_numeric,
+      source: row.source_name,
+      source_url: row.source_url,
     });
   }
-  // For now the distributor portal only renders the scraped (signal-
-  // count) view. alka**tera**-customer brands use the same calculator
-  // here; we can split to the 6-pillar alka**tera** scorer when there's
-  // an obvious need.
-  const vitality = calculateScrapedVitality(valuesMap);
-  const signalsByPillar: Record<string, PillarSignalsSummary> = {
-    environment: {
-      count: vitality.signals_by_pillar.environment.count,
-      signals: vitality.signals_by_pillar.environment.signals,
-    },
-    social: {
-      count: vitality.signals_by_pillar.social.count,
-      signals: vitality.signals_by_pillar.social.signals,
-    },
-    governance: {
-      count: vitality.signals_by_pillar.governance.count,
-      signals: vitality.signals_by_pillar.governance.signals,
-    },
-  };
+  // On-page breakdown re-runs the unified scorer on the current findings
+  // so it reflects the DB right now. The persisted headline (the card
+  // above) is owned by recalculateCompleteness, which additionally maps
+  // an alka**tera**-linked brand's real composite across; the field-level
+  // estimate here is the scraped view.
+  const scoreCategoryConfidence: CategoryConfidence =
+    scores?.category_source === 'declared' || scores?.category_source === 'detected'
+      ? scores.category_source
+      : 'industry_default';
+  const vitality = scoreFromScrapedFields(valuesMap, {
+    category: scores?.category ?? null,
+    categoryConfidence: scoreCategoryConfidence,
+  });
+  const signalsByPillar: Record<string, PillarSignalsSummary> = Object.fromEntries(
+    Object.entries(vitality.evidence.signals).map(([k, sigs]) => [
+      k,
+      { count: sigs.length, signals: sigs },
+    ]),
+  );
 
   // ── Certifications panel: every boolean cert + leadership signal
   //    FieldKey, with active status + source URL.
@@ -313,15 +343,31 @@ export default async function BrandOverviewPage({ params }: PageProps) {
         vitality={scores?.sustainability_score ?? null}
         tier={scores?.score_tier ?? null}
         completeness={scores?.completeness_score ?? null}
+        confidence={scores?.score_confidence ?? null}
+        category={scores?.category ?? null}
+        categorySource={scores?.category_source ?? null}
+        pillars={
+          pillars
+            ? {
+                climate: pillars.climate_score,
+                nature: pillars.nature_score,
+                water: pillars.water_score,
+                circularity: pillars.circularity_score,
+                social: pillars.social_score,
+                governance: pillars.governance_score,
+              }
+            : null
+        }
       />
 
       <BrandScoreBreakdownPanel
         overall={vitality.overall}
         tier={vitality.tier}
-        byPillar={vitality.by_pillar as Record<string, number>}
+        byPillar={vitality.by_pillar as unknown as Record<string, number | null>}
         signalsByPillar={signalsByPillar}
         missingRequired={[]}
-        scoringMode="scraped"
+        source={vitality.evidence.source}
+        confidence={vitality.confidence}
       />
 
       <BrandNotableFactsPanel facts={notableFacts} />

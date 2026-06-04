@@ -1,11 +1,37 @@
-import { Sparkles } from 'lucide-react';
+import { Sparkles, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+
+export interface PillarScores {
+  climate: number | null;
+  nature: number | null;
+  water: number | null;
+  circularity: number | null;
+  social: number | null;
+  governance: number | null;
+}
 
 interface Props {
   vitality: number | null;
   tier: 'leader' | 'progressing' | 'developing' | 'insufficient' | null;
   completeness: number | null;
+  /** How much real data backs the score. */
+  confidence?: 'high' | 'medium' | 'low' | null;
+  /** Resolved product category, if known. */
+  category?: string | null;
+  /** How the category was resolved. */
+  categorySource?: 'declared' | 'detected' | 'default' | null;
+  /** Per-pillar 0–100 scores for the breakdown bars. */
+  pillars?: PillarScores | null;
 }
+
+const PILLAR_ORDER: Array<{ key: keyof PillarScores; label: string }> = [
+  { key: 'climate', label: 'Climate' },
+  { key: 'water', label: 'Water' },
+  { key: 'circularity', label: 'Circularity' },
+  { key: 'nature', label: 'Nature' },
+  { key: 'social', label: 'Social' },
+  { key: 'governance', label: 'Governance' },
+];
 
 /**
  * Vitality is the headline sustainability-performance score for a brand,
@@ -16,8 +42,18 @@ interface Props {
  * uploaded documents looks bad here even if it isn't *missing*
  * anything from the completeness perspective.
  */
-export function VitalityCard({ vitality, tier, completeness }: Props) {
+export function VitalityCard({
+  vitality,
+  tier,
+  completeness,
+  confidence,
+  category,
+  categorySource,
+  pillars,
+}: Props) {
   const score = vitality ?? 0;
+  const hasPillars =
+    !!pillars && PILLAR_ORDER.some(({ key }) => pillars[key] != null);
   const colour = colourForTier(tier);
   const radius = 50;
   const circumference = 2 * Math.PI * radius;
@@ -81,6 +117,7 @@ export function VitalityCard({ vitality, tier, completeness }: Props) {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {renderTierBadge(tier)}
+            {vitality != null && confidence && renderConfidenceBadge(confidence)}
             {completeness != null && (
               <Badge
                 variant="outline"
@@ -93,9 +130,81 @@ export function VitalityCard({ vitality, tier, completeness }: Props) {
           <p className="text-sm text-muted-foreground leading-relaxed">
             {explanationForTier(tier, vitality)}
           </p>
+          {vitality != null && (category || categorySource === 'default') && (
+            <p className="text-[11px] text-muted-foreground">
+              Category:{' '}
+              <span className="font-medium text-foreground">{category ?? 'Unknown'}</span>{' '}
+              <span className="text-muted-foreground/70">({categoryLabel(categorySource)})</span>
+            </p>
+          )}
         </div>
       </div>
+
+      {hasPillars && (
+        <div className="mt-5 pt-5 border-t border-border/40 grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3">
+          {PILLAR_ORDER.map(({ key, label }) => (
+            <PillarBar key={key} label={label} value={pillars![key]} />
+          ))}
+        </div>
+      )}
     </div>
+  );
+}
+
+function PillarBar({ label, value }: { label: string; value: number | null }) {
+  const hasData = value != null;
+  const score = Math.max(0, Math.min(100, Math.round(value ?? 0)));
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-[11px]">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="tabular-nums font-medium">{hasData ? score : '—'}</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-background/60 overflow-hidden">
+        <div
+          className={`h-full transition-[width] duration-500 ${
+            !hasData
+              ? 'bg-muted'
+              : score >= 70
+                ? 'bg-emerald-400'
+                : score >= 50
+                  ? 'bg-sky-400'
+                  : score >= 30
+                    ? 'bg-amber-300'
+                    : 'bg-destructive/70'
+          }`}
+          style={{ width: `${hasData ? score : 0}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function categoryLabel(source: Props['categorySource']): string {
+  switch (source) {
+    case 'declared':
+      return 'provided';
+    case 'detected':
+      return 'detected';
+    default:
+      return 'industry average';
+  }
+}
+
+function renderConfidenceBadge(confidence: 'high' | 'medium' | 'low'): React.ReactNode {
+  const cfg = {
+    high: { label: 'High confidence', className: 'text-emerald-300 border-emerald-500/40 bg-emerald-500/15' },
+    medium: { label: 'Medium confidence', className: 'text-amber-300 border-amber-500/40 bg-amber-500/15' },
+    low: { label: 'Low confidence', className: 'text-muted-foreground border-muted' },
+  }[confidence];
+  return (
+    <Badge
+      variant="outline"
+      className={`text-[10px] uppercase tracking-wider font-semibold inline-flex items-center gap-1 ${cfg.className}`}
+    >
+      <ShieldCheck className="h-3 w-3" />
+      {cfg.label}
+    </Badge>
   );
 }
 

@@ -26,8 +26,12 @@ import {
 import { BrandNotableFactsPanel } from '@/components/admin/directory/brand-notable-facts-panel';
 import { BrandScoreBreakdownPanel } from '@/components/admin/directory/brand-score-breakdown-panel';
 import { FIELD_DEFINITIONS, type FieldKey } from '@/lib/distributor/scraping/field-definitions';
-import { calculateVitality, type FieldValue } from '@/lib/distributor/scoring/vitality-calculator';
-import { calculateScrapedVitality } from '@/lib/distributor/scoring/scraped-vitality';
+import {
+  scoreFromScrapedFields,
+  scoreFromAlkateraComposite,
+  type FieldValue,
+} from '@/lib/distributor/scoring/pillar-scorer';
+import type { VitalityComposite } from '@/lib/vitality/composite';
 import { EsgBreakdownPanel, type EsgSnapshot } from '@/components/shared/esg-breakdown-panel';
 
 export const dynamic = 'force-dynamic';
@@ -111,7 +115,7 @@ export default async function AdminBrandDetailPage({
     brand.alkatera_org_id
       ? supabase
           .from('esg_score_snapshots')
-          .select('composite, environmental, social, governance, breakdown')
+          .select('composite, environmental, social, governance, breakdown, composite_json')
           .eq('organization_id', brand.alkatera_org_id)
           .order('snapshot_date', { ascending: false })
           .limit(1)
@@ -173,26 +177,35 @@ export default async function AdminBrandDetailPage({
       source: row.source_name,
     });
   }
-  // Two-tier scoring: derive the mode from the alka**tera** link so
-  // this page works whether or not the scoring_mode migration has been
-  // applied yet. recalculate.ts persists the same value for cron-side
-  // consumers; the on-page breakdown re-runs the calculator locally
-  // so the two stay in sync regardless of column presence.
+  // Unified scoring: alka**tera**-linked brands map their real on-platform
+  // composite across; everyone else estimates from the local findings.
+  // The on-page breakdown re-runs the scorer locally so it reflects
+  // what's in the DB right now, not the last persisted recalc tick.
   const scoringMode: 'scraped' | 'alkatera' = brand.alkatera_org_id ? 'alkatera' : 'scraped';
-  const vitality =
-    scoringMode === 'alkatera'
-      ? calculateVitality(valuesMap)
-      : calculateScrapedVitality(valuesMap);
+  const compositeJson = (snapshot as { composite_json?: unknown } | null)?.composite_json;
+  let parsedComposite: VitalityComposite | null = null;
+  if (scoringMode === 'alkatera' && compositeJson) {
+    try {
+      parsedComposite = (typeof compositeJson === 'string'
+        ? JSON.parse(compositeJson)
+        : compositeJson) as VitalityComposite;
+    } catch {
+      parsedComposite = null;
+    }
+  }
+  const vitality = parsedComposite
+    ? scoreFromAlkateraComposite(parsedComposite)
+    : scoreFromScrapedFields(valuesMap, {
+        category: brand.category,
+        categoryConfidence: brand.category ? 'declared' : 'industry_default',
+      });
   const REQUIRED_FIELDS_DISPLAY = [
     'carbon_intensity_kgco2e_per_litre',
     'water_usage_litres_per_litre',
     'packaging_primary_material',
     'sustainability_report_url',
   ];
-  const missingRequired =
-    scoringMode === 'alkatera'
-      ? REQUIRED_FIELDS_DISPLAY.filter((k) => !valuesMap.has(k as FieldKey))
-      : [];
+  const missingRequired = REQUIRED_FIELDS_DISPLAY.filter((k) => !valuesMap.has(k as FieldKey));
 
   // ── Certifications panel input. Every boolean cert / leadership-
   //    signal FieldKey, with its active status + source URL (if any).
@@ -389,18 +402,16 @@ export default async function AdminBrandDetailPage({
       <BrandScoreBreakdownPanel
         overall={vitality.overall}
         tier={vitality.tier}
-        byPillar={vitality.by_pillar as Record<string, number>}
-        signalsByPillar={
-          scoringMode === 'scraped' && 'signals_by_pillar' in vitality
-            ? Object.fromEntries(
-                Object.entries(
-                  (vitality as { signals_by_pillar: Record<string, { count: number; signals: string[] }> }).signals_by_pillar,
-                ).map(([k, v]) => [k, { count: v.count, signals: v.signals }]),
-              )
-            : undefined
-        }
+        byPillar={vitality.by_pillar as unknown as Record<string, number | null>}
+        signalsByPillar={Object.fromEntries(
+          Object.entries(vitality.evidence.signals).map(([k, sigs]) => [
+            k,
+            { count: (sigs as string[]).length, signals: sigs as string[] },
+          ]),
+        )}
         missingRequired={missingRequired}
-        scoringMode={scoringMode}
+        source={vitality.evidence.source}
+        confidence={vitality.confidence}
       />
 
       <BrandNotableFactsPanel facts={notableFacts} />

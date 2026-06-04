@@ -36,7 +36,16 @@ export type FieldKey =
   | 'epd_published'
   | 'carbon_negative_claim'
   | 'renewable_energy_percentage'
-  | 'cdr_partnership';
+  | 'cdr_partnership'
+  // Enriched reduction-target fields — capture an interim target on top
+  // of the headline net-zero year so the scorer can grade a target on
+  // *ambition* (how fast) AND *credibility* (is it SBTi-validated, is
+  // there a real baseline) rather than a single far-off year. Mirrors
+  // the shape of the main platform's transition_plans.
+  | 'interim_reduction_percentage'
+  | 'interim_target_year'
+  | 'target_baseline_year'
+  | 'sbti_validated';
 
 export type FieldType = 'boolean' | 'number' | 'year' | 'string' | 'longtext';
 export type Pillar = 'carbon' | 'water' | 'packaging' | 'agriculture' | 'governance' | 'corporate';
@@ -93,6 +102,14 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     description: "Percentage of energy from renewable sources. 100 = fully renewable." },
   { key: 'cdr_partnership',                label: 'CDR Partnership',                   type: 'boolean', pillar: 'carbon',
     description: "Active partnership with a permanent carbon-removal provider (Climeworks, Carbfix, Heirloom, Charm, etc.) — direct-air-capture or mineralisation, not offsetting." },
+  { key: 'interim_reduction_percentage',   label: 'Interim Reduction Target (%)',      type: 'number',  pillar: 'carbon',
+    description: "Published interim emissions-reduction target as a percentage, e.g. 50 for a '50% reduction by 2030' pledge. The headline number of a near-term decarbonisation target, not the net-zero end date." },
+  { key: 'interim_target_year',            label: 'Interim Target Year',               type: 'year',    pillar: 'carbon',
+    description: "The year the interim reduction target is set against, e.g. 2030 for '50% by 2030'." },
+  { key: 'target_baseline_year',           label: 'Target Baseline Year',              type: 'year',    pillar: 'carbon',
+    description: "The baseline year the reduction target is measured from, e.g. 2019. Evidence of a real, accountable plan rather than a bare claim." },
+  { key: 'sbti_validated',                 label: 'SBTi Validated',                    type: 'boolean', pillar: 'carbon',
+    description: "The brand's emissions targets have been independently validated (not just committed) by the Science Based Targets initiative. The strongest credibility signal a reduction target can carry." },
 ];
 
 const FIELD_BY_KEY = new Map<FieldKey, FieldDefinition>(FIELD_DEFINITIONS.map((f) => [f.key, f]));

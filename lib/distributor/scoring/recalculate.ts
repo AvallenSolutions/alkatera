@@ -1,7 +1,15 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { calculateCompleteness } from './completeness-calculator';
-import { calculateVitality, type FieldValue, type ScoreTier } from './vitality-calculator';
-import { calculateScrapedVitality } from './scraped-vitality';
+import {
+  scoreFromScrapedFields,
+  scoreFromAlkateraComposite,
+  type FieldValue,
+  type UnifiedScoreResult,
+  type CategoryConfidence,
+} from './pillar-scorer';
+import { detectBrandCategory } from './category-detector';
+import { isKnownCategory } from '@/lib/industry-benchmarks';
+import type { VitalityComposite } from '@/lib/vitality/composite';
 import type { FieldKey, Pillar } from '../scraping/field-definitions';
 
 const PILLAR_COLUMN: Record<Pillar, string> = {
@@ -47,13 +55,16 @@ export async function recalculateCompleteness(
 ): Promise<RecalcResult | null> {
   const { data: directory } = await supabase
     .from('brand_directory')
-    .select('id, alkatera_org_id')
+    .select('id, alkatera_org_id, name, category')
     .eq('id', brandDirectoryId)
     .maybeSingle();
   if (!directory) return null;
-  const scoringMode = (directory as { alkatera_org_id: string | null }).alkatera_org_id
-    ? 'alkatera'
-    : 'scraped';
+  const dir = directory as {
+    alkatera_org_id: string | null;
+    name: string | null;
+    category: string | null;
+  };
+  const scoringMode: 'alkatera' | 'scraped' = dir.alkatera_org_id ? 'alkatera' : 'scraped';
 
   // Fetch the full active row set so we can grade values, not just count keys.
   const { data: rows } = await supabase
@@ -110,96 +121,208 @@ export async function recalculateCompleteness(
       source: row.source_name,
     });
   }
-  // alka**tera** brands also feed the latest ESG composite into the
-  // scorer when present — captures alka**tera**'s on-platform pillar
-  // calculation the field-level model can't fully replicate.
-  let esgComposite: number | null = null;
+
+  // Resolve the brand's product category — declared → SKU-derived →
+  // AI-detected → industry default. The category drives the
+  // category-adjusted carbon / water benchmarks in the scorer. Only
+  // spend an LLM detection call on scraped brands; alka**tera** brands
+  // score from their on-platform composite, where category is irrelevant.
+  const cat = await resolveCategory(
+    supabase,
+    brandDirectoryId,
+    dir.category,
+    dir.name ?? '',
+    valuesForVitality,
+    scoringMode === 'scraped',
+  );
+
+  // Dispatch onto the single unified scale. alka**tera**-linked brands
+  // pass their real on-platform per-pillar scores through; everything
+  // else is estimated from the scraped / brand-verified fields. Both
+  // land on the same pillars, scale and tier bands.
+  let result: UnifiedScoreResult;
   if (scoringMode === 'alkatera') {
-    const { data: directoryWithOrg } = await supabase
-      .from('brand_directory')
-      .select('alkatera_org_id')
-      .eq('id', brandDirectoryId)
-      .maybeSingle();
-    const orgId = (directoryWithOrg as { alkatera_org_id: string | null } | null)?.alkatera_org_id;
-    if (orgId) {
-      const { data: latestSnapshot } = await supabase
-        .from('esg_score_snapshots')
-        .select('composite')
-        .eq('organization_id', orgId)
-        .order('snapshot_date', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      const composite = (latestSnapshot as { composite: number | null } | null)?.composite;
-      if (typeof composite === 'number' && Number.isFinite(composite)) esgComposite = composite;
-    }
+    const composite = await loadAlkateraComposite(supabase, dir.alkatera_org_id as string);
+    result = composite
+      ? scoreFromAlkateraComposite(composite)
+      : scoreFromScrapedFields(valuesForVitality, {
+          category: cat.category,
+          categoryConfidence: cat.confidence,
+        });
+  } else {
+    result = scoreFromScrapedFields(valuesForVitality, {
+      category: cat.category,
+      categoryConfidence: cat.confidence,
+    });
   }
 
-  // Score by the friendlier of the two calculators — monotone-merge
-  // guarantee. Joining alka**tera** must NEVER drop a brand's
-  // distributor-visible score; it can only raise or hold.
-  //
-  // The two calculators measure the same evidence differently:
-  //   - scraped (3-pillar signal-count): a small number of leadership
-  //     signals firing is enough to clear Leader. Friendly to brands
-  //     with great certifications but sparse quantitative data.
-  //   - alka**tera** (6-pillar credit-based): rewards platform-
-  //     verified rows with a 1.25× weight bonus and folds in the
-  //     ESG composite as a heavy Governance signal. Better when the
-  //     platform has comprehensive coverage.
-  //
-  // We run BOTH for alka**tera**-linked brands and take the higher.
-  // For unlinked brands the alkatera calculator is meaningless
-  // (no composite, no verified-source bonus to capture) so we just
-  // use scraped. Either way the brand can never be punished for the
-  // alka**tera** path producing a lower number on partial data.
-  const scrapedVitality = calculateScrapedVitality(valuesForVitality);
-  const alkateraVitality =
-    scoringMode === 'alkatera'
-      ? calculateVitality(valuesForVitality, { esgComposite })
-      : null;
-  const vitality: { overall: number; tier: ScoreTier } =
-    alkateraVitality && alkateraVitality.overall > scrapedVitality.overall
-      ? alkateraVitality
-      : scrapedVitality;
+  // A brand with zero scraped findings has no estimable score (the
+  // pillar scorer floors to 0/insufficient) — persist null so the UI
+  // shows a dash, not a misleading floor. An alka**tera** brand scored
+  // from its composite keeps its score even with few local findings.
+  const scoredFromComposite = result.evidence.source === 'alkatera';
+  const persistScore =
+    completeness.fields_populated > 0 || (scoredFromComposite && result.overall > 0);
 
   const snapshotRow: Record<string, unknown> = {
     brand_directory_id: brandDirectoryId,
     completeness_score: completeness.overall,
     fields_populated: completeness.fields_populated,
     fields_total: completeness.fields_total,
-    vitality_score: vitality.overall,
-    vitality_tier: vitality.tier,
+    vitality_score: persistScore ? result.overall : null,
+    vitality_tier: persistScore ? result.tier : null,
+    climate_score: result.by_pillar.climate,
+    nature_score: result.by_pillar.nature,
+    water_score: result.by_pillar.water,
+    circularity_score: result.by_pillar.circularity,
+    social_score: result.by_pillar.social,
+    governance_score: result.by_pillar.governance,
+    environment_score: result.environment,
+    score_confidence: persistScore ? result.confidence : null,
+    category_confidence: cat.confidence,
   };
+  // Legacy per-pillar *completeness* columns (the 6-pillar coverage
+  // model) stay on the snapshot, untouched, alongside the new vitality
+  // pillar scores.
   for (const [pillar, column] of Object.entries(PILLAR_COLUMN)) {
     const value = completeness.by_pillar[pillar as Pillar];
     if (typeof value === 'number') snapshotRow[column] = value;
   }
   await supabase.from('brand_completeness_snapshots').insert(snapshotRow);
 
-  // If the brand has zero findings, the vitality calculator still
-  // returns a non-zero "missing fields" floor (~8/100) which renders
-  // as a misleading score on the Discover page. Treat "no findings"
-  // as "no score" — null — so consumers fall back to a dash.
-  const hasAnyFindings = completeness.fields_populated > 0;
-  await supabase
-    .from('brand_directory')
-    .update({
-      completeness_score: completeness.overall,
-      sustainability_score: hasAnyFindings ? vitality.overall : null,
-      score_tier: hasAnyFindings ? vitality.tier : null,
-      scoring_mode: scoringMode,
-      score_updated_at: new Date().toISOString(),
-    })
-    .eq('id', brandDirectoryId);
+  const update: Record<string, unknown> = {
+    completeness_score: completeness.overall,
+    sustainability_score: persistScore ? result.overall : null,
+    score_tier: persistScore ? result.tier : null,
+    scoring_mode: scoringMode,
+    score_confidence: persistScore ? result.confidence : null,
+    category_source: cat.dbSource,
+    score_updated_at: new Date().toISOString(),
+  };
+  if (cat.category) update.category = cat.category;
+  await supabase.from('brand_directory').update(update).eq('id', brandDirectoryId);
 
   return {
     brand_directory_id: brandDirectoryId,
     completeness: completeness.overall,
-    vitality: vitality.overall,
-    vitality_tier: vitality.tier,
+    vitality: result.overall,
+    vitality_tier: result.tier,
     fields_populated: completeness.fields_populated,
     fields_total: completeness.fields_total,
   };
+}
+
+/**
+ * Load the brand's most recent on-platform ESG composite (the full
+ * VitalityComposite with per-pillar breakdown) from esg_score_snapshots.
+ * Returns null when there's no snapshot or no composite_json (older
+ * snapshots stored only the scalar composite).
+ */
+async function loadAlkateraComposite(
+  supabase: SupabaseClient,
+  orgId: string,
+): Promise<VitalityComposite | null> {
+  const { data } = await supabase
+    .from('esg_score_snapshots')
+    .select('composite_json')
+    .eq('organization_id', orgId)
+    .order('snapshot_date', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const raw = (data as { composite_json: unknown } | null)?.composite_json;
+  if (!raw) return null;
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (parsed && typeof parsed === 'object' && 'e' in (parsed as Record<string, unknown>)) {
+      return parsed as VitalityComposite;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+interface ResolvedCategory {
+  category: string | null;
+  /** Value to persist on brand_directory.category_source. */
+  dbSource: 'declared' | 'detected' | 'default';
+  /** Value the scorer + snapshot use. */
+  confidence: CategoryConfidence;
+}
+
+/**
+ * Resolve a brand's product category, cheapest source first:
+ *   1. declared on the directory entry,
+ *   2. declared on any of its distributor listings / SKUs,
+ *   3. AI-detected from the brand description + SKU names,
+ *   4. industry default (no category).
+ */
+async function resolveCategory(
+  supabase: SupabaseClient,
+  brandDirectoryId: string,
+  declared: string | null,
+  brandName: string,
+  values: Map<FieldKey, FieldValue>,
+  allowDetect: boolean,
+): Promise<ResolvedCategory> {
+  if (declared && declared.trim()) {
+    return { category: declared.trim(), dbSource: 'declared', confidence: 'declared' };
+  }
+
+  const { data: profiles } = await supabase
+    .from('brand_profiles')
+    .select('id, category')
+    .eq('brand_directory_id', brandDirectoryId);
+  const profileRows = (profiles ?? []) as Array<{ id: string; category: string | null }>;
+  const fromProfiles = mostCommonKnown(profileRows.map((p) => p.category));
+  if (fromProfiles) return { category: fromProfiles, dbSource: 'declared', confidence: 'declared' };
+
+  let skuNames: string[] = [];
+  const profileIds = profileRows.map((p) => p.id);
+  if (profileIds.length > 0) {
+    const { data: skus } = await supabase
+      .from('brand_skus')
+      .select('category, product_name')
+      .in('brand_profile_id', profileIds);
+    const skuRows = (skus ?? []) as Array<{ category: string | null; product_name: string | null }>;
+    const fromSkus = mostCommonKnown(skuRows.map((s) => s.category));
+    if (fromSkus) return { category: fromSkus, dbSource: 'declared', confidence: 'declared' };
+    skuNames = skuRows
+      .map((s) => s.product_name)
+      .filter((n): n is string => !!n && n.trim().length > 0)
+      .slice(0, 20);
+  }
+
+  if (allowDetect) {
+    const description = values.get('company_description' as FieldKey)?.text ?? null;
+    try {
+      const det = await detectBrandCategory({ brandName, description, skuNames });
+      if (det.category) {
+        return { category: det.category, dbSource: 'detected', confidence: 'detected' };
+      }
+    } catch {
+      /* detection is best-effort — fall through to default */
+    }
+  }
+
+  return { category: null, dbSource: 'default', confidence: 'industry_default' };
+}
+
+/** Most common recognised category in a list, or null if none recognised. */
+function mostCommonKnown(cats: Array<string | null>): string | null {
+  const counts = new Map<string, number>();
+  for (const c of cats) {
+    if (c && isKnownCategory(c)) counts.set(c, (counts.get(c) ?? 0) + 1);
+  }
+  let top: string | null = null;
+  let max = 0;
+  for (const [c, n] of Array.from(counts.entries())) {
+    if (n > max) {
+      max = n;
+      top = c;
+    }
+  }
+  return top;
 }
 
 /**

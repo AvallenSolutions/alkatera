@@ -1,6 +1,7 @@
 import { Info, CheckCircle2, ExternalLink } from 'lucide-react';
 
-export type ScoringMode = 'scraped' | 'alkatera';
+export type ScoreSource = 'scraped' | 'alkatera';
+export type ScoreConfidence = 'high' | 'medium' | 'low';
 
 export interface PillarSignalEvidence {
   id: string;
@@ -19,37 +20,34 @@ export interface PillarSignalsSummary {
 interface Props {
   overall: number | null;
   tier: string | null;
-  /** Mode-shaped pillar map. Scraped → 3 keys (environment / social /
-   *  governance); alkatera → 6 keys (carbon / water / packaging /
-   *  agriculture / governance / corporate). */
-  byPillar: Record<string, number> | null;
-  /** Per-pillar lists of which signals fired. Only present in scraped
-   *  mode (the alka**tera** scorer is still a weighted-sum so there's
-   *  nothing analogous to surface). */
+  /** Unified 6-pillar map: climate / nature / water / circularity /
+   *  social / governance. Null means "no data for this pillar". */
+  byPillar: Record<string, number | null> | null;
+  /** Per-pillar lists of which positive signals fired (scraped path). */
   signalsByPillar?: Record<string, PillarSignalsSummary>;
   missingRequired: string[];
-  scoringMode: ScoringMode;
+  /** Where the score came from. */
+  source: ScoreSource;
+  /** How much real data backs the score. */
+  confidence: ScoreConfidence;
 }
 
-const SCRAPED_PILLAR_ORDER = ['environment', 'social', 'governance'] as const;
-const ALKATERA_PILLAR_ORDER = [
-  'carbon',
+const PILLAR_ORDER = [
+  'climate',
   'water',
-  'packaging',
-  'agriculture',
+  'circularity',
+  'nature',
+  'social',
   'governance',
-  'corporate',
 ] as const;
 
 const PILLAR_LABEL: Record<string, string> = {
-  environment: 'Environment',
+  climate: 'Climate',
+  water: 'Water',
+  circularity: 'Circularity',
+  nature: 'Nature',
   social: 'Social',
   governance: 'Governance',
-  carbon: 'Carbon',
-  water: 'Water',
-  packaging: 'Packaging',
-  agriculture: 'Agriculture',
-  corporate: 'Corporate',
 };
 
 const REQUIRED_LABEL: Record<string, string> = {
@@ -59,21 +57,20 @@ const REQUIRED_LABEL: Record<string, string> = {
   sustainability_report_url: 'Sustainability report URL',
 };
 
-function tierLabel(score: number): string {
-  if (score >= 60) return 'Leader';
-  if (score >= 35) return 'Progressing';
-  if (score >= 15) return 'Developing';
-  return 'Insufficient';
-}
+const CONFIDENCE_LABEL: Record<ScoreConfidence, string> = {
+  high: 'High confidence',
+  medium: 'Medium confidence',
+  low: 'Low confidence',
+};
 
 /**
- * Brand-detail panel that explains the headline sustainability score.
+ * Brand-detail panel that explains the unified sustainability score.
  *
- * For scraped brands the model is a signal-count tier per pillar:
- * count how many distinct positive signals the brand has, map to
- * tier (0=Insufficient, 1=Developing, 2=Progressing, 3+=Leader).
- * The panel surfaces the signals themselves so the tier is auditable
- * — a distributor can see exactly why the brand is where it is.
+ * Six pillars on one 0–100 scale: the four environmental pillars
+ * (Climate, Water, Circularity, Nature) plus Social and Governance.
+ * alka**tera**-linked brands show their real on-platform pillar scores;
+ * scraped brands show an estimate from available evidence, with the
+ * contributing signals listed so the score is auditable.
  */
 export function BrandScoreBreakdownPanel({
   overall,
@@ -81,9 +78,9 @@ export function BrandScoreBreakdownPanel({
   byPillar,
   signalsByPillar,
   missingRequired,
-  scoringMode,
+  source,
+  confidence,
 }: Props) {
-  const pillarOrder = scoringMode === 'alkatera' ? ALKATERA_PILLAR_ORDER : SCRAPED_PILLAR_ORDER;
   return (
     <div className="rounded-xl border border-border/60 bg-card/40 p-5 space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -91,7 +88,7 @@ export function BrandScoreBreakdownPanel({
           <Info className="h-4 w-4 text-muted-foreground" />
           Score breakdown
           <span className="ml-1 text-[10px] uppercase tracking-wider text-muted-foreground font-normal">
-            {scoringMode === 'alkatera' ? 'alkatera mode · 6 pillars' : 'scraped mode · 3 pillars'}
+            {source === 'alkatera' ? 'alkatera composite' : 'estimated'} · {CONFIDENCE_LABEL[confidence]}
           </span>
         </div>
         <div className="text-right">
@@ -108,35 +105,38 @@ export function BrandScoreBreakdownPanel({
 
       {byPillar && (
         <ul className="space-y-3">
-          {pillarOrder.map((p) => {
-            const score = Math.max(0, Math.min(100, Math.round(byPillar[p] ?? 0)));
+          {PILLAR_ORDER.map((p) => {
+            const raw = byPillar[p];
+            const hasData = raw != null;
+            const score = Math.max(0, Math.min(100, Math.round(raw ?? 0)));
             const pillarSignals = signalsByPillar?.[p];
             return (
               <li key={p} className="space-y-1">
                 <div className="flex items-center justify-between text-[11px]">
                   <span className="text-muted-foreground">
                     {PILLAR_LABEL[p]}
-                    {pillarSignals && (
+                    {pillarSignals && pillarSignals.count > 0 && (
                       <span className="ml-2 text-[10px] uppercase tracking-wider">
-                        {tierLabel(score)} · {pillarSignals.count} signal
-                        {pillarSignals.count === 1 ? '' : 's'}
+                        {pillarSignals.count} signal{pillarSignals.count === 1 ? '' : 's'}
                       </span>
                     )}
                   </span>
-                  <span className="tabular-nums font-medium">{score}</span>
+                  <span className="tabular-nums font-medium">{hasData ? score : '—'}</span>
                 </div>
                 <div className="h-1.5 rounded-full bg-background/60 overflow-hidden">
                   <div
                     className={`h-full transition-[width] duration-500 ${
-                      score >= 75
-                        ? 'bg-emerald-400'
-                        : score >= 50
-                          ? 'bg-sky-400'
-                          : score >= 25
-                            ? 'bg-amber-300'
-                            : 'bg-destructive/70'
+                      !hasData
+                        ? 'bg-muted'
+                        : score >= 70
+                          ? 'bg-emerald-400'
+                          : score >= 50
+                            ? 'bg-sky-400'
+                            : score >= 30
+                              ? 'bg-amber-300'
+                              : 'bg-destructive/70'
                     }`}
-                    style={{ width: `${score}%` }}
+                    style={{ width: `${hasData ? score : 0}%` }}
                   />
                 </div>
                 {pillarSignals && pillarSignals.signals.length > 0 && (
@@ -177,10 +177,10 @@ export function BrandScoreBreakdownPanel({
         </ul>
       )}
 
-      {scoringMode === 'alkatera' && missingRequired.length > 0 && (
+      {missingRequired.length > 0 && (
         <div className="rounded-lg border border-amber-300/30 bg-amber-300/5 px-3 py-2 text-[11px]">
           <div className="font-semibold text-amber-200 mb-1">
-            Missing required — these drag the score the most:
+            Missing required fields — these limit the score:
           </div>
           <ul className="space-y-0.5 text-foreground/80">
             {missingRequired.map((key) => (
@@ -191,26 +191,21 @@ export function BrandScoreBreakdownPanel({
       )}
 
       <p className="text-[11px] text-muted-foreground leading-relaxed">
-        {scoringMode === 'alkatera' ? (
+        {source === 'alkatera' ? (
           <>
-            <strong>alka<strong>tera</strong> mode.</strong> Credit-based weighted mean across
-            six pillars, same fairness as scraped mode. Two structural advantages: every field
-            whose source is platform-verified (<code className="text-[10px] bg-muted/50 px-1 py-0.5 rounded">alkatera_live</code>{' '}
-            or{' '}
-            <code className="text-[10px] bg-muted/50 px-1 py-0.5 rounded">brand_verified</code>)
-            earns a 1.25× weight bonus, recognising that platform-verified data is materially
-            stronger evidence than open-web scrapes; and the granular ESG composite the brand
-            calculates on alka<strong>tera</strong> folds into Governance as a heavy signal the
-            field model can't replicate on its own.
+            <strong>alka<strong>tera</strong> composite.</strong> This brand's real on-platform
+            pillar scores (Climate, Water, Circularity, Nature, Social, Governance) mapped onto the
+            distributor scale. The environment pillars carry the headline (≈70%), with Social and
+            Governance as supporting context.
           </>
         ) : (
           <>
-            <strong>Signal-count tier.</strong> Per pillar, the panel counts distinct positive
-            sustainability signals (B Corp, EPD published, carbon-negative operations, etc.).
-            0 signals = Insufficient, 1 = Developing, 2 = Progressing, 3+ = Leader. Missing
-            fields and unverified-by-scraping items do not penalise. The overall headline is
-            Environment-weighted (70/15/15) because carbon footprint is the most material
-            signal for drinks brands.
+            <strong>Estimated from evidence.</strong> Each pillar is graded from the
+            sustainability data we hold — carbon and water are benchmarked against the brand's
+            product category, certifications are credibility-weighted, and reduction targets are
+            scored on ambition and credibility. Pillars with no data are dropped from the mean
+            rather than scored zero. The headline is environment-weighted (≈70%) because carbon and
+            water are the most material signals for drinks brands.
           </>
         )}
       </p>

@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { Upload, Search, Plus, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getSupabaseAdminClient } from '@/lib/supabase/api-client';
+import { RescoreAllButton } from '@/components/admin/directory/rescore-all-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,11 +68,14 @@ export default async function AdminBrandsPage({
             {(count ?? 0).toLocaleString()} canonical brands in the directory.
           </p>
         </div>
-        <Button asChild className="bg-neon-lime hover:bg-neon-lime/90 text-black font-semibold">
-          <Link href="/admin/directory/brands/upload">
-            <Upload className="h-3.5 w-3.5 mr-1.5" /> Upload CSV
-          </Link>
-        </Button>
+        <div className="flex items-center gap-3">
+          <RescoreAllButton />
+          <Button asChild className="bg-neon-lime hover:bg-neon-lime/90 text-black font-semibold">
+            <Link href="/admin/directory/brands/upload">
+              <Upload className="h-3.5 w-3.5 mr-1.5" /> Upload CSV
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <form className="flex flex-wrap gap-2 items-center" action="/admin/directory/brands">
