@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
+import { getVaultSecret } from '@/lib/secrets/vault';
 
 // SSRF protection: block private/internal IP ranges
 const BLOCKED_HOSTS = [
@@ -112,7 +113,7 @@ async function fetchPageContent(url: string): Promise<string | null> {
 }
 
 async function addToSender(email: string, name?: string, company?: string) {
-  const senderToken = process.env.SENDER_API_TOKEN;
+  const senderToken = await getVaultSecret('SENDER_API_TOKEN');
   if (!senderToken) {
     console.error('SENDER_API_TOKEN is not configured');
     return;

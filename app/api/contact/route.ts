@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { rateLimit } from '@/lib/rate-limit';
+import { getVaultSecret } from '@/lib/secrets/vault';
 
 export async function POST(request: NextRequest) {
   try {
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest) {
 
     // 2. Add to Sender mailing list if user consented
     if (subscribe) {
-      const senderToken = process.env.SENDER_API_TOKEN;
+      const senderToken = await getVaultSecret('SENDER_API_TOKEN');
 
       if (!senderToken) {
         console.error('SENDER_API_TOKEN is not configured');

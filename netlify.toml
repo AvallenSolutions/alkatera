@@ -9,6 +9,10 @@
   NODE_VERSION = "18"
   NEXT_TELEMETRY_DISABLED = "1"
   NODE_OPTIONS = "--max-old-space-size=4096"
+  # Fail the build (with offenders named) when the function-scoped env
+  # would exceed AWS Lambda's 4 KB limit, instead of dying silently at
+  # the deploy/function-creation step. See scripts/check-function-env-budget.mjs.
+  STRICT_ENV_BUDGET = "1"
 
 # Headers for security and performance
 [[headers]]
