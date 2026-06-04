@@ -76,6 +76,7 @@
     "eslint": "^8.57.0",
     "eslint-config-next": "14.2.5",
     "framer-motion": "^10.18.0",
+    "inngest": "^4.5.0",
     "input-otp": "^1.2.4",
     "jspdf": "^3.0.4",
     "jspdf-autotable": "^5.0.2",
