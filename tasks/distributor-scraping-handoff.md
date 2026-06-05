@@ -31,18 +31,31 @@ Unified brand scoring lives in `lib/distributor/scoring/`:
 
 ---
 
-## ✅ BLOCKER FIXED (2026-06-05, commit `fb115fee`, deployed live)
-Root cause was the *opposite* of fix A's framing: `external_node_modules = ["nanoid"]`
-in `netlify.toml` told esbuild NOT to inline nanoid, leaving a runtime
-`require('nanoid/non-secure')` and relying on Netlify to copy the package next to the
-function. Under pnpm's symlinked `node_modules`, Netlify's file-tracer never copies it →
-`Runtime.ImportModuleError` at init. **Fix: removed `external_node_modules`** so esbuild
-inlines nanoid's source into the single function bundle (no runtime require).
-Verified locally: esbuild bundles clean (CJS+ESM, incl. the dynamic scoring import),
-zero leftover `require("nanoid")`, bundle `require()`s and exposes `handler`.
-`.npmrc public-hoist-pattern` (fix A) was NOT needed and NOT applied.
-Pending: live end-to-end confirmation (trigger a scrape, watch the fn log show
-`[scrape-brand-bg] done` instead of the init error).
+## ✅ BLOCKER FIXED & VERIFIED IN PROD (2026-06-05, commit `e5be2061`)
+**True root cause** (found via esbuild `--metafile`): the import chain
+`extractors/html-to-text.ts → sanitize-html → postcss → require('nanoid/non-secure')`.
+sanitize-html dragged the whole postcss CSS parser into a *scraper*; postcss has a
+nested `require('nanoid/non-secure')`. Netlify's zip-it-and-ship-it bundler externalised
+that nested require and then couldn't copy `nanoid` through pnpm's symlinked
+`node_modules` → `Runtime.ImportModuleError` at init.
+
+**What didn't work:** removing `external_node_modules=["nanoid"]` from netlify.toml
+(commit `fb115fee`). It fixed *local* esbuild (which inlines nanoid) but Netlify's
+bundler still externalised the require nested inside postcss. Deploy still crashed.
+
+**The fix:** rewrote `html-to-text.ts` to strip HTML→text with a dependency-free regex
+pass (it only ever needed tag removal, not a CSS parser). That deletes the entire
+sanitize-html→postcss→nanoid chain from the function bundle. sanitize-html stays
+installed for `app/blog/[slug]/page.tsx`, which legitimately needs it.
+
+**Verified in prod** (function log, 13:42): Nc'Nean job `d63c6813…` ran the full agent
+(~64s, all Gemini calls) → `status: 'complete', written: 9`. No ImportModuleError.
+
+**Minor follow-up (not a blocker):** two other jobs that same run finished
+`status: 'error', written: 0` after only a category-detect call — i.e. the function
+loads fine but those brands had no usable source (likely missing/failed website).
+Worth a glance at which brands and why, but it's normal per-brand operational outcome,
+not the bundling crash.
 
 ---
 
