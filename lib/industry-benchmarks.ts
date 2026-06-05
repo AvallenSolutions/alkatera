@@ -228,7 +228,11 @@ const CATEGORY_TO_GROUP: Record<string, string> = {
   // the closed set — without these, e.g. cachaça brands could never be
   // categorised and showed a blank "Category".
   Cachaça: 'Spirits', Cachaca: 'Spirits', Pisco: 'Spirits',
-  Aguardiente: 'Spirits', Vermouth: 'Spirits',
+  Aguardiente: 'Spirits', Vermouth: 'Spirits', Arrack: 'Spirits',
+  // Sake — brewed rice; grouped with wine for benchmark purposes (similar
+  // ABV / serving), so it scores against a fermented rather than distilled
+  // baseline.
+  Sake: 'Wine',
   // Beer & Cider
   Lager: 'Beer & Cider', Ale: 'Beer & Cider', IPA: 'Beer & Cider',
   'Stout & Porter': 'Beer & Cider', 'Wheat Beer': 'Beer & Cider',
@@ -291,17 +295,31 @@ const CATEGORY_KEYWORD_RULES: Array<[RegExp, string]> = [
   [/\brye\s+whisk(?:e)?y\b/i, 'Rye Whiskey'],
   [/\b(?:single\s+malt|scotch|whisk(?:e)?y)\b/i, 'Whisky'],
   [/\b(?:rhum|rum)\b/i, 'Rum'],
+  // Tequila/mezcal: explicit name first, then agave-spirit age terms
+  // (reposado/añejo/blanco are overwhelmingly tequila — checked AFTER rum
+  // so "añejo rum" still resolves to Rum above).
   [/\btequila\b/i, 'Tequila'],
+  [/\bdestilado\s+de\s+agave\b/i, 'Mezcal'],
   [/\bme[zs]cal\b/i, 'Mezcal'],
+  [/\b(?:reposado|añejo|anejo)\b/i, 'Tequila'],
   [/\bpisco\b/i, 'Pisco'],
   [/\baguardiente\b/i, 'Aguardiente'],
+  [/\barrack\b/i, 'Arrack'],
   [/\bvermouth\b/i, 'Vermouth'],
-  [/\b(?:cognac|armagnac|brandy)\b/i, 'Brandy'],
+  // Brandy + its named styles/grades (calvados = apple brandy; VSOP/VS/XO
+  // are cognac grades).
+  [/\b(?:cognac|armagnac|brandy|calvados)\b/i, 'Brandy'],
+  [/\bv\.?\s?s\.?\s?o\.?\s?p\b/i, 'Brandy'],
   [/\bgrappa\b/i, 'Grappa'],
   [/\babsinthe\b/i, 'Absinthe'],
   [/\bvodka\b/i, 'Vodka'],
   [/\bgin\b/i, 'Gin'],
+  // Liqueurs / amari / aperitifs — many brands never say "liqueur" but
+  // name a well-known style.
+  [/\b(?:limoncello|sambuca|amaretto|amaro|fernet|ap[ée]ritif|aperitivo|triple\s+sec|curacao|cura[çc]ao)\b/i, 'Liqueur'],
   [/\bliqueu?r\b/i, 'Liqueur'],
+  // Sake (brewed rice)
+  [/\bsake\b/i, 'Sake'],
   // Beer & cider
   [/\bipa\b/i, 'IPA'],
   [/\b(?:stout|porter)\b/i, 'Stout & Porter'],

@@ -51,25 +51,30 @@ export function RescoreAllButton() {
     let updated = 0;
     let errorCount = 0;
     let total = 0;
-    // Hard stop so a bug can never spin forever (25/batch * 400 = 10k rows).
+    // Hard stop so a bug can never spin forever (8/batch * 400 = 3.2k rows).
     for (let guard = 0; guard < 400; guard += 1) {
-      let json: RescoreBatch;
-      try {
-        const res = await fetch('/api/admin/directory/rescore', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ offset, limit: 8 }),
-        });
-        if (!res.ok) {
-          setError(`Failed (${res.status}) at brand ${offset}`);
-          setBusy(false);
-          return;
+      // Retry a batch a couple of times before giving up, so one transient
+      // 502/timeout doesn't abort the whole walk and leave brands unscored.
+      let json: RescoreBatch | null = null;
+      let lastErr = '';
+      for (let attempt = 0; attempt < 3 && !json; attempt += 1) {
+        try {
+          const res = await fetch('/api/admin/directory/rescore', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ offset, limit: 8 }),
+          });
+          if (!res.ok) {
+            lastErr = `HTTP ${res.status}`;
+            continue;
+          }
+          json = (await res.json()) as RescoreBatch;
+        } catch (err) {
+          lastErr = err instanceof Error ? err.message : String(err);
         }
-        json = (await res.json()) as RescoreBatch;
-      } catch (err) {
-        setError(
-          `${err instanceof Error ? err.message : String(err)} (at brand ${offset})`,
-        );
+      }
+      if (!json) {
+        setError(`${lastErr} (stopped at brand ${offset} of ${total || '?'})`);
         setBusy(false);
         return;
       }
