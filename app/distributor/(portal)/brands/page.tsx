@@ -82,10 +82,14 @@ export default async function DistributorBrandsPage() {
         .select('brand_profile_id, status, completed_at, created_at')
         .in('brand_profile_id', brandIds)
         .order('created_at', { ascending: false }),
-      // Canonical scores live on brand_directory after Phase 3.
+      // Canonical scores + key details live on brand_directory after
+      // Phase 3. category/country_of_origin are canonical here; the
+      // per-listing brand_profiles columns are usually null (CSV imports
+      // skip them), so the list must fall back to the directory value or
+      // every row shows a dash even when the scraper found the answer.
       supabase
         .from('brand_directory')
-        .select('id, sustainability_score, score_tier, completeness_score')
+        .select('id, sustainability_score, score_tier, completeness_score, category, country_of_origin')
         .in('id', directoryIds),
     ]);
 
@@ -93,6 +97,8 @@ export default async function DistributorBrandsPage() {
       sustainability_score: number | null;
       score_tier: 'leader' | 'progressing' | 'developing' | 'insufficient' | null;
       completeness_score: number | null;
+      category: string | null;
+      country_of_origin: string | null;
     };
     const directoryScoresById = new Map<string, DirectoryScores>();
     for (const row of (directoryScoresRaw ?? []) as Array<{ id: string } & DirectoryScores>) {
@@ -100,6 +106,8 @@ export default async function DistributorBrandsPage() {
         sustainability_score: row.sustainability_score,
         score_tier: row.score_tier,
         completeness_score: row.completeness_score,
+        category: row.category,
+        country_of_origin: row.country_of_origin,
       });
     }
 
@@ -145,6 +153,10 @@ export default async function DistributorBrandsPage() {
       const scores = directoryScoresById.get(b.brand_directory_id);
       return {
         ...b,
+        // Per-listing value wins (a distributor may curate it); fall back
+        // to the canonical directory value the scraper/detection populates.
+        category: b.category ?? scores?.category ?? null,
+        country_of_origin: b.country_of_origin ?? scores?.country_of_origin ?? null,
         sustainability_score: scores?.sustainability_score ?? null,
         score_tier: scores?.score_tier ?? null,
         completeness_score: scores?.completeness_score ?? null,
