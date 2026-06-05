@@ -74,6 +74,8 @@ Evidence guide for the trickier signals (only use when you can quote supporting 
 - "iwca_member": true ONLY for wine brands that name themselves as International Wineries for Climate Action members. Distillers / brewers should omit.
 - "porto_protocol_signatory": same — wine industry only.
 - "bcorp_certified": true if the page mentions B Corp / B Corporation / Certified B Corporation, including B Impact score, B Corp Month, etc.
+- "product_category": the brand's primary/flagship drinks type as a short specific label (e.g. "Cachaça", "Single Malt Whisky", "Gin", "Rum", "Red Wine", "IPA", "Tequila"). Unlike the numeric fields, you SHOULD fill this whenever the product type is clear from the page — it almost always is. One category only.
+- "country_of_origin": the country where the products are made / the brand originates. You MAY infer this confidently from clear provenance language even if no "country" label appears, e.g. "Brazilian cachaça" → Brazil, "distilled in the Scottish Highlands" → United Kingdom, "Produit de France" → France, "our Jalisco distillery" → Mexico. Return the country name only. Omit only if genuinely ambiguous.
 
 Page text:
 """

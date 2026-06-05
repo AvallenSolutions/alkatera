@@ -148,6 +148,8 @@ const TARGET_FIELDS: FieldKey[] = [
   'sustainability_report_year',
   'parent_company',
   'hq_country',
+  'product_category',
+  'country_of_origin',
   'founding_year',
   'contact_email',
   // Leadership signals (added 2026-06): the scoring model rewards

@@ -224,6 +224,11 @@ const CATEGORY_TO_GROUP: Record<string, string> = {
   Tequila: 'Spirits', Mezcal: 'Spirits', Brandy: 'Spirits', Liqueur: 'Spirits',
   Bourbon: 'Spirits', 'Rye Whiskey': 'Spirits', Absinthe: 'Spirits',
   Grappa: 'Spirits', 'Other Spirits': 'Spirits',
+  // Cane / grape spirits the scraper commonly meets but that weren't in
+  // the closed set — without these, e.g. cachaça brands could never be
+  // categorised and showed a blank "Category".
+  Cachaça: 'Spirits', Cachaca: 'Spirits', Pisco: 'Spirits',
+  Aguardiente: 'Spirits', Vermouth: 'Spirits',
   // Beer & Cider
   Lager: 'Beer & Cider', Ale: 'Beer & Cider', IPA: 'Beer & Cider',
   'Stout & Porter': 'Beer & Cider', 'Wheat Beer': 'Beer & Cider',

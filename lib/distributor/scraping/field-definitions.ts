@@ -22,6 +22,8 @@ export type FieldKey =
   | 'sustainability_report_year'
   | 'parent_company'
   | 'hq_country'
+  | 'product_category'
+  | 'country_of_origin'
   | 'founding_year'
   | 'company_registration_number'
   | 'contact_email'
@@ -85,6 +87,10 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
   { key: 'sustainability_report_year',     label: 'Sustainability Report Year',        type: 'year',    pillar: 'governance' },
   { key: 'parent_company',                 label: 'Parent Company',                    type: 'string',  pillar: 'corporate' },
   { key: 'hq_country',                     label: 'HQ Country',                        type: 'string',  pillar: 'corporate' },
+  { key: 'product_category',               label: 'Product Category',                  type: 'string',  pillar: 'corporate',
+    description: "The brand's primary product type as a short, specific drinks-category label, e.g. 'Cachaça', 'Single Malt Whisky', 'Gin', 'Red Wine', 'IPA'. One category only — the brand's flagship type." },
+  { key: 'country_of_origin',              label: 'Country of Origin',                 type: 'string',  pillar: 'corporate',
+    description: "The country where the brand's products are made / where the brand originates (not necessarily a corporate HQ). May be inferred with confidence from clear provenance, e.g. 'Brazilian cachaça' → Brazil, 'distilled in Scotland' → United Kingdom, 'Produit de France' → France." },
   { key: 'founding_year',                  label: 'Founding Year',                     type: 'year',    pillar: 'corporate' },
   { key: 'company_registration_number',    label: 'Company Registration Number',       type: 'string',  pillar: 'corporate' },
   { key: 'contact_email',                  label: 'Contact Email',                     type: 'string',  pillar: 'corporate',

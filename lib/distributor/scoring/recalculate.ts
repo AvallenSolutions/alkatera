@@ -55,7 +55,7 @@ export async function recalculateCompleteness(
 ): Promise<RecalcResult | null> {
   const { data: directory } = await supabase
     .from('brand_directory')
-    .select('id, alkatera_org_id, name, category')
+    .select('id, alkatera_org_id, name, category, country_of_origin')
     .eq('id', brandDirectoryId)
     .maybeSingle();
   if (!directory) return null;
@@ -63,6 +63,7 @@ export async function recalculateCompleteness(
     alkatera_org_id: string | null;
     name: string | null;
     category: string | null;
+    country_of_origin: string | null;
   };
   const scoringMode: 'alkatera' | 'scraped' = dir.alkatera_org_id ? 'alkatera' : 'scraped';
 
@@ -200,6 +201,21 @@ export async function recalculateCompleteness(
     score_updated_at: new Date().toISOString(),
   };
   if (cat.category) update.category = cat.category;
+
+  // Mirror a scraped country onto the canonical row so the brand detail
+  // "Key details" and the directory list can read it directly (they
+  // don't all walk the scraped_brand_data fallback). Prefer an explicit
+  // country_of_origin finding, fall back to the corporate hq_country
+  // finding. Only fill when the directory doesn't already carry a
+  // (curated / declared) value — never overwrite a human-set country.
+  if (!dir.country_of_origin) {
+    const scrapedCountry =
+      valuesForVitality.get('country_of_origin' as FieldKey)?.text?.trim() ||
+      valuesForVitality.get('hq_country' as FieldKey)?.text?.trim() ||
+      null;
+    if (scrapedCountry) update.country_of_origin = scrapedCountry;
+  }
+
   await supabase.from('brand_directory').update(update).eq('id', brandDirectoryId);
 
   return {
@@ -291,6 +307,21 @@ async function resolveCategory(
       .map((s) => s.product_name)
       .filter((n): n is string => !!n && n.trim().length > 0)
       .slice(0, 20);
+  }
+
+  // A category the brand-website scraper read directly off the site
+  // (the LLM extractor's product_category field). High-signal — the page
+  // almost always states the product type — so we trust it for display.
+  // Known categories also drive the category-adjusted benchmark; an
+  // accurate-but-unrecognised label (rare) still shows to the user but
+  // scores against the industry default.
+  const scrapedCategory = values.get('product_category' as FieldKey)?.text?.trim();
+  if (scrapedCategory) {
+    return {
+      category: scrapedCategory,
+      dbSource: 'detected',
+      confidence: isKnownCategory(scrapedCategory) ? 'detected' : 'industry_default',
+    };
   }
 
   if (allowDetect) {

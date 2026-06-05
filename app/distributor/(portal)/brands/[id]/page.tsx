@@ -198,14 +198,19 @@ export default async function BrandOverviewPage({ params }: PageProps) {
   const missingRequired = REQUIRED_FIELDS.filter((key) => !populated.has(key));
 
   // Display fallback chain for category + country: per-distributor
-  // listing → canonical directory → scraped hq_country finding. Lots
-  // of imports skip mapping the CSV columns, so the per-listing value
-  // is often null even when the canonical brand_directory or the
-  // brand-website scraper knows the answer.
-  const scrapedHqCountry = (scrapedRows ?? []).find((r) => r.field_key === 'hq_country')?.field_value ?? null;
-  const displayCategory = brand.category ?? directoryRow?.category ?? null;
+  // listing → canonical directory → scraped finding. Lots of imports
+  // skip mapping the CSV columns, so the per-listing value is often null
+  // even when the canonical brand_directory or the brand-website scraper
+  // knows the answer. recalc also mirrors the scraped values onto the
+  // directory row, but we read the findings here too so a freshly
+  // scraped brand shows them before the next recalc lands.
+  const findField = (key: string) =>
+    (scrapedRows ?? []).find((r) => r.field_key === key)?.field_value ?? null;
+  const scrapedCategory = findField('product_category');
+  const scrapedCountry = findField('country_of_origin') ?? findField('hq_country');
+  const displayCategory = brand.category ?? directoryRow?.category ?? scrapedCategory;
   const displayCountry =
-    brand.country_of_origin ?? directoryRow?.country_of_origin ?? scrapedHqCountry;
+    brand.country_of_origin ?? directoryRow?.country_of_origin ?? scrapedCountry;
 
   // ── Score breakdown + certifications panels. Mirror the admin
   //    panel: re-run the calculator on the live findings so what's
