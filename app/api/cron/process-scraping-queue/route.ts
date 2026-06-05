@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createHmac } from 'crypto';
 import { safeCompare } from '@/lib/utils/safe-compare';
-import { runBrandAgent } from '@/lib/distributor/scraping/brand-agent';
 import { queueBrandsForScraping } from '@/lib/distributor/scraping/agent-dispatcher';
 
 /**
@@ -11,12 +11,16 @@ import { queueBrandsForScraping } from '@/lib/distributor/scraping/agent-dispatc
  *
  * Triggered every 5 minutes by netlify/functions/process-scraping-queue.ts.
  * Picks up to MAX_JOBS_PER_RUN queued jobs (oldest first), marks them
- * 'running', runs the brand-agent against each, then marks them
- * 'complete' or 'error'.
+ * 'running', and HMAC-fires the `scrape-brand-background` background
+ * function once per job. The actual scrape runs there (15-minute budget)
+ * because a single brand agent exceeds Netlify's ~26s synchronous
+ * ceiling. This route only claims + dispatches, so it returns in well
+ * under the limit. We fire from a Next route (not the scheduled tick
+ * directly) because that's the proven background-invocation path used by
+ * find-websites-background / directory-sourcing-background.
  *
- * Also runs the monthly-refresh sweep on the first invocation each day
- * (cheap idempotent query — re-queues brands that haven't been scraped
- * for 30+ days).
+ * Also runs the monthly-refresh sweep occasionally (cheap idempotent
+ * query — re-queues brands that haven't been scraped for 30+ days).
  *
  * Auth: CRON_SECRET Bearer (same pattern as the pulse-* cron routes).
  */
@@ -53,18 +57,13 @@ export async function POST(request: NextRequest) {
     auth: { autoRefreshToken: false, persistSession: false },
   }) as SupabaseClient;
 
-  // 1. Stale-running recovery. Netlify functions get killed at the
-  //    300s ceiling and the scrape-pipeline has no rollback step, so
-  //    any job that was claimed and marked 'running' by a previous
-  //    invocation that timed out gets stranded forever. Reset anything
-  //    'running' for > 2 min so the next claim can pick it back up.
-  //    Threshold tightened from 5 → 2 min: Netlify schedules the cron
-  //    on a 5-min cadence (with retries clustering tighter), so a 5-min
-  //    threshold meant each tick could see "recently-stuck" jobs as
-  //    "not stale yet" and leave them stranded for a full extra cycle.
-  //    Healthy jobs finish in 30-60s (and run in parallel within a
-  //    tick post-832cf3a5), so 2 min still can't race a live worker.
-  const staleCutoff = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+  // 1. Stale-running recovery. The scrape now runs in a background
+  //    function with a 15-min budget, so a job legitimately stays
+  //    'running' for up to ~that long. Only reset jobs 'running' beyond
+  //    16 min — those are genuinely stranded (the background function
+  //    crashed/was killed) and safe to re-queue without racing a live
+  //    worker.
+  const staleCutoff = new Date(Date.now() - 16 * 60 * 1000).toISOString();
   const { data: recovered } = await supabase
     .from('scraping_jobs')
     .update({ status: 'queued', started_at: null })
@@ -95,112 +94,55 @@ export async function POST(request: NextRequest) {
   }
 
   const startedAt = new Date().toISOString();
+  const jobs = claimed as JobRow[];
   await supabase
     .from('scraping_jobs')
     .update({ status: 'running', started_at: startedAt })
-    .in('id', (claimed as JobRow[]).map((j) => j.id));
+    .in('id', jobs.map((j) => j.id));
 
-  // 3. Run brand-agent against each job in parallel. Sequential was
-  //    safe under the old Anthropic-rate-budget concern but we migrated
-  //    to Gemini, whose quotas are an order of magnitude higher; and
-  //    each brand's bottleneck is the per-source HTTP fetch (different
-  //    domains, no shared host), so parallelising compresses the tick
-  //    from ~8 × 30s = 4 min to ~30s, well clear of the 300s timeout.
-  //    This is the biggest single throughput lever — 68 brands now
-  //    clear in ~5 ticks instead of ~50.
-  const summaries = await Promise.all(
-    (claimed as JobRow[]).map(async (job) => {
-      let result;
-      let errorMessage: string | null = null;
+  // 4. Fire the background scrape for each claimed job. The background
+  //    function (scrape-brand-background) runs the agent with a 15-min
+  //    budget and writes the terminal job status itself. We invoke it the
+  //    same way find-websites does: in-process in dev (no Netlify
+  //    runtime), via a public fetch in prod. Fire-and-forget — it returns
+  //    202 immediately.
+  const hmacSecret = process.env.INTERNAL_JOB_HMAC_SECRET;
+  if (!hmacSecret) {
+    return NextResponse.json({ error: 'missing_hmac_secret' }, { status: 500 });
+  }
+  const isDev = process.env.NODE_ENV !== 'production' && !process.env.NETLIFY;
+  const baseUrl =
+    process.env.URL || process.env.DEPLOY_URL || `https://${request.headers.get('host')}`;
+
+  await Promise.all(
+    jobs.map(async (job) => {
+      const payload = JSON.stringify({
+        jobId: job.id,
+        brandProfileId: job.brand_profile_id,
+        brandDirectoryId: job.brand_directory_id,
+      });
+      const signature = createHmac('sha256', hmacSecret).update(payload).digest('hex');
       try {
-        result = await runBrandAgent({
-          supabase,
-          brandProfileId: job.brand_profile_id ?? undefined,
-          brandDirectoryId: job.brand_directory_id ?? undefined,
-          jobId: job.id,
-        });
-      } catch (err: unknown) {
-        errorMessage = err instanceof Error ? err.message : String(err);
-        result = {
-          sources_attempted: 0,
-          sources_succeeded: 0,
-          sources_skipped: 0,
-          findings_written: 0,
-          products_created: 0,
-          products_linked: 0,
-          documents_ingested: 0,
-          documents_skipped: 0,
-          errors: [errorMessage],
-          skip_reasons: [] as string[],
-        };
+        if (isDev) {
+          const { handler } = await import('@/netlify/functions/scrape-brand-background');
+          void handler({ body: payload, headers: { 'x-internal-hmac': signature } });
+        } else {
+          await fetch(`${baseUrl}/.netlify/functions/scrape-brand-background`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-internal-hmac': signature },
+            body: payload,
+          });
+        }
+      } catch (err) {
+        console.error('[process-scraping-queue] fire failed', job.id, err instanceof Error ? err.message : err);
       }
-
-      // Status rules:
-      //   - Brand-agent threw outright → 'error'
-      //   - Otherwise the job ran to completion. We only mark 'error' if
-      //     real source errors were collected. "All sources skipped"
-      //     (e.g. no website on file, Wikipedia 404) is 'complete' with
-      //     0 findings — the skip reasons go into error_message so the
-      //     user can see why.
-      let finalStatus: 'complete' | 'error';
-      if (errorMessage) finalStatus = 'error';
-      else if (result.errors.length > 0 && result.sources_succeeded === 0) finalStatus = 'error';
-      else finalStatus = 'complete';
-
-      const messageLines: string[] = [];
-      if (result.errors.length > 0) messageLines.push(...result.errors.slice(0, 5));
-      if (result.skip_reasons.length > 0) messageLines.push(...result.skip_reasons.slice(0, 5));
-      const trimmedMessage = messageLines.join('\n');
-
-      await supabase
-        .from('scraping_jobs')
-        .update({
-          status: finalStatus,
-          completed_at: new Date().toISOString(),
-          sources_attempted: result.sources_attempted,
-          sources_succeeded: result.sources_succeeded,
-          error_message: trimmedMessage || null,
-        })
-        .eq('id', job.id);
-
-      // Bump the brand profile (listing-driven jobs) or directory entry
-      // (admin-intake jobs) so the "last activity" column in the UI
-      // reflects this scrape even if nothing was found.
-      if (job.brand_profile_id) {
-        await supabase
-          .from('brand_profiles')
-          .update({ updated_at: new Date().toISOString() })
-          .eq('id', job.brand_profile_id);
-      } else if (job.brand_directory_id) {
-        await supabase
-          .from('brand_directory')
-          .update({ updated_at: new Date().toISOString() })
-          .eq('id', job.brand_directory_id);
-      }
-
-      return {
-        job_id: job.id,
-        brand_profile_id: job.brand_profile_id,
-        brand_directory_id: job.brand_directory_id,
-        status: finalStatus,
-        sources_attempted: result.sources_attempted,
-        sources_succeeded: result.sources_succeeded,
-        sources_skipped: result.sources_skipped,
-        findings_written: result.findings_written,
-        products_created: result.products_created,
-        products_linked: result.products_linked,
-        documents_ingested: result.documents_ingested,
-        documents_skipped: result.documents_skipped,
-        errors: result.errors,
-        skip_reasons: result.skip_reasons,
-      };
     }),
   );
 
   return NextResponse.json({
-    processed: summaries.length,
+    dispatched: jobs.length,
     recovered_stale: recoveredCount,
-    jobs: summaries,
+    job_ids: jobs.map((j) => j.id),
   });
 }
 
