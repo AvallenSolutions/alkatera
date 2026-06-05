@@ -51,11 +51,14 @@ installed for `app/blog/[slug]/page.tsx`, which legitimately needs it.
 **Verified in prod** (function log, 13:42): Nc'Nean job `d63c6813…` ran the full agent
 (~64s, all Gemini calls) → `status: 'complete', written: 9`. No ImportModuleError.
 
-**Minor follow-up (not a blocker):** two other jobs that same run finished
-`status: 'error', written: 0` after only a category-detect call — i.e. the function
-loads fine but those brands had no usable source (likely missing/failed website).
-Worth a glance at which brands and why, but it's normal per-brand operational outcome,
-not the bundling crash.
+**Follow-up RESOLVED (commit `0d20b348`):** the other `status: 'error', written: 0`
+jobs (e.g. Cachaça Velho / Velho Barreiro) were the crawler's self-identifying bot
+User-Agent (`alkatera-distributor-bot/1.0`) getting 403'd by CDN/WAF layers (Azion,
+Cloudflare, etc.). The mandatory homepage fetch 403s → whole brand fails before any
+extraction (only the score recalc's category-detect AI call runs). Repro:
+velhobarreiroshop.com.br → 403 to bot UA, 200 + full page to a browser UA. Fix:
+`lib/distributor/scraping/http.ts` now sends a standard Chrome UA. Re-queued jobs then
+completed successfully in prod.
 
 ---
 

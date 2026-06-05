@@ -110,3 +110,20 @@ strip HTML to text — replaced with a dependency-free regex pass. Kept sanitize
 installed for the legit consumer (`app/blog/[slug]/page.tsx`). Lesson: a server-side
 text-extraction path should never pull a CSS parser; prefer the lightest dep that does
 the job, especially in code that gets bundled into a standalone Netlify function.
+
+---
+
+## Scraper crawler must send a browser User-Agent, not a self-identifying bot UA (2026-06-05)
+`lib/distributor/scraping/http.ts` (`fetchPage`) originally sent
+`alkatera-distributor-bot/1.0 (+...)` "to be polite". CDN/WAF layers in front of brand
+sites (Azion, Cloudflare, Akamai) 403 any non-browser UA outright. Because the brand
+homepage fetch is MANDATORY (a 403 there returns `{ok:false}` early), the whole brand
+scrape fails with `sources_succeeded=0 → job 'error'` and ZERO extraction — the only AI
+call you'll see in the log is the score recalc's `category-detect`. Symptom is
+indistinguishable from "brand has no website" unless you check the job `error_message`
+(it'll say `Brand Website: HTTP 403`).
+
+Diagnosis trick: reproduce `fetchPage` with the bot UA vs a browser UA against the
+brand's real site — `403 (bot) / 200 (browser)` confirms it instantly. Fix: use a
+standard Chrome UA string. Don't reintroduce a bot UA for "politeness"; it silently
+fails real-world WAF-protected sites.
