@@ -125,9 +125,10 @@ export const scrapingBrandRun = inngest.createFunction(
     name: 'Scrape one brand',
     // Limit fan-out concurrency so we don't melt Gemini quotas or
     // hammer shared third-party hosts when 40 brands all share a
-    // sustainability platform. 8 is the same effective throughput as
-    // the old cron tick.
-    concurrency: { limit: 8 },
+    // sustainability platform. Capped at 5 to stay within the Inngest
+    // plan's per-function concurrency limit — a higher value makes the
+    // whole app fail to sync (Inngest rejects the registration).
+    concurrency: { limit: 5 },
     // 3 attempts per brand with exponential backoff. Most transient
     // 5xx / timeout failures should pass on retry.
     retries: 3,
