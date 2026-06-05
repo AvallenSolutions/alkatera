@@ -1,7 +1,14 @@
 /**
  * Polite, bounded HTTP fetch for the scraping pipeline. Wraps fetch with
- * a hard timeout, a user-agent that names us (so we're not pretending to
- * be a browser), and a single-shot retry on transient errors.
+ * a hard timeout and a realistic browser user-agent.
+ *
+ * We used to send a self-identifying `alkatera-distributor-bot/1.0` UA
+ * "to be polite". In practice CDN/WAF layers in front of brand sites
+ * (Azion, Cloudflare, Akamai, etc.) 403 any non-browser UA outright —
+ * e.g. velhobarreiroshop.com.br returns 403 to the bot UA but 200 + the
+ * full page to a browser UA. That blocked the homepage fetch and failed
+ * the whole brand scrape before any extraction ran. A standard browser
+ * UA is required to read the public pages we're crawling.
  */
 export interface FetchResult {
   ok: boolean;
@@ -12,7 +19,7 @@ export interface FetchResult {
 }
 
 const USER_AGENT =
-  'alkatera-distributor-bot/1.0 (+https://alkatera.com/distributor-bot; sustainability data discovery)';
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 const TIMEOUT_MS = 10_000;
 
