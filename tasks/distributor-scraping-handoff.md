@@ -31,7 +31,22 @@ Unified brand scoring lives in `lib/distributor/scoring/`:
 
 ---
 
-## ❌ THE BLOCKER: scrape background function crashes at load
+## ✅ BLOCKER FIXED (2026-06-05, commit `fb115fee`, deployed live)
+Root cause was the *opposite* of fix A's framing: `external_node_modules = ["nanoid"]`
+in `netlify.toml` told esbuild NOT to inline nanoid, leaving a runtime
+`require('nanoid/non-secure')` and relying on Netlify to copy the package next to the
+function. Under pnpm's symlinked `node_modules`, Netlify's file-tracer never copies it →
+`Runtime.ImportModuleError` at init. **Fix: removed `external_node_modules`** so esbuild
+inlines nanoid's source into the single function bundle (no runtime require).
+Verified locally: esbuild bundles clean (CJS+ESM, incl. the dynamic scoring import),
+zero leftover `require("nanoid")`, bundle `require()`s and exposes `handler`.
+`.npmrc public-hoist-pattern` (fix A) was NOT needed and NOT applied.
+Pending: live end-to-end confirmation (trigger a scrape, watch the fn log show
+`[scrape-brand-bg] done` instead of the init error).
+
+---
+
+## ❌ (HISTORICAL) THE BLOCKER: scrape background function crashed at load
 
 ### Architecture now (correct, but the last link crashes)
 `netlify.toml` schedules the Next route every 2 min:
