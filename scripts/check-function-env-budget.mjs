@@ -25,6 +25,13 @@ const PLATFORM_VARS = new Set([
 
 const BUILD_ONLY = new Set([
   'NODE_VERSION', 'NEXT_TELEMETRY_DISABLED', 'NODE_OPTIONS',
+  // FEATURE_FLAGS is injected by Netlify's own build system (its internal
+  // per-site feature flags, as a JSON blob — can be ~9 KB). It is NOT a
+  // user/config env var (absent from `netlify env:list` / `env:get`) and
+  // is NOT forwarded to the Lambda function runtime — it exists only at
+  // build time for build plugins. Counting it here was a false positive
+  // that masked the real offenders.
+  'FEATURE_FLAGS',
 ]);
 
 const SHELL_VARS = new Set([
