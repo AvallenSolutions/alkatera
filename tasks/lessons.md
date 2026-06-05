@@ -82,3 +82,31 @@ POST handlers for vineyard/orchard growing profiles use explicit field lists in
 spreads `...updateFields`). When adding columns, update the explicit field list in
 `app/api/vineyards/[id]/growing-profile/route.ts` and
 `app/api/orchards/[id]/growing-profile/route.ts`.
+
+---
+
+## Netlify function "Cannot find module X" under pnpm — fix at the source, don't externalise (2026-06-05)
+Symptom: a Netlify background/function crashes at init with
+`Runtime.ImportModuleError: Cannot find module '<dep>/<subpath>'`
+(saw it as `nanoid/non-secure` in `scrape-brand-background`).
+
+Root cause: a *transitive* CJS dep does a nested `require('<dep>/...')`. Netlify's
+zip-it-and-ship-it (esbuild) bundler externalises that nested require, then can't copy
+the package through pnpm's symlinked `node_modules` → unresolved at runtime.
+
+What does NOT work: `external_node_modules=["<dep>"]` in netlify.toml, NOR removing it.
+Local `npx esbuild --bundle` inlines the dep fine, so it looks fixed locally but still
+crashes on Netlify — the two bundlers behave differently. Don't trust a local esbuild
+bundle as proof; ZISI is the source of truth.
+
+How to find the real importer FAST:
+`npx esbuild <fn>.ts --bundle --platform=node --metafile=/tmp/m.json --outfile=/tmp/b.js`
+then walk `inputs[*].imports` for the bad path, and walk *up* to the source file that
+pulls in the offending package.
+
+The fix that worked: remove the heavy dep from the function's import graph at the source.
+Here `extractors/html-to-text.ts` imported `sanitize-html` (→ postcss → nanoid) just to
+strip HTML to text — replaced with a dependency-free regex pass. Kept sanitize-html
+installed for the legit consumer (`app/blog/[slug]/page.tsx`). Lesson: a server-side
+text-extraction path should never pull a CSS parser; prefer the lightest dep that does
+the job, especially in code that gets bundled into a standalone Netlify function.
