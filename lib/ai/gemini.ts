@@ -459,6 +459,25 @@ export async function runGroundedSearch({
  * used `anthropic.messages.create({ messages:[{role:'user',content}] })` and
  * read `response.content[0].text`. Logs token usage.
  */
+/**
+ * Hard ceiling for a single non-interactive Gemini call. Without this,
+ * a stalled request blocks forever — and in the scraping pipeline (which
+ * makes several LLM calls per brand inside one Inngest step) a single
+ * hung call runs the step to its maxDuration, gets retried, and leaves
+ * the job stuck `running`. A timeout turns a hang into a clean error the
+ * caller can fall back on, so the job always completes.
+ */
+const GEMINI_CALL_TIMEOUT_MS = 60_000;
+
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`gemini_timeout:${label}:${ms}ms`)), ms),
+    ),
+  ]);
+}
+
 export async function runTextPrompt({
   apiKey,
   model = GEMINI_FAST_MODEL,
@@ -482,7 +501,7 @@ export async function runTextPrompt({
       ...(temperature != null ? { temperature } : {}),
     },
   });
-  const result = await generativeModel.generateContent(prompt);
+  const result = await withTimeout(generativeModel.generateContent(prompt), GEMINI_CALL_TIMEOUT_MS, op);
   logGeminiUsage(op, model, result);
   return result.response.text();
 }
@@ -510,7 +529,7 @@ export async function runJsonPrompt<T = Record<string, unknown>>({
     model,
     generationConfig: { maxOutputTokens: maxTokens, responseMimeType: 'application/json' },
   });
-  const result = await generativeModel.generateContent(prompt);
+  const result = await withTimeout(generativeModel.generateContent(prompt), GEMINI_CALL_TIMEOUT_MS, op);
   logGeminiUsage(op, model, result);
   const text = result.response
     .text()
