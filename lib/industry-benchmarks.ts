@@ -272,6 +272,75 @@ export function isKnownCategory(category: string | null | undefined): boolean {
 }
 
 /**
+ * Ordered keyword → category rules for deterministic category inference
+ * from free text (a brand name + its SKU/product names). Drinks products
+ * almost always name their type in plain text ("Arcane Rhum", "X Single
+ * Malt", "Y London Dry Gin"), so this resolves the vast majority of the
+ * catalogue with zero LLM calls — and works on data we already hold,
+ * unlike the website-corpus extractor which needs a (re)scrape.
+ *
+ * Rules are matched in order; the FIRST hit wins, so more specific terms
+ * (bourbon, single malt, rhum agricole) precede generic ones (whisky,
+ * rum). Each keyword is matched on a word boundary so "gin" doesn't fire
+ * on "ginger" and "ale" doesn't fire on "pale"/"whale".
+ */
+const CATEGORY_KEYWORD_RULES: Array<[RegExp, string]> = [
+  // Spirits — specific first
+  [/\bcacha[çc]a\b/i, 'Cachaça'],
+  [/\bbourbon\b/i, 'Bourbon'],
+  [/\brye\s+whisk(?:e)?y\b/i, 'Rye Whiskey'],
+  [/\b(?:single\s+malt|scotch|whisk(?:e)?y)\b/i, 'Whisky'],
+  [/\b(?:rhum|rum)\b/i, 'Rum'],
+  [/\btequila\b/i, 'Tequila'],
+  [/\bme[zs]cal\b/i, 'Mezcal'],
+  [/\bpisco\b/i, 'Pisco'],
+  [/\baguardiente\b/i, 'Aguardiente'],
+  [/\bvermouth\b/i, 'Vermouth'],
+  [/\b(?:cognac|armagnac|brandy)\b/i, 'Brandy'],
+  [/\bgrappa\b/i, 'Grappa'],
+  [/\babsinthe\b/i, 'Absinthe'],
+  [/\bvodka\b/i, 'Vodka'],
+  [/\bgin\b/i, 'Gin'],
+  [/\bliqueu?r\b/i, 'Liqueur'],
+  // Beer & cider
+  [/\bipa\b/i, 'IPA'],
+  [/\b(?:stout|porter)\b/i, 'Stout & Porter'],
+  [/\b(?:wheat\s+beer|witbier|hefeweizen)\b/i, 'Wheat Beer'],
+  [/\b(?:sour\s+beer|gose)\b/i, 'Sour Beer'],
+  [/\b(?:lager|pilsner|pils)\b/i, 'Lager'],
+  [/\bpale\s+ale\b/i, 'Ale'],
+  [/\bale\b/i, 'Ale'],
+  [/\bbeer\b/i, 'Lager'],
+  [/\bperry\b/i, 'Perry'],
+  [/\bcider\b/i, 'Cider'],
+  // Wine — specific varietals/styles first
+  [/\b(?:champagne|prosecco|cava|cr[ée]mant|sparkling)\b/i, 'Sparkling Wine'],
+  [/\b(?:port|sherry|madeira|fortified)\b/i, 'Fortified Wine'],
+  [/\bnatural\s+wine\b/i, 'Natural Wine'],
+  // The accented "rosé" is unambiguous wine; bare "rose" only counts when
+  // followed by "wine" (avoids "rosemary"/"primrose"). A trailing \b after
+  // "é" never matches in JS (é is a non-word char), so match it directly.
+  [/rosé|\bros[eé]\s+wine\b/i, 'Rosé'],
+  [/\b(?:red\s+wine|cabernet|merlot|shiraz|syrah|malbec|pinot\s+noir|tempranillo)\b/i, 'Red Wine'],
+  [/\b(?:white\s+wine|chardonnay|sauvignon|riesling|pinot\s+grigio|chenin)\b/i, 'White Wine'],
+  // RTD
+  [/\bhard\s+seltzer\b/i, 'Hard Seltzer'],
+];
+
+/**
+ * Best-effort deterministic category from free text (brand + product
+ * names). Returns a value from {@link KNOWN_PRODUCT_CATEGORIES} or null.
+ * No I/O, no LLM — pure keyword matching, safe to run on every recalc.
+ */
+export function inferCategoryFromText(text: string | null | undefined): string | null {
+  if (!text) return null;
+  for (const [pattern, category] of CATEGORY_KEYWORD_RULES) {
+    if (pattern.test(text)) return category;
+  }
+  return null;
+}
+
+/**
  * Get the industry benchmark for a given product category.
  * Returns category-specific override if available, otherwise group benchmark, otherwise default.
  */

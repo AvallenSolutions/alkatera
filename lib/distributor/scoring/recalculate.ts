@@ -8,7 +8,7 @@ import {
   type CategoryConfidence,
 } from './pillar-scorer';
 import { detectBrandCategory } from './category-detector';
-import { isKnownCategory } from '@/lib/industry-benchmarks';
+import { isKnownCategory, inferCategoryFromText } from '@/lib/industry-benchmarks';
 import type { VitalityComposite } from '@/lib/vitality/composite';
 import type { FieldKey, Pillar } from '../scraping/field-definitions';
 
@@ -322,6 +322,18 @@ async function resolveCategory(
       dbSource: 'detected',
       confidence: isKnownCategory(scrapedCategory) ? 'detected' : 'industry_default',
     };
+  }
+
+  // Deterministic inference from the brand name + SKU/product names.
+  // Drinks products almost always name their type in plain text
+  // ("Arcane Rhum", "X Single Malt", "Y London Dry Gin"), so this
+  // resolves most of the catalogue with zero LLM calls and — crucially —
+  // works on data we already hold, so a plain rescore backfills category
+  // for brands whose website scrape captured nothing. Runs before the LLM
+  // detector because it's both more reliable here and free.
+  const inferred = inferCategoryFromText([brandName, ...skuNames].join(' '));
+  if (inferred) {
+    return { category: inferred, dbSource: 'detected', confidence: 'detected' };
   }
 
   if (allowDetect) {
