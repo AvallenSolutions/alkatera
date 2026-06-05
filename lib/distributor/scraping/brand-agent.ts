@@ -8,7 +8,12 @@ import {
 } from './sources';
 import { scoreConfidence } from './confidence-scorer';
 import { coerceFieldValue, type FieldKey } from './field-definitions';
-import { recalculateCompleteness } from '../scoring/recalculate';
+// recalculateCompleteness is imported dynamically at the call site below.
+// It pulls in the vitality scoring graph (@/lib/vitality/*), which drags
+// transitive deps (e.g. nanoid) that the standalone Netlify background
+// bundler can choke on. Keeping the import lazy means the scrape function
+// always LOADS — a scoring/bundling hiccup degrades to "findings saved,
+// score recomputed later" instead of crashing the whole function at init.
 import {
   resolveOrCreateProductEntrySmart,
   clearProductDedupCache,
@@ -270,6 +275,7 @@ export async function runBrandAgent(args: RunBrandAgentArgs): Promise<RunBrandAg
   // rows. Best-effort — if the Phase 5 migration is not yet applied,
   // the call no-ops because the snapshot insert fails silently.
   try {
+    const { recalculateCompleteness } = await import('../scoring/recalculate');
     await recalculateCompleteness(supabase, brandDirectoryId);
   } catch {
     // swallow — score recalculation is a follow-on, not load-bearing.

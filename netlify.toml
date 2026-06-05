@@ -110,6 +110,16 @@
 [functions."app/api/cron/process-scraping-queue/route"]
   schedule = "*/2 * * * *"   # every 2 minutes — 8 brands/run clears a catalogue in ~2h
 
+# The brand scrape runs as a background function (15-min budget). Its
+# import graph pulls in transitive deps (e.g. nanoid via the vitality
+# scoring modules) that the default esbuild bundler leaves as unresolved
+# runtime requires. external_node_modules forces Netlify to COPY these
+# packages into the function bundle so `require('nanoid/non-secure')`
+# resolves at runtime instead of throwing Runtime.ImportModuleError.
+[functions."scrape-brand-background"]
+  node_bundler = "esbuild"
+  external_node_modules = ["nanoid"]
+
 [functions."app/api/cron/process-document-queue/route"]
   schedule = "*/2 * * * *"   # every 2 minutes
 
