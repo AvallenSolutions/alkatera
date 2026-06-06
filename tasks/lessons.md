@@ -127,3 +127,26 @@ Diagnosis trick: reproduce `fetchPage` with the bot UA vs a browser UA against t
 brand's real site — `403 (bot) / 200 (browser)` confirms it instantly. Fix: use a
 standard Chrome UA string. Don't reintroduce a bot UA for "politeness"; it silently
 fails real-world WAF-protected sites.
+
+---
+
+## Derive brand category from data you already hold, not just an LLM (2026-06-06)
+Brand "Category" was blank catalogue-wide because the only populator was a flaky LLM call
+(`detectBrandCategory`) that silently returns null with no GEMINI_API_KEY, no scraped
+description, or an unrecognised answer. Meanwhile the category was sitting in plain text in
+the brand name + SKU product names ("Arcane Rhum", "X Single Malt", "Colombo 7 London Dry
+Gin"). Fix: `inferCategoryFromText()` in `lib/industry-benchmarks.ts` — ordered,
+word-boundary keyword rules mapping brand+SKU text to the known category set. Deterministic,
+no I/O, runs in `recalculate.ts` `resolveCategory` ahead of the LLM, so a plain "Rescore
+all" backfills the catalogue from existing data (2 -> 61 of 68). Lessons:
+- When a field is null everywhere, check the DISPLAY first: list views read different
+  columns than the detail page (brand list read `brand_profiles.category`, detail read
+  `brand_directory.category`; neither used the scraped fallback). Mirror canonical values
+  onto `brand_directory` and coalesce listing -> directory -> scraped in the views.
+- Don't let an auto-derived value masquerade as human-declared. `resolveCategory` trusted
+  any existing `brand_directory.category` as 'declared', so a 2nd recalc froze inferred
+  categories and they could never be re-derived. Gate on `category_source === 'declared'`.
+- Admin "rescore everything" endpoints must batch (client-driven offset/limit + retry).
+  Recalc-all-in-one-request 504'd past Netlify's ~26s ceiling and returned an HTML page,
+  surfacing as "Unexpected token '<' ... is not valid JSON" in the button. maxDuration=60
+  is a Vercel hint the Netlify Next plugin ignores.
