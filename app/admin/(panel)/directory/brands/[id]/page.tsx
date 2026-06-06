@@ -26,6 +26,8 @@ import {
 import { BrandNotableFactsPanel } from '@/components/admin/directory/brand-notable-facts-panel';
 import { BrandScoreBreakdownPanel } from '@/components/admin/directory/brand-score-breakdown-panel';
 import { FIELD_DEFINITIONS, type FieldKey } from '@/lib/distributor/scraping/field-definitions';
+import { KeyDetailsEditor } from '@/components/directory/key-details-editor';
+import { KNOWN_PRODUCT_CATEGORIES } from '@/lib/industry-benchmarks';
 import {
   scoreFromScrapedFields,
   scoreFromAlkateraComposite,
@@ -333,6 +335,14 @@ export default async function AdminBrandDetailPage({
             value={brand.parent_company}
           />
         </dl>
+        <KeyDetailsEditor
+          endpoint={`/api/admin/directory/brands/${brand.id}/key-details`}
+          initialCategory={brand.category}
+          initialCountry={brand.country_of_origin}
+          canEdit
+          categorySuggestions={KNOWN_PRODUCT_CATEGORIES}
+          scopeNote="Saved to the canonical brand record (visible to every distributor). A manually set category is marked authoritative and won't be overwritten by auto-detection."
+        />
         {brand.website && (
           <div className="text-sm pt-3">
             <a

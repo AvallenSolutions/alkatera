@@ -12,6 +12,8 @@ import {
 import { getSupabasePortalServerClient } from '@/lib/supabase/portal-server-client';
 import { Button } from '@/components/ui/button';
 import { WebsiteEditor } from '@/components/distributor/brand-detail/website-editor';
+import { KeyDetailsEditor } from '@/components/directory/key-details-editor';
+import { KNOWN_PRODUCT_CATEGORIES } from '@/lib/industry-benchmarks';
 import { FindingStatus } from '@/components/distributor/brand-detail/finding-status';
 import { CompanyDescription } from '@/components/distributor/brand-detail/company-description';
 import { VitalityCard } from '@/components/distributor/brand-detail/vitality-card';
@@ -415,6 +417,14 @@ export default async function BrandOverviewPage({ params }: PageProps) {
             />
             <Detail label="alkatera tier" value={`Tier ${brand.alkatera_tier}`} />
           </dl>
+          <KeyDetailsEditor
+            endpoint={`/api/distributor/brands/${brand.id}`}
+            initialCategory={displayCategory}
+            initialCountry={displayCountry}
+            canEdit={canEdit}
+            categorySuggestions={KNOWN_PRODUCT_CATEGORIES}
+            scopeNote="Saved to your listing of this brand. Use it to fill in an unusual category or a missing country the auto-detection can't determine."
+          />
         </div>
       </div>
 
