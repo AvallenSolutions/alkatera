@@ -55,7 +55,7 @@ export async function recalculateCompleteness(
 ): Promise<RecalcResult | null> {
   const { data: directory } = await supabase
     .from('brand_directory')
-    .select('id, alkatera_org_id, name, category, country_of_origin')
+    .select('id, alkatera_org_id, name, category, category_source, country_of_origin')
     .eq('id', brandDirectoryId)
     .maybeSingle();
   if (!directory) return null;
@@ -63,6 +63,7 @@ export async function recalculateCompleteness(
     alkatera_org_id: string | null;
     name: string | null;
     category: string | null;
+    category_source: 'declared' | 'detected' | 'default' | null;
     country_of_origin: string | null;
   };
   const scoringMode: 'alkatera' | 'scraped' = dir.alkatera_org_id ? 'alkatera' : 'scraped';
@@ -132,6 +133,7 @@ export async function recalculateCompleteness(
     supabase,
     brandDirectoryId,
     dir.category,
+    dir.category_source,
     dir.name ?? '',
     valuesForVitality,
     scoringMode === 'scraped',
@@ -277,11 +279,19 @@ async function resolveCategory(
   supabase: SupabaseClient,
   brandDirectoryId: string,
   declared: string | null,
+  declaredSource: 'declared' | 'detected' | 'default' | null,
   brandName: string,
   values: Map<FieldKey, FieldValue>,
   allowDetect: boolean,
 ): Promise<ResolvedCategory> {
-  if (declared && declared.trim()) {
+  // Only honour the directory's own category when it was genuinely
+  // declared (curated / imported), NOT when a previous recalc auto-set
+  // it. If we trusted any existing value, an inferred category would be
+  // read back as "declared" on the next run — masquerading as human data
+  // and, worse, freezing it so improved inference rules could never
+  // update it. Re-deriving below keeps auto categories both honestly
+  // labelled ('detected') and re-derivable.
+  if (declared && declared.trim() && declaredSource === 'declared') {
     return { category: declared.trim(), dbSource: 'declared', confidence: 'declared' };
   }
 
