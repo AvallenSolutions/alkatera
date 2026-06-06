@@ -12,6 +12,7 @@ import {
   LogOut,
   Search,
   Lock,
+  GitMerge,
   type LucideIcon,
 } from 'lucide-react';
 import { getSupabasePortalBrowserClient } from '@/lib/supabase/portal-browser-client';
@@ -48,7 +49,10 @@ const NAV_SECTIONS_DEFAULT: NavSection[] = [
   },
   {
     label: 'Engage',
-    items: [{ name: 'Outreach', href: '/distributor/outreach', icon: Mail }],
+    items: [
+      { name: 'Outreach', href: '/distributor/outreach', icon: Mail },
+      { name: 'Data conflicts', href: '/distributor/conflicts', icon: GitMerge },
+    ],
   },
   {
     label: 'Prove',
