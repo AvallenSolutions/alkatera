@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Mail, Check, Copy, ExternalLink } from 'lucide-react';
+import { Mail, Check, Copy, ExternalLink, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -30,11 +30,17 @@ export function BrandOutreachCard({
   const router = useRouter();
   const [email, setEmail] = useState(initialEmail ?? '');
   const [savedEmail, setSavedEmail] = useState(initialEmail ?? '');
-  const [busy, setBusy] = useState<'save' | 'send' | 'remind' | null>(null);
+  const [busy, setBusy] = useState<'save' | 'send' | 'remind' | 'regen' | null>(null);
   const [feedback, setFeedback] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  // Token + expiry are kept in local state so a regenerate updates the
+  // copy link and expiry display instantly (router.refresh() also re-syncs
+  // from the server).
+  const [token, setToken] = useState(uploadToken);
+  const [expiresAt, setExpiresAt] = useState(uploadTokenExpiresAt);
 
   const dirty = email.trim() !== savedEmail;
-  const uploadUrl = uploadToken ? `/brand-upload/${uploadToken}` : null;
+  const uploadUrl = token ? `/brand-upload/${token}` : null;
+  const isExpired = !!expiresAt && new Date(expiresAt).getTime() < Date.now();
 
   async function saveEmail() {
     if (!email && !savedEmail) return;
@@ -97,6 +103,36 @@ export function BrandOutreachCard({
     }
   }
 
+  async function regenerate() {
+    if (isExpired === false && token) {
+      const ok = window.confirm(
+        'Generate a new upload link? The current link will stop working immediately.',
+      );
+      if (!ok) return;
+    }
+    setBusy('regen');
+    setFeedback(null);
+    try {
+      const res = await fetch(`/api/distributor/brands/${brandId}/regenerate-upload-link`, {
+        method: 'POST',
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        brand?: { upload_token: string; upload_token_expires_at: string };
+        error?: string;
+      };
+      if (!res.ok || !body.brand) {
+        setFeedback({ type: 'err', text: `Could not regenerate link (${body.error ?? res.status}).` });
+      } else {
+        setToken(body.brand.upload_token);
+        setExpiresAt(body.brand.upload_token_expires_at);
+        setFeedback({ type: 'ok', text: 'New upload link generated. Copy it to share.' });
+        router.refresh();
+      }
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className="rounded-xl border border-border/60 bg-gradient-to-br from-sky-500/5 via-card/40 to-card/40 p-5 space-y-4">
       <div className="flex items-center gap-2">
@@ -142,13 +178,24 @@ export function BrandOutreachCard({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
         <Stat label="Status" value={statusText(outreachSentAt, reminderCount, lastReminderAt)} />
-        {uploadTokenExpiresAt && (
+        {expiresAt && (
           <Stat
-            label="Link expires"
-            value={new Date(uploadTokenExpiresAt).toLocaleDateString()}
+            label="Upload link"
+            value={
+              isExpired
+                ? `Expired ${new Date(expiresAt).toLocaleDateString()}`
+                : `Expires ${new Date(expiresAt).toLocaleDateString()}`
+            }
+            tone={isExpired ? 'warn' : undefined}
           />
         )}
       </div>
+
+      {isExpired && canEdit && (
+        <div className="text-xs text-amber-300/90">
+          This upload link has expired. Generate a new one to let the brand submit data again.
+        </div>
+      )}
 
       {canEdit && (
         <div className="flex flex-wrap gap-2 pt-1">
@@ -176,7 +223,7 @@ export function BrandOutreachCard({
               {busy === 'remind' ? 'Sending…' : 'Send reminder'}
             </Button>
           )}
-          {uploadUrl && (
+          {uploadUrl && !isExpired && (
             <>
               <Button
                 size="sm"
@@ -198,6 +245,26 @@ export function BrandOutreachCard({
               </Button>
             </>
           )}
+          <Button
+            size="sm"
+            variant={isExpired || !token ? 'default' : 'outline'}
+            disabled={busy !== null}
+            onClick={regenerate}
+            className={
+              isExpired || !token
+                ? 'bg-sky-400 hover:bg-sky-300 text-black font-semibold'
+                : 'border-sky-500/40 text-sky-200 hover:bg-sky-500/10 hover:text-sky-100'
+            }
+          >
+            {busy === 'regen' ? (
+              'Generating…'
+            ) : (
+              <>
+                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                {token ? 'Regenerate link' : 'Generate link'}
+              </>
+            )}
+          </Button>
         </div>
       )}
 
@@ -214,13 +281,13 @@ export function BrandOutreachCard({
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, tone }: { label: string; value: string; tone?: 'warn' }) {
   return (
     <div className="rounded-lg border border-border/60 bg-background/40 p-3">
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-0.5">
         {label}
       </div>
-      <div className="text-sm font-medium">{value}</div>
+      <div className={`text-sm font-medium ${tone === 'warn' ? 'text-amber-300' : ''}`}>{value}</div>
     </div>
   );
 }
