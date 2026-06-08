@@ -52,6 +52,9 @@ export interface AlkateraEvents {
 
   // ─────────── Brand matching ───────────
   'matching/sweep.run': { data: Record<string, never> };
+
+  // ─────────── Monitoring ───────────
+  'monitoring/openlca-cert.check': { data: Record<string, never> };
 }
 
 const eventKey = process.env.INNGEST_EVENT_KEY;

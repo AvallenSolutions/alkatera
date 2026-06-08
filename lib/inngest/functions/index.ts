@@ -12,6 +12,7 @@ import { scrapingQueueTick, scrapingBrandRun } from './scraping';
 import { enrichBrandRun } from './enrich';
 import { documentsQueueTick, documentsProcessOne } from './documents';
 import { matchingSweepRun } from './matching';
+import { openlcaCertMonitor } from './monitoring';
 
 export const allFunctions: InngestFunction.Any[] = [
   scrapingQueueTick,
@@ -20,4 +21,5 @@ export const allFunctions: InngestFunction.Any[] = [
   documentsQueueTick,
   documentsProcessOne,
   matchingSweepRun,
+  openlcaCertMonitor,
 ];
