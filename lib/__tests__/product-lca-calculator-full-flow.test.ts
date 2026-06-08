@@ -382,6 +382,70 @@ describe('calculateProductCarbonFootprint', () => {
   });
 
   // --------------------------------------------------------------------------
+  // DRAFT PCF REUSE — idempotent persistence (no duplicate materials)
+  // --------------------------------------------------------------------------
+  //
+  // Regression test for the tripled-ingredient bug: recalculating into an
+  // existing draft PCF reuses the same PCF id, but persistence is insert-only.
+  // Without a reset, each recalc APPENDED another full set of materials and
+  // production sites, so a thrice-recalculated PCF showed 14 materials × 3 = 42.
+  // The fix clears the PCF's derived child rows before repopulating them.
+
+  describe('Draft PCF reuse (idempotent persistence)', () => {
+    // Wrap the default `from` impl so other tables keep working, while we spy on
+    // delete/insert for the two child tables that previously accumulated.
+    function spyOnChildTables() {
+      const spies = {
+        materialsDelete: vi.fn(),
+        materialsInsert: vi.fn(),
+        sitesDelete: vi.fn(),
+      };
+      const defaultImpl = mockSupabaseClient.from.getMockImplementation()!;
+      mockSupabaseClient.from.mockImplementation((table: string) => {
+        if (table === 'product_carbon_footprint_materials') {
+          const mock = createQueryMock({ data: null, error: null }) as Record<string, ReturnType<typeof vi.fn>>;
+          mock.delete = vi.fn(() => { spies.materialsDelete(); return mock; });
+          mock.insert = vi.fn(() => { spies.materialsInsert(); return mock; });
+          return mock;
+        }
+        if (table === 'product_carbon_footprint_production_sites') {
+          const mock = createQueryMock({ data: [], error: null }) as Record<string, ReturnType<typeof vi.fn>>;
+          mock.delete = vi.fn(() => { spies.sitesDelete(); return mock; });
+          return mock;
+        }
+        return defaultImpl(table);
+      });
+      return spies;
+    }
+
+    it('clears previous-run child rows before re-inserting when reusing an existing PCF', async () => {
+      const spies = spyOnChildTables();
+
+      const result = await calculateProductCarbonFootprint({
+        productId: 'prod-001',
+        draftPcfId: 'lca-001', // existing PCF → update branch returns a row → reuse
+      });
+
+      expect(result.success).toBe(true);
+      // The reset must run, and the fresh set must still be inserted afterwards.
+      expect(spies.materialsDelete).toHaveBeenCalled();
+      expect(spies.sitesDelete).toHaveBeenCalled();
+      expect(spies.materialsInsert).toHaveBeenCalled();
+    });
+
+    it('does NOT clear child rows for a fresh (non-reused) PCF', async () => {
+      const spies = spyOnChildTables();
+
+      await calculateProductCarbonFootprint({ productId: 'prod-001' }); // no draftPcfId
+
+      expect(spies.materialsDelete).not.toHaveBeenCalled();
+      expect(spies.sitesDelete).not.toHaveBeenCalled();
+      // A fresh PCF still inserts its materials.
+      expect(spies.materialsInsert).toHaveBeenCalled();
+    });
+  });
+
+  // --------------------------------------------------------------------------
   // TRANSPORT EMISSIONS
   // --------------------------------------------------------------------------
 
@@ -444,7 +508,9 @@ describe('calculateProductCarbonFootprint', () => {
 
   describe('Error recovery', () => {
     it('cleans up LCA record when material resolution fails', async () => {
-      mockResolveImpactFactors.mockRejectedValueOnce(new Error('Factor not found'));
+      // Use mockRejectedValue (not Once) so both the parallel pre-resolution phase
+      // and the serial fallback loop both reject — preventing the fallback from succeeding.
+      mockResolveImpactFactors.mockRejectedValue(new Error('Factor not found'));
 
       const result = await calculateProductCarbonFootprint({ productId: 'prod-001' });
       expect(result.success).toBe(false);

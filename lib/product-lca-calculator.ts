@@ -348,6 +348,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
 
     let lca: any = null;
     let lcaError: any = null;
+    let reusedExistingPcf = false;
     if (params.draftPcfId) {
       const { data, error } = await supabase
         .from('product_carbon_footprints')
@@ -357,6 +358,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         .maybeSingle();
       lca = data;
       lcaError = error;
+      reusedExistingPcf = !error && !!data;
       // Stale draftPcfId (row deleted, org switched, RLS blocked, etc.):
       // UPDATE returned no row. Fall through to INSERT so the calculation
       // can still proceed instead of failing the whole run.
@@ -399,6 +401,32 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
     }
 
     console.log(`[calculateProductCarbonFootprint] Created LCA record: ${lca.id}`);
+
+    // When recalculating into an existing (reused) draft PCF, the derived child
+    // rows from the previous run are still attached to this PCF id. The
+    // persistence below is insert-only, so without this reset each recalc would
+    // APPEND a second full set — duplicating every material and production site
+    // (root cause of the tripled-ingredient reports). Clear them so a recalc
+    // replaces rather than accumulates. No-op for a freshly-inserted PCF.
+    if (reusedExistingPcf) {
+      const { error: clearMaterialsError } = await supabase
+        .from('product_carbon_footprint_materials')
+        .delete()
+        .eq('product_carbon_footprint_id', lca.id);
+      const { error: clearSitesError } = await supabase
+        .from('product_carbon_footprint_production_sites')
+        .delete()
+        .eq('product_carbon_footprint_id', lca.id);
+      if (clearMaterialsError || clearSitesError) {
+        console.warn(
+          `[calculateProductCarbonFootprint] ⚠️ Failed to clear stale child rows for reused PCF ${lca.id}:`,
+          clearMaterialsError?.message || clearSitesError?.message
+        );
+      } else {
+        console.log(`[calculateProductCarbonFootprint] Cleared previous-run child rows for reused PCF ${lca.id}`);
+      }
+    }
+
     onProgress?.('Processing facility allocations...', 50);
 
     // 4a. Handle facility allocations
