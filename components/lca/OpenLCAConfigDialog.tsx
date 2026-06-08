@@ -29,6 +29,15 @@ interface OpenLCAConfig {
   defaultAllocationMethod?: string;
 }
 
+interface CertCheck {
+  source: string;
+  ok: boolean;
+  validTo: string | null;
+  daysRemaining: number | null;
+  expired: boolean;
+  error?: string;
+}
+
 interface OpenLCAConfigDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -55,10 +64,13 @@ export function OpenLCAConfigDialog({
     success: boolean;
     message: string;
   } | null>(null);
+  const [certChecks, setCertChecks] = useState<CertCheck[] | null>(null);
+  const [certLoading, setCertLoading] = useState(false);
 
   useEffect(() => {
     if (open && currentOrganization?.id) {
       loadConfiguration();
+      fetchCertStatus();
     }
   }, [open, currentOrganization?.id]);
 
@@ -126,6 +138,57 @@ export function OpenLCAConfigDialog({
     } finally {
       setIsTesting(false);
     }
+  };
+
+  // Auto-loaded TLS certificate expiry for the live OpenLCA servers. Read-only
+  // and non-fatal: if it fails, the chips simply don't render. Backed by the
+  // same check the daily cert monitor runs (GET /api/admin/openlca/cert-check).
+  const fetchCertStatus = async () => {
+    setCertLoading(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) return;
+
+      const res = await fetch("/api/admin/openlca/cert-check", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+
+      const data = await res.json();
+      setCertChecks(Array.isArray(data.checks) ? data.checks : []);
+    } catch {
+      // Non-fatal — leave certChecks null so nothing renders.
+    } finally {
+      setCertLoading(false);
+    }
+  };
+
+  const renderCertChip = (c: CertCheck) => {
+    let variant: "success" | "warning" | "destructive" = "success";
+    let label: string;
+    let title: string;
+
+    if (!c.ok) {
+      variant = "destructive";
+      label = "unreachable";
+      title = c.error || "Could not read certificate";
+    } else if (c.expired) {
+      variant = "destructive";
+      label = "cert expired";
+      title = c.validTo ? `Expired ${new Date(c.validTo).toLocaleDateString()}` : "Certificate expired";
+    } else {
+      const days = c.daysRemaining ?? 0;
+      variant = days <= 14 ? "warning" : "success";
+      label = `${days}d left`;
+      title = c.validTo ? `Certificate valid until ${new Date(c.validTo).toLocaleDateString()}` : "";
+    }
+
+    return (
+      <Badge key={c.source} variant={variant} className="text-[10px]" title={title}>
+        {c.source}: {label}
+      </Badge>
+    );
   };
 
   const handleSave = async () => {
@@ -257,6 +320,17 @@ export function OpenLCAConfigDialog({
 
             {config.enabled && (
               <div className="pt-2">
+                {(certLoading || (certChecks && certChecks.length > 0)) && (
+                  <div className="mb-3 flex items-center gap-2 flex-wrap">
+                    <span className="text-xs text-muted-foreground">TLS certificate:</span>
+                    {certLoading && !certChecks ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                    ) : (
+                      certChecks?.map(renderCertChip)
+                    )}
+                  </div>
+                )}
+
                 <Button
                   onClick={testConnection}
                   disabled={isTesting || !config.serverUrl}
