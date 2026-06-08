@@ -47,6 +47,34 @@ let cachedAgribalyseProcesses: any[] | null = null;
 let cachedAgribalyseFilteredProcesses: any[] | null = null;
 let agribalyseCacheTimestamp: number = 0;
 
+// Track the last reachability error per live database so the API can report a
+// DEGRADED state (server unreachable) distinctly from a genuine "no matches".
+// Without this, a connection failure (e.g. expired TLS cert, server down) is
+// indistinguishable from an empty result set and fails silently. See
+// lib/openlca/client.ts for the underlying fetch.
+let openlcaFetchError: string | null = null;
+let agribalyseFetchError: string | null = null;
+
+/**
+ * Produce a concise, actionable label for a live-database fetch failure.
+ * Surfaces the common operational causes (TLS, timeout, DNS) so an outage is
+ * obvious in logs and in the response payload instead of looking like "0 results".
+ */
+function describeFetchError(error: unknown): string {
+  const msg = error instanceof Error ? error.message : String(error);
+  const lower = msg.toLowerCase();
+  if (lower.includes('cert') || lower.includes('altname') || lower.includes('ssl') || lower.includes('tls')) {
+    return `TLS certificate error (server cert may be expired/invalid): ${msg}`;
+  }
+  if (lower.includes('timed out') || lower.includes('timeout') || lower.includes('abort')) {
+    return `Connection timed out: ${msg}`;
+  }
+  if (lower.includes('enotfound') || lower.includes('econnrefused') || lower.includes('eai_again') || lower.includes('fetch failed')) {
+    return `Server unreachable (DNS/connection refused): ${msg}`;
+  }
+  return msg;
+}
+
 async function getOpenLCAProcesses(): Promise<any[]> {
   // Return cached processes if still valid
   if (cachedProcesses && Date.now() - cacheTimestamp < CACHE_DURATION_MS) {
@@ -63,9 +91,11 @@ async function getOpenLCAProcesses(): Promise<any[]> {
     cachedProcesses = Array.isArray(processes) ? processes : [];
     cachedFilteredProcesses = filterDrinksRelevantProcesses(cachedProcesses);
     cacheTimestamp = Date.now();
+    openlcaFetchError = null;
     return cachedProcesses;
   } catch (error) {
-    console.error('Error fetching ecoinvent OpenLCA processes:', error);
+    openlcaFetchError = describeFetchError(error);
+    console.error('[openlca] ecoinvent live search UNAVAILABLE —', openlcaFetchError);
     return [];
   }
 }
@@ -90,9 +120,11 @@ async function getAgribalyseProcesses(): Promise<any[]> {
     cachedAgribalyseProcesses = Array.isArray(processes) ? processes : [];
     cachedAgribalyseFilteredProcesses = filterAgribalyseProcesses(cachedAgribalyseProcesses);
     agribalyseCacheTimestamp = Date.now();
+    agribalyseFetchError = null;
     return cachedAgribalyseProcesses;
   } catch (error) {
-    console.error('Error fetching Agribalyse OpenLCA processes:', error);
+    agribalyseFetchError = describeFetchError(error);
+    console.error('[openlca] Agribalyse live search UNAVAILABLE —', agribalyseFetchError);
     return [];
   }
 }
@@ -751,6 +783,12 @@ export async function GET(request: NextRequest) {
       },
       openlca_enabled: process.env.OPENLCA_SERVER_ENABLED === 'true',
       agribalyse_enabled: isAgribalyseConfigured(),
+      // Degraded-state signals: true when the live database is configured/enabled
+      // but the last fetch attempt failed (unreachable, expired cert, timeout).
+      // Lets the client show "temporarily unavailable" instead of "no results".
+      openlca_error: openlcaFetchError,
+      agribalyse_error: agribalyseFetchError,
+      live_databases_degraded: Boolean(openlcaFetchError || agribalyseFetchError),
     });
 
   } catch (error) {

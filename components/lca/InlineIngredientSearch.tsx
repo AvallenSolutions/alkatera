@@ -71,6 +71,10 @@ interface SearchResponse {
     agribalyse_live: number;
   };
   openlca_enabled: boolean;
+  agribalyse_enabled?: boolean;
+  openlca_error?: string | null;
+  agribalyse_error?: string | null;
+  live_databases_degraded?: boolean;
 }
 
 interface InlineIngredientSearchProps {
@@ -126,6 +130,7 @@ export function InlineIngredientSearch({
   const [error, setError] = useState<string | null>(null);
   const [sourceCounts, setSourceCounts] = useState<SearchResponse['sources'] | null>(null);
   const [openLCAEnabled, setOpenLCAEnabled] = useState(false);
+  const [liveDbDegraded, setLiveDbDegraded] = useState(false);
   const [searchDuration, setSearchDuration] = useState(0);
   const [proxySuggestions, setProxySuggestions] = useState<ProxySuggestion[]>([]);
   const [loadingProxy, setLoadingProxy] = useState(false);
@@ -205,6 +210,7 @@ export function InlineIngredientSearch({
       setResults(data.results || []);
       setSourceCounts(data.sources);
       setOpenLCAEnabled(data.openlca_enabled);
+      setLiveDbDegraded(Boolean(data.live_databases_degraded));
       setShowResults(true);
 
     } catch (err) {
@@ -791,6 +797,24 @@ export function InlineIngredientSearch({
         <Card className="absolute z-50 mt-1 w-full shadow-lg">
           <div className="p-4 text-sm text-muted-foreground">
             <p className="text-center">No results found for &quot;{query}&quot;</p>
+
+            {/* Live reference databases unreachable: explain the degraded state
+                so users don't read an outage as "this ingredient doesn't exist". */}
+            {liveDbDegraded && (
+              <div className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-medium text-foreground">Reference databases temporarily unavailable</p>
+                    <p className="mt-0.5">
+                      The ecoinvent and Agribalyse databases could not be reached, so only your
+                      internal factors are shown. This is a server issue, not a missing ingredient.
+                      Please try again shortly or contact support if it persists.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Brand name suggestion in zero-results */}
             {(() => {
