@@ -20,7 +20,6 @@ import { SupplierOnboardingWizard } from '@/components/supplier-onboarding/Suppl
 import { RosaContextProvider } from '@/lib/rosa/RosaContextProvider'
 import { RealtimeRefreshProvider } from '@/lib/rosa/RealtimeRefreshProvider'
 import { RosaDrawer } from '@/components/rosa/RosaDrawer'
-import { RosaTrigger } from '@/components/rosa/RosaTrigger'
 
 interface AppLayoutProps {
   children: React.ReactNode
@@ -245,7 +244,6 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
         */}
         <RosaDrawer />
       </div>
-      <RosaTrigger />
     </>
   )
 }

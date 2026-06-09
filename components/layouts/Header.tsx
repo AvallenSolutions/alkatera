@@ -33,6 +33,7 @@ import {
 import { cn } from '@/lib/utils'
 import { FeedbackDialog } from '@/components/feedback/FeedbackDialog'
 import { NotificationBell } from '@/components/layouts/NotificationBell'
+import { RosaHeaderButton } from '@/components/rosa/RosaHeaderButton'
 
 interface HeaderProps {
   onMenuClick?: () => void
@@ -135,6 +136,7 @@ export function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
           {/* Header search ('Ask Rosa anything…') and Upload button removed —
               Rosa is now reachable via the floating drawer trigger and the
               hub, and uploads happen through the agent queue. */}
+          <RosaHeaderButton />
           <CommandPalette />
           <FeedbackDialog
             trigger={
