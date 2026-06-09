@@ -108,6 +108,51 @@ export function getAvailablePeriods(cadence: Cadence): Period[] {
   return periods;
 }
 
+const MONTH_ABBR = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
+/**
+ * Format an ISO date (YYYY-MM-DD) as "D Mon YYYY", e.g. "15 Jun 2024".
+ * Parses the parts directly to avoid timezone shifts from `new Date(iso)`.
+ */
+export function formatISODateDisplay(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return iso;
+  return `${d} ${MONTH_ABBR[m - 1]} ${y}`;
+}
+
+/**
+ * Format a date range as "15 Jun 2024 - 14 Jun 2025".
+ */
+export function formatPeriodRangeLabel(startISO: string, endISO: string): string {
+  return `${formatISODateDisplay(startISO)} - ${formatISODateDisplay(endISO)}`;
+}
+
+/**
+ * Build a day-precise, exactly-12-month reporting period from a start date.
+ * End = start + 1 year − 1 day, so the window is inclusive and a full 12 months.
+ *
+ * Examples:
+ *   getCustomAnnualPeriod("2024-06-15") → { start: "2024-06-15", end: "2025-06-14", … }
+ *   getCustomAnnualPeriod("2024-02-29") → { start: "2024-02-29", end: "2025-02-28", … }
+ *     (no 29 Feb the next year, so the window ends 28 Feb — still a full 12 months)
+ */
+export function getCustomAnnualPeriod(startISO: string): Period {
+  const [y, m, d] = startISO.split('-').map(Number);
+  // Same calendar day one year on, in UTC to avoid DST/timezone drift…
+  const endDate = new Date(Date.UTC(y + 1, m - 1, d));
+  // …then step back one day so the inclusive window is exactly 12 months.
+  endDate.setUTCDate(endDate.getUTCDate() - 1);
+  const end = endDate.toISOString().slice(0, 10);
+  return {
+    start: startISO,
+    end,
+    label: formatPeriodRangeLabel(startISO, end),
+  };
+}
+
 /**
  * Calculate the number of months a period covers.
  */

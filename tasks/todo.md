@@ -1,48 +1,60 @@
-# Production-run resource data: implausible-intensity guard
+# Reporting period flexibility
 
-## Context
-Two near-identical SKUs (products 107 = 6x pack, 139 = 4x pack) produced very
-different "Processing" footprints. Root cause confirmed in production data:
-`production_run_resource_data` rows share an identical `water_intake_m3 = 300`
-(a facility-period figure copy-pasted onto each product run), and the 4x pack run
-was logged as a half-day, 1,200-unit micro-batch. The Direct Run Data path divides
-run resources by the run's own production volume with no attribution, so the
-4x pack absorbed 250 L water/unit and 0.75 kWh/unit vs 6.2 L and 0.167 kWh on the
-6x pack. No code bug; the calculator faithfully processed bad input.
+## Part 1 — Financial Year: any month (Settings)
+Current: `components/settings/OrganisationSettings.tsx` (~L665-681) offers 4 presets
+(Jan/Apr/Jul/Oct). Stored as `report_defaults.reporting_period.fiscal_year_start_month`
+(number 1-12). Consumers (`lib/log-data/period-utils.ts`, `hooks/useReportingPeriod.ts`,
+`lib/xero/sync-service.ts`) ALREADY accept any month 1-12 — so this is UI-only.
 
-## Systemic fix (this change)
-Catch implausible per-unit run intensities before they reach a published report.
+- [ ] Replace the 4 SelectItems with all 12 months, annotating the conventional ones
+      (January = Calendar Year, April = UK Financial Year). No storage/consumer change.
 
-- [ ] 1. lib/validation/production-run-sanity.ts: pure utility computing per-unit
-      water (L/unit) and electricity (kWh/unit) intensities, returning warnings when
-      they exceed conservative, documented ceilings.
-- [ ] 2. lib/__tests__/production-run-sanity.test.ts: vitest coverage incl. the real
-      4x pack (250 L/unit -> flagged) and 6x pack (6.2 L/unit -> clean) numbers.
-- [ ] 3. Wire into components/facilities/ProductionRunDataEntry.tsx: live amber
-      warning banner in the Add dialog when entered figures look implausible
-      (non-blocking, prominent). Catches the error at entry time.
-- [ ] 4. Calculation-time guard in lib/product-lca-calculator.ts Direct Run Data
-      path: console.warn mirroring the existing attribution>1 pattern.
+## Part 2 — Facility Data: custom 12-month period to the day
+Current: `components/facilities/DirectDataEntry.tsx` cadence (monthly/quarterly/annual)
+→ `getAvailablePeriods()` dropdown; annual buckets are calendar/FY years only. Schema
+(`utility_data_entries`, `facility_activity_entries`) stores `reporting_period_start/end`
+as DATE — already supports arbitrary ranges. LCA facility allocation uses period-overlap
+queries (`product-lca-calculator.ts`) so custom ranges work downstream.
 
-## Out of scope (client must correct in UI; see instructions)
-- Correcting product 139's run data (water 300 m3 wrong; volume 1,200 likely wrong).
+- [ ] `lib/log-data/period-utils.ts`: add `getCustomAnnualPeriod(startISO)` →
+      `{ start, end = start + 1 year − 1 day, label }` + a range label formatter.
+- [ ] `DirectDataEntry.tsx`: for the **Annual** cadence add a "Custom 12-month period…"
+      entry to the period selector. When chosen, show a day-precision start-date input and
+      auto-compute + display the end (e.g. 15/06/2024 → 14/06/2025). The custom period
+      flows through as `selectedPeriod`; activity-date min/max already bind to it.
+- [ ] Keep monthly/quarterly unchanged; keep existing annual presets for convenience.
+
+## Decisions
+- Custom period is locked to exactly 12 months (custom start day, auto end), per the
+  requirement ("a full 12 month period") — not a free-form arbitrary-length range.
+- Only the Annual cadence gets the custom option.
+
+## Known limitation (flag, not fixing in this change)
+- `lib/xero/resolved-emissions.ts` buckets emissions by calendar year on
+  `reporting_period_start`. Facility utility/activity → LCA allocation is overlap-based and
+  unaffected; only the Xero financial-emissions yearly view assumes calendar years.
+  Refactor deferred unless wanted.
 
 ## Verification
-- [ ] vitest passes for the new test
+- [ ] Unit test for `getCustomAnnualPeriod` (incl. 15/06/2024 → 14/06/2025 + a leap-year start)
 - [ ] tsc clean for touched files
+- [ ] Manual: settings shows 12 months; facility annual "custom" yields a day-precise 12-month window
 - [ ] Review section completed
 
 ## Review (completed)
-- Added lib/validation/production-run-sanity.ts: pure `checkRunIntensity()` with
-  documented, generous per-unit ceilings (water 50 L/unit, electricity 5 kWh/unit
-  for discrete Units; scaled bases for Litres/Hectolitres/kg). Unknown units fall
-  back to the conservative Units basis.
-- Added lib/__tests__/production-run-sanity.test.ts (8 tests) covering the real
-  incident data: 4x pack 250 L/unit flagged, 6x pack 6.2 L/unit clean, 60ml clean.
-- Wired a live amber warning banner into ProductionRunDataEntry.tsx Add dialog
-  (non-blocking, recomputed via useMemo from current form state).
-- Added a calculation-time console.warn guard in the Direct Run Data path of
-  lib/product-lca-calculator.ts, mirroring the existing attribution>1 warning.
-- Verified: 8/8 new tests pass; calculator maturation suite still 13/13; tsc clean
-  for all touched files.
-- NOT changed: client production data (out of scope; client to correct via UI).
+- Part 1: `OrganisationSettings.tsx` financial-year selector now lists all 12 start
+  months (generated, `en-GB` month names), annotating January (Calendar Year) and
+  April (UK Financial Year). Storage (`fiscal_year_start_month`) and all consumers
+  already accepted 1-12, so no other changes were needed.
+- Part 2: added `getCustomAnnualPeriod()`, `formatPeriodRangeLabel()` and
+  `formatISODateDisplay()` to `lib/log-data/period-utils.ts`. `DirectDataEntry.tsx`
+  now offers "Custom 12-month period…" under the Annual cadence; picking it shows a
+  day-precision start-date input and auto-derives the end (start + 12 months − 1 day,
+  shown as e.g. "2024-06-15 to 2025-06-14 (12 months)"). The custom window flows
+  through `selectedPeriod`, so saved `reporting_period_start/end` and the activity-date
+  min/max all honour it. Monthly/quarterly and the annual presets are unchanged.
+- Tests: `lib/__tests__/log-data-period-utils.test.ts` (7) — spec example
+  15/06/2024 → 14/06/2025, calendar year, leap-day start, and both leap-year
+  boundary directions. tsc clean for all touched files.
+- Known limitation (unchanged): `lib/xero/resolved-emissions.ts` still buckets by
+  calendar year; facility → LCA allocation is overlap-based and handles custom periods.

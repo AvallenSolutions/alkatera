@@ -24,6 +24,7 @@ import {
 } from "@/lib/constants/utility-types";
 import { REFRIGERANT_GWP } from "@/lib/ghg-constants";
 import type { Cadence, Period } from "@/lib/log-data/period-utils";
+import { getCustomAnnualPeriod } from "@/lib/log-data/period-utils";
 import { AgentBanner } from "@/components/agents/AgentBanner";
 import { UtilityBillImportDialog } from "./UtilityBillImportDialog";
 import { UtilityRolloverDialog } from "./UtilityRolloverDialog";
@@ -78,7 +79,10 @@ export function DirectDataEntry({
   const { defaultCadence, getAvailablePeriods } = useReportingPeriod();
   const [cadence, setCadence] = useState<Cadence>(defaultCadence);
   const [periods, setPeriods] = useState<Period[]>([]);
+  // selectedPeriodIndex is the array index as a string, or the literal "custom"
+  // when the user has chosen a bespoke 12-month window (Annual cadence only).
   const [selectedPeriodIndex, setSelectedPeriodIndex] = useState<string>("0");
+  const [customStart, setCustomStart] = useState<string>("");
   const [activeTab, setActiveTab] = useState("utilities");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showBillImport, setShowBillImport] = useState(false);
@@ -107,7 +111,12 @@ export function DirectDataEntry({
     setSelectedPeriodIndex("0");
   }, [cadence, getAvailablePeriods]);
 
-  const selectedPeriod = periods[parseInt(selectedPeriodIndex)] || null;
+  const selectedPeriod: Period | null =
+    selectedPeriodIndex === "custom"
+      ? customStart
+        ? getCustomAnnualPeriod(customStart)
+        : null
+      : periods[parseInt(selectedPeriodIndex)] || null;
 
   // =========================================================================
   // Row management helpers
@@ -389,7 +398,17 @@ export function DirectDataEntry({
           </div>
           <div className="space-y-1.5 flex-1 min-w-[200px]">
             <Label className="text-xs font-medium text-muted-foreground">Period</Label>
-            <Select value={selectedPeriodIndex} onValueChange={setSelectedPeriodIndex}>
+            <Select
+              value={selectedPeriodIndex}
+              onValueChange={(v) => {
+                // Prefill the custom start with the most recent annual period's
+                // start so the date input isn't empty on first open.
+                if (v === "custom" && !customStart) {
+                  setCustomStart(periods[0]?.start || new Date().toISOString().slice(0, 10));
+                }
+                setSelectedPeriodIndex(v);
+              }}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Select period..." />
               </SelectTrigger>
@@ -399,12 +418,28 @@ export function DirectDataEntry({
                     {p.label}
                   </SelectItem>
                 ))}
+                {/* Custom day-precise 12-month window — Annual cadence only */}
+                {cadence === "annual" && (
+                  <SelectItem value="custom">Custom 12-month period…</SelectItem>
+                )}
               </SelectContent>
             </Select>
           </div>
+          {selectedPeriodIndex === "custom" && (
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-muted-foreground">Start date</Label>
+              <Input
+                type="date"
+                value={customStart}
+                onChange={(e) => setCustomStart(e.target.value)}
+                className="w-[170px]"
+              />
+            </div>
+          )}
           {selectedPeriod && (
             <div className="text-xs text-muted-foreground pb-2">
               {selectedPeriod.start} to {selectedPeriod.end}
+              {selectedPeriodIndex === "custom" && " (12 months)"}
             </div>
           )}
         </div>

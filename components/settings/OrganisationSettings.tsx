@@ -669,10 +669,22 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="1">Calendar Year (January–December)</SelectItem>
-                    <SelectItem value="4">UK Financial Year (April–March)</SelectItem>
-                    <SelectItem value="7">July–June</SelectItem>
-                    <SelectItem value="10">October–September</SelectItem>
+                    {/* All 12 start months. Label shows the full year span plus a
+                        note on the conventional choices. Value = 1-indexed month. */}
+                    {Array.from({ length: 12 }, (_, i) => {
+                      const startMonth = i + 1;
+                      const startName = new Date(2000, i, 1).toLocaleString('en-GB', { month: 'long' });
+                      const endName = new Date(2000, (i + 11) % 12, 1).toLocaleString('en-GB', { month: 'long' });
+                      const note =
+                        startMonth === 1 ? ' (Calendar Year)'
+                        : startMonth === 4 ? ' (UK Financial Year)'
+                        : '';
+                      return (
+                        <SelectItem key={startMonth} value={String(startMonth)}>
+                          {startName} to {endName}{note}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
