@@ -14,6 +14,8 @@ import {
   scopeSliceForOverhead,
   scopeSliceForXero,
 } from '@/lib/emissions/slice-mapping'
+import { getOrgFyStartMonth } from '@/lib/log-data/org-fiscal-year'
+import { getYearRangeForOrg, getLabelYearForDate } from '@/lib/log-data/period-utils'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -41,15 +43,17 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url)
     const orgId = url.searchParams.get('organizationId')
     const yearRaw = url.searchParams.get('year')
-    const year = yearRaw ? parseInt(yearRaw, 10) : new Date().getFullYear()
     if (!orgId) return NextResponse.json({ error: 'Missing organizationId' }, { status: 400 })
-    if (!Number.isFinite(year)) return NextResponse.json({ error: 'Invalid year' }, { status: 400 })
-
-    const yearStart = `${year}-01-01`
-    const yearEnd = `${year}-12-31`
 
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
     const supabase = createClient(supabaseUrl, serviceKey)
+
+    // Resolve the org's financial-year window. `year` is the reporting label year;
+    // for a calendar-year org this is exactly Jan-Dec, so behaviour is unchanged.
+    const fyStartMonth = await getOrgFyStartMonth(supabase, orgId)
+    const year = yearRaw ? parseInt(yearRaw, 10) : getLabelYearForDate(new Date(), fyStartMonth)
+    if (!Number.isFinite(year)) return NextResponse.json({ error: 'Invalid year' }, { status: 400 })
+    const { yearStart, yearEnd } = getYearRangeForOrg(year, fyStartMonth)
 
     const rows: ResolvedEmissionRow[] = []
 
@@ -94,10 +98,11 @@ export async function GET(request: NextRequest) {
     if (facilityIds.length > 0) {
       const { data: utilityRows } = await supabase
         .from('utility_data_entries')
-        .select('id, utility_type, quantity, unit, reporting_period_start')
+        .select('id, utility_type, quantity, unit, reporting_period_start, reporting_period_end')
         .in('facility_id', facilityIds)
-        .gte('reporting_period_start', yearStart)
+        // Overlap so non-calendar / custom 12-month periods are included.
         .lte('reporting_period_start', yearEnd)
+        .gte('reporting_period_end', yearStart)
 
       for (const u of utilityRows || []) {
         const rec = u as {

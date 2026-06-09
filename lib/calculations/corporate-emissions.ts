@@ -15,6 +15,8 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { GRID_FACTORS_BY_COUNTRY } from '@/lib/grid-emission-factors';
 import { getXeroResolvedEmissions } from '@/lib/xero/resolved-emissions';
+import { getYearRangeForOrg } from '@/lib/log-data/period-utils';
+import { getOrgFyStartMonth } from '@/lib/log-data/org-fiscal-year';
 
 // ============================================================================
 // TYPES
@@ -610,8 +612,13 @@ export async function calculateCorporateEmissions(
   organizationId: string,
   year: number
 ): Promise<CorporateEmissionsResult> {
-  const yearStart = `${year}-01-01`;
-  const yearEnd = `${year}-12-31`;
+  // `year` is the org's reporting *label* year. Resolve the actual window from
+  // the org's financial-year start month so non-calendar FY orgs (and the
+  // custom periods that feed facility data) report on the correct 12 months.
+  // For a calendar-year org (fyStartMonth = 1) this is exactly
+  // `${year}-01-01`..`${year}-12-31`, so existing orgs are unchanged.
+  const fyStartMonth = await getOrgFyStartMonth(supabase, organizationId);
+  const { yearStart, yearEnd } = getYearRangeForOrg(year, fyStartMonth);
 
   // Calculate all scopes
   const [scope1Base, scope2Base, scope3Base, xero] = await Promise.all([
