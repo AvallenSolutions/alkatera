@@ -19,6 +19,7 @@ import type { Orchard } from './types/orchard';
 import { getGridFactor } from './grid-emission-factors';
 import { getAwareFactor } from './calculations/water-risk';
 import { DEFAULT_RECYCLED_CONTENT_CREDIT } from './constants/packaging-defaults';
+import { checkRunIntensity } from './validation/production-run-sanity';
 import {
   getFacilityArchetypeById,
   resolveProxyEmissions,
@@ -649,6 +650,27 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
             `${directRunData.length} run(s), ${runElectricityKwh.toFixed(1)} kWh electricity, ` +
             `${runWaterM3.toFixed(2)} m³ water — no allocation needed for these resources`
           );
+
+          // Sanity guard: in the Direct Run Data path these resources are divided
+          // straight by the run's production volume with no attribution, so a
+          // facility-period figure entered against a small batch (or a wrong
+          // production volume) silently inflates the processing footprint. Flag
+          // implausible per-unit intensities so they don't reach a published report
+          // unnoticed. Non-fatal — the calculation still proceeds with the data given.
+          const intensityWarnings = checkRunIntensity({
+            productionVolume: allocation.productionVolume,
+            productionVolumeUnit: allocation.productionVolumeUnit || 'units',
+            electricityKwh: runElectricityKwh,
+            waterM3: runWaterM3,
+          });
+          for (const w of intensityWarnings) {
+            console.warn(
+              `[calculateProductCarbonFootprint] ⚠️ IMPLAUSIBLE RUN INTENSITY for ${allocation.facilityName} ` +
+              `(${w.field}): ${w.perUnit} per ${w.denominatorLabel} exceeds the ${w.threshold} ceiling. ` +
+              `Verify the production run resource data — this likely indicates a facility-period figure ` +
+              `entered against a single product run, or an incorrect production volume.`
+            );
+          }
         }
 
         const { data: utilityEntries, error: utilityError } = await supabase

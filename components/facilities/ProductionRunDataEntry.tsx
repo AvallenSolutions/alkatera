@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -47,10 +47,12 @@ import {
   Zap,
   Droplets,
   ArrowRightLeft,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 import { DATA_QUALITY_OPTIONS } from "@/lib/constants/utility-types";
+import { checkRunIntensity } from "@/lib/validation/production-run-sanity";
 
 // =============================================================================
 // Types
@@ -162,6 +164,33 @@ export function ProductionRunDataEntry({
     parseFloat(productionDays) > 0
       ? (parseFloat(electricityKwhPerDay) * parseFloat(productionDays)).toFixed(1)
       : null;
+
+  // Live sanity check: flag implausible per-unit intensities (e.g. a facility-wide
+  // water figure entered against a small batch) before the run is saved. Mirrors
+  // the calculation-time guard in lib/product-lca-calculator.ts.
+  const intensityWarnings = useMemo(() => {
+    const volume = parseFloat(productionVolume);
+    if (!Number.isFinite(volume) || volume <= 0) return [];
+    const electricityKwh =
+      electricityMode === "total"
+        ? parseFloat(electricityTotalKwh || "0")
+        : computedKwh
+          ? parseFloat(computedKwh)
+          : 0;
+    return checkRunIntensity({
+      productionVolume: volume,
+      productionVolumeUnit: volumeUnit,
+      electricityKwh,
+      waterM3: parseFloat(waterIntake || "0"),
+    });
+  }, [
+    productionVolume,
+    volumeUnit,
+    electricityMode,
+    electricityTotalKwh,
+    computedKwh,
+    waterIntake,
+  ]);
 
   // =========================================================================
   // Data loading
@@ -841,6 +870,18 @@ export function ProductionRunDataEntry({
                 />
               </div>
             </div>
+
+            {intensityWarnings.length > 0 && (
+              <Alert className="bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-xs text-amber-800 dark:text-amber-200 space-y-1">
+                  <span className="font-semibold block">This run looks unusual — please double-check before saving</span>
+                  {intensityWarnings.map((w) => (
+                    <span key={w.field} className="block">{w.message}</span>
+                  ))}
+                </AlertDescription>
+              </Alert>
+            )}
 
             <DialogFooter>
               <Button
