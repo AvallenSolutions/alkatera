@@ -376,7 +376,7 @@ export function EndOfLifeStep() {
               <thead>
                 <tr className="bg-muted/50 border-b text-xs">
                   <th className="text-left p-2 font-medium">Material</th>
-                  <th className="text-right p-2 font-medium">kg</th>
+                  <th className="text-right p-2 font-medium">Mass (g)</th>
                   <th className="text-center p-2 font-medium">
                     <span className="flex items-center justify-center gap-0.5">
                       <Recycle className="h-3 w-3" /> Recycle
@@ -423,7 +423,9 @@ export function EndOfLifeStep() {
                         </div>
                       </td>
                       <td className="p-2 text-right text-xs text-muted-foreground tabular-nums">
-                        {row.quantity.toFixed(2)}
+                        {/* row.quantity is normalised to kg; show grams (natural
+                            scale for packaging) so small items don't read 0.00 */}
+                        {(row.quantity * 1000).toLocaleString('en-GB', { maximumFractionDigits: 2 })}
                       </td>
                       <td className="p-1">
                         <Input
