@@ -89,6 +89,9 @@ export async function POST(request: NextRequest) {
     start.setDate(start.getDate() - 365);
     const priorStart = new Date(start);
     priorStart.setDate(priorStart.getDate() - 365);
+    // Financial-year context (calendar year when fyStartMonth === 1).
+    const fyStartMonth = await getOrgFyStartMonth(svc, organizationId);
+    const reportingYearFloor = getLabelYearForDate(today, fyStartMonth) - 1;
     const fmt = (d: Date) => d.toISOString().slice(0, 10);
 
     // Resolved shadow prices (needed by multiple sections).
@@ -136,7 +139,7 @@ export async function POST(request: NextRequest) {
     const [revenueRes, fteRes, unitsRes] = await Promise.all([
       svc.from('epr_organization_settings').select('annual_turnover_gbp').eq('organization_id', organizationId).maybeSingle(),
       svc.from('community_local_impact').select('total_employees').eq('organization_id', organizationId).order('reporting_year', { ascending: false }).limit(1).maybeSingle(),
-      svc.from('facility_emissions_aggregated').select('units_produced').eq('organization_id', organizationId).gte('reporting_year', today.getFullYear() - 1),
+      svc.from('facility_emissions_aggregated').select('units_produced').eq('organization_id', organizationId).gte('reporting_year', reportingYearFloor),
     ]);
     const revenue = Number(revenueRes.data?.annual_turnover_gbp ?? 0);
     const fte = Number(fteRes.data?.total_employees ?? 0);
@@ -239,7 +242,6 @@ export async function POST(request: NextRequest) {
       .from('carbon_budgets')
       .select('*')
       .eq('organization_id', organizationId);
-    const fyStartMonth = await getOrgFyStartMonth(svc, organizationId);
     const { yearStart: startOfYear } = getYearRangeForOrg(getLabelYearForDate(today, fyStartMonth), fyStartMonth);
     const yearSnapshots = (snapshots ?? []).filter(
       s => s.metric_key === 'total_co2e' && (s.snapshot_date as string) >= startOfYear,

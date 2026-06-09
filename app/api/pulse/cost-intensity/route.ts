@@ -23,6 +23,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getOrgFyStartMonth } from '@/lib/log-data/org-fiscal-year';
+import { getLabelYearForDate } from '@/lib/log-data/period-utils';
 import {
   computeCostIntensity,
   computeFinancialFootprint,
@@ -72,6 +74,10 @@ export async function GET(request: NextRequest) {
 
     // 1. Trailing-12-month environmental cost in £.
     const today = new Date();
+    // reporting_year is a year-integer aggregate column; floor the "recent rows"
+    // filter at the org's financial-year label year (calendar year when fyStartMonth=1).
+    const fyStartMonth = await getOrgFyStartMonth(svc, organizationId as string);
+    const reportingYearFloor = getLabelYearForDate(today, fyStartMonth) - 1;
     const start = new Date(today);
     start.setDate(start.getDate() - 365);
     const fmt = (d: Date) => d.toISOString().slice(0, 10);
@@ -127,7 +133,7 @@ export async function GET(request: NextRequest) {
         .from('facility_production_volumes')
         .select('production_volume, volume_unit, reporting_year')
         .eq('organization_id', organizationId)
-        .gte('reporting_year', today.getFullYear() - 1),
+        .gte('reporting_year', reportingYearFloor),
       svc
         .from('organizations')
         .select('company_size')
@@ -183,7 +189,7 @@ export async function GET(request: NextRequest) {
         .from('facility_emissions_aggregated')
         .select('units_produced')
         .eq('organization_id', organizationId)
-        .gte('reporting_year', today.getFullYear() - 1);
+        .gte('reporting_year', reportingYearFloor);
       unitsProduced = (legacy ?? []).reduce(
         (sum, row: any) => sum + Number(row.units_produced ?? 0),
         0,

@@ -26,6 +26,7 @@ import {
 } from 'recharts';
 import { Activity, Loader2, Target, TrendingUp } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
+import { useReportingPeriod } from '@/hooks/useReportingPeriod';
 import {
   useRegisterDrillSlot,
   type DrillSlotRenderer,
@@ -85,6 +86,9 @@ function BudgetCrud() {
  */
 function YearEndForecast() {
   const { currentOrganization } = useOrganization();
+  // Forecast over the org's financial year, not the calendar year.
+  const { getYearRange, currentLabelYear } = useReportingPeriod();
+  const { yearStart: fyStart, yearEnd: fyEnd } = getYearRange(currentLabelYear);
   const [annualBudget, setAnnualBudget] = useState<BudgetRow | null>(null);
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,7 +101,7 @@ function YearEndForecast() {
       try {
         const [budgetRes, snapRes] = await Promise.all([
           fetch(`/api/pulse/carbon-budgets?organization_id=${currentOrganization.id}`),
-          fetchYearToDateSnapshots(currentOrganization.id),
+          fetchYearToDateSnapshots(currentOrganization.id, fyStart),
         ]);
         const budgetJson = await budgetRes.json();
         if (cancelled) return;
@@ -113,11 +117,11 @@ function YearEndForecast() {
     return () => {
       cancelled = true;
     };
-  }, [currentOrganization?.id]);
+  }, [currentOrganization?.id, fyStart]);
 
   const chart = useMemo(
-    () => buildForecastChart(snapshots, annualBudget?.budget_tco2e ?? null),
-    [snapshots, annualBudget],
+    () => buildForecastChart(snapshots, annualBudget?.budget_tco2e ?? null, fyStart, fyEnd),
+    [snapshots, annualBudget, fyStart, fyEnd],
   );
 
   return (
@@ -355,10 +359,8 @@ function Stat({
   );
 }
 
-async function fetchYearToDateSnapshots(orgId: string): Promise<Snapshot[]> {
-  const startOfYear = new Date(new Date().getFullYear(), 0, 1)
-    .toISOString()
-    .slice(0, 10);
+async function fetchYearToDateSnapshots(orgId: string, fyStartISO: string): Promise<Snapshot[]> {
+  const startOfYear = fyStartISO;
   const today = new Date().toISOString().slice(0, 10);
   const { supabase } = await import('@/lib/supabaseClient');
   const { data } = await supabase
@@ -413,13 +415,16 @@ function monthlyTotals(snapshots: Snapshot[]): Array<{ month: string; t_co2e: nu
 function buildForecastChart(
   snapshots: Snapshot[],
   _annualBudget: number | null,
+  fyStartISO: string,
+  fyEndISO: string,
 ): {
   points: Array<{ date: string; actual: number | null; forecast: number | null; band: number[] | null }>;
   actualYtdT: number;
   projectedT: number;
 } {
-  const yearStartMs = new Date(new Date().getFullYear(), 0, 1).getTime();
-  const yearEndMs = new Date(new Date().getFullYear(), 11, 31).getTime();
+  // Project across the org's financial year (calendar year when fyStartMonth = 1).
+  const yearStartMs = new Date(`${fyStartISO}T00:00:00Z`).getTime();
+  const yearEndMs = new Date(`${fyEndISO}T00:00:00Z`).getTime();
 
   // Daily snapshots -> cumulative tonnes.
   const points: Array<{
@@ -450,7 +455,7 @@ function buildForecastChart(
     return { points, actualYtdT: cumulative, projectedT: cumulative };
   }
 
-  // Project forward in 7-day steps to 31 Dec.
+  // Project forward in 7-day steps to the financial-year end.
   const lastXDays = regressionPoints[regressionPoints.length - 1].x;
   const totalYearDays = (yearEndMs - yearStartMs) / 86_400_000;
 

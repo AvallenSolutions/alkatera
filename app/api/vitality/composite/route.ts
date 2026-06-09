@@ -38,6 +38,8 @@ import {
   todayIso,
   type TrendPoint,
 } from '@/lib/vitality/snapshot'
+import { getOrgFyStartMonth } from '@/lib/log-data/org-fiscal-year'
+import { getYearRangeForOrg, getLabelYearForDate } from '@/lib/log-data/period-utils'
 import {
   VITALITY_READ_TOOL,
   VITALITY_DETAIL_MAX,
@@ -174,12 +176,16 @@ async function resolveContext(req: NextRequest) {
 async function buildEnvironmentalInputs(
   service: SupabaseClient,
   organizationId: string,
+  fyStartMonth: number,
 ): Promise<Parameters<typeof computeEnvironmentalPillar>[0]> {
-  const yearNow = new Date().getFullYear()
-  const yearStart = `${yearNow}-01-01`
-  const yearEnd = `${yearNow}-12-31`
-  const priorStart = `${yearNow - 1}-01-01`
-  const priorEnd = `${yearNow - 1}-12-31`
+  // Reporting window follows the org's financial year (calendar year when
+  // fyStartMonth === 1). yearNow is the FY *label* year; the reporting_year
+  // integer filters below reuse it so the year-keyed aggregates stay aligned.
+  const yearNow = getLabelYearForDate(new Date(), fyStartMonth)
+  const { yearStart, yearEnd } = getYearRangeForOrg(yearNow, fyStartMonth)
+  const prior = getYearRangeForOrg(yearNow - 1, fyStartMonth)
+  const priorStart = prior.yearStart
+  const priorEnd = prior.yearEnd
 
   // Water billing periods rarely align with calendar years. Use rolling
   // 12-month windows (matching the facility_water_summary view) so that
@@ -900,6 +906,7 @@ async function buildEnvironmentalInputs(
 async function buildSocialInputs(
   service: SupabaseClient,
   organizationId: string,
+  fyStartMonth: number,
 ): Promise<Parameters<typeof computeSocialPillar>[0]> {
   // Community impact: compute LIVE from raw tables. Snapshot-based reads
   // went stale whenever an org added donations/volunteering after the
@@ -911,7 +918,7 @@ async function buildSocialInputs(
   // real for it too, but the calculation requires multi-table summary
   // building that's harder to extract). YoY for both still uses the
   // historical snapshots.
-  const currentYearForSocial = new Date().getFullYear()
+  const currentYearForSocial = getLabelYearForDate(new Date(), fyStartMonth)
   const [
     communityRows,
     peopleRows,
@@ -1385,9 +1392,10 @@ export async function GET(req: NextRequest) {
     snapshotDate = cachedSnapshot.snapshot_date
     trend = await loadTrend(service, organizationId)
   } else {
+    const fyStartMonth = await getOrgFyStartMonth(service, organizationId)
     const [envInputs, socialInputs, govInputs, weights] = await Promise.all([
-      buildEnvironmentalInputs(service, organizationId),
-      buildSocialInputs(service, organizationId),
+      buildEnvironmentalInputs(service, organizationId, fyStartMonth),
+      buildSocialInputs(service, organizationId, fyStartMonth),
       buildGovernanceInputs(service, organizationId),
       loadOrgWeights(service, organizationId),
     ])

@@ -69,5 +69,25 @@ DEFERRED (deliberate — need a holistic, separately-verified pass):
   board-pack `facility_emissions_aggregated`, composite `facility_water_data`): different
   data model (year integer, not date ranges) — out of scope for period flexibility.
 
-## Review (final)
-(to be completed once deferred items are decided)
+## Review (final — all complete)
+Remaining items now done (FY-aware via getOrgFyStartMonth + period-utils):
+- `vitality/composite`: fyStartMonth resolved once in GET, threaded into the
+  environmental + social builders so the whole composite score is internally
+  consistent for FY orgs (env date windows + social/water `reporting_year` filters
+  all use the FY label year). Governance is not time-bucketed.
+- `pulse/carbon-budgets/expanded.tsx` (client forecast widget): YTD fetch + the
+  forecast-to-year-end projection now run over the org's FY window via
+  useReportingPeriod, not the calendar year.
+- `cost-intensity` + `issb-disclosure` + board-pack `facility_emissions_aggregated`:
+  the `reporting_year`-integer "recent rows" floor now uses the FY label year.
+- `whatif-baseline`: confirmed a rolling trailing-12-month baseline anchored to now
+  (FY-agnostic by design) — correctly left unchanged.
+
+Verification: tsc clean for every touched file; vitality + pulse lib suites
+(3068 tests) and period-utils suites green. Calendar-year orgs (fyStartMonth=1)
+are provably unchanged everywhere (getYearRangeForOrg(y,1) === Jan-Dec,
+getLabelYearForDate(d,1) === d.getFullYear()).
+
+Minor follow-up (not data-affecting): `getReportingPeriodPresets` in
+lib/reporting-period-utils.ts still builds calendar-quarter preset BUTTONS; these
+are convenience presets for a date-range picker, not data bucketing — left as-is.

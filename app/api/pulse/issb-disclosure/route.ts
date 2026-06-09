@@ -18,6 +18,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getOrgFyStartMonth } from '@/lib/log-data/org-fiscal-year';
+import { getLabelYearForDate } from '@/lib/log-data/period-utils';
 import { loadShadowPrices } from '@/lib/pulse/shadow-prices';
 import { calculateRegulatoryExposure } from '@/lib/pulse/regulatory-exposure';
 import { buildIssbDisclosure } from '@/lib/pulse/issb-disclosure';
@@ -68,6 +70,9 @@ export async function GET(request: NextRequest) {
     const priorStart = new Date(start);
     priorStart.setDate(priorStart.getDate() - 365);
     const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    // reporting_year is a year-integer aggregate; floor at the org's FY label year.
+    const fyStartMonth = await getOrgFyStartMonth(svc, organizationId as string);
+    const reportingYearFloor = getLabelYearForDate(today, fyStartMonth) - 1;
 
     // Org name.
     const { data: org } = await svc
@@ -109,7 +114,7 @@ export async function GET(request: NextRequest) {
         .from('facility_emissions_aggregated')
         .select('units_produced')
         .eq('organization_id', organizationId)
-        .gte('reporting_year', today.getFullYear() - 1),
+        .gte('reporting_year', reportingYearFloor),
     ]);
     const annualRevenueGbp = Number(revenueRes.data?.annual_turnover_gbp ?? 0);
     const unitsProduced = (unitsRes.data ?? []).reduce(
