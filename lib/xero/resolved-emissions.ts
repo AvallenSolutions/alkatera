@@ -130,10 +130,13 @@ export async function getXeroResolvedEmissions(
     facilityIds.length > 0
       ? supabase
           .from('utility_data_entries')
-          .select('id, utility_type, quantity, unit, reporting_period_start')
+          .select('id, utility_type, quantity, unit, reporting_period_start, reporting_period_end')
           .in('facility_id', facilityIds)
-          .gte('reporting_period_start', yearStart)
+          // Overlap, not "start within window": a facility entry on a non-calendar
+          // or custom 12-month period (e.g. 15 Jun 2024 – 14 Jun 2025) still
+          // overlaps the reporting window even when its start falls outside it.
           .lte('reporting_period_start', yearEnd)
+          .gte('reporting_period_end', yearStart)
       : Promise.resolve({ data: [] as any[] }),
     reportIds.length > 0
       ? supabase
@@ -158,10 +161,11 @@ export async function getXeroResolvedEmissions(
     // the resolver mark overlapping Xero fuel rows as suppressed.
     supabase
       .from('fleet_activities')
-      .select('id, scope, reporting_period_start, emissions_tco2e')
+      .select('id, scope, reporting_period_start, reporting_period_end, emissions_tco2e')
       .eq('organization_id', organizationId)
-      .gte('reporting_period_start', yearStart)
-      .lte('reporting_period_start', yearEnd),
+      // Overlap, not "start within window" (see utility query above).
+      .lte('reporting_period_start', yearEnd)
+      .gte('reporting_period_end', yearStart),
   ])
 
   const linkedIngredientByTxId = new Map<string, string>()
