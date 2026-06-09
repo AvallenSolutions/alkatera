@@ -13,7 +13,7 @@ interface InviteMemberRequest {
 }
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const allowedRoles = ['company_admin', 'company_user'];
+const allowedRoles = ['company_owner', 'company_admin', 'company_user'];
 
 function escapeHtml(text: string): string {
   if (!text) return '';
@@ -26,7 +26,7 @@ function escapeHtml(text: string): string {
 }
 
 function buildInviteEmail(inviteLink: string, organizationName: string, roleName: string, siteUrl: string): string {
-  const roleDisplay = roleName === 'admin' ? 'Admin' : 'Team Member';
+  const roleDisplay = roleName === 'owner' ? 'Owner' : roleName === 'admin' ? 'Admin' : 'Team Member';
   const logoUrl = 'https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png';
 
   return `
@@ -346,11 +346,27 @@ Deno.serve(async (req: Request) => {
     const organizationName = orgData?.name || "your organization";
 
     const roleMapping: Record<string, string> = {
+      'company_owner': 'owner',
       'company_admin': 'admin',
       'company_user': 'member'
     };
 
     const mappedRole = roleMapping[role];
+
+    // Privilege-escalation guard: only an owner may grant ownership. Admins can
+    // invite admins/members but never mint a new owner. (`roleName` is the
+    // inviter's role, verified above.)
+    if (mappedRole === 'owner' && roleName !== 'owner') {
+      return new Response(
+        JSON.stringify({
+          error: "Only organization owners can invite a new owner"
+        }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
 
     const { data: roleData } = await adminClient
       .from("roles")

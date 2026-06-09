@@ -75,7 +75,7 @@ export function TeamSettings({ showHeader = true }: TeamSettingsProps) {
   const [isInviting, setIsInviting] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [inviteeEmail, setInviteeEmail] = useState('')
-  const [inviteeRole, setInviteeRole] = useState<'company_admin' | 'company_user'>('company_user')
+  const [inviteeRole, setInviteeRole] = useState<'company_owner' | 'company_admin' | 'company_user'>('company_user')
   const [invitations, setInvitations] = useState<TeamInvitation[]>([])
   const [memberToDelete, setMemberToDelete] = useState<TeamMember | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -377,13 +377,15 @@ export function TeamSettings({ showHeader = true }: TeamSettingsProps) {
                       <Label htmlFor="role">Role</Label>
                       <Select
                         value={inviteeRole}
-                        onValueChange={(value) => setInviteeRole(value as 'company_admin' | 'company_user')}
+                        onValueChange={(value) => setInviteeRole(value as 'company_owner' | 'company_admin' | 'company_user')}
                         disabled={isInviting}
                       >
                         <SelectTrigger id="role">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
+                          {/* Only an owner may grant ownership */}
+                          {isOwner && <SelectItem value="company_owner">Owner</SelectItem>}
                           <SelectItem value="company_admin">Company Admin</SelectItem>
                           <SelectItem value="company_user">Company User</SelectItem>
                         </SelectContent>
@@ -466,6 +468,15 @@ export function TeamSettings({ showHeader = true }: TeamSettingsProps) {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
+                              {/* Promoting to owner is owner-only (matches the invite flow) */}
+                              {isOwner && (
+                                <SelectItem value="owner">
+                                  <span className="flex items-center gap-1.5">
+                                    <ShieldCheck className="h-3.5 w-3.5" />
+                                    Owner
+                                  </span>
+                                </SelectItem>
+                              )}
                               <SelectItem value="admin">
                                 <span className="flex items-center gap-1.5">
                                   <ShieldCheck className="h-3.5 w-3.5" />
