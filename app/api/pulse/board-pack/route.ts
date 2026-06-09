@@ -15,6 +15,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getOrgFyStartMonth } from '@/lib/log-data/org-fiscal-year';
+import { getYearRangeForOrg, getLabelYearForDate } from '@/lib/log-data/period-utils';
 import { loadShadowPrices } from '@/lib/pulse/shadow-prices';
 import {
   ABATEMENT_LEVERS,
@@ -237,7 +239,8 @@ export async function POST(request: NextRequest) {
       .from('carbon_budgets')
       .select('*')
       .eq('organization_id', organizationId);
-    const startOfYear = new Date(today.getFullYear(), 0, 1).toISOString().slice(0, 10);
+    const fyStartMonth = await getOrgFyStartMonth(svc, organizationId);
+    const { yearStart: startOfYear } = getYearRangeForOrg(getLabelYearForDate(today, fyStartMonth), fyStartMonth);
     const yearSnapshots = (snapshots ?? []).filter(
       s => s.metric_key === 'total_co2e' && (s.snapshot_date as string) >= startOfYear,
     );

@@ -16,6 +16,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { getOrgFyStartMonth } from '@/lib/log-data/org-fiscal-year';
+import { getYearRangeForOrg, getLabelYearForDate } from '@/lib/log-data/period-utils';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { getMemberRole } from '@/app/api/stripe/_helpers/get-member-role';
@@ -66,7 +68,7 @@ function serviceClient() {
 }
 
 /** Start of the most recent full period aligned to the cadence. */
-function currentPeriodStart(period: Budget['period']): Date {
+function currentPeriodStart(period: Budget['period'], fyStartMonth: number): Date {
   const now = new Date();
   if (period === 'monthly') {
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -75,8 +77,10 @@ function currentPeriodStart(period: Budget['period']): Date {
     const q = Math.floor(now.getMonth() / 3);
     return new Date(now.getFullYear(), q * 3, 1);
   }
-  // annual
-  return new Date(now.getFullYear(), 0, 1);
+  // annual — align to the org's financial year, not the calendar year.
+  const labelYear = getLabelYearForDate(now, fyStartMonth);
+  const { yearStart } = getYearRangeForOrg(labelYear, fyStartMonth);
+  return new Date(`${yearStart}T00:00:00Z`);
 }
 
 export async function GET(request: NextRequest) {
@@ -84,6 +88,7 @@ export async function GET(request: NextRequest) {
   if ('error' in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
   const svc = serviceClient();
+  const fyStartMonth = await getOrgFyStartMonth(svc, ctx.organizationId);
 
   const { data: budgets, error } = await svc
     .from('carbon_budgets')
@@ -93,8 +98,8 @@ export async function GET(request: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Pull all snapshots in one hit for the widest period (annual from Jan 1).
-  const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10);
+  // Pull all snapshots in one hit for the widest period (annual from the FY start).
+  const { yearStart } = getYearRangeForOrg(getLabelYearForDate(new Date(), fyStartMonth), fyStartMonth);
   const today = new Date().toISOString().slice(0, 10);
   const { data: snapshots } = await svc
     .from('metric_snapshots')
@@ -106,7 +111,7 @@ export async function GET(request: NextRequest) {
 
   // Compute variance per budget.
   const rows = (budgets ?? []).map(b => {
-    const periodStart = currentPeriodStart(b.period).toISOString().slice(0, 10);
+    const periodStart = currentPeriodStart(b.period, fyStartMonth).toISOString().slice(0, 10);
     // total_co2e is a calendar-year level: the period's actual is the latest
     // snapshot in the period, not a sum of daily rows.
     const actualKg = latestValue(

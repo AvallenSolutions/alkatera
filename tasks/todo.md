@@ -1,60 +1,73 @@
-# Reporting period flexibility
+# Make reporting consumers financial-year aware
 
-## Part 1 — Financial Year: any month (Settings)
-Current: `components/settings/OrganisationSettings.tsx` (~L665-681) offers 4 presets
-(Jan/Apr/Jul/Oct). Stored as `report_defaults.reporting_period.fiscal_year_start_month`
-(number 1-12). Consumers (`lib/log-data/period-utils.ts`, `hooks/useReportingPeriod.ts`,
-`lib/xero/sync-service.ts`) ALREADY accept any month 1-12 — so this is UI-only.
+Audit (post custom-period feature) found calendar-year assumptions across the
+reporting stack. The org FY start month lives at
+`organizations.report_defaults.reporting_period.fiscal_year_start_month` (1-12).
+`getYearRangeForOrg(year, fyStartMonth)` (lib/log-data/period-utils.ts) turns a
+label year + FY month into the correct date window. Key discovery: the corporate
+emissions SQL RPC was DROPPED; the authoritative calc is now TypeScript
+(`lib/calculations/corporate-emissions.ts`), hardcoded to calendar year — so the
+core fix is TS, and all 11 callers pass a year integer, so fixing the calculator
+internally makes every consumer FY-correct at once.
 
-- [ ] Replace the 4 SelectItems with all 12 months, annotating the conventional ones
-      (January = Calendar Year, April = UK Financial Year). No storage/consumer change.
+## Shared helper
+- [ ] `lib/log-data/org-fiscal-year.ts`: `getOrgFyStartMonth(supabase, orgId): Promise<number>`
+      reading report_defaults.reporting_period.fiscal_year_start_month (default 1).
+      Server-usable (mirrors the inline read in lib/xero/sync-service.ts).
 
-## Part 2 — Facility Data: custom 12-month period to the day
-Current: `components/facilities/DirectDataEntry.tsx` cadence (monthly/quarterly/annual)
-→ `getAvailablePeriods()` dropdown; annual buckets are calendar/FY years only. Schema
-(`utility_data_entries`, `facility_activity_entries`) stores `reporting_period_start/end`
-as DATE — already supports arbitrary ranges. LCA facility allocation uses period-overlap
-queries (`product-lca-calculator.ts`) so custom ranges work downstream.
+## Core (highest impact)
+- [ ] `lib/calculations/corporate-emissions.ts` L613-614: replace `${year}-01-01`/
+      `${year}-12-31` with `getYearRangeForOrg(year, fyStartMonth)` (resolve FY month
+      via the helper). Also switch the period-based utility/fleet filters (scope 1 & 2,
+      and scope3 grey fleet) from "reporting_period_start within window" to date-range
+      OVERLAP, matching the Xero fix. Leave `corporate_reports.eq('year', year)` (a
+      year-integer/report-keyed lookup) as-is — out of scope, note it.
 
-- [ ] `lib/log-data/period-utils.ts`: add `getCustomAnnualPeriod(startISO)` →
-      `{ start, end = start + 1 year − 1 day, label }` + a range label formatter.
-- [ ] `DirectDataEntry.tsx`: for the **Annual** cadence add a "Custom 12-month period…"
-      entry to the period selector. When chosen, show a day-precision start-date input and
-      auto-compute + display the end (e.g. 15/06/2024 → 14/06/2025). The custom period
-      flows through as `selectedPeriod`; activity-date min/max already bind to it.
-- [ ] Keep monthly/quarterly unchanged; keep existing annual presets for convenience.
+## Admin
+- [ ] `app/api/emissions/trace/route.ts` L48-49: FY-aware window via helper +
+      getYearRangeForOrg; utility filter → overlap. (fleet/production_logs use a point
+      date here — leave.)
 
-## Decisions
-- Custom period is locked to exactly 12 months (custom start day, auto end), per the
-  requirement ("a full 12 month period") — not a free-form arbitrary-length range.
-- Only the Annual cadence gets the custom option.
+## Pulse / dashboards (build date windows from getFullYear → make FY-aware)
+- [ ] `app/api/pulse/carbon-budgets/route.ts`
+- [ ] `app/api/pulse/board-pack/route.ts`
+- [ ] `app/api/vitality/composite/route.ts`
+- [ ] `app/api/pulse/whatif-baseline/route.ts`
+- [ ] `components/pulse/widgets/carbon-budgets/expanded.tsx` (client — use useReportingPeriod)
+- [ ] Assess `pulse/cost-intensity` + `pulse/issb-disclosure` (these filter a
+      `reporting_year` INTEGER column; convert the getFullYear() default to the FY label
+      year via getLabelYearForDate, or leave if it's the ESG year-integer model).
 
-## Known limitation (flag, not fixing in this change)
-- `lib/xero/resolved-emissions.ts` buckets emissions by calendar year on
-  `reporting_period_start`. Facility utility/activity → LCA allocation is overlap-based and
-  unaffected; only the Xero financial-emissions yearly view assumes calendar years.
-  Refactor deferred unless wanted.
+## Out of scope (different data model — year-integer ESG)
+people-culture/*, community-impact/*, impact-valuation. Not period-flexible; separate.
 
 ## Verification
-- [ ] Unit test for `getCustomAnnualPeriod` (incl. 15/06/2024 → 14/06/2025 + a leap-year start)
-- [ ] tsc clean for touched files
-- [ ] Manual: settings shows 12 months; facility annual "custom" yields a day-precise 12-month window
-- [ ] Review section completed
+- [ ] Unit test for getOrgFyStartMonth default + FY-window wiring where practical
+- [ ] tsc clean for all touched files
+- [ ] Spot-check: calendar-year orgs unchanged (overlap == start-in-window for monthly/
+      calendar-annual entries); only non-calendar/custom periods shift
+- [ ] Review section
 
-## Review (completed)
-- Part 1: `OrganisationSettings.tsx` financial-year selector now lists all 12 start
-  months (generated, `en-GB` month names), annotating January (Calendar Year) and
-  April (UK Financial Year). Storage (`fiscal_year_start_month`) and all consumers
-  already accepted 1-12, so no other changes were needed.
-- Part 2: added `getCustomAnnualPeriod()`, `formatPeriodRangeLabel()` and
-  `formatISODateDisplay()` to `lib/log-data/period-utils.ts`. `DirectDataEntry.tsx`
-  now offers "Custom 12-month period…" under the Annual cadence; picking it shows a
-  day-precision start-date input and auto-derives the end (start + 12 months − 1 day,
-  shown as e.g. "2024-06-15 to 2025-06-14 (12 months)"). The custom window flows
-  through `selectedPeriod`, so saved `reporting_period_start/end` and the activity-date
-  min/max all honour it. Monthly/quarterly and the annual presets are unchanged.
-- Tests: `lib/__tests__/log-data-period-utils.test.ts` (7) — spec example
-  15/06/2024 → 14/06/2025, calendar year, leap-day start, and both leap-year
-  boundary directions. tsc clean for all touched files.
-- Known limitation (unchanged): `lib/xero/resolved-emissions.ts` still buckets by
-  calendar year; facility → LCA allocation is overlap-based and handles custom periods.
+## Review (in progress)
+DONE (committed + pushed):
+- New `lib/log-data/org-fiscal-year.ts` `getOrgFyStartMonth` (server-side, default 1).
+- `corporate-emissions.ts` (SoT) window now FY-aware via getYearRangeForOrg — makes
+  all 11 year-integer callers FY-correct at once. Calendar orgs unchanged.
+- `emissions/trace` route: FY-aware window + utility overlap.
+- `xero/resolved-emissions.ts`: utility/fleet matched by overlap (earlier commit).
+- `pulse/carbon-budgets` route: annual period + snapshot window aligned to FY.
+- `pulse/board-pack` route: YTD start aligned to FY.
+
+DEFERRED (deliberate — need a holistic, separately-verified pass):
+- `vitality/composite`: blends E/S/G pillars + uses a `reporting_year` integer column;
+  converting only the env date-window would make the composite score internally
+  inconsistent for FY orgs. Convert all pillars together.
+- `pulse/carbon-budgets/expanded.tsx` (client forecast widget): projects "to 31 Dec";
+  FY conversion changes the forecast horizon — needs runtime verification.
+- `pulse/whatif-baseline`: uses a ROLLING 12-month window (FY-agnostic) — already fine.
+- `reporting_year`-INTEGER ESG aggregates (`cost-intensity`, `issb-disclosure`,
+  board-pack `facility_emissions_aggregated`, composite `facility_water_data`): different
+  data model (year integer, not date ranges) — out of scope for period flexibility.
+
+## Review (final)
+(to be completed once deferred items are decided)
