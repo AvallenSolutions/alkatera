@@ -102,6 +102,41 @@ describe('getMaterialFactorKey', () => {
   it('maps hdpe_bottle to hdpe', () => {
     expect(getMaterialFactorKey('hdpe_bottle')).toBe('hdpe');
   });
+
+  // Regression: real-world rows store a packaging ROLE in packaging_category
+  // ('container', 'secondary', …), not a material, and product names often omit
+  // the material word. These previously fell back to 'other' and were modelled as
+  // fossil incineration (1.5 kg CO2e/kg), inflating end-of-life ~6× on a report.
+  describe('role-as-category + name/factor inference (glass-as-other regression)', () => {
+    it('classifies a glass bottle named "Flint" via the material name', () => {
+      // "500ml TEO bottle (Wild Flint)" with a packaging ROLE of 'container'
+      expect(getMaterialFactorKey('container', '500ml TEO bottle (Wild Flint)')).toBe('glass');
+    });
+
+    it('classifies glass via the resolved factor name when the name lacks it', () => {
+      expect(
+        getMaterialFactorKey('container', '500ml TEO bottle', 'glass bottle, clear, 60% recycled content')
+      ).toBe('glass');
+    });
+
+    it('classifies a cardboard trade case as paper', () => {
+      expect(getMaterialFactorKey('secondary', 'Trade Case - 6 × 50cl bottles')).toBe('paper');
+      expect(getMaterialFactorKey('shipment', 'Outer Shipper')).toBe('paper');
+    });
+
+    it('classifies a ROPP closure as aluminium', () => {
+      expect(getMaterialFactorKey('closure', 'ROPP Cap 28mm')).toBe('aluminium');
+    });
+
+    it('does NOT misfire on ingredient names containing "case"-like substrings', () => {
+      // "casein" must not be read as "case" → paper
+      expect(getMaterialFactorKey('', 'Casein protein')).toBe('other');
+    });
+
+    it('still falls back to other when nothing identifies the material', () => {
+      expect(getMaterialFactorKey('container', '400/33 Silver GPI')).toBe('other');
+    });
+  });
 });
 
 // ============================================================================

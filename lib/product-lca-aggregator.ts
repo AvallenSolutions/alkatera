@@ -12,6 +12,7 @@
 
 import { SupabaseClient } from '@supabase/supabase-js';
 import type { FallbackEvent } from './impact-waterfall-resolver';
+import { normalizeToKg } from './impact-waterfall-resolver';
 import { calculateUsePhaseEmissions, type UsePhaseConfig } from './use-phase-factors';
 import { calculateMaterialEoL, getMaterialFactorKey, getRegionalDefaults, EOL_DATA_YEAR, REGION_LABELS, type EoLRegion, type RegionalDefaults, type EoLConfig } from './end-of-life-factors';
 import { calculateDistributionEmissions, type DistributionConfig } from './distribution-factors';
@@ -569,7 +570,11 @@ export async function aggregateProductImpacts(
 
     for (const material of materials as Material[]) {
       const materialType = (material.material_type || '').toLowerCase();
-      const rawQuantity = Number(material.quantity || 0);
+      // Defensive unit normalisation. product_carbon_footprint_materials rows are
+      // written by the calculator already in kg (unit: 'kg'), so this is normally
+      // a no-op — but it guards against any non-kg packaging row producing a
+      // 1000× EoL inflation.
+      const rawQuantity = normalizeToKg(material.quantity || 0, material.unit || 'kg');
       if (rawQuantity <= 0) continue;
 
       // Circularity: reuse_trips amortises a reusable container's physical
@@ -603,7 +608,11 @@ export async function aggregateProductImpacts(
         continue;
       }
 
-      const factorKey = getMaterialFactorKey(packagingCategory || 'other', material.material_name);
+      // Resolve the material composition (glass/paper/aluminium/…) for EoL
+      // factors. packaging_category holds a packaging *role*, not a material, so
+      // we also feed the resolved factor/dataset name as a classification signal.
+      const factorName = (material as any).matched_source_name || (material as any).gwp_data_source || '';
+      const factorKey = getMaterialFactorKey(packagingCategory || 'other', material.material_name, factorName);
 
       // Get user pathway overrides from the wizard (keyed by material ID or factorKey).
       // If none set, derive overrides from the material's stored circularity fields

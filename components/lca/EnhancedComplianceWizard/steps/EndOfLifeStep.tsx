@@ -25,6 +25,7 @@ import {
   calculateMaterialEoL,
   DEFAULT_EOL_TRANSPORT_KM,
 } from '@/lib/end-of-life-factors';
+import { normalizeToKg } from '@/lib/impact-waterfall-resolver';
 
 // ============================================================================
 // TYPES
@@ -99,24 +100,30 @@ export function EndOfLifeStep() {
     const materials = preCalcState.materials || [];
     const rows: MaterialRow[] = [];
     let organicTotal = 0;
-    let organicUnit = 'kg';
+    const organicUnit = 'kg';
 
     for (const mat of materials) {
       const packagingCategory = (mat as any).packaging_category || '';
       const materialType = (mat.material_type || '').toLowerCase();
-      const quantity = Number(mat.quantity || 0);
+      // Materials are loaded raw from product_materials, where quantity may be in
+      // grams/litres/etc. Normalise to kg so the table, the live preview and the
+      // EoL factors (which are per-kg) all agree. Without this a 500 g bottle
+      // shows as "500.00 kg" and inflates the estimate 1000×.
+      const quantity = normalizeToKg(mat.quantity || 0, mat.unit || 'kg');
       if (quantity <= 0) continue;
 
       const isPackaging = materialType === 'packaging' || materialType === 'packaging_material';
 
       if (!isPackaging) {
-        // Ingredients → aggregate into one "Organic Waste" row
+        // Ingredients → aggregate into one "Organic Waste" row (already in kg)
         organicTotal += quantity;
-        organicUnit = mat.unit || 'kg';
         continue;
       }
 
-      const factorKey = getMaterialFactorKey(packagingCategory || 'other', mat.material_name);
+      // packaging_category holds a packaging role, not a material — also feed the
+      // resolved emission-factor name so glass/cardboard don't fall back to 'other'.
+      const factorName = (mat as any).matched_source_name || (mat as any).resolvedFactorName || '';
+      const factorKey = getMaterialFactorKey(packagingCategory || 'other', mat.material_name, factorName);
 
       // Use the material's actual name (e.g. "Glass Bottle 500ml")
       // with the factor type in parentheses for clarity
@@ -148,7 +155,7 @@ export function EndOfLifeStep() {
         name: displayName,
         factorKey,
         quantity,
-        unit: mat.unit || 'kg',
+        unit: 'kg',
         pathways: fromCirc ?? regional,
         fromCircularity: !!fromCirc,
         circularityLabel: circParts.length > 0 ? circParts.join(' · ') : undefined,

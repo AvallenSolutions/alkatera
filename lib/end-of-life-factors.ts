@@ -349,16 +349,20 @@ const MATERIAL_TYPE_MAP: Record<string, string> = {
  * avoid false positives (e.g. "aluminium" before generic "can").
  */
 const MATERIAL_NAME_KEYWORDS: [RegExp, string][] = [
-  // Glass
-  [/\bglass\b/i, 'glass'],
-  // Aluminium (British + American spelling)
-  [/\b(aluminium|aluminum|alu)\b/i, 'aluminium'],
+  // Glass — "flint" is the glass-industry term for clear glass; "cullet" is
+  // recycled glass. Both appear in dataset/product names that omit "glass".
+  [/\b(glass|flint|cullet)\b/i, 'glass'],
+  // Aluminium (British + American spelling). "ROPP" = roll-on pilfer-proof
+  // aluminium closure, common on spirits/wine bottles.
+  [/\b(aluminium|aluminum|alu|ropp)\b/i, 'aluminium'],
   // Specific plastics before generic "plastic"
   [/\b(hdpe|high.?density.?poly)\b/i, 'hdpe'],
   [/\bpet\b/i, 'pet'],
   [/\bplastic\b/i, 'pet'], // Default plastic → PET (most common in drinks)
-  // Paper / Cardboard
+  // Paper / Cardboard. Secondary/transit packaging in drinks is corrugated
+  // cardboard, often named "trade case", "shipper" or just "case".
   [/\b(cardboard|carton|corrugated)\b/i, 'paper'],
+  [/\b(trade.?cases?|shippers?|outer.?cases?|cases?)\b/i, 'paper'],
   [/\b(paper|label)\b/i, 'paper'],
   // Steel / Metal
   [/\bsteel\b/i, 'steel'],
@@ -374,22 +378,35 @@ const MATERIAL_NAME_KEYWORDS: [RegExp, string][] = [
  *
  * Resolution order:
  *  1. Exact match on `packagingCategory` via MATERIAL_TYPE_MAP
- *  2. Keyword search on `materialName` (e.g. "Glass Bottle 500ml" → glass)
+ *  2. Keyword search across `materialName` AND `factorName`
+ *     (e.g. "Glass Bottle 500ml" → glass, or factor "glass bottle 60% recycled")
  *  3. Fallback to 'other'
+ *
+ * NOTE: `packagingCategory` on product rows usually holds a packaging *role*
+ * ('container', 'closure', 'secondary', 'shipment', …), NOT a material — so the
+ * step-1 map almost never hits in practice and classification leans on step 2.
+ * The resolved emission-factor / dataset name (`factorName`, e.g. the chosen
+ * ecoinvent process) is frequently the only place the material composition
+ * appears, since user-facing names like "500ml TEO bottle (Wild Flint)" can omit
+ * the material word entirely. Searching both avoids defaulting glass/cardboard to
+ * 'other', whose incineration factor (1.5 kg CO2e/kg fossil) massively overstates
+ * end-of-life emissions.
  */
 export function getMaterialFactorKey(
   packagingCategory: string,
-  materialName?: string
+  materialName?: string,
+  factorName?: string
 ): string {
   // 1. Try exact map lookup on packaging category
   const normalized = (packagingCategory || '').toLowerCase().trim().replace(/\s+/g, '_');
   const mapped = MATERIAL_TYPE_MAP[normalized];
   if (mapped) return mapped;
 
-  // 2. Try keyword detection from the material name
-  if (materialName) {
+  // 2. Try keyword detection across the material name and the resolved factor name
+  const haystack = [materialName, factorName].filter(Boolean).join(' ');
+  if (haystack) {
     for (const [pattern, factorKey] of MATERIAL_NAME_KEYWORDS) {
-      if (pattern.test(materialName)) return factorKey;
+      if (pattern.test(haystack)) return factorKey;
     }
   }
 
