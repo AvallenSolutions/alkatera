@@ -304,7 +304,9 @@ export async function createCompleteMultipack(
       product_description: input.product_description || null,
       product_category: input.product_category || null,
       product_image_url: input.product_image_url || null,
-      system_boundary: input.system_boundary || 'cradle-to-gate',
+      // Let the column default ('cradle_to_gate') apply unless a caller passes
+      // an explicit boundary. The enum uses underscores, never hyphens.
+      ...(input.system_boundary ? { system_boundary: input.system_boundary } : {}),
       is_multipack: true,
       is_draft: false,
       created_by: user.id,
