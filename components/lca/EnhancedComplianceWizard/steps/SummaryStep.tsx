@@ -284,6 +284,9 @@ export function SummaryStep() {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  // Set when the report server rejects generation because the recipe was edited
+  // since the last calculation — surfaces a "Recalculate" affordance.
+  const [isStale, setIsStale] = useState(false);
 
   const productName = preCalcState.product?.name || 'Product';
 
@@ -306,6 +309,7 @@ export function SummaryStep() {
     setPdfState('generating');
     setGenerationStep('fetching-data');
     setPdfError(null);
+    setIsStale(false);
 
     try {
       // Save all ISO fields to DB first
@@ -342,6 +346,14 @@ export function SummaryStep() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        if (response.status === 409 && errorData.error === 'stale_inputs') {
+          // Recipe edited since the last calculation — offer a recalculate path
+          // rather than rendering an out-of-date report.
+          setIsStale(true);
+          setPdfError(errorData.message || 'The recipe has changed since this LCA was last calculated.');
+          setPdfState('error');
+          return;
+        }
         const msg = errorData.details || errorData.error || `PDF generation failed (${response.status})`;
         throw new Error(msg);
       }
@@ -832,16 +844,23 @@ export function SummaryStep() {
       ) : pdfState === 'error' ? (
         /* Error state */
         <div className="space-y-4">
-          <Alert variant="destructive">
+          <Alert variant={isStale ? 'default' : 'destructive'}>
             <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Report Generation Failed</AlertTitle>
+            <AlertTitle>{isStale ? 'Recipe changed since last calculation' : 'Report Generation Failed'}</AlertTitle>
             <AlertDescription>{pdfError || 'An unexpected error occurred'}</AlertDescription>
           </Alert>
 
-          <Button variant="outline" onClick={handleRegenerate} className="gap-2">
-            <RefreshCw className="h-4 w-4" />
-            Try Again
-          </Button>
+          {isStale ? (
+            <Button onClick={() => goToStep(calculationStep)} className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Recalculate LCA
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={handleRegenerate} className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Try Again
+            </Button>
+          )}
         </div>
       ) : null}
     </div>
