@@ -20,7 +20,7 @@ Working one by one, verifying each before moving on.
 - [x] R2: Inngest dead retries + stranded enrich jobs + grounded-search timeout (+ R6 claim guards)
 - [x] R3: Xero token-refresh race + cron fan-out to Inngest
 - [x] P1: Corporate emissions N+1 + move server-side
-- [ ] P2: Report PDF generation to Inngest
+- [x] P2: Report PDF generation to Inngest
 
 ## Medium / Low (after the above)
 - [ ] B9-B18 calculation mediums (EF 3.1 parsing, cache categories, biogenic split, factor drift, audit log, viticulture allocation)
@@ -33,6 +33,17 @@ Working one by one, verifying each before moving on.
 - [ ] P3-P8 performance mediums
 
 ## Review log
+- P2 (2026-06-10): Sustainability report PDF pipeline extracted to
+  lib/reports/generate-sustainability-pdf.ts and runs as Inngest fn
+  reportPdfGenerate (2 steps: build-report-data with queries/key findings/
+  narratives; render-and-upload-pdf with PDFShift + storage; onFailure marks
+  the report failed). The route now authorises (RLS-scoped report fetch),
+  sets status aggregating_data and dispatches; statuses use the existing
+  check-constraint values and feed the polling progress UI. No client change
+  needed (useReportBuilder already fire-and-forgets + polls).
+  NOTE (pre-existing flake, unrelated): supplier-products smart-import test
+  "allows an org member..." gets 429 from in-memory rate-limit state shared
+  across tests.
 - P1 (2026-06-10): (a) Cat 1 production-log loop now fetches the latest
   completed PCF per product in ONE batched query (was one query per log row:
   260+ for a weekly-logging org, 1300+ on the trends tab). (b) New

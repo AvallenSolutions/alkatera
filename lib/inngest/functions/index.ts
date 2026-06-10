@@ -14,6 +14,7 @@ import { documentsQueueTick, documentsProcessOne } from './documents';
 import { matchingSweepRun } from './matching';
 import { openlcaCertMonitor } from './monitoring';
 import { xeroSyncTick, xeroOrgSync } from './xero';
+import { reportPdfGenerate } from './reports';
 
 export const allFunctions: InngestFunction.Any[] = [
   scrapingQueueTick,
@@ -25,4 +26,5 @@ export const allFunctions: InngestFunction.Any[] = [
   openlcaCertMonitor,
   xeroSyncTick,
   xeroOrgSync,
+  reportPdfGenerate,
 ];
