@@ -160,6 +160,32 @@ describe('Product LCA Aggregator', () => {
       expect(result.total_carbon_footprint).toBeCloseTo(expectedTotal, 3);
     });
 
+    it('does NOT re-apply the recycled-content credit to stored impacts', async () => {
+      // The calculator applies the ISO 14067 §6.4.4 recycled-content credit
+      // once, at persist time, so stored impact_climate is already post-credit.
+      // Re-reducing here double-counted the credit (a ~35% understatement for
+      // a 70% recycled can). The stored value must pass through unchanged.
+      const recycledCan = createMockPackaging({
+        id: 'mat-recycled-can',
+        material_name: 'Recycled Aluminium Can 330ml',
+        recycled_content_percentage: 70,
+        impact_climate: 0.225,
+        impact_climate_fossil: 0.220,
+        impact_transport: 0,
+      });
+      setupFromMock([recycledCan]);
+      const { aggregateProductImpacts } = await import('../product-lca-aggregator');
+      const result = await aggregateProductImpacts(
+        mockSupabaseClient as any,
+        'pcf-001',
+        [],
+        'cradle-to-gate',
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.total_carbon_footprint).toBeCloseTo(0.225, 6);
+    });
+
     it('returns error when no materials found', async () => {
       setupFromMock([]);
       const { aggregateProductImpacts } = await import('../product-lca-aggregator');

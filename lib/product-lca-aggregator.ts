@@ -17,7 +17,6 @@ import { calculateUsePhaseEmissions, type UsePhaseConfig } from './use-phase-fac
 import { calculateMaterialEoL, getMaterialFactorKey, getRegionalDefaults, EOL_DATA_YEAR, REGION_LABELS, type EoLRegion, type RegionalDefaults, type EoLConfig } from './end-of-life-factors';
 import { calculateDistributionEmissions, type DistributionConfig } from './distribution-factors';
 import { isStageIncluded, calculateLossMultiplier, type ProductLossConfig } from './system-boundaries';
-import { DEFAULT_RECYCLED_CONTENT_CREDIT } from './constants/packaging-defaults';
 import { IPCC_AR6_GWP } from './ghg-constants';
 import {
   assessMaterialDataQuality,
@@ -277,38 +276,18 @@ export async function aggregateProductImpacts(
 
   console.log('[aggregateProductImpacts] Processing materials...');
 
-  let recycledContentCredit = 0; // Total reduction from recycled-content credits (kg CO2e)
-
   for (const material of materials as Material[]) {
-    let climateImpact = Number(material.impact_climate || 0);
-    let climateFossil = Number(material.impact_climate_fossil || 0);
+    const climateImpact = Number(material.impact_climate || 0);
+    const climateFossil = Number(material.impact_climate_fossil || 0);
     const climateBiogenic = Number(material.impact_climate_biogenic || 0);
     const climateDluc = Number(material.impact_climate_dluc || 0);
     const transportImpact = Number(material.impact_transport || 0);
     const quantity = Number(material.quantity || 0);
 
-    // ISO 14067 §6.4.4 cut-off / substitution credit for recycled feedstock.
-    // The stored emission factor is treated as virgin material; recycled
-    // content displaces a portion of the virgin burden. Applied to PACKAGING
-    // only — primary ingredients don't carry a recycled-content concept.
-    // Reduction = climate × (rc/100) × (1 − DEFAULT_RECYCLED_CONTENT_CREDIT).
-    const materialTypeLower = (material.material_type || '').toLowerCase();
-    const isPackagingMat =
-      materialTypeLower === 'packaging' || materialTypeLower === 'packaging_material';
-    if (isPackagingMat && climateImpact > 0) {
-      const rcRaw = (material as any).recycled_content_percentage;
-      const rcPct = Number.isFinite(Number(rcRaw))
-        ? Math.max(0, Math.min(100, Number(rcRaw)))
-        : 0;
-      if (rcPct > 0) {
-        const reductionFactor = (rcPct / 100) * (1 - DEFAULT_RECYCLED_CONTENT_CREDIT);
-        const climateReduction = climateImpact * reductionFactor;
-        const fossilReduction = climateFossil * reductionFactor;
-        climateImpact -= climateReduction;
-        climateFossil -= fossilReduction;
-        recycledContentCredit += climateReduction;
-      }
-    }
+    // ISO 14067 §6.4.4 recycled-content credit: ALREADY applied by the
+    // calculator before persisting impact_climate (product-lca-calculator,
+    // "Circularity: reuse + recycled content" block). Stored values are
+    // post-credit; do NOT reduce them again here.
 
     totalClimate += climateImpact;
     // NOTE: impact_climate already includes the correct transport and

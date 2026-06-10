@@ -1254,9 +1254,16 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
 
         // Use pre-resolved factors (parallel) or pinned factors
         let resolved: WaterfallResult;
-        if (pinnedMaterials?.has(material.material_name)) {
+        // Pinned rows come from a previously persisted PCF, so their stored
+        // impacts ALREADY include the reuse amortisation, recycled-content
+        // credit, units_per_group allocation, and inbound-container carbon
+        // applied below. Those steps must be skipped for pinned materials or
+        // they compound on every pinned recalculation.
+        const pinnedRow = pinnedMaterials?.get(material.material_name) ?? null;
+        const isPinned = pinnedRow !== null;
+        if (isPinned) {
           console.log(`[calculateProductCarbonFootprint] Using pinned factors for: ${material.material_name}`);
-          resolved = buildResultFromPinnedMaterial(pinnedMaterials.get(material.material_name)!, quantityKg);
+          resolved = buildResultFromPinnedMaterial(pinnedRow, quantityKg);
         } else if (resolvedFactors.has(material.material_name)) {
           resolved = resolvedFactors.get(material.material_name)!;
         } else {
@@ -1326,7 +1333,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           : 0;
         const recycledMultiplier = 1 - (recycledPct / 100) * DEFAULT_RECYCLED_CONTENT_CREDIT;
 
-        if (material.material_type === 'packaging' && reuseTrips > 1) {
+        if (!isPinned && material.material_type === 'packaging' && reuseTrips > 1) {
           console.log(
             `[calculateProductCarbonFootprint] Applying reuse amortisation: ÷${reuseTrips} trips for ${material.material_name}`
           );
@@ -1349,7 +1356,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           transportEmissions /= reuseTrips;
         }
 
-        if (material.material_type === 'packaging' && recycledMultiplier < 1) {
+        if (!isPinned && material.material_type === 'packaging' && recycledMultiplier < 1) {
           console.log(
             `[calculateProductCarbonFootprint] Applying recycled-content credit: ×${recycledMultiplier.toFixed(3)} (${recycledPct}% recycled) for ${material.material_name}`
           );
@@ -1403,7 +1410,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           }
         }
 
-        if (unitsPerGroup > 1) {
+        if (!isPinned && unitsPerGroup > 1) {
           console.log(`[calculateProductCarbonFootprint] Applying packaging allocation: ÷${unitsPerGroup} units for ${material.material_name}`);
           // Divide all resolved impact values by units served
           resolved.impact_climate /= unitsPerGroup;
@@ -1499,7 +1506,13 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         let containerCO2PerUnit = 0;
         const containerType = (material as any).inbound_container_type as string | null;
 
-        if (material.material_type === 'ingredient' && containerType) {
+        if (isPinned && material.material_type === 'ingredient' && containerType) {
+          // Pinned: container carbon is already inside the stored impact_climate.
+          // Carry the scaled audit value forward without adding it again.
+          const pinnedOldQuantity = Number(pinnedRow.quantity) || 1;
+          containerCO2PerUnit =
+            Number(pinnedRow.inbound_container_co2_per_unit || 0) * (quantityKg / pinnedOldQuantity);
+        } else if (material.material_type === 'ingredient' && containerType) {
           try {
             const containerTareKg  = Number((material as any).inbound_container_tare_kg  || 0);
             const containerVolumeL = Number((material as any).inbound_container_volume_l || 0);
