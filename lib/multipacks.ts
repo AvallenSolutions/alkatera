@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { boundaryToDbEnum } from './system-boundaries';
 import type {
   MultipackComponent,
   MultipackSecondaryPackaging,
@@ -305,8 +306,9 @@ export async function createCompleteMultipack(
       product_category: input.product_category || null,
       product_image_url: input.product_image_url || null,
       // Let the column default ('cradle_to_gate') apply unless a caller passes
-      // an explicit boundary. The enum uses underscores, never hyphens.
-      ...(input.system_boundary ? { system_boundary: input.system_boundary } : {}),
+      // an explicit boundary. The enum uses underscores; the app uses hyphens,
+      // so normalise through boundaryToDbEnum() like every other enum writer.
+      ...(input.system_boundary ? { system_boundary: boundaryToDbEnum(input.system_boundary) } : {}),
       is_multipack: true,
       is_draft: false,
       created_by: user.id,
