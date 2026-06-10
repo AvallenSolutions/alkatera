@@ -41,16 +41,30 @@ type ProductRow = {
 type Outcome = { name: string; status: 'done' | 'skipped' | 'error'; detail?: string };
 
 export function RecalculateOrgLcasButton() {
-  const { isAlkateraAdmin, isLoading: adminLoading } = useIsAlkateraAdmin();
-  const { currentOrganization } = useOrganization();
+  const { isAlkateraAdmin } = useIsAlkateraAdmin();
+  const { currentOrganization, userRole } = useOrganization();
 
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number; current: string } | null>(null);
   const [outcomes, setOutcomes] = useState<Outcome[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  if (adminLoading) return null;
-  if (!isAlkateraAdmin) return null;
+  // Anyone who can manage the active org should be able to repropagate a fix to
+  // its own products: an alkatera admin, an org owner/admin, or an advisor acting
+  // within the org. RLS still enforces that only accessible orgs can be written.
+  const canRun =
+    !!currentOrganization &&
+    (isAlkateraAdmin || ['owner', 'admin', 'advisor'].includes((userRole ?? '').toLowerCase()));
+
+  if (!canRun) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        {currentOrganization
+          ? 'You need owner, admin, or advisor access to this organization to recalculate its LCAs.'
+          : 'Select an organization first, then return to this page.'}
+      </p>
+    );
+  }
 
   async function run() {
     if (!currentOrganization?.id) {
@@ -77,6 +91,24 @@ export function RecalculateOrgLcasButton() {
     }
 
     const rows = (products ?? []) as ProductRow[];
+
+    if (rows.length === 0) {
+      setError('No products found in this organization.');
+      setBusy(false);
+      return;
+    }
+
+    const proceed =
+      typeof window === 'undefined' ||
+      window.confirm(
+        `Recalculate ${rows.length} product LCA${rows.length === 1 ? '' : 's'} in "${currentOrganization?.name ?? 'this org'}"? ` +
+          `This creates a new footprint per product and supersedes the current one.`
+      );
+    if (!proceed) {
+      setBusy(false);
+      return;
+    }
+
     const results: Outcome[] = [];
 
     for (let i = 0; i < rows.length; i += 1) {
