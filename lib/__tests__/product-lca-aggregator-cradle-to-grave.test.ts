@@ -171,10 +171,9 @@ describe('Cradle-to-Grave LCA Aggregator', () => {
     const rawMats = breakdown?.by_lifecycle_stage?.raw_materials ?? 0;
     const packaging = breakdown?.by_lifecycle_stage?.packaging ?? 0;
 
-    // Transport is already embedded in impact_climate — no separate addition
-    expect(rawMats).toBeCloseTo(0.450, 3);
-    // Aluminium can: impact_climate only (transport embedded)
-    expect(packaging).toBeCloseTo(0.225, 3);
+    // Inbound transport rides with each material's stage bucket, added once
+    expect(rawMats).toBeCloseTo(0.450 + 0.010, 3);
+    expect(packaging).toBeCloseTo(0.225 + 0.005, 3);
   });
 
   it('includes use-phase emissions for cradle-to-consumer boundary', async () => {
@@ -307,11 +306,12 @@ describe('Cradle-to-Grave LCA Aggregator', () => {
     expect(names).toContain('Pale Malt');
     expect(names).toContain('Aluminium Can 330ml');
 
-    // Climate values should match material impact_climate (not + transport to avoid double-count)
+    // Climate values are impact_climate + inbound transport (counted once),
+    // the same basis as the headline total
     const malt = byMaterial!.find(m => m.name === 'Pale Malt');
     const aluminium = byMaterial!.find(m => m.name === 'Aluminium Can 330ml');
-    expect(malt?.climate).toBeCloseTo(0.450, 3);
-    expect(aluminium?.climate).toBeCloseTo(0.225, 3);
+    expect(malt?.climate).toBeCloseTo(0.450 + 0.010, 3);
+    expect(aluminium?.climate).toBeCloseTo(0.225 + 0.005, 3);
 
     // Sum of by_material.climate should equal materials portion of total
     // (total also includes use-phase, EoL, facility — but cradle-to-gate has none)

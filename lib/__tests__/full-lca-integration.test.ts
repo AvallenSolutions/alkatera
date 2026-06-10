@@ -169,12 +169,14 @@ describe('Scenario 1: Simple beer, cradle-to-gate', () => {
 
     expect(result.success).toBe(true);
 
+    // Each material contributes impact_climate + its inbound transport
+    // (stored impact_climate is factor-only outside the decomposition path)
     const expectedTotal =
-      BARLEY_MALT.impact_climate +
-      CASCADE_HOPS.impact_climate +
-      BREWING_WATER.impact_climate +
-      ALU_CAN.impact_climate +
-      PAPER_LABEL.impact_climate;
+      BARLEY_MALT.impact_climate + BARLEY_MALT.impact_transport +
+      CASCADE_HOPS.impact_climate + CASCADE_HOPS.impact_transport +
+      BREWING_WATER.impact_climate + BREWING_WATER.impact_transport +
+      ALU_CAN.impact_climate + ALU_CAN.impact_transport +
+      PAPER_LABEL.impact_climate + PAPER_LABEL.impact_transport;
 
     expect(result.total_carbon_footprint).toBeCloseTo(expectedTotal, 3);
   });
@@ -209,7 +211,7 @@ describe('Scenario 1: Simple beer, cradle-to-gate', () => {
     expect(materialSum).toBeCloseTo(result.total_carbon_footprint, 3);
   });
 
-  it('INVARIANT: transport NOT in totalClimate', async () => {
+  it('INVARIANT: transport counted exactly once in totalClimate', async () => {
     const { aggregateProductImpacts } = await import('../product-lca-aggregator');
     const result = await aggregateProductImpacts(
       mockSupabaseClient as any,
@@ -224,15 +226,15 @@ describe('Scenario 1: Simple beer, cradle-to-gate', () => {
     // Materials have transport > 0
     expect(totalTransport).toBeGreaterThan(0);
 
-    // But total climate does NOT include transport
-    const climateWithoutTransport =
+    // Total climate includes each material's inbound transport exactly once
+    const climateFactorOnly =
       BARLEY_MALT.impact_climate +
       CASCADE_HOPS.impact_climate +
       BREWING_WATER.impact_climate +
       ALU_CAN.impact_climate +
       PAPER_LABEL.impact_climate;
 
-    expect(totalClimate).toBeCloseTo(climateWithoutTransport, 3);
+    expect(totalClimate).toBeCloseTo(climateFactorOnly + totalTransport, 3);
   });
 });
 
@@ -271,8 +273,10 @@ describe('Scenario 2: Beer with facility, cradle-to-gate', () => {
     // Facility per-unit = 500/10000 = 0.05
     expect(result.impacts.breakdown.by_lifecycle_stage.processing).toBeCloseTo(0.05, 3);
 
-    // Total = materials + facility
-    const materialsClimate = BARLEY_MALT.impact_climate + ALU_CAN.impact_climate;
+    // Total = materials (incl. inbound transport) + facility
+    const materialsClimate =
+      BARLEY_MALT.impact_climate + BARLEY_MALT.impact_transport +
+      ALU_CAN.impact_climate + ALU_CAN.impact_transport;
     expect(result.total_carbon_footprint).toBeCloseTo(materialsClimate + 0.05, 3);
   });
 
@@ -332,9 +336,12 @@ describe('Scenario 3: Contract manufacturer', () => {
     const { scope1, scope2, scope3 } = result.impacts.breakdown.by_scope;
     expect(scope1).toBe(0);
     expect(scope2).toBe(0);
-    // scope3 = material emissions + CM per-unit
+    // scope3 = material emissions (incl. inbound transport, Cat 4) + CM per-unit
     expect(scope3).toBeGreaterThan(0);
-    expect(scope3).toBeCloseTo(BARLEY_MALT.impact_climate + 1000 / 5000, 3);
+    expect(scope3).toBeCloseTo(
+      BARLEY_MALT.impact_climate + BARLEY_MALT.impact_transport + 1000 / 5000,
+      3,
+    );
   });
 });
 
@@ -503,6 +510,9 @@ describe('Scenario 6: Zero-quantity material', () => {
 
     expect(result.success).toBe(true);
     expect(result.materials_count).toBe(2);
-    expect(result.total_carbon_footprint).toBeCloseTo(ALU_CAN.impact_climate, 3);
+    expect(result.total_carbon_footprint).toBeCloseTo(
+      ALU_CAN.impact_climate + ALU_CAN.impact_transport,
+      3,
+    );
   });
 });

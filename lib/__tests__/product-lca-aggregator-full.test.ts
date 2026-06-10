@@ -156,7 +156,10 @@ describe('Product LCA Aggregator', () => {
       );
 
       expect(result.success).toBe(true);
-      const expectedTotal = 0.450 + 0.015 + 0.0005 + 0.225 + 0.005;
+      // Each material contributes impact_climate + its inbound transport
+      // (stored impact_climate is factor-only outside the decomposition path).
+      const expectedTotal =
+        (0.450 + 0.010) + (0.015 + 0.002) + (0.0005 + 0) + (0.225 + 0.005) + (0.005 + 0.001);
       expect(result.total_carbon_footprint).toBeCloseTo(expectedTotal, 3);
     });
 
@@ -225,8 +228,8 @@ describe('Product LCA Aggregator', () => {
   // TRANSPORT: NO DOUBLE-COUNTING (HIGH FIX #5)
   // --------------------------------------------------------------------------
 
-  describe('Transport — no double-counting', () => {
-    it('totalClimate does NOT include impact_transport on top of impact_climate', async () => {
+  describe('Transport — counted exactly once', () => {
+    it('totalClimate includes each material\'s inbound transport once', async () => {
       setupFromMock([MALT, ALU_CAN]);
       const { aggregateProductImpacts } = await import('../product-lca-aggregator');
       const result = await aggregateProductImpacts(
@@ -236,13 +239,45 @@ describe('Product LCA Aggregator', () => {
         'cradle-to-gate',
       );
 
-      // Total should be sum of impact_climate only (0.450 + 0.225 = 0.675)
-      // NOT 0.450 + 0.010 + 0.225 + 0.005 = 0.690 (which would be double-counting)
-      const expectedTotal = MALT.impact_climate + ALU_CAN.impact_climate;
+      // Stored impact_climate is factor-only outside the OpenLCA decomposition
+      // path, so user-entered inbound transport (impact_transport) must be
+      // added during aggregation or it never reaches the headline total.
+      const expectedTotal =
+        MALT.impact_climate + MALT.impact_transport +
+        ALU_CAN.impact_climate + ALU_CAN.impact_transport;
       expect(result.total_carbon_footprint).toBeCloseTo(expectedTotal, 3);
     });
 
-    it('by_material breakdown uses impact_climate only (matches total)', async () => {
+    it('does NOT add transport again when decomposition embedded it in impact_climate', async () => {
+      // The calculator's "replacement" path persists impact_climate with user
+      // transport already folded in, marked by impact_climate_production and
+      // impact_climate_transport_embedded. The aggregator must not add
+      // impact_transport on top for those rows.
+      const decomposedMalt = createMockIngredient({
+        id: 'mat-malt-decomposed',
+        material_name: 'Pale Malt (decomposed)',
+        quantity: 0.5,
+        impact_climate: 0.455, // factor − embedded generic + user DEFRA transport
+        impact_climate_fossil: 0.405,
+        impact_climate_biogenic: 0.050,
+        impact_transport: 0.010,
+        impact_climate_production: 0.430,
+        impact_climate_transport_embedded: 0.015,
+        confidence_score: 70,
+      });
+      setupFromMock([decomposedMalt]);
+      const { aggregateProductImpacts } = await import('../product-lca-aggregator');
+      const result = await aggregateProductImpacts(
+        mockSupabaseClient as any,
+        'pcf-001',
+        [],
+        'cradle-to-gate',
+      );
+
+      expect(result.total_carbon_footprint).toBeCloseTo(0.455, 6);
+    });
+
+    it('by_material breakdown matches the headline total', async () => {
       setupFromMock([MALT, ALU_CAN]);
       const { aggregateProductImpacts } = await import('../product-lca-aggregator');
       const result = await aggregateProductImpacts(
@@ -257,7 +292,7 @@ describe('Product LCA Aggregator', () => {
       expect(materialSum).toBeCloseTo(result.total_carbon_footprint, 3);
     });
 
-    it('transport is tracked in total_transport but not in totalClimate', async () => {
+    it('transport is also tracked separately in total_transport', async () => {
       setupFromMock([MALT, ALU_CAN]);
       const { aggregateProductImpacts } = await import('../product-lca-aggregator');
       const result = await aggregateProductImpacts(
@@ -290,8 +325,8 @@ describe('Product LCA Aggregator', () => {
       );
 
       const stages = result.impacts.breakdown.by_lifecycle_stage;
-      // Transport is already embedded in impact_climate — no separate addition
-      expect(stages.raw_materials).toBeCloseTo(MALT.impact_climate, 4);
+      // Inbound transport rides with the material's stage bucket, added once
+      expect(stages.raw_materials).toBeCloseTo(MALT.impact_climate + MALT.impact_transport, 4);
     });
 
     it('packaging goes to packaging', async () => {
@@ -305,8 +340,8 @@ describe('Product LCA Aggregator', () => {
       );
 
       const stages = result.impacts.breakdown.by_lifecycle_stage;
-      // Transport is already embedded in impact_climate — no separate addition
-      expect(stages.packaging).toBeCloseTo(ALU_CAN.impact_climate, 4);
+      // Inbound transport rides with the material's stage bucket, added once
+      expect(stages.packaging).toBeCloseTo(ALU_CAN.impact_climate + ALU_CAN.impact_transport, 4);
     });
 
     it('raw_materials and packaging are segregated correctly', async () => {
@@ -320,9 +355,9 @@ describe('Product LCA Aggregator', () => {
       );
 
       const stages = result.impacts.breakdown.by_lifecycle_stage;
-      // Transport is already embedded in impact_climate — no separate addition
-      expect(stages.raw_materials).toBeCloseTo(MALT.impact_climate, 4);
-      expect(stages.packaging).toBeCloseTo(ALU_CAN.impact_climate, 4);
+      // Inbound transport rides with each material's stage bucket, added once
+      expect(stages.raw_materials).toBeCloseTo(MALT.impact_climate + MALT.impact_transport, 4);
+      expect(stages.packaging).toBeCloseTo(ALU_CAN.impact_climate + ALU_CAN.impact_transport, 4);
     });
 
     it('[Maturation] rows go to processing stage', async () => {
@@ -344,8 +379,8 @@ describe('Product LCA Aggregator', () => {
       );
 
       const stages = result.impacts.breakdown.by_lifecycle_stage;
-      // Transport is already embedded in impact_climate — no separate addition
-      expect(stages.processing).toBeCloseTo(0.050, 4);
+      // Inbound transport rides with the material's stage bucket, added once
+      expect(stages.processing).toBeCloseTo(0.050 + 0.003, 4);
       expect(stages.raw_materials).toBe(0);
     });
   });
@@ -704,8 +739,8 @@ describe('Product LCA Aggregator', () => {
 
       const scopes = result.impacts.breakdown.by_scope;
       // CM emissions go to scope3 (per-unit = 0.05)
-      // Material emissions also scope3 (MALT impact_climate = 0.450)
-      expect(scopes.scope3).toBeCloseTo(0.450 + 0.05, 3);
+      // Material emissions also scope3, including inbound transport (Cat 4)
+      expect(scopes.scope3).toBeCloseTo(0.450 + 0.010 + 0.05, 3);
       expect(scopes.scope1).toBe(0);
       expect(scopes.scope2).toBe(0);
     });
@@ -753,7 +788,8 @@ describe('Product LCA Aggregator', () => {
       expect(names).toContain('Aluminium Can 330ml');
 
       const malt = byMaterial.find((m: any) => m.name === 'Pale Malt');
-      expect(malt.climate).toBeCloseTo(0.450, 3);
+      // climate + inbound transport, same basis as the headline total
+      expect(malt.climate).toBeCloseTo(0.450 + 0.010, 3);
       expect(malt.quantity).toBe(0.5);
       expect(malt.unit).toBe('kg');
     });
@@ -790,8 +826,10 @@ describe('Product LCA Aggregator', () => {
       );
 
       const ghg = result.impacts.ghg_breakdown;
+      // Inbound transport combustion is fossil CO2, so it feeds the fossil split
       expect(ghg.carbon_origin.fossil).toBeCloseTo(
-        MALT.impact_climate_fossil + ALU_CAN.impact_climate_fossil,
+        MALT.impact_climate_fossil + MALT.impact_transport +
+          ALU_CAN.impact_climate_fossil + ALU_CAN.impact_transport,
         3,
       );
       expect(ghg.carbon_origin.biogenic).toBeCloseTo(

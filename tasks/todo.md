@@ -6,7 +6,7 @@ Working one by one, verifying each before moving on.
 
 ## Critical / High
 - [x] B1: Recycled-content credit applied twice (calculator + aggregator)
-- [ ] B2: Inbound transport excluded from headline LCA total
+- [x] B2: Inbound transport excluded from headline LCA total
 - [ ] S1: Carbon-budgets IDOR (membership check on GET)
 - [ ] S2: Greenwash public scanner SSRF (use safeFetch)
 - [ ] S4: .gitignore business documents
@@ -33,6 +33,17 @@ Working one by one, verifying each before moving on.
 - [ ] P3-P8 performance mediums
 
 ## Review log
+- B2 (2026-06-10): Aggregator now adds each material's impact_transport to the
+  headline total, scope 3, fossil totals, stage bucket and by_material entry,
+  exactly once: skipped when the row's decomposition fields
+  (impact_climate_production + impact_climate_transport_embedded) show the
+  calculator already replaced transport into impact_climate. Implemented in the
+  aggregator (not the calculator) so all existing persisted PCFs are corrected
+  on next aggregation without recalc, and storage keeps factor vs transport
+  separate. Synthetic rows persist impact_transport = 0 so are unaffected.
+  transport_note/integrity comments updated; 10 tests updated to the corrected
+  semantics + 1 new decomposition no-double-count test. lib suite: 3040 pass,
+  only the 4 pre-existing unrelated failures (distributor x3, rosa) remain.
 - B1 (2026-06-10): Credit now applied once, in the calculator at persist time.
   Removed the aggregator's re-credit block (its recycledContentCredit accumulator
   was never read, so nothing downstream lost). Found and fixed a wider pinned-mode

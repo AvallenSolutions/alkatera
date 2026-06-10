@@ -289,20 +289,25 @@ export async function aggregateProductImpacts(
     // "Circularity: reuse + recycled content" block). Stored values are
     // post-credit; do NOT reduce them again here.
 
-    totalClimate += climateImpact;
-    // NOTE: impact_climate already includes the correct transport and
-    // electricity values. The product-lca-calculator applies decomposition
-    // adjustments before writing impact_climate:
-    //
-    // - If user provided specific transport data: impact_climate =
-    //   (ecoinvent total - embedded generic transport) + user DEFRA transport
-    // - If user's origin country differs from factor electricity geography:
-    //   impact_climate is further adjusted by the grid factor ratio
-    // - If no user data: impact_climate = full ecoinvent factor (unchanged)
-    //
-    // transportImpact (impact_transport) is tracked separately in totalTransport
-    // for reporting breakdown only — it is NOT added to totalClimate.
-    totalClimateFossil += climateFossil;
+    // Inbound transport: the calculator only folds user transport INTO
+    // impact_climate on the OpenLCA decomposition path ("replacement":
+    // impact_climate = factor − embedded generic transport + user DEFRA
+    // transport), which it marks by persisting impact_climate_production and
+    // impact_climate_transport_embedded. For every other factor source
+    // (staging, supplier EPD, proxies, pinned) the stored impact_climate is
+    // factor-only, so impact_transport must be added here or user-entered
+    // inbound transport never reaches the headline total. Transport
+    // combustion is fossil CO₂, so it also feeds the fossil totals.
+    const transportEmbeddedInClimate =
+      Number((material as any).impact_climate_production || 0) > 0 &&
+      Number((material as any).impact_climate_transport_embedded || 0) > 0 &&
+      transportImpact > 0;
+    const transportToAdd = transportEmbeddedInClimate ? 0 : transportImpact;
+    const climateWithTransport = climateImpact + transportToAdd;
+    const climateFossilWithTransport = climateFossil + transportToAdd;
+
+    totalClimate += climateWithTransport;
+    totalClimateFossil += climateFossilWithTransport;
     totalClimateBiogenic += climateBiogenic;
     totalClimateDluc += climateDluc;
     totalTransport += transportImpact;
@@ -315,15 +320,19 @@ export async function aggregateProductImpacts(
     totalTerrestrialAcidification += Number(material.impact_terrestrial_acidification || 0);
     totalFossilResourceScarcity += Number(material.impact_fossil_resource_scarcity || 0);
 
-    scope3Emissions += climateImpact;
-    // transportImpact is for reporting breakdown only — NOT added to scope totals.
+    // Inbound transport is upstream Scope 3 (GHG Protocol Cat 4), so it rides
+    // with the material's scope 3 contribution and lifecycle stage bucket
+    // (ISO 14044 allocates inbound transport to the material's stage). The
+    // synthetic rows below ([Maturation]/[Viticulture]/[Orchard]) all persist
+    // impact_transport = 0, so transportToAdd only affects real material rows.
+    scope3Emissions += climateWithTransport;
 
     const materialType = (material.material_type || '').toLowerCase();
 
     if (materialType === 'packaging' || materialType === 'packaging_material') {
-      packagingEmissions += climateImpact;
+      packagingEmissions += climateWithTransport;
     } else if (material.material_name?.startsWith('[Maturation]')) {
-      processingEmissions += climateImpact;
+      processingEmissions += climateWithTransport;
     } else if (material.material_name?.startsWith('[Viticulture Removals]')) {
       // FLAG: Soil carbon removals tracked separately, never netted against emissions.
       // The impact_removals_co2e field stores the positive removal value.
@@ -331,8 +340,8 @@ export async function aggregateProductImpacts(
       // Do NOT add to any emission bucket — removals are reported independently.
     } else if (material.material_name?.startsWith('[Viticulture]')) {
       // On-site vineyard growing emissions (fertiliser, fuel, irrigation, land)
-      rawMaterialsEmissions += climateImpact;
-      viticultureEmissions += climateImpact;
+      rawMaterialsEmissions += climateWithTransport;
+      viticultureEmissions += climateWithTransport;
       if (!viticultureMethodology && (material as any).methodology) {
         viticultureMethodology = (material as any).methodology;
       }
@@ -341,23 +350,21 @@ export async function aggregateProductImpacts(
       orchardRemovalsCo2e += Math.abs(Number((material as any).impact_removals_co2e || 0));
     } else if (material.material_name?.startsWith('[Orchard]')) {
       // On-site orchard growing emissions (fertiliser, fuel, irrigation, land, transport)
-      rawMaterialsEmissions += climateImpact;
-      orchardEmissions += climateImpact;
+      rawMaterialsEmissions += climateWithTransport;
+      orchardEmissions += climateWithTransport;
       if (!orchardMethodology && (material as any).methodology) {
         orchardMethodology = (material as any).methodology;
       }
     } else {
-      rawMaterialsEmissions += climateImpact;
+      rawMaterialsEmissions += climateWithTransport;
       // Track inbound container sub-total (already included in climateImpact)
       containerEmissions += Number((material as any).inbound_container_co2_per_unit || 0);
     }
 
-    // impact_climate on each material already includes inbound transport
-    // (either ecoinvent generic or user-specific DEFRA transport, depending on
-    // whether the user provided transport data and decomposition was available).
-    // Outbound distribution is handled separately by the distribution stage.
+    // Outbound distribution is handled separately by the distribution stage;
+    // only inbound (supplier → factory) transport rides with the material.
 
-    totalCO2Fossil += climateFossil;
+    totalCO2Fossil += climateFossilWithTransport;
     totalCO2Biogenic += climateBiogenic;
 
     // CH₄ and N₂O gas breakdown (ISO 14067 §6.4.3):
@@ -380,24 +387,22 @@ export async function aggregateProductImpacts(
     }
     totalN2O += n2oFromMaterial;
 
-    // Add to per-material breakdown (aggregate by material name)
-    // HIGH FIX #5: Use climateImpact only (NOT + transportImpact) so that
-    // by_material totals match the total_climate headline figure.
-    // Transport is already embedded in climateImpact (included during impact
-    // factor resolution); adding transportImpact separately inflates the per-material
-    // chart vs. the headline number. The by_material breakdown should show the same
-    // basis as total_climate for consistency.
+    // Add to per-material breakdown (aggregate by material name).
+    // Uses the same basis as total_climate (climateWithTransport) so that
+    // by_material totals match the headline figure: each material's inbound
+    // transport rides with it, added exactly once (transportToAdd is 0 when
+    // the calculator already replaced it into impact_climate).
     const materialKey = material.material_name || 'Unknown Material';
     const existingMat = materialBreakdown.find(m => m.name === materialKey);
     if (existingMat) {
       existingMat.quantity += quantity;
-      existingMat.climate += climateImpact;
+      existingMat.climate += climateWithTransport;
     } else {
       materialBreakdown.push({
         name: materialKey,
         quantity,
         unit: material.unit || 'kg',
-        climate: climateImpact,
+        climate: climateWithTransport,
         source: (material as any).impact_source || 'Product LCA',
       });
     }
@@ -839,8 +844,9 @@ export async function aggregateProductImpacts(
   });
 
   // ISO 14044 integrity check: lifecycle stage sum should equal headline total.
-  // Transport is embedded in impact_climate per material, so stage buckets and
-  // headline total should reconcile. Any discrepancy indicates a data issue.
+  // Each material's inbound transport is added once to BOTH its stage bucket
+  // and the headline total (climateWithTransport), so they should reconcile.
+  // Any discrepancy indicates a data issue.
   {
     const stageSum = rawMaterialsEmissions + processingEmissions + packagingEmissions +
       distributionEmissions + usePhaseEmissions + endOfLifeEmissions;
@@ -1247,11 +1253,12 @@ export async function aggregateProductImpacts(
 
     // MAJOR 5: Transport emissions accounting note
     transport_note: {
-      method: 'Transport emissions are calculated using DEFRA freight emission factors and embedded ' +
-        'in per-material impact_climate values during the waterfall impact resolution step. ' +
-        'Inbound transport (supplier to factory) is allocated to the raw materials/packaging lifecycle ' +
-        'stage per ISO 14044. Outbound distribution (factory to retail/consumer) is only included ' +
-        'when the system boundary extends to Cradle-to-Shelf or beyond.',
+      method: 'Inbound transport (supplier to factory) is calculated using DEFRA freight emission ' +
+        'factors and added to each material\'s climate contribution during aggregation, allocated ' +
+        'to the material\'s lifecycle stage per ISO 14044. Where OpenLCA decomposition replaced the ' +
+        'factor\'s embedded generic transport with user-specific transport, it is counted once via ' +
+        'the material\'s impact_climate instead. Outbound distribution (factory to retail/consumer) ' +
+        'is only included when the system boundary extends to Cradle-to-Shelf or beyond.',
       total_transport_kg_co2e: totalTransport,
       is_embedded_in_materials: true,
       outbound_included: isStageIncluded(effectiveBoundary, 'distribution'),
