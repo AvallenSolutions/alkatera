@@ -1257,7 +1257,7 @@ function renderWaterPage(data: LCAReportData): string {
                 <td>${escapeHtml(s.source)}</td>
                 <td>${escapeHtml(s.location)}</td>
                 <td>${escapeHtml(s.volume)}</td>
-                <td><span class="badge badge-${s.risk.toLowerCase()}">${escapeHtml(s.risk)}</span></td>
+                <td>${s.risk ? `<span class="badge badge-${s.risk.toLowerCase()}">${escapeHtml(s.risk)}</span>` : ''}</td>
               </tr>
             `).join('')}
           </tbody>

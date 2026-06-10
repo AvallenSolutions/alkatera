@@ -14,7 +14,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import type { FallbackEvent } from './impact-waterfall-resolver';
 import { normalizeToKg } from './impact-waterfall-resolver';
 import { calculateUsePhaseEmissions, type UsePhaseConfig } from './use-phase-factors';
-import { calculateMaterialEoL, getMaterialFactorKey, getRegionalDefaults, EOL_DATA_YEAR, REGION_LABELS, type EoLRegion, type RegionalDefaults, type EoLConfig } from './end-of-life-factors';
+import { calculateMaterialEoL, getMaterialFactorKey, getPackagingUnitsPerGroup, getRegionalDefaults, EOL_DATA_YEAR, REGION_LABELS, type EoLRegion, type RegionalDefaults, type EoLConfig } from './end-of-life-factors';
 import { calculateDistributionEmissions, type DistributionConfig } from './distribution-factors';
 import { isStageIncluded, calculateLossMultiplier, type ProductLossConfig } from './system-boundaries';
 import { IPCC_AR6_GWP } from './ghg-constants';
@@ -571,7 +571,16 @@ export async function aggregateProductImpacts(
       const reuseTrips = Number.isFinite(Number(rawReuseTrips)) && Number(rawReuseTrips) >= 1
         ? Number(rawReuseTrips)
         : 1;
-      const quantity = rawQuantity / reuseTrips;
+
+      // Shared-packaging allocation (ISO 14044 §4.3.4.2). Secondary/shipment/
+      // tertiary packaging (a 4-pack carton, a shipping case) serves multiple
+      // product units, so its EoL burden must be divided by units_per_group —
+      // the SAME divisor the production side applies in product-lca-calculator.ts.
+      // Without this, the full multipack carton was disposed against every single
+      // bottle, over-counting EoL by the pack factor (×4, ×6, …).
+      const unitsPerGroup = getPackagingUnitsPerGroup(material as any);
+
+      const quantity = rawQuantity / reuseTrips / unitsPerGroup;
 
       // HIGH FIX #6: EoL should only apply to PACKAGING materials and food-waste
       // ingredients. PRIMARY ingredients (barley, water, hops, grapes, etc.) are
@@ -880,7 +889,10 @@ export async function aggregateProductImpacts(
       const matType = (material.material_type || '').toLowerCase();
       if (matType !== 'packaging' && matType !== 'packaging_material') continue;
 
-      const weight = Number(material.quantity || 0);
+      // Weight by the per-unit (amortised) mass so a shared multipack carton
+      // contributes only its 1/units_per_group share to the blended recycled
+      // content, consistent with the EoL/waste figures.
+      const weight = Number(material.quantity || 0) / getPackagingUnitsPerGroup(material);
       const recycledPct = Number(material.recycled_content_percentage || 0);
 
       totalPackagingWeight += weight;

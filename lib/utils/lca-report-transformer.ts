@@ -1,5 +1,13 @@
 import type { LCAReportData } from '@/components/lca-report/types';
 import { getTransportModeWarning } from '@/lib/utils/transport-emissions-calculator';
+import { getPackagingUnitsPerGroup } from '@/lib/end-of-life-factors';
+
+// Page-safe row limit for the single-page Water / Land Use / Supply Chain tables.
+// Those PDF pages are fixed-height with overflow:hidden, so rows beyond what fits
+// would clip silently. Rows are sorted by impact descending (largest contributors
+// always shown) and any remainder is summarised in an explicit overflow row.
+// The complete inventory is always listed in the paginated Ingredient Breakdown.
+const SECTION_TABLE_ROW_LIMIT = 14;
 
 interface AggregatedImpacts {
   climate_change_gwp100?: number;
@@ -1182,7 +1190,13 @@ export function transformLCADataForReport(
                item.name === "Processing" ? "#60a5fa" : "#1d4ed8"
       })),
       sources: (() => {
-        const materialSources = materials.slice(0, 8).map((m: any) => {
+        // Sort by water volume desc so the biggest consumers always appear, then
+        // cap to a page-safe count (was an arbitrary first-8 that hid large juices).
+        const sortedByWater = [...materials].sort(
+          (a: any, b: any) => (b.impact_water || 0) - (a.impact_water || 0)
+        );
+        const shownWater = sortedByWater.slice(0, SECTION_TABLE_ROW_LIMIT);
+        const materialSources = shownWater.map((m: any) => {
           const origin = (m.origin_country || m.country_of_origin || '').toLowerCase();
           let risk: string;
           if (['spain', 'italy', 'india', 'south africa', 'mexico', 'australia', 'egypt', 'pakistan'].some(c => origin.includes(c))) {
@@ -1213,6 +1227,16 @@ export function transformLCADataForReport(
             score: 10,
           });
         }
+        const hiddenWater = sortedByWater.length - shownWater.length;
+        if (hiddenWater > 0) {
+          materialSources.push({
+            source: `+ ${hiddenWater} more material${hiddenWater === 1 ? '' : 's'} (full list in Ingredient Breakdown)`,
+            location: '',
+            volume: '',
+            risk: '',
+            score: 0,
+          });
+        }
         return materialSources;
       })(),
       methodology: {
@@ -1234,7 +1258,10 @@ export function transformLCADataForReport(
       // as it had no relationship to the actual product's packaging mass.
       totalWaste: (() => {
         // Sum actual packaging material masses as the waste total
-        const wasteFromMaterials = packagingMaterials.reduce((sum: number, m: any) => sum + (m.quantity || 0), 0);
+        // Amortise shared multipack/transit packaging by units_per_group so the
+        // per-bottle waste figure carries only its share of the carton, matching
+        // the EoL allocation in the aggregator.
+        const wasteFromMaterials = packagingMaterials.reduce((sum: number, m: any) => sum + (m.quantity || 0) / getPackagingUnitsPerGroup(m), 0);
         const wasteValue = impacts.waste && impacts.waste > 0
           ? impacts.waste
           : wasteFromMaterials > 0
@@ -1283,7 +1310,13 @@ export function transformLCADataForReport(
     landUse: {
       totalLandUse: `${landUse.toFixed(3)}m\u00B2`,
       breakdown: (() => {
-        const materialRows = materials.slice(0, 8).map((m: any) => ({
+        // Sort by land footprint desc so the biggest land users always appear,
+        // then cap to a page-safe count (was an arbitrary first-8).
+        const sortedByLand = [...materials].sort(
+          (a: any, b: any) => (b.impact_land || 0) - (a.impact_land || 0)
+        );
+        const shownLand = sortedByLand.slice(0, SECTION_TABLE_ROW_LIMIT);
+        const materialRows = shownLand.map((m: any) => ({
           material: m.material_name || "Material",
           origin: m.origin_country || m.country_of_origin || "Unknown",
           mass: `${(m.quantity || 0).toFixed(3)} kg`,
@@ -1300,6 +1333,16 @@ export function transformLCADataForReport(
             mass: '-',
             intensity: 0,
             footprint: `${otherLand.toFixed(3)} m\u00B2`,
+          });
+        }
+        const hiddenLand = sortedByLand.length - shownLand.length;
+        if (hiddenLand > 0) {
+          materialRows.push({
+            material: `+ ${hiddenLand} more material${hiddenLand === 1 ? '' : 's'} (full list in Ingredient Breakdown)`,
+            origin: '',
+            mass: '',
+            intensity: 0,
+            footprint: '',
           });
         }
         return materialRows;
@@ -1322,17 +1365,24 @@ export function transformLCADataForReport(
       network: [
         {
           category: "MATERIAL SUPPLIERS",
-          items: (materialBreakdown.length > 0
-            ? materialBreakdown.slice(0, 8).map((m: any) => {
-                const mat = materials.find((mat: any) => mat.material_name === m.name);
-                return { sourceMaterial: mat, displayName: m.name, fallbackLocation: mat?.origin_country || "Various" };
-              })
-            : materials.slice(0, 8).map((m: any) => ({
-                sourceMaterial: m,
-                displayName: m.material_name || "Supplier",
-                fallbackLocation: m.origin_country || m.country_of_origin || "Unknown",
-              }))
-          ).map(({ sourceMaterial: mat, displayName, fallbackLocation }) => {
+          items: (() => {
+            const supplierBase = materialBreakdown.length > 0
+              ? materialBreakdown.map((m: any) => {
+                  const mat = materials.find((mat: any) => mat.material_name === m.name);
+                  return { sourceMaterial: mat, displayName: m.name, fallbackLocation: mat?.origin_country || "Various" };
+                })
+              : materials.map((m: any) => ({
+                  sourceMaterial: m,
+                  displayName: m.material_name || "Supplier",
+                  fallbackLocation: m.origin_country || m.country_of_origin || "Unknown",
+                }));
+            // Sort by transport distance desc so the longest (highest-impact) supply
+            // legs always appear, then cap to a page-safe count (was an arbitrary first-8).
+            const sortedSuppliers = supplierBase.sort(
+              (a: any, b: any) => (Number(b.sourceMaterial?.distance_km) || 0) - (Number(a.sourceMaterial?.distance_km) || 0)
+            );
+            const shownSuppliers = sortedSuppliers.slice(0, SECTION_TABLE_ROW_LIMIT);
+            const supplierRows = shownSuppliers.map(({ sourceMaterial: mat, displayName, fallbackLocation }) => {
             // Use per-material transport CO₂e when available, fall back to estimating
             // from distance × mass × DEFRA road freight factor (0.10768 kg CO₂e/tonne-km)
             const transportCo2 = mat?.impact_transport_co2e
@@ -1368,7 +1418,20 @@ export function transformLCADataForReport(
               mode: modeLabel,
               warning,
             };
-          })
+          });
+            const hiddenSuppliers = sortedSuppliers.length - shownSuppliers.length;
+            if (hiddenSuppliers > 0) {
+              supplierRows.push({
+                name: `+ ${hiddenSuppliers} more material${hiddenSuppliers === 1 ? '' : 's'} (full list in Ingredient Breakdown)`,
+                location: '',
+                distance: '',
+                co2: '',
+                mode: '',
+                warning: null,
+              });
+            }
+            return supplierRows;
+          })()
         }
       ]
     },

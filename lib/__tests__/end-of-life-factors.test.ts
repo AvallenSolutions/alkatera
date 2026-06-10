@@ -9,6 +9,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   calculateMaterialEoL,
   getMaterialFactorKey,
+  getPackagingUnitsPerGroup,
   getRegionalDefaults,
   getEoLMaterialTypes,
   EOL_FACTORS,
@@ -124,6 +125,21 @@ describe('getMaterialFactorKey', () => {
       expect(getMaterialFactorKey('shipment', 'Outer Shipper')).toBe('paper');
     });
 
+    it('classifies a multipack "box" carton as paper (not other)', () => {
+      // Regression: "500ml box" / "4 × 420ml box" multipack cartons were falling
+      // through to 'other' (28% recycle, fossil incineration) because the paper
+      // keyword list lacked "box".
+      expect(getMaterialFactorKey('secondary', '500ml box')).toBe('paper');
+      expect(getMaterialFactorKey('secondary', '4 × 420ml box')).toBe('paper');
+      expect(getMaterialFactorKey('secondary', '6 × 420ml box')).toBe('paper');
+      expect(getMaterialFactorKey('secondary', 'Shipper Boxes')).toBe('paper');
+    });
+
+    it('does NOT misfire on names that merely contain the substring "box"', () => {
+      // \bbox\b must not match "boxwood" or similar non-boundary substrings.
+      expect(getMaterialFactorKey('', 'Boxwood extract')).toBe('other');
+    });
+
     it('classifies a ROPP closure as aluminium', () => {
       expect(getMaterialFactorKey('closure', 'ROPP Cap 28mm')).toBe('aluminium');
     });
@@ -136,6 +152,45 @@ describe('getMaterialFactorKey', () => {
     it('still falls back to other when nothing identifies the material', () => {
       expect(getMaterialFactorKey('container', '400/33 Silver GPI')).toBe('other');
     });
+  });
+});
+
+// ============================================================================
+// SHARED PACKAGING ALLOCATION DIVISOR
+// ============================================================================
+
+describe('getPackagingUnitsPerGroup', () => {
+  const sharedBox = (units: unknown) => ({
+    material_type: 'packaging',
+    packaging_category: 'secondary',
+    units_per_group: units,
+  });
+
+  it('returns units_per_group for shared (secondary/shipment/tertiary) packaging', () => {
+    expect(getPackagingUnitsPerGroup(sharedBox(4))).toBe(4);
+    expect(getPackagingUnitsPerGroup({ ...sharedBox(6), packaging_category: 'shipment' })).toBe(6);
+    expect(getPackagingUnitsPerGroup({ ...sharedBox(24), packaging_category: 'tertiary' })).toBe(24);
+  });
+
+  it('returns 1 (no-op) for primary packaging regardless of units_per_group', () => {
+    expect(getPackagingUnitsPerGroup({ material_type: 'packaging', packaging_category: 'container', units_per_group: 4 })).toBe(1);
+    expect(getPackagingUnitsPerGroup({ material_type: 'packaging', packaging_category: 'closure', units_per_group: 4 })).toBe(1);
+  });
+
+  it('returns 1 for non-packaging materials', () => {
+    expect(getPackagingUnitsPerGroup({ material_type: 'ingredient', packaging_category: 'secondary', units_per_group: 4 })).toBe(1);
+  });
+
+  it('returns 1 when units_per_group is missing or invalid (matches production-side fallback)', () => {
+    expect(getPackagingUnitsPerGroup(sharedBox(undefined))).toBe(1);
+    expect(getPackagingUnitsPerGroup(sharedBox(null))).toBe(1);
+    expect(getPackagingUnitsPerGroup(sharedBox(0))).toBe(1);
+    expect(getPackagingUnitsPerGroup(sharedBox(-3))).toBe(1);
+    expect(getPackagingUnitsPerGroup(sharedBox('not a number'))).toBe(1);
+  });
+
+  it('accepts a numeric string units_per_group', () => {
+    expect(getPackagingUnitsPerGroup(sharedBox('4'))).toBe(4);
   });
 });
 

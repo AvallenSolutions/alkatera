@@ -360,9 +360,10 @@ const MATERIAL_NAME_KEYWORDS: [RegExp, string][] = [
   [/\bpet\b/i, 'pet'],
   [/\bplastic\b/i, 'pet'], // Default plastic → PET (most common in drinks)
   // Paper / Cardboard. Secondary/transit packaging in drinks is corrugated
-  // cardboard, often named "trade case", "shipper" or just "case".
+  // cardboard, often named "trade case", "shipper", "case" or just "box"
+  // (e.g. "500ml box", "4 × 420ml box" — the multipack carton).
   [/\b(cardboard|carton|corrugated)\b/i, 'paper'],
-  [/\b(trade.?cases?|shippers?|outer.?cases?|cases?)\b/i, 'paper'],
+  [/\b(trade.?cases?|shippers?|outer.?cases?|cases?|box(es)?)\b/i, 'paper'],
   [/\b(paper|label)\b/i, 'paper'],
   // Steel / Metal
   [/\bsteel\b/i, 'steel'],
@@ -412,6 +413,42 @@ export function getMaterialFactorKey(
 
   // 3. Fallback
   return 'other';
+}
+
+/**
+ * Packaging roles whose physical material is SHARED across multiple product
+ * units (a 4-pack carton, a shipping case, a pallet). The per-unit footprint
+ * carries only 1/units_per_group of this material — both at production AND at
+ * end-of-life. Primary packaging (container/closure/label) is per-unit and is
+ * never amortised.
+ */
+export const SHARED_PACKAGING_CATEGORIES = ['secondary', 'shipment', 'tertiary'];
+
+/**
+ * Resolve how many product units share one piece of this packaging.
+ *
+ * Mirrors the production-side allocation in product-lca-calculator.ts so the
+ * EoL/circularity path divides the *same* shared packaging by the *same*
+ * divisor. Returns 1 (no-op) for primary packaging, non-packaging materials, or
+ * shared packaging with a missing/invalid `units_per_group` — exactly matching
+ * the production side, which also defaults to 1 (full impact per unit) and
+ * warns when shared packaging lacks the value. This keeps the two paths
+ * consistent regardless of the data's completeness.
+ */
+export function getPackagingUnitsPerGroup(material: {
+  material_type?: string | null;
+  packaging_category?: string | null;
+  units_per_group?: unknown;
+}): number {
+  const materialType = (material.material_type || '').toLowerCase();
+  const isPackaging = materialType === 'packaging' || materialType === 'packaging_material';
+  const category = (material.packaging_category || '').toLowerCase();
+  const isShared = isPackaging && SHARED_PACKAGING_CATEGORIES.includes(category);
+  if (!isShared) return 1;
+
+  const parsed = Number(material.units_per_group);
+  if (!Number.isFinite(parsed) || parsed < 1) return 1;
+  return parsed;
 }
 
 /**
