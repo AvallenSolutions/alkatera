@@ -34,6 +34,7 @@ import { RecipeToolbar } from "@/components/products/RecipeToolbar";
 import { IngredientRow } from "@/components/products/IngredientRow";
 import { PackagingRow } from "@/components/products/PackagingRow";
 import { RecipeSidebarTour, type TourStep } from "@/components/products/RecipeSidebarTour";
+import { RecipeStalenessBanner } from "@/components/products/RecipeStalenessBanner";
 import { useOnboarding } from "@/lib/onboarding/OnboardingContext";
 import { useRecipeEditor } from "@/hooks/useRecipeEditor";
 import { useIngestStash } from "@/hooks/useIngestStash";
@@ -295,6 +296,8 @@ export function RecipeEditorPanel({
       )}
 
       <SearchGuidePanel />
+
+      <RecipeStalenessBanner productId={productId} organizationId={organizationId} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className={compact ? "grid w-full grid-cols-3" : "grid w-full grid-cols-4"}>
