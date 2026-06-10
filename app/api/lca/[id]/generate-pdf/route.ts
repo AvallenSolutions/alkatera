@@ -141,12 +141,13 @@ export async function POST(
       }, 0);
       const editTime = latestMat?.updated_at ? new Date(latestMat.updated_at).getTime() : 0;
       if (editTime > 0 && snapshotTime > 0 && editTime > snapshotTime) {
+        const staleMessage =
+          'The recipe has changed since this LCA was last calculated. Recalculate the LCA to include your latest ingredient and packaging edits, then generate the report.';
         return NextResponse.json(
-          {
-            error: 'stale_inputs',
-            message:
-              'The recipe has changed since this LCA was last calculated. Recalculate the LCA to include your latest ingredient and packaging edits, then generate the report.',
-          },
+          // `message` carries the friendly text for callers that special-case the
+          // code; `details` mirrors it so generic error UIs (which surface
+          // details || error) show the message rather than the bare code.
+          { error: 'stale_inputs', message: staleMessage, details: staleMessage },
           { status: 409 },
         );
       }
