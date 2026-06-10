@@ -29,6 +29,12 @@ import { OpenLCAConfigDialog } from "@/components/lca/OpenLCAConfigDialog";
 import { BOMImportFlow } from "@/components/products/BOMImportFlow";
 import { BrewwRecipeImportDialog } from "@/components/products/BrewwRecipeImportDialog";
 import { useAutoSave } from "@/hooks/useAutoSave";
+import {
+  buildPackagingMaterialData,
+  isPackagingFormSaveable,
+  packagingFormErrors,
+} from "@/lib/products/packaging-material-data";
+import { unitSizeToMl } from "@/lib/constants/material-units";
 import { useIngestStash } from "@/hooks/useIngestStash";
 
 interface Product {
@@ -115,7 +121,7 @@ export default function ProductRecipePage() {
       epr_ram_rating: undefined,
       epr_uk_nation: undefined,
       epr_is_drinks_container: false,
-      units_per_group: 1,
+      units_per_group: '',
       reuse_trips: '',
       recyclability_percent: '',
       end_of_life_pathway: '',
@@ -149,6 +155,8 @@ export default function ProductRecipePage() {
       distance_km: String(f.distance_km || ''),
       packaging_category: f.packaging_category || '',
       net_weight_g: String(f.net_weight_g || ''),
+      units_per_group: String(f.units_per_group || ''),
+      match_status: f.match_status || '',
       recycled_content_percentage: String(f.recycled_content_percentage || ''),
       printing_process: f.printing_process || '',
       is_organic_certified: f.is_organic_certified || false,
@@ -408,6 +416,7 @@ export default function ProductRecipePage() {
           origin_lng: item.origin_lng || undefined,
           origin_country_code: item.origin_country_code || '',
           is_organic_certified: item.is_organic_certified || false,
+          match_status: item.match_status ?? null,
           transport_mode: item.transport_mode || 'truck',
           distance_km: item.distance_km || '',
           // Multi-modal transport legs. If absent, synthesise a single leg from legacy fields
@@ -497,11 +506,19 @@ export default function ProductRecipePage() {
             epr_ram_rating: item.epr_ram_rating || undefined,
             epr_uk_nation: item.epr_uk_nation || undefined,
             epr_is_drinks_container: item.epr_is_drinks_container || false,
-            units_per_group: item.units_per_group || 1,
+            // Legacy shared-packaging rows saved without an answer must ask
+            // the question again rather than silently showing 1.
+            units_per_group: item.units_per_group ?? '',
             reuse_trips: item.reuse_trips ?? '',
             recyclability_percent: item.recyclability_percent ?? '',
             end_of_life_pathway: item.end_of_life_pathway || '',
             biobased_content_percentage: item.biobased_content_percentage ?? '',
+            // Structured identity from the guided wizard (null on manual rows)
+            container_format: item.container_format ?? null,
+            container_material: item.container_material ?? null,
+            container_size_ml: item.container_size_ml ?? null,
+            weight_source: item.weight_source ?? null,
+            match_status: item.match_status ?? null,
           };
         }));
       }
@@ -586,7 +603,7 @@ export default function ProductRecipePage() {
         epr_ram_rating: undefined,
         epr_uk_nation: undefined,
         epr_is_drinks_container: false,
-        units_per_group: 1,
+        units_per_group: '',
         reuse_trips: '',
         recyclability_percent: '',
         end_of_life_pathway: '',
@@ -622,7 +639,7 @@ export default function ProductRecipePage() {
         epr_ram_rating: undefined,
         epr_uk_nation: undefined,
         epr_is_drinks_container: false,
-        units_per_group: 1,
+        units_per_group: '',
         reuse_trips: '',
         recyclability_percent: '',
         end_of_life_pathway: '',
@@ -638,14 +655,29 @@ export default function ProductRecipePage() {
     const validForms = forms.filter(f => f.name && f.amount && Number(f.amount) > 0);
     if (validForms.length === 0 || !currentOrganization?.id) return;
 
-    const { error: deleteError } = await supabase
-      .from("product_materials")
-      .delete()
-      .eq("product_id", productId)
-      .eq("material_type", "ingredient");
-    if (deleteError) throw new Error(`Autosave ingredients failed: ${deleteError.message}`);
+    const existingItems = validForms.filter(f => !f.tempId.startsWith('temp-'));
+    const newItems = validForms.filter(f => f.tempId.startsWith('temp-'));
+    // Keep every row still present in the form — including ones that are
+    // temporarily invalid mid-edit — so autosave never deletes a saved row
+    // the user is part-way through changing.
+    const idsToKeep = forms.filter(f => !f.tempId.startsWith('temp-')).map(f => f.tempId);
 
-    const materialsToInsert = validForms.map(form => {
+    const { data: currentIng } = await supabase
+      .from("product_materials").select("id")
+      .eq("product_id", productId).eq("material_type", "ingredient");
+
+    if (currentIng && currentIng.length > 0) {
+      const idsToDelete = currentIng.map(i => i.id).filter(id => !idsToKeep.includes(id.toString()));
+      if (idsToDelete.length > 0) {
+        const { error } = await supabase.from("product_materials").delete().in("id", idsToDelete);
+        if (error) throw new Error(`Autosave ingredients failed: ${error.message}`);
+      }
+    }
+
+    // Full-row builder: every conditional column gets an explicit null default
+    // so updating an existing row clears stale values exactly like the old
+    // delete-and-reinsert did.
+    const buildMaterialData = (form: IngredientFormData) => {
       const materialData: any = {
         product_id: parseInt(productId),
         material_name: form.name,
@@ -653,8 +685,21 @@ export default function ProductRecipePage() {
         quantity: Number(form.amount),
         unit: form.unit,
         material_type: 'ingredient',
+        match_status: form.match_status ?? null,
         origin_country: form.origin_country || null,
         is_organic_certified: form.is_organic_certified || false,
+        data_source: null,
+        data_source_id: null,
+        openlca_database: null,
+        supplier_product_id: null,
+        cached_co2_factor: null,
+        transport_mode: null,
+        distance_km: null,
+        transport_legs: null,
+        origin_lat: null,
+        origin_lng: null,
+        origin_address: null,
+        origin_country_code: null,
       };
       if (form.data_source === 'openlca' && form.data_source_id) {
         materialData.data_source = 'openlca';
@@ -678,7 +723,6 @@ export default function ProductRecipePage() {
       } else if (form.transport_mode && form.distance_km) {
         materialData.transport_mode = form.transport_mode;
         materialData.distance_km = Number(form.distance_km);
-        materialData.transport_legs = null;
       }
       if (form.origin_lat && form.origin_lng) {
         materialData.origin_lat = form.origin_lat;
@@ -699,23 +743,35 @@ export default function ProductRecipePage() {
       materialData.arable_field_id = form.arable_field_id ?? null;
       materialData.orchard_id = form.orchard_id ?? null;
       return materialData;
-    });
+    };
 
-    const { error: insertError } = await supabase
-      .from("product_materials").insert(materialsToInsert).select();
-    if (insertError) throw new Error(`Autosave ingredients failed: ${insertError.message}`);
+    for (const form of existingItems) {
+      const { error } = await supabase
+        .from("product_materials").update(buildMaterialData(form)).eq("id", form.tempId);
+      if (error) throw new Error(`Autosave ingredients failed: ${error.message}`);
+    }
+
+    if (newItems.length > 0) {
+      const { error } = await supabase
+        .from("product_materials").insert(newItems.map(buildMaterialData)).select();
+      if (error) throw new Error(`Autosave ingredients failed: ${error.message}`);
+    }
     savedIngredientSnapshot.current = formFingerprint(forms);
   }, [productId, currentOrganization?.id, formFingerprint]);
 
   const autoSavePackaging = useCallback(async (forms: PackagingFormData[]) => {
-    const validForms = forms.filter(
-      f => f.name && (Number(f.amount) > 0 || Number(f.net_weight_g) > 0) && f.packaging_category
-    );
+    // Incomplete rows (including shared packaging without units_per_group)
+    // stay in memory until the user finishes them — autosave must never
+    // write a row the Save button would reject.
+    const validForms = forms.filter(isPackagingFormSaveable);
     if (validForms.length === 0 || !currentOrganization?.id) return;
 
     const existingItems = validForms.filter(f => !f.tempId.startsWith('temp-'));
     const newItems = validForms.filter(f => f.tempId.startsWith('temp-'));
-    const idsToKeep = existingItems.map(f => f.tempId);
+    // Keep every row still present in the form — including ones that are
+    // temporarily invalid mid-edit — so autosave never deletes a saved row
+    // the user is part-way through changing.
+    const idsToKeep = forms.filter(f => !f.tempId.startsWith('temp-')).map(f => f.tempId);
 
     const { data: currentPkg } = await supabase
       .from("product_materials").select("id")
@@ -729,74 +785,7 @@ export default function ProductRecipePage() {
       }
     }
 
-    const buildMaterialData = (form: PackagingFormData) => {
-      let quantity = Number(form.amount);
-      if (!quantity || quantity <= 0 || isNaN(quantity)) {
-        const weightG = Number(form.net_weight_g);
-        quantity = isNaN(weightG) ? 0 : (form.unit === 'kg' ? weightG / 1000 : weightG);
-      }
-      const materialData: any = {
-        product_id: parseInt(productId),
-        material_name: form.name,
-        matched_source_name: form.matched_source_name || null,
-        quantity, unit: form.unit, material_type: 'packaging',
-        packaging_category: form.packaging_category || null,
-        origin_country: form.origin_country || null,
-        net_weight_g: Number(form.net_weight_g) || null,
-        recycled_content_percentage: form.recycled_content_percentage ? Number(form.recycled_content_percentage) : null,
-        printing_process: form.printing_process || null,
-      };
-      if (form.data_source === 'openlca' && form.data_source_id) {
-        materialData.data_source = 'openlca';
-        materialData.data_source_id = form.data_source_id;
-        if (form.openlca_database) {
-          materialData.openlca_database = form.openlca_database;
-        }
-      } else if (form.data_source === 'supplier' && form.supplier_product_id) {
-        materialData.data_source = 'supplier';
-        materialData.supplier_product_id = form.supplier_product_id;
-      }
-      // Cache the emission factor value so the resolver always has a local
-      // fallback even when the original data source is unreachable.
-      if (form.carbon_intensity != null && !isNaN(Number(form.carbon_intensity))) {
-        materialData.cached_co2_factor = Number(form.carbon_intensity);
-      }
-      if (form.transport_legs && form.transport_legs.length > 0) {
-        materialData.transport_legs = form.transport_legs;
-        materialData.transport_mode = form.transport_legs[0].transportMode;
-        materialData.distance_km = form.transport_legs[0].distanceKm;
-      } else if (form.transport_mode && form.distance_km) {
-        materialData.transport_mode = form.transport_mode;
-        materialData.distance_km = Number(form.distance_km);
-        materialData.transport_legs = null;
-      }
-      if (form.origin_lat && form.origin_lng) {
-        materialData.origin_lat = form.origin_lat;
-        materialData.origin_lng = form.origin_lng;
-        materialData.origin_address = form.origin_address || null;
-        materialData.origin_country_code = form.origin_country_code || null;
-      }
-      materialData.has_component_breakdown = form.has_component_breakdown || false;
-      if (form.epr_packaging_level) materialData.epr_packaging_level = form.epr_packaging_level;
-      if (form.epr_packaging_activity) materialData.epr_packaging_activity = form.epr_packaging_activity;
-      materialData.epr_is_household = form.epr_is_household !== undefined ? form.epr_is_household : true;
-      if (form.epr_ram_rating) materialData.epr_ram_rating = form.epr_ram_rating;
-      if (form.epr_uk_nation) materialData.epr_uk_nation = form.epr_uk_nation;
-      materialData.epr_is_drinks_container = form.epr_is_drinks_container || false;
-      materialData.units_per_group = Number(form.units_per_group) || 1;
-      // Circularity
-      materialData.reuse_trips = form.reuse_trips && Number(form.reuse_trips) >= 1
-        ? Number(form.reuse_trips)
-        : null;
-      materialData.recyclability_percent = form.recyclability_percent !== ''
-        ? Number(form.recyclability_percent)
-        : null;
-      materialData.end_of_life_pathway = form.end_of_life_pathway || null;
-      materialData.biobased_content_percentage = form.biobased_content_percentage !== ''
-        ? Number(form.biobased_content_percentage)
-        : null;
-      return materialData;
-    };
+    const buildMaterialData = (form: PackagingFormData) => buildPackagingMaterialData(form, productId);
 
     for (const form of existingItems) {
       const materialData = buildMaterialData(form);
@@ -959,6 +948,7 @@ export default function ProductRecipePage() {
         quantity: Number(form.amount),
         unit: form.unit,
         material_type: 'ingredient',
+        match_status: form.match_status ?? null,
         origin_country: form.origin_country || null,
         is_organic_certified: form.is_organic_certified || false,
         transport_mode: completePair ? rawMode : null,
@@ -1115,6 +1105,7 @@ export default function ProductRecipePage() {
           quantity: Number(form.amount),
           unit: form.unit,
           material_type: 'ingredient',
+          match_status: form.match_status ?? null,
           origin_country: form.origin_country || null,
           is_organic_certified: form.is_organic_certified || false,
         };
@@ -1217,43 +1208,17 @@ export default function ProductRecipePage() {
     console.log('=== SAVE PACKAGING DEBUG ===');
     console.log('All packaging forms:', packagingForms);
 
-    // Check each form and collect validation errors
+    // Check each form and collect validation errors (shared with autosave so
+    // the two paths can never accept different rows)
     const validationErrors: string[] = [];
     packagingForms.forEach((form, idx) => {
-      const formErrors: string[] = [];
-      if (!form.packaging_category) {
-        formErrors.push('packaging type');
-      }
-      if (!form.name) {
-        formErrors.push('material name');
-      }
-      if (!form.amount && !form.net_weight_g) {
-        formErrors.push('net weight');
-      } else if (Number(form.amount) <= 0 && Number(form.net_weight_g) <= 0) {
-        formErrors.push('net weight (must be greater than 0)');
-      }
-
+      const formErrors = packagingFormErrors(form);
       if (formErrors.length > 0) {
         validationErrors.push(`Packaging ${idx + 1}: missing ${formErrors.join(', ')}`);
       }
-
-      console.log(`Form ${idx}:`, {
-        name: form.name,
-        hasName: !!form.name,
-        amount: form.amount,
-        hasAmount: !!form.amount,
-        net_weight_g: form.net_weight_g,
-        amountNumber: Number(form.amount),
-        amountValid: Number(form.amount) > 0,
-        packaging_category: form.packaging_category,
-        hasCategory: !!form.packaging_category,
-        errors: formErrors,
-      });
     });
 
-    const validForms = packagingForms.filter(
-      f => f.name && (Number(f.amount) > 0 || Number(f.net_weight_g) > 0) && f.packaging_category
-    );
+    const validForms = packagingForms.filter(isPackagingFormSaveable);
 
     console.log('Valid forms:', validForms);
     console.log('Validation errors:', validationErrors);
@@ -1291,8 +1256,9 @@ export default function ProductRecipePage() {
       const existingItems = validForms.filter(f => !f.tempId.startsWith('temp-'));
       const newItems = validForms.filter(f => f.tempId.startsWith('temp-'));
 
-      // Get IDs of items that should be kept
-      const idsToKeep = existingItems.map(f => f.tempId);
+      // Keep every row still present in the form, including invalid ones that
+      // are merely skipped this save — "skipped" must never mean "deleted".
+      const idsToKeep = packagingForms.filter(f => !f.tempId.startsWith('temp-')).map(f => f.tempId);
 
       // Delete only items that are no longer in the form (not in idsToKeep)
       // First, get all current packaging IDs for this product
@@ -1321,79 +1287,8 @@ export default function ProductRecipePage() {
         }
       }
 
-      // Helper function to build material data object
-      const buildMaterialData = (form: PackagingFormData) => {
-        // Derive quantity from amount, falling back to net_weight_g with unit conversion
-        let quantity = Number(form.amount);
-        if (!quantity || quantity <= 0 || isNaN(quantity)) {
-          const weightG = Number(form.net_weight_g);
-          quantity = isNaN(weightG) ? 0 : (form.unit === 'kg' ? weightG / 1000 : weightG);
-        }
-
-        const materialData: any = {
-          product_id: parseInt(productId),
-          material_name: form.name,
-          matched_source_name: form.matched_source_name || null,
-          quantity,
-          unit: form.unit,
-          material_type: 'packaging',
-          packaging_category: form.packaging_category || null,
-          origin_country: form.origin_country || null,
-          net_weight_g: Number(form.net_weight_g) || null,
-          recycled_content_percentage: form.recycled_content_percentage ? Number(form.recycled_content_percentage) : null,
-          printing_process: form.printing_process || null,
-        };
-
-        // Only include data_source if it's a valid value with required fields
-        if (form.data_source === 'openlca' && form.data_source_id) {
-          materialData.data_source = 'openlca';
-          materialData.data_source_id = form.data_source_id;
-          if (form.openlca_database) {
-            materialData.openlca_database = form.openlca_database;
-          }
-        } else if (form.data_source === 'supplier' && form.supplier_product_id) {
-          materialData.data_source = 'supplier';
-          materialData.supplier_product_id = form.supplier_product_id;
-        }
-
-        // Include transport data — prefer multi-leg JSONB; fall back to single mode/distance
-        if (form.transport_legs && form.transport_legs.length > 0) {
-          materialData.transport_legs = form.transport_legs;
-          materialData.transport_mode = form.transport_legs[0].transportMode;
-          materialData.distance_km = form.transport_legs[0].distanceKm;
-        } else if (form.transport_mode && form.distance_km) {
-          materialData.transport_mode = form.transport_mode;
-          materialData.distance_km = Number(form.distance_km);
-          materialData.transport_legs = null;
-        }
-
-        // Include origin geolocation data if available
-        if (form.origin_lat && form.origin_lng) {
-          materialData.origin_lat = form.origin_lat;
-          materialData.origin_lng = form.origin_lng;
-          materialData.origin_address = form.origin_address || null;
-          materialData.origin_country_code = form.origin_country_code || null;
-        }
-
-        // Include EPR Compliance fields
-        materialData.has_component_breakdown = form.has_component_breakdown || false;
-        if (form.epr_packaging_level) {
-          materialData.epr_packaging_level = form.epr_packaging_level;
-        }
-        if (form.epr_packaging_activity) {
-          materialData.epr_packaging_activity = form.epr_packaging_activity;
-        }
-        materialData.epr_is_household = form.epr_is_household !== undefined ? form.epr_is_household : true;
-        if (form.epr_ram_rating) {
-          materialData.epr_ram_rating = form.epr_ram_rating;
-        }
-        if (form.epr_uk_nation) {
-          materialData.epr_uk_nation = form.epr_uk_nation;
-        }
-        materialData.epr_is_drinks_container = form.epr_is_drinks_container || false;
-
-        return materialData;
-      };
+      // Shared row builder (also used by autosave)
+      const buildMaterialData = (form: PackagingFormData) => buildPackagingMaterialData(form, productId);
 
       // Update existing items (guard against quantity <= 0 to satisfy positive_quantity constraint)
       let allSavedIds: string[] = [];
@@ -1873,6 +1768,7 @@ export default function ProductRecipePage() {
                     onRemove={removePackaging}
                     onAddNewWithType={addPackagingWithType}
                     canRemove={packagingForms.length > 1}
+                    containerSizeMl={unitSizeToMl(product?.unit_size_value, product?.unit_size_unit)}
                   />
                 ))}
               </div>

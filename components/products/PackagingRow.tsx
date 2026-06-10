@@ -19,6 +19,7 @@ import {
   Database,
 } from "lucide-react";
 import { PackagingEditorTabs } from "@/components/products/PackagingEditorTabs";
+import { MatchStatusBadge } from "@/components/products/MatchStatusBadge";
 import type { PackagingFormData } from "@/components/products/PackagingFormCard";
 import type { PackagingCategory } from "@/lib/types/lca";
 import {
@@ -40,6 +41,8 @@ interface PackagingRowProps {
   onAddNewWithType?: (category: PackagingCategory) => void;
   canRemove: boolean;
   defaultExpanded?: boolean;
+  /** Product unit size in ml, when known — tightens the weight plausibility check */
+  containerSizeMl?: number | null;
 }
 
 const TYPE_META: Record<string, { icon: typeof Package; label: string }> = {
@@ -79,7 +82,7 @@ function isRowComplete(packaging: PackagingFormData): boolean {
 }
 
 export function PackagingRow(props: PackagingRowProps) {
-  const { packaging, index, onRemove, canRemove, defaultExpanded } = props;
+  const { packaging, index, onRemove, onUpdate, canRemove, defaultExpanded } = props;
   const [expanded, setExpanded] = useState<boolean>(defaultExpanded ?? !isRowComplete(packaging));
 
   const meta = packaging.packaging_category ? TYPE_META[packaging.packaging_category] : null;
@@ -123,6 +126,10 @@ export function PackagingRow(props: PackagingRowProps) {
             {meta && <Badge variant="outline" className="text-xs">{meta.label}</Badge>}
             {weight && <span>· {weight}</span>}
             {dataSourceBadge(packaging)}
+            <MatchStatusBadge
+              status={packaging.match_status}
+              onConfirm={() => onUpdate(packaging.tempId, { match_status: 'verified' })}
+            />
             {carbonPreview && <span>· {carbonPreview}</span>}
             {summary.total > 0 && (
               <span>· {summary.complete} of {summary.total} sections complete</span>

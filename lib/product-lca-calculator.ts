@@ -1,5 +1,5 @@
 import { getSupabaseBrowserClient } from './supabase/browser-client';
-import { resolveImpactFactors, normalizeToKg, type ProductMaterial, type WaterfallResult, type FallbackEvent } from './impact-waterfall-resolver';
+import { resolveImpactFactors, normalizeToKg, tryNormalizeToKg, type ProductMaterial, type WaterfallResult, type FallbackEvent } from './impact-waterfall-resolver';
 import { calculateTransportEmissions, type TransportMode } from './utils/transport-emissions-calculator';
 import { calculateDistributionEmissions } from './distribution-factors';
 import { resolveImpactSource } from './utils/data-quality-mapper';
@@ -1317,7 +1317,23 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
     for (const material of materials) {
       try {
         // Normalize quantity to kg, allocating batch totals to the functional unit
-        const quantityKg = normalizeToKg(material.quantity, material.unit) / bottlesPerBatch;
+        const normalised = tryNormalizeToKg(material.quantity, material.unit);
+        const quantityKg = normalised.kg / bottlesPerBatch;
+
+        // An unrecognised unit passes through as kg, which can be wildly wrong.
+        // Surface it as a data-quality warning instead of failing silently.
+        if (!normalised.recognised) {
+          fallbackEvents.push({
+            material_name: material.material_name,
+            material_id: material.id?.toString() ?? '',
+            attempted_priority: 'unit normalisation',
+            resolved_priority: 0,
+            fallback_reason: `Quantity unit '${material.unit}' was not recognised, so the value was treated as kilograms. Please change this item's unit to one from the unit list.`,
+            factor_value_kg_co2e: 0,
+            source_reference: 'Unit conversion',
+            category: 'data_quality',
+          });
+        }
 
         // Use pre-resolved factors (parallel) or pinned factors
         let resolved: WaterfallResult;

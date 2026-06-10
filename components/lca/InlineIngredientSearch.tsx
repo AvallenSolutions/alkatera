@@ -11,6 +11,7 @@ import { findBrandNameMatch } from "@/lib/openlca/drinks-aliases";
 import type { DataSource } from "@/lib/types/lca";
 import { cleanFactorDisplayName } from "@/lib/factor-display-name";
 import { FactorInfoHint } from "./FactorInfoHint";
+import { mapOpenLcaUnit } from "@/lib/constants/material-units";
 import { FactorInfoTrigger } from "./FactorInfoTrigger";
 
 interface ProxySuggestion {
@@ -97,6 +98,10 @@ interface InlineIngredientSearchProps {
     recycled_content_pct?: number;
     packaging_components?: any;
     user_query?: string;
+    /** Raw reference unit of the factor (e.g. 'kg', 'l', 'Item(s)'); undefined = unknown */
+    ef_reference_unit?: string;
+    /** True when software picked this result (e.g. AI proxy auto-select) rather than the user */
+    auto_matched?: boolean;
     // Emission factor metadata for detail tooltip
     ef_source?: string;
     ef_source_type?: string;
@@ -289,7 +294,7 @@ export function InlineIngredientSearch({
       const data: SearchResponse = await response.json();
       if (data.results && data.results.length > 0) {
         // Auto-select the first result, preserving the user's original query
-        handleResultSelect(data.results[0], originalUserQuery);
+        handleResultSelect(data.results[0], originalUserQuery, { autoMatched: true });
         setProxySuggestions([]);
       } else {
         // Show the proxy results in the main results list
@@ -319,13 +324,43 @@ export function InlineIngredientSearch({
     }, 300);
   };
 
-  const handleResultSelect = (result: SearchResult, overrideUserQuery?: string) => {
+  const handleResultSelect = async (result: SearchResult, overrideUserQuery?: string, opts?: { autoMatched?: boolean }) => {
     console.log('[InlineSearch] Selected result:', {
       id: result.id,
       source_type: result.source_type,
       name: result.name,
       user_query: overrideUserQuery || query,
     });
+
+    // Live ecoinvent/Agribalyse descriptors don't carry their reference unit,
+    // and assuming "per kg" was wrong for per-litre/per-item processes. Fetch
+    // the real unit on selection (cached server-side); on failure the unit
+    // stays unknown rather than guessed.
+    let resolvedUnit = result.unit;
+    let efReferenceUnit: string | undefined = result.unit;
+    const isLiveResult = result.source_type === 'ecoinvent_live' || result.source_type === 'agribalyse_live';
+    if (isLiveResult && !resolvedUnit) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const db = result.source_type === 'agribalyse_live' ? 'agribalyse' : 'ecoinvent';
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 4000);
+          const resp = await fetch(
+            `/api/openlca/reference-unit?process_id=${encodeURIComponent(result.id)}&database=${db}`,
+            { headers: { Authorization: `Bearer ${session.access_token}` }, signal: controller.signal }
+          );
+          clearTimeout(timer);
+          if (resp.ok) {
+            const data = await resp.json();
+            efReferenceUnit = data.unit ?? undefined;
+            resolvedUnit = mapOpenLcaUnit(data.unit) ?? undefined;
+          }
+        }
+      } catch {
+        // Unknown unit is acceptable; never guess kg.
+      }
+    }
 
     // Map source_type to DB-valid DataSource values.
     // The product_materials.data_source constraint only allows 'openlca', 'supplier', or NULL.
@@ -352,7 +387,10 @@ export function InlineIngredientSearch({
       data_source_id: result.id,
       supplier_product_id: result.source_type === 'primary' ? result.id : undefined,
       supplier_name: result.metadata?.supplier_name || result.supplier_name,
-      unit: result.unit || 'kg',
+      // Empty string = unknown; callers must not prefill a unit from it.
+      unit: resolvedUnit || '',
+      ef_reference_unit: efReferenceUnit,
+      auto_matched: opts?.autoMatched ?? false,
       carbon_intensity: result.co2_factor,
       location: result.location,
       recycled_content_pct: result.recycled_content_pct || result.metadata?.recycled_content_pct,
@@ -677,11 +715,15 @@ export function InlineIngredientSearch({
                       </p>
                     )}
                     <div className="flex flex-wrap items-center gap-2 mt-1">
-                      {result.unit && (
-                        <span className="text-xs text-muted-foreground">
-                          Unit: {result.unit}
+                      {result.unit ? (
+                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+                          per {result.unit}
+                        </Badge>
+                      ) : (result.source_type === 'ecoinvent_live' || result.source_type === 'agribalyse_live') ? (
+                        <span className="text-[10px] text-muted-foreground/70">
+                          unit confirmed on selection
                         </span>
-                      )}
+                      ) : null}
                       {result.location && (
                         <span className="text-xs text-muted-foreground">
                           {result.location}

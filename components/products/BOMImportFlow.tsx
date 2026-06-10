@@ -331,6 +331,9 @@ export function BOMImportFlow({
             is_organic_certified: false,
             transport_mode: "truck",
             distance_km: 0,
+            // Imported matches are used immediately but flagged for a
+            // one-click confirmation (apply + flag model).
+            match_status: match?.data_source_id || match?.supplier_product_id ? 'auto_matched' as const : 'needs_review' as const,
           };
           ingredients.push(ingredientData);
         } else {
@@ -360,7 +363,10 @@ export function BOMImportFlow({
             epr_ram_rating: undefined,
             epr_uk_nation: undefined,
             epr_is_drinks_container: false,
-            units_per_group: 1,
+            // A BOM doesn't say how many products share a case/pallet, so
+            // shared-category rows must ask the user before they can save.
+            units_per_group: '',
+            match_status: match?.data_source_id || match?.supplier_product_id ? 'auto_matched' as const : 'needs_review' as const,
           };
           packaging.push(packagingData);
         }

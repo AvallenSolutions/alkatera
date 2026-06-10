@@ -120,10 +120,13 @@ export function EndOfLifeStep() {
         continue;
       }
 
-      // packaging_category holds a packaging role, not a material — also feed the
-      // resolved emission-factor name so glass/cardboard don't fall back to 'other'.
+      // Wizard-created rows carry the material identity in container_material,
+      // which resolves exactly. Manual rows fall back to name inference because
+      // packaging_category holds a packaging role, not a material — also feed
+      // the resolved emission-factor name so glass/cardboard don't become 'other'.
       const factorName = (mat as any).matched_source_name || (mat as any).resolvedFactorName || '';
-      const factorKey = getMaterialFactorKey(packagingCategory || 'other', mat.material_name, factorName);
+      const containerMaterial = (mat as any).container_material || '';
+      const factorKey = getMaterialFactorKey(containerMaterial || packagingCategory || 'other', mat.material_name, factorName);
 
       // Use the material's actual name (e.g. "Glass Bottle 500ml")
       // with the factor type in parentheses for clarity

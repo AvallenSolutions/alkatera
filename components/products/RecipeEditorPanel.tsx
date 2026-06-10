@@ -17,8 +17,11 @@ import {
   Wine,
   Copy,
   BookmarkPlus,
+  Wand2,
+  ShieldQuestion,
 } from "lucide-react";
 import { useOrganization } from "@/lib/organizationContext";
+import { toast } from "sonner";
 import { IngredientFormCard } from "@/components/products/IngredientFormCard";
 import { PackagingFormCard } from "@/components/products/PackagingFormCard";
 import { BOMImportFlow } from "@/components/products/BOMImportFlow";
@@ -26,6 +29,7 @@ import { MaturationProfileCard } from "@/components/products/MaturationProfileCa
 import { SearchGuidePanel } from "@/components/products/SearchGuidePanel";
 import { RecipeChecklist } from "@/components/products/RecipeChecklist";
 import { PackagingTemplateDialog } from "@/components/products/PackagingTemplateDialog";
+import { PackagingWizard } from "@/components/products/packaging-wizard/PackagingWizard";
 import { IngredientTemplateDialog } from "@/components/products/IngredientTemplateDialog";
 import { RecipeScaleToggle } from "@/components/products/RecipeScaleToggle";
 import { ProductionChainEditor } from "@/components/products/ProductionChainEditor";
@@ -44,6 +48,7 @@ import { useMemo } from "react";
 import type { IngredientFormData } from "@/components/products/IngredientFormCard";
 import type { PackagingFormData } from "@/components/products/PackagingFormCard";
 import type { MaturationFormData } from "@/components/products/MaturationProfileCard";
+import { unitSizeToMl } from "@/lib/constants/material-units";
 
 interface RecipeEditorPanelProps {
   productId: string;
@@ -74,6 +79,7 @@ export function RecipeEditorPanel({
   const { products: linkedSupplierProducts } = useLinkedSupplierProducts(organizationId);
   const [activeTab, setActiveTab] = useState(initialTab);
   const [showBOMImport, setShowBOMImport] = useState(false);
+  const [showPackagingWizard, setShowPackagingWizard] = useState(false);
   const [showChecklist, setShowChecklist] = useState<boolean>(false);
   const [showPackagingChecklist, setShowPackagingChecklist] = useState<boolean>(false);
 
@@ -120,6 +126,7 @@ export function RecipeEditorPanel({
     addPackagingWithType,
     addIngredientWithDefaults,
     addPackagingWithDefaults,
+    addPackagingRows,
     saveIngredients,
     savePackaging,
     setPackagingFromTemplate,
@@ -436,6 +443,17 @@ export function RecipeEditorPanel({
                 importBomLabel="Import BOM"
               />
 
+              {ingredientForms.filter(f => f.match_status === 'auto_matched').length > 0 && (
+                <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 py-2">
+                  <ShieldQuestion className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-xs text-amber-800 dark:text-amber-300">
+                    {ingredientForms.filter(f => f.match_status === 'auto_matched').length} item{ingredientForms.filter(f => f.match_status === 'auto_matched').length > 1 ? 's were' : ' was'} matched
+                    automatically and {ingredientForms.filter(f => f.match_status === 'auto_matched').length > 1 ? 'are' : 'is'} already used in calculations.
+                    Please check each one and click &quot;Looks right&quot; to confirm.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {showChecklist && (
                 <RecipeChecklist
                   productCategory={productCategory}
@@ -546,6 +564,56 @@ export function RecipeEditorPanel({
                 importBomLabel="Import BOM"
               />
 
+              {/* Guided setup: question-led packaging builder. Prominent when
+                  the product has no packaging yet, available as a quiet button
+                  otherwise. */}
+              {packagingCount === 0 ? (
+                <Card className="p-5 border-dashed bg-muted/30">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                    <div className="flex-1">
+                      <h4 className="font-medium flex items-center gap-2">
+                        <Wand2 className="h-4 w-4 text-primary" />
+                        Set up packaging step by step
+                      </h4>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Answer a few questions like &quot;can or bottle?&quot; and &quot;what does it weigh?&quot;
+                        and we will build the list with matching emission factors for you.
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button type="button" onClick={() => setShowPackagingWizard(true)}>
+                        <Wand2 className="h-4 w-4 mr-2" />
+                        Guided setup
+                      </Button>
+                      <Button type="button" variant="outline" onClick={addPackaging}>
+                        Add manually
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowPackagingWizard(true)}
+                >
+                  <Wand2 className="h-4 w-4 mr-2" />
+                  Add packaging with guided setup
+                </Button>
+              )}
+
+              {packagingForms.filter(f => f.match_status === 'auto_matched').length > 0 && (
+                <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 py-2">
+                  <ShieldQuestion className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-xs text-amber-800 dark:text-amber-300">
+                    {packagingForms.filter(f => f.match_status === 'auto_matched').length} item{packagingForms.filter(f => f.match_status === 'auto_matched').length > 1 ? 's were' : ' was'} matched
+                    automatically and {packagingForms.filter(f => f.match_status === 'auto_matched').length > 1 ? 'are' : 'is'} already used in calculations.
+                    Please check each one and click &quot;Looks right&quot; to confirm.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {showPackagingChecklist && (
                 <RecipeChecklist
                   productCategory={productCategory}
@@ -572,6 +640,7 @@ export function RecipeEditorPanel({
                     onRemove={removePackaging}
                     onAddNewWithType={addPackagingWithType}
                     canRemove={packagingForms.length > 1}
+                    containerSizeMl={unitSizeToMl(product?.unit_size_value, product?.unit_size_unit)}
                   />
                 ))}
               </div>
@@ -615,6 +684,28 @@ export function RecipeEditorPanel({
         </TabsContent>
       </Tabs>
 
+
+      <PackagingWizard
+        open={showPackagingWizard}
+        onOpenChange={setShowPackagingWizard}
+        organizationId={organizationId}
+        containerSizeMl={unitSizeToMl(product?.unit_size_value, product?.unit_size_unit)}
+        onComplete={(rows) => {
+          addPackagingRows(rows);
+          // Offer to keep this pack for the next product ("our 750 ml bottle")
+          toast('Reuse this packaging on other products?', {
+            description: 'Save it as a template and apply it with one click next time.',
+            action: {
+              label: 'Save as template',
+              onClick: () => {
+                setTemplateDialogMode('save');
+                setShowTemplateDialog(true);
+              },
+            },
+            duration: 10000,
+          });
+        }}
+      />
 
       <BOMImportFlow
         open={showBOMImport}

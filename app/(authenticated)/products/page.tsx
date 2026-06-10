@@ -11,8 +11,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageLoader } from "@/components/ui/page-loader";
 import { Input } from "@/components/ui/input";
 import { WebsiteImportFlow } from "@/components/products/WebsiteImportFlow";
-import { Plus, Package, AlertCircle, Trash2, MoreVertical, Search, Leaf, ArrowRight, Globe } from "lucide-react";
+import { Plus, Package, AlertCircle, Trash2, MoreVertical, Search, Leaf, ArrowRight, Globe, Copy } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { duplicateProduct } from "@/lib/products";
+import { useRouter } from "next/navigation";
 import { boundaryFromDbEnum, getBoundaryLabel, SYSTEM_BOUNDARIES } from "@/lib/system-boundaries";
 import { useOrganization } from "@/lib/organizationContext";
 import {
@@ -56,6 +58,7 @@ interface Product {
 
 export default function ProductsPage() {
   const { currentOrganization } = useOrganization();
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -211,6 +214,24 @@ export default function ProductsPage() {
     setDeleteDialogOpen(true);
   };
 
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const handleDuplicateClick = async (product: Product, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (duplicatingId) return;
+    setDuplicatingId(product.id);
+    toast.info(`Duplicating "${product.name}"...`, { id: 'duplicate-product' });
+    try {
+      const newId = await duplicateProduct(product.id);
+      toast.success('Copy created. Ingredients and packaging came across; production data and reports start fresh.', { id: 'duplicate-product' });
+      router.push(`/products/${newId}`);
+    } catch (error: any) {
+      console.error('Error duplicating product:', error);
+      toast.error(error.message || 'Failed to duplicate product', { id: 'duplicate-product' });
+      setDuplicatingId(null);
+    }
+  };
+
   const handleDeleteConfirm = async () => {
     if (!productToDelete) return;
 
@@ -350,6 +371,13 @@ export default function ProductsPage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={(e) => handleDuplicateClick(product, e)}
+                      disabled={duplicatingId === product.id}
+                    >
+                      <Copy className="h-4 w-4 mr-2" />
+                      {duplicatingId === product.id ? 'Duplicating...' : 'Duplicate Product'}
+                    </DropdownMenuItem>
                     <DropdownMenuItem
                       className="text-red-600 focus:text-red-600"
                       onClick={(e) => handleDeleteClick(product, e)}

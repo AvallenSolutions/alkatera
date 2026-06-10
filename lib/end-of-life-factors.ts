@@ -329,6 +329,10 @@ const MATERIAL_TYPE_MAP: Record<string, string> = {
   paper: 'paper',
   label: 'paper',
   paper_label: 'paper',
+  // Structured wizard material keys (lib/constants/packaging-catalogue.ts)
+  paperboard: 'paper',
+  plastic_laminate: 'pet',
+  bib_composite: 'paper',
   // Steel
   steel_can: 'steel',
   steel: 'steel',

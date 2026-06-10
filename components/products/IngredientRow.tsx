@@ -15,6 +15,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { IngredientEditorTabs } from "@/components/products/IngredientEditorTabs";
+import { MatchStatusBadge } from "@/components/products/MatchStatusBadge";
 import type { IngredientFormData } from "@/components/products/IngredientFormCard";
 import { AskRosaButton } from "@/components/rosa/AskRosaButton";
 import type { ProductionStage } from "@/lib/types/products";
@@ -90,6 +91,7 @@ export function IngredientRow(props: IngredientRowProps) {
     ingredient,
     index,
     onRemove,
+    onUpdate,
     canRemove,
     defaultExpanded,
     forceExpanded,
@@ -143,6 +145,10 @@ export function IngredientRow(props: IngredientRowProps) {
               <span>{ingredient.amount} {ingredient.unit}</span>
             )}
             {dataSourceBadge(ingredient)}
+            <MatchStatusBadge
+              status={ingredient.match_status}
+              onConfirm={() => onUpdate(ingredient.tempId, { match_status: 'verified' })}
+            />
             {carbonPreview && <span>· {carbonPreview}</span>}
             {summary.total > 0 && (
               <span>· {summary.complete} of {summary.total} sections complete</span>

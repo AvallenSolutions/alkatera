@@ -155,7 +155,11 @@ async function searchOpenLCAProcesses(query: string): Promise<SearchResult[]> {
       id: process['@id'] || process.id,
       name: name,
       category: process.category || 'Uncategorized',
-      unit: 'kg',
+      // Process descriptors don't carry the reference unit, and presenting
+      // every live factor as "per kg" was a lie (some are per litre/item/MJ).
+      // The picker fetches the real unit via /api/openlca/reference-unit on
+      // selection; undefined here means "unknown", never "kg".
+      unit: undefined,
       processType: process.processType || 'LCI_RESULT',
       location: location,
       source: `ecoInvent 3.12 (${systemModel})`,
@@ -189,7 +193,8 @@ async function searchAgribalyseOpenLCAProcesses(query: string): Promise<SearchRe
       id: process['@id'] || process.id,
       name: name,
       category: process.category || 'Uncategorized',
-      unit: 'kg',
+      // Unknown until fetched on selection; see ecoinvent mapping above.
+      unit: undefined,
       processType: process.processType || 'LCI_RESULT',
       location: location,
       source: 'Agribalyse 3.2',

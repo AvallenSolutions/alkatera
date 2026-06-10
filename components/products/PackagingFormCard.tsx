@@ -18,6 +18,10 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Trash2, Building2, Database, Sprout, Info, Package, Tag, Grip, Box, MapPin, Calculator, Truck, Layers, FileText, ChevronDown, ChevronRight, Plus, Loader2, Shield, CheckCircle2, Recycle } from "lucide-react";
 import { lookupPackagingDefaults } from "@/lib/constants/packaging-defaults";
+import { PACKAGING_UNITS } from "@/lib/constants/material-units";
+import { checkPackagingWeight } from "@/lib/constants/packaging-weight-ranges";
+import { defaultTransportForOrigin, UNKNOWN_ORIGIN_DEFAULT } from "@/lib/constants/transport-defaults";
+import { toast } from "sonner";
 import {
   Collapsible,
   CollapsibleContent,
@@ -34,6 +38,7 @@ import { LocationPicker, LocationData } from "@/components/shared/LocationPicker
 import { COUNTRIES } from "@/lib/countries";
 import type {
   DataSource,
+  MatchStatus,
   PackagingCategory,
   EPRPackagingLevel,
   EPRPackagingActivity,
@@ -97,6 +102,15 @@ export interface PackagingFormData {
   recyclability_percent?: number | string;
   end_of_life_pathway?: '' | 'landfill' | 'incineration' | 'recycling' | 'composting' | 'reuse' | 'unknown';
   biobased_content_percentage?: number | string;
+  // Structured identity from the guided packaging wizard. When present, the
+  // end-of-life resolver uses container_material directly instead of
+  // inferring the material from the free-text name.
+  container_format?: string | null;
+  container_material?: string | null;
+  container_size_ml?: number | null;
+  weight_source?: 'measured' | 'typical' | 'estimated' | null;
+  /** Emission factor provenance; null = legacy/unknown (no badge) */
+  match_status?: MatchStatus | null;
 }
 
 interface ProductionFacility {
@@ -125,6 +139,8 @@ interface PackagingFormCardProps {
    * sectioned-expand UI). Default 'all' renders the original full card.
    */
   sectionFilter?: 'all' | 'basics' | 'components' | 'logistics' | 'compliance';
+  /** Product unit size in ml, when known — tightens the weight plausibility check */
+  containerSizeMl?: number | null;
 }
 
 // EPR Packaging Activity options
@@ -371,8 +387,18 @@ export function PackagingFormCard({
   onAddNewWithType,
   canRemove,
   sectionFilter = 'all',
+  containerSizeMl,
 }: PackagingFormCardProps) {
   const showAll = sectionFilter === 'all';
+
+  // Physical plausibility of the entered weight — advisory only, never blocks
+  const weightCheck = checkPackagingWeight({
+    packagingCategory: packaging.packaging_category,
+    materialName: packaging.name || packaging.matched_source_name,
+    containerSizeMl,
+    weightG: packaging.net_weight_g,
+  });
+
   const showBasics = showAll || sectionFilter === 'basics';
   const showComponents = showAll || sectionFilter === 'components';
   const showLogistics = showAll || sectionFilter === 'logistics';
@@ -552,6 +578,15 @@ export function PackagingFormCard({
     }
   };
 
+  // Packaging quantities are always a mass per product unit (net_weight_g
+  // drives the value), so the stored unit must be g or kg. A search result
+  // can carry any reference unit ('l', 'unit', ...); storing that against a
+  // gram weight turned e.g. a 400 g bottle into 400 kg in the calculator.
+  const clampPackagingUnit = (u?: string | null): string => {
+    const cleaned = (u || '').toLowerCase().trim();
+    return PACKAGING_UNITS.some((p) => p.value === cleaned) ? cleaned : 'g';
+  };
+
   const handleSearchSelect = (selection: {
     name: string;
     user_query?: string;
@@ -560,6 +595,7 @@ export function PackagingFormCard({
     supplier_product_id?: string;
     supplier_name?: string;
     unit: string;
+    auto_matched?: boolean;
     carbon_intensity?: number;
     location?: string;
     recycled_content_pct?: number;
@@ -617,11 +653,14 @@ export function PackagingFormCard({
       ef_source_type: selection.ef_source_type,
       ef_data_quality_grade: selection.ef_data_quality_grade,
       ef_uncertainty_percent: selection.ef_uncertainty_percent,
+      // Apply + flag: software picks need a one-click confirmation, the
+      // user's own picks are verified immediately.
+      match_status: selection.auto_matched ? 'auto_matched' : 'verified',
       // Only auto-detect category if user hasn't already chosen one
       ...(!packaging.packaging_category ? { packaging_category: detectedCategory } : {}),
       // Only prefill unit from search result when packaging has no amount set yet (first selection).
       // This prevents overriding a unit the user already chose (e.g., user picked "g" but DB has "kg").
-      ...(!packaging.amount ? { unit: selection.unit } : {}),
+      ...(!packaging.amount ? { unit: clampPackagingUnit(selection.unit) } : {}),
       // Map search location to origin_address (the field actually saved to DB).
       // Only prefill if user hasn't already set an origin address.
       ...(!packaging.origin_address && selection.location ? { origin_address: selection.location } : {}),
@@ -704,8 +743,9 @@ export function PackagingFormCard({
       carbon_intensity: product.impact_climate ?? product.carbon_intensity ?? undefined,
       ef_source: 'Primary Verified',
       ef_source_type: 'primary',
+      match_status: 'verified',
       ...(!packaging.packaging_category ? { packaging_category: detectedCategory } : {}),
-      ...(!packaging.amount ? { unit: product.unit || 'kg' } : {}),
+      ...(!packaging.amount ? { unit: clampPackagingUnit(product.unit) } : {}),
       // Origin/location data from supplier product or supplier profile
       ...(originAddress ? { origin_address: originAddress } : {}),
       ...(originLat != null ? { origin_lat: originLat } : {}),
@@ -1100,25 +1140,16 @@ export function PackagingFormCard({
                     });
                   }}
                   className={
-                    (packaging.packaging_category === 'label' && Number(packaging.net_weight_g) > 10) ||
-                    (packaging.packaging_category === 'closure' && Number(packaging.net_weight_g) > 10)
+                    weightCheck.level === 'warning'
                       ? 'border-amber-500 focus-visible:ring-amber-500'
                       : ''
                   }
                 />
-                {packaging.packaging_category === 'label' && Number(packaging.net_weight_g) > 10 && (
+                {weightCheck.level === 'warning' && (
                   <Alert className="mt-2 bg-amber-50 dark:bg-amber-950 border-amber-300 dark:border-amber-800">
                     <Info className="h-4 w-4 text-amber-600" />
                     <AlertDescription className="text-xs text-amber-800 dark:text-amber-200">
-                      <strong>Sanity Check:</strong> This label weighs over 10g, which is unusually high. Typical beverage labels weigh 1-5g. Please verify this value.
-                    </AlertDescription>
-                  </Alert>
-                )}
-                {packaging.packaging_category === 'closure' && Number(packaging.net_weight_g) > 10 && (
-                  <Alert className="mt-2 bg-amber-50 dark:bg-amber-950 border-amber-300 dark:border-amber-800">
-                    <Info className="h-4 w-4 text-amber-600" />
-                    <AlertDescription className="text-xs text-amber-800 dark:text-amber-200">
-                      <strong>Sanity Check:</strong> This closure/cap weighs over 10g, which is unusually high. Typical caps weigh 2-8g. Please verify this value.
+                      <strong>Please double-check:</strong> {weightCheck.message}
                     </AlertDescription>
                   </Alert>
                 )}
@@ -1131,7 +1162,7 @@ export function PackagingFormCard({
               {packaging.packaging_category && ['secondary', 'shipment', 'tertiary'].includes(packaging.packaging_category) && (
                 <div>
                   <Label htmlFor={`units-per-group-${packaging.tempId}`}>
-                    Units Per Packaging <span className="text-destructive">*</span>
+                    How many products share this packaging? <span className="text-destructive">*</span>
                   </Label>
                   <Input
                     id={`units-per-group-${packaging.tempId}`}
@@ -1141,9 +1172,17 @@ export function PackagingFormCard({
                     placeholder="e.g. 24"
                     value={packaging.units_per_group}
                     onChange={(e) => onUpdate(packaging.tempId, { units_per_group: e.target.value })}
+                    className={!packaging.units_per_group || Number(packaging.units_per_group) < 1
+                      ? 'border-amber-500 focus-visible:ring-amber-500'
+                      : ''}
                   />
+                  {(!packaging.units_per_group || Number(packaging.units_per_group) < 1) && (
+                    <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                      This item cannot be saved until you answer this. Without it the impact of the whole {packaging.packaging_category === 'tertiary' ? 'pallet' : 'pack'} would be counted against every single product.
+                    </p>
+                  )}
                   <p className="text-xs text-muted-foreground mt-1">
-                    How many product units does this packaging contain? (e.g. 24 for a case of 24 bottles). The environmental impact will be divided by this number.
+                    For example, enter 24 for a case that holds 24 bottles. The packaging&apos;s impact is divided by this number.
                   </p>
                 </div>
               )}
@@ -1409,6 +1448,40 @@ export function PackagingFormCard({
                         </div>
                       );
                     })}
+
+                    {/* A leg without a distance is silently excluded from the
+                        calculation — make that visible instead of letting the
+                        user assume their transport is counted. */}
+                    {legs.some((l) => !l.distanceKm || l.distanceKm <= 0) && (
+                      <Alert className="py-2 bg-amber-50 dark:bg-amber-950 border-amber-300 dark:border-amber-800">
+                        <Info className="h-3.5 w-3.5 text-amber-600" />
+                        <AlertDescription className="text-xs text-amber-800 dark:text-amber-200">
+                          Transport for this item is not counted until every step has a distance. Set the origin location to calculate it automatically, or enter the distance yourself.
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="mt-2 h-7 text-xs border-amber-400 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/40 block"
+                            onClick={() => {
+                              const dest = getDestinationCoords();
+                              const est = (packaging.origin_country_code
+                                ? defaultTransportForOrigin({
+                                    originCountryCode: packaging.origin_country_code,
+                                    destinationLat: dest?.lat,
+                                    destinationLng: dest?.lng,
+                                  })
+                                : null) ?? UNKNOWN_ORIGIN_DEFAULT;
+                              updateLegs(legs.map((l) => (!l.distanceKm || l.distanceKm <= 0)
+                                ? { ...l, transportMode: est.mode, distanceKm: est.distanceKm }
+                                : l));
+                              toast.info(est.assumption);
+                            }}
+                          >
+                            Don&apos;t know? Use an estimate
+                          </Button>
+                        </AlertDescription>
+                      </Alert>
+                    )}
 
                     {/* Facility setup hints */}
                     {productionFacilities.length === 0 && totalLinkedFacilities > 0 && (

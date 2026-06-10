@@ -45,6 +45,7 @@ const mockNormalizeToKg = vi.fn((quantity: string | number, unit: string) => {
 vi.mock('../impact-waterfall-resolver', () => ({
   resolveImpactFactors: (...args: unknown[]) => mockResolveImpactFactors(...args),
   normalizeToKg: (...args: unknown[]) => mockNormalizeToKg(...args),
+  tryNormalizeToKg: (...args: unknown[]) => ({ kg: mockNormalizeToKg(...args), recognised: true, assumedDensity: false, kind: 'mass' }),
 }));
 
 const mockCalculateTransportEmissions = vi.fn();

@@ -602,10 +602,13 @@ export async function aggregateProductImpacts(
       }
 
       // Resolve the material composition (glass/paper/aluminium/…) for EoL
-      // factors. packaging_category holds a packaging *role*, not a material, so
-      // we also feed the resolved factor/dataset name as a classification signal.
+      // factors. Wizard-created rows carry the material identity directly in
+      // container_material, which getMaterialFactorKey resolves exactly;
+      // manual rows fall back to name/factor-name inference because
+      // packaging_category holds a packaging *role*, not a material.
       const factorName = (material as any).matched_source_name || (material as any).gwp_data_source || '';
-      const factorKey = getMaterialFactorKey(packagingCategory || 'other', material.material_name, factorName);
+      const containerMaterial = (material as any).container_material || '';
+      const factorKey = getMaterialFactorKey(containerMaterial || packagingCategory || 'other', material.material_name, factorName);
 
       // Get user pathway overrides from the wizard (keyed by material ID or factorKey).
       // If none set, derive overrides from the material's stored circularity fields

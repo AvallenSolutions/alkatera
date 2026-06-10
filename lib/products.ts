@@ -154,3 +154,115 @@ export async function deleteProduct(id: string): Promise<void> {
     throw new Error(error.message);
   }
 }
+
+/**
+ * Duplicate a product: clones the product row plus its ingredients and
+ * packaging (product_materials, including packaging component breakdowns).
+ *
+ * Deliberately NOT copied: production volumes, facility assignments,
+ * production stages (so stage_id is cleared on copied ingredients),
+ * passport settings, and any existing LCA reports. The copy is a fresh
+ * recipe under a new name, ready to tweak for a sibling product.
+ *
+ * Returns the new product's id.
+ */
+export async function duplicateProduct(productId: string): Promise<number> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data: source, error: fetchError } = await supabase
+    .from('products')
+    .select('*')
+    .eq('id', productId)
+    .single();
+  if (fetchError || !source) {
+    throw new Error(fetchError?.message || 'Product not found');
+  }
+
+  // Copy descriptive fields; drop identifiers, timestamps, passport state,
+  // production volumes and the completion flags for data that is not copied.
+  const {
+    id: _id,
+    created_at: _created,
+    updated_at: _updated,
+    passport_token: _ptoken,
+    ...rest
+  } = source as Record<string, any>;
+
+  const productCopy: Record<string, any> = {
+    ...rest,
+    name: `${source.name} (copy)`,
+    sku: null, // a SKU identifies one product; the copy needs its own
+    created_by: user.id,
+    is_draft: true,
+    passport_enabled: false,
+    annual_production_volume: null,
+    core_operations_complete: false,
+    downstream_distribution_complete: false,
+    use_end_of_life_complete: false,
+  };
+
+  const { data: newProduct, error: insertError } = await supabase
+    .from('products')
+    .insert(productCopy)
+    .select('id')
+    .single();
+  if (insertError || !newProduct) {
+    throw new Error(insertError?.message || 'Failed to create the copy');
+  }
+
+  const { data: materials, error: materialsError } = await supabase
+    .from('product_materials')
+    .select('*')
+    .eq('product_id', productId);
+  if (materialsError) {
+    throw new Error(`Copy created, but copying its materials failed: ${materialsError.message}`);
+  }
+
+  // Insert one material at a time so packaging component breakdowns can be
+  // re-parented onto the correct new row. Recipes are small; this is fine.
+  for (const material of materials || []) {
+    const {
+      id: oldMaterialId,
+      created_at: _mCreated,
+      updated_at: _mUpdated,
+      ...materialRest
+    } = material as Record<string, any>;
+
+    const { data: newMaterial, error: matInsertError } = await supabase
+      .from('product_materials')
+      .insert({
+        ...materialRest,
+        product_id: newProduct.id,
+        // Production stages are not copied, so a copied stage link would
+        // point at the source product's chain.
+        stage_id: null,
+      })
+      .select('id')
+      .single();
+    if (matInsertError || !newMaterial) {
+      throw new Error(`Copy created, but material "${material.material_name}" failed to copy: ${matInsertError?.message}`);
+    }
+
+    if (material.has_component_breakdown) {
+      const { data: components } = await supabase
+        .from('packaging_material_components')
+        .select('*')
+        .eq('product_material_id', oldMaterialId);
+      if (components && components.length > 0) {
+        const componentCopies = components.map((c: Record<string, any>) => {
+          const { id: _cId, created_at: _cCreated, updated_at: _cUpdated, ...cRest } = c;
+          return { ...cRest, product_material_id: newMaterial.id };
+        });
+        const { error: compError } = await supabase
+          .from('packaging_material_components')
+          .insert(componentCopies);
+        if (compError) {
+          throw new Error(`Copy created, but packaging components for "${material.material_name}" failed to copy: ${compError.message}`);
+        }
+      }
+    }
+  }
+
+  return newProduct.id;
+}

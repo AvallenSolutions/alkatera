@@ -41,6 +41,10 @@ import {
   type DistributionLeg,
   type DistributionResult,
 } from "@/lib/distribution-factors";
+import { INGREDIENT_UNITS, canonicaliseUnit, convertQuantity, findUnit, mapOpenLcaUnit, quantityToKg, unitKind, unitSizeToMl } from "@/lib/constants/material-units";
+import { checkIngredientAmount } from "@/lib/constants/packaging-weight-ranges";
+import { defaultTransportForOrigin, UNKNOWN_ORIGIN_DEFAULT } from "@/lib/constants/transport-defaults";
+import { toast } from "sonner";
 
 export interface IngredientFormData {
   tempId: string;
@@ -70,6 +74,10 @@ export interface IngredientFormData {
   ef_source_type?: string;
   ef_data_quality_grade?: string;
   ef_uncertainty_percent?: number;
+  /** Raw reference unit of the selected emission factor (e.g. 'kg', 'l', 'Item(s)') */
+  ef_reference_unit?: string;
+  /** Emission factor provenance; null = legacy/unknown (no badge) */
+  match_status?: import('@/lib/types/lca').MatchStatus | null;
   // Inbound delivery container (optional)
   inbound_container_type?: string | null;
   inbound_container_volume_l?: number | null;
@@ -235,48 +243,11 @@ interface IngredientFormCardProps {
   sectionFilter?: 'all' | 'basics' | 'source' | 'logistics' | 'stage';
 }
 
-/**
- * Convert a quantity between units, keeping the physical amount consistent.
- *
- * Mass ↔ volume conversions assume density ≈ 1.0 kg/L (appropriate for most
- * beverages and water-based ingredients). For spirits (~0.8–0.95 kg/L) this
- * introduces a small error, but it's far better than no conversion at all.
- *
- * Returns null when conversion between incompatible unit families (e.g.
- * mass → "unit") so the caller can leave the amount unchanged.
- */
-function convertAmount(
-  amount: number | string,
-  fromUnit: string,
-  toUnit: string
-): number | null {
-  const qty = typeof amount === 'string' ? parseFloat(amount) : amount;
-  if (isNaN(qty) || qty <= 0) return null;
-  if (fromUnit === toUnit) return qty;
-
-  // Convert to grams as the common intermediate
-  const toGrams: Record<string, number> = {
-    kg: 1000,
-    g: 1,
-    mg: 0.001,
-    oz: 28.3495,
-    lb: 453.592,
-    // Volume → mass assuming density ≈ 1.0 kg/L
-    l: 1000,
-    ml: 1,
-  };
-
-  const fromFactor = toGrams[fromUnit];
-  const toFactor = toGrams[toUnit];
-
-  if (!fromFactor || !toFactor) return null; // "unit" or unknown — don't convert
-
-  const grams = qty * fromFactor;
-  const converted = grams / toFactor;
-
-  // Round to avoid floating-point noise (max 6 decimal places)
-  return parseFloat(converted.toPrecision(6));
-}
+// Quantity conversion between units lives in the shared vocabulary so the
+// form, the calculator, and the DB constraint can never drift apart.
+// Mass <-> volume conversions assume density ~1.0 kg/L; returns null for
+// incompatible families (e.g. mass -> "unit") so the amount stays unchanged.
+const convertAmount = convertQuantity;
 
 function formatPerBottle(batchQty: number, unit: string, bottles: number): string {
   if (!batchQty || !bottles || bottles <= 0) return '–';
@@ -357,6 +328,35 @@ export function IngredientFormCard({
     productUnitSizeUnit,
   });
   const isBatchMode = recipeScaleMode === 'per_batch' && bottlesPerBatch > 1;
+
+  // Unit-kind cross-check: the quantity's unit family (mass/volume/count)
+  // should match the selected factor's reference unit family. Mass and
+  // volume interconvert at density ~1 in the calculator, so only the
+  // genuinely incompatible case is flagged: count vs anything else.
+  const unitMismatch = (() => {
+    if (!ingredient.ef_reference_unit) return null;
+    const refUnit = mapOpenLcaUnit(ingredient.ef_reference_unit);
+    if (!refUnit) return null;
+    const refKind = unitKind(refUnit);
+    const enteredKind = unitKind(ingredient.unit);
+    if (!refKind || !enteredKind || refKind === enteredKind) return null;
+    if (refKind !== 'count' && enteredKind !== 'count') return null;
+    return { refUnit, refKind, enteredKind };
+  })();
+
+  // Plausibility: does this amount make physical sense per product unit?
+  // Catches batch quantities entered as per-unit values. Advisory only.
+  const amountCheck = (() => {
+    const unitDef = findUnit(ingredient.unit);
+    const amount = Number(ingredient.amount);
+    if (!unitDef?.toKg || !amount || amount <= 0) return { level: 'ok' as const };
+    const unitSizeMl = unitSizeToMl(productUnitSizeValue, productUnitSizeUnit);
+    return checkIngredientAmount({
+      amountKgPerUnit: (quantityToKg(amount, unitDef) ?? 0) / bottlesPerBatch,
+      unitSizeMl,
+      ingredientName: ingredient.name,
+    });
+  })();
 
   const { hasFeature } = useSubscription();
   const { currentOrganization } = useOrganization();
@@ -735,6 +735,8 @@ export function IngredientFormCard({
     supplier_product_id?: string;
     supplier_name?: string;
     unit: string;
+    ef_reference_unit?: string;
+    auto_matched?: boolean;
     carbon_intensity?: number;
     location?: string;
     ef_source?: string;
@@ -769,9 +771,18 @@ export function IngredientFormCard({
       ef_data_quality_grade: selection.ef_data_quality_grade,
       ef_uncertainty_percent: selection.ef_uncertainty_percent,
       openlca_database: selection.openlca_database,
-      // Only prefill unit from search result when ingredient has no amount set yet (first selection).
-      // This prevents overriding a unit the user already chose (e.g., user picked "g" but DB has "kg").
-      ...(!ingredient.amount ? { unit: selection.unit } : {}),
+      // Remember the factor's reference unit so a quantity entered in an
+      // incompatible unit kind (mass vs volume vs count) can be flagged.
+      ef_reference_unit: selection.ef_reference_unit,
+      // Apply + flag: software picks need a one-click confirmation, the
+      // user's own picks are verified immediately.
+      match_status: selection.auto_matched ? 'auto_matched' : 'verified',
+      // Only prefill unit from search result when ingredient has no amount set
+      // yet (first selection), and only when the factor's unit is known and in
+      // our vocabulary. An unknown unit must never silently become 'kg'.
+      ...(!ingredient.amount && selection.unit && canonicaliseUnit(selection.unit)
+        ? { unit: canonicaliseUnit(selection.unit)! }
+        : {}),
       // Map search location to origin_address (the field actually saved to DB).
       // Only prefill if user hasn't already set an origin address.
       ...(!ingredient.origin_address && selection.location ? { origin_address: selection.location } : {}),
@@ -815,6 +826,7 @@ export function IngredientFormCard({
       carbon_intensity: product.impact_climate ?? product.carbon_intensity ?? undefined,
       ef_source: 'Primary Verified',
       ef_source_type: 'primary',
+      match_status: 'verified',
       ...(!ingredient.amount ? { unit: product.unit || 'kg' } : {}),
       // Origin/location data from supplier product or supplier profile
       ...(originAddress ? { origin_address: originAddress } : {}),
@@ -1019,6 +1031,14 @@ export function IngredientFormCard({
           </div>
           )}
 
+          {/* Search first: the quantity only appears once the ingredient has
+              an identity (a name or a matched factor), so the unit can be
+              defaulted from the factor's reference unit instead of guessed. */}
+          {!(ingredient.name || ingredient.matched_source_name) ? (
+            <p className="text-xs text-muted-foreground italic">
+              Find your ingredient above first. The amount comes next.
+            </p>
+          ) : (
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor={`amount-${ingredient.tempId}`}>
@@ -1042,6 +1062,14 @@ export function IngredientFormCard({
                 <p className="text-xs text-green-700 dark:text-green-400 mt-1">
                   ≈ {formatPerBottle(Number(ingredient.amount), ingredient.unit, bottlesPerBatch)} per bottle
                 </p>
+              )}
+              {amountCheck.level === 'warning' && (
+                <Alert className="mt-2 bg-amber-50 dark:bg-amber-950 border-amber-300 dark:border-amber-800">
+                  <Info className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-xs text-amber-800 dark:text-amber-200">
+                    <strong>Please double-check:</strong> {amountCheck.message}
+                  </AlertDescription>
+                </Alert>
               )}
             </div>
 
@@ -1067,17 +1095,21 @@ export function IngredientFormCard({
                   <SelectValue placeholder="Select unit" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ml">Millilitres (ml)</SelectItem>
-                  <SelectItem value="l">Litres (l)</SelectItem>
-                  <SelectItem value="g">Grams (g)</SelectItem>
-                  <SelectItem value="kg">Kilograms (kg)</SelectItem>
-                  <SelectItem value="oz">Ounces (oz)</SelectItem>
-                  <SelectItem value="lb">Pounds (lb)</SelectItem>
-                  <SelectItem value="unit">Units</SelectItem>
+                  {INGREDIENT_UNITS.map((u) => (
+                    <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              {unitMismatch && (
+                <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                  The emission factor for this ingredient is per {unitMismatch.refUnit === 'unit' ? 'item' : unitMismatch.refUnit},
+                  but the amount is entered in {unitMismatch.enteredKind === 'count' ? 'items' : `a ${unitMismatch.enteredKind} unit`}.
+                  Please switch the unit so they match, or the result will be wrong.
+                </p>
+              )}
             </div>
           </div>
+          )}
           </>}
 
           {showStage && productionStages.length > 0 && (
@@ -1685,6 +1717,40 @@ export function IngredientFormCard({
                     </div>
                   );
                 })}
+
+                {/* A leg without a distance is silently excluded from the
+                    calculation — make that visible instead of letting the
+                    user assume their transport is counted. */}
+                {legs.some((l) => !l.distanceKm || l.distanceKm <= 0) && (
+                  <Alert className="py-2 bg-amber-50 dark:bg-amber-950 border-amber-300 dark:border-amber-800">
+                    <Info className="h-3.5 w-3.5 text-amber-600" />
+                    <AlertDescription className="text-xs text-amber-800 dark:text-amber-200">
+                      Transport for this ingredient is not counted until every step has a distance. Set the origin location to calculate it automatically, or enter the distance yourself.
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-2 h-7 text-xs border-amber-400 text-amber-800 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/40 block"
+                        onClick={() => {
+                          const dest = getDestinationCoords();
+                          const est = (ingredient.origin_country_code
+                            ? defaultTransportForOrigin({
+                                originCountryCode: ingredient.origin_country_code,
+                                destinationLat: dest?.lat,
+                                destinationLng: dest?.lng,
+                              })
+                            : null) ?? UNKNOWN_ORIGIN_DEFAULT;
+                          updateLegs(legs.map((l) => (!l.distanceKm || l.distanceKm <= 0)
+                            ? { ...l, transportMode: est.mode, distanceKm: est.distanceKm }
+                            : l));
+                          toast.info(est.assumption);
+                        }}
+                      >
+                        Don&apos;t know? Use an estimate
+                      </Button>
+                    </AlertDescription>
+                  </Alert>
+                )}
 
                 {/* Facility setup hints */}
                 {productionFacilities.length === 0 && totalLinkedFacilities > 0 && (

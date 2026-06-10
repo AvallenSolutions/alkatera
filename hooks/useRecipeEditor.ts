@@ -1,6 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  buildPackagingMaterialData,
+  isPackagingFormSaveable,
+  packagingFormErrors,
+} from '@/lib/products/packaging-material-data';
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import { useAutoSave } from "@/hooks/useAutoSave";
@@ -70,7 +75,7 @@ const createDefaultPackaging = (): PackagingFormData => ({
   epr_ram_rating: undefined,
   epr_uk_nation: undefined,
   epr_is_drinks_container: false,
-  units_per_group: 1,
+  units_per_group: '',
 });
 
 // Fingerprint for comparing form states (ignores tempId and complex nested objects)
@@ -88,6 +93,8 @@ function formFingerprint(forms: Array<{ [key: string]: any }>): string {
     distance_km: String(f.distance_km || ''),
     packaging_category: f.packaging_category || '',
     net_weight_g: String(f.net_weight_g || ''),
+    units_per_group: String(f.units_per_group || ''),
+    match_status: f.match_status || '',
     recycled_content_percentage: String(f.recycled_content_percentage || ''),
     printing_process: f.printing_process || '',
     is_organic_certified: f.is_organic_certified || false,
@@ -250,6 +257,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
           origin_lng: item.origin_lng || undefined,
           origin_country_code: item.origin_country_code || '',
           is_organic_certified: item.is_organic_certified || false,
+          match_status: item.match_status ?? null,
           transport_mode: item.transport_mode || 'truck',
           distance_km: item.distance_km || '',
           carbon_intensity: item.cached_co2_factor || undefined,
@@ -319,7 +327,23 @@ export function useRecipeEditor(productId: string, organizationId: string) {
             epr_ram_rating: item.epr_ram_rating || undefined,
             epr_uk_nation: item.epr_uk_nation || undefined,
             epr_is_drinks_container: item.epr_is_drinks_container || false,
-            units_per_group: item.units_per_group || 1,
+            // Legacy shared-packaging rows saved without an answer must ask
+            // the question again rather than silently showing 1.
+            units_per_group: item.units_per_group ?? '',
+            // Circularity
+            reuse_trips: item.reuse_trips ?? '',
+            recyclability_percent: item.recyclability_percent ?? '',
+            end_of_life_pathway: item.end_of_life_pathway || '',
+            biobased_content_percentage: item.biobased_content_percentage ?? '',
+            transport_legs: item.transport_legs ?? null,
+            carbon_intensity: item.cached_co2_factor ?? undefined,
+            openlca_database: item.openlca_database || undefined,
+            // Structured identity from the guided wizard (null on manual rows)
+            container_format: item.container_format ?? null,
+            container_material: item.container_material ?? null,
+            container_size_ml: item.container_size_ml ?? null,
+            weight_source: item.weight_source ?? null,
+            match_status: item.match_status ?? null,
           };
         });
         setPackagingForms(mappedPackaging);
@@ -418,6 +442,16 @@ export function useRecipeEditor(productId: string, organizationId: string) {
   };
 
   /** Add a packaging item with a pre-filled name and category (from recipe checklist quick-add) */
+  /** Merge fully-formed rows from the guided packaging wizard into the form. */
+  const addPackagingRows = (rows: PackagingFormData[]) => {
+    if (rows.length === 0) return;
+    setPackagingForms(prev => {
+      // Replace the single untouched starter row instead of appending after it
+      const isEmpty = prev.length === 1 && !prev[0].name && !prev[0].amount && !prev[0].net_weight_g;
+      return isEmpty ? rows : [...prev, ...rows];
+    });
+  };
+
   const addPackagingWithDefaults = (name: string, searchQuery: string, packagingCategory?: PackagingCategory) => {
     setPackagingForms(prev => {
       const newPkg = {
@@ -468,6 +502,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
           quantity: Number(form.amount),
           unit: form.unit,
           material_type: 'ingredient',
+          match_status: form.match_status ?? null,
           origin_country: form.origin_country || null,
           is_organic_certified: form.is_organic_certified || false,
         };
@@ -528,19 +563,14 @@ export function useRecipeEditor(productId: string, organizationId: string) {
 
   const savePackaging = async () => {
     cancelAutoSave(); // Prevent autosave from racing with manual save
+    // Shared with autosave so the two paths can never accept different rows
     const validationErrors: string[] = [];
     packagingForms.forEach((form, idx) => {
-      const formErrors: string[] = [];
-      if (!form.packaging_category) formErrors.push('packaging type');
-      if (!form.name) formErrors.push('material name');
-      if (!form.amount && !form.net_weight_g) formErrors.push('net weight');
-      else if (Number(form.amount) <= 0 && Number(form.net_weight_g) <= 0) formErrors.push('net weight (must be greater than 0)');
+      const formErrors = packagingFormErrors(form);
       if (formErrors.length > 0) validationErrors.push(`Packaging ${idx + 1}: missing ${formErrors.join(', ')}`);
     });
 
-    const validForms = packagingForms.filter(
-      f => f.name && (Number(f.amount) > 0 || Number(f.net_weight_g) > 0) && f.packaging_category
-    );
+    const validForms = packagingForms.filter(isPackagingFormSaveable);
 
     if (validForms.length === 0) {
       if (validationErrors.length > 0) {
@@ -567,7 +597,9 @@ export function useRecipeEditor(productId: string, organizationId: string) {
     try {
       const existingItems = validForms.filter(f => !f.tempId.startsWith('temp-'));
       const newItems = validForms.filter(f => f.tempId.startsWith('temp-'));
-      const idsToKeep = existingItems.map(f => f.tempId);
+      // Keep every row still present in the form, including invalid ones that
+      // are merely skipped this save — "skipped" must never mean "deleted".
+      const idsToKeep = packagingForms.filter(f => !f.tempId.startsWith('temp-')).map(f => f.tempId);
 
       const { data: currentPackaging } = await supabase
         .from("product_materials")
@@ -589,68 +621,8 @@ export function useRecipeEditor(productId: string, organizationId: string) {
         }
       }
 
-      const buildMaterialData = (form: PackagingFormData) => {
-        // Derive quantity from amount, falling back to net_weight_g with unit conversion
-        let quantity = Number(form.amount);
-        if (!quantity || quantity <= 0 || isNaN(quantity)) {
-          const weightG = Number(form.net_weight_g);
-          quantity = isNaN(weightG) ? 0 : (form.unit === 'kg' ? weightG / 1000 : weightG);
-        }
-
-        const materialData: any = {
-          product_id: parseInt(productId),
-          material_name: form.name,
-          matched_source_name: form.matched_source_name || null,
-          quantity,
-          unit: form.unit,
-          material_type: 'packaging',
-          packaging_category: form.packaging_category || null,
-          origin_country: form.origin_country || null,
-          net_weight_g: Number(form.net_weight_g) || null,
-          recycled_content_percentage: form.recycled_content_percentage ? Number(form.recycled_content_percentage) : null,
-          printing_process: form.printing_process || null,
-        };
-
-        if (form.data_source === 'openlca' && form.data_source_id) {
-          materialData.data_source = 'openlca';
-          materialData.data_source_id = form.data_source_id;
-          if (form.openlca_database) {
-            materialData.openlca_database = form.openlca_database;
-          }
-        } else if (form.data_source === 'supplier' && form.supplier_product_id) {
-          materialData.data_source = 'supplier';
-          materialData.supplier_product_id = form.supplier_product_id;
-        }
-
-        if (form.transport_mode && form.distance_km) {
-          materialData.transport_mode = form.transport_mode;
-          materialData.distance_km = Number(form.distance_km);
-        }
-
-        if (form.origin_lat && form.origin_lng) {
-          materialData.origin_lat = form.origin_lat;
-          materialData.origin_lng = form.origin_lng;
-          materialData.origin_address = form.origin_address || null;
-          materialData.origin_country_code = form.origin_country_code || null;
-        }
-
-        if (form.carbon_intensity != null && Number(form.carbon_intensity) > 0) {
-          materialData.cached_co2_factor = Number(form.carbon_intensity);
-        }
-
-        materialData.has_component_breakdown = form.has_component_breakdown || false;
-        if (form.epr_packaging_level) materialData.epr_packaging_level = form.epr_packaging_level;
-        if (form.epr_packaging_activity) materialData.epr_packaging_activity = form.epr_packaging_activity;
-        materialData.epr_is_household = form.epr_is_household !== undefined ? form.epr_is_household : true;
-        if (form.epr_ram_rating) materialData.epr_ram_rating = form.epr_ram_rating;
-        if (form.epr_uk_nation) materialData.epr_uk_nation = form.epr_uk_nation;
-        materialData.epr_is_drinks_container = form.epr_is_drinks_container || false;
-
-        // ISO 14044 allocation: units served by secondary/shipment/tertiary packaging
-        materialData.units_per_group = Number(form.units_per_group) || 1;
-
-        return materialData;
-      };
+      // Shared row builder (also used by autosave)
+      const buildMaterialData = (form: PackagingFormData) => buildPackagingMaterialData(form, productId);
 
       // Update existing items (guard against quantity <= 0 to satisfy positive_quantity constraint)
       for (const form of existingItems) {
@@ -819,15 +791,38 @@ export function useRecipeEditor(productId: string, organizationId: string) {
     const validForms = forms.filter(f => f.name && f.amount && Number(f.amount) > 0);
     if (validForms.length === 0 || !organizationId) return;
 
-    const { error: deleteError } = await supabase
+    const existingItems = validForms.filter(f => !f.tempId.startsWith('temp-'));
+    const newItems = validForms.filter(f => f.tempId.startsWith('temp-'));
+    // Keep every row still present in the form — including ones that are
+    // temporarily invalid mid-edit — so autosave never deletes a saved row
+    // the user is part-way through changing.
+    const idsToKeep = forms.filter(f => !f.tempId.startsWith('temp-')).map(f => f.tempId);
+
+    const { data: currentIngredients } = await supabase
       .from("product_materials")
-      .delete()
+      .select("id")
       .eq("product_id", productId)
       .eq("material_type", "ingredient");
 
-    if (deleteError) throw new Error(`Autosave ingredients failed: ${deleteError.message}`);
+    if (currentIngredients && currentIngredients.length > 0) {
+      const idsToDelete = currentIngredients
+        .map(i => i.id)
+        .filter(id => !idsToKeep.includes(id.toString()));
 
-    const materialsToInsert = validForms.map(form => {
+      if (idsToDelete.length > 0) {
+        const { error: deleteError } = await supabase
+          .from("product_materials")
+          .delete()
+          .in("id", idsToDelete);
+        if (deleteError) throw new Error(`Autosave ingredients failed: ${deleteError.message}`);
+      }
+    }
+
+    // Full-row builder: conditional columns get explicit null defaults so
+    // updating an existing row clears stale values exactly like the old
+    // delete-and-reinsert did. Columns this hook never writes (transport_legs,
+    // inbound container, self-grown links) are left untouched on update.
+    const buildMaterialData = (form: IngredientFormData) => {
       const materialData: any = {
         product_id: parseInt(productId),
         material_name: form.name,
@@ -835,8 +830,21 @@ export function useRecipeEditor(productId: string, organizationId: string) {
         quantity: Number(form.amount),
         unit: form.unit,
         material_type: 'ingredient',
+        match_status: form.match_status ?? null,
         origin_country: form.origin_country || null,
         is_organic_certified: form.is_organic_certified || false,
+        data_source: null,
+        data_source_id: null,
+        openlca_database: null,
+        supplier_product_id: null,
+        cached_co2_factor: null,
+        transport_mode: null,
+        distance_km: null,
+        transport_legs: null,
+        origin_lat: null,
+        origin_lng: null,
+        origin_address: null,
+        origin_country_code: null,
       };
 
       if (form.data_source === 'openlca' && form.data_source_id) {
@@ -850,7 +858,16 @@ export function useRecipeEditor(productId: string, organizationId: string) {
         materialData.supplier_product_id = form.supplier_product_id;
       }
 
-      if (form.transport_mode && form.distance_km) {
+      // Transport — prefer the multi-leg JSONB, falling back to the legacy
+      // single mode/distance. Must mirror buildPackagingMaterialData: the
+      // calculator prefers transport_legs over transport_mode, so omitting legs
+      // here left the calculator reading a stale leg (e.g. a road leg the user
+      // had since changed to sea freight).
+      if (form.transport_legs && form.transport_legs.length > 0) {
+        materialData.transport_legs = form.transport_legs;
+        materialData.transport_mode = form.transport_legs[0].transportMode;
+        materialData.distance_km = form.transport_legs[0].distanceKm;
+      } else if (form.transport_mode && form.distance_km) {
         materialData.transport_mode = form.transport_mode;
         materialData.distance_km = Number(form.distance_km);
       }
@@ -867,14 +884,23 @@ export function useRecipeEditor(productId: string, organizationId: string) {
       }
 
       return materialData;
-    });
+    };
 
-    const { error: insertError } = await supabase
-      .from("product_materials")
-      .insert(materialsToInsert)
-      .select();
+    for (const form of existingItems) {
+      const { error: updateError } = await supabase
+        .from("product_materials")
+        .update(buildMaterialData(form))
+        .eq("id", form.tempId);
+      if (updateError) throw new Error(`Autosave ingredients failed: ${updateError.message}`);
+    }
 
-    if (insertError) throw new Error(`Autosave ingredients failed: ${insertError.message}`);
+    if (newItems.length > 0) {
+      const { error: insertError } = await supabase
+        .from("product_materials")
+        .insert(newItems.map(buildMaterialData))
+        .select();
+      if (insertError) throw new Error(`Autosave ingredients failed: ${insertError.message}`);
+    }
 
     // Update snapshot without refetching (avoids form reset/flicker)
     savedIngredientSnapshot.current = formFingerprint(forms);
@@ -882,14 +908,18 @@ export function useRecipeEditor(productId: string, organizationId: string) {
 
   // Silent save for packaging (no toasts, no fetchProductData)
   const autoSavePackaging = useCallback(async (forms: PackagingFormData[]) => {
-    const validForms = forms.filter(
-      f => f.name && (Number(f.amount) > 0 || Number(f.net_weight_g) > 0) && f.packaging_category
-    );
+    // Incomplete rows (including shared packaging without units_per_group)
+    // stay in memory until the user finishes them — autosave must never
+    // write a row the Save button would reject.
+    const validForms = forms.filter(isPackagingFormSaveable);
     if (validForms.length === 0 || !organizationId) return;
 
     const existingItems = validForms.filter(f => !f.tempId.startsWith('temp-'));
     const newItems = validForms.filter(f => f.tempId.startsWith('temp-'));
-    const idsToKeep = existingItems.map(f => f.tempId);
+    // Keep every row still present in the form — including ones that are
+    // temporarily invalid mid-edit — so autosave never deletes a saved row
+    // the user is part-way through changing.
+    const idsToKeep = forms.filter(f => !f.tempId.startsWith('temp-')).map(f => f.tempId);
 
     const { data: currentPackaging } = await supabase
       .from("product_materials")
@@ -911,65 +941,8 @@ export function useRecipeEditor(productId: string, organizationId: string) {
       }
     }
 
-    const buildMaterialData = (form: PackagingFormData) => {
-      let quantity = Number(form.amount);
-      if (!quantity || quantity <= 0 || isNaN(quantity)) {
-        const weightG = Number(form.net_weight_g);
-        quantity = isNaN(weightG) ? 0 : (form.unit === 'kg' ? weightG / 1000 : weightG);
-      }
-
-      const materialData: any = {
-        product_id: parseInt(productId),
-        material_name: form.name,
-        matched_source_name: form.matched_source_name || null,
-        quantity,
-        unit: form.unit,
-        material_type: 'packaging',
-        packaging_category: form.packaging_category || null,
-        origin_country: form.origin_country || null,
-        net_weight_g: Number(form.net_weight_g) || null,
-        recycled_content_percentage: form.recycled_content_percentage ? Number(form.recycled_content_percentage) : null,
-        printing_process: form.printing_process || null,
-      };
-
-      if (form.data_source === 'openlca' && form.data_source_id) {
-        materialData.data_source = 'openlca';
-        materialData.data_source_id = form.data_source_id;
-        if (form.openlca_database) {
-          materialData.openlca_database = form.openlca_database;
-        }
-      } else if (form.data_source === 'supplier' && form.supplier_product_id) {
-        materialData.data_source = 'supplier';
-        materialData.supplier_product_id = form.supplier_product_id;
-      }
-
-      if (form.transport_mode && form.distance_km) {
-        materialData.transport_mode = form.transport_mode;
-        materialData.distance_km = Number(form.distance_km);
-      }
-
-      if (form.origin_lat && form.origin_lng) {
-        materialData.origin_lat = form.origin_lat;
-        materialData.origin_lng = form.origin_lng;
-        materialData.origin_address = form.origin_address || null;
-        materialData.origin_country_code = form.origin_country_code || null;
-      }
-
-      if (form.carbon_intensity != null && Number(form.carbon_intensity) > 0) {
-        materialData.cached_co2_factor = Number(form.carbon_intensity);
-      }
-
-      materialData.has_component_breakdown = form.has_component_breakdown || false;
-      if (form.epr_packaging_level) materialData.epr_packaging_level = form.epr_packaging_level;
-      if (form.epr_packaging_activity) materialData.epr_packaging_activity = form.epr_packaging_activity;
-      materialData.epr_is_household = form.epr_is_household !== undefined ? form.epr_is_household : true;
-      if (form.epr_ram_rating) materialData.epr_ram_rating = form.epr_ram_rating;
-      if (form.epr_uk_nation) materialData.epr_uk_nation = form.epr_uk_nation;
-      materialData.epr_is_drinks_container = form.epr_is_drinks_container || false;
-      materialData.units_per_group = Number(form.units_per_group) || 1;
-
-      return materialData;
-    };
+    // Shared row builder (also used by the manual Save button)
+    const buildMaterialData = (form: PackagingFormData) => buildPackagingMaterialData(form, productId);
 
     for (const form of existingItems) {
       const materialData = buildMaterialData(form);
@@ -1330,6 +1303,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
     addPackagingWithType,
     addIngredientWithDefaults,
     addPackagingWithDefaults,
+    addPackagingRows,
     saveIngredients,
     savePackaging,
     setPackagingFromTemplate,

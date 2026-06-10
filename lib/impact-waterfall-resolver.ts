@@ -3,6 +3,7 @@ import { DEFAULT_AWARE_FACTOR, getAwareFactorValue } from './calculations/water-
 import { getPreferredDatabase } from './openlca/agribalyse-aliases';
 import type { OpenLCADatabaseSource } from './openlca/client';
 import type { DistributionLeg } from './distribution-factors';
+import { findUnit, quantityToKg, type UnitKind } from './constants/material-units';
 // OpenLCA calculations now happen server-side via /api/openlca/calculate
 
 export type MaterialCategoryType =
@@ -160,7 +161,7 @@ export interface FallbackEvent {
    * a TRANSIENT one (the live server timed out or errored and a re-run may do
    * better). Drives whether the UI shows a calm note or an actionable warning.
    */
-  category?: 'no_match' | 'transient';
+  category?: 'no_match' | 'transient' | 'data_quality';
 }
 
 /**
@@ -316,94 +317,61 @@ function buildSupplierProductResult(
 }
 
 /**
- * Normalise a quantity + unit pair to kilograms.
+ * Normalise a quantity + unit pair to kilograms, reporting how the
+ * conversion went so callers can surface data-quality warnings instead of
+ * letting an unrecognised unit silently pass through as kg.
  *
- * CRITICAL FIX: Previously missing conversions for 'tonnes', 'lbs', 'oz'.
- * Materials entered in tonnes were silently treated as kg — a 1,000× error.
- * Materials entered in lbs were also treated as kg — a 2.2× error.
- *
- * Supported units:
- *   kg, g/grams, mg/milligrams, tonnes/t/metric_tons,
- *   lbs/lb/pounds, oz/ounces,
- *   ml/millilitres, l/litres (assumed density ≈ 1 kg/L for liquids)
- *
- * Unknown units are logged with a warning and treated as kg (passthrough).
+ * - `recognised: false` means the unit was not in the shared vocabulary
+ *   (lib/constants/material-units.ts) and the quantity passed through as kg.
+ *   Callers should flag this to the user; the value may be wildly wrong.
+ * - `assumedDensity: true` means a volume unit was converted at 1 kg/L.
+ *   Fine for water-based liquids; oils and spirits deviate by ~5-20%.
+ * - `kind: 'count'` means the quantity passed through unchanged because the
+ *   emission factor is per item.
  */
-export function normalizeToKg(quantity: string | number, unit: string): number {
+export function tryNormalizeToKg(
+  quantity: string | number,
+  unit: string
+): { kg: number; recognised: boolean; assumedDensity: boolean; kind: UnitKind | null } {
   const qty = typeof quantity === 'string' ? parseFloat(quantity) : quantity;
   if (isNaN(qty) || qty < 0) {
     console.warn(`[normalizeToKg] Invalid quantity: ${quantity} — returning 0`);
-    return 0;
+    return { kg: 0, recognised: true, assumedDensity: false, kind: null };
   }
 
-  const unitLower = (unit || 'kg').toLowerCase().trim();
-
-  switch (unitLower) {
-    // --- Mass units ---
-    case 'kg':
-    case 'kilogram':
-    case 'kilograms':
-      return qty;
-    case 'g':
-    case 'gram':
-    case 'grams':
-      return qty / 1000;
-    case 'mg':
-    case 'milligram':
-    case 'milligrams':
-      return qty / 1_000_000;
-    case 't':
-    case 'tonne':
-    case 'tonnes':
-    case 'metric_ton':
-    case 'metric_tons':
-    case 'metric ton':
-    case 'metric tons':
-      return qty * 1000;
-    case 'lb':
-    case 'lbs':
-    case 'pound':
-    case 'pounds':
-      return qty * 0.453592;
-    case 'oz':
-    case 'ounce':
-    case 'ounces':
-      return qty * 0.0283495;
-
-    // --- Volume units (assumed density ≈ 1 kg/L for water-based liquids) ---
-    case 'ml':
-    case 'millilitre':
-    case 'millilitres':
-    case 'milliliter':
-    case 'milliliters':
-      return qty / 1000;
-    case 'l':
-    case 'litre':
-    case 'litres':
-    case 'liter':
-    case 'liters':
-      return qty;
-
-    // --- Discrete / countable units (pass through as-is; emission factors are per-unit) ---
-    case 'unit':
-    case 'units':
-    case 'item':
-    case 'items':
-    case 'piece':
-    case 'pieces':
-    case 'each':
-    case 'ea':
-    case 'pcs':
-      return qty;
-
-    default:
-      // Unknown unit — passthrough as kg with warning
-      console.warn(
-        `[normalizeToKg] Unknown unit '${unit}' for quantity ${qty} — treating as kg. ` +
-        `Add this unit to normalizeToKg() in impact-waterfall-resolver.ts for correct conversion.`
-      );
-      return qty;
+  const def = findUnit(unit || 'kg');
+  if (!def) {
+    console.warn(
+      `[normalizeToKg] Unknown unit '${unit}' for quantity ${qty} — treating as kg. ` +
+      `Add this unit to lib/constants/material-units.ts for correct conversion.`
+    );
+    return { kg: qty, recognised: false, assumedDensity: false, kind: null };
   }
+
+  if (def.kind === 'count' || def.toKg === null) {
+    // Discrete units pass through as-is; emission factors are per item.
+    return { kg: qty, recognised: true, assumedDensity: false, kind: 'count' };
+  }
+
+  return {
+    kg: quantityToKg(qty, def) ?? qty,
+    recognised: true,
+    assumedDensity: def.kind === 'volume',
+    kind: def.kind,
+  };
+}
+
+/**
+ * Normalise a quantity + unit pair to kilograms.
+ *
+ * Conversions are defined in lib/constants/material-units.ts (the same
+ * vocabulary the unit selects bind to). Volume units assume density
+ * ≈ 1 kg/L. Unknown units are logged and passed through as kg; prefer
+ * tryNormalizeToKg() in calculation paths so the passthrough can be
+ * surfaced to the user as a data-quality warning.
+ */
+export function normalizeToKg(quantity: string | number, unit: string): number {
+  return tryNormalizeToKg(quantity, unit).kg;
 }
 
 /**

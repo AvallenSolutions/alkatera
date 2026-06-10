@@ -52,6 +52,15 @@ export type MaterialType = 'ingredient' | 'packaging';
 
 export type PackagingCategory = 'container' | 'label' | 'closure' | 'secondary' | 'shipment' | 'tertiary';
 
+/**
+ * Emission factor provenance for a product material ("apply + flag" model).
+ * verified = user picked/confirmed (or curated catalogue mapping);
+ * auto_matched = software matched, used in calculations but awaiting a
+ * one-click confirmation; needs_review = no usable match yet.
+ * null/undefined = legacy row, unknown provenance, no badge shown.
+ */
+export type MatchStatus = 'verified' | 'auto_matched' | 'needs_review';
+
 // ============================================================================
 // UK EPR (Extended Producer Responsibility) Types
 // Based on https://www.gov.uk/guidance/how-to-collect-your-packaging-data-for-extended-producer-responsibility

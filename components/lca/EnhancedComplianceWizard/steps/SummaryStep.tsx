@@ -242,7 +242,7 @@ export function SummaryStep() {
     attempted_priority: string;
     resolved_priority: number;
     fallback_reason: string;
-    category?: 'no_match' | 'transient';
+    category?: 'no_match' | 'transient' | 'data_quality';
   }>>([]);
   const [calculationFingerprint, setCalculationFingerprint] = useState<string | null>(null);
 
@@ -557,11 +557,32 @@ export function SummaryStep() {
               const isTransient = (fw: typeof fallbackWarnings[number]) =>
                 fw.category === 'transient' ||
                 (!fw.category && /(timed out|timeout|unavailable|error)/i.test(fw.fallback_reason || ''));
-              const transientIssues = fallbackWarnings.filter(isTransient);
-              const proxyNotes = fallbackWarnings.filter(fw => !isTransient(fw));
+              const dataQualityIssues = fallbackWarnings.filter(fw => fw.category === 'data_quality');
+              const transientIssues = fallbackWarnings.filter(fw => fw.category !== 'data_quality' && isTransient(fw));
+              const proxyNotes = fallbackWarnings.filter(fw => fw.category !== 'data_quality' && !isTransient(fw));
 
               return (
                 <>
+                  {dataQualityIssues.length > 0 && (
+                    <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800">
+                      <Info className="h-4 w-4 text-amber-600" />
+                      <AlertTitle className="text-amber-900 dark:text-amber-300">Please check these entries</AlertTitle>
+                      <AlertDescription>
+                        <p className="text-sm text-amber-800 dark:text-amber-400 mb-1">
+                          {dataQualityIssues.length} item{dataQualityIssues.length > 1 ? 's' : ''} may have been
+                          calculated with the wrong quantity. Please review and correct the entries below, then
+                          re-run the calculation.
+                        </p>
+                        <ul className="mt-1 space-y-0.5 ml-4 text-xs text-amber-800 dark:text-amber-400">
+                          {dataQualityIssues.map((fw, i) => (
+                            <li key={i}>
+                              <strong>{fw.material_name}</strong>: {fw.fallback_reason}
+                            </li>
+                          ))}
+                        </ul>
+                      </AlertDescription>
+                    </Alert>
+                  )}
                   {transientIssues.length > 0 && (
                     <Alert className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/10 dark:border-blue-800">
                       <Info className="h-4 w-4 text-blue-600" />
