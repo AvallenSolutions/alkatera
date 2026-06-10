@@ -49,3 +49,19 @@ STRIPE_TEST_KEYS.txt
 
 # Local Netlify folder
 .netlify
+
+# Business documents and exports — confidential, never commit.
+# (Contracts, finance models, briefings etc. live in the repo root while
+# being worked on; a `git add .` must not sweep them into history.)
+*.docx
+*.xlsx
+*.pptx
+*.pdf
+*.doc
+*.xls
+*.ppt
+.~lock.*#
+Knowledge Bank - */
+
+# Claude Code worktrees (stale checkouts; also excluded from vitest)
+.claude/worktrees/

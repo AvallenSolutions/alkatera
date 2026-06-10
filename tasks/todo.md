@@ -9,7 +9,7 @@ Working one by one, verifying each before moving on.
 - [x] B2: Inbound transport excluded from headline LCA total
 - [x] S1: Carbon-budgets IDOR (membership check on GET) + same hole found in shadow-prices
 - [x] S2: Greenwash public scanner SSRF (use safeFetch) + fetch-url-content + scraping fetchPage
-- [ ] S4: .gitignore business documents
+- [x] S4: .gitignore business documents
 - [ ] R1: Stripe webhook idempotency + lost events
 - [ ] B3: natural_gas_m3 dropped + m3/m³ unit mismatch
 - [ ] B4: Maturation ABV dilution in persisted LCA path
@@ -33,6 +33,10 @@ Working one by one, verifying each before moving on.
 - [ ] P3-P8 performance mediums
 
 ## Review log
+- S4 (2026-06-10): .gitignore now covers office/PDF documents, LibreOffice
+  lock files, Knowledge Bank directories and .claude/worktrees/. Verified no
+  such file was already tracked and all the confidential repo-root documents
+  are now ignored.
 - S2 (2026-06-10): Extracted safeFetch (host + resolved-IP validation, manual
   per-hop redirect re-validation) to lib/utils/safe-fetch.ts and applied it to
   the three remaining redirect-follow fetchers of user-supplied URLs: the
