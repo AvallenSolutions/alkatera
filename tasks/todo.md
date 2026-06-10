@@ -16,7 +16,7 @@ Working one by one, verifying each before moving on.
 - [x] B5: OpenLCA error misclassification (fixed + the whole no-match feature committed)
 - [x] B6: Corporate Scope 3 double counts (Cat 9/4/11)
 - [x] B7: Xero suppression single-month + no pro-rating
-- [ ] B8: Facility per-unit conversion litres vs functional units
+- [x] B8: Facility per-unit conversion litres vs functional units
 - [ ] R2: Inngest dead retries + stranded enrich jobs + grounded-search timeout
 - [ ] R3: Xero token-refresh race + cron fan-out to Inngest
 - [ ] P1: Corporate emissions N+1 + move server-side
@@ -33,6 +33,12 @@ Working one by one, verifying each before moving on.
 - [ ] P3-P8 performance mediums
 
 ## Review log
+- B8 (2026-06-10): Calculator now converts litre/hl/ml production volumes to
+  functional units (via product unit size) before handing facilityEmissions to
+  the aggregator, at both push sites (primary + archetype proxy). Unconvertible
+  units (kg/cases/pallets) keep treated-as-units behaviour with a warning.
+  2 regression tests; full lib sweep green bar the 3 pre-existing distributor
+  failures.
 - B7 (2026-06-10): (a) periodsCovered() in slice-mapping expands utility/fleet
   suppression signals across EVERY covered month, clamped to the window
   (annual bills previously suppressed Xero in their start month only, and

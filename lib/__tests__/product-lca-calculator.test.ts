@@ -661,6 +661,66 @@ describe('calculateProductCarbonFootprint', () => {
       expect(result.success).toBe(true);
     });
 
+    it('converts litre production volumes to functional units for per-unit division', async () => {
+      // The aggregator divides facility emissions by productVolume expecting
+      // UNITS of the product. A volume entered in litres (the archetype-proxy
+      // default) used to be passed through unconverted, skewing per-bottle
+      // processing emissions by the bottle-size factor.
+      const product = createMockProduct({ unit_size_value: 700, unit_size_unit: 'ml' });
+      setupTableMocks({
+        products: { data: product },
+        product_materials: { data: [createMockMaterial()] },
+        product_carbon_footprints: { data: createMockLCA() },
+        product_carbon_footprint_materials: { data: null },
+        product_carbon_footprint_production_sites: { data: [] },
+        contract_manufacturer_allocations: { data: [] },
+        facility_emissions_aggregated: { data: null },
+      });
+      mockResolveImpactFactors.mockResolvedValue(createMockWaterfallResult());
+
+      const facilityAllocation = createMockFacilityAllocation({
+        productionVolume: 7000,
+        productionVolumeUnit: 'litres',
+      });
+      const result = await calculateProductCarbonFootprint({
+        productId: 'prod-123',
+        facilityAllocations: [facilityAllocation],
+      });
+
+      expect(result.success).toBe(true);
+      const facilityEmissionsArg = mockAggregateProductImpacts.mock.calls[0][2] as any[];
+      expect(facilityEmissionsArg).toHaveLength(1);
+      // 7000 L / 0.7 L per bottle = 10000 functional units
+      expect(facilityEmissionsArg[0].productVolume).toBeCloseTo(10000, 6);
+    });
+
+    it('passes unit-based production volumes through unchanged', async () => {
+      const product = createMockProduct({ unit_size_value: 700, unit_size_unit: 'ml' });
+      setupTableMocks({
+        products: { data: product },
+        product_materials: { data: [createMockMaterial()] },
+        product_carbon_footprints: { data: createMockLCA() },
+        product_carbon_footprint_materials: { data: null },
+        product_carbon_footprint_production_sites: { data: [] },
+        contract_manufacturer_allocations: { data: [] },
+        facility_emissions_aggregated: { data: null },
+      });
+      mockResolveImpactFactors.mockResolvedValue(createMockWaterfallResult());
+
+      const facilityAllocation = createMockFacilityAllocation({
+        productionVolume: 5000,
+        productionVolumeUnit: 'units',
+      });
+      const result = await calculateProductCarbonFootprint({
+        productId: 'prod-123',
+        facilityAllocations: [facilityAllocation],
+      });
+
+      expect(result.success).toBe(true);
+      const facilityEmissionsArg = mockAggregateProductImpacts.mock.calls[0][2] as any[];
+      expect(facilityEmissionsArg[0].productVolume).toBe(5000);
+    });
+
     it('should handle facility allocation without emissions data', async () => {
       const product = createMockProduct();
       const materials = [createMockMaterial()];

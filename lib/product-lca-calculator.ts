@@ -434,6 +434,43 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
     // 4a. Handle facility allocations
     const { facilityAllocations } = params;
 
+    // The aggregator's contract is "productVolume = units of THIS PRODUCT
+    // produced" (it divides facility emissions by it for per-unit values).
+    // Allocations may carry the volume in litres/hl instead (the archetype
+    // proxy path defaults to litres), which silently skewed per-bottle
+    // processing emissions by the bottle-size factor (~43% for a 700 ml
+    // bottle). Convert volume units to functional units here; unconvertible
+    // units (kg, cases, pallets) keep the previous treated-as-units
+    // behaviour, with a warning so the data entry can be fixed.
+    const fuSizeLitres = (() => {
+      const v = Number(product.unit_size_value);
+      if (!Number.isFinite(v) || v <= 0) return 0.75;
+      const u = (product.unit_size_unit || '').toLowerCase();
+      if (u === 'ml') return v / 1000;
+      if (u === 'cl') return v / 100;
+      return v; // assume litres
+    })();
+    const volumeToFunctionalUnits = (volume: number, unit: string | undefined, facilityName: string): number => {
+      const vol = Number(volume) || 0;
+      if (vol <= 0) return vol;
+      const u = (unit || 'units').toLowerCase().trim();
+      let litres: number | null = null;
+      if (['l', 'litre', 'litres', 'liter', 'liters'].includes(u)) litres = vol;
+      else if (['hl', 'hectolitre', 'hectolitres', 'hectoliter', 'hectoliters'].includes(u)) litres = vol * 100;
+      else if (['ml', 'millilitre', 'millilitres', 'milliliter', 'milliliters'].includes(u)) litres = vol / 1000;
+      if (litres === null) {
+        if (!['unit', 'units', 'bottle', 'bottles', 'can', 'cans'].includes(u)) {
+          console.warn(
+            `[calculateProductCarbonFootprint] ⚠ Production volume for ${facilityName} is in '${u}', ` +
+            `which cannot be converted to functional units — treating as units. ` +
+            `Enter the volume in units or litres for accurate per-unit processing emissions.`
+          );
+        }
+        return vol;
+      }
+      return litres / fuSizeLitres;
+    };
+
     const collectedFacilityEmissions: FacilityEmissionsData[] = [];
 
     if (facilityAllocations && facilityAllocations.length > 0) {
@@ -542,7 +579,9 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
             // Proxy resolution is per-unit × client volume, so the attribution
             // ratio is implicit in the volume. Surfaced as 1.0 for the report.
             attributionRatio: 1,
-            productVolume: allocation.productionVolume,
+            productVolume: volumeToFunctionalUnits(
+              allocation.productionVolume, allocation.productionVolumeUnit, allocation.facilityName,
+            ),
             countryCode: facilityCountryCode || undefined,
             gridEmissionFactor: gridFactorResult.factor,
             electricityKwh: proxy.breakdown.electricityKwh,
@@ -976,7 +1015,9 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           allocatedWater,
           allocatedWaste,
           attributionRatio,
-          productVolume: allocation.productionVolume,
+          productVolume: volumeToFunctionalUnits(
+            allocation.productionVolume, allocation.productionVolumeUnit, allocation.facilityName,
+          ),
           countryCode: facilityCountryCode || undefined,
           gridEmissionFactor: gridFactorResult.factor,
           electricityKwh: totalElectricityKwh,
