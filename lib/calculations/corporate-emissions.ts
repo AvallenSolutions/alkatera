@@ -347,30 +347,36 @@ export async function calculateScope3(
 
   if (productionData && productionData.length > 0) {
     // Use production logs when available.
-    // Each log's LCA lookup is independent, so run them concurrently instead of
-    // serially (was N sequential round-trips). Contributions are collected in
-    // array order and summed afterwards, so the accumulation is bit-identical to
-    // the previous sequential `breakdown.products += …` loop. Promise.all (not
-    // allSettled) preserves the original throw-on-error behaviour.
-    const productContributions = await Promise.all(
-      productionData.map(async (log) => {
-        if (!log.units_produced || log.units_produced <= 0) return 0;
+    // The per-unit LCA depends only on product_id, but this used to issue one
+    // PCF query PER LOG ROW: 5 products logged weekly for a year = 260 round
+    // trips for 5 distinct rows — and this runs in the browser on the
+    // scope-1-2 trends tab once per reporting year. Fetch the latest
+    // completed PCF per product in ONE query and join in memory.
+    const productIds = Array.from(new Set(productionData.map((log) => String(log.product_id))));
+    const { data: lcas } = await supabase
+      .from('product_carbon_footprints')
+      .select('product_id, aggregated_impacts, updated_at')
+      .in('product_id', productIds)
+      .eq('status', 'completed')
+      .order('updated_at', { ascending: false });
 
-        const { data: lca } = await supabase
-          .from('product_carbon_footprints')
-          .select('aggregated_impacts')
-          .eq('product_id', log.product_id)
-          .eq('status', 'completed')
-          .order('updated_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+    const scope3PerUnitByProduct = new Map<string, number>();
+    for (const lca of lcas ?? []) {
+      const pid = String((lca as any).product_id);
+      if (!scope3PerUnitByProduct.has(pid)) {
+        scope3PerUnitByProduct.set(
+          pid,
+          (lca as any).aggregated_impacts?.breakdown?.by_scope?.scope3 || 0,
+        );
+      }
+    }
 
-        const scope3PerUnit = lca?.aggregated_impacts?.breakdown?.by_scope?.scope3 || 0;
-        return scope3PerUnit > 0 ? scope3PerUnit * log.units_produced : 0;
-      })
-    );
-    for (const contribution of productContributions) {
-      breakdown.products += contribution;
+    for (const log of productionData) {
+      if (!log.units_produced || log.units_produced <= 0) continue;
+      const scope3PerUnit = scope3PerUnitByProduct.get(String(log.product_id)) || 0;
+      if (scope3PerUnit > 0) {
+        breakdown.products += scope3PerUnit * log.units_produced;
+      }
     }
   } else {
     // Fallback: match Company Emissions page logic exactly

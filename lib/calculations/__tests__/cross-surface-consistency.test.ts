@@ -82,6 +82,31 @@ const createRealisticMock = () => {
     builder.then = (resolve: Function) => {
       let response = { data: [], error: null };
 
+      // Latest completed PCFs per product (batched array query — the
+      // production-log path no longer does per-log maybeSingle lookups)
+      if (tableName === 'product_carbon_footprints') {
+        response = {
+          data: [{
+            product_id: 'calvados-001',
+            updated_at: '2024-03-01',
+            aggregated_impacts: {
+              climate_change_gwp100: 2.832,
+              breakdown: {
+                by_scope: { scope1: 0.15, scope2: 0.10, scope3: 2.582 },
+                by_lifecycle_stage: {
+                  raw_materials: 1.5,
+                  manufacturing: 0.832,
+                  distribution: 0.3,
+                  use_phase: 0.1,
+                  end_of_life: 0.1,
+                },
+              },
+            },
+          }],
+          error: null,
+        } as any;
+      }
+
       // Facilities list (new schema)
       if (tableName === 'facilities') {
         response = {

@@ -19,7 +19,7 @@ Working one by one, verifying each before moving on.
 - [x] B8: Facility per-unit conversion litres vs functional units
 - [x] R2: Inngest dead retries + stranded enrich jobs + grounded-search timeout (+ R6 claim guards)
 - [x] R3: Xero token-refresh race + cron fan-out to Inngest
-- [ ] P1: Corporate emissions N+1 + move server-side
+- [x] P1: Corporate emissions N+1 + move server-side
 - [ ] P2: Report PDF generation to Inngest
 
 ## Medium / Low (after the above)
@@ -33,6 +33,15 @@ Working one by one, verifying each before moving on.
 - [ ] P3-P8 performance mediums
 
 ## Review log
+- P1 (2026-06-10): (a) Cat 1 production-log loop now fetches the latest
+  completed PCF per product in ONE batched query (was one query per log row:
+  260+ for a weekly-logging org, 1300+ on the trends tab). (b) New
+  GET /api/emissions/corporate (membership-verified) runs the full cascade
+  server-side incl. the historical-imports fallback; useCompanyFootprint is
+  now a single HTTP call. Hook tests rewritten against the fetch contract;
+  PCF mocks updated to the batched array shape. Remaining client-side callers
+  (scope-1-2 page, useScope3Emissions) still benefit from (a); migrating them
+  to the route is a follow-up.
 - R3 (2026-06-10): (a) Token rotation now persists via
   updateTokensIfRefreshUnchanged (optimistic check on the stored refresh-token
   ciphertext); losing the cross-lambda race re-reads the winner's tokens

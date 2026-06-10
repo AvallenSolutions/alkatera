@@ -307,7 +307,9 @@ describe('calculateScope3', () => {
         error: null,
       },
       product_carbon_footprints: {
-        data: {
+        data: [{
+          product_id: 'prod-1',
+          updated_at: '2024-03-01',
           aggregated_impacts: {
             climate_change_gwp100: 10, // 10 kgCO2e total (includes S1+S2)
             breakdown: {
@@ -318,7 +320,7 @@ describe('calculateScope3', () => {
               },
             },
           },
-        },
+        }],
         error: null,
       },
       corporate_reports: { data: null, error: null },
@@ -445,11 +447,13 @@ describe('calculateScope3', () => {
         ],
         error: null,
       },
-      // Every per-product LCA lookup resolves to scope3 = 7 per unit.
+      // Every product's latest completed LCA resolves to scope3 = 7 per unit.
       product_carbon_footprints: {
-        data: {
-          aggregated_impacts: { breakdown: { by_scope: { scope3: 7 } } },
-        },
+        data: [
+          { product_id: 'p1', updated_at: '2024-03-01', aggregated_impacts: { breakdown: { by_scope: { scope3: 7 } } } },
+          { product_id: 'p2', updated_at: '2024-03-01', aggregated_impacts: { breakdown: { by_scope: { scope3: 7 } } } },
+          { product_id: 'p3', updated_at: '2024-03-01', aggregated_impacts: { breakdown: { by_scope: { scope3: 7 } } } },
+        ],
         error: null,
       },
       corporate_reports: { data: null, error: null },
@@ -550,16 +554,6 @@ describe('calculateCorporateEmissions', () => {
           limit: vi.fn().mockImplementation(() => builder),
           not: vi.fn().mockImplementation(() => builder),
           maybeSingle: vi.fn().mockImplementation(async () => {
-            if (tableName === 'product_carbon_footprints') {
-              return {
-                data: {
-                  aggregated_impacts: {
-                    breakdown: { by_scope: { scope3: 50 } },
-                  },
-                },
-                error: null,
-              };
-            }
             if (tableName === 'corporate_reports') {
               return { data: null, error: null };
             }
@@ -595,6 +589,15 @@ describe('calculateCorporateEmissions', () => {
               ],
               error: null,
             };
+          } else if (tableName === 'product_carbon_footprints') {
+            response = {
+              data: [{
+                product_id: 'prod-1',
+                updated_at: '2024-03-01',
+                aggregated_impacts: { breakdown: { by_scope: { scope3: 50 } } },
+              }],
+              error: null,
+            } as any;
           } else if (tableName === 'fleet_activities') {
             response = { data: [], error: null };
           } else if (tableName === 'production_logs') {
@@ -740,12 +743,14 @@ describe('Edge Cases', () => {
           error: null,
         },
         product_carbon_footprints: {
-          data: {
+          data: [{
+            product_id: 'prod-1',
+            updated_at: '2024-03-01',
             aggregated_impacts: {
               climate_change_gwp100: 10,
               // No breakdown.by_scope
             },
-          },
+          }],
           error: null,
         },
         corporate_reports: { data: null, error: null },
@@ -843,7 +848,9 @@ describe('Double Counting Prevention', () => {
         error: null,
       },
       product_carbon_footprints: {
-        data: {
+        data: [{
+          product_id: 'prod-1',
+          updated_at: '2024-03-01',
           aggregated_impacts: {
             climate_change_gwp100: 15,
             breakdown: {
@@ -854,7 +861,7 @@ describe('Double Counting Prevention', () => {
               },
             },
           },
-        },
+        }],
         error: null,
       },
       corporate_reports: { data: null, error: null },
