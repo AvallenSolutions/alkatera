@@ -41,6 +41,17 @@ async function resolveOrg(request: NextRequest) {
       .limit(1)
       .maybeSingle();
     organizationId = m?.organization_id ?? null;
+  } else {
+    // A caller-supplied org id must never be trusted without verifying
+    // membership: queries below run with the service-role client, so this
+    // check is the only thing standing between tenants.
+    const { data: m } = await supabase
+      .from('organization_members')
+      .select('organization_id')
+      .eq('user_id', user.id)
+      .eq('organization_id', organizationId)
+      .maybeSingle();
+    if (!m) return { error: 'Not a member', status: 403 as const };
   }
   if (!organizationId) return { error: 'No organisation', status: 403 as const };
 

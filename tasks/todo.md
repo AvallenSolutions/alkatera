@@ -7,7 +7,7 @@ Working one by one, verifying each before moving on.
 ## Critical / High
 - [x] B1: Recycled-content credit applied twice (calculator + aggregator)
 - [x] B2: Inbound transport excluded from headline LCA total
-- [ ] S1: Carbon-budgets IDOR (membership check on GET)
+- [x] S1: Carbon-budgets IDOR (membership check on GET) + same hole found in shadow-prices
 - [ ] S2: Greenwash public scanner SSRF (use safeFetch)
 - [ ] S4: .gitignore business documents
 - [ ] R1: Stripe webhook idempotency + lost events
@@ -33,6 +33,10 @@ Working one by one, verifying each before moving on.
 - [ ] P3-P8 performance mediums
 
 ## Review log
+- S1 (2026-06-10): Membership check added to resolveOrg in carbon-budgets AND
+  shadow-prices (swept all 17 copies of the pattern across app/api/pulse; these
+  two were the only ones missing it; facility-impact/layout/peer-benchmark/
+  targets use the cookie-scoped anon client so RLS constrains them). tsc clean.
 - B2 (2026-06-10): Aggregator now adds each material's impact_transport to the
   headline total, scope 3, fossil totals, stage bucket and by_material entry,
   exactly once: skipped when the row's decomposition fields
