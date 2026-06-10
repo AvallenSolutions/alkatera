@@ -27,8 +27,7 @@ import { Button } from '@/components/ui/button';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { useOrganization } from '@/lib/organizationContext';
 import { useIsAlkateraAdmin } from '@/hooks/usePermissions';
-import { calculateProductLCA } from '@/lib/product-lca-calculator';
-import { toValidAllocations } from '@/lib/utils/lca-recalc-allocations';
+import { recalculateProductLca } from '@/lib/utils/recalculate-product-lca';
 
 type ProductRow = {
   id: number | string;
@@ -117,42 +116,12 @@ export function RecalculateOrgLcasButton() {
       setProgress({ done: i, total: rows.length, current: name });
 
       try {
-        const settings = product.last_wizard_settings ?? {};
-
-        // Recover the facility allocations used last time from the most recent
-        // PCF that carries them in draft_data.
-        const { data: pcfs } = await sb
-          .from('product_carbon_footprints')
-          .select('id, draft_data')
-          .eq('product_id', product.id)
-          .eq('organization_id', orgId)
-          .order('updated_at', { ascending: false })
-          .limit(5);
-
-        let validAllocations: any[] = [];
-        for (const pcf of (pcfs ?? []) as Array<{ draft_data: any }>) {
-          const allocs = toValidAllocations(pcf?.draft_data?.facilityAllocations);
-          if (allocs.length > 0) { validAllocations = allocs; break; }
-        }
-
-        if (validAllocations.length === 0) {
+        const outcome = await recalculateProductLca(sb, product, orgId);
+        if (outcome === 'skipped') {
           results.push({ name, status: 'skipped', detail: 'no recoverable facility allocations — re-run via the wizard' });
-          continue;
+        } else {
+          results.push({ name, status: 'done' });
         }
-
-        await calculateProductLCA({
-          productId: String(product.id),
-          functionalUnit: `1 ${product.unit || 'unit'} of ${product.name || 'product'}`,
-          systemBoundary: settings.systemBoundary || 'cradle-to-gate',
-          referenceYear: settings.referenceYear,
-          facilityAllocations: validAllocations,
-          usePhaseConfig: settings.usePhaseConfig,
-          eolConfig: settings.eolConfig,
-          distributionConfig: settings.distributionConfig,
-          productLossConfig: settings.productLossConfig,
-        });
-
-        results.push({ name, status: 'done' });
       } catch (err: unknown) {
         results.push({ name, status: 'error', detail: err instanceof Error ? err.message : String(err) });
       }

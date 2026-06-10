@@ -117,6 +117,41 @@ export async function POST(
       pcf.materials = materials;
     }
 
+    // ========================================================================
+    // STALENESS GUARD
+    // ========================================================================
+    // Editing ingredients/packaging updates product_materials, but does NOT
+    // refresh this PCF's snapshot (product_carbon_footprint_materials +
+    // aggregated_impacts) — only re-running the calculation does. Rendering the
+    // PDF straight from the snapshot would silently show pre-edit numbers. So if
+    // any source material was edited after this snapshot was built, refuse and
+    // tell the caller to recalculate (unless they explicitly opt to proceed).
+    const allowStale = (body as { allowStale?: boolean })?.allowStale === true;
+    if (!allowStale && pcf.product_id) {
+      const { data: latestMat } = await supabase
+        .from('product_materials')
+        .select('updated_at')
+        .eq('product_id', pcf.product_id)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const snapshotTime = (materials ?? []).reduce((max: number, m: any) => {
+        const t = m.created_at ? new Date(m.created_at).getTime() : 0;
+        return t > max ? t : max;
+      }, 0);
+      const editTime = latestMat?.updated_at ? new Date(latestMat.updated_at).getTime() : 0;
+      if (editTime > 0 && snapshotTime > 0 && editTime > snapshotTime) {
+        return NextResponse.json(
+          {
+            error: 'stale_inputs',
+            message:
+              'The recipe has changed since this LCA was last calculated. Recalculate the LCA to include your latest ingredient and packaging edits, then generate the report.',
+          },
+          { status: 409 },
+        );
+      }
+    }
+
     // Fetch organization
     const { data: organization } = await supabase
       .from('organizations')
