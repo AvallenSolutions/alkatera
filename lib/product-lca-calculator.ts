@@ -708,6 +708,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
             diesel_mobile: { factor: 2.68787, scope: 'Scope 1' },       // DEFRA 2025 kg CO2e/litre
             petrol_mobile: { factor: 2.31, scope: 'Scope 1' },          // DEFRA 2025 kg CO2e/litre
             natural_gas: { factor: 0.18293, scope: 'Scope 1' },         // DEFRA 2025 kg CO2e/kWh
+            natural_gas_m3: { factor: 0.18293 * 10.55, scope: 'Scope 1' }, // per m³ (1 m³ ≈ 10.55 kWh) — first-class utility_type, was silently dropped
             lpg: { factor: 1.55537, scope: 'Scope 1' },                 // DEFRA 2025 kg CO2e/litre
             heavy_fuel_oil: { factor: 3.17740, scope: 'Scope 1' },      // DEFRA 2025 kg CO2e/litre
             biomass_solid: { factor: 0.01551, scope: 'Scope 1' },       // DEFRA 2025 kg CO2e/kWh
@@ -747,8 +748,12 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
 
             let co2e = Number(entry.quantity) * config.factor;
 
-            // Handle natural gas m³ → kWh conversion (10.55 kWh/m³)
-            if (entry.utility_type === 'natural_gas' && entry.unit === 'm³') {
+            // Handle natural gas m³ → kWh conversion (10.55 kWh/m³).
+            // The UI writes 'm3' (utility-types defaultUnit); accept the
+            // typographic 'm³' too — matching only 'm³' meant real entries
+            // were treated as kWh, a 10.55x undercount.
+            const unitNorm = (entry.unit || '').toLowerCase().trim();
+            if (entry.utility_type === 'natural_gas' && (unitNorm === 'm3' || unitNorm === 'm³')) {
               co2e = Number(entry.quantity) * 10.55 * config.factor;
             }
 

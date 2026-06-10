@@ -124,6 +124,46 @@ describe('calculateScope1', () => {
     expect(result).toBe(5000);
   });
 
+  it('converts natural_gas in m³ to kWh for both unit spellings (m3 and m³)', async () => {
+    // The UI writes 'm3' (utility-types defaultUnit); the conversion used to
+    // match only the typographic 'm³', so real entries were treated as kWh —
+    // a 10.55x undercount of heating fuel.
+    for (const unit of ['m3', 'm³']) {
+      const mockSupabase = createMockSupabase({
+        facilities: { data: [{ id: 'facility-1', name: 'Main Facility' }], error: null },
+        utility_data_entries: {
+          data: [{ quantity: 100, unit, utility_type: 'natural_gas', facility_id: 'facility-1' }],
+          error: null,
+        },
+        fleet_activities: { data: [], error: null },
+      });
+
+      const result = await calculateScope1(
+        mockSupabase as any, 'org-123', '2024-01-01', '2024-12-31',
+      );
+
+      // 100 m³ × 10.55 kWh/m³ × 0.18293 kgCO2e/kWh
+      expect(result, `unit=${unit}`).toBeCloseTo(100 * 10.55 * 0.18293, 2);
+    }
+  });
+
+  it('counts natural_gas_m3 entries with the per-m³ factor', async () => {
+    const mockSupabase = createMockSupabase({
+      facilities: { data: [{ id: 'facility-1', name: 'Main Facility' }], error: null },
+      utility_data_entries: {
+        data: [{ quantity: 100, unit: 'm3', utility_type: 'natural_gas_m3', facility_id: 'facility-1' }],
+        error: null,
+      },
+      fleet_activities: { data: [], error: null },
+    });
+
+    const result = await calculateScope1(
+      mockSupabase as any, 'org-123', '2024-01-01', '2024-12-31',
+    );
+
+    expect(result).toBeCloseTo(100 * 0.18293 * 10.55, 2);
+  });
+
   it('should filter out Scope 2 utility types (electricity)', async () => {
     const mockSupabase = createMockSupabase({
       facilities: {

@@ -11,7 +11,7 @@ Working one by one, verifying each before moving on.
 - [x] S2: Greenwash public scanner SSRF (use safeFetch) + fetch-url-content + scraping fetchPage
 - [x] S4: .gitignore business documents
 - [x] R1: Stripe webhook idempotency + lost events (migration 20262703900000 needs applying)
-- [ ] B3: natural_gas_m3 dropped + m3/m³ unit mismatch
+- [x] B3: natural_gas_m3 dropped + m3/m³ unit mismatch
 - [ ] B4: Maturation ABV dilution in persisted LCA path
 - [ ] B5: OpenLCA error misclassification (uncommitted code)
 - [ ] B6: Corporate Scope 3 double counts (Cat 9/4/11)
@@ -33,6 +33,13 @@ Working one by one, verifying each before moving on.
 - [ ] P3-P8 performance mediums
 
 ## Review log
+- B3 (2026-06-10): natural_gas_m3 added to the product LCA calculator's factor
+  map (entries previously hit the unknown-type continue and contributed ZERO
+  Scope 1). m³-conversion checks in the calculator, corporate-emissions and
+  Xero resolved-emissions now accept both 'm3' (what the UI writes) and 'm³';
+  previously each file matched only one spelling. slice-mapping verified
+  already correct. 3 new tests; calculations/emissions/xero suites 502 green.
+  Affected PCFs for gas-heated facilities need recalculation.
 - R1 (2026-06-10): stripe_webhook_events table (migration 20262703900000,
   POSTED IN CHAT, needs applying in Supabase SQL editor). Route now claims the
   event before processing, marks processed only after handler success, returns

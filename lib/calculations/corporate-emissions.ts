@@ -131,7 +131,9 @@ export async function calculateScope1(
         // Handle unit conversion for natural gas (m³ to kWh).
         // natural_gas factor is per kWh; natural_gas_m3 factor already includes the 10.55 conversion.
         // Only apply m³→kWh conversion for the base 'natural_gas' type with m³ units.
-        if ((entry as any).utility_type === 'natural_gas' && (entry as any).unit === 'm³') {
+        // The UI writes 'm3'; accept the typographic 'm³' too.
+        const gasUnit = ((entry as any).unit || '').toLowerCase().trim();
+        if ((entry as any).utility_type === 'natural_gas' && (gasUnit === 'm3' || gasUnit === 'm³')) {
           co2e = (entry as any).quantity * 10.55 * emissionConfig.factor;
         }
 

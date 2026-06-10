@@ -228,7 +228,8 @@ export async function getXeroResolvedEmissions(
     reporting_period_start: string
   }>) {
     let factorKey: keyof typeof UTILITY_SLICE_FACTOR | null = null
-    if (u.utility_type === 'natural_gas' && u.unit === 'm3') factorKey = 'natural_gas_m3'
+    const gasUnit = (u.unit || '').toLowerCase().trim()
+    if (u.utility_type === 'natural_gas' && (gasUnit === 'm3' || gasUnit === 'm³')) factorKey = 'natural_gas_m3'
     else if (u.utility_type in UTILITY_SLICE_FACTOR) factorKey = u.utility_type as keyof typeof UTILITY_SLICE_FACTOR
     if (!factorKey) continue
     const { factor, slice } = UTILITY_SLICE_FACTOR[factorKey]
