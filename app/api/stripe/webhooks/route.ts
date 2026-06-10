@@ -21,23 +21,60 @@ import Stripe from 'stripe';
 // Disable body parsing, need raw body for signature verification
 export const runtime = 'nodejs';
 
-// Idempotency: track processed event IDs to prevent duplicate processing on Stripe retries.
-// In-memory is sufficient as Stripe retries within hours and serverless instances persist
-// for the duration of retries. For multi-instance deployments, consider a database table.
-const processedEvents = new Map<string, number>();
-const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+// Idempotency is durable, in the stripe_webhook_events table (migration
+// 20262703900000): a per-lambda in-memory map provided no protection across
+// instances, and the old flow marked events processed BEFORE handling while
+// returning 200 on failure — so a transient handler failure permanently lost
+// the event (Stripe never retried, and a manual retry was skipped as a
+// "duplicate"). Now: claim row → handle → mark processed; failures return 500
+// so Stripe retries, and only events that completed are skipped as duplicates.
 
-function isEventProcessed(eventId: string): boolean {
-  const now = Date.now();
-  // Cleanup stale entries periodically
-  if (processedEvents.size > 5000) {
-    processedEvents.forEach((timestamp, id) => {
-      if (now - timestamp > IDEMPOTENCY_TTL_MS) processedEvents.delete(id);
-    });
+/**
+ * Record the event before processing. Returns 'duplicate' when a previous
+ * delivery fully processed it, 'proceed' otherwise (first delivery, or a
+ * retry of a failed/incomplete one — handlers are idempotent RPCs).
+ */
+async function claimEvent(event: Stripe.Event): Promise<'proceed' | 'duplicate'> {
+  const supabase = getSupabaseAdmin();
+  const { error: insertError } = await supabase
+    .from('stripe_webhook_events')
+    .insert({ id: event.id, type: event.type });
+
+  if (!insertError) return 'proceed';
+
+  if (insertError.code === '23505') {
+    // Already seen: skip only if that delivery completed.
+    const { data: existing } = await supabase
+      .from('stripe_webhook_events')
+      .select('processed')
+      .eq('id', event.id)
+      .maybeSingle();
+    return existing?.processed ? 'duplicate' : 'proceed';
   }
-  if (processedEvents.has(eventId)) return true;
-  processedEvents.set(eventId, now);
-  return false;
+
+  // Table unreachable (e.g. migration not yet applied): log and proceed.
+  // Processing an event twice is recoverable (idempotent RPCs); dropping a
+  // checkout completion is not.
+  console.error('stripe_webhook_events claim failed:', insertError.message);
+  return 'proceed';
+}
+
+async function markEventProcessed(eventId: string): Promise<void> {
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase
+    .from('stripe_webhook_events')
+    .update({ processed: true, processed_at: new Date().toISOString(), error: null })
+    .eq('id', eventId);
+  if (error) console.error('stripe_webhook_events mark-processed failed:', error.message);
+}
+
+async function markEventFailed(eventId: string, message: string): Promise<void> {
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase
+    .from('stripe_webhook_events')
+    .update({ error: message.slice(0, 1000) })
+    .eq('id', eventId);
+  if (error) console.error('stripe_webhook_events mark-failed failed:', error.message);
 }
 
 // Lazy initialization to prevent build-time errors
@@ -92,14 +129,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
     }
 
-    // Idempotency check: skip already-processed events (Stripe retries)
-    if (isEventProcessed(event.id)) {
+    // Idempotency check: skip events a previous delivery fully processed
+    if ((await claimEvent(event)) === 'duplicate') {
       return NextResponse.json({ received: true, duplicate: true });
     }
 
-    // Handle the event — each handler is wrapped individually so a permanent
-    // failure in one handler returns 200 (preventing Stripe retry storms).
-    // Only signature verification failures above return non-200.
+    // Handle the event. Failures return 500 so Stripe retries: the
+    // subscription RPCs are idempotent, and losing a checkout completion or
+    // cancellation to a transient error is far worse than a bounded retry
+    // (Stripe stops after ~3 days of exponential backoff).
     try {
       switch (event.type) {
         case 'checkout.session.completed':
@@ -125,10 +163,12 @@ export async function POST(request: NextRequest) {
         default:
       }
     } catch (handlerError: any) {
-      // Log but return 200 — retrying won't fix a permanent handler failure
       console.error(`Webhook handler error for ${event.type}:`, handlerError.message);
+      await markEventFailed(event.id, handlerError.message ?? 'unknown');
+      return NextResponse.json({ error: 'Handler failed' }, { status: 500 });
     }
 
+    await markEventProcessed(event.id);
     return NextResponse.json({ received: true });
   } catch (error: any) {
     console.error('Webhook processing error:', error.message);

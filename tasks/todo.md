@@ -10,7 +10,7 @@ Working one by one, verifying each before moving on.
 - [x] S1: Carbon-budgets IDOR (membership check on GET) + same hole found in shadow-prices
 - [x] S2: Greenwash public scanner SSRF (use safeFetch) + fetch-url-content + scraping fetchPage
 - [x] S4: .gitignore business documents
-- [ ] R1: Stripe webhook idempotency + lost events
+- [x] R1: Stripe webhook idempotency + lost events (migration 20262703900000 needs applying)
 - [ ] B3: natural_gas_m3 dropped + m3/m³ unit mismatch
 - [ ] B4: Maturation ABV dilution in persisted LCA path
 - [ ] B5: OpenLCA error misclassification (uncommitted code)
@@ -33,6 +33,13 @@ Working one by one, verifying each before moving on.
 - [ ] P3-P8 performance mediums
 
 ## Review log
+- R1 (2026-06-10): stripe_webhook_events table (migration 20262703900000,
+  POSTED IN CHAT, needs applying in Supabase SQL editor). Route now claims the
+  event before processing, marks processed only after handler success, returns
+  500 on failure so Stripe retries (RPCs are idempotent), and skips as
+  duplicate only deliveries that completed. Claim degrades gracefully if the
+  migration is not yet applied (logs + proceeds). 4 new route tests cover
+  process/fail/retry/duplicate.
 - S4 (2026-06-10): .gitignore now covers office/PDF documents, LibreOffice
   lock files, Knowledge Bank directories and .claude/worktrees/. Verified no
   such file was already tracked and all the confidential repo-root documents
