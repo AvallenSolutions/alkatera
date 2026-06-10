@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -99,7 +99,13 @@ export function IngredientRow(props: IngredientRowProps) {
     productionStages,
   } = props;
   const [expanded, setExpanded] = useState<boolean>(defaultExpanded ?? !isRowComplete(ingredient));
-  const isExpanded = forceExpanded || expanded;
+  // The onboarding tour opens the first row so its tabs are visible for the
+  // coachmarks, but the user must still be able to collapse it — guide, don't
+  // lock. So forceExpanded nudges the row open rather than pinning it.
+  useEffect(() => {
+    if (forceExpanded) setExpanded(true);
+  }, [forceExpanded]);
+  const isExpanded = expanded;
 
   const carbonPreview = ingredient.carbon_intensity != null
     ? `${ingredient.carbon_intensity.toFixed(3)} kg CO₂e/${ingredient.unit || 'kg'}`
@@ -115,9 +121,8 @@ export function IngredientRow(props: IngredientRowProps) {
       {/* Compact summary row */}
       <button
         type="button"
-        onClick={() => !forceExpanded && setExpanded(!expanded)}
-        disabled={forceExpanded}
-        className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-muted/40 rounded-t-md focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-default disabled:hover:bg-transparent"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-muted/40 rounded-t-md focus:outline-none focus:ring-2 focus:ring-ring"
       >
         <div className="flex h-7 w-7 items-center justify-center rounded bg-orange-500 text-white font-medium text-xs flex-shrink-0">
           {index + 1}

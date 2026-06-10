@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IngredientFormCard } from "@/components/products/IngredientFormCard";
 import type { IngredientFormData } from "@/components/products/IngredientFormCard";
@@ -42,11 +42,18 @@ interface IngredientEditorTabsProps {
 export function IngredientEditorTabs(props: IngredientEditorTabsProps) {
   const { enableTourAnchors, controlledTab, onTabChange } = props;
   const hasStages = (props.productionStages?.length ?? 0) > 0;
-  const [internalTab, setInternalTab] = useState<TabValue>('basics');
-  const tab = controlledTab ?? internalTab;
+  const [internalTab, setInternalTab] = useState<TabValue>(controlledTab ?? 'basics');
+  // The tour advances the active tab by changing controlledTab — mirror it into
+  // local state so the highlight follows the tour, but a user click below always
+  // wins (guide, don't lock). Previously controlledTab pinned the tab and made
+  // the Basics/Source/Logistics triggers unresponsive on the first row.
+  useEffect(() => {
+    if (controlledTab != null) setInternalTab(controlledTab);
+  }, [controlledTab]);
+  const tab = internalTab;
   const setTab = (v: TabValue) => {
     if (onTabChange) onTabChange(v);
-    if (controlledTab == null) setInternalTab(v);
+    setInternalTab(v);
   };
 
   const status = getIngredientSectionStatus(props.ingredient, hasStages);
