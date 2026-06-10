@@ -30,6 +30,15 @@ export interface ProductMaterial {
   category_type?: MaterialCategoryType;
   /** Which OpenLCA database this process belongs to (ecoinvent or agribalyse) */
   openlca_database?: OpenLCADatabaseSource;
+  /**
+   * Set true once a live OpenLCA calculation has confirmed this process UUID
+   * exists on NEITHER database (genuine no-match, e.g. a literature-proxy
+   * ingredient). When true we skip the live attempt entirely and resolve
+   * straight from the local proxy/staging factors — no wasted 404 round-trips,
+   * no scary "calculation failed" warning. Reset automatically when the
+   * ingredient is re-matched to a real process.
+   */
+  openlca_no_match?: boolean | null;
   /** Whether this ingredient is grown on the producer's own vineyard/farm */
   is_self_grown?: boolean;
 
@@ -145,6 +154,13 @@ export interface FallbackEvent {
   fallback_reason: string;        // e.g. "OpenLCA API timeout (15s)"
   factor_value_kg_co2e: number;   // The per-kg factor that was eventually used
   source_reference: string;       // Where the resolved factor came from
+  /**
+   * Distinguishes an EXPECTED fallback (the ingredient has no live OpenLCA
+   * process, so a documented proxy/generic factor is the correct result) from
+   * a TRANSIENT one (the live server timed out or errored and a re-run may do
+   * better). Drives whether the UI shows a calm note or an actionable warning.
+   */
+  category?: 'no_match' | 'transient';
 }
 
 /**
@@ -811,11 +827,24 @@ export async function resolveImpactFactors(
     }
   }
 
-  const willAttemptOpenLCA = !resolvedFromLocalTable && material.data_source === 'openlca' && !!material.data_source_id && !!organizationId;
+  // Layer 3 hygiene: skip the live attempt entirely if a previous run already
+  // proved this process exists on neither database. It resolves from local
+  // proxy/staging factors below without a wasted 404 round-trip or a warning.
+  if (material.openlca_no_match && material.data_source === 'openlca' && !resolvedFromLocalTable) {
+    console.log(`[Waterfall] Skipping OpenLCA for ${material.material_name}: openlca_no_match flag set (resolves via proxy)`);
+  }
+
+  const willAttemptOpenLCA =
+    !resolvedFromLocalTable &&
+    material.data_source === 'openlca' &&
+    !!material.data_source_id &&
+    !!organizationId &&
+    !material.openlca_no_match;
   console.log(`[Waterfall] Priority 2.5 check for ${material.material_name}:`, {
     data_source: material.data_source,
     data_source_id: material.data_source_id,
     openlca_database: material.openlca_database,
+    openlca_no_match: material.openlca_no_match ?? false,
     organizationId: organizationId,
     resolved_from_local_table: resolvedFromLocalTable,
     will_attempt_openlca: willAttemptOpenLCA,
@@ -826,7 +855,9 @@ export async function resolveImpactFactors(
     console.log(`[Waterfall] Attempting Priority 2.5 (OpenLCA / ${materialDatabase}) for: ${material.material_name}`);
 
     // Helper: call the OpenLCA calculate API for a specific database server
-    type OpenLCAAttemptResult = { ok: true; result: any } | { ok: false; is404: boolean; isTimeout: boolean; error: string };
+    type OpenLCAAttemptResult =
+      | { ok: true; result: any }
+      | { ok: false; is404: boolean; isTimeout: boolean; code?: string; error: string };
 
     const tryOpenLCAServer = async (
       db: OpenLCADatabaseSource,
@@ -858,18 +889,24 @@ export async function resolveImpactFactors(
           if (result.success && result.impacts) {
             return { ok: true, result };
           }
-          return { ok: false, is404: false, isTimeout: false, error: 'No impact data in response' };
+          return { ok: false, is404: false, isTimeout: false, code: 'no_impacts', error: 'No impact data in response' };
         }
         const errorData = await response.json().catch(() => ({}));
+        // The route returns a stable `code` (process_not_found / no_impacts /
+        // method_not_found / timeout / calculation_error) plus the right HTTP
+        // status. Trust the code/status — the old string-sniffing for "404"
+        // never matched because the route used to mask everything as a 500.
+        const code: string | undefined = errorData.code;
         const errMsg = errorData.error || response.statusText || `HTTP ${response.status}`;
-        const is404 = errMsg.includes('404') || response.status === 404;
-        return { ok: false, is404, isTimeout: false, error: errMsg };
+        const is404 = code === 'process_not_found' || response.status === 404 || errMsg.includes('404');
+        const isTimeout = code === 'timeout' || response.status === 504;
+        return { ok: false, is404, isTimeout, code, error: errMsg };
       } catch (err: any) {
         clearTimeout(timeoutId);
         if (err.name === 'AbortError') {
-          return { ok: false, is404: false, isTimeout: true, error: `OpenLCA API timeout (${timeoutMs / 1000}s)` };
+          return { ok: false, is404: false, isTimeout: true, code: 'timeout', error: `OpenLCA API timeout (${timeoutMs / 1000}s)` };
         }
-        return { ok: false, is404: false, isTimeout: false, error: err.message };
+        return { ok: false, is404: false, isTimeout: false, code: 'calculation_error', error: err.message };
       }
     };
 
@@ -936,13 +973,21 @@ export async function resolveImpactFactors(
         // Only try the alternate server on 404 (process genuinely on wrong server).
         // For timeouts/500s, fall through to staging factors immediately — waiting
         // another 45s for the alt server just delays the fallback that will work.
+        // `finalAttempt` tracks the last attempt we made, so the fallback reason
+        // reflects what actually happened (e.g. not-found on BOTH servers).
+        let finalAttempt: OpenLCAAttemptResult = primaryResult;
+        let triedAlternate = false;
         if (primaryResult.is404) {
           const altDatabase: OpenLCADatabaseSource = materialDatabase === 'ecoinvent' ? 'agribalyse' : 'ecoinvent';
           console.log(`[Waterfall] Process not found (404) on ${materialDatabase}, trying ${altDatabase} for: ${material.material_name}`);
 
           const altResult = await tryOpenLCAServer(altDatabase, session.access_token);
+          triedAlternate = true;
+          finalAttempt = altResult;
 
           if (altResult.ok) {
+            // The UUID lived on the OTHER database all along — persist the
+            // correction so subsequent runs target the right server first.
             void supabase.from('product_materials')
               .update({ openlca_database: altDatabase })
               .eq('id', material.id)
@@ -951,16 +996,39 @@ export async function resolveImpactFactors(
           }
         }
 
-        const reason = primaryResult.is404 ? 'not found (404)' : primaryResult.isTimeout ? 'timed out' : `error (${primaryResult.error})`;
-        console.warn(`[Waterfall] OpenLCA API failed for ${material.material_name}: ${reason}. Falling through to staging factors.`);
+        // At this point the live calculation did not succeed. Classify WHY so
+        // the UI can tell an expected proxy fallback apart from a transient
+        // server problem, and so we can stop re-attempting genuine no-matches.
+        const notFoundOnBoth = primaryResult.is404 && (!triedAlternate || (!finalAttempt.ok && finalAttempt.is404));
+        const isTimeout = primaryResult.isTimeout || (finalAttempt !== primaryResult && !finalAttempt.ok && finalAttempt.isTimeout);
+
+        // Layer 3 hygiene: a UUID missing from BOTH databases is a genuine
+        // no-match (typically a literature-proxy ingredient). Record it so we
+        // skip the live attempt on every future recalculation.
+        if (notFoundOnBoth) {
+          void supabase.from('product_materials')
+            .update({ openlca_no_match: true })
+            .eq('id', material.id)
+            .then(() => console.log(`[Waterfall] Marked ${material.material_name} openlca_no_match=true (no process on either database)`));
+        }
+
+        const fallbackCategory: FallbackEvent['category'] = notFoundOnBoth ? 'no_match' : 'transient';
+        const fallbackReason = notFoundOnBoth
+          ? 'No live OpenLCA process available; resolved from a documented proxy factor'
+          : isTimeout
+            ? 'Live OpenLCA calculation timed out; resolved from a generic factor (re-run may use live data)'
+            : 'Live OpenLCA calculation unavailable; resolved from a generic factor (re-run may use live data)';
+
+        console.warn(`[Waterfall] OpenLCA did not resolve ${material.material_name} (${fallbackCategory}). ${fallbackReason}`);
         fallbackEvents?.push({
           material_name: material.material_name,
           material_id: material.id,
           attempted_priority: `2.5 (OpenLCA/${materialDatabase})`,
           resolved_priority: 0,
-          fallback_reason: `OpenLCA API: ${reason}`,
+          fallback_reason: fallbackReason,
           factor_value_kg_co2e: 0,
           source_reference: '',
+          category: fallbackCategory,
         });
       }
     } catch (error: any) {
@@ -970,9 +1038,10 @@ export async function resolveImpactFactors(
         material_id: material.id,
         attempted_priority: `2.5 (OpenLCA/${materialDatabase})`,
         resolved_priority: 0,
-        fallback_reason: `OpenLCA error: ${error.message}`,
+        fallback_reason: 'Live OpenLCA calculation unavailable; resolved from a generic factor (re-run may use live data)',
         factor_value_kg_co2e: 0,
         source_reference: '',
+        category: 'transient',
       });
       // Fall through to Priority 3
     }

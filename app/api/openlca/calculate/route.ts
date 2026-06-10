@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createOpenLCAClientForDatabase } from '@/lib/openlca/client';
 import { ProviderLinking, type ImpactResult } from '@/lib/openlca/schema';
-import { serverErrorResponse } from '@/lib/api/error-response';
+import { classifyOpenLcaError } from '@/lib/openlca/classify-error';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120; // OpenLCA calculations can take 60-90s
@@ -72,6 +72,18 @@ interface CalculateRequest {
   /** Which OpenLCA database to calculate against (default: 'ecoinvent') */
   database?: 'ecoinvent' | 'agribalyse';
 }
+
+/**
+ * Stable, non-sensitive error codes returned to the caller so the waterfall
+ * resolver can react intelligently (e.g. retry the alternate database on a
+ * genuine "process not found") without us leaking internal error detail.
+ *
+ * The real error (stack, server message) is still logged server-side only,
+ * preserving the security-review guarantee (MED-6). Only this fixed vocabulary
+ * crosses the wire.
+ */
+// Error classification lives in lib/openlca/classify-error.ts (unit-tested;
+// the match ordering is load-bearing — see the comment there).
 
 export async function POST(request: NextRequest) {
   try {
@@ -515,6 +527,11 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    return serverErrorResponse('OpenLCA API', error, 'Calculation failed');
+    // Log the real error server-side only (preserves MED-6: never leak internals
+    // to the client), but return a stable, non-sensitive code the resolver can
+    // act on — critically, a 404 'process_not_found' so it retries the other DB.
+    console.error('[OpenLCA API]', error);
+    const { status, code, message } = classifyOpenLcaError(error);
+    return NextResponse.json({ error: message, code }, { status });
   }
 }

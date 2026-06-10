@@ -665,7 +665,7 @@ describe('resolveImpactFactors', () => {
 
       expect(result.data_priority).toBe(3);
       expect(fallbackEvents).toHaveLength(1);
-      expect(fallbackEvents[0].fallback_reason).toContain('timeout');
+      expect(fallbackEvents[0].fallback_reason).toMatch(/timed?\s*out/i);
     });
   });
 

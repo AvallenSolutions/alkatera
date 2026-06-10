@@ -242,6 +242,7 @@ export function SummaryStep() {
     attempted_priority: string;
     resolved_priority: number;
     fallback_reason: string;
+    category?: 'no_match' | 'transient';
   }>>([]);
   const [calculationFingerprint, setCalculationFingerprint] = useState<string | null>(null);
 
@@ -533,36 +534,37 @@ export function SummaryStep() {
             </div>
 
             {fallbackWarnings.length > 0 && (() => {
-              // Separate OpenLCA server errors (timeout/connection) from
-              // materials that simply used generic factors (no live process linked)
-              const openlcaServerErrors = fallbackWarnings.filter(fw =>
-                fw.fallback_reason?.includes('OpenLCA API timeout') ||
-                fw.fallback_reason?.includes('OpenLCA API error') ||
-                fw.fallback_reason?.includes('OpenLCA error')
-              );
-              const otherWarnings = fallbackWarnings.filter(fw =>
-                !fw.fallback_reason?.includes('OpenLCA API timeout') &&
-                !fw.fallback_reason?.includes('OpenLCA API error') &&
-                !fw.fallback_reason?.includes('OpenLCA error')
-              );
+              // Two genuinely different situations, shown very differently:
+              //  • transient — a live OpenLCA calculation timed out or errored;
+              //    re-running may pull higher-quality live data. Actionable.
+              //  • no_match  — the ingredient has no live OpenLCA process at all,
+              //    so a documented proxy/generic factor is the CORRECT result.
+              //    This is expected and needs no action; show it as a calm note.
+              // `category` is set by the resolver; older saved reports fall back
+              // to a keyword heuristic on the reason text.
+              const isTransient = (fw: typeof fallbackWarnings[number]) =>
+                fw.category === 'transient' ||
+                (!fw.category && /(timed out|timeout|unavailable|error)/i.test(fw.fallback_reason || ''));
+              const transientIssues = fallbackWarnings.filter(isTransient);
+              const proxyNotes = fallbackWarnings.filter(fw => !isTransient(fw));
 
               return (
                 <>
-                  {openlcaServerErrors.length > 0 && (
+                  {transientIssues.length > 0 && (
                     <Alert className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/10 dark:border-blue-800">
                       <Info className="h-4 w-4 text-blue-600" />
-                      <AlertTitle className="text-blue-900 dark:text-blue-300">OpenLCA Calculation Issue</AlertTitle>
+                      <AlertTitle className="text-blue-900 dark:text-blue-300">Live data temporarily unavailable</AlertTitle>
                       <AlertDescription>
                         <p className="text-sm text-blue-800 dark:text-blue-400 mb-1">
-                          {openlcaServerErrors.length} material{openlcaServerErrors.length > 1 ? 's' : ''} had an OpenLCA
-                          emission factor assigned but the live calculation failed (server may be temporarily unavailable).
-                          These materials were resolved using verified generic emission factors instead.
-                          Re-running the calculation when the server is available will use the higher-quality live data.
+                          {transientIssues.length} material{transientIssues.length > 1 ? 's' : ''} had a live OpenLCA
+                          factor assigned but the calculation could not complete this time. {transientIssues.length > 1 ? 'They were' : 'It was'} resolved
+                          using verified generic factors, so your results are valid. Re-running the calculation later may pull
+                          the higher-quality live data.
                         </p>
                         <details className="text-xs text-blue-700 dark:text-blue-500">
                           <summary className="cursor-pointer hover:underline">Show affected materials</summary>
                           <ul className="mt-1 space-y-0.5 ml-4">
-                            {openlcaServerErrors.map((fw, i) => (
+                            {transientIssues.map((fw, i) => (
                               <li key={i}>
                                 {fw.material_name} - {fw.fallback_reason}
                               </li>
@@ -576,27 +578,33 @@ export function SummaryStep() {
                           onClick={() => goToStep(calculationStep)}
                         >
                           <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                          Retry failed calculations
+                          Re-run calculation
                         </Button>
                       </AlertDescription>
                     </Alert>
                   )}
-                  {otherWarnings.length > 0 && (
-                    <Alert className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/10 dark:border-amber-800">
-                      <AlertTriangle className="h-4 w-4 text-amber-600" />
-                      <AlertTitle className="text-amber-900 dark:text-amber-300">Data Resolution Warnings</AlertTitle>
+                  {proxyNotes.length > 0 && (
+                    <Alert className="border-border bg-muted/40">
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                      <AlertTitle className="text-foreground">Data resolution notes</AlertTitle>
                       <AlertDescription>
-                        <ul className="mt-1 space-y-1 text-sm text-amber-800 dark:text-amber-400">
-                          {otherWarnings.map((fw, i) => (
-                            <li key={i} className="flex items-start gap-1.5">
-                              <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-amber-500 flex-shrink-0" />
-                              <span>
-                                <strong>{fw.material_name}</strong>: resolved via Priority {fw.resolved_priority}
-                                {' '}instead of {fw.attempted_priority} ({fw.fallback_reason})
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
+                        <p className="text-sm text-muted-foreground mb-1">
+                          {proxyNotes.length} ingredient{proxyNotes.length > 1 ? 's have' : ' has'} no specific process in
+                          the live ecoinvent or Agribalyse databases, so {proxyNotes.length > 1 ? 'they were' : 'it was'} resolved
+                          using documented proxy factors. This is expected for speciality ingredients and the results are valid;
+                          the data quality grade reflects it.
+                        </p>
+                        <details className="text-xs text-muted-foreground">
+                          <summary className="cursor-pointer hover:underline">Show ingredients</summary>
+                          <ul className="mt-1 space-y-1 ml-4">
+                            {proxyNotes.map((fw, i) => (
+                              <li key={i} className="flex items-start gap-1.5">
+                                <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-muted-foreground/50 flex-shrink-0" />
+                                <span><strong>{fw.material_name}</strong>: {fw.fallback_reason}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
                       </AlertDescription>
                     </Alert>
                   )}

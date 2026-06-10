@@ -13,7 +13,7 @@ Working one by one, verifying each before moving on.
 - [x] R1: Stripe webhook idempotency + lost events (migration 20262703900000 needs applying)
 - [x] B3: natural_gas_m3 dropped + m3/m³ unit mismatch
 - [x] B4: Maturation ABV dilution in persisted LCA path
-- [ ] B5: OpenLCA error misclassification (uncommitted code)
+- [x] B5: OpenLCA error misclassification (fixed + the whole no-match feature committed)
 - [ ] B6: Corporate Scope 3 double counts (Cat 9/4/11)
 - [ ] B7: Xero suppression single-month + no pro-rating
 - [ ] B8: Facility per-unit conversion litres vs functional units
@@ -33,6 +33,14 @@ Working one by one, verifying each before moving on.
 - [ ] P3-P8 performance mediums
 
 ## Review log
+- B5 (2026-06-10): classifyOpenLcaError moved to lib/openlca/classify-error.ts
+  with the specific server-state messages ("Impact method not found",
+  "Calculation result ... not found") matched BEFORE the generic 404 sniff, so
+  transient server problems can no longer be recorded as permanent
+  openlca_no_match. 6 unit tests pin the ordering. The previously uncommitted
+  OpenLCA no-match feature (route error vocabulary, resolver flag + skip,
+  wizard transient/no-match split) was complete, reviewed and half-landed (its
+  migration was already on main), so it was committed as part of this fix.
 - B4 (2026-06-10): Persisted LCA path now passes bottleAbvPercent
   (products.alcohol_content_abv) to calculateMaturationImpacts and divides by
   the BOTTLED output volume, matching the product-page preview maths. Unknown/
