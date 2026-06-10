@@ -58,31 +58,48 @@ export function DownloadLCAButton({
     try {
       setIsGenerating(true);
 
-      const { data: lca, error: lcaError } = await supabase
-        .from("product_carbon_footprints")
-        .select("*")
-        .eq("id", lcaId)
-        .single();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Not authenticated");
 
-      if (lcaError) throw lcaError;
+      // generate-pdf renders the real PDF and increments the report count
+      // server-side (so we don't double-count here). It also enforces the
+      // staleness guard: a recipe edited since the last calculation returns 409.
+      const res = await fetch(`/api/lca/${lcaId}/generate-pdf`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ includeNarratives: false, inline: false }),
+      });
 
-      // Increment report count
-      if (lca.organization_id) {
-        await supabase.rpc("increment_report_count", {
-          p_organization_id: lca.organization_id,
-        });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        if (res.status === 409 && err.error === "stale_inputs") {
+          toast.error("Recipe changed since the last calculation", {
+            description: "Recalculate the LCA before downloading, so the report reflects your latest edits.",
+          });
+          return;
+        }
+        throw new Error(err.message || err.details || err.error || `Download failed (${res.status})`);
       }
 
-      // Open the beautiful PDF report page
-      const pdfUrl = `/lca-report/${lcaId}`;
-      window.open(pdfUrl, '_blank');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const safeName = (productName || "Product").replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "");
+      const date = new Date().toISOString().slice(0, 10);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `LCA_Report_${safeName}_${date}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
 
-      toast.success("Report opened - use your browser's print function to save as PDF", {
-        duration: 5000,
-      });
+      toast.success("LCA report downloaded");
     } catch (error: any) {
-      console.error("Error opening PDF:", error);
-      toast.error("Failed to open PDF report");
+      console.error("Error downloading LCA PDF:", error);
+      toast.error(error?.message || "Failed to download the LCA report");
     } finally {
       setIsGenerating(false);
     }
@@ -166,7 +183,7 @@ export function DownloadLCAButton({
         disabled={isGenerating || allocationStatus.loading}
       >
         <Download className="h-4 w-4 mr-2" />
-        {isGenerating ? "Opening..." : "Download PDF"}
+        {isGenerating ? "Preparing..." : "Download LCA"}
       </Button>
     </>
   );

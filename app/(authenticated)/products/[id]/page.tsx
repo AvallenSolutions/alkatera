@@ -23,6 +23,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import dynamic from "next/dynamic";
 import PassportManagementPanel from "@/components/passport/PassportManagementPanel";
 import { ProductGuideTrigger } from "@/components/products/ProductGuide";
+import { DownloadLCAButton } from "@/components/products/DownloadLCAButton";
 import { useProductData } from "@/hooks/data/useProductData";
 
 // Lazy-load ProductGuide — uses framer-motion (~60KB) and only shows
@@ -239,16 +240,26 @@ export default function ProductDashboardPage() {
             <ProductGuideTrigger />
           </div>
 
-          <Button
-            data-guide="product-calculate-btn"
-            onClick={handleCalculate}
-            disabled={!isHealthy}
-            size="lg"
-            className="backdrop-blur-xl bg-lime-500/90 hover:bg-lime-500 text-black font-semibold shadow-lg shadow-lime-500/20 border border-lime-400/50"
-          >
-            <Calculator className="mr-2 h-4 w-4" />
-            Create LCA
-          </Button>
+          <div className="flex items-center gap-2">
+            {lcaReports.length > 0 && lcaReports[0]?.id && (
+              <DownloadLCAButton
+                lcaId={lcaReports[0].id}
+                productName={product.name}
+                productId={Number(productId)}
+                size="lg"
+              />
+            )}
+            <Button
+              data-guide="product-calculate-btn"
+              onClick={handleCalculate}
+              disabled={!isHealthy}
+              size="lg"
+              className="backdrop-blur-xl bg-lime-500/90 hover:bg-lime-500 text-black font-semibold shadow-lg shadow-lime-500/20 border border-lime-400/50"
+            >
+              <Calculator className="mr-2 h-4 w-4" />
+              Create LCA
+            </Button>
+          </div>
         </div>
 
         <div className="mb-6">
