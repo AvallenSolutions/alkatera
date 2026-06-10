@@ -61,6 +61,12 @@ export interface StoredXeroTokens {
   expiresAt: Date
   tenantId: string
   tenantName: string | null
+  /**
+   * Raw ciphertext of the stored refresh token. Used as an optimistic
+   * concurrency token: a refresh based on this value only persists if the
+   * row still holds it (another lambda may have rotated the token first).
+   */
+  refreshTokenEncrypted: string
 }
 
 export interface StoreTokensInput {
@@ -130,7 +136,45 @@ export async function getTokens(organizationId: string): Promise<StoredXeroToken
     expiresAt: new Date(data.token_expires_at),
     tenantId: data.xero_tenant_id,
     tenantName: data.xero_tenant_name,
+    refreshTokenEncrypted: data.refresh_token_encrypted,
   }
+}
+
+/**
+ * Persist rotated tokens ONLY if the stored refresh token is still the one
+ * the refresh was based on. Returns false when another instance rotated
+ * first (e.g. the daily cron and a user-triggered sync on different
+ * lambdas) — the caller must then re-read the stored tokens instead of
+ * overwriting the winner's rotation with a now-invalidated one, which is
+ * how connections used to brick.
+ */
+export async function updateTokensIfRefreshUnchanged(
+  organizationId: string,
+  tenantId: string,
+  expectedRefreshTokenEncrypted: string,
+  accessToken: string,
+  refreshToken: string,
+  expiresAt: Date
+): Promise<boolean> {
+  const db = getServiceClient()
+
+  const { data, error } = await db
+    .from('xero_connections')
+    .update({
+      access_token_encrypted: encryptToken(accessToken),
+      refresh_token_encrypted: encryptToken(refreshToken),
+      token_expires_at: expiresAt.toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('organization_id', organizationId)
+    .eq('xero_tenant_id', tenantId)
+    .eq('refresh_token_encrypted', expectedRefreshTokenEncrypted)
+    .select('id')
+
+  if (error) {
+    throw new Error(`Failed to update Xero tokens: ${error.message}`)
+  }
+  return (data ?? []).length > 0
 }
 
 /**

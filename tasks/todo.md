@@ -18,7 +18,7 @@ Working one by one, verifying each before moving on.
 - [x] B7: Xero suppression single-month + no pro-rating
 - [x] B8: Facility per-unit conversion litres vs functional units
 - [x] R2: Inngest dead retries + stranded enrich jobs + grounded-search timeout (+ R6 claim guards)
-- [ ] R3: Xero token-refresh race + cron fan-out to Inngest
+- [x] R3: Xero token-refresh race + cron fan-out to Inngest
 - [ ] P1: Corporate emissions N+1 + move server-side
 - [ ] P2: Report PDF generation to Inngest
 
@@ -33,6 +33,16 @@ Working one by one, verifying each before moving on.
 - [ ] P3-P8 performance mediums
 
 ## Review log
+- R3 (2026-06-10): (a) Token rotation now persists via
+  updateTokensIfRefreshUnchanged (optimistic check on the stored refresh-token
+  ciphertext); losing the cross-lambda race re-reads the winner's tokens
+  instead of overwriting them with an invalidated rotation, plus a self-heal
+  re-read when the refresh call itself fails because another instance consumed
+  the token. No migration needed. (b) /api/cron/xero-sync is now a heartbeat
+  dispatching xero/sync.tick; new lib/inngest/functions/xero.ts fans out one
+  run per org (per-org concurrency 1, global 3, retry 1, onFailure sends the
+  admin alert email per failed org). 181 xero tests green, tsc clean.
+  Smoke-test the Inngest registration after deploy.
 - R2+R6 (2026-06-10): scraping/documents worker steps now THROW so the
   configured retries actually fire; terminal failures write 'error' via new
   onFailure handlers. STALE_MS raised 5→30 min so the recovery sweep can't

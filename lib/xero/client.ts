@@ -1,6 +1,6 @@
 import 'server-only'
 import { XeroClient } from 'xero-node'
-import { getTokens, updateTokens } from './token-store'
+import { getTokens, updateTokensIfRefreshUnchanged } from './token-store'
 
 // ── Scopes ────────────────────────────────────────────────────────────
 
@@ -83,6 +83,15 @@ export async function getAuthenticatedClient(
   if (now >= expiresAt - REFRESH_BUFFER_MS) {
     // Token is expired or about to expire, refresh it with a lock
     const refreshPromise = (async () => {
+      const useStoredTokens = (stored: NonNullable<Awaited<ReturnType<typeof getTokens>>>) => {
+        xero.setTokenSet({
+          access_token: stored.accessToken,
+          refresh_token: stored.refreshToken,
+          expires_at: Math.floor(stored.expiresAt.getTime() / 1000),
+          token_type: 'Bearer',
+        } as any)
+      }
+
       try {
         const newTokenSet = await xero.refreshWithRefreshToken(
           process.env.XERO_CLIENT_ID!,
@@ -92,19 +101,42 @@ export async function getAuthenticatedClient(
 
         const newExpiresAt = new Date(Date.now() + (newTokenSet.expires_in || 1800) * 1000)
 
-        // CRITICAL: Always persist the new refresh token.
-        // Each refresh invalidates the previous refresh token.
-        await updateTokens(
+        // CRITICAL: Each refresh rotates the refresh token, and the in-process
+        // lock above cannot serialise the cron and a user-triggered sync on
+        // DIFFERENT lambdas. Persist conditionally: only if the stored row
+        // still holds the refresh token this refresh was based on. Losing the
+        // race must NOT overwrite the winner's rotation (that bricked
+        // connections); the stored row is then authoritative.
+        const persisted = await updateTokensIfRefreshUnchanged(
           organizationId,
           tokens.tenantId,
+          tokens.refreshTokenEncrypted,
           newTokenSet.access_token!,
           newTokenSet.refresh_token!,
           newExpiresAt
         )
 
-        // Set the new token on the client
-        xero.setTokenSet(newTokenSet)
+        if (persisted) {
+          xero.setTokenSet(newTokenSet)
+        } else {
+          const fresh = await getTokens(organizationId)
+          if (!fresh) {
+            throw new Error('Xero connection removed during token refresh')
+          }
+          useStoredTokens(fresh)
+        }
       } catch (err) {
+        // Self-heal: if the refresh failed because another instance consumed
+        // the token first, the stored row already holds a fresh rotation.
+        const fresh = await getTokens(organizationId).catch(() => null)
+        if (
+          fresh &&
+          fresh.refreshTokenEncrypted !== tokens.refreshTokenEncrypted &&
+          fresh.expiresAt.getTime() > Date.now() + REFRESH_BUFFER_MS
+        ) {
+          useStoredTokens(fresh)
+          return
+        }
         console.error('Failed to refresh Xero token:', err)
         throw new Error(
           'Xero token refresh failed. The connection may need to be re-authorised.'
