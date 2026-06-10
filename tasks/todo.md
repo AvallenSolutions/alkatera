@@ -15,7 +15,7 @@ Working one by one, verifying each before moving on.
 - [x] B4: Maturation ABV dilution in persisted LCA path
 - [x] B5: OpenLCA error misclassification (fixed + the whole no-match feature committed)
 - [x] B6: Corporate Scope 3 double counts (Cat 9/4/11)
-- [ ] B7: Xero suppression single-month + no pro-rating
+- [x] B7: Xero suppression single-month + no pro-rating
 - [ ] B8: Facility per-unit conversion litres vs functional units
 - [ ] R2: Inngest dead retries + stranded enrich jobs + grounded-search timeout
 - [ ] R3: Xero token-refresh race + cron fan-out to Inngest
@@ -33,6 +33,17 @@ Working one by one, verifying each before moving on.
 - [ ] P3-P8 performance mediums
 
 ## Review log
+- B7 (2026-06-10): (a) periodsCovered() in slice-mapping expands utility/fleet
+  suppression signals across EVERY covered month, clamped to the window
+  (annual bills previously suppressed Xero in their start month only, and
+  out-of-window starts suppressed nothing). (b) overlapFraction() in
+  utility-factors pro-rates overlap-matched entries everywhere quantities are
+  summed: product LCA facility utilities + water, corporate scope 1/2
+  utilities, all three fleet queries (now overlap-fetched too, fixing the
+  FY-straddle binary in/out), and the trace route (kept consistent; also
+  inherited the m3/m³ fix). Legacy rows without period dates keep full-count
+  behaviour. 12 new tests (periodsCovered 8 + pro-rating 4); 567 green
+  across calculations/emissions/xero/calculator suites.
 - B6 (2026-06-10): Scope 3 restructure. Cat 4 calculator REMOVED (its Method 1
   summed per-bottle quantities as annual tonnage; inbound transport is inside
   Cat 1 per-unit scope 3 after B2; its spend fallback double-counted

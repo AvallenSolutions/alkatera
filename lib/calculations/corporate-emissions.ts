@@ -14,6 +14,7 @@
 
 import { SupabaseClient } from '@supabase/supabase-js';
 import { GRID_FACTORS_BY_COUNTRY } from '@/lib/grid-emission-factors';
+import { overlapFraction } from './utility-factors';
 import { getXeroResolvedEmissions } from '@/lib/xero/resolved-emissions';
 import { getYearRangeForOrg } from '@/lib/log-data/period-utils';
 import { getOrgFyStartMonth } from '@/lib/log-data/org-fiscal-year';
@@ -115,18 +116,30 @@ export async function calculateScope1(
         quantity,
         unit,
         utility_type,
-        facility_id
+        facility_id,
+        reporting_period_start,
+        reporting_period_end
       `)
       .in('facility_id', facilityIds)
-      .gte('reporting_period_start', yearStart)
-      .lte('reporting_period_start', yearEnd);
+      // Overlap, not "start within window": an entry on a non-calendar or
+      // custom period still belongs to this window for the overlapping share
+      // (pro-rated below), instead of binarily landing in or out of the year.
+      .lte('reporting_period_start', yearEnd)
+      .gte('reporting_period_end', yearStart);
 
     if (utilityData) {
       for (const entry of utilityData) {
         const emissionConfig = UTILITY_EMISSION_FACTORS[(entry as any).utility_type];
         if (!emissionConfig || emissionConfig.scope !== 'Scope 1') continue;
 
-        let co2e = (entry as any).quantity * emissionConfig.factor;
+        const fraction = overlapFraction(
+          (entry as any).reporting_period_start,
+          (entry as any).reporting_period_end,
+          yearStart,
+          yearEnd,
+        );
+        const quantity = ((entry as any).quantity || 0) * fraction;
+        let co2e = quantity * emissionConfig.factor;
 
         // Handle unit conversion for natural gas (m³ to kWh).
         // natural_gas factor is per kWh; natural_gas_m3 factor already includes the 10.55 conversion.
@@ -134,7 +147,7 @@ export async function calculateScope1(
         // The UI writes 'm3'; accept the typographic 'm³' too.
         const gasUnit = ((entry as any).unit || '').toLowerCase().trim();
         if ((entry as any).utility_type === 'natural_gas' && (gasUnit === 'm3' || gasUnit === 'm³')) {
-          co2e = (entry as any).quantity * 10.55 * emissionConfig.factor;
+          co2e = quantity * 10.55 * emissionConfig.factor;
         }
 
         scope1Total += co2e;
@@ -145,16 +158,20 @@ export async function calculateScope1(
   // 2. Fleet Scope 1 (company-owned combustion vehicles)
   const { data: fleetScope1Data } = await supabase
     .from('fleet_activities')
-    .select('emissions_tco2e')
+    .select('emissions_tco2e, reporting_period_start, reporting_period_end')
     .eq('organization_id', organizationId)
     .eq('scope', 'Scope 1')
-    .gte('reporting_period_start', yearStart)
-    .lte('reporting_period_start', yearEnd);
+    // Overlap + pro-rate (see utility query above).
+    .lte('reporting_period_start', yearEnd)
+    .gte('reporting_period_end', yearStart);
 
   if (fleetScope1Data) {
     fleetScope1Data.forEach((item: any) => {
+      const fraction = overlapFraction(
+        item.reporting_period_start, item.reporting_period_end, yearStart, yearEnd,
+      );
       // Convert from tCO2e to kgCO2e
-      scope1Total += (item.emissions_tco2e || 0) * 1000;
+      scope1Total += (item.emissions_tco2e || 0) * 1000 * fraction;
     });
   }
 
@@ -210,11 +227,16 @@ export async function calculateScope2(
         quantity,
         unit,
         utility_type,
-        facility_id
+        facility_id,
+        reporting_period_start,
+        reporting_period_end
       `)
       .in('facility_id', facilityIds)
-      .gte('reporting_period_start', yearStart)
-      .lte('reporting_period_start', yearEnd);
+      // Overlap, not "start within window": an entry on a non-calendar or
+      // custom period still belongs to this window for the overlapping share
+      // (pro-rated below), instead of binarily landing in or out of the year.
+      .lte('reporting_period_start', yearEnd)
+      .gte('reporting_period_end', yearStart);
 
     if (utilityData) {
       for (const entry of utilityData) {
@@ -230,7 +252,13 @@ export async function calculateScope2(
           }
         }
 
-        const co2e = (entry as any).quantity * factor;
+        const fraction = overlapFraction(
+          (entry as any).reporting_period_start,
+          (entry as any).reporting_period_end,
+          yearStart,
+          yearEnd,
+        );
+        const co2e = ((entry as any).quantity || 0) * fraction * factor;
         scope2Total += co2e;
       }
     }
@@ -239,16 +267,20 @@ export async function calculateScope2(
   // 2. Fleet Scope 2 (company-owned electric vehicles)
   const { data: fleetScope2Data } = await supabase
     .from('fleet_activities')
-    .select('emissions_tco2e')
+    .select('emissions_tco2e, reporting_period_start, reporting_period_end')
     .eq('organization_id', organizationId)
     .eq('scope', 'Scope 2')
-    .gte('reporting_period_start', yearStart)
-    .lte('reporting_period_start', yearEnd);
+    // Overlap + pro-rate (see utility query above).
+    .lte('reporting_period_start', yearEnd)
+    .gte('reporting_period_end', yearStart);
 
   if (fleetScope2Data) {
     fleetScope2Data.forEach((item: any) => {
+      const fraction = overlapFraction(
+        item.reporting_period_start, item.reporting_period_end, yearStart, yearEnd,
+      );
       // Convert from tCO2e to kgCO2e
-      scope2Total += (item.emissions_tco2e || 0) * 1000;
+      scope2Total += (item.emissions_tco2e || 0) * 1000 * fraction;
     });
   }
 
@@ -533,16 +565,20 @@ export async function calculateScope3(
 
   const { data: fleetScope3Data } = await supabase
     .from('fleet_activities')
-    .select('emissions_tco2e')
+    .select('emissions_tco2e, reporting_period_start, reporting_period_end')
     .eq('organization_id', organizationId)
     .eq('scope', 'Scope 3 Cat 6')
-    .gte('reporting_period_start', yearStart)
-    .lte('reporting_period_start', yearEnd);
+    // Overlap + pro-rate (see the Scope 1 utility query for rationale).
+    .lte('reporting_period_start', yearEnd)
+    .gte('reporting_period_end', yearStart);
 
   if (fleetScope3Data) {
     fleetScope3Data.forEach((item: any) => {
+      const fraction = overlapFraction(
+        item.reporting_period_start, item.reporting_period_end, yearStart, yearEnd,
+      );
       // Convert from tCO2e to kgCO2e and add to business travel
-      const itemKg = (item.emissions_tco2e || 0) * 1000;
+      const itemKg = (item.emissions_tco2e || 0) * 1000 * fraction;
       breakdown.business_travel += itemKg;
     });
   }

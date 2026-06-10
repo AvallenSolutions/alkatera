@@ -72,3 +72,36 @@ export function periodFromDate(iso: string | null | undefined): string {
   if (!iso) return 'unknown'
   return iso.slice(0, 7)
 }
+
+/**
+ * Every 'YYYY-MM' period a [start, end] entry covers, clamped to the
+ * reporting window. Suppression signals must occupy EVERY month an entry
+ * covers: keying an annual utility bill to its start month alone left Xero
+ * invoices in the other 11 months unsuppressed (double-counted against the
+ * bill's full-period quantity), and an overlap-fetched entry starting
+ * outside the window produced a suppression key outside it (suppressing
+ * nothing).
+ */
+export function periodsCovered(
+  start: string | null | undefined,
+  end: string | null | undefined,
+  windowStart: string,
+  windowEnd: string,
+): string[] {
+  if (!start) return ['unknown']
+  const lastIso = end && end >= start ? end : start
+  const from = periodFromDate(start > windowStart ? start : windowStart)
+  const to = periodFromDate(lastIso < windowEnd ? lastIso : windowEnd)
+  if (to < from) return []
+
+  const out: string[] = []
+  let [y, m] = from.split('-').map(Number)
+  for (let i = 0; i < 600; i++) {
+    const period = `${y}-${String(m).padStart(2, '0')}`
+    out.push(period)
+    if (period === to) break
+    m += 1
+    if (m > 12) { m = 1; y += 1 }
+  }
+  return out
+}

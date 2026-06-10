@@ -19,6 +19,7 @@ import type { Orchard } from './types/orchard';
 import { getGridFactor } from './grid-emission-factors';
 import { getAwareFactor } from './calculations/water-risk';
 import { DEFAULT_RECYCLED_CONTENT_CREDIT } from './constants/packaging-defaults';
+import { overlapFraction } from './calculations/utility-factors';
 import { checkRunIntensity } from './validation/production-run-sanity';
 import {
   getFacilityArchetypeById,
@@ -675,7 +676,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
 
         const { data: utilityEntries, error: utilityError } = await supabase
           .from('utility_data_entries')
-          .select('utility_type, quantity, unit, calculated_scope')
+          .select('utility_type, quantity, unit, calculated_scope, reporting_period_start, reporting_period_end')
           .eq('facility_id', allocation.facilityId)
           .lte('reporting_period_start', allocation.reportingPeriodEnd)
           .gte('reporting_period_end', allocation.reportingPeriodStart);
@@ -732,6 +733,18 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
               }
             }
 
+            // Overlap-matched entries are pro-rated to the share of their
+            // billing period that falls inside the reporting period: a
+            // 12-month bill overlapping a 3-month period must contribute
+            // ~1/4 of its quantity, not all of it.
+            const periodFraction = overlapFraction(
+              (entry as any).reporting_period_start,
+              (entry as any).reporting_period_end,
+              allocation.reportingPeriodStart,
+              allocation.reportingPeriodEnd,
+            );
+            const proratedQuantity = Number(entry.quantity) * periodFraction;
+
             const config = EMISSION_FACTORS[entry.utility_type];
             if (!config) {
               // Water entries in utility_data_entries (utility_type: water / water_supply)
@@ -739,14 +752,14 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
               // We defer the merge until after checking facility_activity_entries so we can
               // pick the best source and avoid double-counting.
               if (entry.utility_type === 'water' || entry.utility_type === 'water_supply') {
-                let qty = Number(entry.quantity || 0);
+                let qty = proratedQuantity || 0;
                 if (entry.unit === 'litres' || entry.unit === 'L') qty /= 1000; // normalise to m³
                 waterFromUtilityTable += qty;
               }
               continue;
             }
 
-            let co2e = Number(entry.quantity) * config.factor;
+            let co2e = proratedQuantity * config.factor;
 
             // Handle natural gas m³ → kWh conversion (10.55 kWh/m³).
             // The UI writes 'm3' (utility-types defaultUnit); accept the
@@ -754,7 +767,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
             // were treated as kWh, a 10.55x undercount.
             const unitNorm = (entry.unit || '').toLowerCase().trim();
             if (entry.utility_type === 'natural_gas' && (unitNorm === 'm3' || unitNorm === 'm³')) {
-              co2e = Number(entry.quantity) * 10.55 * config.factor;
+              co2e = proratedQuantity * 10.55 * config.factor;
             }
 
             if (config.scope === 'Scope 1') {
@@ -767,7 +780,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
             // Collect energy type breakdown for report
             energyBreakdown.push({
               type: entry.utility_type,
-              quantity: Number(entry.quantity),
+              quantity: proratedQuantity,
               unit: entry.unit || (entry.utility_type === 'natural_gas' ? 'kWh' : 'units'),
               emissions: co2e,
               scope: config.scope,
@@ -794,7 +807,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         if (!hasDirectRunData) {
           const { data: waterData, error: waterError } = await supabase
             .from('facility_activity_entries')
-            .select('activity_category, quantity, unit')
+            .select('activity_category, quantity, unit, reporting_period_start, reporting_period_end')
             .eq('facility_id', allocation.facilityId)
             .in('activity_category', ['water_intake', 'water_recycled'])
             .lte('reporting_period_start', allocation.reportingPeriodEnd)
@@ -872,7 +885,15 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           let waterFromActivityTable = 0;
           if (waterEntries && waterEntries.length > 0) {
             for (const entry of waterEntries) {
-              let quantityM3 = Number(entry.quantity || 0);
+              // Pro-rated to the overlap with the reporting period (see the
+              // utility loop above).
+              const fraction = overlapFraction(
+                (entry as any).reporting_period_start,
+                (entry as any).reporting_period_end,
+                allocation.reportingPeriodStart,
+                allocation.reportingPeriodEnd,
+              );
+              let quantityM3 = Number(entry.quantity || 0) * fraction;
               if (entry.unit === 'litres' || entry.unit === 'L') {
                 quantityM3 = quantityM3 / 1000;
               }

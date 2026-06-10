@@ -16,6 +16,7 @@ import {
 } from '@/lib/emissions/slice-mapping'
 import { getOrgFyStartMonth } from '@/lib/log-data/org-fiscal-year'
 import { getYearRangeForOrg, getLabelYearForDate } from '@/lib/log-data/period-utils'
+import { overlapFraction } from '@/lib/calculations/utility-factors'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -111,19 +112,26 @@ export async function GET(request: NextRequest) {
           quantity: number
           unit: string | null
           reporting_period_start: string
+          reporting_period_end: string | null
         }
-        // Pick factor key (handle m³ natural gas variant)
+        // Pick factor key (handle m³ natural gas variant; both unit spellings)
+        const gasUnit = (rec.unit || '').toLowerCase().trim()
         let factorKey: keyof typeof UTILITY_SLICE_FACTOR | null = null
-        if (rec.utility_type === 'natural_gas' && rec.unit === 'm3') factorKey = 'natural_gas_m3'
+        if (rec.utility_type === 'natural_gas' && (gasUnit === 'm3' || gasUnit === 'm³')) factorKey = 'natural_gas_m3'
         else if (rec.utility_type in UTILITY_SLICE_FACTOR) factorKey = rec.utility_type as keyof typeof UTILITY_SLICE_FACTOR
         if (!factorKey) continue
         const { factor, slice } = UTILITY_SLICE_FACTOR[factorKey]
+        // Pro-rate to the overlap with the window so trace matches
+        // calculateScope1/2 (which pro-rates overlap-matched entries).
+        const fraction = overlapFraction(
+          rec.reporting_period_start, rec.reporting_period_end, yearStart, yearEnd,
+        )
         rows.push({
           source: 'utility_data_entries',
           sourceRowId: rec.id,
           scopeSlice: slice,
           period: periodFromDate(rec.reporting_period_start),
-          kgCO2e: Number(rec.quantity) * factor,
+          kgCO2e: Number(rec.quantity) * fraction * factor,
           suppressed: false,
           suppressedBy: null,
           meta: { utilityType: rec.utility_type, unit: rec.unit },

@@ -29,6 +29,37 @@ export const UTILITY_EMISSION_FACTORS: Record<string, UtilityFactor> = {
   refrigerant_leakage:  { factor: 1430,  native_unit: 'kg',     bucket: 'other' }, // R-134a equivalent default
 };
 
+/**
+ * Fraction of an entry's [start, end] period that falls inside the reporting
+ * window. Overlap-matched entries must be pro-rated: counting a 12-month
+ * bill's full quantity against a 3-month window inflates that window's
+ * emissions ~4x, and an entry straddling the FY boundary otherwise lands
+ * wholly in or out of a year. Returns 1 when dates are missing or degenerate
+ * (legacy rows without periods keep their previous full-count behaviour).
+ */
+export function overlapFraction(
+  entryStart: string | null | undefined,
+  entryEnd: string | null | undefined,
+  windowStart: string,
+  windowEnd: string,
+): number {
+  if (!entryStart) return 1;
+  const s = Date.parse(entryStart);
+  const e = Date.parse(entryEnd || entryStart);
+  const ws = Date.parse(windowStart);
+  const we = Date.parse(windowEnd);
+  if (!Number.isFinite(s) || !Number.isFinite(e) || !Number.isFinite(ws) || !Number.isFinite(we) || e < s) {
+    return 1;
+  }
+  const DAY = 86_400_000;
+  const entryDays = (e - s) / DAY + 1;
+  const overlapStart = Math.max(s, ws);
+  const overlapEnd = Math.min(e, we);
+  if (overlapEnd < overlapStart) return 0;
+  const overlapDays = (overlapEnd - overlapStart) / DAY + 1;
+  return Math.min(1, overlapDays / entryDays);
+}
+
 /** Convert energy units to kWh. Unknown units pass through as-is. */
 export function normaliseEnergyToKwh(value: number, unit: string): number {
   const u = unit?.toLowerCase()?.trim();

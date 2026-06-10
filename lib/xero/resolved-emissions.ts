@@ -22,6 +22,7 @@ import { resolveSuppressions } from '@/lib/emissions/coverage-resolver'
 import {
   UTILITY_SLICE_FACTOR,
   periodFromDate,
+  periodsCovered,
   scopeSliceForOverhead,
   scopeSliceForXero,
 } from '@/lib/emissions/slice-mapping'
@@ -226,6 +227,7 @@ export async function getXeroResolvedEmissions(
     quantity: number
     unit: string | null
     reporting_period_start: string
+    reporting_period_end: string | null
   }>) {
     let factorKey: keyof typeof UTILITY_SLICE_FACTOR | null = null
     const gasUnit = (u.unit || '').toLowerCase().trim()
@@ -233,15 +235,22 @@ export async function getXeroResolvedEmissions(
     else if (u.utility_type in UTILITY_SLICE_FACTOR) factorKey = u.utility_type as keyof typeof UTILITY_SLICE_FACTOR
     if (!factorKey) continue
     const { factor, slice } = UTILITY_SLICE_FACTOR[factorKey]
-    rows.push({
-      source: 'utility_data_entries',
-      sourceRowId: u.id,
-      scopeSlice: slice,
-      period: periodFromDate(u.reporting_period_start),
-      kgCO2e: Number(u.quantity) * factor,
-      suppressed: false,
-      suppressedBy: null,
-    })
+    // One suppression row per covered month (clamped to the window): an
+    // annual/quarterly bill must suppress Xero invoices for its WHOLE period,
+    // not just its start month — calculateScope1/2 counts the bill's full
+    // quantity, so unsuppressed Xero rows in the other months double-count.
+    // These rows are signals only; their kg never feeds the returned totals.
+    for (const period of periodsCovered(u.reporting_period_start, u.reporting_period_end, yearStart, yearEnd)) {
+      rows.push({
+        source: 'utility_data_entries',
+        sourceRowId: `${u.id}:${period}`,
+        scopeSlice: slice,
+        period,
+        kgCO2e: Number(u.quantity) * factor,
+        suppressed: false,
+        suppressedBy: null,
+      })
+    }
   }
 
   for (const o of (overheadRes.data || []) as Array<{
@@ -275,23 +284,27 @@ export async function getXeroResolvedEmissions(
     id: string
     scope: string | null
     reporting_period_start: string | null
+    reporting_period_end: string | null
     emissions_tco2e: number | null
   }>) {
     const scope = f.scope || ''
     if (!scope.startsWith('Scope 1')) continue
     const kg = (Number(f.emissions_tco2e) || 0) * 1000
     if (kg <= 0) continue
-    const period = periodFromDate(f.reporting_period_start)
-    for (const slice of FLEET_SCOPE1_CANDIDATE_SLICES) {
-      rows.push({
-        source: 'fleet_activities',
-        sourceRowId: `${f.id}:${slice}`,
-        scopeSlice: slice,
-        period,
-        kgCO2e: kg,
-        suppressed: false,
-        suppressedBy: null,
-      })
+    // One signal row per covered month per candidate slice (see the utility
+    // loop above for why the whole covered period must be occupied).
+    for (const period of periodsCovered(f.reporting_period_start, f.reporting_period_end, yearStart, yearEnd)) {
+      for (const slice of FLEET_SCOPE1_CANDIDATE_SLICES) {
+        rows.push({
+          source: 'fleet_activities',
+          sourceRowId: `${f.id}:${slice}:${period}`,
+          scopeSlice: slice,
+          period,
+          kgCO2e: kg,
+          suppressed: false,
+          suppressedBy: null,
+        })
+      }
     }
   }
 

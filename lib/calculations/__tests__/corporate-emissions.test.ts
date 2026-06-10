@@ -943,3 +943,109 @@ describe('Type Structure', () => {
     expect(result.breakdown).toHaveProperty('total');
   });
 });
+
+// ============================================================================
+// OVERLAP PRO-RATING (CODE_REVIEW_2026-06-10.md B7)
+// ============================================================================
+
+describe('overlap pro-rating', () => {
+  it('pro-rates a utility entry that only partially overlaps the window', async () => {
+    // 12-month bill (1 Jul 2023 – 30 Jun 2024) against a 2024 calendar window:
+    // 182 of 366 covered days fall inside → roughly half the quantity counts.
+    const mockSupabase = createMockSupabase({
+      facilities: { data: [{ id: 'facility-1', name: 'Main Facility' }], error: null },
+      utility_data_entries: {
+        data: [{
+          quantity: 1000,
+          unit: 'litres',
+          utility_type: 'diesel_stationary',
+          facility_id: 'facility-1',
+          reporting_period_start: '2023-07-01',
+          reporting_period_end: '2024-06-30',
+        }],
+        error: null,
+      },
+      fleet_activities: { data: [], error: null },
+    });
+
+    const result = await calculateScope1(
+      mockSupabase as any, 'org-123', '2024-01-01', '2024-12-31',
+    );
+
+    const entryDays = (Date.parse('2024-06-30') - Date.parse('2023-07-01')) / 86_400_000 + 1;
+    const overlapDays = (Date.parse('2024-06-30') - Date.parse('2024-01-01')) / 86_400_000 + 1;
+    const expected = 1000 * (overlapDays / entryDays) * 2.68787;
+    expect(result).toBeCloseTo(expected, 2);
+  });
+
+  it('counts a fully-inside entry in full', async () => {
+    const mockSupabase = createMockSupabase({
+      facilities: { data: [{ id: 'facility-1', name: 'Main Facility' }], error: null },
+      utility_data_entries: {
+        data: [{
+          quantity: 100,
+          unit: 'litres',
+          utility_type: 'diesel_stationary',
+          facility_id: 'facility-1',
+          reporting_period_start: '2024-03-01',
+          reporting_period_end: '2024-03-31',
+        }],
+        error: null,
+      },
+      fleet_activities: { data: [], error: null },
+    });
+
+    const result = await calculateScope1(
+      mockSupabase as any, 'org-123', '2024-01-01', '2024-12-31',
+    );
+
+    expect(result).toBeCloseTo(100 * 2.68787, 2);
+  });
+
+  it('counts entries without period dates in full (legacy rows)', async () => {
+    const mockSupabase = createMockSupabase({
+      facilities: { data: [{ id: 'facility-1', name: 'Main Facility' }], error: null },
+      utility_data_entries: {
+        data: [{
+          quantity: 100,
+          unit: 'litres',
+          utility_type: 'diesel_stationary',
+          facility_id: 'facility-1',
+          reporting_period_start: null,
+          reporting_period_end: null,
+        }],
+        error: null,
+      },
+      fleet_activities: { data: [], error: null },
+    });
+
+    const result = await calculateScope1(
+      mockSupabase as any, 'org-123', '2024-01-01', '2024-12-31',
+    );
+
+    expect(result).toBeCloseTo(100 * 2.68787, 2);
+  });
+
+  it('pro-rates fleet entries straddling the window boundary', async () => {
+    const mockSupabase = createMockSupabase({
+      facilities: { data: [], error: null },
+      utility_data_entries: { data: [], error: null },
+      fleet_activities: {
+        data: [{
+          emissions_tco2e: 12, // 12 t over 1 Jul 2023 – 30 Jun 2024
+          reporting_period_start: '2023-07-01',
+          reporting_period_end: '2024-06-30',
+        }],
+        error: null,
+      },
+    });
+
+    const result = await calculateScope1(
+      mockSupabase as any, 'org-123', '2024-01-01', '2024-12-31',
+    );
+
+    const entryDays = (Date.parse('2024-06-30') - Date.parse('2023-07-01')) / 86_400_000 + 1;
+    const overlapDays = (Date.parse('2024-06-30') - Date.parse('2024-01-01')) / 86_400_000 + 1;
+    expect(result).toBeCloseTo(12_000 * (overlapDays / entryDays), 1);
+  });
+});
