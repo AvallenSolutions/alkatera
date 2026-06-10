@@ -33,7 +33,7 @@ import { toValidAllocations } from '@/lib/utils/lca-recalc-allocations';
 type ProductRow = {
   id: number | string;
   name: string | null;
-  unit: string | null;
+  unit?: string | null;
   organization_id: string;
   last_wizard_settings: Record<string, any> | null;
 };
@@ -80,7 +80,7 @@ export function RecalculateOrgLcasButton() {
 
     const { data: products, error: prodErr } = await sb
       .from('products')
-      .select('id, name, unit, organization_id, last_wizard_settings')
+      .select('*')
       .eq('organization_id', orgId)
       .order('name');
 
