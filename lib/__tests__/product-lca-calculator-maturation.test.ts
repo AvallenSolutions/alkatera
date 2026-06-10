@@ -555,6 +555,37 @@ describe('calculateProductCarbonFootprint — Maturation Integration', () => {
       expect(warehouseEnergy.impact_climate).toBeCloseTo(warehouseTotalCO2e / 287, 2);
     });
 
+    it('applies ABV dilution: bottling below cask strength yields more bottles, lower per-bottle CO2e', async () => {
+      // Cask fill defaults to 63%; product bottled at 46% → dilution 63/46.
+      // The persisted path previously ignored product ABV and divided by
+      // cask-strength bottle count, over-stating per-bottle maturation CO2e
+      // by ~37% for this profile (and the report disagreed with the product
+      // page preview, which passes ABV correctly).
+      const insertMock = setupFullCalculatorMocks({
+        materials: [createMockMaterial()],
+        maturationProfile: createMockMaturationProfile({
+          barrel_use_number: 1,
+          barrel_type: 'american_oak_200',
+          number_of_barrels: 5,
+        }),
+        productOverrides: { alcohol_content_abv: 46 },
+      });
+
+      mockResolveImpactFactors.mockResolvedValue(createMockWaterfallResult());
+
+      await calculateProductCarbonFootprint({ productId: 'prod-123' });
+
+      const insertedMaterials = insertMock.mock.calls[0][0];
+      const barrelAllocation = insertedMaterials.find(
+        (m: any) => m.material_name === '[Maturation] Oak Barrel Allocation'
+      );
+
+      // Cask-strength output: 1000L × 0.98^12 ≈ 784.7L
+      // Bottled volume: × (63/46) ≈ 1074.7L → /0.7L per bottle
+      const bottledLitres = 1000 * Math.pow(0.98, 12) * (63 / 46);
+      expect(barrelAllocation.impact_climate).toBeCloseTo(200 / (bottledLitres / 0.7), 3);
+    });
+
     it('should fall back to 0.75L bottle size when product has no unit_size_value', async () => {
       // Override product to have no bottle size info
       const insertMock = vi.fn().mockReturnValue(createQueryMock({ data: null, error: null }));

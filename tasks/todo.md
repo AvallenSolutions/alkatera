@@ -12,7 +12,7 @@ Working one by one, verifying each before moving on.
 - [x] S4: .gitignore business documents
 - [x] R1: Stripe webhook idempotency + lost events (migration 20262703900000 needs applying)
 - [x] B3: natural_gas_m3 dropped + m3/m³ unit mismatch
-- [ ] B4: Maturation ABV dilution in persisted LCA path
+- [x] B4: Maturation ABV dilution in persisted LCA path
 - [ ] B5: OpenLCA error misclassification (uncommitted code)
 - [ ] B6: Corporate Scope 3 double counts (Cat 9/4/11)
 - [ ] B7: Xero suppression single-month + no pro-rating
@@ -33,6 +33,12 @@ Working one by one, verifying each before moving on.
 - [ ] P3-P8 performance mediums
 
 ## Review log
+- B4 (2026-06-10): Persisted LCA path now passes bottleAbvPercent
+  (products.alcohol_content_abv) to calculateMaturationImpacts and divides by
+  the BOTTLED output volume, matching the product-page preview maths. Unknown/
+  zero ABV falls back to no dilution (conservative, unchanged behaviour). New
+  regression test (63% cask → 46% bottle). Aged-spirit PCFs need
+  recalculation: maturation stage was over-stated ~38-75%.
 - B3 (2026-06-10): natural_gas_m3 added to the product LCA calculator's factor
   map (entries previously hit the unknown-type continue and contributed ZERO
   Scope 1). m³-conversion checks in the calculator, corporate-emissions and

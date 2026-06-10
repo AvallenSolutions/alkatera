@@ -1778,7 +1778,16 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
     const warehouseCountryCode = params.facilityAllocations?.[0]
       ? (await supabase.from('facilities').select('location_country_code').eq('id', params.facilityAllocations[0].facilityId).single()).data?.location_country_code ?? null
       : null;
-    const matResult = calculateMaturationImpacts(maturationProfile as MaturationProfile, warehouseCountryCode);
+    // ABV dilution matters: a spirit filled at cask strength (e.g. 63.5%) and
+    // bottled lower (e.g. 46%) yields proportionally MORE bottles, so omitting
+    // bottleAbvPercent over-states per-bottle maturation CO2e by 40-75% (see
+    // maturation-calculator header). The product page preview already passes
+    // it (SpecificationTab); the persisted LCA must use the same maths.
+    const productAbv = Number(product.alcohol_content_abv);
+    const matResult = calculateMaturationImpacts(maturationProfile as MaturationProfile, {
+      warehouseCountryCode,
+      bottleAbvPercent: Number.isFinite(productAbv) && productAbv > 0 ? productAbv : undefined,
+    });
 
       // --- Per-bottle allocation ---
       // Regular materials are already per-functional-unit (per bottle). Maturation
@@ -1797,18 +1806,21 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         );
       }
 
-      // Use user-specified bottle count if set, otherwise derive from output volume
+      // Use user-specified bottle count if set, otherwise derive from the
+      // BOTTLED output volume (post-dilution), not the cask-strength volume —
+      // dividing totals by cask-strength bottle counts over-stated per-bottle
+      // impacts for every diluted spirit.
       const totalBottles = maturationProfile.bottles_produced
         ? Number(maturationProfile.bottles_produced)
-        : (matResult.output_volume_litres > 0 && bottleSizeLitres > 0)
-          ? matResult.output_volume_litres / bottleSizeLitres
+        : (matResult.output_volume_bottled_litres > 0 && bottleSizeLitres > 0)
+          ? matResult.output_volume_bottled_litres / bottleSizeLitres
           : 1;
 
       const barrelPerBottle = totalBottles > 0 ? matResult.barrel_total_co2e / totalBottles : 0;
       const warehousePerBottle = totalBottles > 0 ? matResult.warehouse_co2e_total / totalBottles : 0;
       const vocPerBottle = totalBottles > 0 ? matResult.angel_share_photochemical_ozone / totalBottles : 0;
 
-      console.log(`[calculateProductCarbonFootprint] Maturation per-bottle: ${totalBottles.toFixed(0)} bottles from ${matResult.output_volume_litres.toFixed(1)}L (${(bottleSizeLitres * 1000).toFixed(0)}ml/bottle), barrel=${barrelPerBottle.toFixed(4)}/bottle, warehouse=${warehousePerBottle.toFixed(4)}/bottle`);
+      console.log(`[calculateProductCarbonFootprint] Maturation per-bottle: ${totalBottles.toFixed(0)} bottles from ${matResult.output_volume_bottled_litres.toFixed(1)}L bottled (${(bottleSizeLitres * 1000).toFixed(0)}ml/bottle), barrel=${barrelPerBottle.toFixed(4)}/bottle, warehouse=${warehousePerBottle.toFixed(4)}/bottle`);
 
       // Inject barrel allocation as a synthetic material (per-bottle)
       lcaMaterialsWithImpacts.push({
