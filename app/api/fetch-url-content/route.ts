@@ -2,25 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import * as cheerio from 'cheerio';
-
-// SSRF protection: block private/internal IP ranges
-const BLOCKED_HOSTS = [
-  /^localhost$/i,
-  /^127\./,
-  /^10\./,
-  /^172\.(1[6-9]|2\d|3[01])\./,
-  /^192\.168\./,
-  /^169\.254\./,
-  /^0\./,
-  /^\[::1\]$/,
-  /^\[fc/i,
-  /^\[fd/i,
-  /^\[fe80/i,
-];
-
-function isBlockedHost(hostname: string): boolean {
-  return BLOCKED_HOSTS.some(pattern => pattern.test(hostname));
-}
+import { safeFetch, isBlockedHostname } from '@/lib/utils/safe-fetch';
 
 async function authenticateRequest(): Promise<{ authenticated: boolean }> {
   try {
@@ -91,7 +73,7 @@ export async function POST(request: NextRequest) {
     }
 
     // SSRF protection: block internal/private IP ranges
-    if (isBlockedHost(parsedUrl.hostname)) {
+    if (isBlockedHostname(parsedUrl.hostname)) {
       return NextResponse.json(
         { error: 'Access to internal addresses is not allowed' },
         { status: 400 }
@@ -161,13 +143,13 @@ async function fetchPageContent(url: string): Promise<{ text: string; links: str
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
-    const response = await fetch(url, {
+    // safeFetch re-validates the host (and resolved IPs) on every redirect hop
+    const response = await safeFetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; GreenwashGuardian/1.0; +https://alkatera.com)',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',
       },
-      redirect: 'follow',
       signal: controller.signal,
     });
 

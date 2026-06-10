@@ -2,25 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
 import { getVaultSecret } from '@/lib/secrets/vault';
-
-// SSRF protection: block private/internal IP ranges
-const BLOCKED_HOSTS = [
-  /^localhost$/i,
-  /^127\./,
-  /^10\./,
-  /^172\.(1[6-9]|2\d|3[01])\./,
-  /^192\.168\./,
-  /^169\.254\./,
-  /^0\./,
-  /^\[::1\]$/,
-  /^\[fc/i,
-  /^\[fd/i,
-  /^\[fe80/i,
-];
-
-function isBlockedHost(hostname: string): boolean {
-  return BLOCKED_HOSTS.some(pattern => pattern.test(hostname));
-}
+import { safeFetch, isBlockedHostname } from '@/lib/utils/safe-fetch';
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -42,13 +24,15 @@ async function fetchPageContent(url: string): Promise<string | null> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
 
-    const response = await fetch(url, {
+    // safeFetch re-validates the host (and its resolved IPs) on every redirect
+    // hop — this endpoint is unauthenticated, so a redirect to an internal
+    // address would otherwise be an anonymous SSRF.
+    const response = await safeFetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; GreenwashGuardian/1.0; +https://alkatera.com)',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',
       },
-      redirect: 'follow',
       signal: controller.signal,
     });
 
@@ -263,7 +247,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (isBlockedHost(parsedUrl.hostname)) {
+    if (isBlockedHostname(parsedUrl.hostname)) {
       return NextResponse.json(
         { error: 'Access to internal addresses is not allowed' },
         { status: 400 }

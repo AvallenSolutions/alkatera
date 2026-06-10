@@ -8,7 +8,7 @@ Working one by one, verifying each before moving on.
 - [x] B1: Recycled-content credit applied twice (calculator + aggregator)
 - [x] B2: Inbound transport excluded from headline LCA total
 - [x] S1: Carbon-budgets IDOR (membership check on GET) + same hole found in shadow-prices
-- [ ] S2: Greenwash public scanner SSRF (use safeFetch)
+- [x] S2: Greenwash public scanner SSRF (use safeFetch) + fetch-url-content + scraping fetchPage
 - [ ] S4: .gitignore business documents
 - [ ] R1: Stripe webhook idempotency + lost events
 - [ ] B3: natural_gas_m3 dropped + m3/m³ unit mismatch
@@ -33,6 +33,14 @@ Working one by one, verifying each before moving on.
 - [ ] P3-P8 performance mediums
 
 ## Review log
+- S2 (2026-06-10): Extracted safeFetch (host + resolved-IP validation, manual
+  per-hop redirect re-validation) to lib/utils/safe-fetch.ts and applied it to
+  the three remaining redirect-follow fetchers of user-supplied URLs: the
+  unauthenticated greenwash scanner, /api/fetch-url-content (authenticated,
+  same hole), and the distributor scraping fetchPage (directory-sourced URLs,
+  defence-in-depth). import-from-url-background now imports the shared module
+  instead of its local copy. 10 new unit tests incl. redirect-to-metadata and
+  DNS-rebinding cases. Repo-wide redirect:'follow' sweep is now clean.
 - S1 (2026-06-10): Membership check added to resolveOrg in carbon-budgets AND
   shadow-prices (swept all 17 copies of the pattern across app/api/pulse; these
   two were the only ones missing it; facility-impact/layout/peer-benchmark/

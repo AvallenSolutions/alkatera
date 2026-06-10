@@ -10,6 +10,8 @@
  * the whole brand scrape before any extraction ran. A standard browser
  * UA is required to read the public pages we're crawling.
  */
+import { safeFetch } from '../../utils/safe-fetch';
+
 export interface FetchResult {
   ok: boolean;
   status: number;
@@ -27,13 +29,16 @@ export async function fetchPage(url: string): Promise<FetchResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
+    // Brand website URLs come from uploaded distributor lists and AI website-
+    // finding, i.e. they are semi-user-supplied: safeFetch validates the host
+    // and its resolved IPs on every redirect hop so a crafted entry cannot
+    // point the scraper at internal services.
+    const res = await safeFetch(url, {
       headers: {
         'User-Agent': USER_AGENT,
         Accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.5',
         'Accept-Language': 'en-GB,en;q=0.9',
       },
-      redirect: 'follow',
       signal: controller.signal,
     });
     if (!res.ok) {
