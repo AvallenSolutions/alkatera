@@ -30,10 +30,12 @@ import { runBrandAgent } from '@/lib/distributor/scraping/brand-agent';
  */
 
 const MAX_BRANDS_PER_TICK = 40;
-// Stale-running threshold: 5 min. Inngest retries with backoff so a
-// transient hang doesn't need aggressive recovery, but if a step
-// genuinely dies the next tick rescues it.
-const STALE_MS = 5 * 60 * 1000;
+// Stale-running threshold: 30 min. Worker steps now THROW on transient
+// failures so Inngest's retry/backoff handles them (total span can exceed
+// 10 minutes); the sweep must not re-queue a job that is mid-retry or the
+// same brand runs twice. It exists only to rescue jobs whose run died
+// without onFailure firing (e.g. lost event, unregistered function).
+const STALE_MS = 30 * 60 * 1000;
 
 function service(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -78,19 +80,27 @@ export const scrapingQueueTick = inngest.createFunction(
     });
 
     const claimed = await step.run('claim-jobs', async () => {
-      const { data } = await supabase
+      const { data, error: selectError } = await supabase
         .from('scraping_jobs')
         .select('id, brand_profile_id, distributor_org_id, brand_directory_id')
         .eq('status', 'queued')
         .order('created_at', { ascending: true })
         .limit(MAX_BRANDS_PER_TICK);
+      if (selectError) throw new Error(`claim select failed: ${selectError.message}`);
       const rows = (data ?? []) as JobRow[];
       if (rows.length === 0) return [] as JobRow[];
-      await supabase
+      // Status guard so a concurrent writer (admin cancel/requeue) isn't
+      // stomped back to 'running'; throw on error so we never fan out events
+      // for rows still marked 'queued' (the next tick would re-dispatch them).
+      const { data: updated, error: updateError } = await supabase
         .from('scraping_jobs')
         .update({ status: 'running', started_at: new Date().toISOString() })
-        .in('id', rows.map((j) => j.id));
-      return rows;
+        .in('id', rows.map((j) => j.id))
+        .eq('status', 'queued')
+        .select('id');
+      if (updateError) throw new Error(`claim update failed: ${updateError.message}`);
+      const claimedIds = new Set((updated ?? []).map((r: { id: string }) => r.id));
+      return rows.filter((j) => claimedIds.has(j.id));
     });
 
     if (claimed.length === 0) {
@@ -129,10 +139,25 @@ export const scrapingBrandRun = inngest.createFunction(
     // plan's per-function concurrency limit — a higher value makes the
     // whole app fail to sync (Inngest rejects the registration).
     concurrency: { limit: 5 },
-    // 3 attempts per brand with exponential backoff. Most transient
-    // 5xx / timeout failures should pass on retry.
+    // 3 attempts per brand with exponential backoff. The worker step THROWS
+    // on failure (a step that returns an error payload is never retried), so
+    // transient 5xx / timeout failures actually pass on retry; onFailure
+    // below writes the terminal 'error' status when all attempts exhaust.
     retries: 3,
     triggers: [{ event: 'scraping/brand.run' }],
+    onFailure: async ({ event, error }) => {
+      const original = event.data.event.data as { job_id: string };
+      if (!original?.job_id) return;
+      const supabase = service();
+      await supabase
+        .from('scraping_jobs')
+        .update({
+          status: 'error',
+          completed_at: new Date().toISOString(),
+          error_message: `Failed after retries: ${error.message}`.slice(0, 1000),
+        })
+        .eq('id', original.job_id);
+    },
   },
   async ({ event, step }) => {
     const supabase = service();
@@ -143,41 +168,24 @@ export const scrapingBrandRun = inngest.createFunction(
     };
     const { job_id, brand_profile_id, brand_directory_id } = eventData;
 
+    // Throws on transient failure → Inngest retries the step; terminal
+    // failure (all retries exhausted) is handled by onFailure above.
     const result = await step.run('run-brand-agent', async () => {
-      try {
-        const r = await runBrandAgent({
-          supabase,
-          brandProfileId: brand_profile_id ?? undefined,
-          brandDirectoryId: brand_directory_id ?? undefined,
-          jobId: job_id,
-        });
-        return { ...r, errorMessage: null as string | null };
-      } catch (err: unknown) {
-        return {
-          sources_attempted: 0,
-          sources_succeeded: 0,
-          sources_skipped: 0,
-          findings_written: 0,
-          products_created: 0,
-          products_linked: 0,
-          documents_ingested: 0,
-          documents_skipped: 0,
-          errors: [] as string[],
-          skip_reasons: [] as string[],
-          errorMessage: err instanceof Error ? err.message : String(err),
-        };
-      }
+      return runBrandAgent({
+        supabase,
+        brandProfileId: brand_profile_id ?? undefined,
+        brandDirectoryId: brand_directory_id ?? undefined,
+        jobId: job_id,
+      });
     });
 
     await step.run('persist-job-status', async () => {
-      let finalStatus: 'complete' | 'error';
-      if (result.errorMessage) finalStatus = 'error';
-      else if (result.errors.length > 0 && result.sources_succeeded === 0)
-        finalStatus = 'error';
-      else finalStatus = 'complete';
+      // The agent ran to completion; 'error' here means it structurally
+      // failed on every source (a data problem, not a transient one).
+      const finalStatus: 'complete' | 'error' =
+        result.errors.length > 0 && result.sources_succeeded === 0 ? 'error' : 'complete';
 
       const messageLines: string[] = [];
-      if (result.errorMessage) messageLines.push(result.errorMessage);
       if (result.errors.length > 0) messageLines.push(...result.errors.slice(0, 5));
       if (result.skip_reasons.length > 0)
         messageLines.push(...result.skip_reasons.slice(0, 5));

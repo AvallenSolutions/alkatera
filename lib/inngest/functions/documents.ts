@@ -19,7 +19,9 @@ import { processDocument } from '@/lib/distributor/document-processing/processor
  */
 
 const MAX_DOCS_PER_TICK = 12;
-const STALE_MS = 5 * 60 * 1000;
+// 30 min: worker steps throw so Inngest retry/backoff handles transient
+// failures (can span >10 min); the sweep must not re-queue mid-retry jobs.
+const STALE_MS = 30 * 60 * 1000;
 
 function service(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -59,19 +61,26 @@ export const documentsQueueTick = inngest.createFunction(
     });
 
     const claimed = await step.run('claim-docs', async () => {
-      const { data } = await supabase
+      const { data, error: selectError } = await supabase
         .from('document_processing_jobs')
         .select('id, submission_id, brand_profile_id')
         .eq('status', 'queued')
         .order('created_at', { ascending: true })
         .limit(MAX_DOCS_PER_TICK);
+      if (selectError) throw new Error(`claim select failed: ${selectError.message}`);
       const rows = (data ?? []) as DocJobRow[];
       if (rows.length === 0) return [] as DocJobRow[];
-      await supabase
+      // Status guard + throw on error: never fan out events for rows still
+      // marked 'queued' (the next tick would re-dispatch them → double runs).
+      const { data: updated, error: updateError } = await supabase
         .from('document_processing_jobs')
         .update({ status: 'processing', started_at: new Date().toISOString() })
-        .in('id', rows.map((j) => j.id));
-      return rows;
+        .in('id', rows.map((j) => j.id))
+        .eq('status', 'queued')
+        .select('id');
+      if (updateError) throw new Error(`claim update failed: ${updateError.message}`);
+      const claimedIds = new Set((updated ?? []).map((r: { id: string }) => r.id));
+      return rows.filter((j) => claimedIds.has(j.id));
     });
 
     if (claimed.length === 0) {
@@ -95,42 +104,43 @@ export const documentsProcessOne = inngest.createFunction(
     id: 'documents-process-one',
     name: 'Process one document',
     concurrency: { limit: 4 },
+    // The worker step THROWS on failure so these retries actually fire;
+    // onFailure writes the terminal 'error' status when attempts exhaust.
     retries: 2,
     triggers: [{ event: 'documents/process.one' }],
+    onFailure: async ({ event, error }) => {
+      const original = event.data.event.data as { job_id: string };
+      if (!original?.job_id) return;
+      const supabase = service();
+      await supabase
+        .from('document_processing_jobs')
+        .update({
+          status: 'error',
+          completed_at: new Date().toISOString(),
+          error_message: `Failed after retries: ${error.message}`.slice(0, 1000),
+        })
+        .eq('id', original.job_id);
+    },
   },
   async ({ event, step }) => {
     const supabase = service();
     const eventData = event.data as { submission_id: string; job_id: string };
     const { submission_id, job_id } = eventData;
 
+    // Throws on transient failure → Inngest retries; terminal failure is
+    // handled by onFailure above.
     const result = await step.run('process-document', async () => {
-      try {
-        const r = await processDocument({
-          supabase,
-          submissionId: submission_id,
-          jobId: job_id,
-        });
-        return { ...r, threwMessage: null as string | null };
-      } catch (err: unknown) {
-        return {
-          ok: false,
-          fields_extracted: 0,
-          fields_conflicted: 0,
-          errors: [] as string[],
-          threwMessage: err instanceof Error ? err.message : String(err),
-        };
-      }
+      return processDocument({
+        supabase,
+        submissionId: submission_id,
+        jobId: job_id,
+      });
     });
 
     await step.run('persist-job-status', async () => {
       const finalStatus =
-        result.threwMessage || (!result.ok && result.fields_extracted === 0)
-          ? 'error'
-          : 'complete';
-      const trimmedErrors = [
-        ...(result.threwMessage ? [result.threwMessage] : []),
-        ...result.errors.slice(0, 5),
-      ].join('\n');
+        !result.ok && result.fields_extracted === 0 ? 'error' : 'complete';
+      const trimmedErrors = result.errors.slice(0, 5).join('\n');
       await supabase
         .from('document_processing_jobs')
         .update({

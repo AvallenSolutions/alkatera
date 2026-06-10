@@ -449,7 +449,15 @@ export async function runGroundedSearch({
     tools: [{ googleSearch: {} } as unknown as Tool],
     generationConfig: { maxOutputTokens: maxTokens, temperature },
   });
-  const result = await generativeModel.generateContent(prompt);
+  // Grounded search does live web retrieval and is the slowest Gemini entry
+  // point — and a stalled call here was the original deep-enrich incident
+  // class (jobs stuck 'searching' forever). 120s ceiling: roomy for the
+  // normal 60-90s case, finite for the hang.
+  const result = await withTimeout(
+    generativeModel.generateContent(prompt),
+    GROUNDED_SEARCH_TIMEOUT_MS,
+    'grounded_search',
+  );
   logGeminiUsage('grounded_search', model, result);
   return result.response.text();
 }
@@ -468,6 +476,9 @@ export async function runGroundedSearch({
  * caller can fall back on, so the job always completes.
  */
 const GEMINI_CALL_TIMEOUT_MS = 60_000;
+// Grounded search (live web retrieval) legitimately runs 60-90s; give it a
+// higher ceiling than plain generation calls.
+const GROUNDED_SEARCH_TIMEOUT_MS = 120_000;
 
 function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   return Promise.race([

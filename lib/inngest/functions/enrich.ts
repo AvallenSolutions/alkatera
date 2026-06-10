@@ -46,6 +46,23 @@ export const enrichBrandRun = inngest.createFunction(
     // double-persisting findings on retry.
     retries: 2,
     triggers: [{ event: 'enrich/brand.run' }],
+    // Terminal failure (all retries exhausted) must mark the job row, or it
+    // stays 'searching'/'ingesting' forever — there is no stale sweep for
+    // deep_enrich_jobs and the admin UI would spin indefinitely.
+    onFailure: async ({ event, error }) => {
+      const original = event.data.event.data as { job_id: string };
+      if (!original?.job_id) return;
+      const supabase = service();
+      await supabase
+        .from('deep_enrich_jobs')
+        .update({
+          status: 'error',
+          error: `Failed after retries: ${error.message}`.slice(0, 500),
+          phase_message: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', original.job_id);
+    },
   },
   async ({ event, step }) => {
     const supabase = service();
@@ -153,13 +170,17 @@ export const enrichBrandRun = inngest.createFunction(
     // completes end-to-end without anyone watching. The admin GET
     // route still owns the manual-button persistence path.
     await step.run('persist-findings', async () => {
-      // Atomic claim: don't double-persist if an admin happens to
-      // poll the GET route at the same moment.
+      // Atomic claim: don't double-persist if an admin happens to poll the
+      // GET route at the same moment. 'ingesting' is included so OUR OWN
+      // retry of this step can re-claim: previously a persistEnriched
+      // failure left the row at 'ingesting', the retry's 'searched'-only
+      // claim failed, and the job was stuck 'ingesting' forever (the admin
+      // route claims with status='searched', so it still can't race us).
       const { data: claimed } = await supabase
         .from('deep_enrich_jobs')
         .update({ status: 'ingesting', phase_message: 'Persisting findings…' })
         .eq('id', job_id)
-        .eq('status', 'searched')
+        .in('status', ['searched', 'ingesting'])
         .select('id');
       if (!Array.isArray(claimed) || claimed.length !== 1) {
         return { skipped: 'claimed_by_another_handler' };
