@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
-  calculateScope3Cat4,
   calculateScope3Cat9,
   calculateScope3Cat11,
   getScope3Summary,
@@ -48,555 +47,72 @@ const createMockSupabase = (mockResponses: Record<string, any> = {}) => {
 };
 
 // ============================================================================
-// CATEGORY 4: UPSTREAM TRANSPORTATION TESTS
+// CATEGORY 4: UPSTREAM TRANSPORTATION — no calculator to test
 // ============================================================================
-
-describe('calculateScope3Cat4 - Upstream Transportation', () => {
-  describe('Primary Data (Material Transport)', () => {
-    it('should calculate emissions from material transport data with HGV', async () => {
-      const mockSupabase = createMockSupabase({
-        product_carbon_footprint_materials: {
-          data: [
-            {
-              id: 'mat-1',
-              material_name: 'Barley',
-              quantity: 1000, // 1000 kg
-              unit: 'kg',
-              transport_mode: 'truck',
-              distance_km: 500,
-              product_carbon_footprints: {
-                organization_id: 'org-123',
-                status: 'completed',
-              },
-            },
-          ],
-          error: null,
-        },
-        corporate_overheads: { data: [], error: null },
-      });
-
-      const result = await calculateScope3Cat4(
-        mockSupabase as any,
-        'org-123',
-        '2024-01-01',
-        '2024-12-31'
-      );
-
-      // 1000kg = 1 tonne, 500km, HGV factor = 0.10516
-      // Expected: 1 * 500 * 0.10516 = 52.58 kgCO2e
-      expect(result.totalKgCO2e).toBeCloseTo(52.58, 2);
-      expect(result.dataQuality).toBe('primary');
-      expect(result.breakdown).toHaveLength(1);
-      expect(result.breakdown[0].mode).toBe('road_hgv');
-      expect(result.breakdown[0].weightTonnes).toBe(1);
-      expect(result.breakdown[0].distanceKm).toBe(500);
-    });
-
-    it('should calculate emissions from rail transport', async () => {
-      const mockSupabase = createMockSupabase({
-        product_carbon_footprint_materials: {
-          data: [
-            {
-              id: 'mat-1',
-              material_name: 'Hops',
-              quantity: 500, // 500 kg
-              unit: 'kg',
-              transport_mode: 'rail',
-              distance_km: 1000,
-              product_carbon_footprints: {
-                organization_id: 'org-123',
-                status: 'completed',
-              },
-            },
-          ],
-          error: null,
-        },
-        corporate_overheads: { data: [], error: null },
-      });
-
-      const result = await calculateScope3Cat4(
-        mockSupabase as any,
-        'org-123',
-        '2024-01-01',
-        '2024-12-31'
-      );
-
-      // 500kg = 0.5 tonnes, 1000km, rail factor = 0.02768
-      // Expected: 0.5 * 1000 * 0.02768 = 13.84 kgCO2e
-      expect(result.totalKgCO2e).toBeCloseTo(13.84, 2);
-      expect(result.breakdown[0].mode).toBe('rail_freight');
-    });
-
-    it('should calculate emissions from sea container transport', async () => {
-      const mockSupabase = createMockSupabase({
-        product_carbon_footprint_materials: {
-          data: [
-            {
-              id: 'mat-1',
-              material_name: 'Imported Grain',
-              quantity: 10, // 10 tonnes
-              unit: 'tonnes',
-              transport_mode: 'ship',
-              distance_km: 5000,
-              product_carbon_footprints: {
-                organization_id: 'org-123',
-                status: 'completed',
-              },
-            },
-          ],
-          error: null,
-        },
-        corporate_overheads: { data: [], error: null },
-      });
-
-      const result = await calculateScope3Cat4(
-        mockSupabase as any,
-        'org-123',
-        '2024-01-01',
-        '2024-12-31'
-      );
-
-      // 10 tonnes, 5000km, sea_container factor = 0.01601
-      // Expected: 10 * 5000 * 0.01601 = 800.5 kgCO2e
-      expect(result.totalKgCO2e).toBeCloseTo(800.5, 1);
-      expect(result.breakdown[0].mode).toBe('sea_container');
-      expect(result.breakdown[0].weightTonnes).toBe(10);
-    });
-
-    it('should calculate emissions from air freight', async () => {
-      const mockSupabase = createMockSupabase({
-        product_carbon_footprint_materials: {
-          data: [
-            {
-              id: 'mat-1',
-              material_name: 'Specialty Yeast',
-              quantity: 50, // 50 kg
-              unit: 'kg',
-              transport_mode: 'air',
-              distance_km: 2000,
-              product_carbon_footprints: {
-                organization_id: 'org-123',
-                status: 'completed',
-              },
-            },
-          ],
-          error: null,
-        },
-        corporate_overheads: { data: [], error: null },
-      });
-
-      const result = await calculateScope3Cat4(
-        mockSupabase as any,
-        'org-123',
-        '2024-01-01',
-        '2024-12-31'
-      );
-
-      // 50kg = 0.05 tonnes, 2000km, air_freight factor = 0.98495
-      // Expected: 0.05 * 2000 * 0.98495 = 98.495 kgCO2e
-      expect(result.totalKgCO2e).toBeCloseTo(98.495, 2);
-      expect(result.breakdown[0].mode).toBe('air_freight');
-    });
-
-    it('should aggregate multiple material transports', async () => {
-      const mockSupabase = createMockSupabase({
-        product_carbon_footprint_materials: {
-          data: [
-            {
-              id: 'mat-1',
-              material_name: 'Barley',
-              quantity: 1000, // 1 tonne
-              unit: 'kg',
-              transport_mode: 'truck',
-              distance_km: 200,
-              product_carbon_footprints: {
-                organization_id: 'org-123',
-                status: 'completed',
-              },
-            },
-            {
-              id: 'mat-2',
-              material_name: 'Hops',
-              quantity: 500, // 0.5 tonnes
-              unit: 'kg',
-              transport_mode: 'rail',
-              distance_km: 800,
-              product_carbon_footprints: {
-                organization_id: 'org-123',
-                status: 'completed',
-              },
-            },
-          ],
-          error: null,
-        },
-        corporate_overheads: { data: [], error: null },
-      });
-
-      const result = await calculateScope3Cat4(
-        mockSupabase as any,
-        'org-123',
-        '2024-01-01',
-        '2024-12-31'
-      );
-
-      // Barley: 1 * 200 * 0.10516 = 21.032 kgCO2e
-      // Hops: 0.5 * 800 * 0.02768 = 11.072 kgCO2e
-      // Total: 32.104 kgCO2e
-      expect(result.totalKgCO2e).toBeCloseTo(32.104, 2);
-      expect(result.breakdown).toHaveLength(2);
-    });
-
-    it('should handle unit conversion for tonnes vs kg', async () => {
-      const mockSupabase = createMockSupabase({
-        product_carbon_footprint_materials: {
-          data: [
-            {
-              id: 'mat-1',
-              material_name: 'Bulk Grain',
-              quantity: 5, // 5 tonnes (unit specified)
-              unit: 't',
-              transport_mode: 'truck',
-              distance_km: 100,
-              product_carbon_footprints: {
-                organization_id: 'org-123',
-                status: 'completed',
-              },
-            },
-          ],
-          error: null,
-        },
-        corporate_overheads: { data: [], error: null },
-      });
-
-      const result = await calculateScope3Cat4(
-        mockSupabase as any,
-        'org-123',
-        '2024-01-01',
-        '2024-12-31'
-      );
-
-      // 5 tonnes, 100km, HGV factor = 0.10516
-      // Expected: 5 * 100 * 0.10516 = 52.58 kgCO2e
-      expect(result.totalKgCO2e).toBeCloseTo(52.58, 2);
-      expect(result.breakdown[0].weightTonnes).toBe(5);
-    });
-  });
-
-  describe('Spend-Based Fallback', () => {
-    it('should use spend-based estimation when no transport data exists', async () => {
-      const mockSupabase = createMockSupabase({
-        product_carbon_footprint_materials: { data: [], error: null },
-        corporate_overheads: {
-          data: [
-            {
-              computed_co2e: 500,
-              amount: 10000,
-              material_type: 'logistics',
-            },
-          ],
-          error: null,
-        },
-      });
-
-      const result = await calculateScope3Cat4(
-        mockSupabase as any,
-        'org-123',
-        '2024-01-01',
-        '2024-12-31'
-      );
-
-      expect(result.totalKgCO2e).toBe(500);
-      expect(result.dataQuality).toBe('spend_based');
-      expect(result.notes).toContain('Using spend-based estimation - consider adding transport distances for accuracy');
-    });
-
-    it('should aggregate multiple spend-based entries', async () => {
-      const mockSupabase = createMockSupabase({
-        product_carbon_footprint_materials: { data: [], error: null },
-        corporate_overheads: {
-          data: [
-            { computed_co2e: 300, amount: 5000, material_type: 'inbound_freight' },
-            { computed_co2e: 200, amount: 3000, material_type: 'supplier_transport' },
-          ],
-          error: null,
-        },
-      });
-
-      const result = await calculateScope3Cat4(
-        mockSupabase as any,
-        'org-123',
-        '2024-01-01',
-        '2024-12-31'
-      );
-
-      expect(result.totalKgCO2e).toBe(500);
-      expect(result.dataQuality).toBe('spend_based');
-    });
-  });
-
-  describe('Transport Mode Normalization', () => {
-    it('should normalize various truck aliases to road_hgv', async () => {
-      const modeVariants = ['truck', 'lorry', 'hgv', 'road'];
-
-      for (const mode of modeVariants) {
-        const mockSupabase = createMockSupabase({
-          product_carbon_footprint_materials: {
-            data: [
-              {
-                id: 'mat-1',
-                material_name: 'Test Material',
-                quantity: 1000,
-                unit: 'kg',
-                transport_mode: mode,
-                distance_km: 100,
-                product_carbon_footprints: {
-                  organization_id: 'org-123',
-                  status: 'completed',
-                },
-              },
-            ],
-            error: null,
-          },
-          corporate_overheads: { data: [], error: null },
-        });
-
-        const result = await calculateScope3Cat4(
-          mockSupabase as any,
-          'org-123',
-          '2024-01-01',
-          '2024-12-31'
-        );
-
-        expect(result.breakdown[0].mode).toBe('road_hgv');
-      }
-    });
-
-    it('should normalize rail aliases correctly', async () => {
-      const mockSupabase = createMockSupabase({
-        product_carbon_footprint_materials: {
-          data: [
-            {
-              id: 'mat-1',
-              material_name: 'Test Material',
-              quantity: 1000,
-              unit: 'kg',
-              transport_mode: 'train',
-              distance_km: 100,
-              product_carbon_footprints: {
-                organization_id: 'org-123',
-                status: 'completed',
-              },
-            },
-          ],
-          error: null,
-        },
-        corporate_overheads: { data: [], error: null },
-      });
-
-      const result = await calculateScope3Cat4(
-        mockSupabase as any,
-        'org-123',
-        '2024-01-01',
-        '2024-12-31'
-      );
-
-      expect(result.breakdown[0].mode).toBe('rail_freight');
-    });
-
-    it('should skip materials with unknown transport mode', async () => {
-      const mockSupabase = createMockSupabase({
-        product_carbon_footprint_materials: {
-          data: [
-            {
-              id: 'mat-1',
-              material_name: 'Test Material',
-              quantity: 1000,
-              unit: 'kg',
-              transport_mode: 'teleportation', // Unknown mode
-              distance_km: 100,
-              product_carbon_footprints: {
-                organization_id: 'org-123',
-                status: 'completed',
-              },
-            },
-          ],
-          error: null,
-        },
-        corporate_overheads: { data: [], error: null },
-      });
-
-      const result = await calculateScope3Cat4(
-        mockSupabase as any,
-        'org-123',
-        '2024-01-01',
-        '2024-12-31'
-      );
-
-      expect(result.totalKgCO2e).toBe(0);
-      expect(result.breakdown).toHaveLength(0);
-    });
-  });
-
-  describe('Edge Cases', () => {
-    it('should handle zero distance', async () => {
-      const mockSupabase = createMockSupabase({
-        product_carbon_footprint_materials: {
-          data: [
-            {
-              id: 'mat-1',
-              material_name: 'Local Material',
-              quantity: 1000,
-              unit: 'kg',
-              transport_mode: 'truck',
-              distance_km: 0,
-              product_carbon_footprints: {
-                organization_id: 'org-123',
-                status: 'completed',
-              },
-            },
-          ],
-          error: null,
-        },
-        corporate_overheads: { data: [], error: null },
-      });
-
-      const result = await calculateScope3Cat4(
-        mockSupabase as any,
-        'org-123',
-        '2024-01-01',
-        '2024-12-31'
-      );
-
-      expect(result.totalKgCO2e).toBe(0);
-      expect(result.breakdown).toHaveLength(0);
-    });
-
-    it('should handle null transport_mode', async () => {
-      const mockSupabase = createMockSupabase({
-        product_carbon_footprint_materials: {
-          data: [
-            {
-              id: 'mat-1',
-              material_name: 'Material Without Mode',
-              quantity: 1000,
-              unit: 'kg',
-              transport_mode: null,
-              distance_km: 100,
-              product_carbon_footprints: {
-                organization_id: 'org-123',
-                status: 'completed',
-              },
-            },
-          ],
-          error: null,
-        },
-        corporate_overheads: { data: [], error: null },
-      });
-
-      const result = await calculateScope3Cat4(
-        mockSupabase as any,
-        'org-123',
-        '2024-01-01',
-        '2024-12-31'
-      );
-
-      expect(result.totalKgCO2e).toBe(0);
-    });
-
-    it('should handle database errors gracefully', async () => {
-      const mockSupabase = createMockSupabase({
-        product_carbon_footprint_materials: {
-          data: null,
-          error: { message: 'Database connection error' },
-        },
-        corporate_overheads: { data: [], error: null },
-      });
-
-      const result = await calculateScope3Cat4(
-        mockSupabase as any,
-        'org-123',
-        '2024-01-01',
-        '2024-12-31'
-      );
-
-      expect(result.totalKgCO2e).toBe(0);
-      expect(result.notes).toContain('Error fetching material transport data');
-    });
-
-    it('should add note when no data available', async () => {
-      const mockSupabase = createMockSupabase({
-        product_carbon_footprint_materials: { data: [], error: null },
-        corporate_overheads: { data: [], error: null },
-      });
-
-      const result = await calculateScope3Cat4(
-        mockSupabase as any,
-        'org-123',
-        '2024-01-01',
-        '2024-12-31'
-      );
-
-      expect(result.totalKgCO2e).toBe(0);
-      expect(result.notes).toContain(
-        'No upstream transport data available. Add transport distances to materials or logistics spend data.'
-      );
-    });
-
-    it('should handle null quantity gracefully', async () => {
-      const mockSupabase = createMockSupabase({
-        product_carbon_footprint_materials: {
-          data: [
-            {
-              id: 'mat-1',
-              material_name: 'Incomplete Material',
-              quantity: null,
-              unit: 'kg',
-              transport_mode: 'truck',
-              distance_km: 100,
-              product_carbon_footprints: {
-                organization_id: 'org-123',
-                status: 'completed',
-              },
-            },
-          ],
-          error: null,
-        },
-        corporate_overheads: { data: [], error: null },
-      });
-
-      const result = await calculateScope3Cat4(
-        mockSupabase as any,
-        'org-123',
-        '2024-01-01',
-        '2024-12-31'
-      );
-
-      // Should handle null quantity as 0
-      expect(result.totalKgCO2e).toBe(0);
-    });
-  });
-});
+// calculateScope3Cat4 was removed: inbound transport is inside Cat 1 (the
+// per-unit LCA scope 3 multiplied by units produced) and paid logistics
+// overheads (upstream_transport / upstream_logistics) are counted once by
+// the overhead loop in corporate-emissions.ts. The old Method 1 summed
+// per-functional-unit quantities as annual tonnage (dimensionally wrong),
+// and its spend-based fallback double-counted overheads also picked up by
+// the corporate overhead loop.
 
 // ============================================================================
 // CATEGORY 9: DOWNSTREAM TRANSPORTATION TESTS
 // ============================================================================
 
 describe('calculateScope3Cat9 - Downstream Transportation', () => {
-  describe('Corporate Overheads Data', () => {
-    it('should calculate from downstream_logistics overhead data', async () => {
+  describe('No overhead double-counting', () => {
+    it('does NOT read downstream_logistics overheads (counted by the corporate overhead loop)', async () => {
+      // Reading corporate_overheads here double-counted every entry: the
+      // overhead loop in corporate-emissions.ts already sums them into
+      // breakdown.downstream_logistics.
       const mockSupabase = createMockSupabase({
         corporate_overheads: {
+          data: [{ computed_co2e: 1500, amount: 25000, material_type: 'distribution' }],
+          error: null,
+        },
+        production_logs: { data: [], error: null },
+      });
+
+      const result = await calculateScope3Cat9(
+        mockSupabase as any,
+        'org-123',
+        '2024-01-01',
+        '2024-12-31'
+      );
+
+      expect(result.totalKgCO2e).toBe(0);
+      const tablesQueried = (mockSupabase.from as any).mock.calls.map((c: any[]) => c[0]);
+      expect(tablesQueried).not.toContain('corporate_overheads');
+    });
+
+    it('excludes products whose latest LCA already includes distribution', async () => {
+      // Distribution for wide-boundary products is inside the per-unit LCA
+      // scope 3 that Cat 1 multiplies by units — estimating it again here
+      // double-counts.
+      const mockSupabase = createMockSupabase({
+        product_carbon_footprints: {
+          data: [
+            { product_id: 'prod-wide', system_boundary: 'cradle-to-grave', updated_at: '2024-06-01' },
+          ],
+          error: null,
+        },
+        production_logs: {
           data: [
             {
-              computed_co2e: 1500,
-              amount: 25000,
-              material_type: 'distribution',
-              notes: 'Third-party logistics',
+              product_id: 'prod-wide',
+              units_produced: 10000,
+              products: { unit_size_value: 500, unit_size_unit: 'ml' },
+            },
+            {
+              product_id: 'prod-gate',
+              units_produced: 10000,
+              products: { unit_size_value: 500, unit_size_unit: 'ml' },
             },
           ],
           error: null,
         },
-        production_logs: { data: [], error: null },
       });
 
       const result = await calculateScope3Cat9(
@@ -606,32 +122,10 @@ describe('calculateScope3Cat9 - Downstream Transportation', () => {
         '2024-12-31'
       );
 
-      expect(result.totalKgCO2e).toBe(1500);
-      expect(result.dataQuality).toBe('secondary');
-      expect(result.breakdown).toHaveLength(1);
-    });
-
-    it('should aggregate multiple distribution entries', async () => {
-      const mockSupabase = createMockSupabase({
-        corporate_overheads: {
-          data: [
-            { computed_co2e: 800, amount: 15000, material_type: 'domestic_distribution' },
-            { computed_co2e: 1200, amount: 20000, material_type: 'retail_delivery' },
-          ],
-          error: null,
-        },
-        production_logs: { data: [], error: null },
-      });
-
-      const result = await calculateScope3Cat9(
-        mockSupabase as any,
-        'org-123',
-        '2024-01-01',
-        '2024-12-31'
-      );
-
-      expect(result.totalKgCO2e).toBe(2000);
-      expect(result.breakdown).toHaveLength(2);
+      // Only prod-gate counts: 10000 × 0.5L × 1.1 / 1000 = 5.5t × 300km × factor
+      const expected = 5.5 * 300 * TRANSPORT_EMISSION_FACTORS.road_hgv.factor;
+      expect(result.totalKgCO2e).toBeCloseTo(expected, 2);
+      expect(result.notes.some(n => n.includes('excluded'))).toBe(true);
     });
   });
 
@@ -822,34 +316,6 @@ describe('calculateScope3Cat9 - Downstream Transportation', () => {
       expect(result.totalKgCO2e).toBeCloseTo(17.35, 1);
     });
 
-    it('should prefer overhead data over estimation', async () => {
-      const mockSupabase = createMockSupabase({
-        corporate_overheads: {
-          data: [{ computed_co2e: 2000, amount: 30000 }],
-          error: null,
-        },
-        production_logs: {
-          data: [
-            {
-              units_produced: 10000,
-              products: { unit_size_value: 500, unit_size_unit: 'ml' },
-            },
-          ],
-          error: null,
-        },
-      });
-
-      const result = await calculateScope3Cat9(
-        mockSupabase as any,
-        'org-123',
-        '2024-01-01',
-        '2024-12-31'
-      );
-
-      // Should use overhead data, not production estimate
-      expect(result.totalKgCO2e).toBe(2000);
-      expect(result.dataQuality).toBe('secondary');
-    });
   });
 });
 
@@ -858,6 +324,43 @@ describe('calculateScope3Cat9 - Downstream Transportation', () => {
 // ============================================================================
 
 describe('calculateScope3Cat11 - Use of Sold Products', () => {
+  it('excludes products whose latest LCA already includes the use phase', async () => {
+    // Use-phase (refrigeration/carbonation) for wide-boundary products is
+    // inside the per-unit LCA scope 3 that Cat 1 multiplies by units —
+    // estimating it again here double-counts.
+    const mockSupabase = createMockSupabase({
+      product_carbon_footprints: {
+        data: [
+          { product_id: 'prod-1', system_boundary: 'cradle-to-consumer', updated_at: '2024-06-01' },
+        ],
+        error: null,
+      },
+      products: {
+        data: [
+          {
+            id: 'prod-1',
+            name: 'Wide Boundary Beer',
+            product_category: 'beer',
+            unit_size_value: 330,
+            unit_size_unit: 'ml',
+            production_logs: [{ units_produced: 10000, date: '2024-06-15' }],
+          },
+        ],
+        error: null,
+      },
+    });
+
+    const result = await calculateScope3Cat11(
+      mockSupabase as any,
+      'org-123',
+      '2024-01-01',
+      '2024-12-31'
+    );
+
+    expect(result.totalKgCO2e).toBe(0);
+    expect(result.notes.some(n => n.includes('excluded'))).toBe(true);
+  });
+
   describe('Refrigerated Products', () => {
     it('should calculate refrigeration emissions for beer', async () => {
       const mockSupabase = createMockSupabase({
@@ -1411,14 +914,12 @@ describe('getScope3Summary', () => {
       '2024-12-31'
     );
 
-    expect(result).toHaveProperty('cat4_upstream_transport');
     expect(result).toHaveProperty('cat9_downstream_transport');
     expect(result).toHaveProperty('cat11_use_phase');
     expect(result).toHaveProperty('total');
     expect(result).toHaveProperty('notes');
 
     expect(result.total).toBe(
-      result.cat4_upstream_transport +
       result.cat9_downstream_transport +
       result.cat11_use_phase
     );
@@ -1439,12 +940,10 @@ describe('getScope3Summary', () => {
       '2024-12-31'
     );
 
-    // Check that notes are properly prefixed
-    const cat4Notes = result.notes.filter(n => n.startsWith('[Cat 4]'));
+    // Check that notes are properly prefixed (Cat 4 has no calculator)
     const cat9Notes = result.notes.filter(n => n.startsWith('[Cat 9]'));
     const cat11Notes = result.notes.filter(n => n.startsWith('[Cat 11]'));
 
-    expect(cat4Notes.length).toBeGreaterThan(0);
     expect(cat9Notes.length).toBeGreaterThan(0);
     expect(cat11Notes.length).toBeGreaterThan(0);
   });
@@ -1464,7 +963,6 @@ describe('getScope3Summary', () => {
       '2024-12-31'
     );
 
-    expect(result.cat4_upstream_transport).toBe(0);
     expect(result.cat9_downstream_transport).toBe(0);
     expect(result.cat11_use_phase).toBe(0);
     expect(result.total).toBe(0);
@@ -1543,95 +1041,7 @@ describe('Emission Factors', () => {
 // ============================================================================
 
 describe('Data Quality Notes', () => {
-  describe('Category 4 Data Quality', () => {
-    it('should return primary quality when material transport data exists', async () => {
-      const mockSupabase = createMockSupabase({
-        product_carbon_footprint_materials: {
-          data: [
-            {
-              id: 'mat-1',
-              material_name: 'Barley',
-              quantity: 1000,
-              unit: 'kg',
-              transport_mode: 'truck',
-              distance_km: 200,
-              product_carbon_footprints: {
-                organization_id: 'org-123',
-                status: 'completed',
-              },
-            },
-          ],
-          error: null,
-        },
-        corporate_overheads: { data: [], error: null },
-      });
-
-      const result = await calculateScope3Cat4(
-        mockSupabase as any,
-        'org-123',
-        '2024-01-01',
-        '2024-12-31'
-      );
-
-      expect(result.dataQuality).toBe('primary');
-    });
-
-    it('should return spend_based quality when using overhead data', async () => {
-      const mockSupabase = createMockSupabase({
-        product_carbon_footprint_materials: { data: [], error: null },
-        corporate_overheads: {
-          data: [{ computed_co2e: 500, amount: 10000 }],
-          error: null,
-        },
-      });
-
-      const result = await calculateScope3Cat4(
-        mockSupabase as any,
-        'org-123',
-        '2024-01-01',
-        '2024-12-31'
-      );
-
-      expect(result.dataQuality).toBe('spend_based');
-    });
-
-    it('should return secondary quality by default', async () => {
-      const mockSupabase = createMockSupabase({
-        product_carbon_footprint_materials: { data: [], error: null },
-        corporate_overheads: { data: [], error: null },
-      });
-
-      const result = await calculateScope3Cat4(
-        mockSupabase as any,
-        'org-123',
-        '2024-01-01',
-        '2024-12-31'
-      );
-
-      expect(result.dataQuality).toBe('secondary');
-    });
-  });
-
   describe('Category 9 Data Quality', () => {
-    it('should return secondary quality when using overhead data', async () => {
-      const mockSupabase = createMockSupabase({
-        corporate_overheads: {
-          data: [{ computed_co2e: 1000, amount: 20000 }],
-          error: null,
-        },
-        production_logs: { data: [], error: null },
-      });
-
-      const result = await calculateScope3Cat9(
-        mockSupabase as any,
-        'org-123',
-        '2024-01-01',
-        '2024-12-31'
-      );
-
-      expect(result.dataQuality).toBe('secondary');
-    });
-
     it('should return estimated quality when using production-based estimation', async () => {
       const mockSupabase = createMockSupabase({
         corporate_overheads: { data: [], error: null },
@@ -1727,29 +1137,21 @@ describe('Data Quality Notes', () => {
 // ============================================================================
 
 describe('Transport Emission Structure', () => {
-  it('should return correct TransportEmission structure', async () => {
+  it('should return correct TransportEmission structure (Cat 9 estimate)', async () => {
     const mockSupabase = createMockSupabase({
-      product_carbon_footprint_materials: {
+      production_logs: {
         data: [
           {
-            id: 'mat-1',
-            material_name: 'Test Material',
-            quantity: 1000,
-            unit: 'kg',
-            transport_mode: 'truck',
-            distance_km: 500,
-            product_carbon_footprints: {
-              organization_id: 'org-123',
-              status: 'completed',
-            },
+            product_id: 'prod-1',
+            units_produced: 10000,
+            products: { unit_size_value: 500, unit_size_unit: 'ml' },
           },
         ],
         error: null,
       },
-      corporate_overheads: { data: [], error: null },
     });
 
-    const result = await calculateScope3Cat4(
+    const result = await calculateScope3Cat9(
       mockSupabase as any,
       'org-123',
       '2024-01-01',

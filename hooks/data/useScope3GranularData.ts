@@ -507,36 +507,20 @@ export function useScope3GranularData(
       }
 
       // =========================================================================
-      // Categories from scope3-categories.ts (Cat 4, 9, 11)
+      // Categories from scope3-categories.ts (Cat 9, 11)
       // =========================================================================
+      // Cat 4 is no longer estimated separately: inbound transport is inside
+      // Cat 1 (per-unit LCA scope 3) and paid logistics overheads land on
+      // Cat 4 via the upstream_transport/upstream_logistics overhead entries
+      // already collected above.
       try {
-        const { calculateScope3Cat4, calculateScope3Cat9, calculateScope3Cat11 } =
+        const { calculateScope3Cat9, calculateScope3Cat11 } =
           await import('@/lib/calculations/scope3-categories');
 
-        const [cat4Result, cat9Result, cat11Result] = await Promise.all([
-          calculateScope3Cat4(supabase, organizationId, yearStart, yearEnd),
+        const [cat9Result, cat11Result] = await Promise.all([
           calculateScope3Cat9(supabase, organizationId, yearStart, yearEnd),
           calculateScope3Cat11(supabase, organizationId, yearStart, yearEnd),
         ]);
-
-        // Cat 4: Upstream Transportation (add to existing if any overhead entries)
-        if (cat4Result.totalKgCO2e > 0) {
-          const cat4 = categoryData.get(4)!;
-          cat4.totalEmissions += cat4Result.totalKgCO2e;
-          cat4.entryCount += cat4Result.breakdown.length;
-          cat4.dataQuality = cat4Result.dataQuality === 'primary' ? 'primary' : 'secondary';
-          cat4Result.breakdown.forEach((emission, idx) => {
-            cat4.entries.push({
-              id: `cat4-calc-${idx}`,
-              date: yearStart,
-              description: `${emission.mode} transport: ${emission.weightTonnes.toFixed(1)}t × ${emission.distanceKm}km`,
-              emissions: emission.emissionsKgCO2e,
-              unit: 'kg CO₂e',
-              source: emission.source,
-              dataQuality: cat4Result.dataQuality === 'primary' ? 'primary' : 'secondary',
-            });
-          });
-        }
 
         // Cat 9: Downstream Transportation (add to existing downstream_logistics if any)
         if (cat9Result.totalKgCO2e > 0) {
@@ -546,7 +530,7 @@ export function useScope3GranularData(
             cat9.totalEmissions = cat9Result.totalKgCO2e;
             cat9.entryCount = cat9Result.breakdown.length;
             cat9.dataQuality = cat9Result.dataQuality === 'primary' ? 'primary' : 'estimated';
-            cat9Result.breakdown.forEach((emission, idx) => {
+            cat9Result.breakdown.forEach((emission: any, idx: number) => {
               cat9.entries.push({
                 id: `cat9-calc-${idx}`,
                 date: yearStart,
@@ -566,7 +550,7 @@ export function useScope3GranularData(
           cat11.totalEmissions = cat11Result.totalKgCO2e;
           cat11.entryCount = cat11Result.breakdown.length;
           cat11.dataQuality = 'estimated';
-          cat11Result.breakdown.forEach(emission => {
+          cat11Result.breakdown.forEach((emission: any) => {
             cat11.entries.push({
               id: `cat11-${emission.productId}`,
               date: yearStart,
@@ -579,7 +563,7 @@ export function useScope3GranularData(
           });
         }
       } catch (err) {
-        console.warn('[useScope3GranularData] Could not calculate Categories 4, 9, 11:', err);
+        console.warn('[useScope3GranularData] Could not calculate Categories 9, 11:', err);
       }
 
       // =========================================================================

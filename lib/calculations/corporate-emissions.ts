@@ -499,10 +499,14 @@ export async function calculateScope3(
               breakdown.purchased_services += co2e;
             }
             break;
-          // NEW: Manual entries for Categories 4, 9, 11
-          // These ADD to the LCA-calculated values from scope3-categories.ts
+          // Manual entries for Categories 4, 9, 11
           case 'upstream_transport':
-            // Category 4: Upstream Transportation - manual entries
+          case 'upstream_logistics':
+            // Category 4: Upstream Transportation. Counted ONCE here —
+            // upstream_logistics used to fall through to the default branch
+            // (purchased_services) AND be read again by the old Cat 4
+            // spend-based fallback, double-counting it. Inbound transport
+            // captured in product LCAs is already inside Cat 1 (products).
             breakdown.upstream_transport += co2e;
             break;
           case 'downstream_transport':
@@ -544,36 +548,37 @@ export async function calculateScope3(
   }
 
   // =========================================================================
-  // NEW: Categories 4, 9, 11 (Previously Missing)
+  // Categories 9 and 11 (estimators)
   // =========================================================================
-  // These categories use the new scope3-categories.ts calculations
-  // Import is deferred to avoid circular dependencies
+  // Cat 4 has no estimator: inbound transport lives inside the per-unit LCA
+  // scope 3 (Cat 1) and paid logistics spend is counted by the overhead loop
+  // above (upstream_transport / upstream_logistics). The Cat 9 / Cat 11
+  // estimators exclude products whose LCAs already include distribution /
+  // use phase, so nothing is counted twice.
+  // Import is deferred to avoid circular dependencies.
 
   try {
-    const { calculateScope3Cat4, calculateScope3Cat9, calculateScope3Cat11 } =
+    const { calculateScope3Cat9, calculateScope3Cat11 } =
       await import('./scope3-categories');
 
-    const [cat4, cat9, cat11] = await Promise.all([
-      calculateScope3Cat4(supabase, organizationId, yearStart, yearEnd),
+    const [cat9, cat11] = await Promise.all([
       calculateScope3Cat9(supabase, organizationId, yearStart, yearEnd),
       calculateScope3Cat11(supabase, organizationId, yearStart, yearEnd),
     ]);
 
     // Use += to preserve any manual data_log entries already accumulated above
-    breakdown.upstream_transport += cat4.totalKgCO2e;
     breakdown.downstream_transport += cat9.totalKgCO2e;
     breakdown.use_phase += cat11.totalKgCO2e;
 
     // Log data quality notes for visibility
-    if (cat4.notes.length > 0 || cat9.notes.length > 0 || cat11.notes.length > 0) {
+    if (cat9.notes.length > 0 || cat11.notes.length > 0) {
       console.log('[calculateScope3] Scope 3 Category Notes:', {
-        cat4: cat4.notes,
         cat9: cat9.notes,
         cat11: cat11.notes,
       });
     }
   } catch (err) {
-    console.warn('[calculateScope3] Could not calculate Categories 4, 9, 11:', err);
+    console.warn('[calculateScope3] Could not calculate Categories 9, 11:', err);
     // Continue with zeros if calculations fail
   }
 

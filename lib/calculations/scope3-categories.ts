@@ -25,6 +25,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { GRID_FACTORS_BY_COUNTRY } from '@/lib/grid-emission-factors';
+import { isStageIncluded, boundaryFromDbEnum } from '@/lib/system-boundaries';
 
 // ============================================================================
 // TYPES
@@ -123,136 +124,56 @@ export const USE_PHASE_EMISSION_FACTORS = {
 };
 
 // ============================================================================
-// CATEGORY 4: UPSTREAM TRANSPORTATION & DISTRIBUTION
+// CATEGORY 4: UPSTREAM TRANSPORTATION & DISTRIBUTION — accounted elsewhere
 // ============================================================================
+//
+// There is deliberately NO calculateScope3Cat4 here. Category 4 is covered by:
+//
+//   1. Inbound (supplier → factory) transport is part of each product's
+//      cradle-to-gate LCA: the aggregator adds per-material impact_transport
+//      into the per-unit scope 3, which Cat 1 multiplies by units produced
+//      (lib/calculations/corporate-emissions.ts). Computing Cat 4 from the
+//      same LCA materials would double-count it.
+//   2. Paid logistics spend is entered as corporate_overheads with category
+//      'upstream_logistics' or 'upstream_transport', counted once by the
+//      overhead loop in corporate-emissions.ts.
+//
+// The previous Method 1 here also summed PER-FUNCTIONAL-UNIT material
+// quantities (kg per bottle) as if they were annual shipped tonnage — a
+// dimensionally meaningless number — with no reporting-period filter.
 
 /**
- * Calculate Scope 3 Category 4: Upstream Transportation & Distribution
- *
- * This category includes:
- * - Transportation of purchased goods from tier 1 suppliers to the company
- * - Third-party distribution services (inbound logistics)
- * - Transportation between company facilities (if not Scope 1/2)
- *
- * Methods supported:
- * 1. Distance-based: tonnes × km × emission factor per tonne-km
- * 2. Spend-based: logistics spend × emission factor per £
- * 3. Supplier-specific: Primary data from suppliers
- *
- * @param supabase - Supabase client
- * @param organizationId - Organization UUID
- * @param yearStart - Start of reporting period (YYYY-MM-DD)
- * @param yearEnd - End of reporting period (YYYY-MM-DD)
+ * Latest completed PCF per product whose system boundary already includes the
+ * given lifecycle stage. Cat 9 / Cat 11 estimators must skip these products:
+ * their distribution / use-phase emissions are inside the per-unit LCA scope 3
+ * that Cat 1 multiplies by units produced, so estimating them again here
+ * double-counts.
  */
-export async function calculateScope3Cat4(
+async function getProductIdsWithStageInLca(
   supabase: SupabaseClient,
   organizationId: string,
-  yearStart: string,
-  yearEnd: string
-): Promise<{
-  totalKgCO2e: number;
-  breakdown: TransportEmission[];
-  dataQuality: 'primary' | 'secondary' | 'spend_based';
-  notes: string[];
-}> {
-  const emissions: TransportEmission[] = [];
-  const notes: string[] = [];
-  let dataQuality: 'primary' | 'secondary' | 'spend_based' = 'secondary';
+  stage: 'distribution' | 'use_phase',
+): Promise<Set<string>> {
+  const { data } = await supabase
+    .from('product_carbon_footprints')
+    .select('product_id, system_boundary, updated_at')
+    .eq('organization_id', organizationId)
+    .eq('status', 'completed')
+    .order('updated_at', { ascending: false });
 
-  // Method 1: Fetch material transport data from product_lca_materials
-  // Materials with transport distance and mode data
-  const { data: materialsWithTransport, error: materialsError } = await supabase
-    .from('product_carbon_footprint_materials')
-    .select(`
-      id,
-      material_name,
-      quantity,
-      unit,
-      transport_mode,
-      distance_km,
-      product_carbon_footprints!product_lca_materials_lca_id_fkey!inner(
-        organization_id,
-        status,
-        created_at
-      )
-    `)
-    .eq('product_carbon_footprints.organization_id', organizationId)
-    .eq('product_carbon_footprints.status', 'completed')
-    .not('transport_mode', 'is', null)
-    .not('distance_km', 'is', null);
-
-  if (materialsError) {
-    console.error('[scope3-cat4] Error fetching materials transport:', materialsError);
-    notes.push('Error fetching material transport data');
+  const latestBoundary = new Map<string, string>();
+  for (const row of (data || []) as Array<{ product_id: unknown; system_boundary: string | null }>) {
+    const pid = String(row.product_id);
+    if (!latestBoundary.has(pid)) {
+      latestBoundary.set(pid, row.system_boundary || 'cradle-to-gate');
+    }
   }
 
-  // Calculate emissions from material transport
-  (materialsWithTransport || []).forEach((material: any) => {
-    const mode = normalizeTransportMode(material.transport_mode);
-    if (!mode) return;
-
-    const distanceKm = Number(material.distance_km || 0);
-    if (distanceKm <= 0) return;
-
-    // Convert quantity to tonnes (assume kg if unit not specified)
-    let weightTonnes = Number(material.quantity || 0) / 1000;
-    if (material.unit?.toLowerCase() === 'tonnes' || material.unit?.toLowerCase() === 't') {
-      weightTonnes = Number(material.quantity || 0);
-    }
-
-    const factorData = TRANSPORT_EMISSION_FACTORS[mode];
-    const emissionsKgCO2e = weightTonnes * distanceKm * factorData.factor;
-
-    emissions.push({
-      mode,
-      distanceKm,
-      weightTonnes,
-      emissionFactor: factorData.factor,
-      emissionsKgCO2e,
-      source: factorData.source,
-    });
-
-    dataQuality = 'primary';
+  const included = new Set<string>();
+  latestBoundary.forEach((boundary, productId) => {
+    if (isStageIncluded(boundaryFromDbEnum(boundary), stage)) included.add(productId);
   });
-
-  // Method 2: Fallback to spend-based if no transport data
-  if (emissions.length === 0) {
-    const { data: overheadData } = await supabase
-      .from('corporate_overheads')
-      .select('computed_co2e, amount, material_type')
-      .eq('organization_id', organizationId)
-      .eq('category', 'upstream_logistics')
-      .gte('created_at', yearStart)
-      .lte('created_at', yearEnd);
-
-    if (overheadData && overheadData.length > 0) {
-      overheadData.forEach((entry: any) => {
-        emissions.push({
-          mode: 'road_hgv', // Default assumption
-          distanceKm: 0,
-          weightTonnes: 0,
-          emissionFactor: 0,
-          emissionsKgCO2e: Number(entry.computed_co2e || 0),
-          source: 'Spend-based estimate from corporate_overheads',
-        });
-      });
-      dataQuality = 'spend_based';
-      notes.push('Using spend-based estimation - consider adding transport distances for accuracy');
-    }
-  }
-
-  const totalKgCO2e = emissions.reduce((sum, e) => sum + e.emissionsKgCO2e, 0);
-
-  if (emissions.length === 0) {
-    notes.push('No upstream transport data available. Add transport distances to materials or logistics spend data.');
-  }
-
-  return {
-    totalKgCO2e,
-    breakdown: emissions,
-    dataQuality,
-    notes,
-  };
+  return included;
 }
 
 // ============================================================================
@@ -287,35 +208,22 @@ export async function calculateScope3Cat9(
   const notes: string[] = [];
   let dataQuality: 'primary' | 'secondary' | 'estimated' = 'estimated';
 
-  // Method 1: Fetch distribution data from corporate_overheads
-  const { data: distributionData } = await supabase
-    .from('corporate_overheads')
-    .select('computed_co2e, amount, material_type, notes')
-    .eq('organization_id', organizationId)
-    .eq('category', 'downstream_logistics')
-    .gte('created_at', yearStart)
-    .lte('created_at', yearEnd);
+  // NOTE: corporate_overheads with category 'downstream_logistics' are
+  // deliberately NOT read here — the overhead loop in corporate-emissions.ts
+  // already counts them (breakdown.downstream_logistics). Reading them again
+  // here double-counted every downstream-logistics entry in the total.
 
-  if (distributionData && distributionData.length > 0) {
-    distributionData.forEach((entry: any) => {
-      emissions.push({
-        mode: 'road_hgv',
-        distanceKm: 0,
-        weightTonnes: 0,
-        emissionFactor: 0,
-        emissionsKgCO2e: Number(entry.computed_co2e || 0),
-        source: 'From corporate_overheads downstream_logistics',
-      });
-    });
-    dataQuality = 'secondary';
-  }
+  // Estimate based on production volume and average distribution distance,
+  // EXCLUDING products whose latest completed LCA already includes the
+  // distribution stage (counted via Cat 1 per-unit scope 3).
+  {
+    const excludedProducts = await getProductIdsWithStageInLca(
+      supabase, organizationId, 'distribution',
+    );
 
-  // Method 2: Estimate based on production volume and average distribution distance
-  if (emissions.length === 0) {
-    // Get total production volume for the period
     const { data: productionData } = await supabase
       .from('production_logs')
-      .select('units_produced, products(unit_size_value, unit_size_unit)')
+      .select('product_id, units_produced, products(unit_size_value, unit_size_unit)')
       .eq('organization_id', organizationId)
       .gte('date', yearStart)
       .lte('date', yearEnd);
@@ -323,7 +231,12 @@ export async function calculateScope3Cat9(
     if (productionData && productionData.length > 0) {
       // Estimate total weight of products distributed
       let totalWeightTonnes = 0;
+      let excludedCount = 0;
       productionData.forEach((log: any) => {
+        if (excludedProducts.has(String(log.product_id))) {
+          excludedCount += 1;
+          return;
+        }
         const units = Number(log.units_produced || 0);
         const unitSizeL = log.products?.unit_size_unit === 'ml'
           ? Number(log.products.unit_size_value) / 1000
@@ -331,6 +244,13 @@ export async function calculateScope3Cat9(
         // Estimate weight: 1L of beverage ~= 1.1kg including packaging
         totalWeightTonnes += (units * unitSizeL * 1.1) / 1000;
       });
+
+      if (excludedCount > 0) {
+        notes.push(
+          `${excludedCount} production log(s) excluded: their products' LCAs already ` +
+          `include distribution (counted in Category 1).`
+        );
+      }
 
       if (totalWeightTonnes > 0) {
         // UK-centric assumption: 300km average distribution distance.
@@ -409,6 +329,13 @@ export async function calculateScope3Cat11(
   const assumptions: string[] = [];
   const notes: string[] = [];
 
+  // Products whose latest completed LCA already includes the use phase have
+  // refrigeration/carbonation inside the per-unit scope 3 that Cat 1
+  // multiplies by units produced — estimating them again here double-counts.
+  const excludedProducts = await getProductIdsWithStageInLca(
+    supabase, organizationId, 'use_phase',
+  );
+
   // Fetch products with production volumes
   const { data: productsData } = await supabase
     .from('products')
@@ -435,7 +362,12 @@ export async function calculateScope3Cat11(
   const refrigeratedCategories = ['beer', 'cider', 'wine', 'sparkling', 'dairy', 'juice'];
   const carbonatedCategories = ['beer', 'cider', 'sparkling', 'soft_drink', 'soda'];
 
+  let excludedCount = 0;
   productsData.forEach((product: any) => {
+    if (excludedProducts.has(String(product.id))) {
+      excludedCount += 1;
+      return;
+    }
     // Sum production within period
     const productionLogs = (product.production_logs || []).filter((log: any) =>
       log.date >= yearStart && log.date <= yearEnd
@@ -493,6 +425,13 @@ export async function calculateScope3Cat11(
   });
 
   const totalKgCO2e = emissions.reduce((sum, e) => sum + e.emissionsKgCO2e, 0);
+
+  if (excludedCount > 0) {
+    notes.push(
+      `${excludedCount} product(s) excluded: their LCAs already include the use phase ` +
+      `(counted in Category 1).`
+    );
+  }
 
   if (emissions.length === 0) {
     notes.push('No use-phase emissions calculated. Products may not require refrigeration or be carbonated.');
@@ -557,27 +496,26 @@ export async function getScope3Summary(
   yearStart: string,
   yearEnd: string
 ): Promise<{
-  cat4_upstream_transport: number;
   cat9_downstream_transport: number;
   cat11_use_phase: number;
   total: number;
   notes: string[];
 }> {
-  const [cat4, cat9, cat11] = await Promise.all([
-    calculateScope3Cat4(supabase, organizationId, yearStart, yearEnd),
+  // Cat 4 is not summarised here: inbound transport is inside Cat 1 (per-unit
+  // LCA scope 3) and paid logistics overheads are counted by the overhead
+  // loop in corporate-emissions.ts. See the Category 4 banner above.
+  const [cat9, cat11] = await Promise.all([
     calculateScope3Cat9(supabase, organizationId, yearStart, yearEnd),
     calculateScope3Cat11(supabase, organizationId, yearStart, yearEnd),
   ]);
 
-  const total = cat4.totalKgCO2e + cat9.totalKgCO2e + cat11.totalKgCO2e;
+  const total = cat9.totalKgCO2e + cat11.totalKgCO2e;
   const notes = [
-    ...cat4.notes.map(n => `[Cat 4] ${n}`),
-    ...cat9.notes.map(n => `[Cat 9] ${n}`),
-    ...cat11.notes.map(n => `[Cat 11] ${n}`),
+    ...cat9.notes.map((n: string) => `[Cat 9] ${n}`),
+    ...cat11.notes.map((n: string) => `[Cat 11] ${n}`),
   ];
 
   return {
-    cat4_upstream_transport: cat4.totalKgCO2e,
     cat9_downstream_transport: cat9.totalKgCO2e,
     cat11_use_phase: cat11.totalKgCO2e,
     total,

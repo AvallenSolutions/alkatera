@@ -14,7 +14,7 @@ Working one by one, verifying each before moving on.
 - [x] B3: natural_gas_m3 dropped + m3/m³ unit mismatch
 - [x] B4: Maturation ABV dilution in persisted LCA path
 - [x] B5: OpenLCA error misclassification (fixed + the whole no-match feature committed)
-- [ ] B6: Corporate Scope 3 double counts (Cat 9/4/11)
+- [x] B6: Corporate Scope 3 double counts (Cat 9/4/11)
 - [ ] B7: Xero suppression single-month + no pro-rating
 - [ ] B8: Facility per-unit conversion litres vs functional units
 - [ ] R2: Inngest dead retries + stranded enrich jobs + grounded-search timeout
@@ -33,6 +33,19 @@ Working one by one, verifying each before moving on.
 - [ ] P3-P8 performance mediums
 
 ## Review log
+- B6 (2026-06-10): Scope 3 restructure. Cat 4 calculator REMOVED (its Method 1
+  summed per-bottle quantities as annual tonnage; inbound transport is inside
+  Cat 1 per-unit scope 3 after B2; its spend fallback double-counted
+  overheads). upstream_logistics overheads now land on upstream_transport via
+  an explicit overhead-loop case (previously default→purchased_services AND
+  Cat 4 fallback = double). Cat 9 no longer re-reads downstream_logistics
+  overheads (main loop counts them once). Cat 9 + Cat 11 estimators now
+  exclude products whose latest completed PCF boundary already includes
+  distribution / use phase (was double-counted inside Cat 1). Tests rewritten:
+  67 green across scope3-categories + corporate-emissions; tsc clean.
+  NOTE (pre-existing, unrelated): hooks/data/__tests__/useProductSpotlight
+  fails with "No QueryClient set" — test harness lacks a QueryClientProvider
+  wrapper; predates this work.
 - B5 (2026-06-10): classifyOpenLcaError moved to lib/openlca/classify-error.ts
   with the specific server-state messages ("Impact method not found",
   "Calculation result ... not found") matched BEFORE the generic 404 sniff, so
