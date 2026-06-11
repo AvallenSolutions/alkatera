@@ -288,7 +288,7 @@ export async function POST(request: NextRequest) {
               <div style="margin: 30px 0; text-align: center;">
                 <a href="${invitationUrl}" class="alk-btn" style="display: inline-block; background-color: #ccff00; color: #000000; font-family: 'Courier New', monospace; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 3px; padding: 16px 32px; text-decoration: none; border-radius: 4px;">Start the survey</a>
               </div>
-              <p style="color: #999; font-size: 13px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">
+              <p style="color: #aaa; font-size: 13px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">
                 Or copy this link into your browser:<br />
                 <a href="${invitationUrl}" style="color: #ccff00; text-decoration: underline; word-break: break-all;">${invitationUrl}</a>
               </p>
@@ -298,10 +298,10 @@ export async function POST(request: NextRequest) {
                   The survey covers labour &amp; human rights, environment, ethics, health &amp; safety and management systems. You can upload supporting evidence and save your progress as you go. alka<strong style="color: #fff;">tera</strong> is <strong style="color: #fff;">completely free for suppliers</strong>.
                 </p>
               </div>
-              <p style="color: #999; font-size: 13px; line-height: 1.6;">
+              <p style="color: #aaa; font-size: 13px; line-height: 1.6;">
                 This invitation will expire in 30 days. If you have any questions, please contact <a href="mailto:hello@alkatera.com" style="color: #ccff00; text-decoration: underline;">hello@alkatera.com</a>
               </p>
-              <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #333; color: #777; font-family: 'Courier New', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 2px;">
+              <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #333; color: #aaa; font-family: 'Courier New', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;">
                 The alka<strong>tera</strong> Team
               </div>
             </td>
