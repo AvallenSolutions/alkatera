@@ -34,6 +34,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { InlineIngredientSearch } from "@/components/lca/InlineIngredientSearch";
+import { MatchStatusBadge } from "@/components/products/MatchStatusBadge";
 import { LocationPicker, LocationData } from "@/components/shared/LocationPicker";
 import { COUNTRIES } from "@/lib/countries";
 import type {
@@ -1001,6 +1002,10 @@ export function PackagingFormCard({
               <div>
                 <Label htmlFor={`search-${packaging.tempId}`} className="flex items-center gap-2">
                   Emission Factor <span className="text-destructive">*</span>
+                  <MatchStatusBadge
+                    status={packaging.match_status}
+                    onConfirm={() => onUpdate(packaging.tempId, { match_status: 'verified' })}
+                  />
                 </Label>
                 <InlineIngredientSearch
                   organizationId={organizationId}

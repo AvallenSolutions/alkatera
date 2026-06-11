@@ -21,6 +21,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Trash2, Building2, Database, Sprout, Info, MapPin, Calculator, Award, Layers, Package, ChevronDown, ChevronUp, Plus, Loader2, Leaf, Shield, CheckCircle2, Droplets, TreePine, HelpCircle } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { InlineIngredientSearch } from "@/components/lca/InlineIngredientSearch";
+import { MatchStatusBadge } from "@/components/products/MatchStatusBadge";
 import { VineyardSelector, type VineyardOption } from "@/components/vineyards/VineyardSelector";
 import { ArableFieldSelector, type ArableFieldOption } from "@/components/arable-fields/ArableFieldSelector";
 import { OrchardSelector, type OrchardOption } from "@/components/orchards/OrchardSelector";
@@ -964,6 +965,10 @@ export function IngredientFormCard({
           <div>
             <Label htmlFor={`search-${ingredient.tempId}`} className="flex items-center gap-2">
               Emission Factor <span className="text-destructive">*</span>
+              <MatchStatusBadge
+                status={ingredient.match_status}
+                onConfirm={() => onUpdate(ingredient.tempId, { match_status: 'verified' })}
+              />
             </Label>
             <InlineIngredientSearch
               organizationId={organizationId}

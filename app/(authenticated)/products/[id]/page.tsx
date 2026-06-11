@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { PageLoader } from "@/components/ui/page-loader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ArrowLeft, AlertCircle, FileBarChart, Settings, FileText, Info, Calculator, Factory, Globe } from "lucide-react";
@@ -16,10 +15,8 @@ import { SpecificationTab } from "@/components/products/SpecificationTab";
 import { FacilitiesTab } from "@/components/products/FacilitiesTab";
 import { SettingsTab } from "@/components/products/SettingsTab";
 import { EditProductForm } from "@/components/products/EditProductForm";
-import { RecipeEditorPanel } from "@/components/products/RecipeEditorPanel";
 
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import dynamic from "next/dynamic";
 import PassportManagementPanel from "@/components/passport/PassportManagementPanel";
 import { ProductGuideTrigger } from "@/components/products/ProductGuide";
@@ -47,47 +44,6 @@ export default function ProductDashboardPage() {
 
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || "overview");
   const [showEditDialog, setShowEditDialog] = useState(false);
-  const [showRecipeEditor, setShowRecipeEditor] = useState(false);
-  const [recipeInitialTab, setRecipeInitialTab] = useState<string>("ingredients");
-  const [recipeEditorDirty, setRecipeEditorDirty] = useState(false);
-  const [showUnsavedWarning, setShowUnsavedWarning] = useState(false);
-
-  // 5.1 URL State Sync: Open sheets from URL params on mount
-  useEffect(() => {
-    const editorParam = searchParams.get('editor');
-
-    if (editorParam === 'ingredients' || editorParam === 'packaging') {
-      setRecipeInitialTab(editorParam);
-      setShowRecipeEditor(true);
-    }
-  }, []); // Only run on mount
-
-  // Update URL when sheets open/close (shallow — no navigation)
-  const updateUrlParams = useCallback((key: string, value: string | null) => {
-    const url = new URL(window.location.href);
-    if (value) {
-      url.searchParams.set(key, value);
-    } else {
-      url.searchParams.delete(key);
-    }
-    window.history.replaceState({}, '', url.toString());
-  }, []);
-
-  const openRecipeEditor = useCallback((tab: string) => {
-    setRecipeInitialTab(tab);
-    setShowRecipeEditor(true);
-    updateUrlParams('editor', tab);
-  }, [updateUrlParams]);
-
-  const closeRecipeEditor = useCallback((force = false) => {
-    if (!force && recipeEditorDirty) {
-      setShowUnsavedWarning(true);
-      return;
-    }
-    setShowRecipeEditor(false);
-    setRecipeEditorDirty(false);
-    updateUrlParams('editor', null);
-  }, [updateUrlParams, recipeEditorDirty]);
 
   const handleCalculate = () => {
     if (!isHealthy) {
@@ -334,8 +290,6 @@ export default function ProductDashboardPage() {
               packaging={packaging}
               productCategory={product?.product_category ?? null}
               productAbvPercent={product?.alcohol_content_abv ?? null}
-              onManageIngredients={() => openRecipeEditor("ingredients")}
-              onManagePackaging={() => openRecipeEditor("packaging")}
             />
           </TabsContent>
 
@@ -379,7 +333,7 @@ export default function ProductDashboardPage() {
       <ProductGuide
         onAction={(action) => {
           if (action === 'open-ingredients') {
-            openRecipeEditor('ingredients');
+            router.push(`/products/${productId}/recipe?tab=ingredients`);
           }
         }}
       />
@@ -401,66 +355,6 @@ export default function ProductDashboardPage() {
           />
         </DialogContent>
       </Dialog>
-
-      {/* Recipe Editor Sheet */}
-      <Sheet open={showRecipeEditor} onOpenChange={(open) => { if (!open) closeRecipeEditor(); else setShowRecipeEditor(true); }}>
-        <SheetContent
-          side="right"
-          className="w-full sm:max-w-4xl overflow-y-auto"
-          preventClose
-        >
-          <SheetHeader className="mb-4">
-            <SheetTitle>Edit Recipe - {product.name}</SheetTitle>
-            <SheetDescription>
-              Add and manage ingredients and packaging for this product
-            </SheetDescription>
-          </SheetHeader>
-          <RecipeEditorPanel
-            productId={productId}
-            organizationId={currentOrganization?.id || ''}
-            productCategory={product?.product_category}
-            productAbvPercent={product?.alcohol_content_abv ?? null}
-            productBottleSizeMl={
-              product?.unit_size_unit === 'ml'
-                ? Number(product?.unit_size_value) || null
-                : product?.unit_size_unit === 'L'
-                  ? (Number(product?.unit_size_value) || 0) * 1000
-                  : null
-            }
-            onSaveComplete={() => {
-              refetch();
-              closeRecipeEditor(true);
-            }}
-            onDirtyChange={setRecipeEditorDirty}
-            compact={true}
-            initialTab={recipeInitialTab}
-          />
-        </SheetContent>
-      </Sheet>
-
-      {/* Unsaved Changes Warning */}
-      <AlertDialog open={showUnsavedWarning} onOpenChange={setShowUnsavedWarning}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
-            <AlertDialogDescription>
-              You have unsaved changes to your recipe. Are you sure you want to close without saving?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep Editing</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setShowUnsavedWarning(false);
-                closeRecipeEditor(true);
-              }}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Discard Changes
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
     </div>
   );
