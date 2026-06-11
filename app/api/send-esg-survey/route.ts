@@ -230,6 +230,15 @@ export async function POST(request: NextRequest) {
         const safeOrgName = escapeHtml(organizationName || '');
         const safePersonalMessage = personalMessage ? escapeHtml(personalMessage) : '';
 
+        // When the inviter has no profile name we fall back to their email
+        // address. Email clients (notably Outlook) auto-link bare addresses
+        // with default blue underlined styling, which is unreadable on the
+        // black background. Wrapping it in an explicit styled anchor keeps
+        // control of the colour.
+        const inviterDisplayHtml = emailRegex.test(inviterName || '')
+          ? `<a href="mailto:${safeInviterName}" style="color: #ccff00; text-decoration: underline;">${safeInviterName}</a>`
+          : `<strong style="color: #ffffff;">${safeInviterName}</strong>`;
+
         // Email is intentionally dark-themed. Some webmail clients (and OS
         // light mode) strip CSS `background` shorthands and tint the canvas
         // white, leaving the design broken. To force a solid black background
@@ -248,9 +257,13 @@ export async function POST(request: NextRequest) {
 <style>
   :root { color-scheme: dark; supported-color-schemes: dark; }
   body, .alk-canvas { margin:0 !important; padding:0; background-color:#000000 !important; }
+  a { color:#ccff00 !important; }
+  a.alk-btn { color:#000000 !important; }
   @media (prefers-color-scheme: light) {
     body, .alk-canvas { background-color:#000000 !important; }
     .alk-card { background-color:#0a0a0a !important; }
+    a { color:#ccff00 !important; }
+    a.alk-btn { color:#000000 !important; }
   }
 </style>
 </head>
@@ -260,31 +273,35 @@ export async function POST(request: NextRequest) {
       <td align="center" style="padding:24px 12px;background-color:#000000;">
         <table role="presentation" class="alk-card" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#0a0a0a" style="width:600px;max-width:600px;background-color:#0a0a0a;border:1px solid #222;">
           <tr>
-            <td style="padding:40px;font-family:'Courier New', monospace;color:#e0e0e0;background-color:#0a0a0a;">
+            <td style="padding:40px;font-family:Arial, Helvetica, sans-serif;color:#e8e8e8;background-color:#0a0a0a;">
               <div style="border-bottom: 1px solid #333; padding-bottom: 20px; margin-bottom: 30px; text-align: center;">
                 <img src="${logoUrl}" alt="alkatera" width="160" height="auto" style="display: block; margin: 0 auto 16px auto;" />
-                <h1 style="color: #ccff00; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; margin: 0;">Sustainability Survey</h1>
+                <h1 style="color: #ccff00; font-family: 'Courier New', monospace; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; margin: 0;">Sustainability Survey</h1>
               </div>
-              <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
+              <p style="color: #e8e8e8; font-size: 15px; line-height: 1.7; margin: 0 0 16px 0;">
                 Dear ${greeting},
               </p>
-              <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
-                <strong style="color: #fff;">${safeInviterName}</strong> at <strong style="color: #fff;">${safeOrgName}</strong> has invited you to complete a short sustainability survey (ESG self-assessment) on the alka<strong style="color: #fff;">tera</strong> platform. Your responses help ${safeOrgName} gather the supplier evidence they need, including for B Corp certification.
+              <p style="color: #e8e8e8; font-size: 15px; line-height: 1.7; margin: 0 0 16px 0;">
+                ${inviterDisplayHtml} at <strong style="color: #fff;">${safeOrgName}</strong> has invited you to complete a short sustainability survey (ESG self-assessment) on the alka<strong style="color: #fff;">tera</strong> platform. Your responses help ${safeOrgName} gather the supplier evidence they need, including for B Corp certification.
               </p>
-              ${safePersonalMessage ? `<div style="margin: 20px 0; padding: 16px; border-left: 2px solid #ccff00; background-color: #111111;"><p style="color: #999; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 8px 0;">Message from ${safeInviterName}:</p><p style="color: #ccc; font-size: 14px; line-height: 1.8; margin: 0;">${safePersonalMessage}</p></div>` : ''}
+              ${safePersonalMessage ? `<div style="margin: 20px 0; padding: 16px; border-left: 2px solid #ccff00; background-color: #111111;"><p style="color: #aaa; font-family: 'Courier New', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 8px 0;">Message from ${inviterDisplayHtml}:</p><p style="color: #e8e8e8; font-size: 15px; line-height: 1.7; margin: 0;">${safePersonalMessage}</p></div>` : ''}
               <div style="margin: 30px 0; text-align: center;">
-                <a href="${invitationUrl}" style="display: inline-block; background-color: #ccff00; color: #000; font-family: 'Courier New', monospace; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 3px; padding: 16px 32px; text-decoration: none;">Start the survey</a>
+                <a href="${invitationUrl}" class="alk-btn" style="display: inline-block; background-color: #ccff00; color: #000000; font-family: 'Courier New', monospace; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 3px; padding: 16px 32px; text-decoration: none; border-radius: 4px;">Start the survey</a>
               </div>
+              <p style="color: #999; font-size: 13px; line-height: 1.6; text-align: center; margin: 0 0 24px 0;">
+                Or copy this link into your browser:<br />
+                <a href="${invitationUrl}" style="color: #ccff00; text-decoration: underline; word-break: break-all;">${invitationUrl}</a>
+              </p>
               <div style="margin: 24px 0; padding: 20px; background-color: #111111; border: 1px solid #222; border-radius: 4px;">
-                <p style="color: #ccff00; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 12px 0;">What to expect</p>
-                <p style="color: #ccc; font-size: 13px; line-height: 1.8; margin: 0;">
+                <p style="color: #ccff00; font-family: 'Courier New', monospace; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 12px 0;">What to expect</p>
+                <p style="color: #e8e8e8; font-size: 14px; line-height: 1.7; margin: 0;">
                   The survey covers labour &amp; human rights, environment, ethics, health &amp; safety and management systems. You can upload supporting evidence and save your progress as you go. alka<strong style="color: #fff;">tera</strong> is <strong style="color: #fff;">completely free for suppliers</strong>.
                 </p>
               </div>
-              <p style="color: #666; font-size: 12px; line-height: 1.6;">
-                This invitation will expire in 30 days. If you have any questions, please contact <a href="mailto:hello@alkatera.com" style="color: #ccff00; text-decoration: none;">hello@alkatera.com</a>
+              <p style="color: #999; font-size: 13px; line-height: 1.6;">
+                This invitation will expire in 30 days. If you have any questions, please contact <a href="mailto:hello@alkatera.com" style="color: #ccff00; text-decoration: underline;">hello@alkatera.com</a>
               </p>
-              <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #333; color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 2px;">
+              <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #333; color: #777; font-family: 'Courier New', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 2px;">
                 The alka<strong>tera</strong> Team
               </div>
             </td>
