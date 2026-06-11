@@ -24,6 +24,7 @@ import { DataQualityConfidenceCard } from "@/components/facilities/DataQualityCo
 import { ProductionRunDataEntry } from "@/components/facilities/ProductionRunDataEntry";
 import { Sparkles, ExternalLink, Settings2, HelpCircle } from "lucide-react";
 import { FacilityDataSourcingDialog } from "@/components/facilities/FacilityDataSourcingDialog";
+import { FacilityDataDashboard } from "@/components/facilities/FacilityDataDashboard";
 import { UpgradeFacilityDataButton } from "@/components/facilities/UpgradeFacilityDataButton";
 import { UTILITY_TYPES } from "@/lib/constants/utility-types";
 
@@ -574,6 +575,14 @@ export default function FacilityDetailPage() {
         {/* HISTORY TAB */}
         {/* ============================================================= */}
         <TabsContent value="history" className="space-y-6 mt-6">
+          {/* Visual overview of the last 12 months: coverage grid + trend chart */}
+          <FacilityDataDashboard
+            utilityData={utilityData}
+            waterData={waterData}
+            wasteData={wasteData}
+            dataContracts={dataContracts}
+          />
+
           {/* Utility History */}
           <Card>
             <CardHeader>

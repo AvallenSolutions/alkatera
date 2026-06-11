@@ -1,3 +1,25 @@
+# Facility utility data dashboard (visual display of uploaded bill data)
+
+Goal: on the facility History tab, show a visual 12-month view of all utility, water and waste data (from uploaded bills and manual entry) so gaps and trends are obvious.
+
+## Plan
+- [x] New component `components/facilities/FacilityDataDashboard.tsx`
+  - 12-month coverage grid: one row per data series (each utility type, water intake/discharge/recycled, waste streams), one column per month. Cells show the monthly value; gaps highlighted amber; months before tracking started shown muted; current month shown as pending (bill may not have arrived yet).
+  - Bills spanning multiple months (e.g. quarterly water bills) are allocated across months by days, so a quarterly bill covers 3 months rather than showing false gaps.
+  - Trend chart (recharts BarChart, brand #ccff00) for a selectable series, with average reference line, trend vs previous 3 months, coverage stat, and a list of gap months.
+  - Contracted utilities (facility_data_contracts) with no data show as full-gap rows.
+- [x] Mount the dashboard at the top of the History tab in `app/(authenticated)/company/facilities/[id]/page.tsx`, reusing the already-fetched utilityData, waterData, wasteData, dataContracts.
+- [x] Verify: typecheck passes; route compiles and serves 200 on dev server; 5 rendered unit tests pass (gap detection, quarterly-bill allocation, contracted-utility full-gap row, estimated-data marking, empty state).
+
+## Review
+- Coverage grid: one row per series (energy/fuel, water, waste), 12 month columns with the monthly value in each cell. Green = recorded, amber filled = estimated, amber dashed = gap, plain dashed = current month pending, dot = before tracking started. Coverage badge per row (covered/tracked months).
+- Multi-month bills are spread across covered months proportionally by days, so a quarterly water bill fills 3 months instead of showing 2 false gaps.
+- Trend chart: any series selectable (dropdown or click a row label), brand-coloured bars, average reference line, total/monthly average/3-month trend/coverage stats, and missing months listed as badges.
+- Added a jsdom ResizeObserver stub to vitest.setup.ts (recharts needs it).
+- Could not visually verify in the preview browser: no auth session locally and .env.local points at production Supabase, so verification was done via rendered unit tests + dev-server compile instead.
+
+---
+
 # Code review remediation (from CODE_REVIEW_2026-06-10.md)
 
 (Previous FY-aware reporting plan completed and committed: 86454144 and earlier.)
