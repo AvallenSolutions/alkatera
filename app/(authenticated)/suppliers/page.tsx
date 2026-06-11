@@ -885,6 +885,19 @@ export default function SuppliersPage() {
                   className="pl-10"
                 />
               </div>
+
+              {(canCreateSuppliers || canInviteSuppliers) && (
+                <div className="flex flex-col items-center mt-6">
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Know your supplier already? Send them an ESG survey and we&rsquo;ll add them to your
+                    list automatically.
+                  </p>
+                  <Button variant="outline" onClick={() => setEsgSurveyOpen(true)}>
+                    <ClipboardCheck className="h-5 w-5 mr-2" />
+                    Send ESG Survey
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
 
