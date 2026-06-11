@@ -230,36 +230,71 @@ export async function POST(request: NextRequest) {
         const safeOrgName = escapeHtml(organizationName || '');
         const safePersonalMessage = personalMessage ? escapeHtml(personalMessage) : '';
 
-        const emailHtml = `
-          <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #e0e0e0; padding: 40px; border: 1px solid #222;">
-            <div style="border-bottom: 1px solid #333; padding-bottom: 20px; margin-bottom: 30px; text-align: center;">
-              <img src="${logoUrl}" alt="alkatera" width="160" height="auto" style="display: block; margin: 0 auto 16px auto;" />
-              <h1 style="color: #ccff00; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; margin: 0;">Sustainability Survey</h1>
-            </div>
-            <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
-              Dear ${greeting},
-            </p>
-            <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
-              <strong style="color: #fff;">${safeInviterName}</strong> at <strong style="color: #fff;">${safeOrgName}</strong> has invited you to complete a short sustainability survey (ESG self-assessment) on the alka<strong style="color: #fff;">tera</strong> platform. Your responses help ${safeOrgName} gather the supplier evidence they need, including for B Corp certification.
-            </p>
-            ${safePersonalMessage ? `<div style="margin: 20px 0; padding: 16px; border-left: 2px solid #ccff00; background: #111;"><p style="color: #999; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 8px 0;">Message from ${safeInviterName}:</p><p style="color: #ccc; font-size: 14px; line-height: 1.8; margin: 0;">${safePersonalMessage}</p></div>` : ''}
-            <div style="margin: 30px 0; text-align: center;">
-              <a href="${invitationUrl}" style="display: inline-block; background: #ccff00; color: #000; font-family: 'Courier New', monospace; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 3px; padding: 16px 32px; text-decoration: none;">Start the survey</a>
-            </div>
-            <div style="margin: 24px 0; padding: 20px; background: #111; border: 1px solid #222; border-radius: 4px;">
-              <p style="color: #ccff00; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 12px 0;">What to expect</p>
-              <p style="color: #ccc; font-size: 13px; line-height: 1.8; margin: 0;">
-                The survey covers labour &amp; human rights, environment, ethics, health &amp; safety and management systems. You can upload supporting evidence and save your progress as you go. alka<strong style="color: #fff;">tera</strong> is <strong style="color: #fff;">completely free for suppliers</strong>.
+        // Email is intentionally dark-themed. Some webmail clients (and OS
+        // light mode) strip CSS `background` shorthands and tint the canvas
+        // white, leaving the design broken. To force a solid black background
+        // regardless of the recipient's light/dark setting we: (1) declare
+        // color-scheme: dark so clients don't auto-invert, (2) use a table
+        // layout with bgcolor HTML attributes (honoured far more reliably than
+        // CSS), and (3) add a prefers-color-scheme: light override with
+        // !important for clients that still try to re-tint.
+        const emailHtml = `<!DOCTYPE html>
+<html lang="en" style="margin:0;padding:0;">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="color-scheme" content="dark" />
+<meta name="supported-color-schemes" content="dark" />
+<style>
+  :root { color-scheme: dark; supported-color-schemes: dark; }
+  body, .alk-canvas { margin:0 !important; padding:0; background-color:#000000 !important; }
+  @media (prefers-color-scheme: light) {
+    body, .alk-canvas { background-color:#000000 !important; }
+    .alk-card { background-color:#0a0a0a !important; }
+  }
+</style>
+</head>
+<body class="alk-canvas" style="margin:0;padding:0;background-color:#000000;">
+  <table role="presentation" class="alk-canvas" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#000000" style="width:100%;background-color:#000000;">
+    <tr>
+      <td align="center" style="padding:24px 12px;background-color:#000000;">
+        <table role="presentation" class="alk-card" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#0a0a0a" style="width:600px;max-width:600px;background-color:#0a0a0a;border:1px solid #222;">
+          <tr>
+            <td style="padding:40px;font-family:'Courier New', monospace;color:#e0e0e0;background-color:#0a0a0a;">
+              <div style="border-bottom: 1px solid #333; padding-bottom: 20px; margin-bottom: 30px; text-align: center;">
+                <img src="${logoUrl}" alt="alkatera" width="160" height="auto" style="display: block; margin: 0 auto 16px auto;" />
+                <h1 style="color: #ccff00; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; margin: 0;">Sustainability Survey</h1>
+              </div>
+              <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
+                Dear ${greeting},
               </p>
-            </div>
-            <p style="color: #666; font-size: 12px; line-height: 1.6;">
-              This invitation will expire in 30 days. If you have any questions, please contact <a href="mailto:hello@alkatera.com" style="color: #ccff00; text-decoration: none;">hello@alkatera.com</a>
-            </p>
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #333; color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 2px;">
-              The alka<strong>tera</strong> Team
-            </div>
-          </div>
-        `;
+              <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
+                <strong style="color: #fff;">${safeInviterName}</strong> at <strong style="color: #fff;">${safeOrgName}</strong> has invited you to complete a short sustainability survey (ESG self-assessment) on the alka<strong style="color: #fff;">tera</strong> platform. Your responses help ${safeOrgName} gather the supplier evidence they need, including for B Corp certification.
+              </p>
+              ${safePersonalMessage ? `<div style="margin: 20px 0; padding: 16px; border-left: 2px solid #ccff00; background-color: #111111;"><p style="color: #999; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 8px 0;">Message from ${safeInviterName}:</p><p style="color: #ccc; font-size: 14px; line-height: 1.8; margin: 0;">${safePersonalMessage}</p></div>` : ''}
+              <div style="margin: 30px 0; text-align: center;">
+                <a href="${invitationUrl}" style="display: inline-block; background-color: #ccff00; color: #000; font-family: 'Courier New', monospace; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 3px; padding: 16px 32px; text-decoration: none;">Start the survey</a>
+              </div>
+              <div style="margin: 24px 0; padding: 20px; background-color: #111111; border: 1px solid #222; border-radius: 4px;">
+                <p style="color: #ccff00; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 12px 0;">What to expect</p>
+                <p style="color: #ccc; font-size: 13px; line-height: 1.8; margin: 0;">
+                  The survey covers labour &amp; human rights, environment, ethics, health &amp; safety and management systems. You can upload supporting evidence and save your progress as you go. alka<strong style="color: #fff;">tera</strong> is <strong style="color: #fff;">completely free for suppliers</strong>.
+                </p>
+              </div>
+              <p style="color: #666; font-size: 12px; line-height: 1.6;">
+                This invitation will expire in 30 days. If you have any questions, please contact <a href="mailto:hello@alkatera.com" style="color: #ccff00; text-decoration: none;">hello@alkatera.com</a>
+              </p>
+              <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #333; color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 2px;">
+                The alka<strong>tera</strong> Team
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
 
         // Do not CC the inviter: they're often signed in to the main app, and
         // opening their own copy of the link could disrupt their session. The
