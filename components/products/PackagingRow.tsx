@@ -40,6 +40,8 @@ interface PackagingRowProps {
   onRemove: (tempId: string) => void;
   onAddNewWithType?: (category: PackagingCategory) => void;
   canRemove: boolean;
+  /** Product category for benchmark-based impact previews */
+  productCategory?: string | null;
   defaultExpanded?: boolean;
   /** Product unit size in ml, when known — tightens the weight plausibility check */
   containerSizeMl?: number | null;

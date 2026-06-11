@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ChevronDown, ChevronUp, Settings2 } from "lucide-react";
 import { IngredientFormCard } from "@/components/products/IngredientFormCard";
 import type { IngredientFormData } from "@/components/products/IngredientFormCard";
 import type { ProductionStage } from "@/lib/types/products";
@@ -21,81 +21,130 @@ interface IngredientEditorTabsProps {
   onUpdate: (tempId: string, updates: Partial<IngredientFormData>) => void;
   onRemove: (tempId: string) => void;
   canRemove: boolean;
+  /** Product category for benchmark-based impact previews */
+  productCategory?: string | null;
   recipeScaleMode?: 'per_unit' | 'per_batch';
   batchYieldValue?: number | null;
   batchYieldUnit?: string | null;
   productUnitSizeValue?: number | null;
   productUnitSizeUnit?: string | null;
   productionStages?: ProductionStage[];
-  /** When true, render `data-tour-anchor` attributes on tab triggers. Set on
+  /** When true, render `data-tour-anchor` attributes on section triggers. Set on
    *  the first ingredient row only so the coachmark tour has stable anchors. */
   enableTourAnchors?: boolean;
-  /** Controlled tab value. When provided, the tour drives which tab is active. */
+  /** Controlled section value. When provided, the tour drives which section is open. */
   controlledTab?: TabValue;
   onTabChange?: (tab: TabValue) => void;
 }
 
 /**
- * Sectioned mini-editor used inside an expanded IngredientRow. The Stage tab
- * is hidden entirely unless the product has a configured production chain.
+ * Row editor: the essentials (name, factor, amount) are always visible; the
+ * optional depth lives behind one "Add detail to improve accuracy" strip of
+ * chips. Tabs hid what was in them and added a navigation layer to a small
+ * form — chips labelled with their benefit communicate "optional extras"
+ * and open only the fields for that one thing. Same fields, same depth.
  */
 export function IngredientEditorTabs(props: IngredientEditorTabsProps) {
   const { enableTourAnchors, controlledTab, onTabChange } = props;
   const hasStages = (props.productionStages?.length ?? 0) > 0;
-  const [internalTab, setInternalTab] = useState<TabValue>(controlledTab ?? 'basics');
-  // The tour advances the active tab by changing controlledTab — mirror it into
-  // local state so the highlight follows the tour, but a user click below always
-  // wins (guide, don't lock). Previously controlledTab pinned the tab and made
-  // the Basics/Source/Logistics triggers unresponsive on the first row.
+  const [openSection, setOpenSection] = useState<Exclude<TabValue, 'basics'> | null>(
+    controlledTab && controlledTab !== 'basics' ? controlledTab : null
+  );
+  // The tour advances by changing controlledTab — mirror it into local state
+  // so the highlight follows the tour, but a user click always wins.
   useEffect(() => {
-    if (controlledTab != null) setInternalTab(controlledTab);
+    if (controlledTab != null) {
+      setOpenSection(controlledTab === 'basics' ? null : controlledTab);
+    }
   }, [controlledTab]);
-  const tab = internalTab;
-  const setTab = (v: TabValue) => {
-    if (onTabChange) onTabChange(v);
-    setInternalTab(v);
+
+  const toggleSection = (key: Exclude<TabValue, 'basics'>) => {
+    const next = openSection === key ? null : key;
+    setOpenSection(next);
+    onTabChange?.(next ?? 'basics');
   };
 
   const status = getIngredientSectionStatus(props.ingredient, hasStages);
   const anchor = (key: 'basics' | 'source' | 'logistics') =>
     enableTourAnchors ? { 'data-tour-anchor': key } : {};
 
+  const sections: Array<{
+    key: Exclude<TabValue, 'basics'>;
+    label: string;
+    hint: string;
+    show: boolean;
+  }> = [
+    {
+      key: 'source',
+      label: 'Supplier link',
+      hint: "Linking a supplier or your own growing data makes this ingredient's footprint more accurate and verifiable.",
+      show: true,
+    },
+    {
+      key: 'logistics',
+      label: 'Where it comes from',
+      hint: 'Adding where this comes from lets us calculate transport instead of leaving it out.',
+      show: true,
+    },
+    {
+      key: 'stage',
+      label: 'Production stage',
+      hint: 'Assigning a production stage unlocks stage-by-stage insights.',
+      show: hasStages,
+    },
+  ];
+  const visible = sections.filter((sec) => sec.show);
+  const addedCount = visible.filter((sec) => status[sec.key] === 'complete').length;
+  const active = visible.find((sec) => sec.key === openSection) ?? null;
+
   return (
-    <Tabs value={tab} onValueChange={(v) => setTab(v as TabValue)}>
-      <TabsList>
-        <TabsTrigger value="basics" className="gap-2" {...anchor('basics')}>
-          <span>Basics</span>
-          <SectionStatusDot status={status.basics} />
-        </TabsTrigger>
-        <TabsTrigger value="source" className="gap-2" {...anchor('source')}>
-          <span>Source</span>
-          <SectionStatusDot status={status.source} />
-        </TabsTrigger>
-        <TabsTrigger value="logistics" className="gap-2" {...anchor('logistics')}>
-          <span>Logistics</span>
-          <SectionStatusDot status={status.logistics} />
-        </TabsTrigger>
-        {hasStages && (
-          <TabsTrigger value="stage" className="gap-2">
-            <span>Stage</span>
-            <SectionStatusDot status={status.stage} />
-          </TabsTrigger>
-        )}
-      </TabsList>
-      <TabsContent value="basics" className="pt-3">
+    <div className="space-y-3">
+      <div {...anchor('basics')}>
         <IngredientFormCard {...props} sectionFilter="basics" />
-      </TabsContent>
-      <TabsContent value="source" className="pt-3">
-        <IngredientFormCard {...props} sectionFilter="source" />
-      </TabsContent>
-      <TabsContent value="logistics" className="pt-3">
-        <IngredientFormCard {...props} sectionFilter="logistics" />
-      </TabsContent>
-      {hasStages && (
-        <TabsContent value="stage" className="pt-3">
-          <IngredientFormCard {...props} sectionFilter="stage" />
-        </TabsContent>
-      )}
-    </Tabs>
+      </div>
+
+      <div className="border-t pt-3">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+            <Settings2 className="h-3.5 w-3.5" />
+            Add detail to improve accuracy
+          </span>
+          <span className="text-[11px] text-muted-foreground">
+            {addedCount} of {visible.length} added
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-2 mt-2">
+          {visible.map((sec) => (
+            <button
+              key={sec.key}
+              type="button"
+              onClick={() => toggleSection(sec.key)}
+              aria-expanded={openSection === sec.key}
+              className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors ${
+                openSection === sec.key
+                  ? 'border-primary/60 bg-primary/5 text-foreground'
+                  : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
+              }`}
+              {...(sec.key !== 'stage' ? anchor(sec.key) : {})}
+            >
+              {openSection === sec.key ? (
+                <ChevronUp className="h-3 w-3" />
+              ) : (
+                <ChevronDown className="h-3 w-3" />
+              )}
+              {sec.label}
+              <SectionStatusDot status={status[sec.key]} />
+            </button>
+          ))}
+        </div>
+
+        {active && (
+          <div className="mt-3 rounded-md border border-primary/30 bg-primary/[0.03] p-3">
+            <p className="text-xs text-muted-foreground mb-2">{active.hint}</p>
+            <IngredientFormCard {...props} sectionFilter={active.key} />
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

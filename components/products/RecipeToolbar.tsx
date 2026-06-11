@@ -39,45 +39,44 @@ export function RecipeToolbar({
   primaryAddLabel = "Add ingredient",
   importBomLabel = "Import BOM",
 }: RecipeToolbarProps) {
+  // One primary action; every other pathway lives behind a single "More"
+  // menu so an inexperienced user sees one obvious way forward. Actions that
+  // can't do anything yet (save an empty template) don't render at all.
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Button onClick={onAdd} size="sm">
         <Plus className="h-3.5 w-3.5 mr-1" />
         {primaryAddLabel}
       </Button>
-      <Button variant="outline" size="sm" onClick={onApplyTemplate}>
-        <Copy className="h-3.5 w-3.5 mr-1" />
-        Apply template
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={onSaveAsTemplate}
-        disabled={itemCount === 0}
-      >
-        <BookmarkPlus className="h-3.5 w-3.5 mr-1" />
-        Save as template
-      </Button>
-      <Button variant="outline" size="sm" onClick={onImportBom}>
-        <Upload className="h-3.5 w-3.5 mr-1" />
-        {importBomLabel}
-      </Button>
 
-      <div className="ml-auto">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="More actions">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onToggleChecklist}>
-              <ListChecks className="h-4 w-4 mr-2" />
-              {showChecklist ? "Hide" : "Show"} suggestions
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm">
+            More
+            <MoreHorizontal className="h-3.5 w-3.5 ml-1" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          <DropdownMenuItem onClick={onApplyTemplate}>
+            <Copy className="h-4 w-4 mr-2" />
+            Apply a template
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onImportBom}>
+            <Upload className="h-4 w-4 mr-2" />
+            {importBomLabel}
+          </DropdownMenuItem>
+          {itemCount > 0 && (
+            <DropdownMenuItem onClick={onSaveAsTemplate}>
+              <BookmarkPlus className="h-4 w-4 mr-2" />
+              Save as template
             </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+          )}
+          <DropdownMenuItem onClick={onToggleChecklist}>
+            <ListChecks className="h-4 w-4 mr-2" />
+            {showChecklist ? "Hide" : "Show"} suggestions
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

@@ -368,7 +368,30 @@ const AGRIBALYSE_EXCLUDE_PATTERNS = [
   'soup', 'sauce', 'salad', 'vegetable dish',
   // Non-food
   'cosmetic', 'detergent', 'textile', 'clothing',
+  // Food-product packaging systems. Agribalyse models the packaging of a
+  // SPECIFIC food as "<food> | Packaging System, N#, …, Glass bottle {FR}".
+  // These are named after the food they wrap, not the packaging material, so
+  // they are never a usable standalone packaging factor — e.g. a glass-bottle
+  // search must not return "Flavour oil, 0,25L | Packaging System, … Glass
+  // bottle {FR}". See isFoodPackagingSystemName().
+  '| packaging system', 'packaging system, n',
 ];
+
+/**
+ * Detects Agribalyse food-product "packaging system" entries, e.g.
+ * "Flavour oil, 0,25L | Packaging System, N0, All, Glass bottle {FR} U" or
+ * "Soft cheeses - cat C, 200g | Packaging System, N1, Retail, … Label {FR} U".
+ *
+ * These describe the packaging of a named food product, not a reusable
+ * packaging-material factor, so they should never be offered as a match for a
+ * packaging material. Genuine packaging-material processes (e.g. ecoinvent
+ * "packaging glass production", "market for packaging glass") do NOT use the
+ * "| Packaging System" structure and return false.
+ */
+export function isFoodPackagingSystemName(name: string | null | undefined): boolean {
+  if (!name) return false;
+  return /\|\s*packaging system\b/i.test(name) || /\bpackaging system,\s*n\d/i.test(name);
+}
 
 /**
  * Filter Agribalyse processes to only drinks-relevant ones.

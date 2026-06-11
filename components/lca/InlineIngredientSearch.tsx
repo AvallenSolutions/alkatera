@@ -58,6 +58,8 @@ export interface SearchResult {
   // Favourites / popularity boost data
   is_user_favourite?: boolean;
   global_selection_count?: number;
+  /** How many of this organisation's product materials already use this factor */
+  org_usage_count?: number;
 }
 
 interface SearchResponse {
@@ -141,6 +143,8 @@ export function InlineIngredientSearch({
   const [loadingProxy, setLoadingProxy] = useState(false);
   const [proxySearching, setProxySearching] = useState<string | null>(null);
   const [proxyAllFailed, setProxyAllFailed] = useState(false);
+  // Recommended-pick layout: show Best match + 3 alternatives by default
+  const [showAllResults, setShowAllResults] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchStartRef = useRef<number>(0);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -213,6 +217,7 @@ export function InlineIngredientSearch({
 
       const data: SearchResponse = await response.json();
       setResults(data.results || []);
+      setShowAllResults(false);
       setSourceCounts(data.sources);
       setOpenLCAEnabled(data.openlca_enabled);
       setLiveDbDegraded(Boolean(data.live_databases_degraded));
@@ -322,6 +327,34 @@ export function InlineIngredientSearch({
     searchTimeoutRef.current = setTimeout(() => {
       performSearch(newValue);
     }, 300);
+  };
+
+
+  /**
+   * One plain-language sentence explaining WHY the top result is recommended,
+   * so a non-expert can confirm rather than adjudicate raw LCA metadata.
+   */
+  const buildMatchReason = (result: SearchResult): string => {
+    const parts: string[] = [];
+    switch (result.source_type) {
+      case 'primary': parts.push('verified data from your supplier network'); break;
+      case 'global_library': parts.push('from our curated drinks factor library'); break;
+      case 'staging': parts.push("from your organisation's own library"); break;
+      case 'ecoinvent_proxy':
+      case 'ecoinvent_live': parts.push('from the ecoinvent scientific database'); break;
+      case 'agribalyse_live': parts.push('from the Agribalyse food database'); break;
+      default: break;
+    }
+    const grade = result.data_quality_grade || result.metadata?.data_quality_grade;
+    if (grade === 'HIGH') parts.push('high quality data');
+    else if (grade === 'MEDIUM') parts.push('good quality data');
+    if (result.org_usage_count && result.org_usage_count > 0) {
+      parts.push(`you already use it on ${result.org_usage_count} of your product${result.org_usage_count > 1 ? 's' : ''}`);
+    } else if ((result.global_selection_count || 0) >= 3) {
+      parts.push(`chosen by ${result.global_selection_count} other producers`);
+    }
+    const sentence = parts.join(', ');
+    return sentence ? sentence.charAt(0).toUpperCase() + sentence.slice(1) : 'Closest match to your search';
   };
 
   const handleResultSelect = async (result: SearchResult, overrideUserQuery?: string, opts?: { autoMatched?: boolean }) => {
@@ -682,10 +715,23 @@ export function InlineIngredientSearch({
               </div>
             </div>
 
-            {/* Results list */}
-            {results.map((result) => (
-              <Button
+            {/* Results list: one recommended Best match, a few alternatives,
+                everything else behind "Show all" so non-experts confirm a
+                suggestion instead of adjudicating a wall of candidates. */}
+            {(showAllResults ? results : results.slice(0, 4)).map((result, resultIdx) => (
+              <div
                 key={`${result.source_type}-${result.id}`}
+                className={resultIdx === 0 ? "rounded-md border border-primary/50 bg-primary/5 mb-1" : ""}
+              >
+              {resultIdx === 0 && (
+                <div className="flex items-start justify-between gap-2 px-3 pt-2">
+                  <Badge className="bg-primary text-primary-foreground text-[10px] h-5">Best match</Badge>
+                  <span className="text-[11px] text-muted-foreground text-right flex-1">
+                    {buildMatchReason(result)}
+                  </span>
+                </div>
+              )}
+              <Button
                 variant="ghost"
                 className="w-full justify-start text-left h-auto py-3 px-3 hover:bg-accent"
                 onClick={() => handleResultSelect(result)}
@@ -700,6 +746,11 @@ export function InlineIngredientSearch({
                       {getSourceBadge(result)}
                       {result.is_user_favourite && (
                         <Star className="h-3 w-3 text-amber-500 fill-amber-500 flex-shrink-0" />
+                      )}
+                      {(result.org_usage_count || 0) > 0 && (
+                        <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 text-emerald-700 dark:text-emerald-400 border-emerald-400/50">
+                          Used on {result.org_usage_count} of your products
+                        </Badge>
                       )}
                       {!result.is_user_favourite && (result.global_selection_count || 0) >= 3 && (
                         <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 text-muted-foreground border-muted-foreground/30">
@@ -819,7 +870,20 @@ export function InlineIngredientSearch({
                   </div>
                 </div>
               </Button>
+              </div>
             ))}
+
+            {results.length > 4 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="w-full text-xs text-muted-foreground"
+                onClick={() => setShowAllResults((v) => !v)}
+              >
+                {showAllResults ? 'Show fewer' : `Show all ${results.length} matches`}
+              </Button>
+            )}
 
             {/* AI Proxy Suggestion at bottom of results */}
             <ProxySuggestionPanel

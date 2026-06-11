@@ -39,6 +39,13 @@ import { IngredientRow } from "@/components/products/IngredientRow";
 import { PackagingRow } from "@/components/products/PackagingRow";
 import { RecipeSidebarTour, type TourStep } from "@/components/products/RecipeSidebarTour";
 import { RecipeStalenessBanner } from "@/components/products/RecipeStalenessBanner";
+import { RecipeStarterDialog } from "@/components/products/RecipeStarterDialog";
+import { IngredientComposer } from "@/components/products/IngredientComposer";
+import { ReviewMatchesDialog, type ReviewMatchItem } from "@/components/products/ReviewMatchesDialog";
+import { computeIngredientImpactPreview, computePackagingImpactPreview } from "@/lib/products/impact-preview";
+import { findDuplicateIngredientNames, checkRecipeTotalMass } from "@/lib/products/recipe-checks";
+import { autoMatchEmissionFactor } from "@/lib/products/ef-auto-match";
+import { scaleStarterAmount, type RecipeStarter } from "@/lib/constants/recipe-starters";
 import { useOnboarding } from "@/lib/onboarding/OnboardingContext";
 import { useRecipeEditor } from "@/hooks/useRecipeEditor";
 import { useIngestStash } from "@/hooks/useIngestStash";
@@ -80,6 +87,8 @@ export function RecipeEditorPanel({
   const [activeTab, setActiveTab] = useState(initialTab);
   const [showBOMImport, setShowBOMImport] = useState(false);
   const [showPackagingWizard, setShowPackagingWizard] = useState(false);
+  const [showRecipeStarter, setShowRecipeStarter] = useState(false);
+  const [showReviewMatches, setShowReviewMatches] = useState(false);
   const [showChecklist, setShowChecklist] = useState<boolean>(false);
   const [showPackagingChecklist, setShowPackagingChecklist] = useState<boolean>(false);
 
@@ -125,6 +134,7 @@ export function RecipeEditorPanel({
     addPackaging,
     addPackagingWithType,
     addIngredientWithDefaults,
+    addIngredientRows,
     addPackagingWithDefaults,
     addPackagingRows,
     saveIngredients,
@@ -141,6 +151,161 @@ export function RecipeEditorPanel({
     applyProductionTemplate,
     clearProductionChain,
   } = useRecipeEditor(productId, organizationId);
+
+
+  /**
+   * Apply a typical-recipe starter: add the scaled ingredient rows instantly,
+   * then auto-match each one's emission factor in the background. Rows arrive
+   * "Matched, please check" (or needs_review when no confident match exists).
+   */
+  const applyRecipeStarter = (starter: RecipeStarter) => {
+    const unitMl = unitSizeToMl(product?.unit_size_value, product?.unit_size_unit);
+    const rows: IngredientFormData[] = starter.ingredients.map((ing, i) => ({
+      tempId: `temp-starter-${Date.now()}-${i}`,
+      name: ing.name,
+      data_source: null,
+      amount: String(scaleStarterAmount(ing.amountPerLitre, unitMl)),
+      unit: ing.unit,
+      origin_country: '',
+      is_organic_certified: false,
+      transport_mode: 'truck',
+      distance_km: '',
+    }));
+    addIngredientRows(rows);
+    toast.success(`${rows.length} typical ingredients added. Matching emission factors...`);
+
+    void Promise.all(rows.map(async (row, i) => {
+      const match = await autoMatchEmissionFactor({
+        query: starter.ingredients[i].searchQuery,
+        organizationId,
+        materialType: 'ingredient',
+      });
+      if (!match) {
+        updateIngredient(row.tempId, { match_status: 'needs_review' });
+        return;
+      }
+      updateIngredient(row.tempId, {
+        matched_source_name: match.matched_source_name,
+        data_source: match.data_source as any,
+        data_source_id: match.data_source_id,
+        supplier_product_id: match.supplier_product_id,
+        carbon_intensity: match.carbon_intensity,
+        openlca_database: match.openlca_database,
+        ef_source: match.ef_source,
+        ef_source_type: match.ef_source_type,
+        ef_data_quality_grade: match.ef_data_quality_grade,
+        ef_uncertainty_percent: match.ef_uncertainty_percent,
+        match_status: 'auto_matched',
+      });
+    }));
+  };
+
+
+
+  /** Composer add: row arrives instantly; typed-only names auto-match in the background. */
+  const handleComposerAdd = (row: IngredientFormData, needsAutoMatch: string | null) => {
+    addIngredientRows([row]);
+    if (!needsAutoMatch) return;
+    void autoMatchEmissionFactor({
+      query: needsAutoMatch,
+      organizationId,
+      materialType: 'ingredient',
+    }).then((match) => {
+      if (!match) {
+        updateIngredient(row.tempId, { match_status: 'needs_review' });
+        return;
+      }
+      updateIngredient(row.tempId, {
+        matched_source_name: match.matched_source_name,
+        data_source: match.data_source as any,
+        data_source_id: match.data_source_id,
+        supplier_product_id: match.supplier_product_id,
+        carbon_intensity: match.carbon_intensity,
+        openlca_database: match.openlca_database,
+        ef_source: match.ef_source,
+        ef_source_type: match.ef_source_type,
+        ef_data_quality_grade: match.ef_data_quality_grade,
+        ef_uncertainty_percent: match.ef_uncertainty_percent,
+        match_status: 'auto_matched',
+      });
+    });
+  };
+
+  // Recipe-level sanity checks (advisory)
+  const duplicateIngredients = findDuplicateIngredientNames(ingredientForms);
+  const recipeMassWarning = checkRecipeTotalMass({
+    rows: ingredientForms,
+    unitSizeMl: unitSizeToMl(product?.unit_size_value, product?.unit_size_unit),
+    bottlesPerBatch: 1, // per-row batch handling already divides in batch mode
+  });
+
+  // Items for the "Review your matches" stepper: every auto-matched row from
+  // both tabs, with an indicative impact preview for context.
+  const reviewItems: ReviewMatchItem[] = [
+    ...ingredientForms
+      .filter(f => f.match_status === 'auto_matched')
+      .map((f): ReviewMatchItem => ({
+        tempId: f.tempId,
+        kind: 'ingredient',
+        name: f.name || '(unnamed ingredient)',
+        matchedSourceName: f.matched_source_name,
+        efSource: f.ef_source,
+        efDataQualityGrade: f.ef_data_quality_grade,
+        impactPreview: computeIngredientImpactPreview({
+          amount: f.amount,
+          unit: f.unit,
+          carbonIntensity: f.carbon_intensity,
+          unitSizeMl: unitSizeToMl(product?.unit_size_value, product?.unit_size_unit),
+          category: productCategory,
+        }),
+      })),
+    ...packagingForms
+      .filter(f => f.match_status === 'auto_matched')
+      .map((f): ReviewMatchItem => ({
+        tempId: f.tempId,
+        kind: 'packaging',
+        name: f.name || '(unnamed packaging)',
+        matchedSourceName: f.matched_source_name,
+        efSource: f.ef_source,
+        efDataQualityGrade: f.ef_data_quality_grade,
+        impactPreview: computePackagingImpactPreview({
+          netWeightG: f.net_weight_g,
+          carbonIntensity: f.carbon_intensity,
+          unitsPerGroup: f.units_per_group,
+          reuseTrips: f.reuse_trips,
+          unitSizeMl: unitSizeToMl(product?.unit_size_value, product?.unit_size_unit),
+          category: productCategory,
+        }),
+      })),
+  ];
+
+  const confirmReviewItem = (item: ReviewMatchItem) => {
+    if (item.kind === 'ingredient') updateIngredient(item.tempId, { match_status: 'verified' });
+    else updatePackaging(item.tempId, { match_status: 'verified' });
+  };
+
+  const rejectReviewItem = (item: ReviewMatchItem) => {
+    // Clear the match entirely so the row reads "Pick an emission factor"
+    const cleared = {
+      matched_source_name: undefined,
+      data_source: null as any,
+      data_source_id: undefined,
+      carbon_intensity: undefined,
+      ef_source: undefined,
+      ef_source_type: undefined,
+      ef_data_quality_grade: undefined,
+      ef_uncertainty_percent: undefined,
+      match_status: 'needs_review' as const,
+    };
+    if (item.kind === 'ingredient') updateIngredient(item.tempId, cleared);
+    else updatePackaging(item.tempId, cleared);
+  };
+
+  // Maturation only earns a tab when there's data or the drink style ages.
+  // Hidden tabs cost nothing; permanent irrelevant ones cost attention.
+  const showMaturationTab =
+    hasMaturationProfile ||
+    /whisk|whiskey|rum|brandy|cognac|armagnac|wine|port|sherry|madeira|mead|tequila|mezcal|barrel|cask|aged/i.test(productCategory || '');
 
   const recipeScaleMode = (product?.recipe_scale_mode ?? 'per_unit') as 'per_unit' | 'per_batch';
   const batchYieldValue = product?.batch_yield_value ?? null;
@@ -264,24 +429,6 @@ export function RecipeEditorPanel({
 
   return (
     <div className="space-y-4">
-      {/* Toolbar */}
-      {!compact && (
-        <div className="flex justify-between items-center">
-          <Card className="flex-1">
-            <CardHeader className="py-3 px-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base">Recipe Completeness</CardTitle>
-                  <CardDescription className="text-sm">Track your bill of materials progress</CardDescription>
-                </div>
-                <Badge variant={totalItems > 0 ? "default" : "secondary"} className="bg-green-600">
-                  {totalItems} {totalItems === 1 ? 'Item' : 'Items'} Added
-                </Badge>
-              </div>
-            </CardHeader>
-          </Card>
-        </div>
-      )}
 
       {compact && (
         <div className="flex items-center justify-between gap-2 pb-2">
@@ -306,14 +453,15 @@ export function RecipeEditorPanel({
 
       <RecipeStalenessBanner productId={productId} organizationId={organizationId} />
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className={compact ? "grid w-full grid-cols-3" : "grid w-full grid-cols-4"}>
-          {!compact && (
-            <TabsTrigger value="overview" className="flex items-center gap-2">
-              <Info className="h-4 w-4 pointer-events-none" />
-              <span>Overview</span>
-            </TabsTrigger>
-          )}
+      <Tabs
+        value={
+          activeTab === 'overview' || (activeTab === 'maturation' && !showMaturationTab)
+            ? 'ingredients'
+            : activeTab
+        }
+        onValueChange={setActiveTab}
+      >
+        <TabsList className={showMaturationTab ? "grid w-full grid-cols-3" : "grid w-full grid-cols-2"}>
           <TabsTrigger value="ingredients" className="flex items-center gap-2">
             <Leaf className="h-4 w-4 pointer-events-none" />
             <span>Ingredients ({ingredientCount})</span>
@@ -322,76 +470,15 @@ export function RecipeEditorPanel({
             <Box className="h-4 w-4 pointer-events-none" />
             <span>Packaging ({packagingCount})</span>
           </TabsTrigger>
-          <TabsTrigger value="maturation" className="flex items-center gap-2">
-            <Wine className="h-4 w-4 pointer-events-none" />
-            <span>Maturation</span>
-            {hasMaturationProfile && <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">1</Badge>}
-          </TabsTrigger>
+          {showMaturationTab && (
+            <TabsTrigger value="maturation" className="flex items-center gap-2">
+              <Wine className="h-4 w-4 pointer-events-none" />
+              <span>Maturation</span>
+              {hasMaturationProfile && <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">1</Badge>}
+            </TabsTrigger>
+          )}
         </TabsList>
 
-        {!compact && (
-          <TabsContent value="overview" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Recipe Summary</CardTitle>
-                <CardDescription>Bill of materials overview</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <h3 className="font-semibold">Ingredients</h3>
-                    <Badge variant="outline">{ingredientCount} items</Badge>
-                  </div>
-                  {ingredientCount > 0 ? (
-                    <div className="space-y-2">
-                      {ingredientForms.filter(f => f.name && f.amount).map((ingredient) => (
-                        <div key={ingredient.tempId} className="flex items-center justify-between p-2 border rounded text-sm">
-                          <div className="flex-1">
-                            <p className="font-medium">{ingredient.name}</p>
-                            {ingredient.origin_country && (
-                              <p className="text-xs text-muted-foreground">Origin: {ingredient.origin_country}</p>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium">{ingredient.amount} {ingredient.unit}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground py-2">No ingredients added yet</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <h3 className="font-semibold">Packaging</h3>
-                    <Badge variant="outline">{packagingCount} items</Badge>
-                  </div>
-                  {packagingCount > 0 ? (
-                    <div className="space-y-2">
-                      {packagingForms.filter(f => f.name && f.amount && f.packaging_category).map((packaging) => (
-                        <div key={packaging.tempId} className="flex items-center justify-between p-2 border rounded text-sm">
-                          <div className="flex-1">
-                            <p className="font-medium">{packaging.name}</p>
-                            {packaging.packaging_category && (
-                              <p className="text-xs text-muted-foreground capitalize">{packaging.packaging_category.replace('_', ' ')}</p>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium">{packaging.amount} {packaging.unit}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground py-2">No packaging added yet</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
 
         <TabsContent value="ingredients" className="space-y-4">
           <Card className={compact ? "" : "border-l-4 border-l-green-500"}>
@@ -450,9 +537,77 @@ export function RecipeEditorPanel({
                     {ingredientForms.filter(f => f.match_status === 'auto_matched').length} item{ingredientForms.filter(f => f.match_status === 'auto_matched').length > 1 ? 's were' : ' was'} matched
                     automatically and {ingredientForms.filter(f => f.match_status === 'auto_matched').length > 1 ? 'are' : 'is'} already used in calculations.
                     Please check each one and click &quot;Looks right&quot; to confirm.
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="ml-2 h-6 px-2 text-[11px] border-amber-400 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40"
+                      onClick={() => setShowReviewMatches(true)}
+                    >
+                      Review all
+                    </Button>
                   </AlertDescription>
                 </Alert>
               )}
+
+              {duplicateIngredients.length > 0 && (
+                <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 py-2">
+                  <Info className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-xs text-amber-800 dark:text-amber-300">
+                    {duplicateIngredients.join(', ')} appear{duplicateIngredients.length === 1 ? 's' : ''} more than once.
+                    If that&apos;s not deliberate, remove the duplicate so it isn&apos;t counted twice.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {recipeMassWarning && recipeScaleMode === 'per_unit' && (
+                <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 py-2">
+                  <Info className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-xs text-amber-800 dark:text-amber-300">
+                    {recipeMassWarning}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Guided ingredient starter: editing a plausible recipe beats
+                  authoring from a blank tab. Prominent when empty. */}
+              {ingredientForms.every(f => !f.name && !f.amount) ? (
+                <Card className="p-5 border-dashed bg-muted/30">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                    <div className="flex-1">
+                      <h4 className="font-medium flex items-center gap-2">
+                        <Wand2 className="h-4 w-4 text-primary" />
+                        Start from a typical recipe
+                      </h4>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        We add the usual ingredients for your drink style with matching
+                        emission factors. You just adjust the amounts.
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button type="button" onClick={() => setShowRecipeStarter(true)}>
+                        <Wand2 className="h-4 w-4 mr-2" />
+                        Pick a style
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowRecipeStarter(true)}
+                >
+                  <Wand2 className="h-4 w-4 mr-2" />
+                  Add from a typical recipe
+                </Button>
+              )}
+
+              <IngredientComposer
+                organizationId={organizationId}
+                onAdd={handleComposerAdd}
+              />
 
               {showChecklist && (
                 <RecipeChecklist
@@ -485,12 +640,13 @@ export function RecipeEditorPanel({
                       linkedSupplierProducts={linkedSupplierProducts}
                       onUpdate={updateIngredient}
                       onRemove={removeIngredient}
-                      canRemove={ingredientForms.length > 1}
+                      canRemove={ingredientForms.length > 0}
                       recipeScaleMode={recipeScaleMode}
                       batchYieldValue={batchYieldValue}
                       batchYieldUnit={batchYieldUnit}
                       productUnitSizeValue={product?.unit_size_value ?? null}
                       productUnitSizeUnit={product?.unit_size_unit ?? null}
+                      productCategory={productCategory ?? null}
                       productionStages={productionStages}
                       forceExpanded={tourEligible && index === 0}
                       enableTourAnchors={tourEligible && index === 0}
@@ -610,6 +766,15 @@ export function RecipeEditorPanel({
                     {packagingForms.filter(f => f.match_status === 'auto_matched').length} item{packagingForms.filter(f => f.match_status === 'auto_matched').length > 1 ? 's were' : ' was'} matched
                     automatically and {packagingForms.filter(f => f.match_status === 'auto_matched').length > 1 ? 'are' : 'is'} already used in calculations.
                     Please check each one and click &quot;Looks right&quot; to confirm.
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="ml-2 h-6 px-2 text-[11px] border-amber-400 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40"
+                      onClick={() => setShowReviewMatches(true)}
+                    >
+                      Review all
+                    </Button>
                   </AlertDescription>
                 </Alert>
               )}
@@ -639,8 +804,9 @@ export function RecipeEditorPanel({
                     onUpdate={updatePackaging}
                     onRemove={removePackaging}
                     onAddNewWithType={addPackagingWithType}
-                    canRemove={packagingForms.length > 1}
+                    canRemove={packagingForms.length > 0}
                     containerSizeMl={unitSizeToMl(product?.unit_size_value, product?.unit_size_unit)}
+                    productCategory={productCategory ?? null}
                   />
                 ))}
               </div>
@@ -684,6 +850,22 @@ export function RecipeEditorPanel({
         </TabsContent>
       </Tabs>
 
+
+      <ReviewMatchesDialog
+        open={showReviewMatches}
+        onOpenChange={setShowReviewMatches}
+        items={reviewItems}
+        onConfirm={confirmReviewItem}
+        onPickDifferent={rejectReviewItem}
+      />
+
+      <RecipeStarterDialog
+        open={showRecipeStarter}
+        onOpenChange={setShowRecipeStarter}
+        productCategory={productCategory}
+        unitSizeMl={unitSizeToMl(product?.unit_size_value, product?.unit_size_unit)}
+        onApply={applyRecipeStarter}
+      />
 
       <PackagingWizard
         open={showPackagingWizard}

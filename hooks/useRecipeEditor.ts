@@ -6,6 +6,7 @@ import {
   isPackagingFormSaveable,
   packagingFormErrors,
 } from '@/lib/products/packaging-material-data';
+import { autoMatchEmissionFactor } from '@/lib/products/ef-auto-match';
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import { useAutoSave } from "@/hooks/useAutoSave";
@@ -111,13 +112,12 @@ export function useRecipeEditor(productId: string, organizationId: string) {
   const savedIngredientSnapshot = useRef<string>('');
   const savedPackagingSnapshot = useRef<string>('');
 
-  const [ingredientForms, setIngredientForms] = useState<IngredientFormData[]>([
-    { ...DEFAULT_INGREDIENT, tempId: `temp-${Date.now()}` },
-  ]);
+  // Start with no rows: an auto-created blank form used to confront users
+  // with fields before they chose how to add anything. The tab's empty state
+  // offers the pathways instead.
+  const [ingredientForms, setIngredientForms] = useState<IngredientFormData[]>([]);
 
-  const [packagingForms, setPackagingForms] = useState<PackagingFormData[]>([
-    createDefaultPackaging(),
-  ]);
+  const [packagingForms, setPackagingForms] = useState<PackagingFormData[]>([]);
 
   // Maturation profile state
   const [maturationProfile, setMaturationProfile] = useState<MaturationProfile | null>(null);
@@ -267,7 +267,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
         setIngredientForms(mappedIngredients);
         savedIngredientSnapshot.current = formFingerprint(mappedIngredients);
       } else {
-        const defaultForms = [{ ...DEFAULT_INGREDIENT, tempId: `temp-${Date.now()}` }];
+        const defaultForms: IngredientFormData[] = [];
         setIngredientForms(defaultForms);
         savedIngredientSnapshot.current = formFingerprint(defaultForms);
       }
@@ -349,7 +349,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
         setPackagingForms(mappedPackaging);
         savedPackagingSnapshot.current = formFingerprint(mappedPackaging);
       } else {
-        const defaultPkg = [createDefaultPackaging()];
+        const defaultPkg: PackagingFormData[] = [];
         setPackagingForms(defaultPkg);
         savedPackagingSnapshot.current = formFingerprint(defaultPkg);
       }
@@ -394,9 +394,8 @@ export function useRecipeEditor(productId: string, organizationId: string) {
   };
 
   const removeIngredient = (tempId: string) => {
-    if (ingredientForms.length > 1) {
-      setIngredientForms(prev => prev.filter(form => form.tempId !== tempId));
-    }
+    // Removing the last row is fine: the tab's empty state returns
+    setIngredientForms(prev => prev.filter(form => form.tempId !== tempId));
   };
 
   const addIngredient = () => {
@@ -413,9 +412,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
   };
 
   const removePackaging = (tempId: string) => {
-    if (packagingForms.length > 1) {
-      setPackagingForms(prev => prev.filter(form => form.tempId !== tempId));
-    }
+    setPackagingForms(prev => prev.filter(form => form.tempId !== tempId));
   };
 
   const addPackaging = () => {
@@ -430,14 +427,60 @@ export function useRecipeEditor(productId: string, organizationId: string) {
     toast.info(`Adding new ${category} packaging. Your existing items are preserved.`);
   };
 
-  /** Add an ingredient with a pre-filled name (from recipe checklist quick-add) */
+  /**
+   * Add an ingredient with a pre-filled name (from recipe checklist
+   * quick-add), then auto-match its emission factor in the background using
+   * the checklist's curated search query. The row appears instantly; the
+   * match lands a moment later flagged "Matched, please check" (or stays
+   * needs_review when no confident match exists). The user's job becomes
+   * confirm-or-reject instead of choose-correctly.
+   */
   const addIngredientWithDefaults = (name: string, searchQuery: string) => {
+    const tempId = `temp-${Date.now()}`;
     setIngredientForms(prev => {
+      const row = { ...DEFAULT_INGREDIENT, tempId, name };
       // If there's only one empty form, replace it instead of adding
       if (prev.length === 1 && !prev[0].name && !prev[0].amount) {
-        return [{ ...DEFAULT_INGREDIENT, tempId: `temp-${Date.now()}`, name }];
+        return [row];
       }
-      return [...prev, { ...DEFAULT_INGREDIENT, tempId: `temp-${Date.now()}`, name }];
+      return [...prev, row];
+    });
+
+    void (async () => {
+      const match = await autoMatchEmissionFactor({
+        query: searchQuery || name,
+        organizationId,
+        materialType: 'ingredient',
+      });
+      setIngredientForms(prev => prev.map(f => {
+        if (f.tempId !== tempId) return f;
+        // Don't clobber a factor the user picked while we were searching
+        if (f.data_source_id || f.matched_source_name) return f;
+        if (!match) return { ...f, match_status: 'needs_review' };
+        return {
+          ...f,
+          matched_source_name: match.matched_source_name,
+          data_source: match.data_source as any,
+          data_source_id: match.data_source_id,
+          supplier_product_id: match.supplier_product_id,
+          carbon_intensity: match.carbon_intensity,
+          openlca_database: match.openlca_database,
+          ef_source: match.ef_source,
+          ef_source_type: match.ef_source_type,
+          ef_data_quality_grade: match.ef_data_quality_grade,
+          ef_uncertainty_percent: match.ef_uncertainty_percent,
+          match_status: 'auto_matched',
+        };
+      }));
+    })();
+  };
+
+  /** Merge fully-formed ingredient rows (from the recipe starter) into the form. */
+  const addIngredientRows = (rows: IngredientFormData[]) => {
+    if (rows.length === 0) return;
+    setIngredientForms(prev => {
+      const isEmpty = prev.length === 1 && !prev[0].name && !prev[0].amount;
+      return isEmpty ? rows : [...prev, ...rows];
     });
   };
 
@@ -453,9 +496,11 @@ export function useRecipeEditor(productId: string, organizationId: string) {
   };
 
   const addPackagingWithDefaults = (name: string, searchQuery: string, packagingCategory?: PackagingCategory) => {
+    const tempId = `temp-pkg-${Date.now()}`;
     setPackagingForms(prev => {
       const newPkg = {
         ...createDefaultPackaging(),
+        tempId,
         name,
         ...(packagingCategory ? { packaging_category: packagingCategory } : {}),
       };
@@ -465,6 +510,35 @@ export function useRecipeEditor(productId: string, organizationId: string) {
       }
       return [...prev, newPkg];
     });
+
+    // Auto-match in the background (see addIngredientWithDefaults)
+    void (async () => {
+      const match = await autoMatchEmissionFactor({
+        query: searchQuery || name,
+        organizationId,
+        materialType: 'packaging',
+        packagingCategory: packagingCategory || undefined,
+      });
+      setPackagingForms(prev => prev.map(f => {
+        if (f.tempId !== tempId) return f;
+        if (f.data_source_id || f.matched_source_name) return f;
+        if (!match) return { ...f, match_status: 'needs_review' };
+        return {
+          ...f,
+          matched_source_name: match.matched_source_name,
+          data_source: match.data_source as any,
+          data_source_id: match.data_source_id,
+          supplier_product_id: match.supplier_product_id,
+          carbon_intensity: match.carbon_intensity,
+          openlca_database: match.openlca_database,
+          ef_source: match.ef_source,
+          ef_source_type: match.ef_source_type,
+          ef_data_quality_grade: match.ef_data_quality_grade,
+          ef_uncertainty_percent: match.ef_uncertainty_percent,
+          match_status: 'auto_matched',
+        };
+      }));
+    })();
   };
 
   // Save operations
@@ -1302,6 +1376,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
     addPackaging,
     addPackagingWithType,
     addIngredientWithDefaults,
+    addIngredientRows,
     addPackagingWithDefaults,
     addPackagingRows,
     saveIngredients,

@@ -44,6 +44,8 @@ import {
 } from "@/lib/distribution-factors";
 import { INGREDIENT_UNITS, canonicaliseUnit, convertQuantity, findUnit, mapOpenLcaUnit, quantityToKg, unitKind, unitSizeToMl } from "@/lib/constants/material-units";
 import { checkIngredientAmount } from "@/lib/constants/packaging-weight-ranges";
+import { computeIngredientImpactPreview, formatPreviewKg } from "@/lib/products/impact-preview";
+import { densityHintFor } from "@/lib/products/recipe-checks";
 import { defaultTransportForOrigin, UNKNOWN_ORIGIN_DEFAULT } from "@/lib/constants/transport-defaults";
 import { toast } from "sonner";
 
@@ -235,6 +237,8 @@ interface IngredientFormCardProps {
   batchYieldUnit?: string | null;
   productUnitSizeValue?: number | null;
   productUnitSizeUnit?: string | null;
+  /** Product category for benchmark-based impact previews */
+  productCategory?: string | null;
   productionStages?: Array<{ id: string; ordinal: number; name: string; stage_type: string }>;
   /**
    * Render only one section (used by IngredientEditorTabs for the renovated
@@ -313,6 +317,7 @@ export function IngredientFormCard({
   batchYieldUnit = null,
   productUnitSizeValue = null,
   productUnitSizeUnit = null,
+  productCategory = null,
   productionStages = [],
   sectionFilter = 'all',
 }: IngredientFormCardProps) {
@@ -344,6 +349,18 @@ export function IngredientFormCard({
     if (refKind !== 'count' && enteredKind !== 'count') return null;
     return { refUnit, refKind, enteredKind };
   })();
+
+  // Live impact preview: converts the chosen factor + amount into a visible
+  // per-unit number and a share of a typical product's footprint, so a wrong
+  // factor or amount shows up as a weird number rather than staying invisible.
+  const impactPreview = computeIngredientImpactPreview({
+    amount: ingredient.amount,
+    unit: ingredient.unit,
+    carbonIntensity: ingredient.carbon_intensity,
+    bottlesPerBatch,
+    unitSizeMl: unitSizeToMl(productUnitSizeValue, productUnitSizeUnit),
+    category: productCategory,
+  });
 
   // Plausibility: does this amount make physical sense per product unit?
   // Catches batch quantities entered as per-unit values. Advisory only.
@@ -987,7 +1004,8 @@ export function IngredientFormCard({
                     <div className="flex items-center gap-1.5 mt-1.5 px-2.5 py-1.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-xs cursor-help">
                       <Database className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0" />
                       <span className="text-amber-700 dark:text-amber-300">
-                        Calculation proxy: <span className="font-medium">{ingredient.matched_source_name}</span>
+                        Calculating with the closest match: <span className="font-medium">{ingredient.matched_source_name}</span>.
+                        {' '}There is no exact entry for this ingredient, so a close equivalent is used. Your result stays valid, and you can refine it any time.
                       </span>
                       {(ingredient.carbon_intensity || ingredient.ef_source) && (
                         <Info className="h-3 w-3 text-amber-400 dark:text-amber-500 shrink-0 ml-auto" />
@@ -1068,6 +1086,22 @@ export function IngredientFormCard({
                   ≈ {formatPerBottle(Number(ingredient.amount), ingredient.unit, bottlesPerBatch)} per bottle
                 </p>
               )}
+              {impactPreview && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  ≈ {formatPreviewKg(impactPreview.perUnitKgCo2e)} kg CO₂e per unit
+                  {impactPreview.shareOfBenchmark != null && impactPreview.shareOfBenchmark >= 0.01 && (
+                    <> · about {Math.round(impactPreview.shareOfBenchmark * 100)}% of a typical {impactPreview.benchmarkLabel || 'product'} footprint</>
+                  )}
+                </p>
+              )}
+              {impactPreview?.shareOfBenchmark != null && impactPreview.shareOfBenchmark > 0.8 && (
+                <Alert className="mt-2 bg-amber-50 dark:bg-amber-950 border-amber-300 dark:border-amber-800">
+                  <Info className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-xs text-amber-800 dark:text-amber-200">
+                    This one ingredient is more than 80% of a typical product&apos;s whole footprint. That can be right, but please double-check the amount and the matched factor.
+                  </AlertDescription>
+                </Alert>
+              )}
               {amountCheck.level === 'warning' && (
                 <Alert className="mt-2 bg-amber-50 dark:bg-amber-950 border-amber-300 dark:border-amber-800">
                   <Info className="h-4 w-4 text-amber-600" />
@@ -1112,6 +1146,12 @@ export function IngredientFormCard({
                   Please switch the unit so they match, or the result will be wrong.
                 </p>
               )}
+              {(() => {
+                const hint = densityHintFor(ingredient.name, ingredient.unit);
+                return hint ? (
+                  <p className="text-xs text-muted-foreground mt-1">{hint}</p>
+                ) : null;
+              })()}
             </div>
           </div>
           )}

@@ -35,6 +35,8 @@ interface IngredientRowProps {
   onUpdate: (tempId: string, updates: Partial<IngredientFormData>) => void;
   onRemove: (tempId: string) => void;
   canRemove: boolean;
+  /** Product category for benchmark-based impact previews */
+  productCategory?: string | null;
   recipeScaleMode?: 'per_unit' | 'per_batch';
   batchYieldValue?: number | null;
   batchYieldUnit?: string | null;

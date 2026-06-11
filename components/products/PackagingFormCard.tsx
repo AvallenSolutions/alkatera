@@ -20,6 +20,7 @@ import { Trash2, Building2, Database, Sprout, Info, Package, Tag, Grip, Box, Map
 import { lookupPackagingDefaults } from "@/lib/constants/packaging-defaults";
 import { PACKAGING_UNITS } from "@/lib/constants/material-units";
 import { checkPackagingWeight } from "@/lib/constants/packaging-weight-ranges";
+import { computePackagingImpactPreview, formatPreviewKg } from "@/lib/products/impact-preview";
 import { defaultTransportForOrigin, UNKNOWN_ORIGIN_DEFAULT } from "@/lib/constants/transport-defaults";
 import { toast } from "sonner";
 import {
@@ -142,6 +143,8 @@ interface PackagingFormCardProps {
   sectionFilter?: 'all' | 'basics' | 'components' | 'logistics' | 'compliance';
   /** Product unit size in ml, when known — tightens the weight plausibility check */
   containerSizeMl?: number | null;
+  /** Product category for benchmark-based impact previews */
+  productCategory?: string | null;
 }
 
 // EPR Packaging Activity options
@@ -389,8 +392,20 @@ export function PackagingFormCard({
   canRemove,
   sectionFilter = 'all',
   containerSizeMl,
+  productCategory = null,
 }: PackagingFormCardProps) {
   const showAll = sectionFilter === 'all';
+
+  // Live impact preview (see IngredientFormCard): wrong factor/weight becomes
+  // a visibly weird number instead of an invisible mistake.
+  const impactPreview = computePackagingImpactPreview({
+    netWeightG: packaging.net_weight_g,
+    carbonIntensity: packaging.carbon_intensity,
+    unitsPerGroup: packaging.units_per_group,
+    reuseTrips: packaging.reuse_trips,
+    unitSizeMl: containerSizeMl,
+    category: productCategory,
+  });
 
   // Physical plausibility of the entered weight — advisory only, never blocks
   const weightCheck = checkPackagingWeight({
@@ -1026,7 +1041,7 @@ export function PackagingFormCard({
                         <div className="flex items-center gap-1.5 mt-1.5 px-2.5 py-1.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-xs cursor-help">
                           <Database className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0" />
                           <span className="text-amber-700 dark:text-amber-300">
-                            Calculation proxy: <span className="font-medium">{packaging.matched_source_name}</span>
+                            Calculating with the closest match: <span className="font-medium">{packaging.matched_source_name}</span>. There is no exact entry for this material, so a close equivalent is used. Your result stays valid, and you can refine it any time.
                           </span>
                           {(packaging.carbon_intensity || packaging.ef_source) && (
                             <Info className="h-3 w-3 text-amber-400 dark:text-amber-500 shrink-0 ml-auto" />
@@ -1161,6 +1176,22 @@ export function PackagingFormCard({
                 <p className="text-xs text-muted-foreground mt-1">
                   The weight of one unit
                 </p>
+                {impactPreview && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    ≈ {formatPreviewKg(impactPreview.perUnitKgCo2e)} kg CO₂e per unit
+                    {impactPreview.shareOfBenchmark != null && impactPreview.shareOfBenchmark >= 0.01 && (
+                      <> · about {Math.round(impactPreview.shareOfBenchmark * 100)}% of a typical {impactPreview.benchmarkLabel || 'product'} footprint</>
+                    )}
+                  </p>
+                )}
+                {impactPreview?.shareOfBenchmark != null && impactPreview.shareOfBenchmark > 0.8 && (
+                  <Alert className="mt-2 bg-amber-50 dark:bg-amber-950 border-amber-300 dark:border-amber-800">
+                    <Info className="h-4 w-4 text-amber-600" />
+                    <AlertDescription className="text-xs text-amber-800 dark:text-amber-200">
+                      This one item is more than 80% of a typical product&apos;s whole footprint. That can be right (glass bottles are often the biggest share), but please double-check the weight and the matched factor.
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
 
               {/* Units Per Packaging — only for secondary/shipment/tertiary (ISO 14044 allocation) */}

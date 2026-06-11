@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sanitizePostgrestSearch } from '@/lib/utils/sanitize-search';
-import { filterDrinksRelevantProcesses, searchWithAliases, filterAgribalyseProcesses, searchAgribalyseWithAliases } from '@/lib/openlca/drinks-process-filter';
+import { filterDrinksRelevantProcesses, searchWithAliases, filterAgribalyseProcesses, searchAgribalyseWithAliases, isFoodPackagingSystemName } from '@/lib/openlca/drinks-process-filter';
 import { createOpenLCAClientForDatabase, isAgribalyseConfigured } from '@/lib/openlca/client';
 import { INGREDIENT_ALIASES, PACKAGING_ALIASES } from '@/lib/openlca/drinks-aliases';
+import { friendlyNameFor } from '@/lib/factor-friendly-names';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +35,8 @@ interface SearchResult {
   supplier_epr_is_drinks_container?: boolean | null;
   recycled_content_pct?: number | null;
   packaging_components?: any;
+  /** How many of this organisation's product materials already use this factor */
+  org_usage_count?: number;
 }
 
 // Cache the ecoinvent process list in memory to avoid fetching 23k+ processes on every search
@@ -256,7 +259,12 @@ function computeSearchRelevance(resultName: string, query: string): number {
   ];
   const isSubProcess = SUB_PROCESS_PREFIXES.some(prefix => r.startsWith(prefix));
   const isAdaptedFor = r.includes('adapted for') || r.includes('- adapted');
-  const subProcessPenalty = (isSubProcess || isAdaptedFor) ? 50 : 0;
+  // Agribalyse food-product packaging systems ("<food> | Packaging System, …")
+  // are named after the food, not the packaging material — sink them so they
+  // never win a packaging search (defence in depth; they're also filtered out
+  // of the Agribalyse candidate set for packaging).
+  const isFoodPkgSystem = isFoodPackagingSystemName(resultName);
+  const subProcessPenalty = (isSubProcess || isAdaptedFor || isFoodPkgSystem) ? 50 : 0;
 
   // Exact match
   if (r === q || rPrimary === q) return 100 - subProcessPenalty;
@@ -366,7 +374,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Collect results from ALL sources in parallel
-    const allResults: SearchResult[] = [];
+    let allResults: SearchResult[] = [];
 
     // Optional material_type filter: 'ingredient' or 'packaging'
     // When set, supplier products are filtered to only show matching product_type
@@ -669,6 +677,39 @@ export async function GET(request: NextRequest) {
     allResults.push(...openLCAResults);
     allResults.push(...agribalyseResults);
 
+    // For packaging-material searches, drop any food-product packaging-system
+    // entries that slipped through from any source. These describe the
+    // packaging of a named food, never a standalone packaging-material factor.
+    if (materialType === 'packaging') {
+      allResults = allResults.filter(r => !isFoodPackagingSystemName(r.name));
+    }
+
+    // Organisation familiarity signal: count how many of this org's product
+    // materials already reference each candidate factor. "You've used this on
+    // 4 products" is the strongest reassurance a non-expert can get, and
+    // reusing the same factor keeps footprints consistent across SKUs.
+    if (organizationId && allResults.length > 0) {
+      try {
+        const candidateIds = Array.from(new Set(allResults.map(r => r.id))).slice(0, 150);
+        const { data: usageRows } = await supabase
+          .from('product_materials')
+          .select('data_source_id, products!inner(organization_id)')
+          .eq('products.organization_id', organizationId)
+          .in('data_source_id', candidateIds);
+        const usageCounts = new Map<string, number>();
+        for (const row of usageRows || []) {
+          if (!row.data_source_id) continue;
+          usageCounts.set(row.data_source_id, (usageCounts.get(row.data_source_id) || 0) + 1);
+        }
+        for (const r of allResults) {
+          const count = usageCounts.get(r.id);
+          if (count) r.org_usage_count = count;
+        }
+      } catch {
+        // Familiarity is a nice-to-have; never fail the search over it.
+      }
+    }
+
     // Build boost map from favourites/popularity data
     const boostMap = new Map<string, { isUserFavourite: boolean; globalCount: number }>();
     for (const row of boostResults) {
@@ -682,15 +723,30 @@ export async function GET(request: NextRequest) {
     // as a tiebreaker. This prevents irrelevant staging results (e.g. "Heat,
     // central...syrup production") from ranking above the correct Agribalyse
     // match (e.g. "Syrup, Maple") just because staging has a higher source priority.
-    const sourceBoost: Record<string, number> = {
-      'primary': 5,        // Verified supplier data gets a small boost
-      'global_library': 3, // Curated drinks factor library
-      'staging': 2,        // Internal/staging factors
-      'ecoinvent_proxy': 1,
-      'agribalyse_live': 1,
-      'ecoinvent_live': 1,
-      'defra': 0,
-    };
+    // For packaging materials, prefer the curated library and ecoinvent
+    // material processes over Agribalyse — Agribalyse is a food database whose
+    // packaging entries are food-product-specific, so it's the weakest source
+    // for a standalone packaging factor. Ingredient searches keep the default
+    // boosts (Agribalyse is a strong source for food ingredients).
+    const sourceBoost: Record<string, number> = materialType === 'packaging'
+      ? {
+          'primary': 5,        // Verified supplier data
+          'global_library': 4, // Curated drinks packaging library — best for packaging
+          'staging': 3,        // Internal/staging factors
+          'ecoinvent_proxy': 2,
+          'ecoinvent_live': 2, // ecoinvent has genuine packaging-material processes
+          'agribalyse_live': 0, // food database — weakest for packaging
+          'defra': 1,
+        }
+      : {
+          'primary': 5,        // Verified supplier data gets a small boost
+          'global_library': 3, // Curated drinks factor library
+          'staging': 2,        // Internal/staging factors
+          'ecoinvent_proxy': 1,
+          'agribalyse_live': 1,
+          'ecoinvent_live': 1,
+          'defra': 0,
+        };
 
     allResults.sort((a, b) => {
       const aBoostData = boostMap.get(a.id);
@@ -706,6 +762,11 @@ export async function GET(request: NextRequest) {
 
       // Tier 1: Relevance score (higher is better)
       if (aRelevance !== bRelevance) return bRelevance - aRelevance;
+
+      // Tier 1.5: Factors this organisation already uses on other products
+      const aOrgUse = a.org_usage_count || 0;
+      const bOrgUse = b.org_usage_count || 0;
+      if (aOrgUse !== bOrgUse) return bOrgUse - aOrgUse;
 
       // Tier 2: Global popularity as tiebreaker within same relevance
       const aGlobal = aBoostData?.globalCount || 0;
@@ -737,6 +798,12 @@ export async function GET(request: NextRequest) {
             result.friendly_name = term.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
             break;
           }
+        }
+        // Curated fallback for processes the aliases don't cover, so far
+        // fewer results show a raw "market for X {RER}| Cutoff, U" title.
+        if (!result.friendly_name) {
+          const curated = friendlyNameFor(result.name);
+          if (curated) result.friendly_name = curated;
         }
       }
     }

@@ -74,10 +74,10 @@ export function RecipeModePicker(props: RecipeModePickerProps) {
   const hasChain = productionStages.length > 0;
   const currentMode = deriveCurrentMode(recipeScaleMode, hasChain);
 
-  // The picker collapses to a summary line once the user has made a choice.
-  // It re-opens automatically when in the default per_unit + no-chain state so
-  // first-time users see the three options.
-  const [editing, setEditing] = useState<boolean>(currentMode === "per_unit" && !hasChain);
+  // The picker always starts collapsed to a one-line summary. Per unit is a
+  // sensible default, and three permanent setup cards overwhelmed new users
+  // before they had entered a single ingredient; "Change" reopens the cards.
+  const [editing, setEditing] = useState<boolean>(false);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
 
   useEffect(() => {
