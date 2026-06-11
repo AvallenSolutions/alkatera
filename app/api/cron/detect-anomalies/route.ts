@@ -72,6 +72,11 @@ async function sendAlertEmail(
   org: { id: string; name: string },
   anomalies: { metric_key: string; observed: number; expected: number; z_score: number }[],
 ): Promise<void> {
+  // Outbound Pulse alert emails are opt-in. They are disabled unless
+  // PULSE_EMAIL_ALERTS is explicitly set to 'true'. Anomaly detection and the
+  // in-app Pulse inbox are unaffected; only email delivery is gated here.
+  if (process.env.PULSE_EMAIL_ALERTS !== 'true') return;
+
   const resendApiKey = process.env.RESEND_API_KEY;
   if (!resendApiKey) return;
 
