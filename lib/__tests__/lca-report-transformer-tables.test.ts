@@ -54,6 +54,88 @@ const LCA: any = {
   },
 };
 
+// Three provenance archetypes for the ingredient breakdown: supplier-verified,
+// live-database (ecoinvent), and proxy fallback. The report (on-screen page +
+// PDF) renders a source badge, quality grade chip and confidence score per
+// row, so these fields must survive the transform for every archetype.
+const PROVENANCE_MATERIALS = [
+  {
+    id: 'mat-supplier',
+    material_name: 'Organic Apple Juice',
+    material_type: 'ingredient',
+    quantity: 0.4,
+    unit: 'kg',
+    impact_climate: 0.2,
+    impact_source: 'primary_verified',
+    data_priority: 1,
+    data_quality_grade: 'HIGH',
+    confidence_score: 95,
+  },
+  {
+    id: 'mat-openlca',
+    material_name: 'Cane Sugar',
+    material_type: 'ingredient',
+    quantity: 0.1,
+    unit: 'kg',
+    impact_climate: 0.1,
+    impact_source: 'secondary_modelled',
+    gwp_data_source: 'Ecoinvent 3.12',
+    data_quality_grade: 'MEDIUM',
+    confidence_score: 80,
+  },
+  {
+    id: 'mat-proxy',
+    material_name: 'Yuzu Extract',
+    material_type: 'ingredient',
+    quantity: 0.01,
+    unit: 'kg',
+    impact_climate: 0.05,
+    impact_source: 'hybrid_proxy',
+    matched_source_name: 'Citrus fruit, processed',
+    gwp_data_source: 'AGRIBALYSE 3.2',
+    data_quality_grade: 'LOW',
+    confidence_score: 50,
+  },
+];
+
+describe('LCA report transformer — ingredient provenance fields', () => {
+  const lca: any = {
+    ...LCA,
+    materials: PROVENANCE_MATERIALS,
+    product_lca_materials: PROVENANCE_MATERIALS,
+  };
+  const report: any = transformLCADataForReport(lca, null, null);
+  const rows = report.ingredientBreakdown.ingredients;
+  const byName = (n: string) => rows.find((r: any) => r.name === n);
+
+  it('carries source, grade and confidence for a supplier-verified ingredient', () => {
+    const row = byName('Organic Apple Juice');
+    expect(row.dataSource).toBe('Primary');
+    expect(row.factorDatabase).toBe('Supplier verified');
+    expect(row.dataQualityGrade).toBe('HIGH');
+    expect(row.confidenceScore).toBe(95);
+    expect(row.isProxy).toBe(false);
+  });
+
+  it('carries source, grade and confidence for a live-database ingredient', () => {
+    const row = byName('Cane Sugar');
+    expect(row.dataSource).toBe('Secondary');
+    expect(row.factorDatabase).toBe('ecoinvent 3.12');
+    expect(row.dataQualityGrade).toBe('MEDIUM');
+    expect(row.confidenceScore).toBe(80);
+  });
+
+  it('carries source, grade, confidence and proxy identity for a proxy ingredient', () => {
+    const row = byName('Yuzu Extract');
+    expect(row.dataSource).toBe('Proxy');
+    expect(row.isProxy).toBe(true);
+    expect(row.calculationFactor).toBe('Citrus fruit, processed');
+    expect(row.factorDatabase).toBe('AGRIBALYSE 3.2');
+    expect(row.dataQualityGrade).toBe('LOW');
+    expect(row.confidenceScore).toBe(50);
+  });
+});
+
 describe('LCA report transformer — Water / Land / Supply tables', () => {
   const report: any = transformLCADataForReport(LCA, null, null);
 

@@ -860,6 +860,7 @@ describe('calculateProductCarbonFootprint', () => {
         expect.anything(), // fallbackEvents
         expect.anything(), // materialResolutions
         undefined,         // referenceYear (not set in params)
+        expect.anything(), // calculatorWarnings (upstream warnings)
       );
     });
 
@@ -1135,6 +1136,119 @@ describe('normalizeToKg', () => {
   it('should handle string quantities', () => {
     expect(normalizeToKg('100', 'g')).toBe(0.1);
     expect(normalizeToKg('1.5', 'kg')).toBe(1.5);
+  });
+});
+
+// ============================================================================
+// FACILITY ATTRIBUTION RATIO (unit normalisation)
+// ============================================================================
+
+describe('computeAttributionRatio', () => {
+  const base = {
+    facilityName: 'Test Brewery',
+    productionVolume: 10_000,
+    productionVolumeUnit: 'litres',
+    facilityTotalProduction: 100_000,
+    facilityTotalProductionUnit: 'litres',
+  };
+
+  it('divides directly when both units match', async () => {
+    const { computeAttributionRatio } = await import('../product-lca-calculator');
+    const { rawRatio, warnings } = computeAttributionRatio(base, 0.75, true);
+    expect(rawRatio).toBeCloseTo(0.1);
+    expect(warnings).toHaveLength(0);
+  });
+
+  it('normalises hectolitres total against litres production (the 100x bug)', async () => {
+    const { computeAttributionRatio } = await import('../product-lca-calculator');
+    // 10,000 L of this product out of 1,000 hl (= 100,000 L) total → 10%
+    const { rawRatio, warnings } = computeAttributionRatio(
+      { ...base, facilityTotalProduction: 1_000, facilityTotalProductionUnit: 'hl' },
+      0.75,
+      true,
+    );
+    expect(rawRatio).toBeCloseTo(0.1);
+    expect(warnings).toHaveLength(0);
+  });
+
+  it('normalises kg production against tonnes total', async () => {
+    const { computeAttributionRatio } = await import('../product-lca-calculator');
+    const { rawRatio, warnings } = computeAttributionRatio(
+      { ...base, productionVolume: 5_000, productionVolumeUnit: 'kg', facilityTotalProduction: 50, facilityTotalProductionUnit: 'tonnes' },
+      0.75,
+      true,
+    );
+    expect(rawRatio).toBeCloseTo(0.1);
+    expect(warnings).toHaveLength(0);
+  });
+
+  it('converts bottles to litres via the product unit size when known', async () => {
+    const { computeAttributionRatio } = await import('../product-lca-calculator');
+    // 10,000 bottles × 0.75 L = 7,500 L out of 75,000 L total → 10%
+    const { rawRatio, warnings } = computeAttributionRatio(
+      { ...base, productionVolume: 10_000, productionVolumeUnit: 'bottles', facilityTotalProduction: 75_000, facilityTotalProductionUnit: 'litres' },
+      0.75,
+      true,
+    );
+    expect(rawRatio).toBeCloseTo(0.1);
+    expect(warnings).toHaveLength(0);
+  });
+
+  it('falls back to a raw ratio with a warning when units cannot be reconciled', async () => {
+    const { computeAttributionRatio } = await import('../product-lca-calculator');
+    // bottles vs litres but product size unknown → no conversion possible
+    const { rawRatio, warnings } = computeAttributionRatio(
+      { ...base, productionVolume: 10_000, productionVolumeUnit: 'bottles', facilityTotalProduction: 75_000, facilityTotalProductionUnit: 'litres' },
+      0.75,
+      false,
+    );
+    expect(rawRatio).toBeCloseTo(10_000 / 75_000);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("can't be converted automatically");
+    expect(warnings[0]).not.toContain('Priority');
+  });
+
+  it('assumes the same unit when facilityTotalProductionUnit is absent (legacy inputs)', async () => {
+    const { computeAttributionRatio } = await import('../product-lca-calculator');
+    const { rawRatio, warnings } = computeAttributionRatio(
+      { ...base, facilityTotalProductionUnit: undefined },
+      0.75,
+      true,
+    );
+    expect(rawRatio).toBeCloseTo(0.1);
+    expect(warnings).toHaveLength(0);
+  });
+
+  it('warns in plain language when the ratio exceeds 1', async () => {
+    const { computeAttributionRatio } = await import('../product-lca-calculator');
+    const { rawRatio, warnings } = computeAttributionRatio(
+      { ...base, productionVolume: 200_000 },
+      0.75,
+      true,
+    );
+    expect(rawRatio).toBeCloseTo(2);
+    expect(warnings.some(w => w.includes('capped at 100%'))).toBe(true);
+  });
+
+  it('warns when the ratio is implausibly tiny', async () => {
+    const { computeAttributionRatio } = await import('../product-lca-calculator');
+    const { warnings } = computeAttributionRatio(
+      { ...base, productionVolume: 1, facilityTotalProduction: 1_000_000 },
+      0.75,
+      true,
+    );
+    expect(warnings.some(w => w.includes('less than 0.01%'))).toBe(true);
+  });
+
+  it('returns zero ratio and no warnings when the facility total is missing', async () => {
+    const { computeAttributionRatio } = await import('../product-lca-calculator');
+    const { rawRatio, warnings } = computeAttributionRatio(
+      { ...base, facilityTotalProduction: 0 },
+      0.75,
+      true,
+    );
+    expect(rawRatio).toBe(0);
+    expect(warnings).toHaveLength(0);
   });
 });
 

@@ -38,7 +38,8 @@ import {
 import Link from "next/link";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { validateMaterialsBeforeCalculation, type ProductMaterial } from "@/lib/impact-waterfall-resolver";
-import { calculateProductLCA } from "@/lib/product-lca-calculator";
+import { calculateProductLCA, computeAttributionRatio } from "@/lib/product-lca-calculator";
+import { DataSourceBadge } from "@/components/ui/data-source-badge";
 import { toast } from "sonner";
 import { InlineIngredientSearch } from "@/components/lca/InlineIngredientSearch";
 import type { DataSource } from "@/lib/types/lca";
@@ -46,7 +47,11 @@ import type { DataSource } from "@/lib/types/lca";
 interface MaterialWithValidation extends ProductMaterial {
   hasData: boolean;
   dataQuality?: string;
+  dataQualityGrade?: string;
   confidenceScore?: number;
+  gwpDataSource?: string;
+  nonGwpDataSource?: string;
+  isHybridSource?: boolean;
   error?: string;
 }
 
@@ -71,6 +76,7 @@ interface FacilityAllocation {
   productionVolume: string;
   productionVolumeUnit: string;
   facilityTotalProduction: string;
+  facilityTotalProductionUnit: string;
   selectedSessionId?: string;
 }
 
@@ -200,7 +206,11 @@ export default function CalculateLCAPage() {
               ...mat,
               hasData: true,
               dataQuality: validMaterial.resolved.data_quality_tag,
-              confidenceScore: validMaterial.resolved.confidence_score
+              dataQualityGrade: validMaterial.resolved.data_quality_grade,
+              confidenceScore: validMaterial.resolved.confidence_score,
+              gwpDataSource: validMaterial.resolved.gwp_data_source,
+              nonGwpDataSource: validMaterial.resolved.non_gwp_data_source,
+              isHybridSource: validMaterial.resolved.is_hybrid_source,
             };
           } else if (missingMaterial) {
             return {
@@ -333,6 +343,8 @@ export default function CalculateLCAPage() {
                 facilityTotalProduction: latestSession
                   ? String(latestSession.total_production_volume)
                   : productVolume,
+                facilityTotalProductionUnit: latestSession?.volume_unit?.toLowerCase()
+                  || runSummary.productionVolumeUnit,
                 selectedSessionId: latestSession?.id,
               };
             }
@@ -347,6 +359,7 @@ export default function CalculateLCAPage() {
                 productionVolume: '',
                 productionVolumeUnit: latestSession.volume_unit?.toLowerCase() || 'units',
                 facilityTotalProduction: String(latestSession.total_production_volume),
+                facilityTotalProductionUnit: latestSession.volume_unit?.toLowerCase() || 'units',
                 selectedSessionId: latestSession.id,
               };
             }
@@ -360,6 +373,7 @@ export default function CalculateLCAPage() {
               productionVolume: '',
               productionVolumeUnit: 'units',
               facilityTotalProduction: '',
+              facilityTotalProductionUnit: 'units',
             };
           }));
         }
@@ -433,7 +447,11 @@ export default function CalculateLCAPage() {
               ...updatedRow,
               hasData: true,
               dataQuality: valid.resolved.data_quality_tag,
+              dataQualityGrade: valid.resolved.data_quality_grade,
               confidenceScore: valid.resolved.confidence_score,
+              gwpDataSource: valid.resolved.gwp_data_source,
+              nonGwpDataSource: valid.resolved.non_gwp_data_source,
+              isHybridSource: valid.resolved.is_hybrid_source,
               error: undefined,
             } as MaterialWithValidation;
           }
@@ -512,6 +530,7 @@ export default function CalculateLCAPage() {
           productionVolume: parseFloat(a.productionVolume),
           productionVolumeUnit: a.productionVolumeUnit,
           facilityTotalProduction: parseFloat(a.facilityTotalProduction),
+          facilityTotalProductionUnit: a.facilityTotalProductionUnit || a.productionVolumeUnit,
         }));
 
       const result = await calculateProductLCA({
@@ -666,6 +685,21 @@ export default function CalculateLCAPage() {
         </Alert>
       )}
 
+      {/* Low-quality data warning: the calculation will run, but the result
+          will carry high uncertainty until these factors are improved. */}
+      {materials.some(m => m.hasData && m.dataQualityGrade === 'LOW') && (
+        <Alert className="border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20">
+          <AlertCircle className="h-4 w-4 text-amber-600" />
+          <AlertTitle className="text-amber-900 dark:text-amber-100">Some materials use low-quality estimates</AlertTitle>
+          <AlertDescription className="text-amber-800 dark:text-amber-200">
+            {materials.filter(m => m.hasData && m.dataQualityGrade === 'LOW').length} material
+            {materials.filter(m => m.hasData && m.dataQualityGrade === 'LOW').length !== 1 ? 's are' : ' is'} using
+            generic estimate data, so the result will carry higher uncertainty. Asking your supplier for
+            product data, or picking a closer database match with &quot;Fix&quot;, will make the footprint more reliable.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Materials Table */}
       <Card>
         <CardHeader>
@@ -700,6 +734,18 @@ export default function CalculateLCAPage() {
                         {material.material_name}
                         {material.matched_source_name && material.matched_source_name !== material.material_name && (
                           <div className="text-xs text-amber-500 font-normal mt-0.5">Proxy: {material.matched_source_name}</div>
+                        )}
+                        {material.hasData && (material.gwpDataSource || material.isHybridSource) && (
+                          <div className="mt-1">
+                            <DataSourceBadge
+                              variant="compact"
+                              gwpDataSource={material.gwpDataSource}
+                              nonGwpDataSource={material.nonGwpDataSource}
+                              isHybridSource={material.isHybridSource}
+                              dataQualityGrade={material.dataQualityGrade}
+                              confidenceScore={material.confidenceScore}
+                            />
+                          </div>
                         )}
                       </TableCell>
                       <TableCell className="capitalize">{material.material_type}</TableCell>
@@ -873,7 +919,8 @@ export default function CalculateLCAPage() {
                                         reportingPeriodStart: session.reporting_period_start,
                                         reportingPeriodEnd: session.reporting_period_end,
                                         facilityTotalProduction: String(session.total_production_volume),
-                                        productionVolumeUnit: session.volume_unit || 'units',
+                                        facilityTotalProductionUnit: session.volume_unit?.toLowerCase() || 'units',
+                                        productionVolumeUnit: session.volume_unit?.toLowerCase() || 'units',
                                         selectedSessionId: session.id,
                                       }
                                     : a
@@ -928,7 +975,7 @@ export default function CalculateLCAPage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="space-y-2">
                       <Label>Product Volume</Label>
                       <Input
@@ -971,17 +1018,57 @@ export default function CalculateLCAPage() {
                         Total production at facility in the period
                       </p>
                     </div>
-                  </div>
-
-                  {allocation.productionVolume && allocation.facilityTotalProduction && (
-                    <div className="p-3 rounded-lg bg-lime-50 dark:bg-lime-900/20 border border-lime-200 dark:border-lime-800">
-                      <p className="text-sm text-lime-800 dark:text-lime-200">
-                        <strong>Attribution Ratio:</strong>{' '}
-                        {((parseFloat(allocation.productionVolume) / parseFloat(allocation.facilityTotalProduction)) * 100).toFixed(2)}%
-                        of facility emissions will be allocated to this product
+                    <div className="space-y-2">
+                      <Label>Unit</Label>
+                      <Select
+                        value={allocation.facilityTotalProductionUnit}
+                        onValueChange={(value) => updateAllocation(allocation.facilityId, 'facilityTotalProductionUnit', value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PRODUCTION_UNITS.map((unit) => (
+                            <SelectItem key={unit.value} value={unit.value}>
+                              {unit.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Unit of the facility total
                       </p>
                     </div>
-                  )}
+                  </div>
+
+                  {allocation.productionVolume && allocation.facilityTotalProduction && (() => {
+                    const { rawRatio, warnings: ratioWarnings } = computeAttributionRatio(
+                      {
+                        facilityName: allocation.facilityName,
+                        productionVolume: parseFloat(allocation.productionVolume),
+                        productionVolumeUnit: allocation.productionVolumeUnit,
+                        facilityTotalProduction: parseFloat(allocation.facilityTotalProduction),
+                        facilityTotalProductionUnit: allocation.facilityTotalProductionUnit,
+                      },
+                      0.75,
+                      false,
+                    );
+                    const pct = Math.min(1, Math.max(0, rawRatio)) * 100;
+                    return (
+                      <div className="p-3 rounded-lg bg-lime-50 dark:bg-lime-900/20 border border-lime-200 dark:border-lime-800">
+                        <p className="text-sm text-lime-800 dark:text-lime-200">
+                          <strong>Attribution Ratio:</strong>{' '}
+                          {pct.toFixed(2)}%
+                          of facility emissions will be allocated to this product
+                        </p>
+                        {ratioWarnings.length > 0 && (
+                          <p className="text-xs text-amber-700 dark:text-amber-400 mt-2">
+                            {ratioWarnings[0]}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               ))}
 

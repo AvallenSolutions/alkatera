@@ -132,6 +132,11 @@ export function CalculationStep() {
           productionVolume: parseFloat(a.productionVolume),
           productionVolumeUnit: a.productionVolumeUnit,
           facilityTotalProduction: parseFloat(a.facilityTotalProduction || a.productionVolume),
+          // When the total falls back to the product volume, its unit is the
+          // product volume's unit by construction.
+          facilityTotalProductionUnit: a.facilityTotalProduction
+            ? (a.facilityTotalProductionUnit || a.productionVolumeUnit)
+            : a.productionVolumeUnit,
           dataCollectionMode: a.dataCollectionMode ?? 'primary',
           archetypeId: a.archetypeId ?? null,
           proxyJustification: a.proxyJustification,

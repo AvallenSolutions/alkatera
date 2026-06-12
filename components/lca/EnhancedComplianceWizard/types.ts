@@ -93,6 +93,8 @@ export interface FacilityAllocation {
   productionVolume: string;
   productionVolumeUnit: string;
   facilityTotalProduction: string;
+  /** Unit of facilityTotalProduction (defaults to the reporting session's unit). */
+  facilityTotalProductionUnit?: string;
   selectedSessionId?: string;
 
   // Proxy-mode fields. `primary` is the default and requires no extra data.

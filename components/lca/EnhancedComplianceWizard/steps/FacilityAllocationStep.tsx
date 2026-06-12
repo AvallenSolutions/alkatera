@@ -21,6 +21,7 @@ import {
   Link2,
 } from 'lucide-react';
 import { PRODUCTION_UNITS, type DataCollectionMode, type HybridArchetypeOverrides } from '../types';
+import { computeAttributionRatio } from '@/lib/product-lca-calculator';
 import { useWizardContext } from '../WizardContext';
 import { FacilityArchetypeProxyForm } from '@/components/facilities/FacilityArchetypeProxyForm';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -85,6 +86,7 @@ export function FacilityAllocationStep() {
         productionVolume: sku,
         facilityTotalProduction: total,
         productionVolumeUnit: 'litres',
+        facilityTotalProductionUnit: 'litres',
       })),
     }));
   };
@@ -130,6 +132,7 @@ export function FacilityAllocationStep() {
               facilityTotalProduction: String(
                 session.total_production_volume
               ),
+              facilityTotalProductionUnit: session.volume_unit || 'units',
               productionVolumeUnit: session.volume_unit || 'units',
               selectedSessionId: session.id,
             }
@@ -351,7 +354,7 @@ export function FacilityAllocationStep() {
               )}
 
               {/* Volume inputs */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs">Product Volume</Label>
                   <Input
@@ -408,23 +411,61 @@ export function FacilityAllocationStep() {
                     className="h-8 text-sm"
                   />
                 </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Unit</Label>
+                  <Select
+                    value={allocation.facilityTotalProductionUnit || allocation.productionVolumeUnit}
+                    onValueChange={(value) =>
+                      updateAllocation(
+                        allocation.facilityId,
+                        'facilityTotalProductionUnit',
+                        value
+                      )
+                    }
+                  >
+                    <SelectTrigger className="h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PRODUCTION_UNITS.map((unit) => (
+                        <SelectItem key={unit.value} value={unit.value}>
+                          {unit.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {/* Attribution ratio */}
               {allocation.productionVolume &&
-                allocation.facilityTotalProduction && (
-                  <div className="p-2 rounded bg-lime-50 dark:bg-lime-900/20 border border-lime-200 dark:border-lime-800">
-                    <p className="text-xs text-lime-800 dark:text-lime-200">
-                      <strong>Attribution:</strong>{' '}
-                      {(
-                        (parseFloat(allocation.productionVolume) /
-                          parseFloat(allocation.facilityTotalProduction)) *
-                        100
-                      ).toFixed(2)}
-                      %
-                    </p>
-                  </div>
-                )}
+                allocation.facilityTotalProduction && (() => {
+                  const { rawRatio, warnings: ratioWarnings } = computeAttributionRatio(
+                    {
+                      facilityName: allocation.facilityName,
+                      productionVolume: parseFloat(allocation.productionVolume),
+                      productionVolumeUnit: allocation.productionVolumeUnit,
+                      facilityTotalProduction: parseFloat(allocation.facilityTotalProduction),
+                      facilityTotalProductionUnit: allocation.facilityTotalProductionUnit,
+                    },
+                    0.75,
+                    false,
+                  );
+                  return (
+                    <div className="p-2 rounded bg-lime-50 dark:bg-lime-900/20 border border-lime-200 dark:border-lime-800">
+                      <p className="text-xs text-lime-800 dark:text-lime-200">
+                        <strong>Attribution:</strong>{' '}
+                        {(Math.min(1, Math.max(0, rawRatio)) * 100).toFixed(2)}
+                        %
+                      </p>
+                      {ratioWarnings.length > 0 && (
+                        <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                          {ratioWarnings[0]}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
             </div>
           ))}
         </div>

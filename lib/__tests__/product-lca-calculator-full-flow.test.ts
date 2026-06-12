@@ -558,6 +558,7 @@ describe('calculateProductCarbonFootprint', () => {
         expect.anything(), // fallbackEvents
         expect.anything(), // materialResolutions
         undefined,         // referenceYear (not set in params)
+        expect.anything(), // calculatorWarnings (upstream warnings)
       );
     });
 
@@ -595,6 +596,7 @@ describe('calculateProductCarbonFootprint', () => {
         expect.anything(), // fallbackEvents
         expect.anything(), // materialResolutions
         undefined,         // referenceYear (not set in params)
+        expect.anything(), // calculatorWarnings (upstream warnings)
       );
     });
   });

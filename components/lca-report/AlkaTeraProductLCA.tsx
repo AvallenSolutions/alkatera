@@ -19,6 +19,7 @@ import {
   LandUseMethodologyPage
 } from './pages/Methodologies';
 import { SupplyChainPage } from './pages/SupplyChain';
+import { IngredientBreakdownPage } from './pages/IngredientBreakdown';
 import type { LCAReportData } from './types';
 
 interface AlkaTeraProductLCAProps {
@@ -38,6 +39,7 @@ export const AlkaTeraProductLCA = ({ data }: AlkaTeraProductLCAProps) => {
       <MethodologyPage data={data} />
       <ClimatePage data={data} />
       <ClimateMethodologyPage data={data} />
+      <IngredientBreakdownPage data={data} />
       <WaterPage data={data} />
       <WaterMethodologyPage data={data} />
       <CircularityPage data={data} />

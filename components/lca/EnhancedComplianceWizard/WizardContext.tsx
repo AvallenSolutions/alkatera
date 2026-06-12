@@ -601,6 +601,7 @@ export function WizardProvider({
               facilityTotalProduction: String(
                 latestSession.total_production_volume
               ),
+              facilityTotalProductionUnit: latestSession.volume_unit || 'units',
               selectedSessionId: latestSession.id,
               dataCollectionMode: defaultMode,
               archetypeId: defaultArchetypeId,
@@ -616,6 +617,7 @@ export function WizardProvider({
             productionVolume: prePopulatedVolume,
             productionVolumeUnit: annualVolume ? annualUnit : 'units',
             facilityTotalProduction: '',
+            facilityTotalProductionUnit: 'units',
             dataCollectionMode: defaultMode,
             archetypeId: defaultArchetypeId,
             proxyJustification: defaultJustification,
@@ -1054,6 +1056,7 @@ export function WizardProvider({
               reportingPeriodStart: bestSession.reporting_period_start,
               reportingPeriodEnd: bestSession.reporting_period_end,
               facilityTotalProduction: String(bestSession.total_production_volume || ''),
+              facilityTotalProductionUnit: bestSession.volume_unit || alloc.facilityTotalProductionUnit,
               productionVolumeUnit: bestSession.volume_unit || alloc.productionVolumeUnit,
               selectedSessionId: bestSession.id,
             };

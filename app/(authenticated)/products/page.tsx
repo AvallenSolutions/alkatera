@@ -34,6 +34,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { DataQualityIndicator } from "@/components/ui/data-quality-indicator";
 
 interface ProductCarbonFootprint {
   system_boundary: string | null;
@@ -53,6 +54,8 @@ interface Product {
   functional_unit_measure: string | null;
   system_boundary: string;
   product_carbon_footprints: ProductCarbonFootprint[];
+  /** Impact-weighted data quality score (0-100) from the latest completed PCF. */
+  dqi_score: number | null;
   created_at: string;
 }
 
@@ -141,12 +144,33 @@ export default function ProductsPage() {
         }
       }
 
+      // Fetch each product's data quality score (DQI) from its completed PCF.
+      // dqi_score is the impact-weighted confidence across all materials,
+      // written by the aggregator on every calculation.
+      const { data: dqiData } = productIds.length > 0
+        ? await supabase
+            .from("product_carbon_footprints")
+            .select("product_id, dqi_score, status")
+            .in("product_id", productIds)
+            .eq("status", "completed")
+            .not("dqi_score", "is", null)
+            .order("created_at", { ascending: false })
+        : { data: [] };
+
+      const dqiMap = new Map<string, number>();
+      for (const pcf of dqiData || []) {
+        if (pcf.product_id && !dqiMap.has(String(pcf.product_id))) {
+          dqiMap.set(String(pcf.product_id), Number(pcf.dqi_score));
+        }
+      }
+
       setProducts(
         (data || []).map((p: any) => ({
           ...p,
           product_carbon_footprints: pcfBoundaryMap.has(String(p.id))
             ? [{ system_boundary: pcfBoundaryMap.get(String(p.id))! }]
             : [],
+          dqi_score: dqiMap.get(String(p.id)) ?? null,
         }))
       );
     } catch (error) {
@@ -420,6 +444,20 @@ export default function ProductsPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">System Boundary:</span>
                     {getBoundaryBadge(getEffectiveBoundary(product))}
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Data Quality:</span>
+                    {product.dqi_score !== null ? (
+                      <DataQualityIndicator
+                        variant="minimal"
+                        confidenceScore={Math.round(product.dqi_score)}
+                        dataQualityGrade={product.dqi_score >= 80 ? 'HIGH' : product.dqi_score >= 50 ? 'MEDIUM' : 'LOW'}
+                        methodology="Weighted across all materials in the latest calculation"
+                      />
+                    ) : (
+                      <span className="text-sm text-muted-foreground">—</span>
+                    )}
                   </div>
 
                   <div className="text-xs text-muted-foreground pt-2 border-t">

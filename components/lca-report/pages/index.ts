@@ -20,3 +20,5 @@ export {
 } from './Methodologies';
 
 export { SupplyChainPage } from './SupplyChain';
+
+export { IngredientBreakdownPage } from './IngredientBreakdown';

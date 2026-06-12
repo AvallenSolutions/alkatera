@@ -192,6 +192,14 @@ describe('getPackagingUnitsPerGroup', () => {
   it('accepts a numeric string units_per_group', () => {
     expect(getPackagingUnitsPerGroup(sharedBox('4'))).toBe(4);
   });
+
+  // The production-side calculator (product-lca-calculator.ts) uses this same
+  // helper as its divisor, so these variants must amortise identically on both
+  // the production and EoL paths.
+  it('treats packaging_material type and capitalised categories as shared packaging', () => {
+    expect(getPackagingUnitsPerGroup({ material_type: 'packaging_material', packaging_category: 'secondary', units_per_group: 4 })).toBe(4);
+    expect(getPackagingUnitsPerGroup({ material_type: 'Packaging', packaging_category: 'Secondary', units_per_group: 6 })).toBe(6);
+  });
 });
 
 // ============================================================================

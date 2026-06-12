@@ -41,32 +41,50 @@ export function DataSourceBadge({
       };
     }
 
-    const source = gwpDataSource || dataSource;
+    const source = (gwpDataSource || dataSource || '').toLowerCase();
 
-    if (source?.includes('Supplier') || dataQualityGrade === 'HIGH') {
+    if (source.includes('supplier')) {
       return {
-        label: 'Supplier EPD',
+        label: 'Supplier data',
         icon: Award,
         color: 'bg-green-50 text-green-700 border-green-200',
-        tooltip: 'Third-party verified supplier data (95% confidence)',
+        tooltip: 'Verified data provided by the supplier of this material',
       };
     }
 
-    if (source?.includes('DEFRA')) {
+    if (source.includes('defra')) {
       return {
-        label: 'DEFRA 2025',
+        label: 'DEFRA',
         icon: Database,
         color: 'bg-blue-50 text-blue-700 border-blue-200',
         tooltip: 'UK Government emission factors for regulatory compliance',
       };
     }
 
-    if (source?.includes('Ecoinvent')) {
+    if (source.includes('agribalyse')) {
+      return {
+        label: 'AGRIBALYSE',
+        icon: Database,
+        color: 'bg-teal-50 text-teal-700 border-teal-200',
+        tooltip: 'AGRIBALYSE agricultural lifecycle inventory database',
+      };
+    }
+
+    if (source.includes('ecoinvent') || source.includes('openlca')) {
       return {
         label: 'Ecoinvent',
         icon: Database,
         color: 'bg-teal-50 text-teal-700 border-teal-200',
-        tooltip: 'Ecoinvent 3.12 lifecycle inventory database',
+        tooltip: 'Ecoinvent lifecycle inventory database',
+      };
+    }
+
+    if (source) {
+      return {
+        label: gwpDataSource || dataSource || 'Database',
+        icon: Database,
+        color: 'bg-gray-50 text-gray-700 border-gray-200',
+        tooltip: `Emission factor from ${gwpDataSource || dataSource}`,
       };
     }
 
