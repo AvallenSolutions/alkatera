@@ -5,9 +5,9 @@
  *
  * THE five-second answer: are we on track against our targets? Aggregates
  * every active target's trajectory (lib/pulse/forecast.ts) into a worst-of
- * verdict (lib/pulse/verdict.ts) and says it plainly, naming the target in
- * the worst shape. With no targets it shows current emissions and invites
- * setting one.
+ * verdict (lib/pulse/verdict.ts), says it plainly, and DRAWS it: the driving
+ * target's history (solid), forecast (dashed) and target line render beside
+ * the words, with the hero's ambient tint following the verdict state.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -19,7 +19,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
 import { cn } from '@/lib/utils';
 import { METRIC_DEFINITIONS, type MetricKey } from '@/lib/pulse/metric-keys';
-import { forecastTrajectory } from '@/lib/pulse/forecast';
+import { forecastTrajectory, type TrajectoryPoint } from '@/lib/pulse/forecast';
 import {
   aggregateVerdict,
   buildVerdictCopy,
@@ -34,12 +34,50 @@ interface TargetRow {
   target_date: string;
 }
 
-const STATE_STYLE: Record<VerdictState, { icon: typeof CheckCircle2; text: string; ring: string }> = {
-  on_track: { icon: CheckCircle2, text: 'text-emerald-500', ring: 'border-emerald-500/40' },
-  at_risk: { icon: AlertTriangle, text: 'text-amber-500', ring: 'border-amber-500/40' },
-  off_track: { icon: XCircle, text: 'text-red-500', ring: 'border-red-500/40' },
-  insufficient_data: { icon: Hourglass, text: 'text-muted-foreground', ring: 'border-border/60' },
-  no_targets: { icon: TargetIcon, text: 'text-muted-foreground', ring: 'border-border/60' },
+const STATE_STYLE: Record<
+  VerdictState,
+  { icon: typeof CheckCircle2; text: string; ring: string; edge: string; glow: string; chart: string }
+> = {
+  on_track: {
+    icon: CheckCircle2,
+    text: 'text-emerald-500',
+    ring: 'border-emerald-500/40',
+    edge: 'border-l-emerald-500',
+    glow: 'bg-emerald-500/15 dark:bg-emerald-500/10',
+    chart: '#10b981',
+  },
+  at_risk: {
+    icon: AlertTriangle,
+    text: 'text-amber-500',
+    ring: 'border-amber-500/40',
+    edge: 'border-l-amber-500',
+    glow: 'bg-amber-500/15 dark:bg-amber-500/10',
+    chart: '#f59e0b',
+  },
+  off_track: {
+    icon: XCircle,
+    text: 'text-red-500',
+    ring: 'border-red-500/40',
+    edge: 'border-l-red-500',
+    glow: 'bg-red-500/15 dark:bg-red-500/10',
+    chart: '#ef4444',
+  },
+  insufficient_data: {
+    icon: Hourglass,
+    text: 'text-muted-foreground',
+    ring: 'border-border/60',
+    edge: 'border-l-border',
+    glow: 'bg-[#ccff00]/10 dark:bg-[#ccff00]/5',
+    chart: '#ccff00',
+  },
+  no_targets: {
+    icon: TargetIcon,
+    text: 'text-muted-foreground',
+    ring: 'border-border/60',
+    edge: 'border-l-[#ccff00]/60',
+    glow: 'bg-[#ccff00]/10 dark:bg-[#ccff00]/5',
+    chart: '#ccff00',
+  },
 };
 
 export function PulseVerdictHero() {
@@ -47,6 +85,8 @@ export function PulseVerdictHero() {
   const orgId = currentOrganization?.id;
   const [loading, setLoading] = useState(true);
   const [verdictInputs, setVerdictInputs] = useState<TargetVerdictInput[]>([]);
+  const [pointsByTarget, setPointsByTarget] = useState<Record<string, TrajectoryPoint[]>>({});
+  const [co2History, setCo2History] = useState<{ date: string; value: number }[]>([]);
   const [emissionsNow, setEmissionsNow] = useState<{ value: number; deltaPct: number | null } | null>(null);
 
   useEffect(() => {
@@ -76,29 +116,32 @@ export function PulseVerdictHero() {
         (byMetric[key] ??= []).push({ date: row.snapshot_date as string, value: Number(row.value) });
       }
 
-      setVerdictInputs(
-        targets.map(t => {
-          const def = METRIC_DEFINITIONS[t.metric_key as MetricKey];
-          const { targetStatus } = forecastTrajectory({
-            history: byMetric[t.metric_key] ?? [],
-            targetDate: t.target_date,
-            targetValue: Number(t.target_value),
-            higherIsBetter: def?.higherIsBetter ?? false,
-          });
-          return {
-            targetId: t.id,
-            metricKey: t.metric_key,
-            targetValue: Number(t.target_value),
-            targetDate: t.target_date,
-            status: targetStatus.status,
-            probability: targetStatus.probability,
-            gap: targetStatus.gap,
-          };
-        }),
-      );
+      const inputs: TargetVerdictInput[] = [];
+      const points: Record<string, TrajectoryPoint[]> = {};
+      for (const t of targets) {
+        const def = METRIC_DEFINITIONS[t.metric_key as MetricKey];
+        const result = forecastTrajectory({
+          history: byMetric[t.metric_key] ?? [],
+          targetDate: t.target_date,
+          targetValue: Number(t.target_value),
+          higherIsBetter: def?.higherIsBetter ?? false,
+        });
+        points[t.id] = result.points;
+        inputs.push({
+          targetId: t.id,
+          metricKey: t.metric_key,
+          targetValue: Number(t.target_value),
+          targetDate: t.target_date,
+          status: result.targetStatus.status,
+          probability: result.targetStatus.probability,
+          gap: result.targetStatus.gap,
+        });
+      }
+      setVerdictInputs(inputs);
+      setPointsByTarget(points);
 
-      // Current emissions + 12-month direction, for the no-targets state.
       const co2 = byMetric['total_co2e'] ?? [];
+      setCo2History(co2);
       if (co2.length > 0) {
         const latest = co2[co2.length - 1].value;
         const yearAgoDate = new Date(co2[co2.length - 1].date);
@@ -123,65 +166,162 @@ export function PulseVerdictHero() {
   const style = STATE_STYLE[verdict.state];
   const Icon = style.icon;
 
+  const chartPoints = verdict.driving ? (pointsByTarget[verdict.driving.targetId] ?? []) : [];
+  const showChart = !loading && verdict.driving && chartPoints.length >= 2;
+  // With no targets, still draw the emissions history so the hero is never a wall of text.
+  const showHistoryOnly = !loading && !verdict.driving && co2History.length >= 2;
+
   return (
-    <Card className="overflow-hidden border-border/60 bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-900/80 dark:via-slate-900 dark:to-slate-800/80">
+    <Card
+      className={cn(
+        'overflow-hidden border-border/60 border-l-4 bg-gradient-to-br from-slate-50 via-white to-slate-50 transition-colors dark:from-slate-900/80 dark:via-slate-900 dark:to-slate-800/80',
+        style.edge,
+      )}
+    >
       <CardContent className="relative p-6 sm:p-8">
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 flex items-center justify-end">
-          <div className="h-56 w-56 -translate-y-12 translate-x-24 rounded-full bg-[#ccff00]/10 blur-3xl dark:bg-[#ccff00]/5" />
+          <div className={cn('h-56 w-56 -translate-y-12 translate-x-24 rounded-full blur-3xl transition-colors', style.glow)} />
         </div>
 
-        <div className="relative flex flex-wrap items-center gap-5">
-          <div className={cn('flex h-16 w-16 items-center justify-center rounded-2xl border-2 bg-background/40', style.ring)}>
-            {loading ? (
-              <div className="h-7 w-7 animate-pulse rounded-full bg-muted/60" />
-            ) : (
-              <Icon className={cn('h-8 w-8', style.text)} aria-hidden="true" />
-            )}
-          </div>
-
-          <div className="min-w-0 flex-1">
-            {loading ? (
-              <>
-                <div className="h-7 w-40 animate-pulse rounded bg-muted/60" />
-                <div className="mt-2 h-4 w-3/4 animate-pulse rounded bg-muted/60" />
-              </>
-            ) : (
-              <>
-                <h2 className={cn('text-2xl font-semibold', style.text)}>{copy.headline}</h2>
-                <p className="mt-1 max-w-2xl text-sm text-muted-foreground sm:text-base">{copy.sub}</p>
-              </>
-            )}
-          </div>
-
-          {!loading && verdict.state === 'no_targets' && (
-            <div className="flex flex-col items-end gap-2">
-              {emissionsNow && (
-                <p className="text-sm text-muted-foreground">
-                  Emissions now:{' '}
-                  <span className="font-semibold tabular-nums text-foreground">
-                    {Math.round(emissionsNow.value).toLocaleString('en-GB')} kg CO2e
-                  </span>
-                  {emissionsNow.deltaPct !== null && (
-                    <span className={cn('ml-1.5 text-xs', emissionsNow.deltaPct <= 0 ? 'text-emerald-500' : 'text-red-500')}>
-                      {emissionsNow.deltaPct <= 0 ? '' : '+'}
-                      {emissionsNow.deltaPct.toFixed(0)}% vs a year ago
-                    </span>
-                  )}
-                </p>
+        <div className="relative grid items-center gap-6 lg:grid-cols-[1fr_minmax(220px,300px)]">
+          <div className="flex items-start gap-4">
+            <div className={cn('flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-2 bg-background/40', style.ring)}>
+              {loading ? (
+                <div className="h-6 w-6 animate-pulse rounded-full bg-muted/60" />
+              ) : (
+                <Icon className={cn('h-7 w-7', style.text)} aria-hidden="true" />
               )}
-              <Button asChild size="sm">
-                <Link href="/pulse/targets">Set a target</Link>
-              </Button>
             </div>
-          )}
+            <div className="min-w-0">
+              {loading ? (
+                <>
+                  <div className="h-7 w-40 animate-pulse rounded bg-muted/60" />
+                  <div className="mt-2 h-4 w-3/4 animate-pulse rounded bg-muted/60" />
+                </>
+              ) : (
+                <>
+                  <h2 className={cn('text-2xl font-semibold sm:text-3xl', style.text)}>{copy.headline}</h2>
+                  <p className="mt-1 max-w-xl text-sm text-muted-foreground sm:text-base">{copy.sub}</p>
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    {verdict.state === 'no_targets' ? (
+                      <Button asChild size="sm">
+                        <Link href="/pulse/targets">Set a target</Link>
+                      </Button>
+                    ) : (
+                      <Button asChild size="sm" variant="outline">
+                        <Link href="/pulse/targets">Targets &amp; actions</Link>
+                      </Button>
+                    )}
+                    {verdict.state === 'no_targets' && emissionsNow && (
+                      <p className="text-xs text-muted-foreground">
+                        Emissions now:{' '}
+                        <span className="font-semibold tabular-nums text-foreground">
+                          {Math.round(emissionsNow.value).toLocaleString('en-GB')} kg CO2e
+                        </span>
+                        {emissionsNow.deltaPct !== null && (
+                          <span className={cn('ml-1.5', emissionsNow.deltaPct <= 0 ? 'text-emerald-500' : 'text-red-500')}>
+                            {emissionsNow.deltaPct <= 0 ? '' : '+'}
+                            {emissionsNow.deltaPct.toFixed(0)}% vs a year ago
+                          </span>
+                        )}
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
 
-          {!loading && verdict.state !== 'no_targets' && (
-            <Button asChild size="sm" variant="outline">
-              <Link href="/pulse/targets">Targets &amp; actions</Link>
-            </Button>
+          {showChart && verdict.driving && (
+            <TrajectoryMiniChart
+              points={chartPoints}
+              targetValue={verdict.driving.targetValue}
+              colour={style.chart}
+              metricKey={verdict.driving.metricKey}
+            />
+          )}
+          {showHistoryOnly && (
+            <TrajectoryMiniChart
+              points={co2History.map(p => ({ ...p, forecast: false }))}
+              targetValue={null}
+              colour={style.chart}
+              metricKey="total_co2e"
+            />
           )}
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Compact hand-rolled SVG trajectory: solid history, dashed forecast, a
+ * "today" divider and the target as a dashed horizontal line. Deliberately
+ * lighter than the full fan chart in the Performance tab.
+ */
+function TrajectoryMiniChart({
+  points,
+  targetValue,
+  colour,
+  metricKey,
+}: {
+  points: Array<{ date: string; value: number; forecast: boolean }>;
+  targetValue: number | null;
+  colour: string;
+  metricKey: string;
+}) {
+  const W = 300;
+  const H = 110;
+  const PAD = 6;
+
+  const values = points.map(p => p.value);
+  const allValues = targetValue !== null ? [...values, targetValue] : values;
+  const min = Math.min(...allValues);
+  const max = Math.max(...allValues);
+  const span = max - min || 1;
+  const x = (i: number) => PAD + (i / Math.max(points.length - 1, 1)) * (W - PAD * 2);
+  const y = (v: number) => H - PAD - ((v - min) / span) * (H - PAD * 2 - 14);
+
+  const firstForecastIdx = points.findIndex(p => p.forecast);
+  const historyPts = firstForecastIdx === -1 ? points : points.slice(0, firstForecastIdx + 1);
+  const forecastPts = firstForecastIdx === -1 ? [] : points.slice(Math.max(firstForecastIdx - 1, 0));
+
+  const toPolyline = (pts: typeof points, offset: number) =>
+    pts.map((p, i) => `${x(offset + i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
+
+  const historyLine = toPolyline(historyPts, 0);
+  const forecastLine = toPolyline(forecastPts, Math.max(firstForecastIdx - 1, 0));
+  const todayX = firstForecastIdx > 0 ? x(firstForecastIdx - 1) : null;
+  const targetY = targetValue !== null ? y(targetValue) : null;
+  const unit = METRIC_DEFINITIONS[metricKey as MetricKey]?.unit ?? '';
+
+  return (
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className="h-[110px] w-full"
+      role="img"
+      aria-label={`History and forecast for ${METRIC_DEFINITIONS[metricKey as MetricKey]?.label ?? metricKey}`}
+    >
+      {targetY !== null && (
+        <>
+          <line x1={PAD} y1={targetY} x2={W - PAD} y2={targetY} stroke={colour} strokeWidth={1} strokeDasharray="2 5" opacity={0.5} />
+          <text x={W - PAD} y={targetY - 4} textAnchor="end" fontSize={9} fill={colour} opacity={0.9}>
+            target{targetValue !== null ? ` ${Math.round(targetValue).toLocaleString('en-GB')} ${unit}` : ''}
+          </text>
+        </>
+      )}
+      {todayX !== null && (
+        <>
+          <line x1={todayX} y1={PAD} x2={todayX} y2={H - PAD} stroke="currentColor" strokeWidth={1} strokeDasharray="2 4" opacity={0.2} />
+          <text x={todayX + 4} y={H - PAD - 2} fontSize={9} fill="currentColor" opacity={0.45}>
+            today
+          </text>
+        </>
+      )}
+      <polyline points={historyLine} fill="none" stroke={colour} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+      {forecastPts.length >= 2 && (
+        <polyline points={forecastLine} fill="none" stroke={colour} strokeWidth={2} strokeDasharray="4 4" opacity={0.65} strokeLinecap="round" />
+      )}
+    </svg>
   );
 }
