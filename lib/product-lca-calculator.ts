@@ -19,6 +19,7 @@ import type { Orchard } from './types/orchard';
 import { getGridFactor } from './grid-emission-factors';
 import { getAwareFactor } from './calculations/water-risk';
 import { DEFAULT_RECYCLED_CONTENT_CREDIT } from './constants/packaging-defaults';
+import { getPackagingUnitsPerGroup, SHARED_PACKAGING_CATEGORIES } from './end-of-life-factors';
 import { overlapFraction } from './calculations/utility-factors';
 import { checkRunIntensity } from './validation/production-run-sanity';
 import {
@@ -45,6 +46,15 @@ export interface FacilityAllocationInput {
   productionVolume: number;
   productionVolumeUnit: string;
   facilityTotalProduction: number;
+  /**
+   * Unit of facilityTotalProduction. When absent, it is assumed to equal
+   * productionVolumeUnit (the historical behaviour); a warning is pushed when
+   * the resulting attribution ratio looks implausible. When present and
+   * different from productionVolumeUnit, both volumes are normalised to a
+   * common basis before computing the facility share, preventing silent
+   * litres-vs-hectolitres style errors (100x).
+   */
+  facilityTotalProductionUnit?: string;
 
   /**
    * How data was collected. Defaults to 'primary' (the historical behaviour).
@@ -115,7 +125,9 @@ async function generateCalculationFingerprint(params: {
     facilities: (params.facilityAllocations || []).map(f => ({
       id: f.facilityId,
       production: f.productionVolume,
+      productionUnit: f.productionVolumeUnit || '',
       total: f.facilityTotalProduction,
+      totalUnit: f.facilityTotalProductionUnit || '',
     })).sort((a, b) => a.id.localeCompare(b.id)),
     factors: params.factorValues
       .map(f => ({ n: f.name, v: Number(f.impact_climate_per_kg.toFixed(8)), s: f.gwp_data_source }))
@@ -129,6 +141,108 @@ async function generateCalculationFingerprint(params: {
   const data = encoder.encode(canonical);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
   return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Unit families recognised for production volumes. Shared by the
+// functional-unit conversion and the facility attribution ratio so the two
+// can never disagree about what a unit string means.
+const LITRE_FAMILY = ['l', 'litre', 'litres', 'liter', 'liters'];
+const HECTOLITRE_FAMILY = ['hl', 'hectolitre', 'hectolitres', 'hectoliter', 'hectoliters'];
+const MILLILITRE_FAMILY = ['ml', 'millilitre', 'millilitres', 'milliliter', 'milliliters'];
+const COUNT_FAMILY = ['unit', 'units', 'bottle', 'bottles', 'can', 'cans'];
+const MASS_KG_FAMILY = ['kg', 'kilogram', 'kilograms', 'kgs'];
+const MASS_TONNE_FAMILY = ['t', 'tonne', 'tonnes', 'metric ton', 'metric tons'];
+
+/**
+ * Convert a production volume to a comparable basis: litres for volume-family
+ * units (counts convert via the product's unit size when known), kilograms
+ * for mass-family units. Returns null when the unit can't be converted
+ * (cases, pallets, or counts when the product's unit size is unknown —
+ * converting counts via a guessed bottle size would be worse than not
+ * converting at all).
+ */
+function allocationVolumeToBasis(
+  volume: number,
+  unit: string,
+  fuSizeLitres: number,
+  fuSizeKnown: boolean,
+): { kind: 'volume' | 'mass'; value: number } | null {
+  const u = (unit || '').toLowerCase().trim();
+  if (LITRE_FAMILY.includes(u)) return { kind: 'volume', value: volume };
+  if (HECTOLITRE_FAMILY.includes(u)) return { kind: 'volume', value: volume * 100 };
+  if (MILLILITRE_FAMILY.includes(u)) return { kind: 'volume', value: volume / 1000 };
+  if (COUNT_FAMILY.includes(u) && fuSizeKnown) return { kind: 'volume', value: volume * fuSizeLitres };
+  if (MASS_KG_FAMILY.includes(u)) return { kind: 'mass', value: volume };
+  if (MASS_TONNE_FAMILY.includes(u)) return { kind: 'mass', value: volume * 1000 };
+  return null;
+}
+
+/**
+ * Compute the facility attribution ratio (productionVolume / facilityTotal)
+ * with unit normalisation. Returns the raw (unclamped) ratio plus any
+ * plain-language warnings for the user.
+ *
+ * Rules:
+ * - No facilityTotalProductionUnit, or same unit as productionVolumeUnit:
+ *   divide directly (units cancel) — the historical behaviour.
+ * - Different units of the same kind (litres vs hectolitres, kg vs tonnes,
+ *   bottles vs litres when the bottle size is known): normalise both to a
+ *   common basis before dividing.
+ * - Different units that can't be reconciled: divide directly and warn,
+ *   since the ratio may be wrong by the unit factor.
+ *
+ * Exported so UI previews can show the same ratio (and the same caveats)
+ * the calculation will use.
+ */
+export function computeAttributionRatio(
+  allocation: Pick<
+    FacilityAllocationInput,
+    'facilityName' | 'productionVolume' | 'productionVolumeUnit' | 'facilityTotalProduction' | 'facilityTotalProductionUnit'
+  >,
+  fuSizeLitres: number,
+  fuSizeKnown: boolean,
+): { rawRatio: number; warnings: string[] } {
+  const warnings: string[] = [];
+  const prod = Number(allocation.productionVolume) || 0;
+  const total = Number(allocation.facilityTotalProduction) || 0;
+  if (total <= 0) return { rawRatio: 0, warnings };
+
+  const prodUnit = (allocation.productionVolumeUnit || '').toLowerCase().trim();
+  const totalUnit = (allocation.facilityTotalProductionUnit || '').toLowerCase().trim();
+
+  let rawRatio: number;
+  if (!totalUnit || totalUnit === prodUnit) {
+    rawRatio = prod / total;
+  } else {
+    const prodBasis = allocationVolumeToBasis(prod, prodUnit, fuSizeLitres, fuSizeKnown);
+    const totalBasis = allocationVolumeToBasis(total, totalUnit, fuSizeLitres, fuSizeKnown);
+    if (prodBasis && totalBasis && prodBasis.kind === totalBasis.kind && totalBasis.value > 0) {
+      rawRatio = prodBasis.value / totalBasis.value;
+    } else {
+      rawRatio = prod / total;
+      warnings.push(
+        `For facility "${allocation.facilityName}", your production volume is in "${allocation.productionVolumeUnit}" ` +
+        `but the facility's total output is in "${allocation.facilityTotalProductionUnit}", and these can't be converted automatically. ` +
+        `The two numbers were compared as entered, so this facility's share of emissions may be inaccurate. ` +
+        `Please enter both volumes in the same unit.`
+      );
+    }
+  }
+
+  if (rawRatio > 1) {
+    warnings.push(
+      `More of this product was attributed to facility "${allocation.facilityName}" than the facility's total output ` +
+      `(${prod} ${allocation.productionVolumeUnit || 'units'} vs ${total} ${allocation.facilityTotalProductionUnit || allocation.productionVolumeUnit || 'units'}). ` +
+      `The facility share has been capped at 100%. Check that both volumes are correct and use the same unit.`
+    );
+  } else if (rawRatio > 0 && rawRatio < 0.0001) {
+    warnings.push(
+      `This product accounts for less than 0.01% of facility "${allocation.facilityName}"'s output. ` +
+      `If that doesn't sound right, double-check the two production volumes and their units.`
+    );
+  }
+
+  return { rawRatio, warnings };
 }
 
 /**
@@ -434,6 +548,10 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
     // 4a. Handle facility allocations
     const { facilityAllocations } = params;
 
+    // Plain-language warnings for the user, passed through the aggregator into
+    // aggregated_impacts.calculation_warnings so they appear in the LCA report.
+    const calculatorWarnings: string[] = [];
+
     // The aggregator's contract is "productVolume = units of THIS PRODUCT
     // produced" (it divides facility emissions by it for per-unit values).
     // Allocations may carry the volume in litres/hl instead (the archetype
@@ -442,6 +560,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
     // bottle). Convert volume units to functional units here; unconvertible
     // units (kg, cases, pallets) keep the previous treated-as-units
     // behaviour, with a warning so the data entry can be fixed.
+    const fuSizeKnown = Number.isFinite(Number(product.unit_size_value)) && Number(product.unit_size_value) > 0;
     const fuSizeLitres = (() => {
       const v = Number(product.unit_size_value);
       if (!Number.isFinite(v) || v <= 0) return 0.75;
@@ -455,11 +574,11 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       if (vol <= 0) return vol;
       const u = (unit || 'units').toLowerCase().trim();
       let litres: number | null = null;
-      if (['l', 'litre', 'litres', 'liter', 'liters'].includes(u)) litres = vol;
-      else if (['hl', 'hectolitre', 'hectolitres', 'hectoliter', 'hectoliters'].includes(u)) litres = vol * 100;
-      else if (['ml', 'millilitre', 'millilitres', 'milliliter', 'milliliters'].includes(u)) litres = vol / 1000;
+      if (LITRE_FAMILY.includes(u)) litres = vol;
+      else if (HECTOLITRE_FAMILY.includes(u)) litres = vol * 100;
+      else if (MILLILITRE_FAMILY.includes(u)) litres = vol / 1000;
       if (litres === null) {
-        if (!['unit', 'units', 'bottle', 'bottles', 'can', 'cans'].includes(u)) {
+        if (!COUNT_FAMILY.includes(u)) {
           console.warn(
             `[calculateProductCarbonFootprint] ⚠ Production volume for ${facilityName} is in '${u}', ` +
             `which cannot be converted to functional units — treating as units. ` +
@@ -961,15 +1080,17 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           }
 
           // CRITICAL FIX: Attribution ratio must be in [0, 1].
-          const rawAttributionRatio = allocation.facilityTotalProduction > 0
-            ? allocation.productionVolume / allocation.facilityTotalProduction
-            : 0;
-          if (rawAttributionRatio > 1) {
+          // Volumes are normalised to a common unit first (litres) when the
+          // two units differ, so litres-vs-hectolitres entries no longer skew
+          // the facility share by 100x. Plain-language warnings surface in
+          // the LCA report via calculatorWarnings.
+          const { rawRatio: rawAttributionRatio, warnings: ratioWarnings } =
+            computeAttributionRatio(allocation, fuSizeLitres, fuSizeKnown);
+          if (ratioWarnings.length > 0) {
+            calculatorWarnings.push(...ratioWarnings);
             console.warn(
-              `[calculateProductCarbonFootprint] ⚠️ ATTRIBUTION RATIO > 1 for ${allocation.facilityName}: ` +
-              `productionVolume=${allocation.productionVolume} > facilityTotalProduction=${allocation.facilityTotalProduction}. ` +
-              `This means more product was attributed to this facility than its total output, which is physically impossible. ` +
-              `Clamping ratio to 1.0. Please verify that productionVolume and facilityTotalProduction use the same unit.`
+              `[calculateProductCarbonFootprint] ⚠️ Facility allocation for ${allocation.facilityName}:`,
+              ratioWarnings.join(' | ')
             );
           }
           attributionRatio = Math.min(1, Math.max(0, rawAttributionRatio));
@@ -1463,34 +1584,28 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         // silently default to 1, meaning the full packaging impact was attributed
         // to each unit rather than being shared — a systematic over-count.
         // Now we warn explicitly so the data entry issue is surfaced.
-        const rawUnitsPerGroup = (material as any).units_per_group;
-        const parsedUnitsPerGroup = Number(rawUnitsPerGroup);
-
+        //
+        // The divisor itself comes from getPackagingUnitsPerGroup(), the same
+        // helper the EoL path uses, so production and end-of-life can never
+        // amortise the same packaging by different amounts.
+        const materialTypeLower = (material.material_type || '').toLowerCase();
         const isSharedPackaging = (
-          material.material_type === 'packaging' &&
-          material.packaging_category &&
-          ['secondary', 'shipment', 'tertiary'].includes(material.packaging_category)
+          (materialTypeLower === 'packaging' || materialTypeLower === 'packaging_material') &&
+          SHARED_PACKAGING_CATEGORIES.includes((material.packaging_category || '').toLowerCase())
         );
 
-        let unitsPerGroup = 1;
-        if (isSharedPackaging) {
-          if (!rawUnitsPerGroup || isNaN(parsedUnitsPerGroup) || parsedUnitsPerGroup <= 0) {
-            console.warn(
-              `[calculateProductCarbonFootprint] ⚠️ PACKAGING ALLOCATION: "${material.material_name}" ` +
-              `(${material.packaging_category}) is shared packaging but has no valid units_per_group ` +
-              `(value: ${rawUnitsPerGroup}). Defaulting to 1 (full impact per unit — likely an over-count). ` +
-              `Please set units_per_group to the number of product units in each ${material.packaging_category} pack.`
-            );
-            unitsPerGroup = 1;
-          } else if (parsedUnitsPerGroup < 1) {
-            console.warn(
-              `[calculateProductCarbonFootprint] ⚠️ PACKAGING ALLOCATION: "${material.material_name}" ` +
-              `units_per_group=${parsedUnitsPerGroup} is less than 1 (invalid). Clamping to 1.`
-            );
-            unitsPerGroup = 1;
-          } else {
-            unitsPerGroup = parsedUnitsPerGroup;
-          }
+        const unitsPerGroup = getPackagingUnitsPerGroup(material as any);
+        if (isSharedPackaging && unitsPerGroup === 1) {
+          console.warn(
+            `[calculateProductCarbonFootprint] ⚠️ PACKAGING ALLOCATION: "${material.material_name}" ` +
+            `(${material.packaging_category}) is shared packaging but has no valid units_per_group ` +
+            `(value: ${(material as any).units_per_group}). Defaulting to 1 (full impact per unit — likely an over-count).`
+          );
+          calculatorWarnings.push(
+            `The packaging item "${material.material_name}" is a multipack or shipping pack, but it doesn't say how many products share it. ` +
+            `Its full impact has been counted against every single unit, which likely overstates the footprint. ` +
+            `Edit this packaging item and set "units per pack" to fix this.`
+          );
         }
 
         if (!isPinned && unitsPerGroup > 1) {
@@ -1741,6 +1856,9 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           impact_climate_fossil: (material as any).is_biogenic_carbon ? 0 : resolved.impact_climate_fossil,
           impact_climate_biogenic: (material as any).is_biogenic_carbon ? adjustedClimate : resolved.impact_climate_biogenic,
           impact_climate_dluc: resolved.impact_climate_dluc,
+          // True when the resolver could not characterise a fossil/biogenic split
+          // and attributed the whole total to fossil (ISO 14067 §6.4.9.3 disclosure).
+          carbon_split_estimated: resolved.carbon_split_estimated || false,
           // GHG gas breakdown (ISO 14067)
           ch4_kg: resolved.ch4_kg || 0,
           ch4_fossil_kg: resolved.ch4_fossil_kg || 0,
@@ -2868,6 +2986,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       fallbackEvents,
       materialResolutions,
       referenceYear,
+      calculatorWarnings,
     );
 
     if (!aggregationResult.success) {

@@ -3,47 +3,102 @@
 import { PageWrapper, SectionHeader } from '../Layout';
 import type { LCAReportData } from '../types';
 
-export const ClimateMethodologyPage = ({ data }: { data: LCAReportData }) => (
-  <PageWrapper theme="light" pageNumber={5}>
-    <SectionHeader number="3A" title="Climate Impact Methodology" theme="light" className="mb-8" />
+// GHG species rows for the dual-standard inventory table. Each line is reported
+// separately so the report satisfies BOTH ISO 14067:2018 (fossil-only headline,
+// biogenic excluded) and the GHG Protocol Product Standard (all-species total,
+// biogenic disclosed). Biogenic CO₂ carries GWP 1 but is kept out of the headline.
+const ghgSpeciesRows = (g: LCAReportData['ghgDetailed']) => [
+  { species: 'CO₂ (fossil)', co2e: g.fossilCo2, gwp: '1', accent: '#ef4444', inFossil: true },
+  { species: 'CO₂ (biogenic)', co2e: g.biogenicCo2, gwp: '1*', accent: '#22c55e', inFossil: false },
+  { species: 'CO₂ (LULUC)', co2e: g.dlucCo2, gwp: '1', accent: '#f97316', inFossil: true },
+  { species: 'CH₄ (fossil)', co2e: g.ch4FossilKgCo2e, gwp: '29.8', accent: '#ef4444', inFossil: true },
+  { species: 'CH₄ (biogenic)', co2e: g.ch4BiogenicKgCo2e, gwp: '27.0', accent: '#22c55e', inFossil: false },
+  { species: 'N₂O', co2e: g.n2oKgCo2e, gwp: '273', accent: '#ef4444', inFossil: true },
+  { species: 'HFCs / PFCs', co2e: g.hfcPfc, gwp: 'Var.', accent: '#a8a29e', inFossil: true },
+];
 
-    <div className="mb-8">
-      <h3 className="text-sm uppercase tracking-wider text-neutral-500 mb-3 font-medium">Calculation Methodology</h3>
-      <p className="text-neutral-600 text-sm leading-relaxed max-w-3xl">
-        Carbon footprint calculated using ISO 14067:2018 methodology for quantification and communication of greenhouse gas emissions.
-        All greenhouse gases are converted to CO2 equivalents using IPCC AR6 100-year Global Warming Potential (GWP100) factors.
-        Calculations follow the attributional life cycle assessment approach.
-      </p>
-    </div>
+export const ClimateMethodologyPage = ({ data }: { data: LCAReportData }) => {
+  const g = data.ghgDetailed;
+  return (
+    <PageWrapper theme="light" pageNumber={5}>
+      <SectionHeader number="3A" title="Climate Impact Methodology" theme="light" className="mb-6" />
 
-    <div className="mb-8">
-      <h3 className="text-xl font-normal mb-6 text-neutral-800">IPCC AR6 GHG Breakdown</h3>
-      <div className="space-y-3">
-        {data.climateImpact.methodology.ghgBreakdown.map((item, i) => (
-          <div key={i} className="flex items-center justify-between bg-neutral-50 rounded-xl p-5 border border-neutral-100">
-            <div className="flex items-center gap-4">
-              <span className="font-mono text-lg text-emerald-600 font-medium italic">{item.label}</span>
+      <div className="mb-6">
+        <h3 className="text-sm uppercase tracking-wider text-neutral-500 mb-2 font-medium">Calculation Methodology</h3>
+        <p className="text-neutral-600 text-xs leading-relaxed max-w-3xl">
+          Carbon footprint quantified using ISO 14067:2018, with results also presented on a GHG Protocol
+          Product Standard basis. Greenhouse gases are converted to CO₂ equivalents using IPCC AR6 100-year
+          Global Warming Potential (GWP100) factors, following the attributional life cycle assessment approach.
+        </p>
+      </div>
+
+      {/* Two headline totals — the heart of dual-standard reporting */}
+      <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <div className="text-[10px] font-mono uppercase tracking-wider text-amber-700 mb-1">Fossil Carbon Footprint (headline)</div>
+          <div className="text-2xl font-serif text-amber-900">{g.fossilOnlyTotal ?? g.totalGwp100} <span className="text-sm font-sans text-amber-700">kg CO₂e</span></div>
+          <div className="text-[10px] text-amber-700/80 mt-1">Excludes biogenic CO₂ per ISO 14067:2018 §6.4.9.3</div>
+        </div>
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+          <div className="text-[10px] font-mono uppercase tracking-wider text-emerald-700 mb-1">Total incl. Biogenic</div>
+          <div className="text-2xl font-serif text-emerald-900">{g.totalGwp100} <span className="text-sm font-sans text-emerald-700">kg CO₂e</span></div>
+          <div className="text-[10px] text-emerald-700/80 mt-1">All-species basis per GHG Protocol Product Standard</div>
+        </div>
+      </div>
+
+      {/* Per-gas inventory, each origin reported separately */}
+      <div className="mb-5">
+        <h3 className="text-base font-normal mb-3 text-neutral-800">GHG Inventory by Species &amp; Origin (IPCC AR6)</h3>
+        <div className="border border-neutral-200 rounded-xl overflow-hidden">
+          <div className="grid grid-cols-[1fr_auto_auto] gap-4 px-4 py-2 bg-neutral-50 text-[10px] font-mono uppercase tracking-wider text-neutral-400">
+            <span>Species</span><span className="text-right">kg CO₂e</span><span className="text-right w-16">GWP-100</span>
+          </div>
+          {ghgSpeciesRows(g).map((row, i) => (
+            <div key={i} className="grid grid-cols-[1fr_auto_auto] gap-4 px-4 py-1.5 border-t border-neutral-100 text-xs items-center">
+              <span className="flex items-center gap-2 text-neutral-700">
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: row.accent }} />
+                {row.species}
+              </span>
+              <span className="text-right font-mono text-neutral-800">{row.co2e}</span>
+              <span className="text-right font-mono text-neutral-400 w-16">{row.gwp}</span>
             </div>
-            <div className="font-mono font-medium text-lg">{item.value} <span className="text-neutral-400 text-base">{item.unit}</span></div>
-            <div className="text-xs text-neutral-400 font-mono">GWP: {item.gwp}</div>
+          ))}
+          <div className="grid grid-cols-[1fr_auto_auto] gap-4 px-4 py-2 border-t border-neutral-200 bg-emerald-50 text-xs font-semibold items-center">
+            <span className="text-emerald-900">Total GWP-100 (all species)</span>
+            <span className="text-right font-mono text-emerald-900">{g.totalGwp100}</span>
+            <span className="w-16" />
           </div>
-        ))}
+          <div className="grid grid-cols-[1fr_auto_auto] gap-4 px-4 py-2 border-t border-amber-200 bg-amber-50 text-xs font-semibold items-center">
+            <span className="text-amber-900">Fossil Carbon Footprint (excl. biogenic)</span>
+            <span className="text-right font-mono text-amber-900">{g.fossilOnlyTotal ?? g.totalGwp100}</span>
+            <span className="w-16" />
+          </div>
+        </div>
+        <p className="text-[9px] text-neutral-400 mt-1">* Biogenic CO₂ is characterised at GWP 1 for the species inventory but reported separately from the fossil carbon footprint per ISO 14067:2018 §6.4.9.3.</p>
       </div>
-    </div>
 
-    <div>
-      <h3 className="text-xl font-normal mb-4 text-neutral-800">Compliance Standards</h3>
-      <div className="space-y-2">
-        {data.climateImpact.methodology.standards.map((std, i) => (
-          <div key={i} className="flex items-start gap-3">
-            <div className="w-1.5 h-1.5 rounded-full bg-neutral-800 mt-2"></div>
-            <p className="font-mono text-sm text-neutral-600">{std}</p>
-          </div>
-        ))}
+      {/* Biogenic carbon disclosure note */}
+      {g.biogenicNote && (
+        <div className="bg-green-50 border border-green-100 rounded-xl p-3 mb-5">
+          <div className="text-[10px] font-semibold text-green-800 mb-1">Biogenic Carbon Note (ISO 14067:2018)</div>
+          <p className="text-[10px] text-neutral-600 leading-relaxed">{g.biogenicNote}</p>
+        </div>
+      )}
+
+      <div>
+        <h3 className="text-sm font-normal mb-2 text-neutral-800">Reference Standards</h3>
+        <div className="flex flex-wrap gap-x-6 gap-y-1">
+          {data.climateImpact.methodology.standards.map((std, i) => (
+            <div key={i} className="flex items-start gap-2">
+              <div className="w-1 h-1 rounded-full bg-neutral-800 mt-1.5"></div>
+              <p className="font-mono text-[10px] text-neutral-600">{std}</p>
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
-  </PageWrapper>
-);
+    </PageWrapper>
+  );
+};
 
 export const WaterMethodologyPage = ({ data }: { data: LCAReportData }) => (
   <PageWrapper theme="light" pageNumber={8}>

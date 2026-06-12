@@ -271,16 +271,22 @@ describe('Group B: buildSupplierProductResult — calculation accuracy', () => {
     expect(result.impact_climate_fossil).toBe(15);   // 1.5 * 10
     expect(result.impact_climate_biogenic).toBe(5);   // 0.5 * 10
     expect(result.impact_climate_dluc).toBe(1);       // 0.1 * 10
+    expect(result.carbon_split_estimated).toBe(false); // real split, not estimated
   });
 
-  it('B5: GHG estimation fallback: no breakdown → 85/15 split', async () => {
+  it('B5: no fossil/biogenic breakdown → 100% fossil + estimated flag (ISO 14067 §6.4.9.3)', async () => {
+    // When a supplier declares neither ghg_fossil nor ghg_biogenic, the resolver
+    // must NOT fabricate an 85/15 split. It attributes the whole total to fossil
+    // (conservative for the headline) and flags the split as estimated so the
+    // report can disclose "not separately characterised".
     const product = makeSupplierProduct({ impact_climate: 2.0 });
     mockSupplierProductResolve(product);
 
     const result = await resolveImpactFactors(makeMaterial(), 10);
-    expect(result.impact_climate_fossil).toBeCloseTo(17);     // 2.0 * 0.85 * 10
-    expect(result.impact_climate_biogenic).toBeCloseTo(3);     // 2.0 * 0.15 * 10
+    expect(result.impact_climate_fossil).toBeCloseTo(20);     // 2.0 * 10, all fossil
+    expect(result.impact_climate_biogenic).toBe(0);           // no fabricated biogenic
     expect(result.impact_climate_dluc).toBe(0);
+    expect(result.carbon_split_estimated).toBe(true);
   });
 
   it('B6: water scarcity with supplier factor overrides AWARE', async () => {
@@ -436,7 +442,8 @@ describe('Group D: Waterfall priority — supplier product resolution', () => {
 
     const result = await resolveImpactFactors(makeMaterial(), 10);
     expect(result.data_priority).toBe(1);
-    expect(result.supplier_lca_id).toBe('sp-001');
+    // supplier_lca_id is reserved for Priority 1c PCF records; for 1a use resolved_factor_id
+    expect(result.resolved_factor_id).toBe('sp-001');
   });
 
   it('D2: supplier product with NO data → falls through (throws when no fallback)', async () => {

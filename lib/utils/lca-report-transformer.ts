@@ -164,7 +164,9 @@ interface OrganizationData {
  *
  * The pedigree matrix assesses data quality across 5 dimensions, each scored
  * 1 (best) to 5 (worst), following the Weidema & Wesnæs (1996) pedigree approach
- * adopted by ISO 14044 Clause 4.2.3.6.3 and implemented in ecoinvent.
+ * implemented in ecoinvent and consistent with the ISO 14044 §4.2.3.6 data-quality
+ * criteria. (ISO 14044 requires data quality to be characterised; it does not
+ * itself mandate the pedigree matrix, which is established LCA community practice.)
  *
  * Scoring logic:
  *
@@ -635,6 +637,9 @@ export function transformLCADataForReport(
   const ghgFull = impacts.ghg_breakdown || {};
   const co2eContrib = ghgFull.co2e_contributions || {};
   const gasInv = ghgFull.gas_inventory || {};
+  // How many inputs had no fossil/biogenic split in their LCI data and were
+  // attributed wholly to fossil (ISO 14067 §6.4.9.3). Disclosed in the note.
+  const estimatedSplitCount = Number((ghgFull as any).carbon_origin?.estimated_split_count || 0);
 
   // CRITICAL: Use ?? (nullish coalescing) instead of || for all gas values.
   // The aggregator can legitimately compute 0 for pure CO₂ species (e.g. when N₂O CO₂e
@@ -678,6 +683,22 @@ export function transformLCADataForReport(
   const rCh4FossilKg = ch4FossilKg * reconScale;
   const rCh4BiogenicKg = ch4BiogenicKg * reconScale;
   const rN2oKg = n2oKg * reconScale;
+
+  // ── Canonical fossil carbon footprint (ISO 14067:2018 §6.4.9.3) ────────────
+  // The HEADLINE figure is the fossil-only carbon footprint: the sum of the
+  // reconciled fossil GHG species, excluding biogenic CO₂ and biogenic CH₄.
+  // This is the SAME value reported on the Section 06 "Fossil Carbon Footprint"
+  // line (fossilOnlyTotal below), so the cover, Executive Summary, Climate page
+  // and detailed GHG table are guaranteed to agree — they all read this one
+  // variable. Previously the headline used `totalCarbon` (all-species GWP-100
+  // minus the top-level `impacts.climate_biogenic`), which understated the
+  // biogenic share because that field omits biogenic CH₄ and is 0 on many
+  // records, so the cover showed the all-species total while Section 06 showed
+  // the lower fossil-only figure — the contradiction reviewers flagged.
+  // Falls back to `totalCarbon` only for legacy records with no gas
+  // decomposition (where no biogenic split exists, fossil ≈ total anyway).
+  const fossilSpeciesSum = rCo2Fossil + rCo2Dluc + rCh4FossilKgCo2e + rN2oKgCo2e + rHfcPfc;
+  const headlineFossilCarbon = fossilSpeciesSum > 0 ? fossilSpeciesSum : totalCarbon;
 
   // Determine GWP method from materials
   const gwpMethod = materials[0]?.gwp_method || 'IPCC AR6 GWP-100';
@@ -724,8 +745,12 @@ export function transformLCADataForReport(
     // Expose transport emissions, mode, and distance as separate fields so that
     // the ingredient GWP column can be reconciled against the lifecycle stage totals.
     // Previously transport was embedded inside the GWP value with no visibility.
+    // Use the same field the aggregator adds per material (`impact_transport`)
+    // as the final fallback, so this sub-line equals the inbound transport that
+    // Section 13's cradle-to-gate hotspot figure includes — the two reconcile:
+    // production (GWP column) + inbound transport (this sub-line) = hotspot value.
     const transportCO2Raw = Number(
-      m.impact_transport_co2e ?? m.transport_co2e ?? 0
+      m.impact_transport_co2e ?? m.transport_co2e ?? m.impact_transport ?? 0
     );
     const transportDistanceKm = Number(m.distance_km || 0);
 
@@ -927,13 +952,50 @@ export function transformLCADataForReport(
         { type: "Limitation", text: "Secondary LCI data (ecoinvent 3.12, AGRIBALYSE 3.2) represents average technology and conditions; site-specific primary data would improve accuracy." },
       ];
 
+  // ── Reconcile Section 13 (Interpretation hotspots) with Section 08 ──────────
+  // The stored `impacts.interpretation` is a snapshot whose per-material figures
+  // (`by_material[].climate`) reflect whatever aggregator version ran when the
+  // LCA was last calculated — some include inbound transport, some don't. Section
+  // 08 is recomputed live from the materials here, so the two tables drifted and
+  // showed two different numbers for the same ingredient with no reconciliation.
+  // Rebuild the hotspots from the SAME live ingredient rows and the SAME
+  // denominator Section 08 uses, so a hotspot's value and contribution are now
+  // identical to that ingredient's row in Section 08. Inbound transport stays
+  // itemised on its own sub-line in Section 08 (and inside the product total),
+  // not folded into either table's per-material figure.
+  const storedInterpretation = (impacts as any).interpretation;
+  let interpretationForReport = storedInterpretation || undefined;
+  if (storedInterpretation?.significant_issues) {
+    const reconciledHotspots = ingredientRows
+      .map((r) => ({
+        name: r.name,
+        impact: parseFloat(r.climateImpact),
+        pct: parseFloat(r.climatePercentage),
+      }))
+      .filter((h) => Number.isFinite(h.pct) && h.pct > 5)
+      .sort((a, b) => b.pct - a.pct)
+      .map((h) => ({
+        name: h.name,
+        impact_kg_co2e: h.impact,
+        contribution_pct: h.pct,
+        category: 'material' as const,
+      }));
+    interpretationForReport = {
+      ...storedInterpretation,
+      significant_issues: {
+        ...storedInterpretation.significant_issues,
+        hotspots: reconciledHotspots,
+      },
+    };
+  }
+
   return {
     meta: {
       productName: lca.product_name,
       refId: `LCA-${lca.id.substring(0, 8).toUpperCase()}`,
       date: new Date(lca.created_at).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
       organization: organization?.name || 'Your Organisation',
-      generatedBy: 'AlkaTera Platform',
+      generatedBy: 'alkatera',
       // ISSUE E FIX: Read version from report_metadata instead of hardcoding (ISO 14044 §4.2.1).
       version: (impacts as any).report_metadata?.version || '1.0',
       assessmentPeriod: new Date(lca.created_at).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
@@ -1001,7 +1063,6 @@ export function transformLCADataForReport(
         'ISO 14067:2018 — Greenhouse gases — Carbon footprint of products',
         'ISO 14046:2014 — Environmental management — Water footprint',
         'GHG Protocol — Product Life Cycle Accounting and Reporting Standard',
-        'PAS 2050:2011 — Specification for the assessment of life cycle GHG emissions',
       ],
     },
     executiveSummary: {
@@ -1015,10 +1076,10 @@ export function transformLCADataForReport(
         const categoryList = assessedCategories.length > 2
           ? assessedCategories.slice(0, -1).join(', ') + ', and ' + assessedCategories[assessedCategories.length - 1]
           : assessedCategories.join(' and ');
-        return `This Life Cycle Assessment evaluates the environmental impacts of ${lca.product_name} in accordance with ISO 14044:2006 and ISO 14067:2018. The assessment quantifies impacts across ${assessedCategories.length} environmental categories including ${categoryList}. Data quality achieves a ${dqRating.toLowerCase()} rating (${dqScore}%) based on the ISO 14044 pedigree matrix approach, with ${primaryCount} primary data points and ${secondaryCount} secondary database values.`;
+        return `This Life Cycle Assessment evaluates the environmental impacts of ${lca.product_name} in accordance with ISO 14044:2006 and ISO 14067:2018. The assessment quantifies impacts across ${assessedCategories.length} environmental categories including ${categoryList}. Data quality achieves a ${dqRating.toLowerCase()} rating (${dqScore}%) from a pedigree-matrix assessment (Weidema & Wesnæs 1996) informed by the ISO 14044 §4.2.3.6 data-quality criteria, with ${primaryCount} primary data points and ${secondaryCount} secondary database values.`;
       })(),
       keyHighlight: {
-        value: totalCarbon.toFixed(3),
+        value: headlineFossilCarbon.toFixed(3),
         label: "kg CO\u2082eq per unit",
         subtext: `${dqRating} data quality (${dqScore}%)`
       },
@@ -1042,7 +1103,7 @@ export function transformLCADataForReport(
         { category: 'Resource Depletion', model: 'ADP ultimate reserves', reference: 'van Oers et al. (2002)' },
       ],
       softwareAndDatabases: [
-        { name: 'AlkaTera Platform', version: '2.0', purpose: 'LCA modelling, data collection, and report generation' },
+        { name: 'alkatera', version: '2.0', purpose: 'LCA modelling, data collection, and report generation' },
         { name: 'ecoinvent', version: '3.12', purpose: 'Background LCI data for industrial processes and materials' },
         { name: 'AGRIBALYSE', version: '3.2', purpose: 'Agricultural and food product lifecycle inventory data (ADEME)' },
         { name: 'DEFRA Emission Factors', version: String(defraYear), purpose: 'UK government GHG conversion factors' },
@@ -1062,11 +1123,11 @@ export function transformLCADataForReport(
         totalMaterials: materials.length,
       },
       materialQuality: materialQualityRows,
-      missingDataTreatment: 'Missing data is handled using proxy emission factors from ecoinvent 3.12 and AGRIBALYSE 3.2 databases, selected based on geographic and technological representativeness. All proxy selections are documented with confidence scores and quality grades per ISO 14044 Clause 4.2.3.6.3.',
+      missingDataTreatment: 'Missing data is handled using proxy emission factors from ecoinvent 3.12 and AGRIBALYSE 3.2 databases, selected based on geographic and technological representativeness. All proxy selections are documented with confidence scores and quality grades, informed by the ISO 14044 §4.2.3.6 data-quality requirements.',
       uncertaintyNote: 'Uncertainty in this assessment arises from: (1) measurement variability in primary data, (2) representativeness of secondary database values for the specific production system, and (3) characterisation model uncertainty in LCIA methods. A sensitivity analysis of key parameters is recommended for future iterations.',
     },
     climateImpact: {
-      totalCarbon: totalCarbon.toFixed(3),
+      totalCarbon: headlineFossilCarbon.toFixed(3),
       breakdown: chartBreakdown,
       // LOW FIX #23: Add Use Phase and End of Life to climateImpact.stages so all
       // 6 possible lifecycle stages are represented in the stages data table.
@@ -1103,16 +1164,16 @@ export function transformLCADataForReport(
         standards: [
           "ISO 14067:2018 — Greenhouse gases — Carbon footprint of products",
           "ISO 14040/14044 — Life Cycle Assessment principles and framework",
-          "GHG Protocol — Product Life Cycle Accounting and Reporting Standard",
-          "PAS 2050:2011 — Specification for the assessment of life cycle GHG emissions"
+          "GHG Protocol — Product Life Cycle Accounting and Reporting Standard"
         ]
       }
     },
     ghgDetailed: {
       totalGwp100: totalCarbonIncludingBiogenic.toFixed(4),
       // ISO 14067 §6.4.9.3: Fossil-only = sum of fossil species only
-      // (excludes biogenic CO₂ and biogenic CH₄)
-      fossilOnlyTotal: (rCo2Fossil + rCo2Dluc + rCh4FossilKgCo2e + rN2oKgCo2e + rHfcPfc).toFixed(4),
+      // (excludes biogenic CO₂ and biogenic CH₄). Same source as the headline
+      // (headlineFossilCarbon) so Section 06 and the cover can never diverge.
+      fossilOnlyTotal: headlineFossilCarbon.toFixed(4),
       fossilCo2: rCo2Fossil.toFixed(4),
       biogenicCo2: rCo2Biogenic.toFixed(4),
       dlucCo2: rCo2Dluc.toFixed(4),
@@ -1134,6 +1195,9 @@ export function transformLCADataForReport(
         { gas: 'HFCs/PFCs', gwp100: 'Variable', source: 'IPCC AR6 (2021)' },
       ],
       biogenicNote: 'Biogenic CO\u2082 emissions are reported separately from fossil CO\u2082 per ISO 14067:2018 \u00A76.4.9.3 and are excluded from the headline fossil carbon footprint. The value shown represents biogenic carbon released during processing, use, and end-of-life of biomass-derived inputs, as captured by the underlying emission factors (ecoinvent 3.12, AGRIBALYSE 3.2). Biogenic carbon uptake during biomass growth and any downstream release are accounted for inside those factors; this report does not apply an additional uptake credit or end-of-life virtual emission on top. Where upstream datasets already net uptake against release, the residual biogenic CO\u2082 shown here reflects that net. Land-use change (LULUC) carbon is reported on a separate line per ISO 14067 \u00A76.4.9.4.'
+        + (estimatedSplitCount > 0
+            ? ` For ${estimatedSplitCount} input${estimatedSplitCount === 1 ? '' : 's'}, a fossil/biogenic split was not separately characterised in the underlying data; ${estimatedSplitCount === 1 ? 'its' : 'their'} emissions are reported wholly as fossil CO\u2082, a conservative treatment that does not understate the headline fossil carbon footprint.`
+            : '')
     },
     environmentalImpacts: {
       categories: envCategories,
@@ -1441,7 +1505,7 @@ export function transformLCADataForReport(
 
     // ── ISO Compliance Additions (pass through from aggregated_impacts) ────
 
-    interpretation: (impacts as any).interpretation || undefined,
+    interpretation: interpretationForReport,
 
     uncertaintySensitivity: (() => {
       const us = (impacts as any).uncertainty_sensitivity;

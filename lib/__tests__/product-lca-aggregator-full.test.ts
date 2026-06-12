@@ -163,6 +163,38 @@ describe('Product LCA Aggregator', () => {
       expect(result.total_carbon_footprint).toBeCloseTo(expectedTotal, 3);
     });
 
+    it('counts materials with an estimated fossil/biogenic split (ISO 14067 §6.4.9.3 disclosure)', async () => {
+      // Two materials had no LCI split (attributed 100% to fossil, flagged
+      // estimated); one had a real split. Only the two with non-trivial impact
+      // and the estimated flag should be counted, so the report can disclose them.
+      const estimatedA = createMockIngredient({
+        id: 'mat-est-a', material_name: 'Proxy Ingredient A',
+        impact_climate: 0.2, impact_climate_fossil: 0.2, impact_climate_biogenic: 0,
+        impact_transport: 0, carbon_split_estimated: true,
+      });
+      const estimatedB = createMockPackaging({
+        id: 'mat-est-b', material_name: 'Proxy Packaging B',
+        impact_climate: 0.1, impact_climate_fossil: 0.1, impact_climate_biogenic: 0,
+        impact_transport: 0, carbon_split_estimated: true,
+      });
+      const realSplit = createMockIngredient({
+        id: 'mat-real', material_name: 'Verified Ingredient',
+        impact_climate: 0.3, impact_climate_fossil: 0.25, impact_climate_biogenic: 0.05,
+        impact_transport: 0, carbon_split_estimated: false,
+      });
+      setupFromMock([estimatedA, estimatedB, realSplit]);
+      const { aggregateProductImpacts } = await import('../product-lca-aggregator');
+      const result = await aggregateProductImpacts(
+        mockSupabaseClient as any,
+        'pcf-001',
+        [],
+        'cradle-to-gate',
+      );
+
+      expect(result.success).toBe(true);
+      expect((result.impacts.ghg_breakdown as any).carbon_origin.estimated_split_count).toBe(2);
+    });
+
     it('does NOT re-apply the recycled-content credit to stored impacts', async () => {
       // The calculator applies the ISO 14067 §6.4.4 recycled-content credit
       // once, at persist time, so stored impact_climate is already post-credit.
@@ -607,6 +639,175 @@ describe('Product LCA Aggregator', () => {
       expect(result.warnings).toBeDefined();
       expect(result.warnings!.some((w: string) => w.includes('End-of-life'))).toBe(true);
       warnSpy.mockRestore();
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // WARNING PLUMBING (upstream warnings + fallback event formatting)
+  // --------------------------------------------------------------------------
+
+  describe('Warning plumbing', () => {
+    it('passes upstream calculator warnings through to the result', async () => {
+      setupFromMock([MALT, ALU_CAN]);
+      const { aggregateProductImpacts } = await import('../product-lca-aggregator');
+
+      const upstream = ['The packaging item "Box" is a multipack or shipping pack, but it doesn\'t say how many products share it.'];
+      const result = await aggregateProductImpacts(
+        mockSupabaseClient as any,
+        'pcf-001',
+        [],
+        'cradle-to-gate',
+        undefined, undefined, undefined, undefined, undefined,
+        undefined, undefined, undefined,
+        upstream,
+      );
+
+      expect(result.warnings).toBeDefined();
+      expect(result.warnings).toEqual(expect.arrayContaining(upstream));
+    });
+
+    it('formats data_quality fallback events in plain language (no Priority jargon)', async () => {
+      setupFromMock([MALT, ALU_CAN]);
+      const { aggregateProductImpacts } = await import('../product-lca-aggregator');
+
+      const events = [
+        {
+          material_name: 'Pale Malt',
+          material_id: 'mat-malt',
+          attempted_priority: 2,
+          resolved_priority: 2,
+          fallback_reason: "Quantity unit 'pint' was not recognised, so the value was treated as kilograms. Please change this item's unit to one from the unit list.",
+          factor_value_kg_co2e: 0.45,
+          source_reference: 'test',
+          category: 'data_quality' as const,
+        },
+        {
+          material_name: 'Cascade Hops',
+          material_id: 'mat-hops',
+          attempted_priority: 2,
+          resolved_priority: 3,
+          fallback_reason: 'OpenLCA timeout',
+          factor_value_kg_co2e: 0.015,
+          source_reference: 'test',
+          category: 'transient' as const,
+        },
+      ];
+
+      const result = await aggregateProductImpacts(
+        mockSupabaseClient as any,
+        'pcf-001',
+        [],
+        'cradle-to-gate',
+        undefined, undefined, undefined, undefined, undefined,
+        events as any,
+      );
+
+      expect(result.warnings).toBeDefined();
+      const dqWarning = result.warnings!.find((w: string) => w.startsWith('Pale Malt:'));
+      expect(dqWarning).toBeDefined();
+      expect(dqWarning).not.toContain('Priority');
+      expect(dqWarning).toContain('was not recognised');
+      // Non-data_quality events keep the technical template
+      const transientWarning = result.warnings!.find((w: string) => w.startsWith('Cascade Hops:'));
+      expect(transientWarning).toContain('Priority');
+    });
+
+    it('warns when an EoL packaging row carries an unrecognised unit', async () => {
+      const pintCan = { ...ALU_CAN, unit: 'pint' };
+      setupFromMock([MALT, pintCan]);
+      const { aggregateProductImpacts } = await import('../product-lca-aggregator');
+
+      const result = await aggregateProductImpacts(
+        mockSupabaseClient as any,
+        'pcf-001',
+        [],
+        'cradle-to-grave',
+        USE_PHASE_CONFIG,
+        EOL_CONFIG,
+      );
+
+      expect(result.warnings).toBeDefined();
+      const w = result.warnings!.find((x: string) => x.includes('unrecognised unit "pint"'));
+      expect(w).toBeDefined();
+      expect(w).toContain('Aluminium Can 330ml');
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // RECYCLED CONTENT vs AVOIDED-BURDEN CROSS-CHECK (no maths change)
+  // --------------------------------------------------------------------------
+
+  describe('Recycled content vs avoided-burden warning', () => {
+    const recycledCan = { ...ALU_CAN, recycled_content_percentage: 40 };
+
+    it('warns when a recycled-content material also gets an avoided-burden EoL credit', async () => {
+      setupFromMock([MALT, recycledCan]);
+      const { aggregateProductImpacts } = await import('../product-lca-aggregator');
+
+      const result = await aggregateProductImpacts(
+        mockSupabaseClient as any,
+        'pcf-001',
+        [],
+        'cradle-to-grave',
+        USE_PHASE_CONFIG,
+        EOL_CONFIG, // no allocationMethod → defaults to avoided-burden
+      );
+
+      const w = result.warnings?.find((x: string) => x.includes('count the same benefit twice'));
+      expect(w).toBeDefined();
+      expect(w).toContain('Aluminium Can 330ml');
+      expect(w).toContain('40% recycled');
+      expect(w).toContain('cut-off');
+    });
+
+    it('does not warn under cut-off allocation', async () => {
+      setupFromMock([MALT, recycledCan]);
+      const { aggregateProductImpacts } = await import('../product-lca-aggregator');
+
+      const result = await aggregateProductImpacts(
+        mockSupabaseClient as any,
+        'pcf-001',
+        [],
+        'cradle-to-grave',
+        USE_PHASE_CONFIG,
+        { ...EOL_CONFIG, allocationMethod: 'cut-off' } as any,
+      );
+
+      expect(result.warnings?.find((x: string) => x.includes('count the same benefit twice'))).toBeUndefined();
+    });
+
+    it('does not warn when recycled content is zero', async () => {
+      setupFromMock([MALT, ALU_CAN]);
+      const { aggregateProductImpacts } = await import('../product-lca-aggregator');
+
+      const result = await aggregateProductImpacts(
+        mockSupabaseClient as any,
+        'pcf-001',
+        [],
+        'cradle-to-grave',
+        USE_PHASE_CONFIG,
+        EOL_CONFIG,
+      );
+
+      expect(result.warnings?.find((x: string) => x.includes('count the same benefit twice'))).toBeUndefined();
+    });
+
+    it('does not change the calculated totals (warning only)', async () => {
+      const { aggregateProductImpacts } = await import('../product-lca-aggregator');
+
+      setupFromMock([MALT, recycledCan]);
+      const withRecycled = await aggregateProductImpacts(
+        mockSupabaseClient as any, 'pcf-001', [], 'cradle-to-grave', USE_PHASE_CONFIG, EOL_CONFIG,
+      );
+
+      setupFromMock([MALT, ALU_CAN]);
+      const withoutRecycled = await aggregateProductImpacts(
+        mockSupabaseClient as any, 'pcf-001', [], 'cradle-to-grave', USE_PHASE_CONFIG, EOL_CONFIG,
+      );
+
+      // The recycled-content discount is applied upstream in the calculator;
+      // the aggregator must not alter the maths based on this warning.
+      expect(withRecycled.total_carbon_footprint).toBeCloseTo(withoutRecycled.total_carbon_footprint, 10);
     });
   });
 

@@ -68,6 +68,11 @@ function alkateraLogo(height: number, dark = true): string {
   return `<img src="${ALKATERA_LOGO_URL}" alt="alkatera" style="height: ${height}px; width: auto; object-fit: contain; ${filter}" />`;
 }
 
+/** Renders the brand name "alkatera" (lowercase, with "tera" in bold) per brand guidelines. */
+function alkateraName(): string {
+  return `alka<span style="font-weight: 700;">tera</span>`;
+}
+
 // ============================================================================
 // PAGE RENDERERS
 // ============================================================================
@@ -97,7 +102,7 @@ function renderCoverPage(data: LCAReportData): string {
       <div style="position: relative; z-index: 10; width: 100%; max-width: 500px;">
         <div style="background: #ccff00; color: black; padding: 24px 32px; border-radius: 12px; margin-bottom: 80px; transform: rotate(-1deg);">
           <h2 style="font-family: 'Fira Code', monospace; font-weight: 700; font-style: italic; font-size: 22px; letter-spacing: -0.5px;">LIFE CYCLE ASSESSMENT</h2>
-          <p style="font-size: 11px; margin-top: 4px; opacity: 0.7;">ISO 14044:2006 &amp; ISO 14067:2018 Compliant</p>
+          <p style="font-size: 11px; margin-top: 4px; opacity: 0.7;">Prepared in accordance with ISO 14067:2018 &amp; ISO 14044:2006</p>
         </div>
         <h1 style="font-size: 64px; font-family: 'Playfair Display', serif; font-weight: 300; line-height: 1.1; margin-bottom: 16px; color: white;">
           ${escapeHtml(data.meta.productName)}
@@ -157,7 +162,7 @@ function renderExecSummaryPage(data: LCAReportData): string {
 
       <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
         <div class="metric-card">
-          <div class="metric-label">Climate Impact</div>
+          <div class="metric-label">Carbon Footprint (fossil)</div>
           <div class="metric-value">${escapeHtml(data.climateImpact.totalCarbon)}</div>
           <div class="metric-unit">kg CO&#8322;e</div>
         </div>
@@ -353,7 +358,7 @@ function renderMethodologyPage(data: LCAReportData): string {
 
   const software = data.methodology.softwareAndDatabases.map(s =>
     `<div style="display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #f5f5f4;">
-      <span style="font-size: 12px; font-weight: 500; width: 140px;">${escapeHtml(s.name)} <span style="color: #78716c; font-weight: 400;">v${escapeHtml(s.version)}</span></span>
+      <span style="font-size: 12px; font-weight: 500; width: 140px;">${/^alkatera$/i.test(s.name) ? alkateraName() : escapeHtml(s.name)} <span style="color: #78716c; font-weight: 400;">v${escapeHtml(s.version)}</span></span>
       <span style="font-size: 11px; color: #78716c;">${escapeHtml(s.purpose)}</span>
     </div>`
   ).join('');
@@ -562,6 +567,17 @@ function renderDataQualityPage(data: LCAReportData): string {
 function renderClimatePage(data: LCAReportData): string {
   const maxStageValue = Math.max(...data.climateImpact.stages.map(s => s.value), 0.001);
 
+  // Headline is the fossil-only carbon footprint (ISO 14067 §6.4.9.3). Biogenic
+  // carbon is reported separately (Section 06) and the lifecycle stage bars below
+  // are all-species, so explain the difference rather than leave the headline
+  // looking inconsistent with the stage totals.
+  const totalAllSpecies = parseFloat(data.ghgDetailed?.totalGwp100 || '0');
+  const fossilHeadline = parseFloat(data.climateImpact.totalCarbon || '0');
+  const biogenicSeparate = totalAllSpecies - fossilHeadline;
+  const biogenicHeadlineNote = biogenicSeparate > 0.0005
+    ? `<div style="font-size: 9px; color: #78716c; margin-top: 8px; line-height: 1.4; max-width: 340px;">Fossil carbon footprint per ISO 14067:2018. Biogenic carbon (${biogenicSeparate.toFixed(4)} kg CO&#8322;e) is reported separately in Section 06 and excluded here. The lifecycle stage bars below include biogenic carbon and sum to ${totalAllSpecies.toFixed(4)} kg CO&#8322;e.</div>`
+    : '';
+
   const stagesBars = data.climateImpact.stages.map(stage =>
     `<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
       <div style="width: 120px; font-size: 12px; color: #78716c; text-align: right; flex-shrink: 0;">${escapeHtml(stage.label)}</div>
@@ -581,12 +597,13 @@ function renderClimatePage(data: LCAReportData): string {
 
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px;">
         <div>
-          <div style="font-size: 10px; font-family: 'Fira Code', monospace; color: #78716c; margin-bottom: 8px;">TOTAL CLIMATE IMPACT (GWP-100)</div>
+          <div style="font-size: 10px; font-family: 'Fira Code', monospace; color: #78716c; margin-bottom: 8px;">FOSSIL CARBON FOOTPRINT (GWP-100)</div>
           <div style="font-size: 64px; font-family: 'Playfair Display', serif; color: #ccff00; line-height: 1;">
             ${escapeHtml(data.climateImpact.totalCarbon)}
             <span style="font-size: 18px; color: #78716c; font-family: 'Inter', sans-serif; margin-left: 8px;">kg CO&#8322;e</span>
           </div>
           <div style="font-size: 11px; color: #78716c; margin-top: 6px;">per ${escapeHtml(data.functionalUnit.value)}</div>
+          ${biogenicHeadlineNote}
         </div>
         <div style="width: 180px; height: 180px; border-radius: 50%; ${donutStyle} position: relative;">
           <div style="position: absolute; inset: 45px; background: #1c1917; border-radius: 50%;"></div>
@@ -1125,10 +1142,52 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
   const perPage = 10;
   const pages: string[] = [];
 
+  // ── Reconciliation (#3) ────────────────────────────────────────────────────
+  // The rows below are material-production only, so the "% Climate" column would
+  // otherwise sum to ~90% with no explanation — the remainder is inbound
+  // transport plus the non-material lifecycle stages (processing, distribution,
+  // use, end-of-life). Add an explicit "Other lifecycle stages" residual row and
+  // a Total row on the final page so the column sums to 100% and the GWP column
+  // reconciles to the product total, instead of presenting a partial share as if
+  // it were complete.
+  const reconcileTotal = parseFloat(data.ingredientBreakdown.totalClimateImpact) || 0;
+  const materialsSubtotal = ingredients.reduce((s, ing) => s + (parseFloat(ing.climateImpact) || 0), 0);
+  const otherStages = Math.max(reconcileTotal - materialsSubtotal, 0);
+  const materialsPct = reconcileTotal > 0 ? (materialsSubtotal / reconcileTotal) * 100 : 0;
+  const otherPct = Math.max(100 - materialsPct, 0);
+
   for (let i = 0; i < ingredients.length; i += perPage) {
     const pageIngredients = ingredients.slice(i, i + perPage);
     const isFirstPage = i === 0;
+    const isLastPage = i + perPage >= ingredients.length;
     const pageNum = 10 + Math.floor(i / perPage);
+
+    // First page uses the dark table style, later pages the light one — pick
+    // residual/total row colours that read on whichever background applies.
+    const subtleColor = isFirstPage ? '#a8a29e' : '#57534e';
+    const strongColor = isFirstPage ? '#ffffff' : '#1c1917';
+    const ruleColor = isFirstPage ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.2)';
+
+    // Residual + Total rows close the table out on the final page so the
+    // "% Climate" column sums to 100% (see reconciliation note above).
+    const summaryRows = isLastPage
+      ? `${otherStages > 0.0005 ? `<tr style="color: ${subtleColor}; font-style: italic;">
+            <td style="font-weight: 500;">Other lifecycle stages
+              <div style="font-size: 7.5px; margin-top: 2px;">Inbound transport, processing, distribution, use &amp; end-of-life</div>
+            </td>
+            <td></td><td></td>
+            <td style="font-weight: 500;">${otherStages.toFixed(4)}</td>
+            <td><span style="color: #ccff00;">${otherPct.toFixed(1)}%</span></td>
+            <td></td><td></td><td></td>
+          </tr>` : ''}
+          <tr style="font-weight: 700; color: ${strongColor}; border-top: 2px solid ${ruleColor};">
+            <td>Total carbon footprint</td>
+            <td></td><td></td>
+            <td>${reconcileTotal.toFixed(3)}</td>
+            <td><span style="color: #ccff00;">100%</span></td>
+            <td></td><td></td><td></td>
+          </tr>`
+      : '';
 
     const rows = pageIngredients.map(ing => {
       // Ingredient cell: show real name, then proxy factor below if different
@@ -1150,6 +1209,14 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
         : ing.dataSource === 'Primary'
           ? `<span class="badge badge-low">Primary</span>`
           : `<span class="badge badge-medium">Secondary</span>`;
+
+      // Quality grade chip (ISO 14044 §4.2.3.6 data quality transparency).
+      // badge-low is the green style, badge-high the red one — the classes
+      // are named after risk, so the mapping is inverted on purpose.
+      const grade = (ing.dataQualityGrade || '').toUpperCase();
+      const gradeChip = ['HIGH', 'MEDIUM', 'LOW'].includes(grade)
+        ? `<span class="badge ${grade === 'HIGH' ? 'badge-low' : grade === 'MEDIUM' ? 'badge-medium' : 'badge-high'}" style="margin-left: 3px;">${escapeHtml(grade.charAt(0) + grade.slice(1).toLowerCase())}</span>`
+        : '';
 
       const containerNote = (ing as any).containerCO2
         ? `<div style="font-size: 8px; color: #78716c; margin-top: 2px;">incl. ${escapeHtml((ing as any).containerCO2)} kg CO₂e inbound container (${escapeHtml((ing as any).containerType || '')})</div>`
@@ -1175,7 +1242,7 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
         <td><span style="color: #ccff00;">${escapeHtml(ing.climatePercentage)}</span></td>
         <td>${escapeHtml(ing.acidification)}</td>
         <td>${escapeHtml(ing.eutrophication)}</td>
-        <td>${dataSourceBadge}${ing.confidenceScore > 0 ? `<div style="font-size: 7.5px; color: #78716c; margin-top: 2px;">${ing.confidenceScore}%</div>` : ''}</td>
+        <td>${dataSourceBadge}${gradeChip}${ing.confidenceScore > 0 ? `<div style="font-size: 7.5px; color: #78716c; margin-top: 2px;">${ing.confidenceScore}% confidence</div>` : ''}</td>
       </tr>`;
     }).join('');
 
@@ -1188,6 +1255,9 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
 
         ${isFirstPage ? `
           <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #78716c; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">PER-INGREDIENT ENVIRONMENTAL CONTRIBUTION · REAL INGREDIENT &amp; CALCULATION FACTOR</div>
+          <div style="margin-bottom: 16px; font-size: 9px; color: #78716c; line-height: 1.5;">
+            The <strong>GWP (kg CO&#8322;e)</strong> column shows each ingredient's material production impact. Inbound transport is itemised separately on a sub-line beneath the ingredient where present, and is included in the product total. The most significant ingredients shown here are restated in the Interpretation hotspots (Section 13) using these same production figures.
+          </div>
         ` : ''}
 
         ${isFirstPage && hasProxies ? `
@@ -1207,17 +1277,17 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
             <th>% Climate</th>
             <th>Acid. (SO&#8322;-eq)</th>
             <th>Eutroph. (P-eq)</th>
-            <th>Data / Conf.</th>
+            <th>Source / Quality</th>
           </tr></thead>
-          <tbody>${rows}</tbody>
+          <tbody>${rows}${summaryRows}</tbody>
         </table>
 
-        ${isFirstPage && ingredients.length <= perPage ? `
-          <div style="margin-top: 20px; padding: 14px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);">
-            <div style="font-size: 10px; color: #a8a29e; line-height: 1.6;">
-              <strong style="color: #ccff00;">Total Climate Impact:</strong> ${escapeHtml(data.ingredientBreakdown.totalClimateImpact)} kg CO&#8322;e per functional unit.
-              Acidification values in kg SO&#8322;-eq (terrestrial). Eutrophication values in kg P-eq (freshwater). Values below detection shown as 0.000e+0.
-              ${hasProxies ? '&#x26A0; Proxy factors are used where a direct dataset match was not available — see Data Quality section.' : ''}
+        ${isLastPage ? `
+          <div style="margin-top: 20px; padding: 14px; background: ${isFirstPage ? 'rgba(255,255,255,0.05)' : '#f5f5f4'}; border-radius: 8px; border: 1px solid ${isFirstPage ? 'rgba(255,255,255,0.1)' : '#e7e5e4'};">
+            <div style="font-size: 10px; color: ${isFirstPage ? '#a8a29e' : '#57534e'}; line-height: 1.6;">
+              <strong style="color: ${isFirstPage ? '#ccff00' : '#1c1917'};">Coverage:</strong> The ingredients and packaging listed above are material-production impacts and account for ${materialsPct.toFixed(1)}% of the ${escapeHtml(data.ingredientBreakdown.totalClimateImpact)} kg CO&#8322;e total per functional unit. The remaining ${otherPct.toFixed(1)}% comes from inbound transport and the non-material lifecycle stages (processing, distribution, use and end-of-life), shown in the "Other lifecycle stages" row and detailed in Sections 05 to 07.
+              Acidification values in kg SO&#8322;-eq (terrestrial); eutrophication in kg P-eq (freshwater); values below detection shown as 0.000e+0.
+              ${hasProxies ? '&#x26A0; Proxy factors are used where a direct dataset match was not available (see the Data Quality section).' : ''}
             </div>
           </div>
         ` : ''}
@@ -1520,7 +1590,7 @@ function renderInterpretationPage(data: LCAReportData): string {
 
   const hotspotsHtml = interp.significant_issues.hotspots.length > 0
     ? `<table class="data-table">
-        <thead><tr><th>Material</th><th>Impact (kg CO₂e)</th><th>Contribution</th></tr></thead>
+        <thead><tr><th>Material</th><th>GWP (kg CO₂e)</th><th>Contribution</th></tr></thead>
         <tbody>
           ${interp.significant_issues.hotspots.map(h => `
             <tr>
@@ -1530,7 +1600,10 @@ function renderInterpretationPage(data: LCAReportData): string {
             </tr>
           `).join('')}
         </tbody>
-      </table>`
+      </table>
+      <p style="font-size: 9px; color: #78716c; line-height: 1.5; margin-top: 6px;">
+        Hotspots restate the most significant ingredients from Section 08 using the same material-production GWP and contribution share, so the two sections reconcile. Inbound transport is itemised separately in Section 08 and is included in the product total.
+      </p>`
     : '<p style="font-size: 12px; color: #78716c;">No individual material exceeds the 5% significance threshold.</p>';
 
   // FIX #5: Always explain EoL recycling credits in interpretation, not just when >100%.
@@ -1920,7 +1993,14 @@ export function renderLcaReportHtml(data: LCAReportData): string {
   // ISSUE G FIX: Replace __PAGE_NUM__ placeholders with sequential page numbers.
   // The cover page has no page number, so the first __PAGE_NUM__ occurrence is page 1.
   let pageCounter = 0;
-  const pagesWithNumbers = pages.replace(/__PAGE_NUM__/g, () => String(++pageCounter));
+  const pagesWithNumbers = pages
+    .replace(/__PAGE_NUM__/g, () => String(++pageCounter))
+    // Defensive brand-name normalisation: older stored snapshots (e.g. the
+    // critical-review disclosure persisted in aggregated_impacts) can carry the
+    // legacy "AlkaTera" casing. The brand name is always lowercase "alkatera",
+    // so normalise any stray capitalised token in the rendered body. Lowercase
+    // usages and the branded alka<b>tera</b> spans are unaffected.
+    .replace(/Alka[Tt]era/g, 'alkatera');
 
   return `<!DOCTYPE html>
 <html lang="en">

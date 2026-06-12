@@ -6,6 +6,23 @@ import type { DistributionLeg } from './distribution-factors';
 import { findUnit, quantityToKg, type UnitKind } from './constants/material-units';
 // OpenLCA calculations now happen server-side via /api/openlca/calculate
 
+/**
+ * How long a confirmed openlca_no_match verdict stays trusted before the
+ * resolver re-tries a live lookup (the OpenLCA databases get updated, so a
+ * material that had no process six months ago may have one now). Exported
+ * for tests.
+ */
+export const NO_MATCH_TTL_DAYS = 90;
+
+/** True when a no-match verdict is recent enough to skip the live attempt. */
+export function isNoMatchFresh(material: Pick<ProductMaterial, 'openlca_no_match' | 'openlca_no_match_at'>, now: number = Date.now()): boolean {
+  return (
+    !!material.openlca_no_match &&
+    !!material.openlca_no_match_at &&
+    (now - Date.parse(material.openlca_no_match_at)) < NO_MATCH_TTL_DAYS * 86_400_000
+  );
+}
+
 export type MaterialCategoryType =
   | 'SCOPE_1_2_ENERGY'
   | 'SCOPE_3_TRANSPORT'
@@ -40,6 +57,13 @@ export interface ProductMaterial {
    * ingredient is re-matched to a real process.
    */
   openlca_no_match?: boolean | null;
+  /**
+   * When the no-match verdict was last confirmed by a live lookup. NULL or
+   * older than NO_MATCH_TTL_DAYS counts as stale: the resolver re-tries the
+   * live calculation (databases get updated) and refreshes or clears the
+   * flag based on the outcome.
+   */
+  openlca_no_match_at?: string | null;
   /** Whether this ingredient is grown on the producer's own vineyard/farm */
   is_self_grown?: boolean;
 
@@ -76,6 +100,16 @@ export interface WaterfallResult {
   ch4_fossil_kg?: number;    // Fossil methane (kg CH4) - GWP 29.8
   ch4_biogenic_kg?: number;  // Biogenic methane (kg CH4) - GWP 27.2
   n2o_kg?: number;           // Nitrous oxide (kg N2O) - GWP 273
+
+  /**
+   * True when the fossil/biogenic CO₂ split could NOT be resolved from the
+   * underlying LCI data, so the whole climate total was attributed to fossil
+   * CO₂ (biogenic = 0) as a conservative fallback rather than fabricating an
+   * 85/15 ratio. Surfaced in the report so the biogenic line is disclosed as
+   * "not separately characterised" instead of implying a measured split.
+   * ISO 14067:2018 §6.4.9.3.
+   */
+  carbon_split_estimated?: boolean;
 
   // Extended ReCiPe 2016 impacts (complete 18 categories)
   impact_ozone_depletion: number;
@@ -225,15 +259,15 @@ function buildSupplierProductResult(
   // Calculate water scarcity - use product's scarcity factor if available, else use AWARE factor
   const waterScarcityFactor = product.water_scarcity_factor ?? awareFactor;
 
-  // Calculate GHG breakdown - use product-specific values or estimate from total
-  // Fall back to legacy carbon_intensity if impact_climate is not set
+  // Calculate GHG breakdown. Use the supplier's declared fossil/biogenic split
+  // when present; otherwise attribute the whole total to fossil (biogenic = 0)
+  // and flag it as estimated, rather than fabricating an 85/15 ratio.
+  // Conservative for the fossil headline; ISO 14067:2018 §6.4.9.3.
+  // Fall back to legacy carbon_intensity if impact_climate is not set.
   const climateTotal = Number(product.impact_climate ?? (product as any).carbon_intensity ?? 0);
-  const ghgFossil = product.ghg_fossil !== null && product.ghg_fossil !== undefined
-    ? Number(product.ghg_fossil)
-    : climateTotal * 0.85;
-  const ghgBiogenic = product.ghg_biogenic !== null && product.ghg_biogenic !== undefined
-    ? Number(product.ghg_biogenic)
-    : climateTotal * 0.15;
+  const carbonSplitEstimated = product.ghg_fossil == null && product.ghg_biogenic == null;
+  const ghgBiogenic = product.ghg_biogenic != null ? Number(product.ghg_biogenic) : 0;
+  const ghgFossil = product.ghg_fossil != null ? Number(product.ghg_fossil) : climateTotal - ghgBiogenic;
   const ghgDluc = Number(product.ghg_land_use_change || 0);
 
   // Calculate water breakdown - use product-specific values or use total
@@ -276,6 +310,7 @@ function buildSupplierProductResult(
     impact_climate_fossil: ghgFossil * quantity_kg,
     impact_climate_biogenic: ghgBiogenic * quantity_kg,
     impact_climate_dluc: ghgDluc * quantity_kg,
+    carbon_split_estimated: carbonSplitEstimated,
     impact_water: waterTotal * quantity_kg,
     impact_water_scarcity: waterBlue * quantity_kg * waterScarcityFactor,
     impact_land: Number(product.impact_land || 0) * quantity_kg,
@@ -566,11 +601,20 @@ export async function resolveImpactFactors(
           const impacts = supplierLca.aggregated_impacts;
           console.log(`[Waterfall] ✓ Priority 1c SUCCESS: Using supplier LCA ${supplierLca.id}`);
 
+          // Use the supplier LCA's declared fossil/biogenic split when present;
+          // otherwise attribute the whole total to fossil (biogenic = 0) and flag
+          // as estimated rather than fabricating an 85/15 ratio. ISO 14067 §6.4.9.3.
+          const lcaClimateTotal = Number(impacts.climate_change_gwp100 || 0);
+          const lcaSplitEstimated = impacts.climate_fossil == null && impacts.climate_biogenic == null;
+          const lcaBiogenic = impacts.climate_biogenic != null ? Number(impacts.climate_biogenic) : 0;
+          const lcaFossil = impacts.climate_fossil != null ? Number(impacts.climate_fossil) : lcaClimateTotal - lcaBiogenic;
+
           return {
-            impact_climate: (impacts.climate_change_gwp100 || 0) * quantity_kg,
-            impact_climate_fossil: (impacts.climate_fossil || impacts.climate_change_gwp100 * 0.85 || 0) * quantity_kg,
-            impact_climate_biogenic: (impacts.climate_biogenic || impacts.climate_change_gwp100 * 0.15 || 0) * quantity_kg,
+            impact_climate: lcaClimateTotal * quantity_kg,
+            impact_climate_fossil: lcaFossil * quantity_kg,
+            impact_climate_biogenic: lcaBiogenic * quantity_kg,
             impact_climate_dluc: (impacts.climate_dluc || 0) * quantity_kg,
+            carbon_split_estimated: lcaSplitEstimated,
             impact_water: (impacts.water_consumption || 0) * quantity_kg,
             impact_water_scarcity: (impacts.water_scarcity_aware || impacts.water_consumption * awareFactor || 0) * quantity_kg,
             impact_land: (impacts.land_use || 0) * quantity_kg,
@@ -684,13 +728,17 @@ export async function resolveImpactFactors(
 
         const gwpTotal = Number(defraFactor.co2_factor || 0) * quantity_kg;
 
-        // Use actual GHG breakdown from Ecoinvent if available, else estimate
+        // Split the DEFRA GWP using the Ecoinvent proxy's fossil/biogenic ratio
+        // when present; otherwise attribute it wholly to fossil and flag as
+        // estimated rather than fabricating an 85/15 ratio. ISO 14067 §6.4.9.3.
+        // (These are energy/transport/commuting factors, so fossil-dominated.)
+        const hybridSplitEstimated = !(ecoinventProxy.impact_climate_fossil || ecoinventProxy.impact_climate_biogenic) || !ecoinventProxy.impact_climate;
         const fossilRatio = ecoinventProxy.impact_climate_fossil && ecoinventProxy.impact_climate
           ? ecoinventProxy.impact_climate_fossil / ecoinventProxy.impact_climate
-          : 0.85;
+          : 1;
         const biogenicRatio = ecoinventProxy.impact_climate_biogenic && ecoinventProxy.impact_climate
           ? ecoinventProxy.impact_climate_biogenic / ecoinventProxy.impact_climate
-          : 0.15;
+          : 0;
 
         return {
           // GWP from DEFRA, split using Ecoinvent ratios
@@ -698,6 +746,7 @@ export async function resolveImpactFactors(
           impact_climate_fossil: gwpTotal * fossilRatio,
           impact_climate_biogenic: gwpTotal * biogenicRatio,
           impact_climate_dluc: Number(ecoinventProxy.impact_climate_dluc || 0) * quantity_kg,
+          carbon_split_estimated: hybridSplitEstimated,
           // GHG gas breakdown from Ecoinvent
           ch4_kg: Number(ecoinventProxy.ch4_factor || 0) * quantity_kg,
           ch4_fossil_kg: Number(ecoinventProxy.ch4_fossil_factor || 0) * quantity_kg,
@@ -795,11 +844,18 @@ export async function resolveImpactFactors(
     }
   }
 
-  // Layer 3 hygiene: skip the live attempt entirely if a previous run already
-  // proved this process exists on neither database. It resolves from local
-  // proxy/staging factors below without a wasted 404 round-trip or a warning.
+  // Layer 3 hygiene: skip the live attempt if a previous run already proved
+  // this process exists on neither database — but only while that verdict is
+  // fresh. The OpenLCA databases get updated, so a no-match older than the
+  // TTL (or one recorded before timestamps existed) earns one fresh live
+  // attempt, after which the flag is refreshed or cleared based on the result.
+  const noMatchIsFresh = isNoMatchFresh(material);
   if (material.openlca_no_match && material.data_source === 'openlca' && !resolvedFromLocalTable) {
-    console.log(`[Waterfall] Skipping OpenLCA for ${material.material_name}: openlca_no_match flag set (resolves via proxy)`);
+    console.log(
+      noMatchIsFresh
+        ? `[Waterfall] Skipping OpenLCA for ${material.material_name}: openlca_no_match flag set (resolves via proxy)`
+        : `[Waterfall] openlca_no_match for ${material.material_name} is stale or untimestamped — re-trying live lookup`
+    );
   }
 
   const willAttemptOpenLCA =
@@ -807,7 +863,7 @@ export async function resolveImpactFactors(
     material.data_source === 'openlca' &&
     !!material.data_source_id &&
     !!organizationId &&
-    !material.openlca_no_match;
+    !noMatchIsFresh;
   console.log(`[Waterfall] Priority 2.5 check for ${material.material_name}:`, {
     data_source: material.data_source,
     data_source_id: material.data_source_id,
@@ -935,6 +991,14 @@ export async function resolveImpactFactors(
         const primaryResult = await tryOpenLCAServer(materialDatabase, session.access_token);
 
         if (primaryResult.ok) {
+          // A stale no-match verdict just got disproven by a live result —
+          // clear it so future runs go straight to the live lookup.
+          if (material.openlca_no_match) {
+            void supabase.from('product_materials')
+              .update({ openlca_no_match: false, openlca_no_match_at: null })
+              .eq('id', material.id)
+              .then(() => console.log(`[Waterfall] Cleared stale openlca_no_match for ${material.material_name} (live process found)`));
+          }
           return buildOpenLCAResult(primaryResult.result);
         }
 
@@ -956,8 +1020,9 @@ export async function resolveImpactFactors(
           if (altResult.ok) {
             // The UUID lived on the OTHER database all along — persist the
             // correction so subsequent runs target the right server first.
+            // Also clears any stale no-match verdict in the same write.
             void supabase.from('product_materials')
-              .update({ openlca_database: altDatabase })
+              .update({ openlca_database: altDatabase, openlca_no_match: false, openlca_no_match_at: null })
               .eq('id', material.id)
               .then(() => console.log(`[Waterfall] Auto-corrected openlca_database to '${altDatabase}' for ${material.material_name}`));
             return buildOpenLCAResult(altResult.result);
@@ -975,7 +1040,7 @@ export async function resolveImpactFactors(
         // skip the live attempt on every future recalculation.
         if (notFoundOnBoth) {
           void supabase.from('product_materials')
-            .update({ openlca_no_match: true })
+            .update({ openlca_no_match: true, openlca_no_match_at: new Date().toISOString() })
             .eq('id', material.id)
             .then(() => console.log(`[Waterfall] Marked ${material.material_name} openlca_no_match=true (no process on either database)`));
         }
@@ -1062,19 +1127,23 @@ export async function resolveImpactFactors(
       console.log(`[Waterfall] ✓ Direct ID lookup SUCCESS: Using Ecoinvent proxy ${directProxy.material_name}`);
 
       const climateTotal = Number(directProxy.impact_climate || 0) * quantity_kg;
+      // Use the proxy's fossil/biogenic split when present; otherwise attribute
+      // the whole total to fossil (biogenic = 0) and flag as estimated rather
+      // than fabricating an 85/15 ratio. ISO 14067 §6.4.9.3.
       const hasGHGBreakdown = directProxy.impact_climate_fossil || directProxy.impact_climate_biogenic;
       const fossilCO2 = hasGHGBreakdown
         ? Number(directProxy.impact_climate_fossil || 0) * quantity_kg
-        : climateTotal * 0.85;
+        : climateTotal;
       const biogenicCO2 = hasGHGBreakdown
         ? Number(directProxy.impact_climate_biogenic || 0) * quantity_kg
-        : climateTotal * 0.15;
+        : 0;
 
       return {
         impact_climate: climateTotal,
         impact_climate_fossil: fossilCO2,
         impact_climate_biogenic: biogenicCO2,
         impact_climate_dluc: Number(directProxy.impact_climate_dluc || 0) * quantity_kg,
+        carbon_split_estimated: !hasGHGBreakdown,
         ch4_kg: Number(directProxy.ch4_factor || 0) * quantity_kg,
         ch4_fossil_kg: Number(directProxy.ch4_fossil_factor || 0) * quantity_kg,
         ch4_biogenic_kg: Number(directProxy.ch4_biogenic_factor || 0) * quantity_kg,
@@ -1171,19 +1240,22 @@ export async function resolveImpactFactors(
 
       if (nameProxy && nameProxy.impact_climate) {
         const climateTotal = Number(nameProxy.impact_climate || 0) * quantity_kg;
+        // Fossil/biogenic split from the proxy when present; otherwise 100%
+        // fossil + estimated flag rather than a fabricated 85/15. ISO 14067 §6.4.9.3.
         const hasGHGBreakdown = nameProxy.impact_climate_fossil || nameProxy.impact_climate_biogenic;
         const fossilCO2 = hasGHGBreakdown
           ? Number(nameProxy.impact_climate_fossil || 0) * quantity_kg
-          : climateTotal * 0.85;
+          : climateTotal;
         const biogenicCO2 = hasGHGBreakdown
           ? Number(nameProxy.impact_climate_biogenic || 0) * quantity_kg
-          : climateTotal * 0.15;
+          : 0;
 
         return {
           impact_climate: climateTotal,
           impact_climate_fossil: fossilCO2,
           impact_climate_biogenic: biogenicCO2,
           impact_climate_dluc: Number(nameProxy.impact_climate_dluc || 0) * quantity_kg,
+          carbon_split_estimated: !hasGHGBreakdown,
           ch4_kg: Number(nameProxy.ch4_factor || 0) * quantity_kg,
           ch4_fossil_kg: Number(nameProxy.ch4_fossil_factor || 0) * quantity_kg,
           ch4_biogenic_kg: Number(nameProxy.ch4_biogenic_factor || 0) * quantity_kg,
@@ -1311,14 +1383,16 @@ export async function resolveImpactFactors(
     const marineEcotoxicity = Number(stagingFactor.marine_ecotoxicity_factor || 0) * quantity_kg;
     const marineEutrophication = Number(stagingFactor.marine_eutrophication_factor || 0) * quantity_kg;
 
-    // Use actual GHG breakdown from staging factors if available
+    // Use the staging factor's fossil/biogenic split when available; otherwise
+    // attribute the whole total to fossil (biogenic = 0) and flag as estimated
+    // rather than fabricating an 85/15 ratio. ISO 14067 §6.4.9.3.
     const hasFossilBiogenicSplit = stagingFactor.co2_fossil_factor || stagingFactor.co2_biogenic_factor;
     const fossilCO2 = hasFossilBiogenicSplit
       ? Number(stagingFactor.co2_fossil_factor || 0) * quantity_kg
-      : co2Total * 0.85;
+      : co2Total;
     const biogenicCO2 = hasFossilBiogenicSplit
       ? Number(stagingFactor.co2_biogenic_factor || 0) * quantity_kg
-      : co2Total * 0.15;
+      : 0;
     const dlucCO2 = Number(stagingFactor.co2_dluc_factor || 0) * quantity_kg;
 
     // HIGH FIX #13: Document the source of CH4/N2O gas breakdown from staging factors.
@@ -1343,6 +1417,7 @@ export async function resolveImpactFactors(
       impact_climate_fossil: fossilCO2,
       impact_climate_biogenic: biogenicCO2,
       impact_climate_dluc: dlucCO2,
+      carbon_split_estimated: !hasFossilBiogenicSplit,
       // GHG gas breakdown — from Ecoinvent 3.12 / DEFRA LCI data in staging factors
       ch4_kg: Number(stagingFactor.ch4_factor || 0) * quantity_kg,
       ch4_fossil_kg: Number(stagingFactor.ch4_fossil_factor || 0) * quantity_kg,
@@ -1405,20 +1480,23 @@ export async function resolveImpactFactors(
 
     const climateTotal = Number(ecoinventProxy.impact_climate || 0) * quantity_kg;
 
-    // Use actual GHG breakdown from Ecoinvent if available
+    // Use the Ecoinvent proxy's fossil/biogenic split when available; otherwise
+    // attribute the whole total to fossil (biogenic = 0) and flag as estimated
+    // rather than fabricating an 85/15 ratio. ISO 14067 §6.4.9.3.
     const hasGHGBreakdown = ecoinventProxy.impact_climate_fossil || ecoinventProxy.impact_climate_biogenic;
     const fossilCO2 = hasGHGBreakdown
       ? Number(ecoinventProxy.impact_climate_fossil || 0) * quantity_kg
-      : climateTotal * 0.85;
+      : climateTotal;
     const biogenicCO2 = hasGHGBreakdown
       ? Number(ecoinventProxy.impact_climate_biogenic || 0) * quantity_kg
-      : climateTotal * 0.15;
+      : 0;
 
     return {
       impact_climate: climateTotal,
       impact_climate_fossil: fossilCO2,
       impact_climate_biogenic: biogenicCO2,
       impact_climate_dluc: Number(ecoinventProxy.impact_climate_dluc || 0) * quantity_kg,
+      carbon_split_estimated: !hasGHGBreakdown,
       // GHG gas breakdown from Ecoinvent
       ch4_kg: Number(ecoinventProxy.ch4_factor || 0) * quantity_kg,
       ch4_fossil_kg: Number(ecoinventProxy.ch4_fossil_factor || 0) * quantity_kg,
@@ -1464,12 +1542,15 @@ export async function resolveImpactFactors(
   if (material.cached_co2_factor && Number(material.cached_co2_factor) > 0) {
     console.warn(`[Waterfall] ⚠ Using cached CO2 factor for: ${material.material_name} (${material.cached_co2_factor} kg CO2e/unit)`);
 
+    // Cached factor carries no fossil/biogenic split, so attribute the whole
+    // total to fossil (biogenic = 0) and flag as estimated. ISO 14067 §6.4.9.3.
     const co2Total = Number(material.cached_co2_factor) * quantity_kg;
     return {
       impact_climate: co2Total,
-      impact_climate_fossil: co2Total * 0.85,
-      impact_climate_biogenic: co2Total * 0.15,
+      impact_climate_fossil: co2Total,
+      impact_climate_biogenic: 0,
       impact_climate_dluc: 0,
+      carbon_split_estimated: true,
       ch4_kg: 0,
       ch4_fossil_kg: 0,
       ch4_biogenic_kg: 0,

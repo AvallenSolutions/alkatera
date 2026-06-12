@@ -101,6 +101,8 @@ import {
   normalizeToKg,
   resolveImpactFactors,
   validateMaterialsBeforeCalculation,
+  isNoMatchFresh,
+  NO_MATCH_TTL_DAYS,
 } from '@/lib/impact-waterfall-resolver';
 import type { ProductMaterial, FallbackEvent } from '@/lib/impact-waterfall-resolver';
 
@@ -177,6 +179,36 @@ beforeEach(() => {
   vi.spyOn(console, 'log').mockImplementation(() => {});
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(console, 'error').mockImplementation(() => {});
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// 0. isNoMatchFresh (openlca_no_match staleness)
+// ────────────────────────────────────────────────────────────────────────────
+
+describe('isNoMatchFresh', () => {
+  const DAY = 86_400_000;
+  const now = Date.parse('2026-06-11T12:00:00Z');
+
+  it('is fresh when the verdict is recent', () => {
+    const at = new Date(now - 10 * DAY).toISOString();
+    expect(isNoMatchFresh({ openlca_no_match: true, openlca_no_match_at: at }, now)).toBe(true);
+  });
+
+  it('is stale once the verdict is older than the TTL (re-try the live lookup)', () => {
+    const at = new Date(now - (NO_MATCH_TTL_DAYS + 1) * DAY).toISOString();
+    expect(isNoMatchFresh({ openlca_no_match: true, openlca_no_match_at: at }, now)).toBe(false);
+  });
+
+  it('is stale when the verdict has no timestamp (legacy rows from before the column existed)', () => {
+    expect(isNoMatchFresh({ openlca_no_match: true, openlca_no_match_at: null }, now)).toBe(false);
+    expect(isNoMatchFresh({ openlca_no_match: true, openlca_no_match_at: undefined }, now)).toBe(false);
+  });
+
+  it('is never fresh when the flag is not set', () => {
+    const at = new Date(now - 1 * DAY).toISOString();
+    expect(isNoMatchFresh({ openlca_no_match: false, openlca_no_match_at: at }, now)).toBe(false);
+    expect(isNoMatchFresh({ openlca_no_match: null, openlca_no_match_at: null }, now)).toBe(false);
+  });
 });
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -789,7 +821,7 @@ describe('resolveImpactFactors', () => {
       expect(result.data_quality_tag).toBe('Secondary_Modelled'); // has fossil/biogenic split
     });
 
-    it('estimates fossil/biogenic split when factors are absent (85%/15%)', async () => {
+    it('attributes 100% to fossil + flags estimated when split factors are absent (ISO 14067 §6.4.9.3)', async () => {
       const material = createMaterial({
         material_name: 'Generic plastic',
         data_source: 'staging',
@@ -807,9 +839,13 @@ describe('resolveImpactFactors', () => {
 
       const result = await resolveImpactFactors(material, 1, 'org-001');
 
+      // No fossil/biogenic split in the factor: the whole total goes to fossil
+      // (conservative for the headline) and the split is flagged as estimated,
+      // rather than fabricating an 85/15 ratio.
       expect(result.impact_climate).toBeCloseTo(4.0);
-      expect(result.impact_climate_fossil).toBeCloseTo(3.4);  // 4.0 * 0.85
-      expect(result.impact_climate_biogenic).toBeCloseTo(0.6); // 4.0 * 0.15
+      expect(result.impact_climate_fossil).toBeCloseTo(4.0);  // 100% fossil
+      expect(result.impact_climate_biogenic).toBe(0);          // no fabricated biogenic
+      expect(result.carbon_split_estimated).toBe(true);
       expect(result.data_quality_tag).toBe('Secondary_Estimated'); // no split = estimated
     });
   });
@@ -869,8 +905,10 @@ describe('resolveImpactFactors', () => {
       const result = await resolveImpactFactors(material, 2, 'org-001');
 
       expect(result.impact_climate).toBeCloseTo(7.0); // 3.5 * 2
-      expect(result.impact_climate_fossil).toBeCloseTo(5.95); // 7.0 * 0.85
-      expect(result.impact_climate_biogenic).toBeCloseTo(1.05); // 7.0 * 0.15
+      // Cached factor carries no split: 100% fossil + estimated flag, not 85/15.
+      expect(result.impact_climate_fossil).toBeCloseTo(7.0); // 100% fossil
+      expect(result.impact_climate_biogenic).toBe(0);         // no fabricated biogenic
+      expect(result.carbon_split_estimated).toBe(true);
       expect(result.data_priority).toBe(3);
       expect(result.data_quality_grade).toBe('LOW');
       expect(result.confidence_score).toBe(30);

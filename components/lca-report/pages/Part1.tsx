@@ -6,6 +6,18 @@ import type { LCAReportData } from '../types';
 import { Check, X, ImageIcon } from 'lucide-react';
 import { AlkaTeraLogoVertical } from '../Logo';
 
+/**
+ * Map a pedigree temporal-representativeness score (1 best – 5 worst, per the
+ * Weidema & Wesnæs pedigree approach) to a plain-language label for the
+ * executive summary. Kept here so the figure reflects the real data quality
+ * assessment rather than a hardcoded value.
+ */
+const temporalLabel = (score: number): string => {
+  if (score <= 2) return 'High';
+  if (score <= 3) return 'Medium';
+  return 'Low';
+};
+
 export const CoverPage = ({ data }: { data: LCAReportData }) => (
   <PageWrapper theme="dark" className="justify-between overflow-hidden relative">
     <div className="absolute inset-0 z-0">
@@ -55,7 +67,21 @@ export const CoverPage = ({ data }: { data: LCAReportData }) => (
   </PageWrapper>
 );
 
-export const ExecSummaryPage = ({ data }: { data: LCAReportData }) => (
+export const ExecSummaryPage = ({ data }: { data: LCAReportData }) => {
+  // Real, data-derived summary sentences (replacing the previous hardcoded
+  // marketing prose that asserted "reduced carbon emissions" / "new benchmark"
+  // on every report regardless of the actual product).
+  const scopeLabel = data.meta.lcaScopeType || 'cradle-to-gate';
+  const primaryShare = data.dataQuality.coverageSummary.primaryDataShare;
+  const dqRating = (data.dataQuality.overallRating || 'medium').toLowerCase();
+  const scopeAndQualitySentence =
+    `This ${scopeLabel} assessment draws on primary data for ${primaryShare}% of inputs, supporting an overall ${dqRating} data-quality rating; the remaining inputs use representative secondary and proxy emission factors.`;
+  const hotspot = data.interpretation?.significant_issues;
+  const hotspotSentence = hotspot?.dominant_lifecycle_stage
+    ? `The largest contribution comes from ${hotspot.dominant_lifecycle_stage.toLowerCase()}, accounting for ${Math.round(hotspot.dominant_stage_pct)}% of the total carbon footprint.`
+    : null;
+
+  return (
   <PageWrapper theme="light" pageNumber={1}>
     <div className="mb-8">
       <SectionHeader number="01" title="Executive Summary" />
@@ -79,11 +105,13 @@ export const ExecSummaryPage = ({ data }: { data: LCAReportData }) => (
               {data.executiveSummary.content}
             </p>
             <p>
-              The assessment demonstrates reduced carbon emissions via recycled materials and logistics optimisation. This profile sets a new benchmark for our sustainability targets.
+              {scopeAndQualitySentence}
             </p>
-            <p>
-              Analysis covers all direct and indirect emissions adhering to ISO 14040/44. Expanded boundaries provide granular visibility into supply chain impacts.
-            </p>
+            {hotspotSentence && (
+              <p>
+                {hotspotSentence}
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -110,8 +138,8 @@ export const ExecSummaryPage = ({ data }: { data: LCAReportData }) => (
             <h3 className="text-sm font-bold font-serif text-neutral-800 uppercase tracking-wider mb-1">Data Quality</h3>
             <div className="text-[10px] font-mono text-neutral-400 mb-2">ISO VERIFIED</div>
             <div className="space-y-1 text-[10px] text-neutral-500">
-              <div className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-green-500"></span>Primary Data: 65%</div>
-              <div className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-green-500"></span>Temporal: High</div>
+              <div className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-green-500"></span>Primary Data: {data.dataQuality.coverageSummary.primaryDataShare}%</div>
+              <div className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-green-500"></span>Temporal: {temporalLabel(data.dataQuality.pedigreeMatrix.temporalRepresentativeness)}</div>
             </div>
           </div>
           <div className="flex flex-col items-center">
@@ -138,7 +166,8 @@ export const ExecSummaryPage = ({ data }: { data: LCAReportData }) => (
       </div>
     </div>
   </PageWrapper>
-);
+  );
+};
 
 export const MethodologyPage = ({ data }: { data: LCAReportData }) => (
   <PageWrapper theme="light" pageNumber={2}>
@@ -194,7 +223,7 @@ export const ClimatePage = ({ data }: { data: LCAReportData }) => (
 
     <div className="flex items-center justify-between mb-8">
       <div className="w-1/3">
-        <div className="text-sm font-mono text-neutral-500 mb-2">TOTAL CLIMATE IMPACT</div>
+        <div className="text-sm font-mono text-neutral-500 mb-2">FOSSIL CARBON FOOTPRINT</div>
         <div className="text-8xl font-serif text-[#ccff00] leading-none">
           {data.climateImpact.totalCarbon}
           <span className="text-2xl text-neutral-500 ml-2 font-sans">kg CO2e</span>

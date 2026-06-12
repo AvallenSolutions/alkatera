@@ -12,7 +12,7 @@
 
 import { SupabaseClient } from '@supabase/supabase-js';
 import type { FallbackEvent } from './impact-waterfall-resolver';
-import { normalizeToKg } from './impact-waterfall-resolver';
+import { tryNormalizeToKg } from './impact-waterfall-resolver';
 import { calculateUsePhaseEmissions, type UsePhaseConfig } from './use-phase-factors';
 import { calculateMaterialEoL, getMaterialFactorKey, getPackagingUnitsPerGroup, getRegionalDefaults, EOL_DATA_YEAR, REGION_LABELS, type EoLRegion, type RegionalDefaults, type EoLConfig } from './end-of-life-factors';
 import { calculateDistributionEmissions, type DistributionConfig } from './distribution-factors';
@@ -154,11 +154,14 @@ export async function aggregateProductImpacts(
   fallbackEvents?: FallbackEvent[],
   materialResolutions?: any[],
   referenceYear?: number,
+  upstreamWarnings?: string[],
 ): Promise<AggregationResult> {
   console.log(`[aggregateProductImpacts] Processing PCF: ${productCarbonFootprintId}`);
 
-  // Collect non-fatal warnings to surface in the report
-  const calculationWarnings: string[] = [];
+  // Collect non-fatal warnings to surface in the report.
+  // upstreamWarnings come from the calculator (facility allocation, packaging
+  // allocation, unit normalisation) so everything lands in one place.
+  const calculationWarnings: string[] = [...(upstreamWarnings ?? [])];
 
   // 1. Fetch materials
   const { data: materials, error: materialsError } = await supabase
@@ -240,6 +243,11 @@ export async function aggregateProductImpacts(
   let totalClimateBiogenic = 0;
   let totalClimateDluc = 0;
   let totalTransport = 0;
+  // How many materials had no fossil/biogenic split in their LCI data, so the
+  // resolver attributed the whole climate total to fossil CO₂ (ISO 14067
+  // §6.4.9.3 disclosure). Surfaced so the report can flag the biogenic line as
+  // "not separately characterised" rather than implying a measured zero.
+  let carbonSplitEstimatedCount = 0;
   let totalWater = 0;
   let totalWaterScarcity = 0;
   let totalLand = 0;
@@ -311,6 +319,11 @@ export async function aggregateProductImpacts(
     totalClimateBiogenic += climateBiogenic;
     totalClimateDluc += climateDluc;
     totalTransport += transportImpact;
+    // Count materials whose fossil/biogenic split was estimated (100% fossil
+    // fallback) and that carry a non-trivial climate impact worth disclosing.
+    if ((material as any).carbon_split_estimated && climateWithTransport > 0) {
+      carbonSplitEstimatedCount += 1;
+    }
     totalWater += Number(material.impact_water || 0);
     totalWaterScarcity += Number(material.impact_water_scarcity || 0);
     totalLand += Number(material.impact_land || 0);
@@ -551,6 +564,14 @@ export async function aggregateProductImpacts(
 
   if (isStageIncluded(effectiveBoundary, 'end_of_life')) {
     const eolRegion: EoLRegion = eolConfig?.region || 'eu';
+    // ISO 14044 §4.3.4.3: a material whose production impact is already
+    // discounted for recycled content should not ALSO receive a full
+    // avoided-burden recycling credit at end-of-life — that counts the same
+    // recycling benefit twice. We don't change the maths (the user may have
+    // a defensible reason), but we flag it plainly. Collected per material,
+    // warned once after the loop.
+    const doubleCreditMaterials: Array<{ name: string; recycledPct: number }> = [];
+    const eolAllocationMethod = eolConfig?.allocationMethod ?? 'avoided-burden';
 
     for (const material of materials as Material[]) {
       const materialType = (material.material_type || '').toLowerCase();
@@ -558,7 +579,15 @@ export async function aggregateProductImpacts(
       // written by the calculator already in kg (unit: 'kg'), so this is normally
       // a no-op — but it guards against any non-kg packaging row producing a
       // 1000× EoL inflation.
-      const rawQuantity = normalizeToKg(material.quantity || 0, material.unit || 'kg');
+      const normalised = tryNormalizeToKg(material.quantity || 0, material.unit || 'kg');
+      if (!normalised.recognised) {
+        calculationWarnings.push(
+          `The packaging item "${material.material_name}" has an unrecognised unit "${material.unit}", ` +
+          `so its end-of-life impact was estimated assuming the amount is in kilograms. ` +
+          `Please edit the item and pick a unit from the list.`
+        );
+      }
+      const rawQuantity = normalised.kg;
       if (rawQuantity <= 0) continue;
 
       // Circularity: reuse_trips amortises a reusable container's physical
@@ -716,6 +745,29 @@ export async function aggregateProductImpacts(
       });
 
       console.log(`[aggregateProductImpacts] EoL ${material.material_name} (${factorKey}): net=${eolResult.net.toFixed(6)}, avoided=${eolResult.avoided.toFixed(6)}, gross=${eolResult.gross.toFixed(6)}`);
+
+      // Potential double-count: recycled-content discount on production AND
+      // an actual avoided-burden credit at EoL (avoided < 0 means a credit
+      // was applied) for the same material.
+      const materialRecycledPct = Number((material as any).recycled_content_percentage || 0);
+      if (materialRecycledPct > 0 && eolAllocationMethod === 'avoided-burden' && eolResult.avoided < 0) {
+        doubleCreditMaterials.push({
+          name: material.material_name || 'Packaging',
+          recycledPct: materialRecycledPct,
+        });
+      }
+    }
+
+    if (doubleCreditMaterials.length > 0) {
+      const list = doubleCreditMaterials
+        .map(m => `"${m.name}" (${m.recycledPct}% recycled)`)
+        .join(', ');
+      calculationWarnings.push(
+        `The packaging item${doubleCreditMaterials.length === 1 ? '' : 's'} ${list} already ` +
+        `receive${doubleCreditMaterials.length === 1 ? 's' : ''} a discount for recycled content, and the end-of-life settings ` +
+        `also give full credit for future recycling. This can count the same benefit twice and make the footprint ` +
+        `look smaller than it really is. Consider switching the end-of-life recycling credit to "cut-off" in the End of Life step.`
+      );
     }
   } else if (!isStageIncluded(effectiveBoundary, 'end_of_life')) {
     // Legacy: For cradle-to-gate/shelf/consumer, no EoL
@@ -1013,12 +1065,18 @@ export async function aggregateProductImpacts(
   console.log(`[aggregateProductImpacts] Uncertainty: ±${uncertaintyDisplayPct}% (σ_g=${propagatedUncertaintyPct}%, 95% CI: ${ci95Lower.toFixed(4)} – ${ci95Upper.toFixed(4)} kg CO₂e)`);
   console.log(`[aggregateProductImpacts] Sensitivity: ${sensitivityResults.length} parameters tested, ${highlySensitiveParams.length} highly sensitive`);
 
-  // 10b. Append fallback events to calculation warnings for UI visibility
+  // 10b. Append fallback events to calculation warnings for UI visibility.
+  // data_quality events already carry a plain-language reason written for the
+  // user; the priority-fallback template would only add jargon on top.
   if (fallbackEvents && fallbackEvents.length > 0) {
     for (const evt of fallbackEvents) {
-      calculationWarnings.push(
-        `${evt.material_name}: resolved via Priority ${evt.resolved_priority} instead of ${evt.attempted_priority} (${evt.fallback_reason})`
-      );
+      if (evt.category === 'data_quality') {
+        calculationWarnings.push(`${evt.material_name}: ${evt.fallback_reason}`);
+      } else {
+        calculationWarnings.push(
+          `${evt.material_name}: resolved via Priority ${evt.resolved_priority} instead of ${evt.attempted_priority} (${evt.fallback_reason})`
+        );
+      }
     }
   }
 
@@ -1119,6 +1177,9 @@ export async function aggregateProductImpacts(
         fossil: totalClimateFossil,
         biogenic: totalClimateBiogenic,
         land_use_change: totalClimateDluc,
+        // Number of materials whose fossil/biogenic split was not characterised
+        // in the LCI data and was attributed wholly to fossil (ISO 14067 §6.4.9.3).
+        estimated_split_count: carbonSplitEstimatedCount,
       },
       gas_inventory: {
         // ISSUE A FIX: co2_fossil/co2_biogenic now store PURE CO₂ species mass (GWP=1),
@@ -1158,7 +1219,7 @@ export async function aggregateProductImpacts(
       score: dqiScore,
       rating: dqiScore >= 80 ? 'Good' : dqiScore >= 50 ? 'Fair' : 'Poor',
       // MINOR 1: DQI aggregation methodology disclosure
-      aggregation_method: 'Impact-weighted arithmetic mean of per-material confidence scores, following the Pedigree Matrix approach (Weidema & Wesnæs 1996) as adopted by ISO 14044 §4.2.3.6.3 and ecoinvent.',
+      aggregation_method: 'Impact-weighted arithmetic mean of per-material confidence scores, following the pedigree-matrix approach (Weidema & Wesnæs 1996) used in ecoinvent and consistent with the ISO 14044 §4.2.3.6 data-quality criteria.',
       pedigree_dimensions: ['Reliability', 'Completeness', 'Temporal representativeness', 'Geographical representativeness', 'Technological representativeness'],
       // ISSUE C FIX: Allocation method — specific, accurate statement.
       // Removed vague "as documented per material" language.

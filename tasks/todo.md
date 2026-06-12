@@ -1,3 +1,74 @@
+# Dual-standard LCA report compliance (ISO 14067:2018 + GHG Protocol Product Standard)
+
+Goal: make the LCA report defensibly compliant with BOTH ISO 14067:2018 (fossil-only
+headline, biogenic reported separately) AND the GHG Protocol Product Standard (biogenic
+included in an all-species total, disclosed separately). Standards research confirmed the
+only headline divergence is biogenic CO2; the architecture is already "one inventory, two
+totals". Tim's scope decision: do all three gaps; conservative claim stance.
+
+## Findings (where we stand)
+- The PDF report (lib/pdf/render-lca-html.ts) is already ~80% dual-compliant: fossil-only
+  headline (headlineFossilCarbon), all-species total, carbon-origin split, biogenic note,
+  dLUC line, full GHG species table. Both reports share transformLCADataForReport.
+- The React on-screen report (/lca-report/[id] -> AlkaTeraProductLCA) is fed the SAME rich
+  data but renders only a subset, and HARDCODES data-quality values.
+- The fossil/biogenic split is only genuine when a material resolves via OpenLCA or an
+  ecoinvent proxy carrying the breakdown columns; otherwise the resolver fabricates 85/15.
+
+## Phase A — Rendering + claim wording (contained, low risk, do first) — DONE
+- [x] A1: Fixed hardcoded data-quality values in ExecSummaryPage (Part1.tsx). Now reads
+      data.dataQuality.coverageSummary.primaryDataShare and a temporalLabel() mapping of
+      pedigreeMatrix.temporalRepresentativeness (1-2 High, 3 Medium, 4-5 Low).
+- [x] A2: ClimateMethodologyPage rebuilt to PDF parity (Methodologies.tsx). Renders the two
+      headline totals (fossil-only vs all-species), full per-species/per-origin GHG table
+      (CO2 fossil/biogenic/LULUC, CH4 fossil/biogenic, N2O, HFCs), the §6.4.9.3 footnote,
+      the biogenic note, and reframed "Reference Standards". Visually verified via fixture
+      route: fits the A4 page exactly (1123px, no clipping).
+- [x] A3: Conservative claim wording applied:
+      - render-lca-html.ts cover: "...Compliant" -> "Prepared in accordance with..."
+      - Layout.tsx footer: "ISO 14040/44 Compliant" -> "Prepared in accordance with..."
+      - Part1.tsx exec copy: "adhering to" -> "in accordance with"
+      - Dropped PAS 2050 from both standards lists; "Compliance" -> "Reference Standards"
+      - Corrected pedigree overclaims in transformer (exec prose, missingDataTreatment,
+        doc comment) and aggregator aggregation_method (no longer claims a §4.2.3.6.3 mandate)
+- [x] A4: Verified - tsc exit 0 / 0 errors; 27 unit tests green (generate-pdf-route x20 +
+      transformer-tables x7); ClimateMethodologyPage visually confirmed in browser.
+
+## Phase B — Make the fossil/biogenic split real — DONE (Tim: 100% fossil + flag, no recalc)
+- [x] B1: Audited the resolver. Found EIGHT 85/15 fabrication sites (not the ~5 expected):
+      buildSupplierProductResult, Priority 1c supplier LCA, Priority 2 DEFRA+ecoinvent hybrid
+      (ratio default), direct proxy, name proxy, ecoinvent proxy, staging factor, and the
+      cached last-resort path.
+- [x] B2: Replaced all 8. Each now uses the real fossil/biogenic columns when present;
+      otherwise attributes the whole total to fossil (biogenic = 0) and sets a new
+      WaterfallResult.carbon_split_estimated flag. No 85/15 fabrication remains.
+- [x] B3: Threaded the flag through for honest disclosure: calculator carries
+      carbon_split_estimated onto each lcaMaterial -> aggregator counts non-trivial
+      estimated materials into ghg_breakdown.carbon_origin.estimated_split_count ->
+      transformer appends a sentence to the biogenic note ("For N input(s), a fossil/
+      biogenic split was not separately characterised ... reported wholly as fossil CO2").
+- [x] B4: No recalculation (Tim's choice). Future calculations use the new logic; existing
+      PCFs are untouched.
+- [x] Verify: tsc exit 0 / 0 errors; 281 tests green. Updated 2 resolver tests + 2 supplier
+      tests from the old 85/15 expectation to the new methodology; added an aggregator test
+      asserting estimated_split_count.
+
+## Review
+- Counter-intuitive headline finding: the PDF report was already ~80% dual-compliant via the
+  shared transformer (fossil-only headline + all-species total + per-origin GHG table). The
+  gaps were (a) the React on-screen report rendered only a subset and hardcoded data-quality
+  values, (b) the fossil/biogenic split was fabricated 85/15 whenever real LCI columns were
+  absent, and (c) overstated conformance claims.
+- Phase A (rendering + claims) and Phase B (real split + estimated-flag disclosure) both
+  shipped and are verified. No production recalculation was run.
+- Follow-ups noted, not actioned: the exec-summary's 2nd/3rd paragraphs are still hardcoded
+  marketing prose ("demonstrates reduced carbon emissions...") shown on every report
+  regardless of the product — same integrity class as the 65% fix, worth removing. And the
+  deeper win remains routing more materials through OpenLCA/ecoinvent processes that carry a
+  genuine fossil/biogenic split, so fewer inputs hit the 100%-fossil fallback at all.
+
+---
+
 # Facility utility data dashboard (visual display of uploaded bill data)
 
 Goal: on the facility History tab, show a visual 12-month view of all utility, water and waste data (from uploaded bills and manual entry) so gaps and trends are obvious.
