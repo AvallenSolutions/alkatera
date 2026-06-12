@@ -139,7 +139,11 @@ export function checkPackagingWeight(input: WeightCheckInput): WeightCheckResult
   let maxG: number | null = null;
   let label = '';
 
-  if (category === 'container' || category === '') {
+  // Role categories (label, closure, secondary, ...) get their role's range.
+  // Everything else — 'container', legacy values like 'primary', or no
+  // category at all — falls through to name-based inference, so a row whose
+  // category was never set is still checked against what its name says it is.
+  if (!ROLE_RULES[category]) {
     for (const rule of CONTAINER_RULES) {
       if (!rule.pattern.test(name)) continue;
       label = rule.label;

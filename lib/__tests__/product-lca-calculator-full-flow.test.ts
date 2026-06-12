@@ -602,6 +602,65 @@ describe('calculateProductCarbonFootprint', () => {
   });
 
   // --------------------------------------------------------------------------
+  // MASS PLAUSIBILITY WARNINGS (placeholder/mis-entered quantities)
+  // --------------------------------------------------------------------------
+  //
+  // Regression for the 70 placeholder rows found in production (quantity 1,
+  // no unit): a "1 kg aluminium can" is a data-entry artefact, not a can.
+  // The calculator applies the same plausibility ranges as the entry forms
+  // (lib/constants/packaging-weight-ranges.ts) and surfaces failures through
+  // the calculation warnings so they appear in the LCA report.
+
+  describe('Mass plausibility warnings', () => {
+    const upstreamWarningsArg = () =>
+      (mockAggregateProductImpacts.mock.calls[0]?.[12] ?? []) as string[];
+
+    it('warns when a packaging item has an implausible mass (1 kg aluminium can)', async () => {
+      const placeholderCan = { ...MOCK_MATERIAL_CAN, quantity: 1, unit: 'kg' };
+      mockSupabaseClient.from.mockImplementation((table: string) => {
+        if (table === 'products') return createQueryMock({ data: MOCK_PRODUCT, error: null });
+        if (table === 'product_materials') return createQueryMock({ data: [placeholderCan], error: null });
+        if (table === 'product_carbon_footprints') return createQueryMock({ data: MOCK_LCA_RECORD, error: null });
+        return createQueryMock({ data: table === 'product_carbon_footprint_production_sites' || table === 'contract_manufacturer_allocations' || table === 'utility_data_entries' || table === 'facility_activity_entries' ? [] : null, error: null });
+      });
+
+      await calculateProductCarbonFootprint({ productId: 'prod-001' });
+
+      const warnings = upstreamWarningsArg();
+      const w = warnings.find((x) => x.startsWith('Aluminium Can:'));
+      expect(w).toBeDefined();
+      expect(w).toContain('unusual for');
+      expect(w).toContain('double-check the weight');
+    });
+
+    it('warns when an ingredient amount exceeds 3x the product mass', async () => {
+      // 2 kg of malt in a 330 ml beer (ceiling ≈ 0.99 kg)
+      const heavyMalt = { ...MOCK_MATERIAL_MALT, quantity: 2, unit: 'kg' };
+      mockSupabaseClient.from.mockImplementation((table: string) => {
+        if (table === 'products') return createQueryMock({ data: MOCK_PRODUCT, error: null });
+        if (table === 'product_materials') return createQueryMock({ data: [heavyMalt], error: null });
+        if (table === 'product_carbon_footprints') return createQueryMock({ data: MOCK_LCA_RECORD, error: null });
+        return createQueryMock({ data: table === 'product_carbon_footprint_production_sites' || table === 'contract_manufacturer_allocations' || table === 'utility_data_entries' || table === 'facility_activity_entries' ? [] : null, error: null });
+      });
+
+      await calculateProductCarbonFootprint({ productId: 'prod-001' });
+
+      const warnings = upstreamWarningsArg();
+      const w = warnings.find((x) => x.includes('Pale Malt'));
+      expect(w).toBeDefined();
+      expect(w).toContain('seems high');
+    });
+
+    it('does not warn for plausible masses (15 g can, 500 g malt)', async () => {
+      await calculateProductCarbonFootprint({ productId: 'prod-001' });
+
+      const warnings = upstreamWarningsArg();
+      expect(warnings.find((x) => x.includes('unusual for'))).toBeUndefined();
+      expect(warnings.find((x) => x.includes('seems high'))).toBeUndefined();
+    });
+  });
+
+  // --------------------------------------------------------------------------
   // INTERPRETATION
   // --------------------------------------------------------------------------
 

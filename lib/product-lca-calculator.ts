@@ -20,6 +20,7 @@ import { getGridFactor } from './grid-emission-factors';
 import { getAwareFactor } from './calculations/water-risk';
 import { DEFAULT_RECYCLED_CONTENT_CREDIT } from './constants/packaging-defaults';
 import { getPackagingUnitsPerGroup, SHARED_PACKAGING_CATEGORIES } from './end-of-life-factors';
+import { checkPackagingWeight, checkIngredientAmount } from './constants/packaging-weight-ranges';
 import { overlapFraction } from './calculations/utility-factors';
 import { checkRunIntensity } from './validation/production-run-sanity';
 import {
@@ -1454,6 +1455,38 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
             source_reference: 'Unit conversion',
             category: 'data_quality',
           });
+        }
+
+        // Mass plausibility (same rules the entry forms use, applied here so
+        // imported, legacy, and placeholder rows that never went through a
+        // form are also caught). A 1 kg "aluminium can" is a placeholder or
+        // entry mistake, not a can — flag it in the report rather than
+        // silently inflating the footprint. Advisory only; never blocks.
+        // Skipped for count units (mass is meaningless) and unrecognised
+        // units (already warned above).
+        if (normalised.recognised && (normalised.kind === 'mass' || normalised.kind === 'volume') && quantityKg > 0) {
+          const materialTypeForCheck = (material.material_type || '').toLowerCase();
+          const unitSizeMl = fuSizeKnown ? fuSizeLitres * 1000 : null;
+          if (materialTypeForCheck === 'packaging' || materialTypeForCheck === 'packaging_material') {
+            const check = checkPackagingWeight({
+              packagingCategory: material.packaging_category,
+              materialName: material.material_name,
+              containerSizeMl: unitSizeMl,
+              weightG: quantityKg * 1000,
+            });
+            if (check.level === 'warning' && check.message) {
+              calculatorWarnings.push(`${material.material_name}: ${check.message}`);
+            }
+          } else if (materialTypeForCheck === 'ingredient') {
+            const check = checkIngredientAmount({
+              amountKgPerUnit: quantityKg,
+              unitSizeMl,
+              ingredientName: material.material_name,
+            });
+            if (check.level === 'warning' && check.message) {
+              calculatorWarnings.push(check.message);
+            }
+          }
         }
 
         // Use pre-resolved factors (parallel) or pinned factors
