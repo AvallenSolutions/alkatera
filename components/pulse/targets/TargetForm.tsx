@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
+import { supabase } from '@/lib/supabaseClient';
 import { ALL_METRIC_KEYS, METRIC_DEFINITIONS, type MetricKey } from '@/lib/pulse/metric-keys';
+
+const REDUCTION_CHIPS = [10, 20, 30, 42, 50];
 
 export const TARGET_PRESETS = [
   { label: 'SBTi 1.5°C: -42% absolute scope 1+2 by 2030', metric: 'total_co2e', factor: 0.58, year: 2030, methodology: 'SBTi 1.5C aligned' },
@@ -45,15 +49,72 @@ export function TargetForm({ organizationId, onCreated, onMetricKeyChange }: Tar
   const [methodology, setMethodology] = useState('');
   const [notes, setNotes] = useState('');
 
+  // Baseline prefill: the latest recorded value for the chosen metric (the
+  // same daily snapshots the trajectory forecast uses). The user can always
+  // type over it; once they have, we stop auto-filling.
+  const [baselineTouched, setBaselineTouched] = useState(false);
+  const [baselineSource, setBaselineSource] = useState<string | null>(null);
+
+  // Target entry mode: an absolute number, or a percentage reduction from
+  // the baseline. Reduction only makes sense for lower-is-better metrics.
+  const [targetMode, setTargetMode] = useState<'absolute' | 'percent'>('absolute');
+  const [reductionPct, setReductionPct] = useState('10');
+
+  const metricDef = METRIC_DEFINITIONS[metricKey];
+  const supportsReduction = !(metricDef?.higherIsBetter ?? false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setBaselineSource(null);
+    (async () => {
+      const { data } = await supabase
+        .from('metric_snapshots')
+        .select('snapshot_date, value')
+        .eq('organization_id', organizationId)
+        .eq('metric_key', metricKey)
+        .order('snapshot_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (cancelled || !data) return;
+      const formatted = new Date(data.snapshot_date as string).toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      });
+      setBaselineSource(formatted);
+      if (!baselineTouched) {
+        setBaselineValue(String(Number(data.value)));
+        setBaselineDate(String(data.snapshot_date));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organizationId, metricKey]);
+
   function changeMetric(key: MetricKey) {
     setMetricKey(key);
     onMetricKeyChange?.(key);
+    if (METRIC_DEFINITIONS[key]?.higherIsBetter) setTargetMode('absolute');
+  }
+
+  /** The target value that will be saved, given the current entry mode. */
+  function effectiveTargetValue(): number | null {
+    if (targetMode === 'absolute') {
+      return targetValue === '' ? null : Number(targetValue);
+    }
+    const baseline = Number(baselineValue);
+    const pct = Number(reductionPct);
+    if (!Number.isFinite(baseline) || !Number.isFinite(pct)) return null;
+    return Number((baseline * (1 - pct / 100)).toFixed(2));
   }
 
   function applyPreset(preset: (typeof TARGET_PRESETS)[number]) {
     changeMetric(preset.metric as MetricKey);
     setTargetDate(`${preset.year}-12-31`);
     setMethodology(preset.methodology);
+    setTargetMode('absolute');
     if (baselineValue) {
       const baseline = Number(baselineValue);
       const newTarget =
@@ -73,7 +134,7 @@ export function TargetForm({ organizationId, onCreated, onMetricKeyChange }: Tar
         metric_key: metricKey,
         baseline_value: Number(baselineValue),
         baseline_date: baselineDate,
-        target_value: Number(targetValue),
+        target_value: effectiveTargetValue(),
         target_date: targetDate,
         methodology: methodology || null,
         notes: notes || null,
@@ -86,7 +147,10 @@ export function TargetForm({ organizationId, onCreated, onMetricKeyChange }: Tar
       return;
     }
     setBaselineValue('');
+    setBaselineTouched(false);
     setTargetValue('');
+    setReductionPct('10');
+    setTargetMode('absolute');
     setMethodology('');
     setNotes('');
     await onCreated();
@@ -136,9 +200,17 @@ export function TargetForm({ organizationId, onCreated, onMetricKeyChange }: Tar
               id="baseline-value"
               type="number"
               value={baselineValue}
-              onChange={e => setBaselineValue(e.target.value)}
+              onChange={e => {
+                setBaselineTouched(true);
+                setBaselineValue(e.target.value);
+              }}
               placeholder="e.g. 1200"
             />
+            {baselineSource && !baselineTouched && baselineValue !== '' && (
+              <p className="text-xs text-muted-foreground">
+                Filled from your latest data ({baselineSource}). Type to change it.
+              </p>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="baseline-date">Baseline date</Label>
@@ -150,14 +222,79 @@ export function TargetForm({ organizationId, onCreated, onMetricKeyChange }: Tar
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="target-value">Target value</Label>
-            <Input
-              id="target-value"
-              type="number"
-              value={targetValue}
-              onChange={e => setTargetValue(e.target.value)}
-              placeholder="e.g. 600"
-            />
+            <div className="flex items-center justify-between">
+              <Label htmlFor="target-value">Target</Label>
+              {supportsReduction && (
+                <div className="flex rounded-md border border-border/60 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setTargetMode('absolute')}
+                    className={cn(
+                      'rounded px-2 py-0.5 text-[10px] font-medium transition-colors',
+                      targetMode === 'absolute' ? 'bg-[#ccff00]/20 text-foreground' : 'text-muted-foreground',
+                    )}
+                  >
+                    Value
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTargetMode('percent')}
+                    className={cn(
+                      'rounded px-2 py-0.5 text-[10px] font-medium transition-colors',
+                      targetMode === 'percent' ? 'bg-[#ccff00]/20 text-foreground' : 'text-muted-foreground',
+                    )}
+                  >
+                    % reduction
+                  </button>
+                </div>
+              )}
+            </div>
+            {targetMode === 'absolute' ? (
+              <Input
+                id="target-value"
+                type="number"
+                value={targetValue}
+                onChange={e => setTargetValue(e.target.value)}
+                placeholder="e.g. 600"
+              />
+            ) : (
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    id="target-value"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={reductionPct}
+                    onChange={e => setReductionPct(e.target.value)}
+                    className="w-24"
+                  />
+                  <span className="text-sm text-muted-foreground">% less than baseline</span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {REDUCTION_CHIPS.map(pct => (
+                    <button
+                      key={pct}
+                      type="button"
+                      onClick={() => setReductionPct(String(pct))}
+                      className={cn(
+                        'rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors',
+                        reductionPct === String(pct)
+                          ? 'border-[#ccff00]/60 bg-[#ccff00]/15 text-foreground'
+                          : 'border-border/60 text-muted-foreground hover:text-foreground',
+                      )}
+                    >
+                      -{pct}%
+                    </button>
+                  ))}
+                </div>
+                {baselineValue !== '' && effectiveTargetValue() !== null && (
+                  <p className="text-xs text-muted-foreground">
+                    Works out at {effectiveTargetValue()!.toLocaleString('en-GB')} {metricDef?.unit ?? ''}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="target-date">Target date</Label>
@@ -195,7 +332,7 @@ export function TargetForm({ organizationId, onCreated, onMetricKeyChange }: Tar
         )}
 
         <div className="flex justify-end">
-          <Button onClick={createTarget} disabled={creating || !baselineValue || !targetValue}>
+          <Button onClick={createTarget} disabled={creating || !baselineValue || effectiveTargetValue() === null}>
             {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Set target
           </Button>
