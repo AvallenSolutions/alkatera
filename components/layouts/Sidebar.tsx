@@ -118,9 +118,7 @@ const navigationStructure: NavItem[] = [
     children: [
       { name: 'Dashboard',         href: '/pulse/',                           icon: Activity,   minTier: 1 },
       { name: 'Financial',         href: '/pulse/financial/',                 icon: TrendingUp, minTier: 1 },
-      { name: 'Impact Valuation',  href: '/pulse/financial/impact-valuation/', icon: TrendingUp, minTier: 3 },
       { name: 'Targets',           href: '/pulse/targets/',                   icon: TrendingUp, minTier: 1 },
-      { name: 'Prices',            href: '/pulse/settings/shadow-prices/',    icon: TrendingUp, minTier: 1 },
     ],
   },
   {
@@ -222,8 +220,6 @@ const navigationStructure: NavItem[] = [
       { name: 'Sustainability Reports', href: '/reports/sustainability/',    icon: TrendingUp, minTier: 1, requiresMilestone: 'has_product' },
       { name: 'LCA Reports',            href: '/reports/lcas/',              icon: Award,      minTier: 2, requiresMilestone: 'has_lca' },
       { name: 'Historical Imports',     href: '/reports/historical/',        icon: Library,    minTier: 1 },
-      // Impact Valuation moved to Pulse -> Financial. Old link still
-      // resolves via the redirect at /reports/impact-valuation.
     ],
   },
   {

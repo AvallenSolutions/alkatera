@@ -35,7 +35,6 @@ import { ProductEnvCostCard } from '@/components/pulse/widgets/product-env-cost/
 import { CostIntensityCompact } from '@/components/pulse/widgets/cost-intensity/CostIntensityCompact';
 import { TopCostDriversCard as TopCostDriversCompact } from '@/components/pulse/widgets/top-cost-drivers/TopCostDriversCard';
 import { IssbDisclosureCompact } from '@/components/pulse/widgets/issb-disclosure/IssbDisclosureCompact';
-import { ImpactValuationCard } from '@/components/pulse/widgets/impact-valuation/ImpactValuationCard';
 
 // Expanded slot mounts -- register drill renderers.
 import { FinancialFootprintExpandedSlot } from '@/components/pulse/widgets/financial-footprint/expanded';
@@ -47,7 +46,6 @@ import { ProductEnvCostExpandedSlot } from '@/components/pulse/widgets/product-e
 import { TopCostDriversExpandedSlot } from '@/components/pulse/widgets/top-cost-drivers/expanded';
 import { CostIntensityExpandedSlot } from '@/components/pulse/widgets/cost-intensity/expanded';
 import { IssbDisclosureExpandedSlot } from '@/components/pulse/widgets/issb-disclosure/expanded';
-import { ImpactValuationExpandedSlot } from '@/components/pulse/widgets/impact-valuation/expanded';
 
 import { BoardPackButton } from '@/components/pulse/financial/BoardPackButton';
 
@@ -82,7 +80,6 @@ function PulseFinancialShellBody() {
           'cost-intensity',
           'top-cost-drivers',
           'issb-disclosure',
-          'impact-valuation',
         ],
       },
     }),
@@ -107,7 +104,6 @@ function PulseFinancialShellBody() {
       <TopCostDriversExpandedSlot />
       <CostIntensityExpandedSlot />
       <IssbDisclosureExpandedSlot />
-      <ImpactValuationExpandedSlot />
 
       {/* The overlay itself. Mounted once. */}
       <WidgetDrillOverlay />
@@ -215,13 +211,6 @@ function FinancialCardGrid() {
       </div>
       <div className="sm:col-span-1 sm:row-span-1">
         <IssbDisclosureCompact />
-      </div>
-
-      {/* Impact Valuation (2x1) -- four-capital monetised impact. Moved here
-          from /reports/impact-valuation so the full CFO-facing finance view
-          lives in one place. */}
-      <div className="sm:col-span-2 sm:row-span-1">
-        <ImpactValuationCard />
       </div>
     </div>
   );

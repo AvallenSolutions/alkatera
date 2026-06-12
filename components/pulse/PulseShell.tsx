@@ -38,7 +38,6 @@ import { LiveActivityExpandedSlot } from '@/components/pulse/widgets/live-activi
 // Financial-only drill slots -- surfaced by the CFO persona view.
 import { CostIntensityExpandedSlot } from '@/components/pulse/widgets/cost-intensity/expanded';
 import { IssbDisclosureExpandedSlot } from '@/components/pulse/widgets/issb-disclosure/expanded';
-import { ImpactValuationExpandedSlot } from '@/components/pulse/widgets/impact-valuation/expanded';
 import { usePulseDrillUrl } from '@/hooks/usePulseDrillUrl';
 import { LiveMetricsStrip } from '@/components/pulse/widgets/LiveMetricsStrip';
 import { AskRosaWidget } from '@/components/pulse/widgets/AskRosaWidget';
@@ -157,7 +156,6 @@ function PulseShellBody() {
       <LiveActivityExpandedSlot />
       <CostIntensityExpandedSlot />
       <IssbDisclosureExpandedSlot />
-      <ImpactValuationExpandedSlot />
       {/* Full-page overlay. Mounted once at shell level. */}
       <WidgetDrillOverlay />
     </>

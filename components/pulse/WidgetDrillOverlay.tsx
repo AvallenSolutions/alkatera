@@ -172,7 +172,6 @@ function widgetFullPageHref(widgetId: string): string | null {
     'carbon-budgets': '/pulse/financial',
     'product-env-cost': '/pulse/financial',
     'issb-disclosure': '/pulse/financial',
-    'impact-valuation': '/pulse/financial/impact-valuation',
   };
   return map[widgetId] ?? null;
 }

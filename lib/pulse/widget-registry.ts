@@ -40,8 +40,7 @@ export type WidgetId =
   // drill-overlay lookups (`?drill=top-cost-drivers`) find a label.
   | 'cost-intensity'
   | 'top-cost-drivers'
-  | 'issb-disclosure'
-  | 'impact-valuation';
+  | 'issb-disclosure';
 
 export type Footprint = '1x1' | '2x1' | '2x2';
 
@@ -412,20 +411,6 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
       why: 'Gives you a head start on investor-ready and audit-ready climate reporting.',
       source: 'Your emissions data mapped to IFRS S2 fields; some regulatory inputs use placeholder values until you enter them.',
       isEstimate: true,
-    },
-  }),
-  'impact-valuation': withLayout({
-    id: 'impact-valuation',
-    label: 'Total impact in pounds',
-    description:
-      'Your full impact across nature, people, society and governance, valued in pounds. Full report at /pulse/financial/impact-valuation.',
-    footprint: '2x1',
-    exempt: true, // rendered inside FinancialGrid, not on the main Pulse grid
-    phase: 20,
-    explainer: {
-      what: 'Your total impact across nature, people, society and governance, valued in pounds.',
-      why: 'A single, comparable figure for your full impact, useful for boards and tenders.',
-      source: 'The four-capital impact model applied to your data.',
     },
   }),
 };

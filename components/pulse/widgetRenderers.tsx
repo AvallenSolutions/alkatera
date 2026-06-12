@@ -8,9 +8,8 @@
  * read-only persona grids (PulsePersonaGrid).
  *
  * Includes the financial-only cards (cost-intensity, top-cost-drivers,
- * issb-disclosure, impact-valuation) so persona presets that surface them
- * (e.g. the CFO view) can render directly. Their drill overlays are mounted at
- * shell level.
+ * issb-disclosure) so the Financial view can render them directly. Their
+ * drill overlays are mounted at shell level.
  */
 
 import type { ReactNode } from 'react';
@@ -37,7 +36,6 @@ import { LiveActivityCard } from '@/components/pulse/widgets/live-activity/LiveA
 import { CostIntensityCompact } from '@/components/pulse/widgets/cost-intensity/CostIntensityCompact';
 import { TopCostDriversCard } from '@/components/pulse/widgets/top-cost-drivers/TopCostDriversCard';
 import { IssbDisclosureCompact } from '@/components/pulse/widgets/issb-disclosure/IssbDisclosureCompact';
-import { ImpactValuationCard } from '@/components/pulse/widgets/impact-valuation/ImpactValuationCard';
 
 /**
  * Renderers for each widget id. `live-metrics-strip` and `ask-rosa` are
@@ -65,5 +63,4 @@ export const WIDGET_RENDERERS: Partial<Record<WidgetId, () => ReactNode>> = {
   'cost-intensity': () => <CostIntensityCompact />,
   'top-cost-drivers': () => <TopCostDriversCard />,
   'issb-disclosure': () => <IssbDisclosureCompact />,
-  'impact-valuation': () => <ImpactValuationCard />,
 };
