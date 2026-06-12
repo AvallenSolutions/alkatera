@@ -15,7 +15,8 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, TrendingUp } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowRight, Loader2, TrendingUp } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -328,6 +329,13 @@ function SelectedLeverDetail({ lever }: { lever: Lever }) {
           {formatGbp(lever.npv_gbp)}
         </span>
       </p>
+      <Link
+        href={`/pulse/targets?lever=${encodeURIComponent(lever.id)}#actions`}
+        className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-[#ccff00]/40 bg-[#ccff00]/10 px-2.5 py-1 text-xs font-medium text-[#9bbf00] hover:bg-[#ccff00]/20 dark:text-[#ccff00]"
+      >
+        Plan this action
+        <ArrowRight className="h-3 w-3" />
+      </Link>
     </div>
   );
 }

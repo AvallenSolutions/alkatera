@@ -7,6 +7,14 @@ import {
   type SupplierEsgCoverage,
 } from './supplier-esg-evidence';
 import { calculateCorporateEmissions } from '@/lib/calculations/corporate-emissions';
+import {
+  assessReductionPlan,
+  assessNetZeroPathway,
+  isEmissionsTarget,
+  hasDeclaredMethodology,
+  type InitiativeEvidenceRow,
+  type TargetEvidenceRow,
+} from './initiative-evidence';
 
 // Maps B Corp 2026 requirements to the alkatera modules that already hold
 // relevant data. Only modules confirmed to exist in the schema are mapped;
@@ -90,6 +98,52 @@ function esgCoverageResult(
   };
 }
 
+/**
+ * Initiatives linked (via initiative_target_links) to at least one
+ * emissions-related sustainability target. Used by IT5-Y3-002 and IT5-Y5-001.
+ */
+async function fetchEmissionsLinkedInitiatives(
+  supabase: SupabaseClient,
+  organizationId: string,
+): Promise<InitiativeEvidenceRow[]> {
+  const { data: targetRows } = await supabase
+    .from('sustainability_targets')
+    .select('id, metric_key, scope')
+    .eq('organization_id', organizationId);
+  const emissionsTargetIds = (targetRows ?? [])
+    .filter((t: any) => isEmissionsTarget(t))
+    .map((t: any) => t.id);
+  if (emissionsTargetIds.length === 0) return [];
+
+  const { data: links } = await supabase
+    .from('initiative_target_links')
+    .select('initiative_id')
+    .in('target_id', emissionsTargetIds);
+  const initiativeIds = Array.from(new Set((links ?? []).map((l: any) => l.initiative_id)));
+  if (initiativeIds.length === 0) return [];
+
+  const { data: initiatives } = await supabase
+    .from('reduction_initiatives')
+    .select(
+      'id, title, status, start_date, end_date, owner_user_id, owner_name, approved_at, percent_complete, progress_updated_at, expected_annual_reduction_value, expected_annual_reduction_unit',
+    )
+    .in('id', initiativeIds)
+    .eq('organization_id', organizationId);
+  return (initiatives ?? []) as InitiativeEvidenceRow[];
+}
+
+function summariseInitiative(i: InitiativeEvidenceRow): string {
+  const parts = [
+    i.status === 'completed' ? 'Completed' : i.status === 'active' ? 'Active' : 'Planned',
+    i.owner_name || (i.owner_user_id ? 'owner assigned' : null),
+    i.percent_complete != null ? `${i.percent_complete}% complete` : null,
+    i.expected_annual_reduction_value
+      ? `expected ${i.expected_annual_reduction_value} ${i.expected_annual_reduction_unit ?? ''}`.trim()
+      : null,
+  ].filter(Boolean);
+  return parts.join(', ');
+}
+
 const MAPPINGS: Record<string, ModuleMapping> = {
   // Climate Action — GHG measurement
   'IT5-Y0-001': {
@@ -155,29 +209,115 @@ const MAPPINGS: Record<string, ModuleMapping> = {
   'IT5-Y0-002': {
     module: 'targets',
     moduleLabel: 'Sustainability targets',
-    moduleLink: '/pulse',
+    moduleLink: '/pulse/targets',
     async query(supabase, orgId) {
       // Fetch the org's targets and filter for emissions-related ones in JS.
       // Don't cap the query before filtering — a small `.limit()` here could
       // drop the only CO2 target if it isn't among the first rows returned.
       const { data } = await supabase
         .from('sustainability_targets')
-        .select('id, metric_key, target_value, target_date, scope, status')
+        .select('id, metric_key, target_value, target_date, scope, status, methodology, notes')
         .eq('organization_id', orgId)
         .order('target_date', { ascending: false });
-      const rows = (data ?? []).filter((r: any) =>
-        /co2|carbon|emission|ghg|scope/i.test(
-          `${r.metric_key} ${r.scope ?? ''}`,
-        ),
-      );
+      const rows = (data ?? []).filter((r: any) => isEmissionsTarget(r));
       const base = summariseCount(rows.length, 'emissions reduction targets');
+
+      // A bare number is a weak commitment; B Corp expects it to be aligned
+      // with science-based targets or equivalent, so we ask for the method.
+      // Soft signal only: this never un-passes verified evidence links.
+      if (rows.length > 0 && !rows.some((r: any) => hasDeclaredMethodology(r))) {
+        base.completeness = 'partial';
+        base.completenessNote =
+          'You have an emissions target, but no method behind it. Add the method (for example SBTi 1.5C) to the target to strengthen this evidence.';
+      }
+
       return {
         ...base,
         items: rows.slice(0, 5).map((r: any) => ({
           sourceRecordId: r.id,
           label: r.metric_key,
-          summary: `Target ${r.target_value} by ${r.target_date} (${r.status})`,
+          summary: `Target ${r.target_value} by ${r.target_date} (${r.status})${r.methodology ? `, method: ${r.methodology}` : ''}`,
         })),
+      };
+    },
+  },
+  // Climate Action — time-bound emissions reduction plan with tracked
+  // progress (Year 3). Evidence is reduction initiatives linked to emissions
+  // targets; the completeness rules live in initiative-evidence.ts.
+  'IT5-Y3-002': {
+    module: 'targets',
+    moduleLabel: 'Sustainability targets',
+    moduleLink: '/pulse/targets',
+    async query(supabase, orgId) {
+      const initiatives = await fetchEmissionsLinkedInitiatives(supabase, orgId);
+      const plan = assessReductionPlan(initiatives);
+
+      if (initiatives.length === 0) {
+        return {
+          found: false,
+          completeness: plan.completeness,
+          completenessNote: plan.note,
+          items: [],
+        };
+      }
+
+      return {
+        found: true,
+        completeness: plan.completeness,
+        completenessNote: plan.note,
+        items: [
+          // Stable aggregate item first so the nightly cron's suggestion
+          // stays a single row rather than churning per initiative.
+          { sourceRecordId: 'aggregate', label: 'Emissions reduction action plan', summary: plan.note },
+          ...(plan.qualifying.length > 0 ? plan.qualifying : initiatives).slice(0, 5).map((i) => ({
+            sourceRecordId: i.id,
+            label: i.title,
+            summary: summariseInitiative(i),
+          })),
+        ],
+      };
+    },
+  },
+  // Climate Action — net zero pathway (Year 5). Conservative platform
+  // signal: a net-zero target plus a qualifying tracked plan; validated
+  // pathway documents usually still arrive as manual evidence.
+  'IT5-Y5-001': {
+    module: 'targets',
+    moduleLabel: 'Sustainability targets',
+    moduleLink: '/pulse/targets',
+    async query(supabase, orgId) {
+      const { data: targetRows } = await supabase
+        .from('sustainability_targets')
+        .select('id, metric_key, target_value, target_date, scope, status, methodology, notes')
+        .eq('organization_id', orgId);
+      const targets = (targetRows ?? []) as TargetEvidenceRow[];
+      const initiatives = await fetchEmissionsLinkedInitiatives(supabase, orgId);
+      const pathway = assessNetZeroPathway(targets, initiatives);
+
+      const netZero = targets.filter(
+        (t) => isEmissionsTarget(t) && Number(t.target_value) === 0 && t.target_date,
+      );
+
+      return {
+        found: pathway.completeness !== 'missing',
+        completeness: pathway.completeness,
+        completenessNote: pathway.note,
+        items:
+          pathway.completeness === 'missing'
+            ? []
+            : [
+                { sourceRecordId: 'aggregate', label: 'Net zero pathway', summary: pathway.note },
+                ...netZero.slice(0, 3).map((t) => ({
+                  sourceRecordId: t.id,
+                  label: t.metric_key,
+                  summary: `Net zero by ${t.target_date}${t.methodology ? `, method: ${t.methodology}` : ''}`,
+                })),
+                ...pathway.qualifying.slice(0, 3).map((i) => ({
+                  sourceRecordId: i.id,
+                  label: i.title,
+                  summary: summariseInitiative(i),
+                })),
+              ],
       };
     },
   },

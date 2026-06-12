@@ -1,96 +1,107 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, Target as TargetIcon, Trash2 } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { ArrowLeft, Plus, Target as TargetIcon } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
+import { useAuth } from '@/components/providers/AuthProvider';
 import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { ALL_METRIC_KEYS, METRIC_DEFINITIONS, type MetricKey } from '@/lib/pulse/metric-keys';
+import { Card, CardContent } from '@/components/ui/card';
+import { supabase } from '@/lib/supabaseClient';
+import { TargetForm, TARGET_PRESETS } from '@/components/pulse/targets/TargetForm';
+import { TargetCard } from '@/components/pulse/targets/TargetCard';
+import { InitiativeBoard } from '@/components/pulse/targets/InitiativeBoard';
+import { InitiativeDialog } from '@/components/pulse/targets/InitiativeDialog';
+import { BcorpClimatePanel } from '@/components/pulse/targets/BcorpClimatePanel';
+import { initiativeTargetIds, type Initiative, type Target } from '@/components/pulse/targets/types';
 
-interface Target {
-  id: string;
-  metric_key: MetricKey;
-  baseline_value: number;
-  baseline_date: string;
-  target_value: number;
-  target_date: string;
-  notes: string | null;
-}
-
-const PRESETS = [
-  { label: 'SBTi 1.5°C: -42% absolute scope 1+2 by 2030', metric: 'total_co2e', factor: 0.58, year: 2030 },
-  { label: 'Net zero scope 1+2 by 2040', metric: 'total_co2e', factor: 0, year: 2040 },
-  { label: '100% LCA coverage by 2027', metric: 'lca_completeness_pct', factor: 100, year: 2027 },
-] as const;
-
-export default function TargetsPage() {
+/**
+ * Targets & Actions hub: set sustainability targets, build the action plan
+ * behind them, and see how both feed B Corp climate evidence.
+ */
+function TargetsActionsHub() {
   const { currentOrganization } = useOrganization();
+  const { user } = useAuth();
+  const searchParams = useSearchParams();
+
   const [targets, setTargets] = useState<Target[]>([]);
+  const [initiatives, setInitiatives] = useState<Initiative[]>([]);
+  const [viewerRole, setViewerRole] = useState<string | null>(null);
+  const [snapshotsByMetric, setSnapshotsByMetric] = useState<Record<string, { date: string; value: number }[]>>({});
   const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  // Form state
-  const [metricKey, setMetricKey] = useState<MetricKey>('total_co2e');
-  const [baselineValue, setBaselineValue] = useState('');
-  const [baselineDate, setBaselineDate] = useState(new Date().toISOString().slice(0, 10));
-  const [targetValue, setTargetValue] = useState('');
-  const [targetDate, setTargetDate] = useState('2030-12-31');
-  const [notes, setNotes] = useState('');
+  // Initiative dialog state
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingInitiative, setEditingInitiative] = useState<Initiative | null>(null);
+  const [dialogTargetIds, setDialogTargetIds] = useState<string[]>([]);
+  const [dialogLeverId, setDialogLeverId] = useState<string | null>(null);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     if (!currentOrganization?.id) return;
-    setLoading(true);
-    const res = await fetch(`/api/pulse/targets?organization_id=${currentOrganization.id}`);
-    const body = await res.json().catch(() => ({}));
-    setTargets(body.targets ?? []);
+    const orgId = currentOrganization.id;
+
+    const [targetsRes, initiativesRes] = await Promise.all([
+      fetch(`/api/pulse/targets?organization_id=${orgId}`),
+      fetch(`/api/pulse/initiatives?organization_id=${orgId}`),
+    ]);
+    const targetsBody = await targetsRes.json().catch(() => ({}));
+    const initiativesBody = await initiativesRes.json().catch(() => ({}));
+    const ts: Target[] = targetsBody.targets ?? [];
+    setTargets(ts);
+    setInitiatives(initiativesBody.initiatives ?? []);
+    setViewerRole(initiativesBody.viewerRole ?? null);
+
+    // Snapshot history for trajectory pills (same source as the Pulse widget).
+    const metricKeys = Array.from(new Set(ts.map((t) => t.metric_key)));
+    if (metricKeys.length > 0) {
+      const { data: snapshotRows } = await supabase
+        .from('metric_snapshots')
+        .select('metric_key, snapshot_date, value')
+        .eq('organization_id', orgId)
+        .in('metric_key', metricKeys)
+        .order('snapshot_date', { ascending: true });
+      const grouped: Record<string, { date: string; value: number }[]> = {};
+      for (const row of snapshotRows ?? []) {
+        const key = row.metric_key as string;
+        (grouped[key] ??= []).push({ date: row.snapshot_date as string, value: Number(row.value) });
+      }
+      setSnapshotsByMetric(grouped);
+    } else {
+      setSnapshotsByMetric({});
+    }
     setLoading(false);
-  }
+  }, [currentOrganization?.id]);
 
   useEffect(() => {
     refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentOrganization?.id]);
+  }, [refresh]);
 
-  async function createTarget() {
-    if (!currentOrganization?.id) return;
-    setCreating(true);
-    setError(null);
-    const res = await fetch('/api/pulse/targets', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        organization_id: currentOrganization.id,
-        metric_key: metricKey,
-        baseline_value: Number(baselineValue),
-        baseline_date: baselineDate,
-        target_value: Number(targetValue),
-        target_date: targetDate,
-        notes: notes || null,
-      }),
-    });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setError(body.error ?? `Failed (${res.status})`);
-      setCreating(false);
-      return;
+  // Deep link from the MACC chart: /pulse/targets?lever=<id>#actions
+  useEffect(() => {
+    const lever = searchParams.get('lever');
+    if (lever && !loading) {
+      setEditingInitiative(null);
+      setDialogTargetIds([]);
+      setDialogLeverId(lever);
+      setDialogOpen(true);
     }
-    setBaselineValue('');
-    setTargetValue('');
-    setNotes('');
-    await refresh();
-    setCreating(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, loading]);
+
+  function openNewInitiative(targetId?: string) {
+    setEditingInitiative(null);
+    setDialogTargetIds(targetId ? [targetId] : []);
+    setDialogLeverId(null);
+    setDialogOpen(true);
+  }
+
+  function openEditInitiative(initiative: Initiative) {
+    setEditingInitiative(initiative);
+    setDialogTargetIds([]);
+    setDialogLeverId(null);
+    setDialogOpen(true);
   }
 
   async function deleteTarget(id: string) {
@@ -98,25 +109,24 @@ export default function TargetsPage() {
     await refresh();
   }
 
-  function applyPreset(preset: (typeof PRESETS)[number]) {
-    setMetricKey(preset.metric as MetricKey);
-    setTargetDate(`${preset.year}-12-31`);
-    if (baselineValue) {
-      const baseline = Number(baselineValue);
-      const newTarget =
-        preset.factor === 100 ? 100 : Number((baseline * preset.factor).toFixed(2));
-      setTargetValue(String(newTarget));
+  const initiativesByTarget = useMemo(() => {
+    const map = new Map<string, Initiative[]>();
+    for (const i of initiatives) {
+      for (const tid of initiativeTargetIds(i)) {
+        (map.get(tid) ?? map.set(tid, []).get(tid)!).push(i);
+      }
     }
-  }
+    return map;
+  }, [initiatives]);
 
   const rosaSlice = useMemo(
     () => ({
       id: 'sustainability-targets',
-      label: 'Sustainability targets',
+      label: 'Targets and action plan',
       priority: 8,
       data: {
         targetCount: targets.length,
-        targets: targets.map(t => ({
+        targets: targets.map((t) => ({
           id: t.id,
           metricKey: t.metric_key,
           baselineValue: t.baseline_value,
@@ -124,13 +134,19 @@ export default function TargetsPage() {
           targetValue: t.target_value,
           targetDate: t.target_date,
         })),
-        availablePresets: PRESETS.map(p => p.label),
-        formMetricKey: metricKey,
+        initiativeCount: initiatives.length,
+        initiativesByStatus: initiatives.reduce<Record<string, number>>((acc, i) => {
+          acc[i.status] = (acc[i.status] ?? 0) + 1;
+          return acc;
+        }, {}),
+        availablePresets: TARGET_PRESETS.map((p) => p.label),
       },
     }),
-    [targets, metricKey],
+    [targets, initiatives],
   );
   useRosaPageContext(rosaSlice);
+
+  if (!currentOrganization?.id) return null;
 
   return (
     <div className="space-y-6">
@@ -144,113 +160,17 @@ export default function TargetsPage() {
         </Link>
         <div className="flex items-center gap-2">
           <TargetIcon className="h-6 w-6 text-[#ccff00]" />
-          <h1 className="text-3xl font-semibold tracking-tight">Targets</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">Targets &amp; Actions</h1>
         </div>
         <p className="max-w-xl text-sm text-muted-foreground">
-          Set sustainability commitments. Pulse will project your trajectory at the current
-          pace and flag whether you are on track, at risk, or off track.
+          Set sustainability commitments and build the plan behind them. Pulse projects your
+          trajectory at the current pace; approved actions count towards your B Corp evidence.
         </p>
       </header>
 
-      <Card className="border-border/60">
-        <CardContent className="space-y-4 p-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            Add a target
-          </h2>
+      <BcorpClimatePanel />
 
-          <div className="flex flex-wrap gap-2">
-            {PRESETS.map(p => (
-              <Button
-                key={p.label}
-                size="sm"
-                variant="outline"
-                onClick={() => applyPreset(p)}
-                className="text-xs"
-              >
-                {p.label}
-              </Button>
-            ))}
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="metric">Metric</Label>
-              <Select value={metricKey} onValueChange={v => setMetricKey(v as MetricKey)}>
-                <SelectTrigger id="metric">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ALL_METRIC_KEYS.map(k => (
-                    <SelectItem key={k} value={k}>
-                      {METRIC_DEFINITIONS[k].label} ({METRIC_DEFINITIONS[k].unit})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="baseline-value">Baseline value</Label>
-              <Input
-                id="baseline-value"
-                type="number"
-                value={baselineValue}
-                onChange={e => setBaselineValue(e.target.value)}
-                placeholder="e.g. 1200"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="baseline-date">Baseline date</Label>
-              <Input
-                id="baseline-date"
-                type="date"
-                value={baselineDate}
-                onChange={e => setBaselineDate(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="target-value">Target value</Label>
-              <Input
-                id="target-value"
-                type="number"
-                value={targetValue}
-                onChange={e => setTargetValue(e.target.value)}
-                placeholder="e.g. 600"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="target-date">Target date</Label>
-              <Input
-                id="target-date"
-                type="date"
-                value={targetDate}
-                onChange={e => setTargetDate(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
-              <Label htmlFor="notes">Notes (optional)</Label>
-              <Input
-                id="notes"
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-                placeholder="e.g. SBTi-validated, board-approved Q1 2026"
-              />
-            </div>
-          </div>
-
-          {error && (
-            <p className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-600 dark:text-amber-300">
-              {error}
-            </p>
-          )}
-
-          <div className="flex justify-end">
-            <Button onClick={createTarget} disabled={creating || !baselineValue || !targetValue}>
-              {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Set target
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <TargetForm organizationId={currentOrganization.id} onCreated={refresh} />
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
@@ -266,39 +186,63 @@ export default function TargetsPage() {
           </Card>
         ) : (
           <ul className="space-y-2">
-            {targets.map(t => {
-              const def = METRIC_DEFINITIONS[t.metric_key];
-              return (
-                <li key={t.id}>
-                  <Card className="border-border/60">
-                    <CardContent className="flex items-center justify-between gap-4 p-4">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">
-                          {def?.label ?? t.metric_key} → {t.target_value.toLocaleString('en-GB')}{' '}
-                          {def?.unit ?? ''} by {t.target_date}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Baseline {t.baseline_value.toLocaleString('en-GB')} {def?.unit ?? ''} on{' '}
-                          {t.baseline_date}
-                          {t.notes ? ` · ${t.notes}` : ''}
-                        </p>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => deleteTarget(t.id)}
-                        className="text-muted-foreground hover:text-red-500"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </li>
-              );
-            })}
+            {targets.map((t) => (
+              <li key={t.id}>
+                <TargetCard
+                  target={t}
+                  history={snapshotsByMetric[t.metric_key] ?? []}
+                  initiatives={initiativesByTarget.get(t.id) ?? []}
+                  onDelete={deleteTarget}
+                  onAddInitiative={(targetId) => openNewInitiative(targetId)}
+                />
+              </li>
+            ))}
           </ul>
         )}
       </section>
+
+      <section id="actions" className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Action plan
+          </h2>
+          <Button size="sm" onClick={() => openNewInitiative()}>
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
+            New action
+          </Button>
+        </div>
+        {loading ? (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : (
+          <InitiativeBoard
+            initiatives={initiatives}
+            viewerRole={viewerRole}
+            viewerUserId={user?.id ?? null}
+            onEdit={openEditInitiative}
+            onChanged={refresh}
+          />
+        )}
+      </section>
+
+      <InitiativeDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        organizationId={currentOrganization.id}
+        targets={targets}
+        initiative={editingInitiative}
+        initialTargetIds={dialogTargetIds}
+        initialLeverId={dialogLeverId}
+        onSaved={refresh}
+      />
     </div>
+  );
+}
+
+export default function TargetsPage() {
+  // useSearchParams requires a Suspense boundary in the App Router.
+  return (
+    <Suspense fallback={null}>
+      <TargetsActionsHub />
+    </Suspense>
   );
 }

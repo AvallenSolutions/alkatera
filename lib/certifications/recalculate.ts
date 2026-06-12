@@ -122,6 +122,35 @@ export async function recalculateBcorpForSupplier(
   }
 }
 
+/**
+ * Best-effort: when a reduction initiative changes in a way that could affect
+ * climate-action evidence (created, approved, completed, cancelled, progress
+ * updated), refresh the organisation's B Corp readiness immediately rather
+ * than waiting for the nightly cron. Never throws.
+ */
+export async function recalculateBcorpForInitiativeOrg(
+  supabase: SupabaseClient,
+  organizationId: string,
+): Promise<void> {
+  try {
+    const frameworkId = await getBcorpFrameworkId(supabase);
+    if (!frameworkId) return;
+
+    const { data: cert } = await supabase
+      .from('organization_certifications')
+      .select('id')
+      .eq('framework_id', frameworkId)
+      .eq('organization_id', organizationId)
+      .neq('status', 'not_started')
+      .maybeSingle();
+    if (!cert?.id) return;
+
+    await recalculateAndNotify(supabase, organizationId, cert.id as string);
+  } catch (err) {
+    console.error('recalculateBcorpForInitiativeOrg failed:', err);
+  }
+}
+
 async function notifyOwners(
   supabase: SupabaseClient,
   organizationId: string,
