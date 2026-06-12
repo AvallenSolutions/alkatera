@@ -64,7 +64,7 @@ export function GridCarbonCard() {
   return (
     <PulseCard
       icon={Zap}
-      label="Grid carbon"
+      label="Grid electricity now"
       headline={currentGramsPerKwh !== undefined ? `${Math.round(currentGramsPerKwh)}g` : '—'}
       sub="CO₂ / kWh, GB-NATIONAL"
       status={status}

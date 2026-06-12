@@ -55,7 +55,7 @@ export function ImpactValuationCard() {
   return (
     <PulseCard
       icon={Sparkles}
-      label="Impact valuation"
+      label="Total impact in pounds"
       headline={net !== null ? formatSignedGbp(net) : '—'}
       sub={net !== null ? 'net monetised impact' : 'Run calculation to populate'}
       status={status}

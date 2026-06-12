@@ -93,7 +93,7 @@ export function IssbDisclosureCompact() {
   return (
     <PulseCard
       icon={FileText}
-      label="ISSB readiness"
+      label="Investor climate disclosure"
       headline={data ? `${readinessPct}%` : '—'}
       sub="IFRS S2 quantitative cover"
       status={data ? status : null}

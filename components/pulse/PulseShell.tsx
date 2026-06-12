@@ -2,15 +2,14 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, MessageSquare, PoundSterling, RefreshCw } from 'lucide-react';
+import { Activity, LayoutGrid, MessageSquare, RefreshCw } from 'lucide-react';
 import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PulseGrid } from '@/components/pulse/PulseGrid';
-import { PulsePersonaGrid } from '@/components/pulse/PulsePersonaGrid';
-import { PulsePersonaToggle } from '@/components/pulse/PulsePersonaToggle';
-import { PulseVitalityHero } from '@/components/pulse/PulseVitalityHero';
-import { PERSONAS, DEFAULT_PERSONA, type PulseView } from '@/lib/pulse/layout';
+import { PulseTabbedView } from '@/components/pulse/PulseTabbedView';
+import { PulseVerdictHero } from '@/components/pulse/PulseVerdictHero';
+import { DEFAULT_VIEW, type PulseView } from '@/lib/pulse/layout';
 import {
   PulseRealtimeProvider,
   usePulseRealtimeContext,
@@ -66,18 +65,20 @@ export function PulseShell() {
 
 const VIEW_STORAGE_KEY = 'pulse:view';
 
-/** Persona/view preference, persisted per-browser in localStorage. */
+/**
+ * View preference, persisted per-browser in localStorage. 'advanced' opens
+ * the customisable grid; anything else (including legacy persona values like
+ * 'founder' or 'cfo' from the old persona toggle) maps to the tabbed view.
+ */
 function usePulseView(): [PulseView, (next: PulseView) => void] {
-  const [view, setView] = useState<PulseView>(DEFAULT_PERSONA);
+  const [view, setView] = useState<PulseView>(DEFAULT_VIEW);
 
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(VIEW_STORAGE_KEY);
-      if (saved === 'advanced' || (saved && saved in PERSONAS)) {
-        setView(saved as PulseView);
-      }
+      setView(saved === 'advanced' ? 'advanced' : 'tabs');
     } catch {
-      // localStorage unavailable -- fall back to the default persona.
+      // localStorage unavailable -- fall back to the default view.
     }
   }, []);
 
@@ -122,12 +123,17 @@ function PulseShellBody() {
     <>
       <div className="space-y-6 pb-12">
         <PulseHeader view={view} onChangeView={setView} />
-        <PulseVitalityHero />
-        {/* Full-width KPI strip sits above the grid -- doesn't fit the card metaphor. */}
-        <LiveMetricsStrip />
-        {view === 'advanced' ? <PulseGrid /> : <PulsePersonaGrid persona={view} />}
-        {/* Rosa chat sits below, full width -- also exempt from the grid. */}
-        <AskRosaWidget />
+        <PulseVerdictHero />
+        {view === 'advanced' ? (
+          <>
+            {/* Customise mode: the full draggable grid, as before. */}
+            <LiveMetricsStrip />
+            <PulseGrid />
+            <AskRosaWidget />
+          </>
+        ) : (
+          <PulseTabbedView />
+        )}
       </div>
       {/* Drill slot mounts -- register their renderers for matching targets. */}
       <WaterfallSlotMount />
@@ -168,52 +174,44 @@ function PulseHeader({
   const subtitle =
     view === 'advanced'
       ? 'Build your own view from every available metric. Drag, pin and customise.'
-      : PERSONAS[view].blurb;
+      : 'Are we on track, what is it costing, and what needs attention.';
 
   return (
-    <header className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <Activity className="h-6 w-6 text-[#ccff00]" aria-hidden="true" />
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground">
-              Pulse
-            </h1>
-            <Badge
-              variant="outline"
-              className="border-[#ccff00]/40 bg-[#ccff00]/10 text-[10px] font-semibold uppercase tracking-wider text-[#ccff00]"
-            >
-              Beta
-            </Badge>
-          </div>
-          <p className="mt-1 max-w-xl text-sm text-muted-foreground">{subtitle}</p>
-        </div>
-
+    <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div>
         <div className="flex items-center gap-2">
-          <ConnectionHeartbeat />
-          <RefreshPulseButton />
-          <Button asChild variant="default" size="sm" className="bg-[#ccff00] text-black hover:bg-[#b8e600]">
-            <Link href="/pulse/financial/">
-              <PoundSterling className="mr-2 h-4 w-4" />
-              Financial view
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/pulse/settings/shadow-prices/">
-              <PoundSterling className="mr-2 h-4 w-4" />
-              Prices
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/settings/feedback/">
-              <MessageSquare className="mr-2 h-4 w-4" />
-              Beta feedback
-            </Link>
-          </Button>
+          <Activity className="h-6 w-6 text-[#ccff00]" aria-hidden="true" />
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">
+            Pulse
+          </h1>
+          <Badge
+            variant="outline"
+            className="border-[#ccff00]/40 bg-[#ccff00]/10 text-[10px] font-semibold uppercase tracking-wider text-[#ccff00]"
+          >
+            Beta
+          </Badge>
         </div>
+        <p className="mt-1 max-w-xl text-sm text-muted-foreground">{subtitle}</p>
       </div>
 
-      <PulsePersonaToggle view={view} onChange={onChangeView} />
+      <div className="flex items-center gap-2">
+        <ConnectionHeartbeat />
+        <RefreshPulseButton />
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onChangeView(view === 'advanced' ? 'tabs' : 'advanced')}
+        >
+          <LayoutGrid className="mr-2 h-4 w-4" />
+          {view === 'advanced' ? 'Back to simple view' : 'Customise'}
+        </Button>
+        <Button asChild variant="ghost" size="icon" title="Beta feedback">
+          <Link href="/settings/feedback/">
+            <MessageSquare className="h-4 w-4" />
+            <span className="sr-only">Beta feedback</span>
+          </Link>
+        </Button>
+      </div>
     </header>
   );
 }

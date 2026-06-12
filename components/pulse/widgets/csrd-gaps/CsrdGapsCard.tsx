@@ -55,7 +55,7 @@ export function CsrdGapsCard() {
   return (
     <PulseCard
       icon={FileCheck2}
-      label="CSRD readiness"
+      label="Disclosure readiness"
       headline={data ? `${gapsOpen}` : '—'}
       sub={gapsOpen === 1 ? 'gap open' : 'gaps open'}
       status={status}

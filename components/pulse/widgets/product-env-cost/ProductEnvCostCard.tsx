@@ -52,7 +52,7 @@ export function ProductEnvCostCard() {
   return (
     <PulseCard
       icon={Package}
-      label="Env cost per unit"
+      label="Cost per product"
       headline={avg !== null ? formatGbp(avg) : '—'}
       sub={`avg across ${data?.product_count ?? 0} product${data?.product_count === 1 ? '' : 's'}`}
       footprint="2x1"

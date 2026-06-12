@@ -59,7 +59,7 @@ export function ScenarioSensitivityCard() {
   return (
     <PulseCard
       icon={Gauge}
-      label="Carbon price sensitivity"
+      label="Carbon price stress test"
       headline={
         data
           ? `±${formatGbp(data.sensitivity_gbp_per_10_per_tonne)}`

@@ -63,7 +63,7 @@ export function PeerBenchmarkCard() {
   return (
     <PulseCard
       icon={BarChart3}
-      label="Peer benchmark"
+      label="How you compare"
       headline={avg !== null ? `${ordinal(avg)}` : '—'}
       sub={avg !== null ? 'percentile vs peers' : 'Need more data'}
       status={status}

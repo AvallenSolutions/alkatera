@@ -60,7 +60,7 @@ export function MaccCard() {
   return (
     <PulseCard
       icon={TrendingUp}
-      label="Abatement potential"
+      label="Cheapest ways to cut carbon"
       headline={
         data
           ? `${Math.round(tonnesPayingBack).toLocaleString('en-GB')} tCO₂e`

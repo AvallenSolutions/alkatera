@@ -26,7 +26,7 @@ export function LiveActivityCard() {
   return (
     <PulseCard
       icon={Activity}
-      label="Live activity"
+      label="Latest activity"
       headline={latest ? truncate(latest.description, 40) : 'No activity yet'}
       sub={latest ? timeAgo(latest.occurredAt) : 'Waiting for the first event'}
       status={pill}

@@ -46,7 +46,7 @@ export function AlertsInboxCard() {
   return (
     <PulseCard
       icon={AlertTriangle}
-      label="Alerts inbox"
+      label="Alerts"
       headline={counts ? `${total}` : '—'}
       sub={total === 1 ? 'open alert' : 'open alerts'}
       status={status}

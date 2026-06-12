@@ -123,7 +123,7 @@ export function TargetTrajectoryCard() {
   return (
     <PulseCard
       icon={Target}
-      label="Target trajectory"
+      label="Progress to targets"
       headline={headline}
       sub={sub}
       status={status}

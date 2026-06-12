@@ -39,7 +39,7 @@ const SUGGESTIONS = [
   'Compare water use across our sites for the last 90 days.',
 ];
 
-export function AskRosaWidget() {
+export function AskRosaWidget({ collapsed = false }: { collapsed?: boolean } = {}) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
@@ -178,6 +178,46 @@ export function AskRosaWidget() {
     e.preventDefault();
     void send(input);
   };
+
+  // Collapsed entry point for the Overview tab: one input plus two
+  // suggestions; expands into the full conversation on first send.
+  if (collapsed && turns.length === 0 && !streaming) {
+    return (
+      <Card className="border-border/60">
+        <CardContent className="space-y-2.5 p-4">
+          <form onSubmit={onSubmit} className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 shrink-0 text-[#ccff00]" aria-hidden="true" />
+            <input
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              placeholder="Ask Rosa about anything on this page…"
+              className="flex-1 rounded-md border border-border/60 bg-background/60 px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 focus:border-[#ccff00]/60"
+            />
+            <Button
+              type="submit"
+              size="sm"
+              disabled={!input.trim()}
+              className="bg-[#ccff00] text-black hover:bg-[#b8e600]"
+            >
+              <Send className="h-3.5 w-3.5" />
+            </Button>
+          </form>
+          <div className="flex flex-wrap gap-1.5 pl-6">
+            {SUGGESTIONS.slice(0, 2).map(s => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => void send(s)}
+                className="rounded-full border border-border/60 bg-card/40 px-3 py-1 text-[11px] text-muted-foreground transition hover:border-[#ccff00]/50 hover:text-foreground"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="border-border/60">

@@ -75,7 +75,7 @@ export function WhatIfCard() {
   return (
     <PulseCard
       icon={Sparkles}
-      label="What-if playground"
+      label="Try a change"
       headline={savingGbp > 0 ? formatGbp(savingGbp) : '—'}
       sub={savingT > 0 ? `potential savings at default levers` : 'Default scenario'}
       footprint="2x1"

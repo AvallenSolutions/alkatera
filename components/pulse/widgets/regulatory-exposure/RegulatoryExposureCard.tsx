@@ -90,7 +90,7 @@ export function RegulatoryExposureCard() {
   return (
     <PulseCard
       icon={Scale}
-      label="Regulatory exposure"
+      label="Carbon taxes and levies"
       headline={data ? formatGbp(data.total_annual_gbp) : '—'}
       sub="UK ETS · CBAM · Plastic Tax · EPR"
       status={status}

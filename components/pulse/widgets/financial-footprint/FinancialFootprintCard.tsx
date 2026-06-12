@@ -76,7 +76,7 @@ export function FinancialFootprintCard() {
   return (
     <PulseCard
       icon={PoundSterling}
-      label="Annual liability"
+      label="What your impact costs"
       headline={headline}
       sub="Environmental cost, last 12 months"
       status={status}

@@ -75,7 +75,7 @@ export function FacilityImpactCard() {
   return (
     <PulseCard
       icon={Factory}
-      label="Facility impact"
+      label="Impact by site"
       headline={
         annualTonnes > 0
           ? `${annualTonnes.toLocaleString('en-GB', { maximumFractionDigits: 0 })} t`

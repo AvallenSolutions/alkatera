@@ -125,7 +125,7 @@ function withLayout(
 export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
   'insight-card': withLayout({
     id: 'insight-card',
-    label: 'AI insight of the day',
+    label: "Today's insight",
     description: 'Claude-written brief explaining what changed and why.',
     footprint: '2x1',
     phase: 3,
@@ -151,7 +151,7 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
   }),
   'target-trajectory': withLayout({
     id: 'target-trajectory',
-    label: 'Target trajectories',
+    label: 'Progress to targets',
     description: 'Forecast vs target with on-track / at-risk pill.',
     footprint: '2x1',
     phase: 4,
@@ -164,7 +164,7 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
   }),
   'alerts-inbox': withLayout({
     id: 'alerts-inbox',
-    label: 'Alerts inbox',
+    label: 'Alerts',
     description: 'Anomaly detector output. Acknowledge or dismiss.',
     footprint: '1x1',
     phase: 5,
@@ -177,7 +177,7 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
   }),
   'grid-carbon': withLayout({
     id: 'grid-carbon',
-    label: 'UK grid carbon',
+    label: 'Grid electricity now',
     description: 'Live g CO₂/kWh + cleanest production window.',
     footprint: '1x1',
     phase: 6,
@@ -190,7 +190,7 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
   }),
   'peer-benchmark': withLayout({
     id: 'peer-benchmark',
-    label: 'Peer benchmarks',
+    label: 'How you compare',
     description: 'Anonymised percentile vs your industry segment.',
     footprint: '1x1',
     phase: 7,
@@ -202,7 +202,7 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
   }),
   'live-activity': withLayout({
     id: 'live-activity',
-    label: 'Live activity feed',
+    label: 'Latest activity',
     description: 'Chronological stream of every live event in the org.',
     footprint: '2x2',
     phase: 2,
@@ -214,7 +214,7 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
   }),
   'facility-impact': withLayout({
     id: 'facility-impact',
-    label: 'Facility impact',
+    label: 'Impact by site',
     description:
       'Scope 1 & 2 utilities, water and waste over 12 months with live grid-carbon overlay.',
     footprint: '2x2',
@@ -227,9 +227,9 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
   }),
   'csrd-gaps': withLayout({
     id: 'csrd-gaps',
-    label: 'CSRD readiness',
+    label: 'Disclosure readiness',
     description:
-      'ESRS disclosure points evaluated against your live data. Each gap has a one-click fix.',
+      'EU sustainability reporting checks against your data. Each gap has a one-click fix.',
     footprint: '1x1',
     phase: 9,
     explainer: {
@@ -267,7 +267,7 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
   }),
   'what-if': withLayout({
     id: 'what-if',
-    label: 'What-if playground',
+    label: 'Try a change',
     description:
       'Decarbonisation levers: renewables, heat pumps, HVO. Instant emissions and £-saving impact.',
     footprint: '2x1',
@@ -294,7 +294,7 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
   }),
   'financial-footprint': withLayout({
     id: 'financial-footprint',
-    label: 'Annual financial liability',
+    label: 'What your impact costs',
     description: 'Environmental cost of the last 12 months with year-on-year delta.',
     footprint: '2x2',
     phase: 14,
@@ -306,7 +306,7 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
   }),
   'scenario-sensitivity': withLayout({
     id: 'scenario-sensitivity',
-    label: 'Carbon price sensitivity',
+    label: 'Carbon price stress test',
     description:
       'What happens to your annual carbon bill if UK ETS moves.',
     footprint: '2x1',
@@ -320,7 +320,7 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
   }),
   'product-env-cost': withLayout({
     id: 'product-env-cost',
-    label: 'Environmental cost per unit',
+    label: 'Cost per product',
     description:
       'Embedded £/unit for every product with a completed LCA.',
     footprint: '2x1',
@@ -333,9 +333,9 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
   }),
   'regulatory-exposure': withLayout({
     id: 'regulatory-exposure',
-    label: 'Regulatory exposure',
+    label: 'Carbon taxes and levies',
     description:
-      'Annual £ liability under UK ETS, EU CBAM, Plastic Packaging Tax and Packaging EPR.',
+      'Estimated yearly cost of UK and EU carbon and packaging charges.',
     footprint: '2x1',
     phase: 17,
     explainer: {
@@ -346,9 +346,9 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
   }),
   macc: withLayout({
     id: 'macc',
-    label: 'Abatement cost curve',
+    label: 'Cheapest ways to cut carbon',
     description:
-      'Decarbonisation levers plotted by tCO₂e abated vs £/t cost.',
+      'Your carbon-cutting options ranked by cost per tonne saved.',
     footprint: '2x2',
     phase: 18,
     explainer: {
@@ -401,7 +401,7 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
   }),
   'issb-disclosure': withLayout({
     id: 'issb-disclosure',
-    label: 'ISSB / IFRS S2 disclosure',
+    label: 'Investor climate disclosure',
     description:
       'Auto-populated climate-related financial disclosure.',
     footprint: '1x1',
@@ -416,9 +416,9 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
   }),
   'impact-valuation': withLayout({
     id: 'impact-valuation',
-    label: 'Impact valuation',
+    label: 'Total impact in pounds',
     description:
-      'Monetised four-capital impact (natural, human, social, governance). Full report at /pulse/financial/impact-valuation.',
+      'Your full impact across nature, people, society and governance, valued in pounds. Full report at /pulse/financial/impact-valuation.',
     footprint: '2x1',
     exempt: true, // rendered inside FinancialGrid, not on the main Pulse grid
     phase: 20,

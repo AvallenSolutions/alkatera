@@ -55,7 +55,7 @@ export function InsightCardCompact() {
   return (
     <PulseCard
       icon={Sparkles}
-      label="AI insight of the day"
+      label="Today's insight"
       headline={truncate(headline, 40)}
       sub={insight ? `Generated ${formatDate(insight.generated_at)}` : 'No insight yet'}
       footprint="2x1"
