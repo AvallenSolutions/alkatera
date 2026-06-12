@@ -1,14 +1,23 @@
 /**
  * Pulse — anomaly detection.
  *
- * Strategy: per (org, metric_key), compute the rolling 30-day mean and
- * standard deviation of metric_snapshots values. Flag anything where the
- * latest value is more than ±2.5σ from the mean.
+ * Strategy: per (org, metric_key), compare the latest metric_snapshot value
+ * against the rolling 30-day mean. Flag it only when the move is BOTH:
+ *   - material:   at least MIN_RELATIVE_DEVIATION (5%) away from the mean, and
+ *   - unusual:    at least Z_THRESHOLD (2.5) standard deviations out.
  *
- * Severity:
- *   - low:    2.5 ≤ |z| < 3
- *   - medium: 3   ≤ |z| < 4
- *   - high:   |z| ≥ 4
+ * Why both gates: a pure z-score is unreliable on a near-flat series. When a
+ * metric barely moves day to day, the standard deviation collapses to
+ * floating-point noise, so a trivial 0.4% wobble scores z = 5 (or, when the
+ * variance is essentially zero, astronomical values like 6e12). The relative
+ * gate kills those false positives. To keep z meaningful we also floor the
+ * standard deviation at MIN_STD_FRACTION of the mean, so a genuine flat-then-
+ * jump (where the historical variance is near zero) still produces a bounded,
+ * sensible z rather than being missed or producing a quadrillion.
+ *
+ * Cadence: one alert per (org, metric_key) per CALENDAR MONTH. `detected_at`
+ * is pinned to the first of the month and the unique key dedupes on it, so the
+ * hourly detector cannot flood the inbox with a fresh row every run.
  *
  * Cold-start guard: skip detection if fewer than 14 historical points exist.
  */
@@ -29,6 +38,15 @@ export interface AnomalyDetection {
 const Z_THRESHOLD = 2.5;
 const MIN_HISTORY = 14;
 const BASELINE_WINDOW_DAYS = 30;
+/** A move must be at least this far from the mean (as a fraction) to count. */
+const MIN_RELATIVE_DEVIATION = 0.05;
+/** Floor the standard deviation at this fraction of |mean| so a near-flat
+ *  baseline cannot produce an astronomical z-score. */
+const MIN_STD_FRACTION = 0.02;
+/** Clamp the stored z so the UI never shows a meaningless huge number. */
+const Z_DISPLAY_CAP = 99;
+/** Treat a mean smaller than this as zero (can't take a relative deviation). */
+const NEAR_ZERO = 1e-9;
 
 export function classifySeverity(absZ: number): 'low' | 'medium' | 'high' | null {
   if (absZ < Z_THRESHOLD) return null;
@@ -37,12 +55,18 @@ export function classifySeverity(absZ: number): 'low' | 'medium' | 'high' | null
   return 'high';
 }
 
+/** First instant of the calendar month containing `now`, in ISO form. */
+function monthBucket(now: Date): string {
+  return `${now.toISOString().slice(0, 7)}-01T00:00:00.000Z`;
+}
+
 export async function detectAnomaliesForOrg(
   supabase: SupabaseClient,
   orgId: string,
+  now: Date = new Date(),
 ): Promise<AnomalyDetection[]> {
   // Pull the trailing baseline window for every metric in one query.
-  const sinceStr = new Date(Date.now() - (BASELINE_WINDOW_DAYS + 1) * 86400_000)
+  const sinceStr = new Date(now.getTime() - (BASELINE_WINDOW_DAYS + 1) * 86400_000)
     .toISOString()
     .slice(0, 10);
 
@@ -62,6 +86,7 @@ export async function detectAnomaliesForOrg(
     grouped.set(r.metric_key as string, arr);
   }
 
+  const detectedAt = monthBucket(now);
   const anomalies: AnomalyDetection[] = [];
   // Array.from required: tsconfig target doesn't allow direct Map iteration.
   for (const [metricKey, history] of Array.from(grouped.entries())) {
@@ -72,36 +97,47 @@ export async function detectAnomaliesForOrg(
     const mean =
       baseline.reduce((sum: number, p: { value: number }) => sum + p.value, 0) /
       baseline.length;
+
+    // Can't take a relative deviation around a zero mean.
+    if (Math.abs(mean) < NEAR_ZERO) continue;
+
+    // Gate 1: the move must be materially large, not floating-point noise.
+    const relDev = Math.abs(latest.value - mean) / Math.abs(mean);
+    if (relDev < MIN_RELATIVE_DEVIATION) continue;
+
     const variance =
       baseline.reduce(
         (sum: number, p: { value: number }) => sum + (p.value - mean) ** 2,
         0,
       ) / baseline.length;
     const std = Math.sqrt(variance);
-    if (std === 0) continue; // can't z-score a flat series
 
-    const z = (latest.value - mean) / std;
+    // Floor std at a fraction of the mean so a flat baseline can't blow z up.
+    const effectiveStd = Math.max(std, MIN_STD_FRACTION * Math.abs(mean));
+    const z = (latest.value - mean) / effectiveStd;
+
+    // Gate 2: still has to be statistically unusual.
     const severity = classifySeverity(Math.abs(z));
     if (!severity) continue;
 
     anomalies.push({
       organization_id: orgId,
       metric_key: metricKey as MetricKey,
-      // Day-granular so the (org, metric_key, detected_at) unique key dedupes
-      // per day. A full timestamp here meant every (e.g. hourly) run inserted
-      // a fresh row, flooding the alerts inbox with duplicates.
-      detected_at: `${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`,
+      // Month-granular: the unique (org, metric_key, detected_at) key keeps
+      // this to a single alert per metric per calendar month, however often
+      // the detector runs.
+      detected_at: detectedAt,
       severity,
       observed: latest.value,
       expected: mean,
-      z_score: z,
+      z_score: Math.sign(z) * Math.min(Math.abs(z), Z_DISPLAY_CAP),
     });
   }
 
   return anomalies;
 }
 
-/** Insert anomalies, ignoring conflicts on the unique daily key. */
+/** Insert anomalies, ignoring conflicts on the unique monthly key. */
 export async function persistAnomalies(
   supabase: SupabaseClient,
   anomalies: AnomalyDetection[],

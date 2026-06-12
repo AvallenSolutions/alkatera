@@ -137,7 +137,10 @@ Use the tools to find what caused this. Look at the metric history around the da
         userId: user.id,
       },
       model: MODEL,
-      maxRounds: 4,
+      // Keep the investigation tight: each round is a model call plus tool
+      // execution, and the whole request must finish inside the serverless
+      // timeout or the platform returns an HTML error page instead of JSON.
+      maxRounds: 3,
     });
 
     // Parse the model's JSON response. Be tolerant of stray prose / fences.

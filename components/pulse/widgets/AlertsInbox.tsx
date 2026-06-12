@@ -78,7 +78,21 @@ export function AlertsInbox() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ force }),
       });
-      const json = await res.json();
+      // The explain endpoint runs an AI investigation that can exceed the
+      // serverless timeout; when it does, the platform returns an HTML error
+      // page, not JSON. Read text first so a blind res.json() can't throw a
+      // cryptic "Unexpected token <" at the user.
+      const raw = await res.text();
+      let json: { ok?: boolean; error?: string; explanation?: any } = {};
+      try {
+        json = JSON.parse(raw);
+      } catch {
+        throw new Error(
+          res.status === 504 || res.status === 502
+            ? 'Rosa could not finish investigating in time. Please try again.'
+            : `Could not investigate right now (${res.status}). Please try again.`,
+        );
+      }
       if (!res.ok || !json.ok) {
         throw new Error(json.error ?? `Failed (${res.status})`);
       }
