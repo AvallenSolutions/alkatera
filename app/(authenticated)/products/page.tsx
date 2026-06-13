@@ -35,6 +35,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { DataQualityIndicator } from "@/components/ui/data-quality-indicator";
+import { ProductPortfolioMatrix } from "@/components/products/ProductPortfolioMatrix";
+import { buildPortfolioPoints, sumFacilityVolume, type PortfolioResult } from "@/lib/products/portfolio";
+import { cn } from "@/lib/utils";
 
 interface ProductCarbonFootprint {
   system_boundary: string | null;
@@ -69,6 +72,8 @@ export default function ProductsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [portfolio, setPortfolio] = useState<PortfolioResult | null>(null);
+  const [view, setView] = useState<'list' | 'portfolio'>('list');
 
   useEffect(() => {
     if (currentOrganization?.id) {
@@ -147,31 +152,53 @@ export default function ProductsPage() {
       // Fetch each product's data quality score (DQI) from its completed PCF.
       // dqi_score is the impact-weighted confidence across all materials,
       // written by the aggregator on every calculation.
+      // Completed PCFs carry the DQI plus the per-unit climate figure and the
+      // facility detail we sum into an annual volume for the portfolio matrix.
+      // JSON-path selects keep the payload slim (no full aggregated_impacts).
       const { data: dqiData } = productIds.length > 0
         ? await supabase
             .from("product_carbon_footprints")
-            .select("product_id, dqi_score, status")
+            .select(
+              "product_id, dqi_score, status, perUnit:aggregated_impacts->climate_change_gwp100, facilityDetail:aggregated_impacts->facility_detail"
+            )
             .in("product_id", productIds)
             .eq("status", "completed")
-            .not("dqi_score", "is", null)
             .order("created_at", { ascending: false })
         : { data: [] };
 
       const dqiMap = new Map<string, number>();
+      const perUnitMap = new Map<string, number>();
+      const volumeMap = new Map<string, number>();
       for (const pcf of dqiData || []) {
-        if (pcf.product_id && !dqiMap.has(String(pcf.product_id))) {
-          dqiMap.set(String(pcf.product_id), Number(pcf.dqi_score));
-        }
+        const pid = pcf.product_id ? String(pcf.product_id) : null;
+        if (!pid || dqiMap.has(pid) || perUnitMap.has(pid)) continue; // first (latest) per product wins
+        if (pcf.dqi_score != null) dqiMap.set(pid, Number(pcf.dqi_score));
+        if (pcf.perUnit != null) perUnitMap.set(pid, Number(pcf.perUnit));
+        volumeMap.set(pid, sumFacilityVolume(pcf.facilityDetail as any));
       }
 
-      setProducts(
-        (data || []).map((p: any) => ({
-          ...p,
-          product_carbon_footprints: pcfBoundaryMap.has(String(p.id))
-            ? [{ system_boundary: pcfBoundaryMap.get(String(p.id))! }]
-            : [],
-          dqi_score: dqiMap.get(String(p.id)) ?? null,
-        }))
+      const productsWithMeta = (data || []).map((p: any) => ({
+        ...p,
+        product_carbon_footprints: pcfBoundaryMap.has(String(p.id))
+          ? [{ system_boundary: pcfBoundaryMap.get(String(p.id))! }]
+          : [],
+        dqi_score: dqiMap.get(String(p.id)) ?? null,
+      }));
+      setProducts(productsWithMeta);
+
+      // Portfolio matrix data: only products with a completed footprint.
+      setPortfolio(
+        buildPortfolioPoints(
+          productsWithMeta
+            .filter((p: any) => perUnitMap.has(String(p.id)))
+            .map((p: any) => ({
+              id: p.id,
+              name: p.name,
+              perUnitKgCo2e: perUnitMap.get(String(p.id)) ?? null,
+              annualVolume: volumeMap.get(String(p.id)) ?? null,
+              functionalUnit: p.unit_size_unit ?? p.functional_unit ?? null,
+            }))
+        )
       );
     } catch (error) {
       console.error("Error fetching products:", error);
@@ -326,19 +353,47 @@ export default function ProductsPage() {
       </div>
 
       {products.length > 0 && (
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder="Search products by name, description, or functional unit..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search products by name, description, or functional unit..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <div className="flex rounded-md border border-border/60 p-0.5">
+            <button
+              type="button"
+              onClick={() => setView('list')}
+              className={cn(
+                'rounded px-3 py-1.5 text-xs font-medium transition-colors',
+                view === 'list' ? 'bg-[#ccff00]/20 text-foreground' : 'text-muted-foreground',
+              )}
+            >
+              List
+            </button>
+            <button
+              type="button"
+              onClick={() => setView('portfolio')}
+              className={cn(
+                'rounded px-3 py-1.5 text-xs font-medium transition-colors',
+                view === 'portfolio' ? 'bg-[#ccff00]/20 text-foreground' : 'text-muted-foreground',
+              )}
+            >
+              Portfolio
+            </button>
+          </div>
         </div>
       )}
 
       <FlagThresholdBanner />
+
+      {products.length > 0 && view === 'portfolio' && portfolio && (
+        <ProductPortfolioMatrix data={portfolio} />
+      )}
 
       {products.length === 0 ? (
         <Card className="border-2 border-dashed">
@@ -368,7 +423,7 @@ export default function ProductsPage() {
             </div>
           </CardContent>
         </Card>
-      ) : filteredProducts.length === 0 ? (
+      ) : view !== 'list' ? null : filteredProducts.length === 0 ? (
         <Card>
           <CardContent className="pt-6">
             <Alert>

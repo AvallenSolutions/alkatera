@@ -24,6 +24,8 @@ import {
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { useOrganization } from "@/lib/organizationContext";
 import { calculateCorporateEmissions, type ScopeBreakdown } from "@/lib/calculations/corporate-emissions";
+import { EmissionsTrendChart } from "@/components/reports/company-footprint/EmissionsTrendChart";
+import { Scope3BreakdownChart } from "@/components/reports/company-footprint/Scope3BreakdownChart";
 import { PageLoader } from "@/components/ui/page-loader";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -255,6 +257,10 @@ export default function CompanyFootprintPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Multi-year trend + Scope 3 breakdown (fed by liveEmissions) */}
+      <EmissionsTrendChart liveEmissions={liveEmissions} />
+      <Scope3BreakdownChart liveEmissions={liveEmissions} />
 
       {/* Existing Reports */}
       {reports.length > 0 && (
