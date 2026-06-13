@@ -72,6 +72,7 @@ export function AddFacilityWizard({
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{ facilityName?: string; functions?: string; location?: string }>({});
   const { currentCount, maxCount, isUnlimited, isLoading: isLoadingLimit, checkLimit } = useFacilityLimit();
   const atLimit = !isUnlimited && maxCount != null && currentCount >= maxCount;
 
@@ -104,18 +105,18 @@ export function AddFacilityWizard({
     }
 
     if (step === 2) {
+      const errors: { facilityName?: string; functions?: string; location?: string } = {};
       if (!facilityName.trim()) {
-        toast.error('Please enter a facility name');
-        return;
+        errors.facilityName = 'Please enter a facility name.';
       }
       if (selectedFunctions.length === 0) {
-        toast.error('Please select at least one function');
-        return;
+        errors.functions = 'Please select at least one function.';
       }
       if (!addressLat || !addressLng || !addressCity || !addressCountry) {
-        toast.error('Please select a location using the search');
-        return;
+        errors.location = 'Please select a location using the search.';
       }
+      setFieldErrors(errors);
+      if (Object.keys(errors).length > 0) return;
     }
 
     if (step === 3) {
@@ -187,6 +188,7 @@ export function AddFacilityWizard({
     setAddressCountry(location.countryCode || location.country || '');
     setAddressLat(location.lat);
     setAddressLng(location.lng);
+    setFieldErrors((prev) => (prev.location ? { ...prev, location: undefined } : prev));
   };
 
   const handleSubmit = async () => {
@@ -332,8 +334,15 @@ export function AddFacilityWizard({
                   id="facilityName"
                   placeholder="e.g., London Brewery"
                   value={facilityName}
-                  onChange={(e) => setFacilityName(e.target.value)}
+                  onChange={(e) => {
+                    setFacilityName(e.target.value);
+                    setFieldErrors((prev) => (prev.facilityName ? { ...prev, facilityName: undefined } : prev));
+                  }}
+                  aria-invalid={!!fieldErrors.facilityName}
                 />
+                {fieldErrors.facilityName && (
+                  <p className="text-sm font-medium text-destructive mt-1.5">{fieldErrors.facilityName}</p>
+                )}
               </div>
 
               <div>
@@ -347,13 +356,19 @@ export function AddFacilityWizard({
                       key={func}
                       variant={selectedFunctions.includes(func) ? 'default' : 'outline'}
                       className="cursor-pointer"
-                      onClick={() => toggleFunction(func)}
+                      onClick={() => {
+                        toggleFunction(func);
+                        setFieldErrors((prev) => (prev.functions ? { ...prev, functions: undefined } : prev));
+                      }}
                     >
                       {selectedFunctions.includes(func) && <Check className="h-3 w-3 mr-1" />}
                       {func}
                     </Badge>
                   ))}
                 </div>
+                {fieldErrors.functions && (
+                  <p className="text-sm font-medium text-destructive mt-1.5">{fieldErrors.functions}</p>
+                )}
               </div>
 
               <div>
@@ -371,6 +386,9 @@ export function AddFacilityWizard({
                   <p className="text-xs text-muted-foreground mt-2">
                     Selected: {addressLine1}
                   </p>
+                )}
+                {fieldErrors.location && !addressLine1 && (
+                  <p className="text-sm font-medium text-destructive mt-1.5">{fieldErrors.location}</p>
                 )}
               </div>
             </div>
@@ -652,7 +670,7 @@ export function AddFacilityWizard({
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             ) : (
-              <Button onClick={handleSubmit} disabled={isSubmitting || atLimit}>
+              <Button onClick={handleSubmit} disabled={atLimit} loading={isSubmitting}>
                 {atLimit ? 'Limit Reached' : isSubmitting ? 'Creating...' : 'Create Facility & Enter Data'}
               </Button>
             )}

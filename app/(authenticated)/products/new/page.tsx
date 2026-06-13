@@ -17,7 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Loader2, Save, ArrowLeft, Image as ImageIcon, AlertCircle, Info, Package, Layers, FileUp, PenLine, FileSpreadsheet } from "lucide-react";
+import { Save, ArrowLeft, Image as ImageIcon, AlertCircle, Info, Package, Layers, FileUp, PenLine, FileSpreadsheet } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useOrganization } from "@/lib/organizationContext";
 import { toast } from "sonner";
@@ -95,9 +95,12 @@ export default function NewProductLCAPage() {
     product_image_url: "",
   });
   const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof ProductFormData, string>>>({});
 
   const handleInputChange = (field: keyof ProductFormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    // Clear a field's inline error as soon as the user edits it.
+    setFieldErrors((prev) => (prev[field] ? { ...prev, [field]: undefined } : prev));
   };
 
   const handleBOMImportComplete = (
@@ -176,44 +179,43 @@ export default function NewProductLCAPage() {
   };
 
   const validateForm = (isDraft: boolean = false): boolean => {
+    const errors: Partial<Record<keyof ProductFormData, string>> = {};
+
     if (!formData.name.trim()) {
-      toast.error("Product name is required");
-      return false;
+      errors.name = "Product name is required";
     }
 
-    // For multipacks, validate components are selected
-    if (productType === "multipack" && !isDraft) {
-      if (selectedComponents.length === 0) {
-        toast.error("Please add at least one product to the multipack");
-        return false;
-      }
-    }
-
-    // For single products, validate unit size and category
+    // For single products, validate unit size and category inline.
     if (productType === "single" && !isDraft) {
       if (!formData.product_category) {
-        toast.error("Product category is required");
-        return false;
+        errors.product_category = "Product category is required";
       }
 
       if (!formData.unit_size_value) {
-        toast.error("Unit size is required");
-        return false;
-      }
-
-      const size = parseFloat(formData.unit_size_value);
-      if (isNaN(size) || size <= 0) {
-        toast.error("Unit size must be a positive number");
-        return false;
+        errors.unit_size_value = "Unit size is required";
+      } else {
+        const size = parseFloat(formData.unit_size_value);
+        if (isNaN(size) || size <= 0) {
+          errors.unit_size_value = "Unit size must be a positive number";
+        }
       }
 
       if (!formData.unit_size_unit) {
-        toast.error("Unit type is required");
-        return false;
+        errors.unit_size_unit = "Unit type is required";
       }
     }
 
-    return true;
+    setFieldErrors(errors);
+
+    // The multipack component list has no single field to attach to, so it
+    // keeps a toast.
+    let multipackOk = true;
+    if (productType === "multipack" && !isDraft && selectedComponents.length === 0) {
+      toast.error("Please add at least one product to the multipack");
+      multipackOk = false;
+    }
+
+    return Object.keys(errors).length === 0 && multipackOk;
   };
 
   const saveMultipack = async () => {
@@ -669,7 +671,11 @@ export default function NewProductLCAPage() {
               value={formData.name}
               onChange={(e) => handleInputChange("name", e.target.value)}
               disabled={isSubmitting || isSavingDraft}
+              aria-invalid={!!fieldErrors.name}
             />
+            {fieldErrors.name && (
+              <p className="text-sm font-medium text-destructive">{fieldErrors.name}</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -737,9 +743,13 @@ export default function NewProductLCAPage() {
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">
-              Select the category that best describes your product
-            </p>
+            {fieldErrors.product_category ? (
+              <p className="text-sm font-medium text-destructive">{fieldErrors.product_category}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Select the category that best describes your product
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -818,7 +828,11 @@ export default function NewProductLCAPage() {
                   value={formData.unit_size_value}
                   onChange={(e) => handleInputChange("unit_size_value", e.target.value)}
                   disabled={isSubmitting || isSavingDraft}
+                  aria-invalid={!!fieldErrors.unit_size_value}
                 />
+                {fieldErrors.unit_size_value && (
+                  <p className="text-sm font-medium text-destructive">{fieldErrors.unit_size_value}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -839,6 +853,9 @@ export default function NewProductLCAPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                {fieldErrors.unit_size_unit && (
+                  <p className="text-sm font-medium text-destructive">{fieldErrors.unit_size_unit}</p>
+                )}
               </div>
             </div>
 
@@ -879,40 +896,30 @@ export default function NewProductLCAPage() {
             <Button
               variant="outline"
               onClick={handleSaveDraft}
+              loading={isSavingDraft}
               disabled={isSubmitting || isSavingDraft || isUploading}
             >
-              {isSavingDraft ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving Draft...
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Draft
-                </>
-              )}
+              {!isSavingDraft && <Save className="mr-2 h-4 w-4" />}
+              {isSavingDraft ? "Saving Draft..." : "Save Draft"}
             </Button>
           )}
-          <Button onClick={handleSubmit} size="lg" disabled={isSubmitting || isSavingDraft || isUploading}>
+          <Button
+            onClick={handleSubmit}
+            size="lg"
+            loading={isSubmitting}
+            disabled={isSubmitting || isSavingDraft || isUploading}
+          >
             {isSubmitting ? (
+              "Creating..."
+            ) : productType === "multipack" ? (
               <>
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Creating...
+                <Layers className="mr-2 h-5 w-5" />
+                Create Multipack
               </>
             ) : (
               <>
-                {productType === "multipack" ? (
-                  <>
-                    <Layers className="mr-2 h-5 w-5" />
-                    Create Multipack
-                  </>
-                ) : (
-                  <>
-                    <Save className="mr-2 h-5 w-5" />
-                    Create Product
-                  </>
-                )}
+                <Save className="mr-2 h-5 w-5" />
+                Create Product
               </>
             )}
           </Button>

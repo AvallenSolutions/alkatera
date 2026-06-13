@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -290,7 +291,16 @@ export default function LcasPage() {
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">All Reports</h2>
 
-        {filteredReports.length === 0 ? (
+        {reports.length === 0 ? (
+          <EmptyState
+            compact
+            icon={Award}
+            title="No LCA reports yet"
+            description="Complete a product footprint to generate your first life-cycle assessment report."
+            actionLabel="Go to products"
+            actionHref="/products"
+          />
+        ) : filteredReports.length === 0 ? (
           <Card>
             <CardContent className="p-12 text-center text-muted-foreground">
               <Award className="h-12 w-12 mx-auto mb-4 opacity-50" />

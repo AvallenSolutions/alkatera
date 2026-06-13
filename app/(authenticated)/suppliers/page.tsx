@@ -59,6 +59,7 @@ import {
   ChevronRight,
   X,
   ClipboardCheck,
+  Loader2,
 } from 'lucide-react';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabaseClient';
@@ -1393,6 +1394,7 @@ export default function SuppliersPage() {
               disabled={deleting}
               className="bg-red-600 hover:bg-red-700"
             >
+              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {deleting ? 'Removing...' : 'Remove Supplier'}
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,6 +39,7 @@ interface TargetFormProps {
 export function TargetForm({ organizationId, onCreated, onMetricKeyChange }: TargetFormProps) {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ baselineValue?: string; targetDate?: string }>({});
 
   const [metricKey, setMetricKey] = useState<MetricKey>('total_co2e');
   const [baselineValue, setBaselineValue] = useState('');
@@ -124,6 +124,19 @@ export function TargetForm({ organizationId, onCreated, onMetricKeyChange }: Tar
   }
 
   async function createTarget() {
+    // Inline validation: positive baseline, and a target date after the
+    // baseline date (the disabled guard already covers empty baseline/target).
+    const errors: { baselineValue?: string; targetDate?: string } = {};
+    const baselineNum = Number(baselineValue);
+    if (!Number.isFinite(baselineNum) || baselineNum <= 0) {
+      errors.baselineValue = 'Enter a baseline greater than zero.';
+    }
+    if (targetDate && baselineDate && targetDate <= baselineDate) {
+      errors.targetDate = 'Target date must be after the baseline date.';
+    }
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
     setCreating(true);
     setError(null);
     const res = await fetch('/api/pulse/targets', {
@@ -203,13 +216,19 @@ export function TargetForm({ organizationId, onCreated, onMetricKeyChange }: Tar
               onChange={e => {
                 setBaselineTouched(true);
                 setBaselineValue(e.target.value);
+                setFieldErrors(prev => (prev.baselineValue ? { ...prev, baselineValue: undefined } : prev));
               }}
               placeholder="e.g. 1200"
+              aria-invalid={!!fieldErrors.baselineValue}
             />
-            {baselineSource && !baselineTouched && baselineValue !== '' && (
-              <p className="text-xs text-muted-foreground">
-                Filled from your latest data ({baselineSource}). Type to change it.
-              </p>
+            {fieldErrors.baselineValue ? (
+              <p className="text-xs font-medium text-destructive">{fieldErrors.baselineValue}</p>
+            ) : (
+              baselineSource && !baselineTouched && baselineValue !== '' && (
+                <p className="text-xs text-muted-foreground">
+                  Filled from your latest data ({baselineSource}). Type to change it.
+                </p>
+              )
             )}
           </div>
           <div className="space-y-1.5">
@@ -302,8 +321,15 @@ export function TargetForm({ organizationId, onCreated, onMetricKeyChange }: Tar
               id="target-date"
               type="date"
               value={targetDate}
-              onChange={e => setTargetDate(e.target.value)}
+              onChange={e => {
+                setTargetDate(e.target.value);
+                setFieldErrors(prev => (prev.targetDate ? { ...prev, targetDate: undefined } : prev));
+              }}
+              aria-invalid={!!fieldErrors.targetDate}
             />
+            {fieldErrors.targetDate && (
+              <p className="text-xs font-medium text-destructive">{fieldErrors.targetDate}</p>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="methodology">Method (optional)</Label>
@@ -332,8 +358,11 @@ export function TargetForm({ organizationId, onCreated, onMetricKeyChange }: Tar
         )}
 
         <div className="flex justify-end">
-          <Button onClick={createTarget} disabled={creating || !baselineValue || effectiveTargetValue() === null}>
-            {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          <Button
+            onClick={createTarget}
+            loading={creating}
+            disabled={creating || !baselineValue || effectiveTargetValue() === null}
+          >
             Set target
           </Button>
         </div>

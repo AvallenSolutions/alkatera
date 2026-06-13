@@ -9,6 +9,7 @@ import { useAuth } from '@/components/providers/AuthProvider';
 import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { supabase } from '@/lib/supabaseClient';
 import { TargetForm, TARGET_PRESETS } from '@/components/pulse/targets/TargetForm';
 import { TargetCard } from '@/components/pulse/targets/TargetCard';
@@ -179,11 +180,12 @@ function TargetsActionsHub() {
         {loading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : targets.length === 0 ? (
-          <Card className="border-dashed border-border/60">
-            <CardContent className="p-6 text-sm text-muted-foreground">
-              No active targets yet.
-            </CardContent>
-          </Card>
+          <EmptyState
+            compact
+            icon={TargetIcon}
+            title="No targets yet"
+            description="Set your first target using the form above, and Pulse will track whether you're on course to hit it."
+          />
         ) : (
           <ul className="space-y-2">
             {targets.map((t) => (
