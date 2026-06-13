@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { DELETE_PRODUCT_IDS, KEEP_PRODUCT_IDS, ORCHARD_ID, makeCtx, type SeedCtx } from './shared';
 import { seedEntities } from './entities';
+import { seedCompletedLcas } from './lca';
 import { seedOperations } from './operations';
 import { seedProgramme } from './programme';
 import { seedSupplyChain } from './supply-chain';
@@ -22,6 +23,7 @@ export async function seedDrinksCoDemo(svc: SupabaseClient): Promise<SeedOutcome
   const ctx: SeedCtx = makeCtx(svc);
 
   await seedEntities(ctx);
+  await seedCompletedLcas(ctx);
   await seedOperations(ctx);
   await seedProgramme(ctx);
   await seedSupplyChain(ctx);
@@ -31,9 +33,8 @@ export async function seedDrinksCoDemo(svc: SupabaseClient): Promise<SeedOutcome
     report: ctx.report,
     warnings: ctx.warnings,
     nextSteps: [
-      'Switch to the alkatera Drinks Co org, then open Admin Tools → Recalculate LCAs and run it to compute the real product footprints (the calculator runs in the browser).',
-      'Verify one regenerated LCA report (e.g. the Cotswolds Estate Bacchus wine) before relying on the batch.',
-      'Walk the Pulse overview, company footprint, water dashboard, targets + MACC, B Corp readiness, social sections and suppliers to confirm every area renders.',
+      'Completed LCAs are seeded directly (realistic estimates), so every product shows a footprint immediately — no recalc needed.',
+      'Switch to the alkatera Drinks Co org and walk the Pulse overview, products + an LCA report, company footprint, water dashboard, targets + MACC, B Corp readiness, social sections and suppliers to confirm every area renders.',
     ],
   };
 }
@@ -85,8 +86,15 @@ export async function resetDrinksCoDemo(svc: SupabaseClient): Promise<SeedOutcom
   await clear('dashboard_anomalies', 'organization_id', orgId);
   await svc.from('orchard_growing_profiles').delete().eq('orchard_id', ORCHARD_ID);
   await svc.from('orchards').delete().eq('id', ORCHARD_ID);
-  // seed draft PCFs + computed PCFs for the keeper products
-  await svc.from('product_carbon_footprints').delete().eq('organization_id', orgId).in('product_id', KEEP_PRODUCT_IDS);
+  // PCFs for the keeper products: clear children first (FKs don't cascade).
+  const { data: pcfs } = await svc.from('product_carbon_footprints').select('id').eq('organization_id', orgId).in('product_id', KEEP_PRODUCT_IDS);
+  const pcfIds = (pcfs ?? []).map((r: any) => r.id);
+  if (pcfIds.length) {
+    await svc.from('products').update({ latest_lca_id: null, has_active_lca: false }).eq('organization_id', orgId).in('id', KEEP_PRODUCT_IDS);
+    await svc.from('product_carbon_footprint_materials').delete().in('product_carbon_footprint_id', pcfIds);
+    await svc.from('product_carbon_footprint_production_sites').delete().in('product_carbon_footprint_id', pcfIds);
+    await svc.from('product_carbon_footprints').delete().in('id', pcfIds);
+  }
 
   ctx.report.reset = `cleared ${new Set(removed).size} seed tables`;
   return { ok: true, report: ctx.report, warnings: ctx.warnings, nextSteps: ['Re-run the seed to rebuild the demo dataset.'] };
