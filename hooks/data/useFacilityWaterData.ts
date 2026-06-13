@@ -53,6 +53,10 @@ export interface FacilityWaterSummary {
   risk_level: 'high' | 'medium' | 'low';
   recycling_rate_percent: number;
   avg_water_intensity_m3_per_unit: number | null;
+  /** Total production volume for the year (sum across reporting sessions sharing the dominant unit). */
+  production_volume_total?: number | null;
+  /** Dominant production unit, used to express water use as litres per litre of product. */
+  production_unit?: string | null;
   data_points_count: number;
   measured_data_points: number;
   earliest_data: string | null;
@@ -150,7 +154,7 @@ export function useFacilityWaterData(year?: number) {
 
     try {
       // Fetch time series from facility_activity_entries (where water data is actually stored)
-      const [overviewResult, summariesResult, timeSeriesResult] = await Promise.all([
+      const [overviewResult, summariesResult, timeSeriesResult, sessionsResult] = await Promise.all([
         supabase
           .from('company_water_overview')
           .select('*')
@@ -171,7 +175,15 @@ export function useFacilityWaterData(year?: number) {
           .in('activity_category', ['water_intake', 'water_discharge', 'water_recycled'])
           .gte('reporting_period_start', yearStart)
           .lte('reporting_period_start', yearEnd)
-          .order('reporting_period_start', { ascending: true })
+          .order('reporting_period_start', { ascending: true }),
+
+        // Production volumes per facility (for the litres-per-litre water-use
+        // ratio). Most-recent session gives the unit; volumes sharing it sum.
+        supabase
+          .from('facility_reporting_sessions')
+          .select('facility_id, total_production_volume, volume_unit, reporting_period_start')
+          .eq('organization_id', currentOrganization.id)
+          .order('reporting_period_start', { ascending: false })
       ]);
 
       if (overviewResult.error) throw overviewResult.error;
@@ -208,7 +220,28 @@ export function useFacilityWaterData(year?: number) {
           setCompanyOverview(rawOverview);
         }
       }
-      setFacilitySummaries(summariesResult.data || []);
+      // Attach production volume + unit per facility (for litres-per-litre).
+      // Sessions are sorted newest-first; the latest session sets the unit,
+      // and volumes sharing that unit are summed.
+      const sessionsByFacility = new Map<string, { unit: string; volume: number }>();
+      for (const s of (sessionsResult?.data || []) as Array<{ facility_id: string; total_production_volume: number; volume_unit: string }>) {
+        const fid = String(s.facility_id);
+        const existing = sessionsByFacility.get(fid);
+        if (!existing) {
+          sessionsByFacility.set(fid, { unit: s.volume_unit, volume: Number(s.total_production_volume) || 0 });
+        } else if (existing.unit === s.volume_unit) {
+          existing.volume += Number(s.total_production_volume) || 0;
+        }
+      }
+      const summariesWithProduction = ((summariesResult.data || []) as FacilityWaterSummary[]).map((f) => {
+        const prod = sessionsByFacility.get(String(f.facility_id));
+        return {
+          ...f,
+          production_volume_total: prod?.volume ?? null,
+          production_unit: prod?.unit ?? null,
+        };
+      });
+      setFacilitySummaries(summariesWithProduction);
 
       // Transform facility_activity_entries into time series data
       const timeSeriesData: WaterTimeSeries[] = [];

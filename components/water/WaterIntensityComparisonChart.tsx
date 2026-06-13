@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { litresPerLitre } from '@/lib/calculations/water-use-ratio';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -53,6 +54,14 @@ export function WaterIntensityComparisonChart({
         if (index === arr.length - 1) status = 'best';
         if (index === 0) status = 'worst';
 
+        // Litres of water per litre of product, when this site reports output
+        // in a volume unit; null otherwise (then we show m³/unit).
+        const ratioLPerL = litresPerLitre(
+          facility.net_consumption_m3,
+          facility.production_volume_total ?? null,
+          facility.production_unit ?? null,
+        );
+
         return {
           ...facility,
           name: facility.facility_name.length > 20
@@ -60,6 +69,7 @@ export function WaterIntensityComparisonChart({
             : facility.facility_name,
           fullName: facility.facility_name,
           intensity,
+          ratioLPerL,
           status,
           aboveBenchmark: industryBenchmark ? intensity > industryBenchmark : false,
         };
@@ -131,9 +141,11 @@ export function WaterIntensityComparisonChart({
         <div className="font-medium text-sm mb-2">{data.fullName}</div>
         <div className="space-y-1 text-xs">
           <div className="flex justify-between gap-4">
-            <span className="text-muted-foreground">Water Intensity:</span>
+            <span className="text-muted-foreground">Water use:</span>
             <span className="font-medium">
-              {data.intensity.toFixed(4)} m³/unit
+              {data.ratioLPerL != null
+                ? `${data.ratioLPerL >= 100 ? Math.round(data.ratioLPerL) : (Math.round(data.ratioLPerL * 10) / 10)} litres per litre`
+                : `${data.intensity.toFixed(4)} m³/unit`}
             </span>
           </div>
           <div className="flex justify-between gap-4">

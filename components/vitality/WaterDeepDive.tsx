@@ -39,6 +39,7 @@ import type {
 import { WaterConsumptionChart } from '@/components/water/WaterConsumptionChart';
 import { WaterSourceBreakdownChart } from '@/components/water/WaterSourceBreakdownChart';
 import { WaterIntensityComparisonChart } from '@/components/water/WaterIntensityComparisonChart';
+import { aggregateWaterUseRatio, formatWaterRatio } from '@/lib/calculations/water-use-ratio';
 import { RelatableMetric } from '@/components/shared/RelatableMetric';
 
 const FacilityWaterRiskMap = dynamic(
@@ -157,6 +158,8 @@ export function WaterDeepDive({
         risk_level: f.risk_level,
         recycling_rate_percent: 0,
         avg_water_intensity_m3_per_unit: productionVol > 0 ? netConsumption / productionVol : null,
+        production_volume_total: productionVol > 0 ? productionVol : null,
+        production_unit: (f as any).production_unit ?? null,
         data_points_count: f.products_linked?.length || 0,
         measured_data_points: hasOperational ? 1 : 0,
         earliest_data: null,
@@ -205,6 +208,20 @@ export function WaterDeepDive({
 
     return result;
   }, [facilities, searchQuery, riskFilter, sortBy]);
+
+  // Litres of water per litre of product, across facilities reporting output
+  // in a volume unit (the recognised drinks-industry water-use ratio).
+  const waterUseRatio = useMemo(
+    () =>
+      aggregateWaterUseRatio(
+        facilities.map((f) => ({
+          netWaterM3: f.net_consumption_m3,
+          productionVolume: f.production_volume_total ?? null,
+          productionUnit: f.production_unit ?? null,
+        })),
+      ),
+    [facilities],
+  );
 
   const riskCounts = useMemo(() => ({
     high: facilities.filter(f => f.risk_level === 'high').length,
@@ -290,6 +307,27 @@ export function WaterDeepDive({
           subtitle={!hasOperationalWaterData ? 'No facility data' : undefined}
         />
       </div>
+
+      {waterUseRatio.ratio !== null && (
+        <Card className="border-blue-500/30 bg-blue-500/[0.04]">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Water use ratio
+              </p>
+              <p className="mt-1 text-3xl font-semibold text-foreground">
+                {formatWaterRatio(waterUseRatio.ratio)}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                How much water it takes to make a litre of your product, across{' '}
+                {waterUseRatio.facilityCount} site{waterUseRatio.facilityCount === 1 ? '' : 's'} reporting
+                production in litres.
+              </p>
+            </div>
+            <Droplets className="h-8 w-8 shrink-0 text-blue-500/70" aria-hidden="true" />
+          </CardContent>
+        </Card>
+      )}
 
       {displayTotalConsumption > 0 && (
         <RelatableMetric
