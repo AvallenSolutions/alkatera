@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { inngest } from '../client';
 import { syncOrganisation } from '@/lib/xero/sync-service';
+import { findSupplierMatches } from '@/lib/xero/supplier-matcher';
 
 /**
  * Xero scheduled sync, on Inngest. Replaces the synchronous loop in
@@ -131,6 +132,18 @@ export const xeroOrgSync = inngest.createFunction(
       return syncOrganisation(organization_id, 'cron');
     });
 
-    return { organization_id, result };
+    // Reconcile Xero contacts to supplier records so spend (and its
+    // spend-based emissions) can be rolled up per supplier. Best-effort:
+    // a matching hiccup must not fail or retry the whole sync.
+    const matching = await step.run('match-suppliers', async () => {
+      try {
+        return await findSupplierMatches(service(), organization_id);
+      } catch (err) {
+        console.error('[xero] supplier matching failed (non-fatal):', err);
+        return { matched: 0, unmatched: 0, error: true };
+      }
+    });
+
+    return { organization_id, result, matching };
   },
 );

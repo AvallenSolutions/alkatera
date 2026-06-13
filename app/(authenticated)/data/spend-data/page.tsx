@@ -20,6 +20,7 @@ import { AIClassificationPanel } from '@/components/xero/AIClassificationPanel'
 import { SyncHistoryPanel } from '@/components/xero/SyncHistoryPanel'
 import { TransactionBrowser } from '@/components/xero/TransactionBrowser'
 import { SupplierRulesManager } from '@/components/xero/SupplierRulesManager'
+import { SupplierMatchingPanel } from '@/components/xero/SupplierMatchingPanel'
 import { DataQualityProgress } from '@/components/xero/DataQualityProgress'
 import { SyncDataButton } from '@/components/xero/SyncDataButton'
 import { useSpendInboxState } from '@/hooks/useSpendInboxState'
@@ -194,6 +195,14 @@ export default function SpendDataPage() {
                 <div>
                   <h3 className="text-sm font-semibold mb-2">Supplier rules</h3>
                   <SupplierRulesManager />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold mb-2">Reconcile Xero suppliers</h3>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Match the contacts you pay in Xero to your supplier records, so spend and
+                    emissions roll up per supplier.
+                  </p>
+                  <SupplierMatchingPanel />
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold mb-2">Sync history</h3>

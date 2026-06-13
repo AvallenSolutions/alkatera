@@ -64,6 +64,8 @@ import Image from 'next/image';
 import { supabase } from '@/lib/supabaseClient';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { useOrganization } from '@/lib/organizationContext';
+import { SuppliersByEmissions } from '@/components/suppliers/SuppliersByEmissions';
+import { SupplierTieringPanel } from '@/components/suppliers/SupplierTieringPanel';
 import { useSupplierPermissions } from '@/hooks/useSupplierPermissions';
 import { useSupplierLimit } from '@/hooks/useSubscription';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -857,6 +859,15 @@ export default function SuppliersPage() {
           </div>
         )}
       </div>
+
+      {/* Spend-driven supplier insight: who carries the most impact, and which
+          are your direct/material suppliers for B Corp. */}
+      {hasSuppliers && currentOrganization?.id && (
+        <div className="space-y-6">
+          <SuppliersByEmissions organizationId={currentOrganization.id} />
+          <SupplierTieringPanel organizationId={currentOrganization.id} />
+        </div>
+      )}
 
       {/* ── Empty State: Inline Directory ── */}
       {!hasSuppliers && (
