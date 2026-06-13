@@ -169,16 +169,16 @@ async function seedSnapshots(ctx: SeedCtx): Promise<void> {
     const date = monthEnd(monthsAgo);
     const progress = i / Math.max(1, HISTORY_MONTHS - 1);
 
-    // trailing-12-month totals
-    const lo = Math.max(0, i - 11);
-    const co2e12 = monthlyScope12.slice(lo, i + 1).reduce((a, b) => a + b, 0);
-    const water12 = monthlyWater.slice(lo, i + 1).reduce((a, b) => a + b, 0);
+    // Annualised run-rate (this month × 12) so the trend declines cleanly rather
+    // than ramping while a trailing window fills.
+    const co2eAnnual = monthlyScope12[i] * 12;
+    const waterAnnual = monthlyWater[i] * 12;
     const productsAssessed = Math.min(9, Math.round(1 + progress * 8));
     const completeness = Math.round(10 + progress * 80);
 
     metricRows.push(
-      { organization_id: orgId, metric_key: 'total_co2e', snapshot_date: date, value: Math.round(co2e12), unit: 'kg CO2e', dimensions: {} },
-      { organization_id: orgId, metric_key: 'water_consumption', snapshot_date: date, value: Math.round(water12), unit: 'm3', dimensions: {} },
+      { organization_id: orgId, metric_key: 'total_co2e', snapshot_date: date, value: Math.round(co2eAnnual), unit: 'kg CO2e', dimensions: {} },
+      { organization_id: orgId, metric_key: 'water_consumption', snapshot_date: date, value: Math.round(waterAnnual), unit: 'm3', dimensions: {} },
       { organization_id: orgId, metric_key: 'products_assessed', snapshot_date: date, value: productsAssessed, unit: 'products', dimensions: {} },
       { organization_id: orgId, metric_key: 'lca_completeness_pct', snapshot_date: date, value: completeness, unit: '%', dimensions: {} },
     );

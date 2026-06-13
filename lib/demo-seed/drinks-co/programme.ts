@@ -10,8 +10,8 @@ async function seedTargets(ctx: SeedCtx): Promise<Record<string, string>> {
   const { data: targets, error } = await svc
     .from('sustainability_targets')
     .insert([
-      { organization_id: orgId, metric_key: 'total_co2e', baseline_value: 21000, baseline_date: '2024-12-31', target_value: 12180, target_date: '2030-12-31', status: 'active', scope: '1+2', methodology: 'SBTi 1.5°C aligned (-42% absolute by 2030)', notes: 'Board-approved near-term science-based target.' },
-      { organization_id: orgId, metric_key: 'water_consumption', baseline_value: 9000, baseline_date: '2024-12-31', target_value: 6300, target_date: '2028-12-31', status: 'active', scope: 'operations', methodology: '-30% absolute water intake', notes: 'Driven by CIP optimisation and rainwater harvesting.' },
+      { organization_id: orgId, metric_key: 'total_co2e', baseline_value: 429000, baseline_date: '2024-12-31', target_value: 249000, target_date: '2030-12-31', status: 'active', scope: '1+2', methodology: 'SBTi 1.5°C aligned (-42% absolute by 2030)', notes: 'Board-approved near-term science-based target.' },
+      { organization_id: orgId, metric_key: 'water_consumption', baseline_value: 32000, baseline_date: '2024-12-31', target_value: 22400, target_date: '2028-12-31', status: 'active', scope: 'operations', methodology: '-30% absolute water intake', notes: 'Driven by CIP optimisation and rainwater harvesting.' },
       { organization_id: orgId, metric_key: 'lca_completeness_pct', baseline_value: 30, baseline_date: '2025-06-30', target_value: 100, target_date: '2027-12-31', status: 'active', scope: 'portfolio', methodology: 'Full product LCA coverage', notes: 'Every SKU carries a verified cradle-to-gate footprint.' },
     ])
     .select('id, metric_key');
@@ -27,8 +27,8 @@ async function seedTargets(ctx: SeedCtx): Promise<Record<string, string>> {
 
   await svc.from('carbon_budgets').delete().eq('organization_id', orgId);
   await svc.from('carbon_budgets').insert([
-    { organization_id: orgId, scope: 'all', period: 'annual', budget_tco2e: 18, effective_from: '2026-01-01', notes: 'Group-wide annual carbon budget aligned to the SBTi trajectory.' },
-    { organization_id: orgId, scope: 'scope_1', period: 'annual', budget_tco2e: 7.5, effective_from: '2026-01-01' },
+    { organization_id: orgId, scope: 'all', period: 'annual', budget_tco2e: 330, effective_from: '2026-01-01', notes: 'Group-wide annual carbon budget aligned to the SBTi trajectory.' },
+    { organization_id: orgId, scope: 'scope_1', period: 'annual', budget_tco2e: 150, effective_from: '2026-01-01' },
   ]);
 
   ctx.report.targets = `${targets?.length ?? 0} targets + FLAG target + 2 carbon budgets`;
