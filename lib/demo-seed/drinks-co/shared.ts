@@ -11,6 +11,9 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 export const DRINKS_CO_ORG_ID = 'b0a00000-0000-4000-8000-000000000001';
 
+/** The org owner (hello@alkatera.com) — used for NOT NULL uploaded_by/created_by FKs. */
+export const OWNER_USER_ID = '27ea31a3-949c-4107-bcd1-e1b1eff818d1';
+
 /** The six real facilities (stable seeded UUIDs). */
 export const FACILITIES = {
   winery: 'b0a10001-0000-4000-8000-000000000001',

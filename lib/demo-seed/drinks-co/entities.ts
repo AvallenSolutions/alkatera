@@ -24,7 +24,9 @@ async function curate(ctx: SeedCtx): Promise<void> {
   const { error: delProd } = await svc.from('products').delete().eq('organization_id', orgId).in('id', DELETE_PRODUCT_IDS);
   if (delProd) ctx.warnings.push(`product cleanup: ${delProd.message}`);
 
-  // Remove the two generic junk facilities (only if free of dependents).
+  // Repoint any keeper product whose core_operations_facility_id still points at
+  // a junk facility onto the brewery, then remove the junk facilities.
+  await svc.from('products').update({ core_operations_facility_id: FACILITIES.brewery }).eq('organization_id', orgId).in('core_operations_facility_id', JUNK_FACILITY_IDS);
   for (const fid of JUNK_FACILITY_IDS) {
     const { error } = await svc.from('facilities').delete().eq('id', fid).eq('organization_id', orgId);
     if (error) ctx.warnings.push(`junk facility ${fid.slice(0, 8)}: ${error.message}`);
@@ -171,6 +173,7 @@ async function rebuildCalvados(ctx: SeedCtx): Promise<void> {
         material_type: 'ingredient',
         quantity: 0.002,
         unit: 'kg',
+        is_self_grown: false,
         origin_country: 'United Kingdom',
         origin_country_code: 'GB',
         transport_mode: 'truck',
@@ -181,7 +184,8 @@ async function rebuildCalvados(ctx: SeedCtx): Promise<void> {
         material_name: 'Water',
         material_type: 'ingredient',
         quantity: 0.4,
-        unit: 'L',
+        unit: 'l',
+        is_self_grown: false,
         origin_country: 'United Kingdom',
         origin_country_code: 'GB',
       },
@@ -239,8 +243,9 @@ async function rebuildCalvados(ctx: SeedCtx): Promise<void> {
         material_name: 'Cardboard Case (6pk)',
         material_type: 'packaging',
         packaging_category: 'secondary',
-        quantity: 0.166667 * 0.42,
+        quantity: 0.07,
         unit: 'kg',
+        units_per_group: 6,
         net_weight_g: 70,
         total_weight_kg: 0.07,
         recycled_content_percentage: 80,
@@ -251,7 +256,10 @@ async function rebuildCalvados(ctx: SeedCtx): Promise<void> {
       },
     ];
 
-    const { error } = await svc.from('product_materials').insert([...ingredients, ...packaging]);
+    // PostgREST unions keys across a batch insert, so every row must carry
+    // is_self_grown (NOT NULL) — the packaging rows are never self-grown.
+    const allRows = [...ingredients, ...packaging.map((p) => ({ ...p, is_self_grown: false }))];
+    const { error } = await svc.from('product_materials').insert(allRows);
     if (error) throw new Error(`calvados BOM ${v.productId}: ${error.message}`);
   }
   ctx.report.calvados = 'rebuilt glass + paper Calvados BOMs (orchard apples)';

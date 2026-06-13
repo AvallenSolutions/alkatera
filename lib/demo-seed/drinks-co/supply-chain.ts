@@ -87,7 +87,7 @@ async function seedXero(ctx: SeedCtx): Promise<void> {
       rows.push({
         organization_id: orgId, xero_transaction_id: `drinksco-demo-${n++}`, xero_transaction_type: 'invoice',
         xero_contact_name: s.name, description: `${s.sector} supply`, amount, currency: 'GBP', transaction_date: date,
-        emission_category: category, classification_source: 'auto', classification_confidence: 0.9,
+        emission_category: category, classification_source: 'ai', classification_confidence: 0.9,
         spend_based_emissions_kg: Math.round(amount * 0.35), data_quality_tier: 4, upgrade_status: 'pending',
         reporting_year: Number(date.slice(0, 4)),
       });
