@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageLoader } from "@/components/ui/page-loader";
 import { Input } from "@/components/ui/input";
 import { WebsiteImportFlow } from "@/components/products/WebsiteImportFlow";
-import { Plus, Package, AlertCircle, Trash2, MoreVertical, Search, Leaf, ArrowRight, Globe, Copy } from "lucide-react";
+import { Plus, Package, AlertCircle, Trash2, MoreVertical, Search, Leaf, ArrowRight, Globe, Copy, Sparkles, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { duplicateProduct } from "@/lib/products";
 import { useRouter } from "next/navigation";
@@ -74,6 +74,8 @@ export default function ProductsPage() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [portfolio, setPortfolio] = useState<PortfolioResult | null>(null);
   const [view, setView] = useState<'list' | 'portfolio'>('list');
+  const [matchCount, setMatchCount] = useState(0);
+  const [findingMatches, setFindingMatches] = useState(false);
 
   useEffect(() => {
     if (currentOrganization?.id) {
@@ -207,6 +209,49 @@ export default function ProductsPage() {
     }
   };
 
+  const loadMatchCount = async () => {
+    if (!currentOrganization?.id) return;
+    try {
+      const res = await fetch(`/api/products/ingredient-matches?organization_id=${currentOrganization.id}`);
+      const body = await res.json().catch(() => ({}));
+      setMatchCount(res.ok ? (body.suggestions?.length ?? 0) : 0);
+    } catch {
+      // non-fatal
+    }
+  };
+
+  useEffect(() => {
+    loadMatchCount();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentOrganization?.id]);
+
+  const findSupplierMatches = async () => {
+    if (!currentOrganization?.id) return;
+    setFindingMatches(true);
+    try {
+      const res = await fetch('/api/products/ingredient-matches/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organization_id: currentOrganization.id }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (res.ok) {
+        await loadMatchCount();
+        if ((body.created ?? 0) > 0) {
+          router.push('/products/supplier-matches');
+        } else {
+          toast.success('No new supplier matches found. Connect more suppliers or add supplier products.');
+        }
+      } else {
+        toast.error(body.error ?? 'Could not look for matches');
+      }
+    } catch {
+      toast.error('Could not look for matches');
+    } finally {
+      setFindingMatches(false);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-GB", {
       day: "2-digit",
@@ -334,6 +379,18 @@ export default function ProductsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {products.length > 0 && (
+            <Button
+              size="lg"
+              variant="outline"
+              className="gap-2"
+              onClick={findSupplierMatches}
+              disabled={findingMatches}
+            >
+              {findingMatches ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              Find supplier matches
+            </Button>
+          )}
           <Button
             size="lg"
             variant="outline"
@@ -351,6 +408,20 @@ export default function ProductsPage() {
           </Link>
         </div>
       </div>
+
+      {matchCount > 0 && (
+        <Link
+          href="/products/supplier-matches"
+          className="flex items-center gap-2 rounded-lg border border-[#ccff00]/40 bg-[#ccff00]/[0.06] px-4 py-2.5 text-sm transition-colors hover:bg-[#ccff00]/10"
+        >
+          <Sparkles className="h-4 w-4 shrink-0 text-[#ccff00]" />
+          <span className="flex-1">
+            {matchCount} supplier {matchCount === 1 ? 'match' : 'matches'} to review. Linking adds real
+            supplier data to your footprints.
+          </span>
+          <span className="text-xs text-muted-foreground">Review →</span>
+        </Link>
+      )}
 
       {products.length > 0 && (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">

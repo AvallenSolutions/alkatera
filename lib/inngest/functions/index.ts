@@ -15,6 +15,7 @@ import { matchingSweepRun } from './matching';
 import { openlcaCertMonitor } from './monitoring';
 import { xeroSyncTick, xeroOrgSync } from './xero';
 import { reportPdfGenerate } from './reports';
+import { ingredientMatchSuggest } from './ingredient-match';
 
 export const allFunctions: InngestFunction.Any[] = [
   scrapingQueueTick,
@@ -27,4 +28,5 @@ export const allFunctions: InngestFunction.Any[] = [
   xeroSyncTick,
   xeroOrgSync,
   reportPdfGenerate,
+  ingredientMatchSuggest,
 ];

@@ -62,6 +62,11 @@ export interface AlkateraEvents {
 
   // ─────────── Report generation ───────────
   'reports/pdf.generate': { data: { report_id: string } };
+
+  // ─────────── Ingredient -> supplier-product matching ───────────
+  'ingredients/match.suggest': {
+    data: { organization_id: string; supplier_product_ids?: string[] };
+  };
 }
 
 const eventKey = process.env.INNGEST_EVENT_KEY;

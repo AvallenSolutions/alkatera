@@ -63,6 +63,9 @@ function getNotificationRoute(
   if (notification.entity_type === 'advisor_conversation' && notification.entity_id) {
     return `/settings/messages/${notification.entity_id}`
   }
+  if (notification.entity_type === 'ingredient_match') {
+    return '/products/supplier-matches'
+  }
   return null
 }
 

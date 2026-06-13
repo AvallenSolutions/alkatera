@@ -161,6 +161,20 @@ export async function POST(request: NextRequest) {
       console.error('[smart-import confirm] audit stamp failed (non-fatal):', auditErr);
     }
 
+    // Best-effort: suggest ingredient matches for the brand and notify them
+    // that this supplier just published data. Non-fatal if Inngest is absent.
+    if (productIds.length > 0 && supplier.organization_id) {
+      try {
+        const { inngest } = await import('@/lib/inngest/client');
+        await inngest.send({
+          name: 'ingredients/match.suggest',
+          data: { organization_id: supplier.organization_id, supplier_product_ids: productIds },
+        });
+      } catch (eventErr) {
+        console.error('[smart-import confirm] match.suggest dispatch failed (non-fatal):', eventErr);
+      }
+    }
+
     return NextResponse.json({ created: productIds.length, productIds });
   } catch (error: any) {
     console.error('[smart-import confirm] error:', error);
