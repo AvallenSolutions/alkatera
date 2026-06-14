@@ -36,6 +36,7 @@ import { AutoEvidencePanel } from '@/components/certifications/AutoEvidencePanel
 import { getRequirementGuidance } from '@/lib/certifications/requirement-guidance';
 import { RoadmapCard } from '@/components/certifications/RoadmapCard';
 import { RecertDeltaCard } from '@/components/certifications/RecertDeltaCard';
+import { DeadlinePlanCard } from '@/components/certifications/DeadlinePlanCard';
 import { PlatformHealthPanel } from '@/components/certifications/PlatformHealthPanel';
 import type {
   CertificationReadiness,
@@ -215,6 +216,10 @@ export function GapAnalysisView({
           </Select>
         </CardContent>
       </Card>
+
+      {(readiness.certificationType === 'recertification' || readiness.recertPrepActive) && (
+        <DeadlinePlanCard readiness={readiness} />
+      )}
 
       {readiness.certificationType === 'recertification' && (
         <RecertDeltaCard
