@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { EvidenceLinker } from '@/components/certifications/EvidenceLinker';
 import { AutoEvidencePanel } from '@/components/certifications/AutoEvidencePanel';
+import { getRequirementGuidance } from '@/lib/certifications/requirement-guidance';
 import { PlatformHealthPanel } from '@/components/certifications/PlatformHealthPanel';
 import type {
   CertificationReadiness,
@@ -360,6 +361,35 @@ export function GapAnalysisView({
           </DialogHeader>
           {activeRequirement && readiness.frameworkId && (
             <div className="space-y-4">
+              {(() => {
+                const g = getRequirementGuidance(activeRequirement.code, activeRequirement.topicArea);
+                return (
+                  <div className="space-y-2.5 rounded-lg border border-border/60 bg-muted/30 p-3 text-xs">
+                    <div>
+                      <p className="font-semibold text-foreground">What this needs</p>
+                      <p className="mt-0.5 text-muted-foreground">{g.summary}</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-foreground">Evidence that works</p>
+                      <ul className="mt-0.5 list-disc space-y-0.5 pl-4 text-muted-foreground">
+                        {g.evidence.map((e) => (
+                          <li key={e}>{e}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    {g.pitfalls && g.pitfalls.length > 0 && (
+                      <div>
+                        <p className="font-semibold text-amber-600 dark:text-amber-400">Watch out for</p>
+                        <ul className="mt-0.5 list-disc space-y-0.5 pl-4 text-muted-foreground">
+                          {g.pitfalls.map((p) => (
+                            <li key={p}>{p}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
               <AutoEvidencePanel
                 requirementId={activeRequirement.requirementId}
                 onAccepted={async () => {
