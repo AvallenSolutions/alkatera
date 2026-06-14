@@ -37,6 +37,7 @@ import { getRequirementGuidance } from '@/lib/certifications/requirement-guidanc
 import { RoadmapCard } from '@/components/certifications/RoadmapCard';
 import { RecertDeltaCard } from '@/components/certifications/RecertDeltaCard';
 import { DeadlinePlanCard } from '@/components/certifications/DeadlinePlanCard';
+import { EligibilityEstimateCard } from '@/components/certifications/EligibilityEstimateCard';
 import { PlatformHealthPanel } from '@/components/certifications/PlatformHealthPanel';
 import type {
   CertificationReadiness,
@@ -228,6 +229,10 @@ export function GapAnalysisView({
           )}
         </CardContent>
       </Card>
+
+      {readiness.certificationType === 'new' && (
+        <EligibilityEstimateCard readiness={readiness} />
+      )}
 
       {(readiness.certificationType === 'recertification' || readiness.recertPrepActive) && (
         <DeadlinePlanCard readiness={readiness} />
@@ -422,6 +427,14 @@ export function GapAnalysisView({
                             <li key={p}>{p}</li>
                           ))}
                         </ul>
+                      </div>
+                    )}
+                    {g.template && (
+                      <div>
+                        <p className="font-semibold text-foreground">Starter you can adapt</p>
+                        <p className="mt-0.5 whitespace-pre-wrap rounded border border-border/60 bg-background/60 p-2 italic text-muted-foreground">
+                          {g.template}
+                        </p>
                       </div>
                     )}
                   </div>

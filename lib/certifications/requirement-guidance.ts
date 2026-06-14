@@ -12,7 +12,21 @@ export interface RequirementGuidance {
   evidence: string[];
   /** Common mistakes / things that fail review. */
   pitfalls?: string[];
+  /** Starter wording the user can adapt for manual / document requirements. */
+  template?: string;
 }
+
+/** Starter templates for the manual requirements where a blank page is the blocker. */
+const TEMPLATES: Record<string, string> = {
+  'IT1-Y0-001':
+    '[Company] exists to [purpose]. We are committed to creating value for all our stakeholders — our workers, customers, suppliers, communities and the environment — not only our shareholders, and our board considers their interests in its decisions.',
+  'IT1-Y0-002':
+    'Code of Conduct: the standards of behaviour we expect of everyone at [Company], covering integrity, anti-bribery and conflicts of interest. Whistleblowing: anyone can raise a concern confidentially via [channel] without fear of retaliation.',
+  'IT4-Y0-002':
+    'Human Rights & Responsible Sourcing Policy: [Company] respects internationally recognised human rights across our operations and supply chain, expects the same of our suppliers, and assesses and acts on salient risks.',
+  'IT7-Y0-001':
+    'Responsible Government Affairs Statement: any advocacy or trade-association activity [Company] takes part in is consistent with our mission and disclosed; we do not lobby against our stated environmental and social commitments.',
+};
 
 /** Per-requirement-code guidance for the requirements users ask about most. */
 const BY_CODE: Record<string, RequirementGuidance> = {
@@ -144,7 +158,7 @@ export function getRequirementGuidance(
   code: string | null | undefined,
   topicArea: string | null | undefined,
 ): RequirementGuidance {
-  if (code && BY_CODE[code]) return BY_CODE[code];
-  if (topicArea && BY_TOPIC[topicArea]) return BY_TOPIC[topicArea];
-  return GENERIC;
+  const base = (code && BY_CODE[code]) || (topicArea && BY_TOPIC[topicArea]) || GENERIC;
+  const template = code ? TEMPLATES[code] : undefined;
+  return template ? { ...base, template } : base;
 }
