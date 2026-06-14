@@ -32,6 +32,7 @@ import { FlagTargetSetting } from '@/components/certifications/FlagTargetSetting
 import { EvidenceLinker } from '@/components/certifications/EvidenceLinker';
 import { YearProgressionStepper } from '@/components/certifications/YearProgressionStepper';
 import { BcorpExperience } from '@/components/certifications/BcorpExperience';
+import { CertificationExperience } from '@/components/certifications/CertificationExperience';
 import { useCertificationEvidence } from '@/hooks/data/useCertificationEvidence';
 import { useCertificationAuditPackages } from '@/hooks/data/useCertificationAuditPackages';
 import { toast } from 'sonner';
@@ -157,6 +158,32 @@ const canopyFrameworkFeatures: Record<string, string> = {
   sbti: 'sbti_targets',
 };
 
+// Checklist-style frameworks that use the generalised, B Corp-grade experience
+// (graded readiness, per-requirement guidance, auto-evidence, evidence library).
+const GENERALISED_FRAMEWORKS: Record<
+  string,
+  { label: string; description: string; governingBody: string }
+> = {
+  iso14001: {
+    label: 'ISO 14001',
+    description:
+      'The international standard for environmental management systems. Build, run and continually improve how you manage your environmental impact.',
+    governingBody: 'International Organization for Standardization (ISO)',
+  },
+  iso50001: {
+    label: 'ISO 50001',
+    description:
+      'The international standard for energy management systems. Establish the systems and data to keep improving your energy performance.',
+    governingBody: 'International Organization for Standardization (ISO)',
+  },
+  ecovadis: {
+    label: 'EcoVadis',
+    description:
+      'A sustainability rating across environment, labour and human rights, ethics and sustainable procurement, scored on policies, actions and results.',
+    governingBody: 'EcoVadis',
+  },
+};
+
 export default function CertificationDetailsPage() {
   const params = useParams();
   const router = useRouter();
@@ -171,6 +198,24 @@ export default function CertificationDetailsPage() {
       <FeatureGate feature="bcorp_tracking">
         <BcorpExperience />
       </FeatureGate>
+    );
+  }
+
+  // Checklist-style frameworks get the generalised, B Corp-grade experience.
+  const generalised = GENERALISED_FRAMEWORKS[code?.toLowerCase()];
+  if (generalised) {
+    const experience = (
+      <CertificationExperience
+        frameworkCode={code.toLowerCase()}
+        label={generalised.label}
+        description={generalised.description}
+        governingBody={generalised.governingBody}
+      />
+    );
+    return requiredFeature ? (
+      <FeatureGate feature={requiredFeature}>{experience}</FeatureGate>
+    ) : (
+      experience
     );
   }
 

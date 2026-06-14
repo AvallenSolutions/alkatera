@@ -36,3 +36,21 @@ export function getRequirementDef(
   if (!fw || !requirementCode) return null;
   return fw.requirements.find((r) => r.code === requirementCode) ?? null;
 }
+
+/** Resolve a generalised framework's content by its DB framework id. */
+export function getFrameworkContentById(
+  frameworkId: string | null | undefined,
+): FrameworkContentDef | null {
+  if (!frameworkId) return null;
+  return (
+    Object.values(FRAMEWORK_CONTENT).find((f) => f.frameworkId === frameworkId) ??
+    null
+  );
+}
+
+/** The framework code for a generalised framework's DB id, if any. */
+export function frameworkCodeForId(
+  frameworkId: string | null | undefined,
+): string | null {
+  return getFrameworkContentById(frameworkId)?.code ?? null;
+}

@@ -4,7 +4,7 @@ import type { CertificationReadiness } from '@/lib/certifications/scoring';
 
 export type { CertificationReadiness } from '@/lib/certifications/scoring';
 
-export function useCertificationReadiness() {
+export function useCertificationReadiness(frameworkCode?: string) {
   const { currentOrganization } = useOrganization();
   const [readiness, setReadiness] = useState<CertificationReadiness | null>(
     null,
@@ -19,7 +19,10 @@ export function useCertificationReadiness() {
     }
     try {
       setLoading(true);
-      const response = await fetch('/api/certifications/readiness');
+      const qs = frameworkCode
+        ? `?framework_code=${encodeURIComponent(frameworkCode)}`
+        : '';
+      const response = await fetch(`/api/certifications/readiness${qs}`);
       if (!response.ok) {
         throw new Error('Failed to fetch readiness');
       }
@@ -32,7 +35,7 @@ export function useCertificationReadiness() {
     } finally {
       setLoading(false);
     }
-  }, [currentOrganization?.id]);
+  }, [currentOrganization?.id, frameworkCode]);
 
   useEffect(() => {
     fetchReadiness();

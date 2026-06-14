@@ -9,6 +9,11 @@ import {
   computePlatformHealth,
   getMappedRequirementCodes,
 } from '@/lib/certifications/platform-data';
+import { computeProbeHealth } from '@/lib/certifications/platform-probes';
+import {
+  isGeneralisedFramework,
+  getRequirementDef,
+} from '@/lib/certifications/frameworks';
 
 export async function GET(request: NextRequest) {
   try {
@@ -55,7 +60,7 @@ export async function GET(request: NextRequest) {
     // B Corp mappings exist today; other frameworks get theirs in their content
     // phase and return an empty set until then.
     let platformHealth = readiness.platformHealth;
-    if (readiness.hasCertification && frameworkCode === 'bcorp_2026') {
+    if (frameworkCode === 'bcorp_2026' && readiness.hasCertification) {
       try {
         const mapped = new Set(getMappedRequirementCodes());
         const codes = readiness.requirementStatuses
@@ -68,6 +73,19 @@ export async function GET(request: NextRequest) {
         );
       } catch (err) {
         console.error('computePlatformHealth failed:', err);
+      }
+    } else if (isGeneralisedFramework(frameworkCode)) {
+      // ISO 14001 / 50001 / EcoVadis: data-quality from the shared probes.
+      // Runs regardless of an active certification row, since these frameworks
+      // are tracked before a formal certification engagement exists.
+      try {
+        const items = readiness.requirementStatuses.map((rs) => ({
+          code: rs.code,
+          probe: getRequirementDef(frameworkCode, rs.code)?.probe ?? null,
+        }));
+        platformHealth = await computeProbeHealth(supabase, organizationId, items);
+      } catch (err) {
+        console.error('computeProbeHealth failed:', err);
       }
     }
 

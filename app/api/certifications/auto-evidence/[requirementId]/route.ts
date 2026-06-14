@@ -3,6 +3,11 @@ import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 import { resolveUserOrganization } from '@/lib/supabase/resolve-organization';
 import { getBcorpFrameworkId } from '@/lib/certifications/readiness';
 import { queryPlatformEvidence } from '@/lib/certifications/platform-data';
+import { queryProbeEvidence } from '@/lib/certifications/platform-probes';
+import {
+  frameworkCodeForId,
+  getRequirementDef,
+} from '@/lib/certifications/frameworks';
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -29,11 +34,10 @@ export async function GET(
     }
 
     const requirementId = params.requirementId;
-    const frameworkId = await getBcorpFrameworkId(supabase);
 
     const { data: reqRow } = await supabase
       .from('certification_framework_requirements')
-      .select('id, requirement_code')
+      .select('id, requirement_code, framework_id')
       .eq('id', requirementId)
       .maybeSingle();
 
@@ -44,11 +48,25 @@ export async function GET(
       );
     }
 
-    const platform = await queryPlatformEvidence(
-      supabase,
-      reqRow.requirement_code,
-      organizationId,
-    );
+    // The cert FK + evidence lookups are scoped to the requirement's own
+    // framework. For generalised frameworks (ISO 14001/50001, EcoVadis) the
+    // auto-evidence comes from the shared probes; for B Corp it comes from the
+    // B Corp module mappings.
+    const generalisedCode = frameworkCodeForId(reqRow.framework_id);
+    const frameworkId =
+      reqRow.framework_id ?? (await getBcorpFrameworkId(supabase));
+
+    const platform = generalisedCode
+      ? await queryProbeEvidence(
+          supabase,
+          getRequirementDef(generalisedCode, reqRow.requirement_code)?.probe ?? null,
+          organizationId,
+        )
+      : await queryPlatformEvidence(
+          supabase,
+          reqRow.requirement_code,
+          organizationId,
+        );
 
     if (!platform) {
       // No platform mapping for this requirement (manual evidence only).

@@ -83,6 +83,8 @@ interface GapAnalysisViewProps {
   focusRequirementId?: string | null;
   /** Increment to (re)open focusRequirementId's evidence dialog. */
   focusSignal?: number;
+  /** Framework code; routes per-requirement guidance and gates B Corp-only UI. */
+  frameworkCode?: string;
 }
 
 const STATUS_CONFIG: Record<
@@ -134,7 +136,9 @@ export function GapAnalysisView({
   blockingSignal = 0,
   focusRequirementId = null,
   focusSignal = 0,
+  frameworkCode = 'bcorp_2026',
 }: GapAnalysisViewProps) {
+  const isBcorp = frameworkCode === 'bcorp_2026';
   const [statusFilter, setStatusFilter] = useState<string>(
     initialBlockingOnly ? 'blocking' : 'all',
   );
@@ -185,6 +189,7 @@ export function GapAnalysisView({
   // until loaded; the API suppresses it entirely below a minimum cohort size.
   const [benchmark, setBenchmark] = useState<Record<string, number> | null>(null);
   useEffect(() => {
+    if (!isBcorp) return; // The peer benchmark cohort is B Corp-specific.
     let cancelled = false;
     (async () => {
       try {
@@ -199,7 +204,7 @@ export function GapAnalysisView({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isBcorp]);
 
   // "View blocking requirements" can be triggered while this view is already
   // mounted, so react to the signal rather than only the initial prop.
@@ -284,17 +289,19 @@ export function GapAnalysisView({
               <SelectItem value="future">Future</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={yearFilter} onValueChange={setYearFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Year band" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All year bands</SelectItem>
-              <SelectItem value="0">Year 0</SelectItem>
-              <SelectItem value="3">Year 3</SelectItem>
-              <SelectItem value="5">Year 5</SelectItem>
-            </SelectContent>
-          </Select>
+          {isBcorp && (
+            <Select value={yearFilter} onValueChange={setYearFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Year band" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All year bands</SelectItem>
+                <SelectItem value="0">Year 0</SelectItem>
+                <SelectItem value="3">Year 3</SelectItem>
+                <SelectItem value="5">Year 5</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
           {notApplicableCount > 0 && (
             <p className="text-xs text-muted-foreground">
               {notApplicableCount} requirement{notApplicableCount === 1 ? '' : 's'} hidden — they don&apos;t apply to your company size.
@@ -465,7 +472,7 @@ export function GapAnalysisView({
           {activeRequirement && readiness.frameworkId && (
             <div className="space-y-4">
               {(() => {
-                const g = getRequirementGuidance(activeRequirement.code, activeRequirement.topicArea);
+                const g = getRequirementGuidance(activeRequirement.code, activeRequirement.topicArea, frameworkCode);
                 return (
                   <div className="space-y-2.5 rounded-lg border border-border/60 bg-muted/30 p-3 text-xs">
                     <div>
