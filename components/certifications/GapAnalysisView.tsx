@@ -181,6 +181,26 @@ export function GapAnalysisView({
     void loadActions();
   }, [loadActions]);
 
+  // Anonymised peer benchmark: % of brands that meet each requirement. Null
+  // until loaded; the API suppresses it entirely below a minimum cohort size.
+  const [benchmark, setBenchmark] = useState<Record<string, number> | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/certifications/benchmark');
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!cancelled && json.available) setBenchmark(json.byRequirement ?? {});
+      } catch {
+        /* non-fatal */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // "View blocking requirements" can be triggered while this view is already
   // mounted, so react to the signal rather than only the initial prop.
   useEffect(() => {
@@ -392,6 +412,14 @@ export function GapAnalysisView({
                               <Badge variant="outline" className="text-xs">
                                 Year {rs.applicableFromYear}
                               </Badge>
+                            )}
+                            {benchmark && benchmark[rs.requirementId] != null && (
+                              <span
+                                className="text-[10px] text-muted-foreground"
+                                title="Share of brands pursuing B Corp 2026 that meet this requirement"
+                              >
+                                {benchmark[rs.requirementId]}% of brands meet this
+                              </span>
                             )}
                             {readiness.staleRequirementCodes?.includes(
                               rs.code,
