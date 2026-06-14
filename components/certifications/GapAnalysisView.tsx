@@ -39,6 +39,8 @@ import { RecertDeltaCard } from '@/components/certifications/RecertDeltaCard';
 import { DeadlinePlanCard } from '@/components/certifications/DeadlinePlanCard';
 import { EligibilityEstimateCard } from '@/components/certifications/EligibilityEstimateCard';
 import { MomentumCard } from '@/components/certifications/MomentumCard';
+import { RequirementActionPlan, type RequirementAction } from '@/components/certifications/RequirementActionPlan';
+import { useOrganization } from '@/lib/organizationContext';
 import { PlatformHealthPanel } from '@/components/certifications/PlatformHealthPanel';
 import type {
   CertificationReadiness,
@@ -140,6 +142,44 @@ export function GapAnalysisView({
   const [activeRequirement, setActiveRequirement] =
     useState<RequirementStatus | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  // Assigned actions (owner / due date / next step) per requirement, from the
+  // gap-analysis table — so "who's doing what by when" is visible on each card.
+  const { currentOrganization } = useOrganization();
+  const [actionByReq, setActionByReq] = useState<Record<string, RequirementAction>>({});
+
+  const loadActions = useMemo(
+    () => async () => {
+      const orgId = currentOrganization?.id;
+      if (!orgId || !readiness.frameworkId) return;
+      try {
+        const res = await fetch(
+          `/api/certifications/gap-analysis?organization_id=${orgId}&framework_id=${readiness.frameworkId}`,
+        );
+        if (!res.ok) return;
+        const json = await res.json();
+        const map: Record<string, RequirementAction> = {};
+        for (const a of json.analyses ?? []) {
+          if (a.assigned_to || a.target_completion_date || a.action_required) {
+            map[a.requirement_id] = {
+              assigned_to: a.assigned_to,
+              target_completion_date: a.target_completion_date,
+              action_required: a.action_required,
+              compliance_status: a.compliance_status,
+            };
+          }
+        }
+        setActionByReq(map);
+      } catch {
+        /* non-fatal */
+      }
+    },
+    [currentOrganization?.id, readiness.frameworkId],
+  );
+
+  useEffect(() => {
+    void loadActions();
+  }, [loadActions]);
 
   // "View blocking requirements" can be triggered while this view is already
   // mounted, so react to the signal rather than only the initial prop.
@@ -374,6 +414,16 @@ export function GapAnalysisView({
                             {rs.evidenceCount === 1 ? '' : 's'} ·{' '}
                             {rs.verifiedCount} verified
                           </p>
+                          {actionByReq[rs.requirementId] && (
+                            <p className="mt-1 text-xs text-[#7c3aed] dark:text-purple-400">
+                              {actionByReq[rs.requirementId].assigned_to
+                                ? `Owner: ${actionByReq[rs.requirementId].assigned_to}`
+                                : 'Action assigned'}
+                              {actionByReq[rs.requirementId].target_completion_date
+                                ? ` · due ${actionByReq[rs.requirementId].target_completion_date}`
+                                : ''}
+                            </p>
+                          )}
                         </div>
                         <Button
                           variant="outline"
@@ -456,6 +506,12 @@ export function GapAnalysisView({
                 onCreateEvidence={onCreateEvidence}
                 onDeleteEvidence={onDeleteEvidence}
                 onVerifyEvidence={onVerifyEvidence}
+              />
+              <RequirementActionPlan
+                frameworkId={readiness.frameworkId}
+                requirementId={activeRequirement.requirementId}
+                initial={actionByReq[activeRequirement.requirementId]}
+                onSaved={loadActions}
               />
             </div>
           )}
