@@ -112,6 +112,11 @@ export function CarbonBudgetWidget() {
             <h3 className="mt-0.5 text-sm font-semibold text-foreground">
               Actual vs budget this period
             </h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              A cap you set on emissions for the period, with a traffic light for
+              whether you are under or over. Think of it as a spending budget, but
+              for carbon.
+            </p>
           </div>
           {canEdit && !adding && (
             <Button size="sm" variant="outline" onClick={() => setAdding(true)}>

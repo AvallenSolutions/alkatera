@@ -70,8 +70,12 @@ export function CostIntensityCard() {
             Cost intensity
           </p>
           <h3 className="mt-0.5 text-sm font-semibold text-foreground">
-            Environmental cost per business unit
+            Cost per £1m sales, per person, per unit
           </h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Your environmental cost measured against revenue, headcount and units
+            made, so you can compare it fairly as the business grows.
+          </p>
         </header>
 
         {loading && (

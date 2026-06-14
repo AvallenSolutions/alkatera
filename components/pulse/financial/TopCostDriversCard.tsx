@@ -84,8 +84,13 @@ export function TopCostDriversCard() {
               Top cost drivers
             </p>
             <h3 className="mt-0.5 text-sm font-semibold text-foreground">
-              Where the money is going
+              Where your impact costs the most
             </h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Your activities ranked by the pound value of their environmental
+              impact, biggest first, so you can see where cutting impact saves
+              the most.
+            </p>
           </div>
           <div className="flex rounded-md border border-border/60 bg-card/40 p-0.5 text-[11px]">
             {(

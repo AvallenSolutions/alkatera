@@ -112,9 +112,10 @@ export function IssbDisclosureCard() {
               Climate-related financial disclosure, auto-populated
             </h3>
             <p className="mt-1 text-xs text-muted-foreground">
-              UK SDS (Sustainability Disclosure Standards) aligned with IFRS S2.
-              Quantitative sections are live; governance and risk narrative
-              scaffolds are ready for you to fill in.
+              A ready-started draft of the climate disclosure investors and
+              auditors ask for (IFRS S2 / UK SDS). The number sections are filled
+              from your data; the governance and risk narrative is yours to
+              complete.
             </p>
           </div>
           <div className="flex flex-shrink-0 items-center gap-2">

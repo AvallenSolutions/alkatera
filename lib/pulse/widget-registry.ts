@@ -294,26 +294,26 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
   'financial-footprint': withLayout({
     id: 'financial-footprint',
     label: 'What your impact costs',
-    description: 'Environmental cost of the last 12 months with year-on-year delta.',
+    description: 'The pound value of your last 12 months of carbon, water and waste.',
     footprint: '2x2',
     phase: 14,
     explainer: {
       what: 'The cost of your environmental impact over the last 12 months, in pounds.',
       why: 'Turns emissions and resource use into a number the whole business understands.',
-      source: 'Your live impact data multiplied by your shadow prices.',
+      source: 'Your live impact data multiplied by recognised damage-cost prices (what a tonne of CO2e or cubic metre of water costs society).',
     },
   }),
   'scenario-sensitivity': withLayout({
     id: 'scenario-sensitivity',
     label: 'Carbon price stress test',
     description:
-      'What happens to your annual carbon bill if UK ETS moves.',
+      'How much your annual carbon bill changes if carbon prices rise or fall.',
     footprint: '2x1',
     phase: 15,
     explainer: {
-      what: 'How your annual carbon bill changes if the carbon price moves.',
-      why: 'Shows how exposed you are to rising carbon costs.',
-      source: 'Your annual emissions priced at a range of illustrative carbon prices.',
+      what: 'Your annual emissions re-priced at higher and lower carbon prices.',
+      why: 'Shows how exposed your costs are if carbon gets more expensive in future.',
+      source: 'Your annual emissions multiplied by a range of illustrative carbon prices.',
       isEstimate: true,
     },
   }),
@@ -334,13 +334,13 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
     id: 'regulatory-exposure',
     label: 'Carbon taxes and levies',
     description:
-      'Estimated yearly cost of UK and EU carbon and packaging charges.',
+      'The carbon and packaging charges you actually have to pay each year.',
     footprint: '2x1',
     phase: 17,
     explainer: {
-      what: 'Your estimated annual liability under carbon and packaging regulations.',
-      why: "Quantifies the regulatory cost you're carrying so it isn't a surprise.",
-      source: 'Your emissions and packaging data assessed against UK ETS, EU CBAM, Plastic Packaging Tax and Packaging EPR.',
+      what: 'Your estimated annual bill under each UK carbon and packaging rule, with the ones you are exempt from marked "not applicable".',
+      why: "Tells you the regulatory cost you genuinely carry, so it isn't a surprise and you don't budget for charges that don't apply to you.",
+      source: 'Your emissions and packaging tonnage tested against each regime’s eligibility thresholds (UK ETS, UK CBAM, Plastic Packaging Tax and Packaging EPR).',
     },
   }),
   macc: withLayout({

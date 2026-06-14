@@ -86,8 +86,13 @@ export function ProductEnvironmentalCostWidget() {
               Environmental cost per unit
             </p>
             <h3 className="mt-0.5 text-sm font-semibold text-foreground">
-              What every SKU carries in externalities
+              The environmental cost built into each product
             </h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              For every product with a completed footprint, the pound value of
+              its carbon, water and land impact per unit, so you can see which
+              lines carry the most impact to make and sell.
+            </p>
           </div>
           <Link
             href="/products"

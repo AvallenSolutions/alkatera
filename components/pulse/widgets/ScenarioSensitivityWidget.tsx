@@ -92,8 +92,13 @@ export function ScenarioSensitivityWidget() {
               Carbon price sensitivity
             </p>
             <h3 className="mt-0.5 text-sm font-semibold text-foreground">
-              What happens if the UK ETS moves?
+              What rising carbon prices would cost you
             </h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Re-prices your annual emissions at higher and lower carbon prices,
+              so you can see how exposed your costs are if carbon gets more
+              expensive.
+            </p>
           </div>
         </header>
 

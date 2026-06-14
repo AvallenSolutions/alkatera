@@ -120,8 +120,9 @@ export function FinancialFootprintWidget() {
               Annual environmental liability
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground/80">
-              What your last 12 months would cost if carbon, water and waste were
-              fully priced.
+              The pound value of the carbon, water and waste behind your last 12
+              months, using recognised damage-cost prices. It puts your
+              environmental impact in money terms the whole business understands.
             </p>
           </div>
         </header>
