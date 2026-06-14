@@ -35,6 +35,10 @@ async function curate(ctx: SeedCtx): Promise<void> {
   // Normalise the lowercase "beer" category left by the Breww import.
   await svc.from('products').update({ product_category: 'Beer & Cider' }).eq('organization_id', orgId).eq('product_category', 'beer');
 
+  // A realistic company size so B Corp size-based requirement personalisation
+  // applies (a craft producer is a small employer despite contract facilities).
+  await svc.from('organizations').update({ company_size: '11-50 employees' }).eq('id', orgId);
+
   ctx.report.curation = `removed ${DELETE_PRODUCT_IDS.length} clutter products + ${JUNK_FACILITY_IDS.length} junk facilities`;
 }
 
