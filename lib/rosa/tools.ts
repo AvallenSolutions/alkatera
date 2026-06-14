@@ -310,6 +310,12 @@ export const ROSA_TOOLS: ToolDefinition[] = [
       "Identifies the single next most-valuable data-capture step for this org (e.g. 'add a supplier', 'complete the canning facility allocation', 'close reporting period X'). Use when the user asks 'what should I do next?'.",
     input_schema: { type: 'object', properties: {}, required: [] },
   },
+  {
+    name: 'get_bcorp_readiness',
+    description:
+      "Returns the org's B Corp 2026 certification readiness: submit-readiness % (Year 0) and whole-programme %, whether they can submit, the blocking-requirement count, the prioritised next actions (each with what it needs and why), and — for recertifying orgs — the count of new / changed / carried-over requirements. Use for ANY B Corp question: 'are we ready to certify?', 'what's our biggest gap?', 'what do I need for requirement X / Fair Work / climate?', 'what's changed for recertification?'.",
+    input_schema: { type: 'object', properties: {}, required: [] },
+  },
   // ───────────── Memory tools ─────────────
   {
     name: 'list_memories',
@@ -647,6 +653,8 @@ export async function executeTool(
         return await toolCompareToBenchmark(ctx, input as { product_id: string });
       case 'suggest_data_gaps':
         return await toolSuggestDataGaps(ctx);
+      case 'get_bcorp_readiness':
+        return await toolGetBcorpReadiness(ctx);
       case 'list_memories':
         return await toolListMemories(ctx);
       case 'save_memory':
@@ -768,6 +776,60 @@ async function toolGetDataReadiness(ctx: ToolContext): Promise<ToolResult> {
       audit: { tool: 'get_data_readiness', error: message },
     };
   }
+}
+
+async function toolGetBcorpReadiness(ctx: ToolContext): Promise<ToolResult> {
+  // Dynamic imports keep the server-only readiness module out of any client bundle.
+  const { calculateCertificationReadiness } = await import('@/lib/certifications/readiness');
+  const { topActions } = await import('@/lib/certifications/roadmap');
+  const { getRequirementGuidance } = await import('@/lib/certifications/requirement-guidance');
+  const { getRecertDelta } = await import('@/lib/certifications/recert-deltas');
+
+  const r = await calculateCertificationReadiness(ctx.supabase, ctx.organizationId);
+  if (!r.hasCertification) {
+    return {
+      is_error: false,
+      content: JSON.stringify({
+        hasCertification: false,
+        note: 'No B Corp certification has been started for this organisation yet. They can begin from the Certifications page.',
+      }),
+      audit: { tool: 'get_bcorp_readiness', hasCertification: false },
+    };
+  }
+
+  const nextActions = topActions(r, 5).map((a) => ({
+    code: a.code,
+    name: a.name,
+    bucket: a.bucket,
+    mandatory: a.mandatory,
+    reason: a.reason,
+    whatYouNeed: getRequirementGuidance(a.code, a.topicArea).summary,
+  }));
+
+  const summary: Record<string, unknown> = {
+    hasCertification: true,
+    certificationType: r.certificationType,
+    currentYearBand: r.currentYearBand,
+    readyToSubmit: r.isReadyToSubmit,
+    year0ReadinessPct: r.year0ReadinessPct,
+    programmeReadinessPct: r.programmeReadinessPct,
+    blockingCount: r.blockingRequirements.length,
+    nextActions,
+  };
+
+  if (r.certificationType === 'recertification') {
+    const counts: Record<string, number> = { new: 0, changed: 0, carried_over: 0 };
+    for (const rs of r.requirementStatuses.filter((x) => x.applicable !== false)) {
+      counts[getRecertDelta(rs.code, rs.topicArea, rs.applicableFromYear).kind] += 1;
+    }
+    summary.recertDeltas = counts;
+  }
+
+  return {
+    is_error: false,
+    content: JSON.stringify(summary),
+    audit: { tool: 'get_bcorp_readiness', year0ReadinessPct: r.year0ReadinessPct, readyToSubmit: r.isReadyToSubmit },
+  };
 }
 
 async function toolListFacilities(ctx: ToolContext): Promise<ToolResult> {
