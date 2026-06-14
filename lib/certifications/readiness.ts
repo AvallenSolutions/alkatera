@@ -7,6 +7,7 @@ import {
   normaliseBand,
   type CertMetaInput,
   type CertificationReadiness,
+  type OrgSize,
   type RequirementInput,
 } from './scoring';
 
@@ -28,6 +29,17 @@ interface RequirementRow {
   topic_area: string | null;
   order_index: number | null;
   applicable_from_year: number | null;
+  size_threshold: string | null;
+}
+
+/** Map the org's stored company_size to a coarse small/medium/large tier. */
+function mapOrgSize(companySize: string | null | undefined): OrgSize {
+  if (!companySize) return null;
+  const s = companySize.toLowerCase();
+  if (/large|enterprise|250|500|1000|201|1,000/.test(s)) return 'large';
+  if (/medium|50-|51|100|200|mid/.test(s)) return 'medium';
+  if (/small|micro|sme|1-|11-|startup|10/.test(s)) return 'small';
+  return null;
 }
 
 interface EvidenceRow {
@@ -88,10 +100,17 @@ export async function calculateCertificationReadiness(
       }
     : null;
 
+  const { data: orgRow } = await supabase
+    .from('organizations')
+    .select('company_size')
+    .eq('id', organizationId)
+    .maybeSingle();
+  const orgSize = mapOrgSize(orgRow?.company_size as string | null | undefined);
+
   const { data: reqData } = await supabase
     .from('certification_framework_requirements')
     .select(
-      'id, requirement_code, requirement_name, description, section, topic_area, order_index, applicable_from_year',
+      'id, requirement_code, requirement_name, description, section, topic_area, order_index, applicable_from_year, size_threshold',
     )
     .eq('framework_id', frameworkId)
     .order('order_index', { ascending: true });
@@ -109,6 +128,7 @@ export async function calculateCertificationReadiness(
     topicArea: r.topic_area ?? r.section ?? 'Other',
     orderIndex: r.order_index ?? 0,
     applicableFromYear: normaliseBand(r.applicable_from_year),
+    sizeThreshold: r.size_threshold,
   }));
 
   const reqIds = requirements.map((r) => r.id);
@@ -124,7 +144,7 @@ export async function calculateCertificationReadiness(
   }
 
   const result = withFramework(
-    computeReadiness(requirements, evidenceByReq, cert),
+    computeReadiness(requirements, evidenceByReq, cert, undefined, orgSize),
   );
 
   // Stale evidence (Phase 4): map stale links back to requirement codes.

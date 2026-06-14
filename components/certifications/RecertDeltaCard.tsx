@@ -26,10 +26,12 @@ export function RecertDeltaCard({
   readiness: CertificationReadiness;
   onOpen: (requirementId: string) => void;
 }) {
-  const tagged = readiness.requirementStatuses.map((rs) => ({
-    rs,
-    delta: getRecertDelta(rs.code, rs.topicArea, rs.applicableFromYear),
-  }));
+  const tagged = readiness.requirementStatuses
+    .filter((rs) => rs.applicable !== false)
+    .map((rs) => ({
+      rs,
+      delta: getRecertDelta(rs.code, rs.topicArea, rs.applicableFromYear),
+    }));
   const counts = { new: 0, changed: 0, carried_over: 0 } as Record<DeltaKind, number>;
   for (const t of tagged) counts[t.delta.kind] += 1;
 

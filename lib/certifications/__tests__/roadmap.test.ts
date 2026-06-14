@@ -4,7 +4,7 @@ import type { CertificationReadiness, RequirementStatus } from '../scoring';
 
 const rs = (code: string, year: 0 | 3 | 5, status: RequirementStatus['status']): RequirementStatus => ({
   requirementId: code, code, name: code, description: null, topicArea: 'Climate Action', section: null,
-  orderIndex: 0, applicableFromYear: year, status, evidenceCount: 0, verifiedCount: 0,
+  orderIndex: 0, applicableFromYear: year, status, evidenceCount: 0, verifiedCount: 0, applicable: true,
 });
 
 function readiness(reqs: RequirementStatus[], platformCodes: string[]): CertificationReadiness {

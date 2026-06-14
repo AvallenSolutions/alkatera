@@ -24,6 +24,26 @@ export interface RequirementStatus {
   status: RequirementStatusValue;
   evidenceCount: number;
   verifiedCount: number;
+  /** False when the requirement's size threshold excludes this org. */
+  applicable: boolean;
+}
+
+export type OrgSize = 'small' | 'medium' | 'large' | null | undefined;
+
+const SIZE_RANK: Record<string, number> = { small: 0, medium: 1, large: 2 };
+const THRESHOLD_MIN: Record<string, number> = { all: 0, medium_large: 1, large_only: 2 };
+
+/**
+ * Whether a requirement applies given its size threshold and the org's size.
+ * Unknown org size never hides a requirement (fail safe towards showing it).
+ */
+export function requirementApplies(
+  sizeThreshold: string | null | undefined,
+  orgSize: OrgSize,
+): boolean {
+  if (!sizeThreshold || sizeThreshold === 'all') return true;
+  if (orgSize == null) return true;
+  return (SIZE_RANK[orgSize] ?? 0) >= (THRESHOLD_MIN[sizeThreshold] ?? 0);
 }
 
 export interface TopicYearBand {
@@ -164,6 +184,7 @@ export interface RequirementInput {
   topicArea: string;
   orderIndex: number;
   applicableFromYear: YearBand;
+  sizeThreshold?: string | null;
 }
 
 export interface CertMetaInput {
@@ -183,6 +204,7 @@ export function computeReadiness(
   evidenceByReq: Record<string, Array<string | null>>,
   cert: CertMetaInput | null,
   today: Date = new Date(),
+  orgSize: OrgSize = null,
 ): CertificationReadiness {
   const base: CertificationReadiness = {
     hasCertification: !!cert,
@@ -220,10 +242,15 @@ export function computeReadiness(
       status: evaluateStatus(links, r.applicableFromYear, currentYearBand),
       evidenceCount: links.length,
       verifiedCount: links.filter((s) => s === 'verified').length,
+      applicable: requirementApplies(r.sizeThreshold, orgSize),
     };
   });
 
-  const foundationReqs = requirementStatuses.filter(
+  // Everything below counts only requirements that actually apply to this org,
+  // so size-excluded requirements never penalise readiness or block submission.
+  const applicableStatuses = requirementStatuses.filter((rs) => rs.applicable);
+
+  const foundationReqs = applicableStatuses.filter(
     (rs) => rs.topicArea === 'foundation',
   );
   const foundationComplete =
@@ -235,20 +262,21 @@ export function computeReadiness(
   );
   const riskToolComplete = riskTool?.status === 'passed';
 
-  const blockingRequirements = requirementStatuses.filter(
+  const blockingRequirements = applicableStatuses.filter(
     (rs) => rs.applicableFromYear === 0 && rs.status !== 'passed',
   );
   const isReadyToSubmit = blockingRequirements.length === 0;
 
   // Two honest readiness figures: Year-0 (submit-readiness) and the whole
-  // Year 0/3/5 programme. Only `passed` (human-verified) counts.
-  const year0Reqs = requirementStatuses.filter((rs) => rs.applicableFromYear === 0);
+  // Year 0/3/5 programme. Only `passed` (human-verified) counts; only
+  // applicable requirements are in the denominator.
+  const year0Reqs = applicableStatuses.filter((rs) => rs.applicableFromYear === 0);
   const year0ReadinessPct = isReadyToSubmit
     ? 100
     : pct(year0Reqs.filter((rs) => rs.status === 'passed').length, year0Reqs.length);
   const programmeReadinessPct = pct(
-    requirementStatuses.filter((rs) => rs.status === 'passed').length,
-    requirementStatuses.length,
+    applicableStatuses.filter((rs) => rs.status === 'passed').length,
+    applicableStatuses.length,
   );
 
   const topicAreas = Array.from(
@@ -263,7 +291,7 @@ export function computeReadiness(
   ];
 
   const topicSummaries: TopicSummary[] = orderedTopics.map((topicArea) => {
-    const inTopic = requirementStatuses.filter(
+    const inTopic = applicableStatuses.filter(
       (rs) => rs.topicArea === topicArea,
     );
     const byYear = {} as Record<YearBand, TopicYearBand>;

@@ -45,7 +45,7 @@ export function buildRoadmap(readiness: CertificationReadiness): NextAction[] {
   }
 
   const candidates = readiness.requirementStatuses.filter(
-    (rs) => rs.status === 'in_progress' || rs.status === 'not_started',
+    (rs) => rs.applicable !== false && (rs.status === 'in_progress' || rs.status === 'not_started'),
   );
 
   const actions = candidates.map((rs): NextAction & { rank: number } => {

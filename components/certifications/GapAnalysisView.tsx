@@ -160,7 +160,14 @@ export function GapAnalysisView({
   const lockImpactTopics =
     readiness.certificationType === 'new' && !readiness.foundationComplete;
 
+  // Requirements that don't apply to this org's size are hidden so users only
+  // see what's relevant to them.
+  const notApplicableCount = readiness.requirementStatuses.filter(
+    (rs) => rs.applicable === false,
+  ).length;
+
   const matchesFilters = (rs: RequirementStatus): boolean => {
+    if (rs.applicable === false) return false;
     if (statusFilter === 'blocking' && !blockingIds.has(rs.requirementId)) {
       return false;
     }
@@ -214,6 +221,11 @@ export function GapAnalysisView({
               <SelectItem value="5">Year 5</SelectItem>
             </SelectContent>
           </Select>
+          {notApplicableCount > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {notApplicableCount} requirement{notApplicableCount === 1 ? '' : 's'} hidden — they don&apos;t apply to your company size.
+            </p>
+          )}
         </CardContent>
       </Card>
 
