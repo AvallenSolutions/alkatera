@@ -59,11 +59,20 @@ export interface CertificationReadiness {
   foundationComplete: boolean;
   riskToolComplete: boolean;
   isReadyToSubmit: boolean;
+  /** % of Year-0 requirements passed — the "can we submit?" number. */
+  year0ReadinessPct: number;
+  /** % of every requirement (Year 0/3/5) passed — the whole-programme view. */
+  programmeReadinessPct: number;
   blockingRequirements: RequirementStatus[];
   requirementStatuses: RequirementStatus[];
   topicSummaries: TopicSummary[];
   staleRequirementCodes?: string[];
   recertPrepActive?: boolean;
+}
+
+/** passed / total as a 0-100 integer; 0 when there are no requirements. */
+function pct(passed: number, total: number): number {
+  return total > 0 ? Math.round((passed / total) * 100) : 0;
 }
 
 /**
@@ -186,6 +195,8 @@ export function computeReadiness(
     foundationComplete: false,
     riskToolComplete: false,
     isReadyToSubmit: false,
+    year0ReadinessPct: 0,
+    programmeReadinessPct: 0,
     blockingRequirements: [],
     requirementStatuses: [],
     topicSummaries: [],
@@ -229,6 +240,17 @@ export function computeReadiness(
   );
   const isReadyToSubmit = blockingRequirements.length === 0;
 
+  // Two honest readiness figures: Year-0 (submit-readiness) and the whole
+  // Year 0/3/5 programme. Only `passed` (human-verified) counts.
+  const year0Reqs = requirementStatuses.filter((rs) => rs.applicableFromYear === 0);
+  const year0ReadinessPct = isReadyToSubmit
+    ? 100
+    : pct(year0Reqs.filter((rs) => rs.status === 'passed').length, year0Reqs.length);
+  const programmeReadinessPct = pct(
+    requirementStatuses.filter((rs) => rs.status === 'passed').length,
+    requirementStatuses.length,
+  );
+
   const topicAreas = Array.from(
     new Set(requirementStatuses.map((rs) => rs.topicArea)),
   );
@@ -261,6 +283,8 @@ export function computeReadiness(
     foundationComplete,
     riskToolComplete,
     isReadyToSubmit,
+    year0ReadinessPct,
+    programmeReadinessPct,
     blockingRequirements,
     requirementStatuses,
     topicSummaries,
