@@ -47,16 +47,24 @@ interface EvidenceRow {
   verification_status: string | null;
 }
 
-/** Resolve the active B Corp 2026 framework id. */
-export async function getBcorpFrameworkId(
+/** Resolve a framework id by its code (defaults to B Corp 2026). */
+export async function getFrameworkId(
   supabase: SupabaseClient,
+  frameworkCode: string = BCORP_2026_FRAMEWORK_CODE,
 ): Promise<string | null> {
   const { data } = await supabase
     .from('certification_frameworks')
     .select('id')
-    .eq('framework_code', BCORP_2026_FRAMEWORK_CODE)
+    .eq('framework_code', frameworkCode)
     .maybeSingle();
   return data?.id ?? null;
+}
+
+/** Resolve the active B Corp 2026 framework id (back-compat alias). */
+export async function getBcorpFrameworkId(
+  supabase: SupabaseClient,
+): Promise<string | null> {
+  return getFrameworkId(supabase, BCORP_2026_FRAMEWORK_CODE);
 }
 
 /**
@@ -66,8 +74,9 @@ export async function calculateCertificationReadiness(
   supabase: SupabaseClient,
   organizationId: string,
   certificationId?: string | null,
+  frameworkCode: string = BCORP_2026_FRAMEWORK_CODE,
 ): Promise<CertificationReadiness> {
-  const frameworkId = await getBcorpFrameworkId(supabase);
+  const frameworkId = await getFrameworkId(supabase, frameworkCode);
   if (!frameworkId) return computeReadiness([], {}, null);
   const withFramework = (r: CertificationReadiness): CertificationReadiness => ({
     ...r,
@@ -178,8 +187,9 @@ export async function persistScoreHistory(
   supabase: SupabaseClient,
   organizationId: string,
   readiness: CertificationReadiness,
+  frameworkCode: string = BCORP_2026_FRAMEWORK_CODE,
 ): Promise<void> {
-  const frameworkId = await getBcorpFrameworkId(supabase);
+  const frameworkId = readiness.frameworkId ?? (await getFrameworkId(supabase, frameworkCode));
   if (!frameworkId) return;
 
   const evaluated = readiness.requirementStatuses.filter(

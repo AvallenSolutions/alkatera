@@ -32,25 +32,30 @@ export async function GET(request: NextRequest) {
 
     const certificationId =
       request.nextUrl.searchParams.get('certification_id') || undefined;
+    const frameworkCode =
+      request.nextUrl.searchParams.get('framework_code') || 'bcorp_2026';
 
     const readiness = await calculateCertificationReadiness(
       supabase,
       organizationId,
       certificationId,
+      frameworkCode,
     );
 
     // Best-effort history write; never block the response on it.
     if (readiness.hasCertification) {
       try {
-        await persistScoreHistory(supabase, organizationId, readiness);
+        await persistScoreHistory(supabase, organizationId, readiness, frameworkCode);
       } catch (err) {
         console.error('persistScoreHistory failed:', err);
       }
     }
 
-    // Data quality (Platform Health) for mapped requirements present here.
+    // Data quality (Platform Health) from the auto-evidence mappings. Only the
+    // B Corp mappings exist today; other frameworks get theirs in their content
+    // phase and return an empty set until then.
     let platformHealth = readiness.platformHealth;
-    if (readiness.hasCertification) {
+    if (readiness.hasCertification && frameworkCode === 'bcorp_2026') {
       try {
         const mapped = new Set(getMappedRequirementCodes());
         const codes = readiness.requirementStatuses
