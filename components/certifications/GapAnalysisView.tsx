@@ -38,6 +38,7 @@ import { RoadmapCard } from '@/components/certifications/RoadmapCard';
 import { RecertDeltaCard } from '@/components/certifications/RecertDeltaCard';
 import { DeadlinePlanCard } from '@/components/certifications/DeadlinePlanCard';
 import { EligibilityEstimateCard } from '@/components/certifications/EligibilityEstimateCard';
+import { MomentumCard } from '@/components/certifications/MomentumCard';
 import { PlatformHealthPanel } from '@/components/certifications/PlatformHealthPanel';
 import type {
   CertificationReadiness,
@@ -229,6 +230,8 @@ export function GapAnalysisView({
           )}
         </CardContent>
       </Card>
+
+      <MomentumCard />
 
       {readiness.certificationType === 'new' && (
         <EligibilityEstimateCard readiness={readiness} />
