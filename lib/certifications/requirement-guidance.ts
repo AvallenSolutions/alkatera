@@ -5,6 +5,8 @@
 // Lookup order: exact requirement code -> topic-area default -> generic default.
 // We deliberately keep copy jargon-free and concrete (British English).
 
+import { getRequirementDef } from '@/lib/certifications/frameworks';
+
 export interface RequirementGuidance {
   /** What the requirement is really asking for, in plain terms. */
   summary: string;
@@ -157,7 +159,14 @@ const GENERIC: RequirementGuidance = {
 export function getRequirementGuidance(
   code: string | null | undefined,
   topicArea: string | null | undefined,
+  frameworkCode?: string | null,
 ): RequirementGuidance {
+  // Non-B-Corp frameworks carry their guidance inline in the framework registry.
+  if (frameworkCode && frameworkCode !== 'bcorp_2026') {
+    const def = getRequirementDef(frameworkCode, code);
+    if (def) return { summary: def.summary, evidence: def.evidence, pitfalls: def.pitfalls };
+    return GENERIC;
+  }
   const base = (code && BY_CODE[code]) || (topicArea && BY_TOPIC[topicArea]) || GENERIC;
   const template = code ? TEMPLATES[code] : undefined;
   return template ? { ...base, template } : base;
