@@ -34,6 +34,7 @@ import {
 import { EvidenceLinker } from '@/components/certifications/EvidenceLinker';
 import { AutoEvidencePanel } from '@/components/certifications/AutoEvidencePanel';
 import { getRequirementGuidance } from '@/lib/certifications/requirement-guidance';
+import { RoadmapCard } from '@/components/certifications/RoadmapCard';
 import { PlatformHealthPanel } from '@/components/certifications/PlatformHealthPanel';
 import type {
   CertificationReadiness,
@@ -213,6 +214,14 @@ export function GapAnalysisView({
           </Select>
         </CardContent>
       </Card>
+
+      <RoadmapCard
+        readiness={readiness}
+        onOpen={(id) => {
+          const rs = readiness.requirementStatuses.find((r) => r.requirementId === id);
+          if (rs) setActiveRequirement(rs);
+        }}
+      />
 
       {readiness.platformHealth && (
         <PlatformHealthPanel entries={readiness.platformHealth} />
