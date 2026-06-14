@@ -15,10 +15,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Loader2, Send, Sparkles, Wrench } from 'lucide-react';
+import { ArrowRight, Loader2, Send, Sparkles } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 
 interface ToolChip {
   name: string;
@@ -226,9 +225,6 @@ export function AskRosaWidget({ collapsed = false }: { collapsed?: boolean } = {
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-[#ccff00]" />
             <h3 className="text-sm font-semibold text-foreground">Ask Rosa</h3>
-            <span className="rounded-full bg-[#ccff00]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#ccff00]">
-              Tool-aware
-            </span>
           </div>
           <Link
             href="/rosa"
@@ -307,27 +303,10 @@ function TurnBubble({ turn }: { turn: Turn }) {
       </div>
     );
   }
+  // Tool-call activity is tracked internally for debugging but no longer shown
+  // to users — the "spanner" chips were noise on the dashboard.
   return (
     <div className="space-y-1.5">
-      {turn.tools && turn.tools.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {turn.tools.map((t, i) => (
-            <span
-              key={i}
-              className={cn(
-                'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider',
-                t.is_error
-                  ? 'border-red-500/40 bg-red-500/10 text-red-500'
-                  : 'border-border/60 bg-muted/40 text-muted-foreground',
-              )}
-              title={t.preview}
-            >
-              <Wrench className="h-2.5 w-2.5" />
-              {t.name}
-            </span>
-          ))}
-        </div>
-      )}
       <div className="rounded-2xl rounded-tl-sm bg-card/60 px-3 py-2 text-sm text-foreground whitespace-pre-wrap">
         {turn.text || (
           <span className="text-muted-foreground">…</span>

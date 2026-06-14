@@ -220,6 +220,10 @@ async function seedSnapshots(ctx: SeedCtx): Promise<void> {
     products_assessed: 9,
   });
 
+  // Drop any stale AI insight (e.g. an old "no data recorded yet" headline that
+  // now contradicts the seeded data); a fresh, accurate one regenerates later.
+  await svc.from('dashboard_insights').delete().eq('organization_id', orgId);
+
   ctx.report.snapshots = `${metricRows.length} metric + ${esgRows.length} ESG + ${vitalityRows.length} vitality snapshots`;
 }
 

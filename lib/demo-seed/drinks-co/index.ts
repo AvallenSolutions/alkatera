@@ -84,6 +84,7 @@ export async function resetDrinksCoDemo(svc: SupabaseClient): Promise<SeedOutcom
   await clear('xero_connections', 'organization_id', orgId);
   await clear('operational_change_events', 'organization_id', orgId);
   await clear('dashboard_anomalies', 'organization_id', orgId);
+  await clear('dashboard_insights', 'organization_id', orgId);
   await svc.from('orchard_growing_profiles').delete().eq('orchard_id', ORCHARD_ID);
   await svc.from('orchards').delete().eq('id', ORCHARD_ID);
   // PCFs for the keeper products: clear children first (FKs don't cascade).
