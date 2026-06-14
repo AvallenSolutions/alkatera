@@ -88,22 +88,47 @@ export async function GET(request: NextRequest) {
     // "assumed" flags so the UI can nudge the user to fill it in.
     const { data: pcfs } = await svc
       .from('product_carbon_footprints')
-      .select('id')
+      .select('id, product_id')
       .eq('organization_id', organizationId)
       .eq('status', 'completed');
     const pcfIds = (pcfs ?? []).map(p => p.id);
+    const productByPcf = new Map<string, number>();
+    for (const p of pcfs ?? []) if (p.product_id != null) productByPcf.set(p.id as string, Number(p.product_id));
+
+    // Annual production units per product, so per-unit packaging mass scales to
+    // an annual tonnage. Prefer logged production; fall back to the product's
+    // declared annual volume; 0 means we can't annualise (stays conservative).
+    const annualUnitsByProduct = new Map<number, number>();
+    const { data: prodLogs } = await svc
+      .from('production_logs')
+      .select('product_id, units_produced, date')
+      .eq('organization_id', organizationId)
+      .gte('date', fmt(start));
+    for (const r of prodLogs ?? []) {
+      const pid = Number(r.product_id);
+      const u = Number(r.units_produced ?? 0);
+      if (pid && Number.isFinite(u) && u > 0) annualUnitsByProduct.set(pid, (annualUnitsByProduct.get(pid) ?? 0) + u);
+    }
+    const { data: prods } = await svc
+      .from('products')
+      .select('id, annual_production_volume')
+      .eq('organization_id', organizationId);
+    for (const p of prods ?? []) {
+      const pid = Number(p.id);
+      if (!annualUnitsByProduct.has(pid) && Number(p.annual_production_volume) > 0) {
+        annualUnitsByProduct.set(pid, Number(p.annual_production_volume));
+      }
+    }
 
     let plasticPackagingT = 0;
     let recycledShare = 0;
     const byMaterial: Record<string, number> = {};
 
     if (pcfIds.length > 0) {
-      // `mass_kg` + an optional `material` column. Different schemas exist --
-      // we select widely and reduce defensively.
       const { data: materials } = await svc
         .from('product_carbon_footprint_materials')
         .select(
-          'packaging_category, quantity, unit, data_source, packaging_material',
+          'product_carbon_footprint_id, packaging_category, quantity, unit, data_source, packaging_material',
         )
         .in('product_carbon_footprint_id', pcfIds)
         .not('packaging_category', 'is', null);
@@ -112,23 +137,27 @@ export async function GET(request: NextRequest) {
       let plasticRecycledMass = 0;
       for (const row of (materials ?? []) as Array<any>) {
         const mat = ((row.packaging_material ?? '') as string).toLowerCase();
-        // Convert quantity -> tonnes. Only accept rows with explicit mass-like units.
+        // Per-unit mass -> tonnes (only explicit mass-like units).
         const unit = ((row.unit ?? '') as string).toLowerCase();
-        let tonnes = 0;
+        let perUnitT = 0;
         const q = Number(row.quantity ?? 0);
         if (!Number.isFinite(q) || q <= 0) continue;
-        if (unit === 'kg' || unit === 'kilogram' || unit === 'kilograms') tonnes = q / 1000;
-        else if (unit === 't' || unit === 'tonne' || unit === 'tonnes') tonnes = q;
-        else if (unit === 'g' || unit === 'gram' || unit === 'grams') tonnes = q / 1_000_000;
+        if (unit === 'kg' || unit === 'kilogram' || unit === 'kilograms') perUnitT = q / 1000;
+        else if (unit === 't' || unit === 'tonne' || unit === 'tonnes') perUnitT = q;
+        else if (unit === 'g' || unit === 'gram' || unit === 'grams') perUnitT = q / 1_000_000;
         else continue;
+
+        // Scale per-unit packaging mass by the product's annual production.
+        const pid = productByPcf.get(row.product_carbon_footprint_id as string);
+        const annualUnits = pid != null ? (annualUnitsByProduct.get(pid) ?? 0) : 0;
+        const tonnes = perUnitT * annualUnits;
+        if (tonnes <= 0) continue;
 
         const bucket = resolveMaterialBucket(mat, row.packaging_category as string);
         if (bucket) byMaterial[bucket] = (byMaterial[bucket] ?? 0) + tonnes;
 
         if (bucket === 'plastic') {
           plasticMass += tonnes;
-          // Heuristic: if the data_source is 'supplier' we trust the material
-          // label; if 'recycled' is in the name, count as recycled.
           if (/recyc/.test(mat)) plasticRecycledMass += tonnes;
         }
       }
@@ -138,11 +167,13 @@ export async function GET(request: NextRequest) {
 
     const input: RegulatoryInput = {
       annual_tonnes_co2e: annualTonnes,
-      uk_ets_free_allocation_t: 0, // no free allocation field in DB yet
+      uk_ets_covered: false,       // drinks producers are below the ETS threshold
+      uk_ets_free_allocation_t: 0,
       cbam_embedded_tonnes: 0,     // no CBAM scope field in DB yet
       plastic_packaging_tonnes: plasticPackagingT,
       plastic_recycled_share: recycledShare,
       packaging_by_material_t: byMaterial,
+      // annual_turnover_gbp omitted — EPR size test falls back to tonnage
     };
 
     const result = calculateRegulatoryExposure(input);

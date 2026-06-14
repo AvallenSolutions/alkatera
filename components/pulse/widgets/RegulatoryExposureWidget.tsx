@@ -23,6 +23,7 @@ interface RegulatoryLine {
   source: string;
   fix_href: string;
   assumed: boolean;
+  applies?: boolean;
 }
 
 interface ApiPayload {
@@ -73,8 +74,10 @@ export function RegulatoryExposureWidget() {
             UK ETS, CBAM, Plastic Tax, Packaging EPR
           </h3>
           <p className="mt-1 text-xs text-muted-foreground">
-            Annual £ liability under the live regimes hitting drinks businesses
-            right now. Fill in the gaps to sharpen the numbers.
+            Your estimated annual £ liability under each UK/EU carbon and
+            packaging regime. Each line shows how it&apos;s worked out; regimes
+            you&apos;re out of scope for or exempt from read as
+            &ldquo;Not applicable&rdquo; with the reason.
           </p>
         </header>
 
@@ -136,6 +139,11 @@ function RegulatoryLineEl({ line }: { line: RegulatoryLine }) {
       <div className="flex items-baseline justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-foreground">{line.label}</span>
+          {line.applies === false && !line.assumed && (
+            <span className="rounded-full border border-border/60 bg-muted/40 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Not applicable
+            </span>
+          )}
           {line.assumed && (
             <span className="flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-500">
               <Info className="h-2.5 w-2.5" />
