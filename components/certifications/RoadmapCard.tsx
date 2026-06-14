@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { CertificationReadiness } from '@/lib/certifications/scoring';
 import { bucketLabel, topActions, type NextActionBucket } from '@/lib/certifications/roadmap';
+import { OnePagerButton } from '@/components/certifications/OnePagerButton';
 
 const BUCKET_STYLE: Record<NextActionBucket, string> = {
   confirm: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
@@ -37,7 +38,10 @@ export function RoadmapCard({
       <CardContent className="space-y-4 p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 className="text-sm font-semibold text-foreground">Your next steps</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-foreground">Your next steps</h3>
+              <OnePagerButton />
+            </div>
             <p className="mt-0.5 text-xs text-muted-foreground">
               The most useful things to do next, easiest and most urgent first.
             </p>
