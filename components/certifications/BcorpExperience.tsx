@@ -33,6 +33,7 @@ import {
   Award,
   ArrowLeft,
   RefreshCw,
+  LayoutDashboard,
   Target,
   FileText,
   Package,
@@ -52,7 +53,7 @@ import { RiskToolWizard } from '@/components/certifications/RiskToolWizard';
 import { PreAuditChecklist } from '@/components/certifications/PreAuditChecklist';
 import { AuditTimeline } from '@/components/certifications/AuditTimeline';
 import { ClarificationRequests } from '@/components/certifications/ClarificationRequests';
-import { UpcomingRequirements } from '@/components/certifications/UpcomingRequirements';
+import { BcorpOverview } from '@/components/certifications/BcorpOverview';
 import { SupplyChainEsgCard } from '@/components/certifications/SupplyChainEsgCard';
 import { StandardsBanner } from '@/components/certifications/StandardsBanner';
 import { RecertBanner } from '@/components/certifications/RecertBanner';
@@ -95,8 +96,18 @@ export function BcorpExperience() {
     refetch: refetchReadiness,
   } = useCertificationReadiness();
 
-  const [activeTab, setActiveTab] = useState('gap-analysis');
+  const [activeTab, setActiveTab] = useState('overview');
   const [blockingSignal, setBlockingSignal] = useState(0);
+  const [focusRequirementId, setFocusRequirementId] = useState<string | null>(null);
+  const [focusSignal, setFocusSignal] = useState(0);
+
+  // From the Overview tab's roadmap/recert cards: jump to a requirement in the
+  // Requirements tab and open its evidence dialog.
+  const openRequirement = (id: string) => {
+    setFocusRequirementId(id);
+    setFocusSignal((n) => n + 1);
+    setActiveTab('requirements');
+  };
   const [journeyOpen, setJourneyOpen] = useState(false);
   const [riskToolOpen, setRiskToolOpen] = useState(false);
   const [checklistReady, setChecklistReady] = useState(false);
@@ -157,7 +168,7 @@ export function BcorpExperience() {
     ),
   );
   useEffect(() => {
-    if (hasSubmittedPackage) setActiveTab('audit-packages');
+    if (hasSubmittedPackage) setActiveTab('audit');
   }, [hasSubmittedPackage]);
 
   const handleCreateEvidence = async (
@@ -183,7 +194,7 @@ export function BcorpExperience() {
     if (!bcorpFrameworkId) return;
     await startCertification(bcorpFrameworkId, choice);
     await Promise.all([refetch(), refetchReadiness(), refetchScores()]);
-    setActiveTab('gap-analysis');
+    setActiveTab('overview');
   };
 
   const handleExportPackage = async (packageId: string) => {
@@ -256,9 +267,9 @@ export function BcorpExperience() {
           />
           <ReadinessBanner
             readiness={readiness}
-            onPrepareAudit={() => setActiveTab('audit-packages')}
+            onPrepareAudit={() => setActiveTab('audit')}
             onViewBlocking={() => {
-              setActiveTab('gap-analysis');
+              setActiveTab('requirements');
               setBlockingSignal((n) => n + 1);
             }}
           />
@@ -267,63 +278,52 @@ export function BcorpExperience() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList>
-          <TabsTrigger value="gap-analysis" className="flex items-center gap-2">
+          <TabsTrigger value="overview" className="flex items-center gap-2">
+            <LayoutDashboard className="h-4 w-4" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="requirements" className="flex items-center gap-2">
             <Target className="h-4 w-4" />
-            Gap Analysis
+            Requirements
           </TabsTrigger>
           <TabsTrigger value="evidence" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             Evidence
           </TabsTrigger>
-          <TabsTrigger
-            value="audit-packages"
-            className="flex items-center gap-2"
-          >
+          <TabsTrigger value="audit" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
-            Audit Packages
+            Audit
           </TabsTrigger>
         </TabsList>
 
         {/* Gap Analysis Tab */}
-        <TabsContent value="gap-analysis">
+        {/* Overview Tab — at-a-glance: where we stand + what to do next */}
+        <TabsContent value="overview">
           {readiness && readiness.hasCertification ? (
             <div className="space-y-6">
               <StandardsBanner onApplied={() => refetchReadiness()} />
               <RecertBanner active={!!readiness.recertPrepActive} />
-              {isCertified && <UpcomingRequirements readiness={readiness} />}
-              <GapAnalysisView
+              <BcorpOverview
                 readiness={readiness}
-                loading={readinessLoading}
-                evidence={evidence}
-                onCreateEvidence={handleCreateEvidence}
-                onDeleteEvidence={handleDeleteEvidence}
-                onVerifyEvidence={handleVerifyEvidence}
-                onOpenRiskTool={() => setRiskToolOpen(true)}
-                onRefresh={async () => {
-                  await Promise.all([
-                    refetchReadiness(),
-                    refetchEvidence(),
-                    refetchScores(),
-                  ]);
-                }}
-                blockingSignal={blockingSignal}
+                certified={isCertified}
+                onOpenRequirement={openRequirement}
               />
-              <SupplyChainEsgCard />
             </div>
           ) : (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Target className="h-5 w-5 text-blue-600" />
-                  Gap Analysis
+                  <Award className="h-5 w-5 text-amber-600" />
+                  Get started
                 </CardTitle>
                 <CardDescription>
-                  Start your B Corp certification to see a live gap analysis
+                  Begin your B Corp certification to see your readiness and a
+                  guided plan.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="py-8 text-center text-muted-foreground">
-                  <Target className="mx-auto mb-2 h-12 w-12 opacity-50" />
+                  <Award className="mx-auto mb-2 h-12 w-12 opacity-50" />
                   <p>No active B Corp certification yet.</p>
                   <Button
                     className="mt-4"
@@ -338,8 +338,41 @@ export function BcorpExperience() {
           )}
         </TabsContent>
 
+        {/* Requirements Tab — the working list of every requirement */}
+        <TabsContent value="requirements">
+          {readiness && readiness.hasCertification ? (
+            <GapAnalysisView
+              readiness={readiness}
+              loading={readinessLoading}
+              evidence={evidence}
+              onCreateEvidence={handleCreateEvidence}
+              onDeleteEvidence={handleDeleteEvidence}
+              onVerifyEvidence={handleVerifyEvidence}
+              onOpenRiskTool={() => setRiskToolOpen(true)}
+              onRefresh={async () => {
+                await Promise.all([
+                  refetchReadiness(),
+                  refetchEvidence(),
+                  refetchScores(),
+                ]);
+              }}
+              blockingSignal={blockingSignal}
+              focusRequirementId={focusRequirementId}
+              focusSignal={focusSignal}
+            />
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                <Target className="mx-auto mb-2 h-12 w-12 opacity-50" />
+                <p>Start your certification from the Overview tab to see your requirements.</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
         {/* Evidence Tab */}
-        <TabsContent value="evidence">
+        <TabsContent value="evidence" className="space-y-6">
+          <SupplyChainEsgCard />
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -488,7 +521,7 @@ export function BcorpExperience() {
         </TabsContent>
 
         {/* Audit Packages Tab */}
-        <TabsContent value="audit-packages" className="space-y-6">
+        <TabsContent value="audit" className="space-y-6">
           {readiness?.isReadyToSubmit && (
             <PreAuditChecklist onReadyChange={setChecklistReady} />
           )}

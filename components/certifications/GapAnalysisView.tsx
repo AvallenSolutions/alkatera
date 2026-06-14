@@ -34,14 +34,8 @@ import {
 import { EvidenceLinker } from '@/components/certifications/EvidenceLinker';
 import { AutoEvidencePanel } from '@/components/certifications/AutoEvidencePanel';
 import { getRequirementGuidance } from '@/lib/certifications/requirement-guidance';
-import { RoadmapCard } from '@/components/certifications/RoadmapCard';
-import { RecertDeltaCard } from '@/components/certifications/RecertDeltaCard';
-import { DeadlinePlanCard } from '@/components/certifications/DeadlinePlanCard';
-import { EligibilityEstimateCard } from '@/components/certifications/EligibilityEstimateCard';
-import { MomentumCard } from '@/components/certifications/MomentumCard';
 import { RequirementActionPlan, type RequirementAction } from '@/components/certifications/RequirementActionPlan';
 import { useOrganization } from '@/lib/organizationContext';
-import { PlatformHealthPanel } from '@/components/certifications/PlatformHealthPanel';
 import type {
   CertificationReadiness,
   RequirementStatus,
@@ -85,6 +79,10 @@ interface GapAnalysisViewProps {
   initialBlockingOnly?: boolean;
   /** Increment to force the blocking-only filter + scroll into view. */
   blockingSignal?: number;
+  /** A requirement to open (from the Overview tab); paired with focusSignal. */
+  focusRequirementId?: string | null;
+  /** Increment to (re)open focusRequirementId's evidence dialog. */
+  focusSignal?: number;
 }
 
 const STATUS_CONFIG: Record<
@@ -134,6 +132,8 @@ export function GapAnalysisView({
   onRefresh,
   initialBlockingOnly = false,
   blockingSignal = 0,
+  focusRequirementId = null,
+  focusSignal = 0,
 }: GapAnalysisViewProps) {
   const [statusFilter, setStatusFilter] = useState<string>(
     initialBlockingOnly ? 'blocking' : 'all',
@@ -214,6 +214,18 @@ export function GapAnalysisView({
     }
   }, [blockingSignal]);
 
+  // Open a specific requirement's evidence dialog when asked from the Overview
+  // tab (the "Open" buttons on the roadmap / recert cards live there now).
+  useEffect(() => {
+    if (focusSignal > 0 && focusRequirementId) {
+      const rs = readiness.requirementStatuses.find(
+        (r) => r.requirementId === focusRequirementId,
+      );
+      if (rs) setActiveRequirement(rs);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusSignal]);
+
   const blockingIds = useMemo(
     () => new Set(readiness.blockingRequirements.map((r) => r.requirementId)),
     [readiness.blockingRequirements],
@@ -290,38 +302,6 @@ export function GapAnalysisView({
           )}
         </CardContent>
       </Card>
-
-      <MomentumCard />
-
-      {readiness.certificationType === 'new' && (
-        <EligibilityEstimateCard readiness={readiness} />
-      )}
-
-      {(readiness.certificationType === 'recertification' || readiness.recertPrepActive) && (
-        <DeadlinePlanCard readiness={readiness} />
-      )}
-
-      {readiness.certificationType === 'recertification' && (
-        <RecertDeltaCard
-          readiness={readiness}
-          onOpen={(id) => {
-            const rs = readiness.requirementStatuses.find((r) => r.requirementId === id);
-            if (rs) setActiveRequirement(rs);
-          }}
-        />
-      )}
-
-      <RoadmapCard
-        readiness={readiness}
-        onOpen={(id) => {
-          const rs = readiness.requirementStatuses.find((r) => r.requirementId === id);
-          if (rs) setActiveRequirement(rs);
-        }}
-      />
-
-      {readiness.platformHealth && (
-        <PlatformHealthPanel entries={readiness.platformHealth} />
-      )}
 
       {readiness.topicSummaries.map((topic) => {
         const topicRequirements = readiness.requirementStatuses
