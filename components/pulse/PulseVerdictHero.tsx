@@ -24,6 +24,7 @@ import {
   aggregateVerdict,
   buildVerdictCopy,
   type TargetVerdictInput,
+  type Verdict,
   type VerdictState,
 } from '@/lib/pulse/verdict';
 
@@ -88,6 +89,9 @@ export function PulseVerdictHero() {
   const [pointsByTarget, setPointsByTarget] = useState<Record<string, TrajectoryPoint[]>>({});
   const [co2History, setCo2History] = useState<{ date: string; value: number }[]>([]);
   const [emissionsNow, setEmissionsNow] = useState<{ value: number; deltaPct: number | null } | null>(null);
+  // Which metric the hero leads with. Emissions over time is the default focus;
+  // the founder can switch to any other target via the chips.
+  const [focusMetric, setFocusMetric] = useState<string>('total_co2e');
 
   useEffect(() => {
     if (!orgId) return;
@@ -161,15 +165,45 @@ export function PulseVerdictHero() {
     };
   }, [orgId]);
 
-  const verdict = useMemo(() => aggregateVerdict(verdictInputs), [verdictInputs]);
+  // Metrics offered in the selector: every metric with an active target, plus
+  // emissions (always available so it can lead even before a target is set).
+  const availableMetrics = useMemo(() => {
+    const keys = verdictInputs.map((i) => i.metricKey);
+    if (!keys.includes('total_co2e')) keys.unshift('total_co2e');
+    return Array.from(new Set(keys));
+  }, [verdictInputs]);
+
+  // Keep the focused metric valid once data loads (default back to emissions).
+  useEffect(() => {
+    if (availableMetrics.length && !availableMetrics.includes(focusMetric)) {
+      setFocusMetric(availableMetrics.includes('total_co2e') ? 'total_co2e' : availableMetrics[0]);
+    }
+  }, [availableMetrics, focusMetric]);
+
+  const focusedInput = useMemo(
+    () => verdictInputs.find((i) => i.metricKey === focusMetric) ?? null,
+    [verdictInputs, focusMetric],
+  );
+  const aggregate = useMemo(() => aggregateVerdict(verdictInputs), [verdictInputs]);
+  // The hero reflects the FOCUSED metric (emissions by default), not the
+  // worst-of aggregate — the founder asked for emissions front and centre.
+  const verdict: Verdict = useMemo(() => {
+    if (verdictInputs.length === 0) return { state: 'no_targets', driving: null };
+    if (focusedInput) {
+      const known = (['off_track', 'at_risk', 'on_track'] as string[]).includes(focusedInput.status);
+      return { state: known ? (focusedInput.status as VerdictState) : 'insufficient_data', driving: focusedInput };
+    }
+    return aggregate; // focused metric has no target — fall back to a useful verdict
+  }, [verdictInputs, focusedInput, aggregate]);
   const copy = useMemo(() => buildVerdictCopy(verdict), [verdict]);
   const style = STATE_STYLE[verdict.state];
   const Icon = style.icon;
 
-  const chartPoints = verdict.driving ? (pointsByTarget[verdict.driving.targetId] ?? []) : [];
-  const showChart = !loading && verdict.driving && chartPoints.length >= 2;
-  // With no targets, still draw the emissions history so the hero is never a wall of text.
-  const showHistoryOnly = !loading && !verdict.driving && co2History.length >= 2;
+  // Chart follows the focused metric: its target trajectory if it has one,
+  // otherwise the emissions history so the hero is never a wall of text.
+  const chartPoints = focusedInput ? (pointsByTarget[focusedInput.targetId] ?? []) : [];
+  const showChart = !loading && focusedInput && chartPoints.length >= 2;
+  const showHistoryOnly = !loading && !focusedInput && co2History.length >= 2;
 
   return (
     <Card
@@ -200,6 +234,26 @@ export function PulseVerdictHero() {
                 </>
               ) : (
                 <>
+                  {availableMetrics.length > 1 && (
+                    <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                      <span className="mr-1 text-[11px] uppercase tracking-wider text-muted-foreground">Tracking</span>
+                      {availableMetrics.map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => setFocusMetric(m)}
+                          className={cn(
+                            'rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors',
+                            m === focusMetric
+                              ? 'border-[#ccff00]/60 bg-[#ccff00]/15 text-foreground'
+                              : 'border-border/60 text-muted-foreground hover:text-foreground',
+                          )}
+                        >
+                          {METRIC_DEFINITIONS[m as MetricKey]?.label ?? m}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <h2 className={cn('text-2xl font-semibold sm:text-3xl', style.text)}>{copy.headline}</h2>
                   <p className="mt-1 max-w-xl text-sm text-muted-foreground sm:text-base">{copy.sub}</p>
                   <div className="mt-3 flex flex-wrap items-center gap-3">

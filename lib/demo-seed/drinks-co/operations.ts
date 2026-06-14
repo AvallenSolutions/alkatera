@@ -201,8 +201,13 @@ async function seedSnapshots(ctx: SeedCtx): Promise<void> {
     });
   }
 
-  await svc.from('metric_snapshots').upsert(metricRows, { onConflict: 'organization_id,metric_key,snapshot_date' });
-  await svc.from('esg_score_snapshots').upsert(esgRows, { onConflict: 'organization_id,snapshot_date' });
+  // Clear any pre-existing (often erratic, daily) snapshots first so the trend
+  // is the clean monthly series we seed — mixing the two makes the chart jagged.
+  const managedKeys = ['total_co2e', 'water_consumption', 'products_assessed', 'lca_completeness_pct'];
+  await svc.from('metric_snapshots').delete().eq('organization_id', orgId).in('metric_key', managedKeys);
+  await svc.from('metric_snapshots').insert(metricRows);
+  await svc.from('esg_score_snapshots').delete().eq('organization_id', orgId);
+  await svc.from('esg_score_snapshots').insert(esgRows);
   await svc.from('vitality_score_snapshots').delete().eq('organization_id', orgId);
   await svc.from('vitality_score_snapshots').insert(vitalityRows);
 
