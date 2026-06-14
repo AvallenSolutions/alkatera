@@ -35,6 +35,7 @@ import { EvidenceLinker } from '@/components/certifications/EvidenceLinker';
 import { AutoEvidencePanel } from '@/components/certifications/AutoEvidencePanel';
 import { getRequirementGuidance } from '@/lib/certifications/requirement-guidance';
 import { RoadmapCard } from '@/components/certifications/RoadmapCard';
+import { RecertDeltaCard } from '@/components/certifications/RecertDeltaCard';
 import { PlatformHealthPanel } from '@/components/certifications/PlatformHealthPanel';
 import type {
   CertificationReadiness,
@@ -214,6 +215,16 @@ export function GapAnalysisView({
           </Select>
         </CardContent>
       </Card>
+
+      {readiness.certificationType === 'recertification' && (
+        <RecertDeltaCard
+          readiness={readiness}
+          onOpen={(id) => {
+            const rs = readiness.requirementStatuses.find((r) => r.requirementId === id);
+            if (rs) setActiveRequirement(rs);
+          }}
+        />
+      )}
 
       <RoadmapCard
         readiness={readiness}
