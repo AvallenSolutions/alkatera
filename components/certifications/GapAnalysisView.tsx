@@ -463,14 +463,15 @@ export function GapAnalysisView({
         open={!!activeRequirement}
         onOpenChange={(open) => !open && setActiveRequirement(null)}
       >
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>
               {activeRequirement?.code} — {activeRequirement?.name}
             </DialogTitle>
           </DialogHeader>
           {activeRequirement && readiness.frameworkId && (
-            <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2 md:items-start">
+              <div className="space-y-4">
               {(() => {
                 const g = getRequirementGuidance(activeRequirement.code, activeRequirement.topicArea, frameworkCode);
                 return (
@@ -508,26 +509,29 @@ export function GapAnalysisView({
                   </div>
                 );
               })()}
-              <AutoEvidencePanel
-                requirementId={activeRequirement.requirementId}
-                onAccepted={async () => {
-                  if (onRefresh) await onRefresh();
-                }}
-              />
-              <EvidenceLinker
-                evidence={evidence}
-                requirementId={activeRequirement.requirementId}
-                frameworkId={readiness.frameworkId}
-                onCreateEvidence={onCreateEvidence}
-                onDeleteEvidence={onDeleteEvidence}
-                onVerifyEvidence={onVerifyEvidence}
-              />
-              <RequirementActionPlan
-                frameworkId={readiness.frameworkId}
-                requirementId={activeRequirement.requirementId}
-                initial={actionByReq[activeRequirement.requirementId]}
-                onSaved={loadActions}
-              />
+              </div>
+              <div className="space-y-4">
+                <AutoEvidencePanel
+                  requirementId={activeRequirement.requirementId}
+                  onAccepted={async () => {
+                    if (onRefresh) await onRefresh();
+                  }}
+                />
+                <EvidenceLinker
+                  evidence={evidence}
+                  requirementId={activeRequirement.requirementId}
+                  frameworkId={readiness.frameworkId}
+                  onCreateEvidence={onCreateEvidence}
+                  onDeleteEvidence={onDeleteEvidence}
+                  onVerifyEvidence={onVerifyEvidence}
+                />
+                <RequirementActionPlan
+                  frameworkId={readiness.frameworkId}
+                  requirementId={activeRequirement.requirementId}
+                  initial={actionByReq[activeRequirement.requirementId]}
+                  onSaved={loadActions}
+                />
+              </div>
             </div>
           )}
         </DialogContent>
