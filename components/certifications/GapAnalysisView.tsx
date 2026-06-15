@@ -509,14 +509,14 @@ export function GapAnalysisView({
                   </div>
                 );
               })()}
-              </div>
-              <div className="space-y-4">
                 <AutoEvidencePanel
                   requirementId={activeRequirement.requirementId}
                   onAccepted={async () => {
                     if (onRefresh) await onRefresh();
                   }}
                 />
+              </div>
+              <div className="space-y-4">
                 <EvidenceLinker
                   evidence={evidence}
                   requirementId={activeRequirement.requirementId}
