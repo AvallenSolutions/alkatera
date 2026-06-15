@@ -14,7 +14,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import type { FallbackEvent } from './impact-waterfall-resolver';
 import { tryNormalizeToKg } from './impact-waterfall-resolver';
 import { calculateUsePhaseEmissions, type UsePhaseConfig } from './use-phase-factors';
-import { calculateMaterialEoL, getMaterialFactorKey, getPackagingUnitsPerGroup, getRegionalDefaults, EOL_DATA_YEAR, REGION_LABELS, type EoLRegion, type RegionalDefaults, type EoLConfig } from './end-of-life-factors';
+import { calculateMaterialEoL, getMaterialFactorKey, getPackagingUnitsPerGroup, getRegionalDefaults, isStalePathwayOverride, EOL_DATA_YEAR, REGION_LABELS, type EoLRegion, type RegionalDefaults, type EoLConfig } from './end-of-life-factors';
 import { calculateDistributionEmissions, type DistributionConfig } from './distribution-factors';
 import { isStageIncluded, calculateLossMultiplier, type ProductLossConfig } from './system-boundaries';
 import { IPCC_AR6_GWP } from './ghg-constants';
@@ -643,6 +643,16 @@ export async function aggregateProductImpacts(
       // If none set, derive overrides from the material's stored circularity fields
       // so a firkin marked "reuse" isn't defaulted to the regional recycling mix.
       let pathwayOverrides = eolConfig?.pathways?.[material.id] || eolConfig?.pathways?.[factorKey];
+
+      // Self-heal stale overrides: if the material was reclassified since the
+      // override was seeded (e.g. a glass bottle once read as 'other'), the
+      // stored split is a pristine default for the WRONG material. Discard it so
+      // we fall through to the correct regional default for the current factor —
+      // glass's 74/8/18 instead of 'other''s 28/22/50. Hand-edited splits, which
+      // match no regional default, are kept. Mirrors the wizard's re-seed.
+      if (isStalePathwayOverride(pathwayOverrides, eolRegion, factorKey)) {
+        pathwayOverrides = undefined;
+      }
 
       const storedPathway = (material as any).end_of_life_pathway as string | null | undefined;
       if (!pathwayOverrides && storedPathway) {

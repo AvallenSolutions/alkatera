@@ -589,6 +589,49 @@ export function getRegionalDefaults(
 }
 
 /**
+ * Compare two pathway splits on the five disposal fields (treating a missing
+ * anaerobic_digestion as 0).
+ */
+export function pathwaysEqual(
+  a: Partial<RegionalDefaults>,
+  b: Partial<RegionalDefaults>
+): boolean {
+  return (
+    (a.recycling ?? 0) === (b.recycling ?? 0) &&
+    (a.landfill ?? 0) === (b.landfill ?? 0) &&
+    (a.incineration ?? 0) === (b.incineration ?? 0) &&
+    (a.composting ?? 0) === (b.composting ?? 0) &&
+    (a.anaerobic_digestion ?? 0) === (b.anaerobic_digestion ?? 0)
+  );
+}
+
+/**
+ * A stored EoL pathway override is "stale" when it exactly matches a pristine
+ * regional default for some material OTHER than `factorKey` — meaning it was
+ * auto-seeded under a previous classification that has since been corrected
+ * (e.g. a glass bottle once misread as 'other', left on the 'other' 28/22/50
+ * split instead of glass's 74/8/18). A hand-edited split matches no regional
+ * default and is never considered stale, so genuine user overrides survive.
+ *
+ * Used by both the End-of-Life wizard step (to refresh what's displayed/saved)
+ * and the aggregator (to ignore stale overrides at calculation time), so a
+ * reclassified material self-heals regardless of how the recalc is triggered.
+ */
+export function isStalePathwayOverride(
+  override: Partial<RegionalDefaults> | undefined | null,
+  region: EoLRegion,
+  factorKey: string
+): boolean {
+  if (!override) return false;
+  // Already correct for the current classification — not stale.
+  if (pathwaysEqual(override, getRegionalDefaults(region, factorKey))) return false;
+  // Matches a pristine default for a different material → stale auto-seed.
+  return Object.values(REGIONAL_DEFAULTS[region] || {}).some((d) =>
+    pathwaysEqual(override, d)
+  );
+}
+
+/**
  * Region display labels
  */
 export const REGION_LABELS: Record<EoLRegion, string> = {

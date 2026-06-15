@@ -12,6 +12,8 @@ import {
   getPackagingUnitsPerGroup,
   getRegionalDefaults,
   getEoLMaterialTypes,
+  pathwaysEqual,
+  isStalePathwayOverride,
   EOL_FACTORS,
   REGIONAL_DEFAULTS,
   MATERIAL_TYPE_LABELS,
@@ -313,6 +315,48 @@ describe('getRegionalDefaults', () => {
   it('returns "other" defaults for unknown material type', () => {
     const defaults = getRegionalDefaults('eu', 'unicorn_material');
     expect(defaults).toEqual(REGIONAL_DEFAULTS.eu.other);
+  });
+});
+
+describe('pathwaysEqual', () => {
+  it('treats a missing anaerobic_digestion as 0', () => {
+    expect(
+      pathwaysEqual(
+        { recycling: 74, landfill: 8, incineration: 18, composting: 0 },
+        { recycling: 74, landfill: 8, incineration: 18, composting: 0, anaerobic_digestion: 0 }
+      )
+    ).toBe(true);
+  });
+
+  it('returns false when any field differs', () => {
+    expect(pathwaysEqual(REGIONAL_DEFAULTS.uk.glass, REGIONAL_DEFAULTS.uk.other)).toBe(false);
+  });
+});
+
+describe('isStalePathwayOverride — self-heal after reclassification', () => {
+  // The Everleaf bug: a glass bottle was once misread as 'other' and seeded with
+  // the 'other' 28/22/50 split; after it is correctly detected as 'glass', that
+  // stored override is stale and must be ignored in favour of glass's 74/8/18.
+  it('flags an "other" split kept on a now-glass material as stale', () => {
+    expect(isStalePathwayOverride(REGIONAL_DEFAULTS.uk.other, 'uk', 'glass')).toBe(true);
+  });
+
+  it('does NOT flag the override once it matches the current factor default', () => {
+    expect(isStalePathwayOverride(REGIONAL_DEFAULTS.uk.glass, 'uk', 'glass')).toBe(false);
+  });
+
+  it('does NOT flag an "other" split on a material still classified as other', () => {
+    expect(isStalePathwayOverride(REGIONAL_DEFAULTS.uk.other, 'uk', 'other')).toBe(false);
+  });
+
+  it('preserves a hand-edited split that matches no regional default', () => {
+    const custom = { recycling: 50, landfill: 30, incineration: 20, composting: 0, anaerobic_digestion: 0 };
+    expect(isStalePathwayOverride(custom, 'uk', 'glass')).toBe(false);
+  });
+
+  it('treats null/undefined overrides as not stale', () => {
+    expect(isStalePathwayOverride(undefined, 'uk', 'glass')).toBe(false);
+    expect(isStalePathwayOverride(null, 'uk', 'glass')).toBe(false);
   });
 });
 

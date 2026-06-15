@@ -209,7 +209,7 @@ export function generateAssumptions(ctx: AssumptionContext): string[] {
     if (ctx.hasIngredients) {
       assumptions.push({
         category: 'end_of_life',
-        text: `Ingredient waste (organic fraction) is aggregated into a single organic waste stream with region-specific composting, anaerobic digestion, and landfill split.`,
+        text: `Ingredients are excluded from the end-of-life stage: the liquid inputs become the product that is consumed, not waste that is disposed of, so they carry no disposal pathway. End-of-life is modelled for packaging materials only.`,
       });
     }
   }

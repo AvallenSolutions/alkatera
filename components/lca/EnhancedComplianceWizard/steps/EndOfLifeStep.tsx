@@ -22,6 +22,7 @@ import {
   getMaterialFactorKey,
   MATERIAL_TYPE_LABELS,
   REGION_LABELS,
+  isStalePathwayOverride,
   calculateMaterialEoL,
   DEFAULT_EOL_TRANSPORT_KM,
 } from '@/lib/end-of-life-factors';
@@ -95,30 +96,28 @@ export function EndOfLifeStep() {
 
   // Build material rows — one row per packaging material so users can see
   // exactly which materials are in their product (e.g. "Glass Bottle 500ml").
-  // Ingredients are grouped into a single "Organic Waste" row.
+  // Ingredients are intentionally excluded: in a beverage the liquid inputs
+  // become the product that is consumed, not waste that is disposed of, so they
+  // have no end-of-life pathway. This matches the report aggregator
+  // (product-lca-aggregator.ts), which skips non-packaging materials in EoL.
   const materialRows = useMemo((): MaterialRow[] => {
     const materials = preCalcState.materials || [];
     const rows: MaterialRow[] = [];
-    let organicTotal = 0;
-    const organicUnit = 'kg';
 
     for (const mat of materials) {
       const packagingCategory = (mat as any).packaging_category || '';
       const materialType = (mat.material_type || '').toLowerCase();
+
+      const isPackaging = materialType === 'packaging' || materialType === 'packaging_material';
+      // Ingredients have no EoL pathway — skip them entirely (see note above).
+      if (!isPackaging) continue;
+
       // Materials are loaded raw from product_materials, where quantity may be in
       // grams/litres/etc. Normalise to kg so the table, the live preview and the
       // EoL factors (which are per-kg) all agree. Without this a 500 g bottle
       // shows as "500.00 kg" and inflates the estimate 1000×.
       const quantity = normalizeToKg(mat.quantity || 0, mat.unit || 'kg');
       if (quantity <= 0) continue;
-
-      const isPackaging = materialType === 'packaging' || materialType === 'packaging_material';
-
-      if (!isPackaging) {
-        // Ingredients → aggregate into one "Organic Waste" row (already in kg)
-        organicTotal += quantity;
-        continue;
-      }
 
       // Wizard-created rows carry the material identity in container_material,
       // which resolves exactly. Manual rows fall back to name inference because
@@ -165,25 +164,25 @@ export function EndOfLifeStep() {
       });
     }
 
-    // Add aggregated organic waste row for ingredients
-    if (organicTotal > 0) {
-      rows.push({
-        id: 'organic',
-        name: 'Organic Waste (ingredients)',
-        factorKey: 'organic',
-        quantity: organicTotal,
-        unit: organicUnit,
-        pathways: getRegionalDefaults(config.region, 'organic'),
-      });
-    }
-
     return rows;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preCalcState.materials]);
 
-  // Seed pathways for any materials that don't yet have overrides (e.g. on
-  // first mount or when new materials are added). Does NOT run on region
-  // change — `updateRegion` handles that to avoid overwriting user edits.
+  // A material's classification can change between calculations (e.g. a glass
+  // bottle named "500ml TEO bottle (Wild Flint)" used to fall through to the
+  // generic 'other' factor and is now correctly detected as 'glass'). When that
+  // happens the stored pathway, seeded under the OLD classification, is stale —
+  // a glass bottle left on the 'other' 28/22/50 split instead of glass's
+  // 74/8/18. Re-seed those, while leaving genuine user edits alone.
+  const materialSignature = useMemo(
+    () => materialRows.map((r) => `${r.id}:${r.factorKey}`).join('|'),
+    [materialRows]
+  );
+
+  // Seed pathways for materials without an override (first mount / new
+  // materials) AND refresh stale auto-seeds left over from a prior
+  // classification. Does NOT run on region change — `updateRegion` handles
+  // that to avoid overwriting user edits.
   useEffect(() => {
     const existing = config.pathways;
     const pathways: Record<string, RegionalDefaults> = {};
@@ -195,17 +194,28 @@ export function EndOfLifeStep() {
     }
 
     for (const row of materialRows) {
-      if (!pathways[row.id]) {
-        // Try backwards-compat key (factorKey), then fall back to defaults.
-        // Rows seeded from material circularity fields use row.pathways
-        // directly so the stored pathway/recyclability wins over regional.
+      const stored = pathways[row.id];
+      // The split this row should carry for its CURRENT classification.
+      const correct = row.fromCircularity
+        ? row.pathways
+        : getRegionalDefaults(config.region, row.factorKey);
+
+      if (!stored) {
+        // First seed. Try backwards-compat key (factorKey), then defaults.
         const legacy = existing[row.factorKey];
-        const defaults = row.fromCircularity
-          ? row.pathways
-          : getRegionalDefaults(config.region, row.factorKey);
         pathways[row.id] = legacy && !row.fromCircularity
-          ? { ...defaults, ...legacy }
-          : defaults;
+          ? { ...correct, ...legacy }
+          : correct;
+        changed = true;
+      } else if (
+        !row.fromCircularity &&
+        isStalePathwayOverride(stored, config.region, row.factorKey)
+      ) {
+        // Stale auto-seed left over from the material's previous classification
+        // (e.g. a glass bottle on the 'other' split). Refresh to the current
+        // factor's default. A hand-edited split — matching no regional default
+        // — is preserved untouched.
+        pathways[row.id] = correct;
         changed = true;
       }
     }
@@ -214,7 +224,7 @@ export function EndOfLifeStep() {
       updateField('eolConfig', { ...config, pathways });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [materialRows.length]);
+  }, [materialSignature]);
 
   const updateRegion = (region: EoLRegion) => {
     // Reset all pathways to new region defaults, but preserve rows that were
