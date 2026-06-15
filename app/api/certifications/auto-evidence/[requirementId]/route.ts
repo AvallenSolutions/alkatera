@@ -8,6 +8,7 @@ import {
   frameworkCodeForId,
   getRequirementDef,
 } from '@/lib/certifications/frameworks';
+import { getBcorpV21Requirement } from '@/lib/certifications/frameworks/bcorp-v2';
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -56,17 +57,20 @@ export async function GET(
     const frameworkId =
       reqRow.framework_id ?? (await getBcorpFrameworkId(supabase));
 
+    const bcorpReq = getBcorpV21Requirement(reqRow.requirement_code);
     const platform = generalisedCode
       ? await queryProbeEvidence(
           supabase,
           getRequirementDef(generalisedCode, reqRow.requirement_code)?.probe ?? null,
           organizationId,
         )
-      : await queryPlatformEvidence(
-          supabase,
-          reqRow.requirement_code,
-          organizationId,
-        );
+      : bcorpReq
+        ? await queryProbeEvidence(supabase, bcorpReq.probe ?? null, organizationId)
+        : await queryPlatformEvidence(
+            supabase,
+            reqRow.requirement_code,
+            organizationId,
+          );
 
     if (!platform) {
       // No platform mapping for this requirement (manual evidence only).

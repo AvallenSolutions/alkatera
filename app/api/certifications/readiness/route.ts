@@ -5,15 +5,12 @@ import {
   calculateCertificationReadiness,
   persistScoreHistory,
 } from '@/lib/certifications/readiness';
-import {
-  computePlatformHealth,
-  getMappedRequirementCodes,
-} from '@/lib/certifications/platform-data';
 import { computeProbeHealth } from '@/lib/certifications/platform-probes';
 import {
   isGeneralisedFramework,
   getRequirementDef,
 } from '@/lib/certifications/frameworks';
+import { getBcorpV21Requirement } from '@/lib/certifications/frameworks/bcorp-v2';
 
 export async function GET(request: NextRequest) {
   try {
@@ -61,18 +58,16 @@ export async function GET(request: NextRequest) {
     // phase and return an empty set until then.
     let platformHealth = readiness.platformHealth;
     if (frameworkCode === 'bcorp_2026' && readiness.hasCertification) {
+      // B Corp v2.1 auto-evidence is driven by the content module's probes,
+      // the same shared engine the other frameworks use.
       try {
-        const mapped = new Set(getMappedRequirementCodes());
-        const codes = readiness.requirementStatuses
-          .map((rs) => rs.code)
-          .filter((c) => mapped.has(c));
-        platformHealth = await computePlatformHealth(
-          supabase,
-          organizationId,
-          codes,
-        );
+        const items = readiness.requirementStatuses.map((rs) => ({
+          code: rs.code,
+          probe: getBcorpV21Requirement(rs.code)?.probe ?? null,
+        }));
+        platformHealth = await computeProbeHealth(supabase, organizationId, items);
       } catch (err) {
-        console.error('computePlatformHealth failed:', err);
+        console.error('computeProbeHealth (bcorp) failed:', err);
       }
     } else if (isGeneralisedFramework(frameworkCode)) {
       // ISO 14001 / 50001 / EcoVadis: data-quality from the shared probes.

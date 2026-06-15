@@ -6,6 +6,7 @@
 // We deliberately keep copy jargon-free and concrete (British English).
 
 import { getRequirementDef } from '@/lib/certifications/frameworks';
+import { getBcorpV21Requirement } from '@/lib/certifications/frameworks/bcorp-v2';
 
 export interface RequirementGuidance {
   /** What the requirement is really asking for, in plain terms. */
@@ -167,7 +168,14 @@ export function getRequirementGuidance(
     if (def) return { summary: def.summary, evidence: def.evidence, pitfalls: def.pitfalls };
     return GENERIC;
   }
-  const base = (code && BY_CODE[code]) || (topicArea && BY_TOPIC[topicArea]) || GENERIC;
+  // B Corp v2.1 requirements carry their own summary in the content module.
+  // Prefer it, then enrich with any hand-written per-code/topic guidance.
+  const v21 = getBcorpV21Requirement(code);
+  const base =
+    (code && BY_CODE[code]) ||
+    (v21 && { summary: v21.summary, evidence: GENERIC.evidence }) ||
+    (topicArea && BY_TOPIC[topicArea]) ||
+    GENERIC;
   const template = code ? TEMPLATES[code] : undefined;
   return template ? { ...base, template } : base;
 }

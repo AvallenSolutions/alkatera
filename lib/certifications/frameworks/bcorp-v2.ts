@@ -203,3 +203,12 @@ export const BCORP_V21_REQUIREMENTS: BCorpRequirement[] = [
   { code: 'GACA3.1', topic: T.GACA, name: 'Responsible tax policy', summary: 'Adopt a public responsible-tax policy.', year: 0, bands: ['xxl'], probe: 'governancePolicies' },
   { code: 'GACA3.2', topic: T.GACA, name: 'Country-by-country reporting', summary: 'Publicly share country-by-country tax reporting annually.', year: 3, bands: ['xxl'] },
 ];
+
+const BY_CODE = new Map(BCORP_V21_REQUIREMENTS.map((r) => [r.code, r]));
+
+/** Look up a v2.1 B Corp requirement by its code. */
+export function getBcorpV21Requirement(
+  code: string | null | undefined,
+): BCorpRequirement | null {
+  return (code && BY_CODE.get(code)) || null;
+}
