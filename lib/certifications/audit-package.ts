@@ -11,7 +11,7 @@ import {
   buildReadme,
   type BiaManifestGroup,
 } from './render-audit-html';
-import { BIA_AREAS, biaAreaForRequirement, biaAreaNote } from './bia-mapping';
+import { BCORP_SECTIONS, bcorpSectionForRequirement } from './bcorp-structure';
 
 const BUCKET = 'evidence-library';
 
@@ -181,12 +181,13 @@ export async function generateAuditPackage(
         const fileName = safeName(docMeta.document_name);
         let entryName: string;
         if (layout === 'bia') {
-          const area = biaAreaForRequirement(
+          const section = bcorpSectionForRequirement(
             topicByReq.get(e.requirement_id),
             codeByReq.get(e.requirement_id),
           );
+          const folder = safeName(`${section.abbrev}-${section.label}`);
           const code = safeName(codeByReq.get(e.requirement_id) ?? e.requirement_id);
-          entryName = `evidence/${area}/${prefix}${code}-${fileName}`;
+          entryName = `evidence/${folder}/${prefix}${code}-${fileName}`;
         } else {
           const area = safeName(topicByReq.get(e.requirement_id) ?? 'other');
           entryName = `evidence/${prefix}${area}-${e.requirement_id}-${fileName}`;
@@ -204,16 +205,16 @@ export async function generateAuditPackage(
     }
   }
 
-  // B Impact Assessment evidence map: group requirements (and the files we
-  // bundled for them) by BIA Impact Area.
+  // B Corp evidence map: group requirements (and the files we bundled for them)
+  // by Foundation Requirements + the 7 Impact Topics.
   if (layout === 'bia') {
-    const groups: BiaManifestGroup[] = BIA_AREAS.map((area) => ({
-      area,
-      note: biaAreaNote(area),
+    const groups: BiaManifestGroup[] = BCORP_SECTIONS.map((section) => ({
+      area: `${section.label} (${section.abbrev})`,
+      note: section.note,
       requirements: readiness.requirementStatuses
         .filter(
           (r) =>
-            biaAreaForRequirement(r.topicArea, r.code) === area &&
+            bcorpSectionForRequirement(r.topicArea, r.code).key === section.key &&
             r.status !== 'future',
         )
         .sort((a, b) => a.orderIndex - b.orderIndex)
@@ -228,7 +229,7 @@ export async function generateAuditPackage(
     const manifestPdf = await convertHtmlToPdf(
       renderBiaManifestHtml(orgName, groups),
     );
-    entries.push({ name: 'bia_evidence_map.pdf', data: manifestPdf.buffer });
+    entries.push({ name: 'bcorp_evidence_map.pdf', data: manifestPdf.buffer });
   }
 
   entries.push({

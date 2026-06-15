@@ -601,7 +601,7 @@ export function BcorpExperience() {
                       <CardDescription className="mt-1">
                         {!checklistReady
                           ? 'Complete the pre-audit checklist above to enable export.'
-                          : 'Auditor package is organised by requirement. The B Impact Assessment bundle is organised by BIA Impact Area with an evidence map so you know which file goes where.'}
+                          : 'Auditor package is organised by requirement. The B Impact Assessment bundle is organised by the B Corp Foundation Requirements and 7 Impact Topics (B Lab Standards v2.2), with an evidence map so you know which file goes where.'}
                       </CardDescription>
                     </CardHeader>
                   </Card>
