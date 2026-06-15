@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -111,6 +112,7 @@ export function BcorpExperience() {
   const [journeyOpen, setJourneyOpen] = useState(false);
   const [riskToolOpen, setRiskToolOpen] = useState(false);
   const [checklistReady, setChecklistReady] = useState(false);
+  const [includePending, setIncludePending] = useState(false);
   const [exportingPackageId, setExportingPackageId] = useState<string | null>(
     null,
   );
@@ -197,13 +199,20 @@ export function BcorpExperience() {
     setActiveTab('overview');
   };
 
-  const handleExportPackage = async (packageId: string) => {
+  const handleExportPackage = async (
+    packageId: string,
+    layout: 'requirement' | 'bia' = 'requirement',
+  ) => {
     setExportingPackageId(packageId);
     try {
       const res = await fetch('/api/certifications/audit-package/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ package_id: packageId }),
+        body: JSON.stringify({
+          package_id: packageId,
+          layout,
+          include_pending: includePending,
+        }),
       });
       if (!res.ok) {
         const e = await res.json().catch(() => ({}));
@@ -536,7 +545,7 @@ export function BcorpExperience() {
                         <CardTitle className="text-base">
                           {pkg.package_name}
                         </CardTitle>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           {pkg.export_url && (
                             <a
                               href={pkg.export_url}
@@ -550,25 +559,50 @@ export function BcorpExperience() {
                           )}
                           <Button
                             size="sm"
+                            variant="outline"
                             disabled={
                               !checklistReady || exportingPackageId === pkg.id
                             }
-                            onClick={() => handleExportPackage(pkg.id)}
+                            onClick={() => handleExportPackage(pkg.id, 'requirement')}
                           >
                             {exportingPackageId === pkg.id
                               ? 'Exporting...'
                               : pkg.exported_at
-                                ? 'Re-export package'
-                                : 'Prepare Audit Package'}
+                                ? 'Re-export auditor package'
+                                : 'Prepare auditor package'}
+                          </Button>
+                          <Button
+                            size="sm"
+                            disabled={
+                              !checklistReady || exportingPackageId === pkg.id
+                            }
+                            onClick={() => handleExportPackage(pkg.id, 'bia')}
+                          >
+                            {exportingPackageId === pkg.id
+                              ? 'Exporting...'
+                              : 'B Impact Assessment bundle'}
                           </Button>
                         </div>
                       </div>
-                      {!checklistReady && (
-                        <CardDescription>
-                          Complete the pre-audit checklist above to enable
-                          export.
-                        </CardDescription>
-                      )}
+                      <div className="mt-2 flex items-center gap-2">
+                        <Checkbox
+                          id={`include-pending-${pkg.id}`}
+                          checked={includePending}
+                          onCheckedChange={(v) => setIncludePending(v === true)}
+                        />
+                        <label
+                          htmlFor={`include-pending-${pkg.id}`}
+                          className="text-sm text-muted-foreground"
+                        >
+                          Include unverified (pending) evidence too, marked
+                          PENDING- so nothing is silently left out.
+                        </label>
+                      </div>
+                      <CardDescription className="mt-1">
+                        {!checklistReady
+                          ? 'Complete the pre-audit checklist above to enable export.'
+                          : 'Auditor package is organised by requirement. The B Impact Assessment bundle is organised by BIA Impact Area with an evidence map so you know which file goes where.'}
+                      </CardDescription>
                     </CardHeader>
                   </Card>
                   {(pkg.exported_at || pkg.audit_stage) && (

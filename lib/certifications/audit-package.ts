@@ -7,13 +7,23 @@ import {
   renderCoverSheetHtml,
   renderRequirementsSummaryHtml,
   renderRiskToolHtml,
+  renderBiaManifestHtml,
   buildReadme,
+  type BiaManifestGroup,
 } from './render-audit-html';
+import { BIA_AREAS, biaAreaForRequirement, biaAreaNote } from './bia-mapping';
 
 const BUCKET = 'evidence-library';
 
 function safeName(s: string): string {
   return s.replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 80);
+}
+
+export interface AuditPackageOptions {
+  /** Include pending (unverified) evidence too, marked PENDING-. Default false. */
+  includePending?: boolean;
+  /** 'requirement' (auditor, by requirement) or 'bia' (by B Impact Assessment area). */
+  layout?: 'requirement' | 'bia';
 }
 
 export interface AuditPackageResult {
@@ -30,7 +40,9 @@ export async function generateAuditPackage(
   supabase: SupabaseClient,
   organizationId: string,
   packageId: string,
+  options: AuditPackageOptions = {},
 ): Promise<AuditPackageResult> {
+  const { includePending = false, layout = 'requirement' } = options;
   const { data: pkg } = await supabase
     .from('certification_audit_packages')
     .select('*')
@@ -61,24 +73,34 @@ export async function generateAuditPackage(
     cert?.id ?? null,
   );
 
-  // Verified evidence for this org's framework.
+  // Evidence for this org's framework. Always include verified; optionally
+  // include pending too. Rejected evidence is never bundled.
+  const acceptedStatuses = includePending
+    ? ['verified', 'pending']
+    : ['verified'];
   const { data: evidence } = await supabase
     .from('certification_evidence_links')
     .select(
       'id, requirement_id, source_module, source_record_id, evidence_description, verification_status',
     )
     .eq('organization_id', organizationId)
-    .eq('verification_status', 'verified');
-  const verified = evidence ?? [];
+    .in('verification_status', acceptedStatuses);
+  const included = evidence ?? [];
 
   const evidenceCountByReq: Record<string, number> = {};
-  for (const e of verified) {
+  for (const e of included) {
     evidenceCountByReq[e.requirement_id] =
       (evidenceCountByReq[e.requirement_id] ?? 0) + 1;
   }
 
   const topicByReq = new Map(
     readiness.requirementStatuses.map((r) => [r.requirementId, r.topicArea]),
+  );
+  const codeByReq = new Map(
+    readiness.requirementStatuses.map((r) => [r.requirementId, r.code]),
+  );
+  const nameByReq = new Map(
+    readiness.requirementStatuses.map((r) => [r.requirementId, r.name]),
   );
 
   // Risk profile
@@ -127,12 +149,13 @@ export async function generateAuditPackage(
     { name: 'cover_sheet.pdf', data: coverPdf.buffer },
     { name: 'requirements_summary.pdf', data: reqPdf.buffer },
     { name: 'risk_tool_output.pdf', data: riskPdf.buffer },
-    { name: 'README.txt', data: Buffer.from(buildReadme(orgName), 'utf8') },
   ];
 
-  // Pull verified evidence files from the evidence library.
+  // Pull evidence files from the evidence library. Track the bundled file names
+  // per requirement so the BIA manifest can list exactly what's in each area.
   let evidenceFileCount = 0;
-  const docIds = verified
+  const filesByReq = new Map<string, string[]>();
+  const docIds = included
     .filter((e) => e.source_module === 'evidence_library' && e.source_record_id)
     .map((e) => e.source_record_id as string);
   if (docIds.length > 0) {
@@ -140,10 +163,8 @@ export async function generateAuditPackage(
       .from('evidence_documents')
       .select('id, document_name, storage_object_path')
       .in('id', docIds);
-    const docById = new Map(
-      (docs ?? []).map((d: any) => [d.id, d]),
-    );
-    for (const e of verified) {
+    const docById = new Map((docs ?? []).map((d: any) => [d.id, d]));
+    for (const e of included) {
       if (e.source_module !== 'evidence_library' || !e.source_record_id) {
         continue;
       }
@@ -155,19 +176,65 @@ export async function generateAuditPackage(
           .download(docMeta.storage_object_path);
         if (!blob) continue;
         const buf = Buffer.from(await blob.arrayBuffer());
-        const area = safeName(topicByReq.get(e.requirement_id) ?? 'other');
-        entries.push({
-          name: `evidence/${area}-${e.requirement_id}-${safeName(
-            docMeta.document_name,
-          )}`,
-          data: buf,
-        });
+        const pending = e.verification_status !== 'verified';
+        const prefix = pending ? 'PENDING-' : '';
+        const fileName = safeName(docMeta.document_name);
+        let entryName: string;
+        if (layout === 'bia') {
+          const area = biaAreaForRequirement(
+            topicByReq.get(e.requirement_id),
+            codeByReq.get(e.requirement_id),
+          );
+          const code = safeName(codeByReq.get(e.requirement_id) ?? e.requirement_id);
+          entryName = `evidence/${area}/${prefix}${code}-${fileName}`;
+        } else {
+          const area = safeName(topicByReq.get(e.requirement_id) ?? 'other');
+          entryName = `evidence/${prefix}${area}-${e.requirement_id}-${fileName}`;
+        }
+        entries.push({ name: entryName, data: buf });
+        const justName = entryName.split('/').pop() as string;
+        filesByReq.set(e.requirement_id, [
+          ...(filesByReq.get(e.requirement_id) ?? []),
+          justName,
+        ]);
         evidenceFileCount += 1;
       } catch (err) {
         console.error('Failed to add evidence file to package:', err);
       }
     }
   }
+
+  // B Impact Assessment evidence map: group requirements (and the files we
+  // bundled for them) by BIA Impact Area.
+  if (layout === 'bia') {
+    const groups: BiaManifestGroup[] = BIA_AREAS.map((area) => ({
+      area,
+      note: biaAreaNote(area),
+      requirements: readiness.requirementStatuses
+        .filter(
+          (r) =>
+            biaAreaForRequirement(r.topicArea, r.code) === area &&
+            r.status !== 'future',
+        )
+        .sort((a, b) => a.orderIndex - b.orderIndex)
+        .map((r) => ({
+          code: r.code,
+          name: r.name,
+          status: r.status,
+          files: filesByReq.get(r.requirementId) ?? [],
+        })),
+    })).filter((g) => g.requirements.length > 0);
+
+    const manifestPdf = await convertHtmlToPdf(
+      renderBiaManifestHtml(orgName, groups),
+    );
+    entries.push({ name: 'bia_evidence_map.pdf', data: manifestPdf.buffer });
+  }
+
+  entries.push({
+    name: 'README.txt',
+    data: Buffer.from(buildReadme(orgName, { layout, includePending }), 'utf8'),
+  });
 
   const zipBuffer = createZip(entries);
   const ts = Date.now();

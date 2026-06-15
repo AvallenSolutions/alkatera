@@ -36,6 +36,10 @@ export async function POST(request: NextRequest) {
       supabase,
       organizationId,
       body.package_id,
+      {
+        includePending: body.include_pending === true,
+        layout: body.layout === 'bia' ? 'bia' : 'requirement',
+      },
     );
 
     return NextResponse.json(result, { status: 201 });
