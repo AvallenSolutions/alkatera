@@ -33,12 +33,18 @@ interface RequirementRow {
 }
 
 /** Map the org's stored company_size to a coarse small/medium/large tier. */
+// Map the org's free-text company_size onto a B Lab v2.1 size band. Largest
+// signals are checked first. Unknown -> null, which never hides a requirement.
 function mapOrgSize(companySize: string | null | undefined): OrgSize {
   if (!companySize) return null;
   const s = companySize.toLowerCase();
-  if (/large|enterprise|250|500|1000|201|1,000/.test(s)) return 'large';
-  if (/medium|50-|51|100|200|mid/.test(s)) return 'medium';
-  if (/small|micro|sme|1-|11-|startup|10/.test(s)) return 'small';
+  if (/xx ?large|10,?000|enterprise/.test(s)) return 'xxl';
+  if (/x ?large|1,?000|9,?999/.test(s)) return 'xl';
+  if (/large|250|500|999/.test(s)) return 'lg';
+  if (/medium|mid|50|100|200|249/.test(s)) return 'md';
+  if (/small|sme|11|49/.test(s)) return 'sm';
+  if (/micro|1-9|start ?up/.test(s)) return 'mi';
+  if (/no ?worker|sole|owner.?operat|self.?employ/.test(s)) return 'nw';
   return null;
 }
 

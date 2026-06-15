@@ -28,14 +28,32 @@ export interface RequirementStatus {
   applicable: boolean;
 }
 
-export type OrgSize = 'small' | 'medium' | 'large' | null | undefined;
+// B Lab v2.1 size bands (nw..xxl), plus legacy small/medium/large for back-compat.
+export type OrgSize =
+  | 'nw'
+  | 'mi'
+  | 'sm'
+  | 'md'
+  | 'lg'
+  | 'xl'
+  | 'xxl'
+  | 'small'
+  | 'medium'
+  | 'large'
+  | null
+  | undefined;
 
+const V21_BANDS = new Set(['nw', 'mi', 'sm', 'md', 'lg', 'xl', 'xxl']);
 const SIZE_RANK: Record<string, number> = { small: 0, medium: 1, large: 2 };
 const THRESHOLD_MIN: Record<string, number> = { all: 0, medium_large: 1, large_only: 2 };
 
 /**
  * Whether a requirement applies given its size threshold and the org's size.
  * Unknown org size never hides a requirement (fail safe towards showing it).
+ *
+ * Two encodings are supported: the v2.1 band-list (comma-separated band codes,
+ * e.g. "lg,xl,xxl" — applies if the org's band is in the list) and the legacy
+ * small/medium/large rank threshold.
  */
 export function requirementApplies(
   sizeThreshold: string | null | undefined,
@@ -43,6 +61,13 @@ export function requirementApplies(
 ): boolean {
   if (!sizeThreshold || sizeThreshold === 'all') return true;
   if (orgSize == null) return true;
+  const parts = sizeThreshold
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length > 0 && parts.every((p) => V21_BANDS.has(p))) {
+    return parts.includes(orgSize);
+  }
   return (SIZE_RANK[orgSize] ?? 0) >= (THRESHOLD_MIN[sizeThreshold] ?? 0);
 }
 
