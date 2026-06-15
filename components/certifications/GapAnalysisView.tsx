@@ -509,14 +509,20 @@ export function GapAnalysisView({
                   </div>
                 );
               })()}
+                <RequirementActionPlan
+                  frameworkId={readiness.frameworkId}
+                  requirementId={activeRequirement.requirementId}
+                  initial={actionByReq[activeRequirement.requirementId]}
+                  onSaved={loadActions}
+                />
+              </div>
+              <div className="space-y-4">
                 <AutoEvidencePanel
                   requirementId={activeRequirement.requirementId}
                   onAccepted={async () => {
                     if (onRefresh) await onRefresh();
                   }}
                 />
-              </div>
-              <div className="space-y-4">
                 <EvidenceLinker
                   evidence={evidence}
                   requirementId={activeRequirement.requirementId}
@@ -524,12 +530,6 @@ export function GapAnalysisView({
                   onCreateEvidence={onCreateEvidence}
                   onDeleteEvidence={onDeleteEvidence}
                   onVerifyEvidence={onVerifyEvidence}
-                />
-                <RequirementActionPlan
-                  frameworkId={readiness.frameworkId}
-                  requirementId={activeRequirement.requirementId}
-                  initial={actionByReq[activeRequirement.requirementId]}
-                  onSaved={loadActions}
                 />
               </div>
             </div>
