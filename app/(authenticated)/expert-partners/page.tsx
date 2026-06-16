@@ -34,7 +34,7 @@ const PARTNERS: PartnerSummary[] = [
     name: 'Lucent Energy',
     category: 'Solar energy partner',
     summary:
-      'Solar electricity specialists for drinks producers. Lucent designs, funds, and installs on-site solar systems that cut energy costs and reduce the emissions behind every batch you make.',
+      'Renewable energy specialists helping breweries, wineries and distilleries reduce energy costs and cut their carbon footprint through commercial solar PV, battery storage and EV charging.',
     logoSrc: '/images/partners/lucent-energy/logo.png',
     logoClassName: 'bg-slate-900 object-contain p-1.5',
     hoverBorder: 'hover:border-amber-300 dark:hover:border-amber-700',

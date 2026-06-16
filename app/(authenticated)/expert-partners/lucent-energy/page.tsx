@@ -120,8 +120,9 @@ export default function LucentEnergyPartnerPage() {
                   <Badge variant="secondary" className="text-xs">Solar energy partner</Badge>
                 </div>
                 <CardDescription className="text-base max-w-xl">
-                  Solar electricity specialists for drinks producers. Lucent designs, funds, and installs
-                  on-site solar systems that cut energy costs and reduce the emissions behind every batch you make.
+                  Lucent Energy helps breweries, wineries, distilleries and other manufacturing businesses
+                  reduce energy costs and make meaningful, measurable reductions to their carbon footprint
+                  through renewable energy solutions.
                 </CardDescription>
               </div>
             </div>
@@ -152,33 +153,66 @@ export default function LucentEnergyPartnerPage() {
         </CardContent>
       </Card>
 
-      {/* Why We Recommend Them */}
+      {/* About Lucent Energy */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Why we recommend Lucent Energy</CardTitle>
+          <CardTitle className="text-lg">About Lucent Energy</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
           <p>
-            alka<strong>tera</strong> helps you measure the carbon footprint of your products and operations.
-            For most drinks producers, the electricity used in production, packing, and chilling is one of the
-            largest and most controllable parts of that footprint. Generating your own clean power on site is
-            one of the most direct ways to bring it down.
+            We specialise in the design, supply and installation of commercial solar PV systems, battery storage,
+            EV charging infrastructure and energy efficiency solutions. Unlike many sustainability initiatives,
+            solar energy delivers tangible results from day one, reducing reliance on grid electricity, lowering
+            operating costs and directly offsetting carbon emissions through the generation of clean, renewable
+            power on-site.
           </p>
           <p>
-            Lucent Energy specialises in solar electricity systems for the drinks industry. They understand the
-            demand patterns of breweries, distilleries, and wineries, and design systems that match generation to
-            the way you actually use power, rather than selling a one-size-fits-all installation.
+            For energy-intensive producers, solar is a sustainability investment capable of delivering both
+            significant environmental benefits and attractive financial returns. By generating electricity where
+            it is consumed, businesses can reduce exposure to rising energy prices, improve energy resilience and
+            make genuine progress towards their carbon reduction and net-zero objectives without compromising
+            operational performance.
           </p>
           <p>
-            This is not a generic marketplace listing. We have chosen Lucent as our solar partner because of the
-            quality of their work and their focus on real, measurable outcomes. When you engage Lucent you contract
-            with them directly. alka<strong>tera</strong> does not take a margin on the work.
+            Our team understands the unique energy demands of breweries, wineries and distilleries and works
+            closely with clients to identify commercially viable opportunities that deliver long-term value. We
+            believe sustainability should be more than a reporting exercise; it should create measurable benefits
+            for both the environment and the bottom line.
           </p>
         </CardContent>
       </Card>
 
       {/* Service Categories */}
       <PartnerServices heading="What Lucent Energy can help with" categories={SERVICE_CATEGORIES} />
+
+      {/* Closing CTA */}
+      <Card className="border-2 border-amber-200 dark:border-amber-800/50 bg-gradient-to-br from-white to-amber-50/30 dark:from-slate-900 dark:to-amber-950/20">
+        <CardContent className="p-6 space-y-4">
+          <div className="space-y-1.5">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              Interested in exploring renewable energy for your site?
+            </h2>
+            <p className="text-sm text-muted-foreground max-w-2xl">
+              Get in touch with Lucent Energy to discuss how solar and renewable technologies can reduce costs,
+              lower emissions and support your sustainability goals.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Button asChild className="bg-amber-500 hover:bg-amber-600 text-slate-900">
+              <a href={LUCENT_WEBSITE} target="_blank" rel="noopener noreferrer">
+                Visit Lucent Energy
+                <ExternalLink className="ml-2 h-4 w-4" />
+              </a>
+            </Button>
+            <Button variant="outline" asChild>
+              <a href={LUCENT_MAILTO}>
+                <Mail className="mr-2 h-4 w-4" />
+                Book a free assessment
+              </a>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
