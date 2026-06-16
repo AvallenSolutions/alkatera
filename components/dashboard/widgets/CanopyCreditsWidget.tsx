@@ -74,7 +74,7 @@ export function CanopyCreditsWidget() {
             Use your consulting credit for strategy, verification, or B Corp guidance.
           </p>
           <Button variant="outline" size="sm" asChild>
-            <Link href="/expert-partners/">Get started</Link>
+            <Link href="/expert-partners/impact-focus/">Get started</Link>
           </Button>
         </CardContent>
       </Card>
@@ -101,7 +101,7 @@ export function CanopyCreditsWidget() {
             Your £{creditAmount} consulting credit has been applied. You still receive a discount on all Impact Focus services.
           </p>
           <Button variant="ghost" size="sm" className="mt-2 px-0" asChild>
-            <Link href="/expert-partners/">View Impact Focus</Link>
+            <Link href="/expert-partners/impact-focus/">View Impact Focus</Link>
           </Button>
         </CardContent>
       </Card>

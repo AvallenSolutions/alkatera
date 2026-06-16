@@ -1,0 +1,184 @@
+import Link from 'next/link'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  ExternalLink,
+  Mail,
+  Sparkles,
+  ArrowLeft,
+  SunMedium,
+  PencilRuler,
+  Building2,
+  PoundSterling,
+  Wrench,
+  BatteryCharging,
+  CarFront,
+  Activity,
+} from 'lucide-react'
+import { PartnerServices } from '@/components/partners/PartnerServices'
+import type { PartnerServiceCategory } from '@/lib/partners/service-styles'
+
+// TODO(tim): confirm Lucent Energy's real website URL and enquiry email, then update these.
+const LUCENT_WEBSITE = 'https://www.lucent.energy'
+const LUCENT_EMAIL = 'hello@lucent.energy'
+const LUCENT_MAILTO = `mailto:${LUCENT_EMAIL}?subject=${encodeURIComponent(
+  'Solar enquiry from alkatera user',
+)}&body=${encodeURIComponent(
+  "Hi Lucent Energy,\n\nI'm an alkatera user and would like to discuss a solar electricity system for my site, including a free feasibility assessment.\n\nThanks",
+)}`
+
+const SERVICE_CATEGORIES: PartnerServiceCategory[] = [
+  {
+    label: 'Assessment and Design',
+    tagline: 'Understanding your site and designing the right system for it',
+    accent: 'orange',
+    services: [
+      {
+        icon: SunMedium,
+        title: 'Solar Feasibility Assessment',
+        description: 'For producers wondering whether on-site solar stacks up. Lucent reviews your site, roof or land, and electricity demand profile to model how much of your usage solar could cover and what it would save. Free for alkatera users.',
+      },
+      {
+        icon: PencilRuler,
+        title: 'Bespoke System Design and Specification',
+        description: 'For sites ready to move forward. Lucent designs a solar PV system sized to your production load and energy patterns, so generation matches the times you actually draw power.',
+      },
+      {
+        icon: Building2,
+        title: 'Roof and Structural Survey',
+        description: 'For breweries, distilleries, and wineries with large roof areas or available land. A structural and shading survey confirms what your buildings can carry and where panels will perform best.',
+      },
+    ],
+  },
+  {
+    label: 'Funding and Installation',
+    tagline: 'Removing the upfront barriers and delivering the project end to end',
+    accent: 'amber',
+    services: [
+      {
+        icon: PoundSterling,
+        title: 'Flexible Funding and Power Purchase Agreements',
+        description: 'For businesses that want clean electricity without a large capital outlay. Lucent offers outright purchase, leasing, and power purchase agreements where you pay only for the power you use, often below grid rates.',
+      },
+      {
+        icon: Wrench,
+        title: 'Installation and Grid Connection',
+        description: 'For producers who need a single accountable partner. Lucent manages the full installation, certification, and grid connection process, keeping disruption to production to a minimum.',
+      },
+    ],
+  },
+  {
+    label: 'Storage, Reporting and Optimisation',
+    tagline: 'Getting the most from every unit you generate and proving the impact',
+    accent: 'yellow',
+    services: [
+      {
+        icon: BatteryCharging,
+        title: 'Battery Storage and Energy Management',
+        description: 'For sites whose demand peaks outside daylight hours. Battery storage captures daytime generation for use during evening or overnight production, increasing how much of your own clean power you actually consume.',
+      },
+      {
+        icon: CarFront,
+        title: 'EV Charging Infrastructure',
+        description: 'For fleets and visitor sites. Lucent can pair your solar system with EV charging so on-site generation powers your vehicles and reduces transport emissions.',
+      },
+      {
+        icon: Activity,
+        title: 'Generation Monitoring and Carbon Reporting',
+        description: 'For teams tracking their footprint. Real-time monitoring shows generation and self-consumption, and the renewable electricity data feeds straight into your alkatera Scope 2 reporting.',
+      },
+    ],
+  },
+]
+
+export default function LucentEnergyPartnerPage() {
+  return (
+    <div className="space-y-10">
+      {/* Back link */}
+      <Link
+        href="/expert-partners/"
+        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        All expert partners
+      </Link>
+
+      {/* Lucent Energy Hero Card */}
+      <Card className="border-2 border-amber-200 dark:border-amber-800/50 bg-gradient-to-br from-white to-amber-50/30 dark:from-slate-900 dark:to-amber-950/20">
+        <CardHeader>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-4 min-w-0">
+              <img
+                src="/images/partners/lucent-energy/logo.png"
+                alt="Lucent Energy"
+                className="h-16 w-16 shrink-0 rounded-md bg-slate-900 object-contain p-1.5"
+              />
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <CardTitle className="text-2xl">Lucent Energy</CardTitle>
+                  <Badge variant="secondary" className="text-xs">Solar energy partner</Badge>
+                </div>
+                <CardDescription className="text-base max-w-xl">
+                  Solar electricity specialists for drinks producers. Lucent designs, funds, and installs
+                  on-site solar systems that cut energy costs and reduce the emissions behind every batch you make.
+                </CardDescription>
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50">
+            <Sparkles className="h-4 w-4 text-amber-600 shrink-0" />
+            <p className="text-sm text-amber-800 dark:text-amber-200">
+              As an alka<strong>tera</strong> user, your <strong>initial solar feasibility assessment is free</strong>.
+              Find out how much of your site&apos;s electricity solar could cover, with no obligation.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Button asChild className="bg-amber-500 hover:bg-amber-600 text-slate-900">
+              <a href={LUCENT_WEBSITE} target="_blank" rel="noopener noreferrer">
+                Visit Lucent Energy
+                <ExternalLink className="ml-2 h-4 w-4" />
+              </a>
+            </Button>
+            <Button variant="outline" asChild>
+              <a href={LUCENT_MAILTO}>
+                <Mail className="mr-2 h-4 w-4" />
+                Book a free assessment
+              </a>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Why We Recommend Them */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Why we recommend Lucent Energy</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <p>
+            alka<strong>tera</strong> helps you measure the carbon footprint of your products and operations.
+            For most drinks producers, the electricity used in production, packing, and chilling is one of the
+            largest and most controllable parts of that footprint. Generating your own clean power on site is
+            one of the most direct ways to bring it down.
+          </p>
+          <p>
+            Lucent Energy specialises in solar electricity systems for the drinks industry. They understand the
+            demand patterns of breweries, distilleries, and wineries, and design systems that match generation to
+            the way you actually use power, rather than selling a one-size-fits-all installation.
+          </p>
+          <p>
+            This is not a generic marketplace listing. We have chosen Lucent as our solar partner because of the
+            quality of their work and their focus on real, measurable outcomes. When you engage Lucent you contract
+            with them directly. alka<strong>tera</strong> does not take a margin on the work.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Service Categories */}
+      <PartnerServices heading="What Lucent Energy can help with" categories={SERVICE_CATEGORIES} />
+    </div>
+  )
+}

@@ -56,7 +56,7 @@ export function VerificationCard({ variant }: VerificationCardProps) {
             <p className="text-sm text-muted-foreground">{description}</p>
             <div className="flex items-center gap-3 pt-1">
               <Button variant="outline" size="sm" asChild>
-                <Link href="/expert-partners/">
+                <Link href="/expert-partners/impact-focus/">
                   Learn about this service
                   <ArrowRight className="ml-1 h-3 w-3" />
                 </Link>
