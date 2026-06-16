@@ -12,7 +12,10 @@ const CreatePostSchema = z.object({
   tags: z.array(z.string()).optional().nullable(),
   content_type: z.string().optional().nullable(),
   status: z.string().optional().nullable(),
-  read_time: z.number().optional().nullable(),
+  // read_time is a free-text label ("5 min read", "3:24"); the DB column is
+  // `text` and calculate_read_time() returns text. Must be a string, not a
+  // number, or the form payload fails validation with "Invalid request body".
+  read_time: z.string().optional().nullable(),
   meta_title: z.string().optional().nullable(),
   meta_description: z.string().optional().nullable(),
   og_image_url: z.string().optional().nullable(),
