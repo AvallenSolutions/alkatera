@@ -94,7 +94,7 @@ export default function ExpertPartnersPage() {
                     <img
                       src={partner.logoSrc}
                       alt={partner.name}
-                      className={cn('h-14 w-14 shrink-0 rounded-md', partner.logoClassName)}
+                      className={cn('h-14 w-14 shrink-0 rounded-md object-contain', partner.logoClassName)}
                     />
                     <div className="space-y-1.5 min-w-0">
                       <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{partner.name}</h2>
