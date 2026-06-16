@@ -19,9 +19,8 @@ import {
 import { PartnerServices } from '@/components/partners/PartnerServices'
 import type { PartnerServiceCategory } from '@/lib/partners/service-styles'
 
-// TODO(tim): confirm Lucent Energy's real website URL and enquiry email, then update these.
-const LUCENT_WEBSITE = 'https://www.lucent.energy'
-const LUCENT_EMAIL = 'hello@lucent.energy'
+const LUCENT_WEBSITE = 'https://www.lucentenergy.co.uk'
+const LUCENT_EMAIL = 'info@lucentenergy.co.uk'
 const LUCENT_MAILTO = `mailto:${LUCENT_EMAIL}?subject=${encodeURIComponent(
   'Solar enquiry from alkatera user',
 )}&body=${encodeURIComponent(
