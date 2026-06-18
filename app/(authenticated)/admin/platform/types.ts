@@ -183,3 +183,21 @@ export interface PlatformAlerts {
   inactive_orgs: InactiveOrgAlert[];
   verification_backlog: number;
 }
+
+// Admin Audit Log
+export interface AdminAuditEntry {
+  id: string;
+  actor_id: string | null;
+  actor_email: string | null;
+  action: string;
+  target_type: string | null;
+  target_id: string | null;
+  target_label: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface AdminAuditLog {
+  total: number;
+  entries: AdminAuditEntry[];
+}

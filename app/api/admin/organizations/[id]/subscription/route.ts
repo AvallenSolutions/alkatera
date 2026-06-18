@@ -95,7 +95,7 @@ export async function PATCH(
 
     const { data: existing, error: fetchError } = await adminClient
       .from('organizations')
-      .select('id, subscription_started_at')
+      .select('id, name, subscription_tier, subscription_status, subscription_started_at')
       .eq('id', params.id)
       .maybeSingle();
 
@@ -116,6 +116,29 @@ export async function PATCH(
       .single();
 
     if (updateError) throw updateError;
+
+    // Audit trail: record who changed what (actor derived server-side in the RPC).
+    // Non-fatal: an audit hiccup must not fail the admin action.
+    try {
+      const changes: Record<string, { from: unknown; to: unknown }> = {};
+      if (subscription_tier !== undefined && subscription_tier !== existing.subscription_tier) {
+        changes.tier = { from: existing.subscription_tier, to: subscription_tier };
+      }
+      if (subscription_status !== undefined && subscription_status !== existing.subscription_status) {
+        changes.status = { from: existing.subscription_status, to: subscription_status };
+      }
+      if (Object.keys(changes).length > 0) {
+        await (supabase.rpc as any)('log_admin_action', {
+          p_action: 'org.subscription_update',
+          p_target_type: 'organization',
+          p_target_id: params.id,
+          p_target_label: existing.name ?? updated?.name ?? null,
+          p_metadata: changes,
+        });
+      }
+    } catch (logErr) {
+      console.warn('[audit] failed to log org.subscription_update', logErr);
+    }
 
     return NextResponse.json({ organization: updated });
   } catch (error: unknown) {

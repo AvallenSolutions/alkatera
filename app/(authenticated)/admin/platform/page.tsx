@@ -26,6 +26,7 @@ import { OrganizationsAndSuppliersCard } from "./components/OrganizationsAndSupp
 import { InsightsSection } from "./components/InsightsSection";
 import { AlertsPanel } from "./components/AlertsPanel";
 import { FeatureAdoptionCard } from "./components/FeatureAdoptionCard";
+import { AdminAuditLogSection } from "./components/AdminAuditLogSection";
 
 export default function PlatformDashboardPage() {
   const { isAlkateraAdmin, isLoading: authLoading } = useIsAlkateraAdmin();
@@ -220,6 +221,9 @@ export default function PlatformDashboardPage() {
         loading={false}
         onOrganizationUpdated={fetchData}
       />
+
+      {/* Admin audit trail — who changed what, for accountability */}
+      <AdminAuditLogSection />
 
       {/* Integrations */}
       <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-5 space-y-3">
