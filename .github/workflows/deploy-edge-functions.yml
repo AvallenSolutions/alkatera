@@ -31,6 +31,7 @@ jobs:
           supabase link --project-ref $SUPABASE_PROJECT_ID
 
           # Deploy all edge functions
+          supabase functions deploy invite-advisor --no-verify-jwt
           supabase functions deploy add-facility-activity-entry --no-verify-jwt
           supabase functions deploy add-facility-activity-data --no-verify-jwt
           supabase functions deploy create-calculation-log --no-verify-jwt
