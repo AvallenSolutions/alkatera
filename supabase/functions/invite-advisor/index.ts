@@ -7,12 +7,32 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+type AdvisorAccessLevel = "read_only" | "read_write";
+
 interface InviteAdvisorRequest {
   email: string;
   accessNotes?: string;
+  accessLevel?: AdvisorAccessLevel;
 }
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Look up an auth user by email, paginating so users beyond the first page
+// are not missed (listUsers defaults to 50 per page).
+async function findUserByEmail(
+  adminClient: ReturnType<typeof createClient>,
+  email: string,
+) {
+  const perPage = 200;
+  for (let page = 1; page <= 50; page++) {
+    const { data, error } = await adminClient.auth.admin.listUsers({ page, perPage });
+    if (error || !data?.users?.length) break;
+    const match = data.users.find((u) => u.email?.toLowerCase() === email);
+    if (match) return match;
+    if (data.users.length < perPage) break;
+  }
+  return null;
+}
 
 function escapeHtml(text: string): string {
   if (!text) return '';
@@ -24,8 +44,11 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#039;');
 }
 
-function buildAdvisorInviteEmail(inviteLink: string, organizationName: string, accessNotes: string | null, siteUrl: string): string {
+function buildAdvisorInviteEmail(inviteLink: string, organizationName: string, accessNotes: string | null, siteUrl: string, accessLevel: AdvisorAccessLevel): string {
   const logoUrl = 'https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png';
+  const accessDescription = accessLevel === 'read_only'
+    ? "As an advisor, you'll have view-only access to their sustainability data, reports, and LCA assessments to help them measure, manage, and improve their environmental impact."
+    : "As an advisor, you'll be able to view and edit their sustainability data, manage LCA assessments, and generate reports to help them measure, manage, and improve their environmental impact.";
 
   return `
     <!DOCTYPE html>
@@ -55,12 +78,12 @@ function buildAdvisorInviteEmail(inviteLink: string, organizationName: string, a
 
                   <p style="margin: 0 0 20px 0; color: #4a4a4a; font-size: 16px;">You've been invited to become an advisor for <strong>${escapeHtml(organizationName)}</strong> on alka<strong>tera</strong>.</p>
 
-                  <p style="margin: 0 0 20px 0; color: #4a4a4a; font-size: 16px;">As an advisor, you'll have read-only access to their sustainability data to help them measure, manage, and improve their environmental impact.</p>
+                  <p style="margin: 0 0 20px 0; color: #4a4a4a; font-size: 16px;">${accessDescription}</p>
 
                   ${accessNotes ? `
                   <div style="margin: 20px 0; padding: 16px; border-left: 4px solid #ccff00; background-color: #f9f9f9; border-radius: 0 8px 8px 0;">
                     <p style="margin: 0; color: #666; font-size: 14px; font-style: italic;">"${escapeHtml(accessNotes)}"</p>
-                    <p style="margin: 8px 0 0 0; color: #888; font-size: 12px;">— Message from the organisation</p>
+                    <p style="margin: 8px 0 0 0; color: #888; font-size: 12px;">Message from the organisation</p>
                   </div>
                   ` : ''}
 
@@ -175,7 +198,10 @@ Deno.serve(async (req: Request) => {
     }
 
     const requestBody = await req.json();
-    const { email, accessNotes }: InviteAdvisorRequest = requestBody;
+    const { email, accessNotes, accessLevel }: InviteAdvisorRequest = requestBody;
+
+    const normalizedAccessLevel: AdvisorAccessLevel =
+      accessLevel === 'read_only' ? 'read_only' : 'read_write';
 
     if (!email || typeof email !== 'string') {
       return new Response(
@@ -215,7 +241,7 @@ Deno.serve(async (req: Request) => {
       console.error("Error getting organization ID:", orgIdError);
       return new Response(
         JSON.stringify({
-          error: "You must be a member of an organization to invite advisors"
+          error: "You must be a member of an organisation to invite advisors"
         }),
         {
           status: 403,
@@ -234,7 +260,7 @@ Deno.serve(async (req: Request) => {
     if (!userRole || userRole !== 'company_admin') {
       return new Response(
         JSON.stringify({
-          error: "Only organization owners and admins can invite advisors"
+          error: "Only organisation owners and admins can invite advisors"
         }),
         {
           status: 403,
@@ -273,32 +299,24 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Check if advisor already has active access
-    const { data: existingAccess } = await adminClient
-      .from("advisor_organization_access")
-      .select("id")
-      .eq("organization_id", organizationId)
-      .eq("is_active", true)
-      .single();
+    // If this email already belongs to a user with active access to this org,
+    // block the duplicate. The accept RPC is the authoritative guard; this is a
+    // friendly early-out so the admin gets a clear message instead of a silent no-op.
+    const existingUser = await findUserByEmail(adminClient, normalizedEmail);
 
-    // Get the user ID for this email if they exist
-    const { data: existingUsers } = await adminClient.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find(u => u.email?.toLowerCase() === normalizedEmail);
-
-    if (existingUser && existingAccess) {
-      // Check if this specific user already has access
+    if (existingUser) {
       const { data: userAccess } = await adminClient
         .from("advisor_organization_access")
         .select("id")
         .eq("organization_id", organizationId)
         .eq("advisor_user_id", existingUser.id)
         .eq("is_active", true)
-        .single();
+        .maybeSingle();
 
       if (userAccess) {
         return new Response(
           JSON.stringify({
-            error: "This user already has advisor access to your organization"
+            error: "This user already has advisor access to your organisation"
           }),
           {
             status: 409,
@@ -315,7 +333,7 @@ Deno.serve(async (req: Request) => {
       .eq("id", organizationId)
       .single();
 
-    const organizationName = orgData?.name || "your organization";
+    const organizationName = orgData?.name || "your organisation";
 
     // Create the invitation
     const { data: invitation, error: inviteError } = await adminClient
@@ -325,6 +343,7 @@ Deno.serve(async (req: Request) => {
         advisor_email: normalizedEmail,
         invited_by: user.id,
         access_notes: accessNotes?.trim() || null,
+        access_level: normalizedAccessLevel,
       })
       .select("invitation_token")
       .single();
@@ -357,7 +376,7 @@ Deno.serve(async (req: Request) => {
     const inviteLink = `${siteUrl}/advisor-invite/${invitation.invitation_token}`;
 
     // Send branded email via Resend
-    const emailHtml = buildAdvisorInviteEmail(inviteLink, organizationName, accessNotes?.trim() || null, siteUrl);
+    const emailHtml = buildAdvisorInviteEmail(inviteLink, organizationName, accessNotes?.trim() || null, siteUrl, normalizedAccessLevel);
 
     const resendResponse = await fetch('https://api.resend.com/emails', {
       method: 'POST',

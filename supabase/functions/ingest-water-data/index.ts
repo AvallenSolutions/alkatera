@@ -125,20 +125,33 @@ Deno.serve(async (req: Request) => {
 
     // If not a member, check advisor access
     let organizationId = memberData?.organization_id;
+    let isReadOnlyAdvisor = false;
     if (!organizationId) {
       const { data: advisorData } = await supabaseAdmin
         .from("advisor_organization_access")
-        .select("organization_id")
+        .select("organization_id, access_level")
         .eq("advisor_user_id", user.id)
         .eq("is_active", true)
         .limit(1)
         .maybeSingle();
       organizationId = advisorData?.organization_id;
+      isReadOnlyAdvisor = advisorData?.access_level === "read_only";
     }
 
     if (!organizationId) {
       return new Response(
         JSON.stringify({ error: "User does not have access to any organization" }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // This endpoint writes water/activity data; read-only advisors may not.
+    if (isReadOnlyAdvisor) {
+      return new Response(
+        JSON.stringify({ error: "Read-only advisors cannot modify this organisation's data." }),
         {
           status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },

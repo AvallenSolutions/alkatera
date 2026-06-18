@@ -9,10 +9,14 @@ import { SignupForm } from "./SignupForm"
 
 interface AuthFormProps {
   tier?: string | null
+  returnUrl?: string | null
 }
 
-export function AuthForm({ tier }: AuthFormProps) {
+export function AuthForm({ tier, returnUrl }: AuthFormProps) {
   const [mode, setMode] = useState<"login" | "signup">(tier ? "signup" : "login")
+
+  // Where to land after auth: an explicit returnUrl wins, then the tier flow.
+  const redirectTo = returnUrl ?? (tier ? `/settings?tier=${tier}` : undefined)
 
   return (
     <div data-auth-page className="relative min-h-screen text-white">
@@ -68,9 +72,9 @@ export function AuthForm({ tier }: AuthFormProps) {
           <div className="border border-white/10 bg-white/5 backdrop-blur-md rounded-2xl p-8">
             {/* Auth Forms */}
             {mode === "login" ? (
-              <LoginForm redirectTo={tier ? `/settings?tier=${tier}` : undefined} />
+              <LoginForm redirectTo={redirectTo} />
             ) : (
-              <SignupForm redirectTo={tier ? `/settings?tier=${tier}` : undefined} />
+              <SignupForm redirectTo={redirectTo} />
             )}
 
             {/* Forgot password & mode toggle */}

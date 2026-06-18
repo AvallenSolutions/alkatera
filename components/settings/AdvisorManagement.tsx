@@ -50,6 +50,8 @@ import {
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
+type AdvisorAccessLevel = 'read_only' | 'read_write';
+
 interface Advisor {
   advisor_user_id: string;
   advisor_email: string;
@@ -58,6 +60,7 @@ interface Advisor {
   expertise_areas: string[] | null;
   granted_at: string;
   is_active: boolean;
+  access_level: AdvisorAccessLevel;
 }
 
 interface AdvisorInvitation {
@@ -67,6 +70,7 @@ interface AdvisorInvitation {
   invited_at: string;
   expires_at: string;
   access_notes: string | null;
+  access_level: AdvisorAccessLevel;
 }
 
 export function AdvisorManagement() {
@@ -78,6 +82,7 @@ export function AdvisorManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [inviteeEmail, setInviteeEmail] = useState('');
   const [accessNotes, setAccessNotes] = useState('');
+  const [accessLevel, setAccessLevel] = useState<AdvisorAccessLevel>('read_write');
   const [advisorToRevoke, setAdvisorToRevoke] = useState<Advisor | null>(null);
   const [isRevoking, setIsRevoking] = useState(false);
   const { toast } = useToast();
@@ -105,7 +110,7 @@ export function AdvisorManagement() {
       // Fetch pending invitations
       const { data: invitationData, error: invitationError } = await supabase
         .from('advisor_invitations')
-        .select('id, advisor_email, status, invited_at, expires_at, access_notes')
+        .select('id, advisor_email, status, invited_at, expires_at, access_notes, access_level')
         .eq('organization_id', currentOrganization.id)
         .in('status', ['pending', 'expired'])
         .order('invited_at', { ascending: false });
@@ -161,6 +166,7 @@ export function AdvisorManagement() {
           body: JSON.stringify({
             email: inviteeEmail.trim(),
             accessNotes: accessNotes.trim() || undefined,
+            accessLevel,
           }),
         }
       );
@@ -179,6 +185,7 @@ export function AdvisorManagement() {
       setIsDialogOpen(false);
       setInviteeEmail('');
       setAccessNotes('');
+      setAccessLevel('read_write');
       fetchAdvisors();
     } catch (error) {
       console.error('Error inviting advisor:', error);
@@ -225,6 +232,50 @@ export function AdvisorManagement() {
       setIsRevoking(false);
     }
   };
+
+  const handleChangeLevel = async (advisor: Advisor, level: AdvisorAccessLevel) => {
+    if (!currentOrganization || level === advisor.access_level) return;
+
+    // Optimistic update
+    setAdvisors((prev) =>
+      prev.map((a) =>
+        a.advisor_user_id === advisor.advisor_user_id ? { ...a, access_level: level } : a
+      )
+    );
+
+    const { error } = await supabase.rpc('set_advisor_access_level', {
+      p_advisor_user_id: advisor.advisor_user_id,
+      p_organization_id: currentOrganization.id,
+      p_level: level,
+    });
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update access level. Please try again.',
+        variant: 'destructive',
+      });
+      fetchAdvisors(); // revert to server truth
+    } else {
+      toast({
+        title: 'Access Updated',
+        description: `${advisor.advisor_name || advisor.advisor_email} now has ${
+          level === 'read_only' ? 'read-only' : 'read & write'
+        } access.`,
+      });
+    }
+  };
+
+  const accessBadge = (level: AdvisorAccessLevel) =>
+    level === 'read_only' ? (
+      <Badge variant="outline" className="text-sky-600 border-sky-600">
+        Read only
+      </Badge>
+    ) : (
+      <Badge variant="outline" className="text-emerald-600 border-emerald-600">
+        Read &amp; write
+      </Badge>
+    );
 
   const handleCancelInvitation = async (invitationId: string) => {
     try {
@@ -320,8 +371,8 @@ export function AdvisorManagement() {
                 <DialogHeader>
                   <DialogTitle>Invite Sustainability Advisor</DialogTitle>
                   <DialogDescription>
-                    Invite an alkatera-accredited advisor to help with your sustainability journey.
-                    They will receive full access to data, reports, and LCA features.
+                    Invite a sustainability advisor to help with your sustainability journey.
+                    They will receive full access to your data, reports, and LCA features.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
@@ -349,6 +400,44 @@ export function AdvisorManagement() {
                     />
                     <p className="text-xs text-muted-foreground">
                       These notes will be visible to the advisor when they accept the invitation.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Access Level</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {([
+                        {
+                          value: 'read_write' as const,
+                          title: 'Read & write',
+                          desc: 'View and edit data, LCAs, and reports',
+                        },
+                        {
+                          value: 'read_only' as const,
+                          title: 'Read only',
+                          desc: 'View data and reports; cannot make changes',
+                        },
+                      ]).map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setAccessLevel(opt.value)}
+                          disabled={isInviting}
+                          aria-pressed={accessLevel === opt.value}
+                          className={`rounded-lg border p-3 text-left transition-colors disabled:opacity-50 ${
+                            accessLevel === opt.value
+                              ? 'border-primary ring-1 ring-primary bg-primary/5'
+                              : 'border-input hover:border-primary/50'
+                          }`}
+                        >
+                          <span className="block text-sm font-medium">{opt.title}</span>
+                          <span className="block text-xs text-muted-foreground mt-0.5">
+                            {opt.desc}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      You can change this at any time from the advisors list.
                     </p>
                   </div>
                 </div>
@@ -422,6 +511,7 @@ export function AdvisorManagement() {
                         <TableHead>Advisor</TableHead>
                         <TableHead>Company</TableHead>
                         <TableHead>Expertise</TableHead>
+                        <TableHead>Access</TableHead>
                         <TableHead>Since</TableHead>
                         {isAdmin && <TableHead className="text-right">Actions</TableHead>}
                       </TableRow>
@@ -453,6 +543,26 @@ export function AdvisorManagement() {
                                 </Badge>
                               )}
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            {isAdmin ? (
+                              <select
+                                value={advisor.access_level}
+                                onChange={(e) =>
+                                  handleChangeLevel(
+                                    advisor,
+                                    e.target.value as AdvisorAccessLevel
+                                  )
+                                }
+                                className="h-8 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                aria-label="Advisor access level"
+                              >
+                                <option value="read_write">Read &amp; write</option>
+                                <option value="read_only">Read only</option>
+                              </select>
+                            ) : (
+                              accessBadge(advisor.access_level)
+                            )}
                           </TableCell>
                           <TableCell>
                             {new Date(advisor.granted_at).toLocaleDateString()}
@@ -487,6 +597,7 @@ export function AdvisorManagement() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Email</TableHead>
+                        <TableHead>Access</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Sent</TableHead>
                         <TableHead>Expires</TableHead>
@@ -499,6 +610,7 @@ export function AdvisorManagement() {
                           <TableCell className="font-medium">
                             {invitation.advisor_email}
                           </TableCell>
+                          <TableCell>{accessBadge(invitation.access_level)}</TableCell>
                           <TableCell>{getStatusBadge(invitation.status)}</TableCell>
                           <TableCell>
                             {new Date(invitation.invited_at).toLocaleDateString()}

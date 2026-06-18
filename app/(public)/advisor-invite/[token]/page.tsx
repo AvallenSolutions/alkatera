@@ -24,6 +24,7 @@ interface InvitationDetails {
   invited_at: string;
   expires_at: string;
   status: string;
+  access_level: 'read_only' | 'read_write';
 }
 
 export default function AdvisorInvitePage() {
@@ -63,6 +64,7 @@ export default function AdvisorInvitePage() {
           invited_at: string;
           expires_at: string;
           status: string;
+          access_level: 'read_only' | 'read_write';
           organization_name: string;
         } | null;
 
@@ -113,6 +115,7 @@ export default function AdvisorInvitePage() {
           invited_at: data.invited_at,
           expires_at: data.expires_at,
           status: data.status,
+          access_level: data.access_level === 'read_only' ? 'read_only' : 'read_write',
         });
       } catch (err) {
         console.error('Error loading invitation:', err);
@@ -160,9 +163,10 @@ export default function AdvisorInvitePage() {
   };
 
   const handleSignIn = () => {
-    // Store the return URL and redirect to sign in
+    // Store the return URL and redirect to the auth page. New advisors can
+    // toggle to "Sign up" there; on success they return here to accept.
     const returnUrl = `/advisor-invite/${token}`;
-    router.push(`/sign-in?returnUrl=${encodeURIComponent(returnUrl)}`);
+    router.push(`/login?returnUrl=${encodeURIComponent(returnUrl)}`);
   };
 
   if (isLoading) {
@@ -289,16 +293,28 @@ export default function AdvisorInvitePage() {
             </div>
           )}
 
-          {/* What advisors can do */}
+          {/* What advisors can do (depends on the access level granted) */}
           <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
             <p className="text-sm font-medium text-green-700 dark:text-green-300 mb-2">
-              As an advisor, you will be able to:
+              {invitation.access_level === 'read_only'
+                ? 'You have been granted read-only access. You will be able to:'
+                : 'You have been granted read & write access. You will be able to:'}
             </p>
             <ul className="text-sm text-green-600 dark:text-green-400 space-y-1 list-disc list-inside">
-              <li>View and edit sustainability data</li>
-              <li>Create and manage LCA assessments</li>
-              <li>Generate and publish reports</li>
-              <li>View audit logs</li>
+              {invitation.access_level === 'read_only' ? (
+                <>
+                  <li>View sustainability data and LCA assessments</li>
+                  <li>Generate reports</li>
+                  <li>Message the team with advice</li>
+                </>
+              ) : (
+                <>
+                  <li>View and edit sustainability data</li>
+                  <li>Create and manage LCA assessments</li>
+                  <li>Generate and publish reports</li>
+                  <li>View audit logs</li>
+                </>
+              )}
             </ul>
           </div>
 
@@ -308,13 +324,14 @@ export default function AdvisorInvitePage() {
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  Please sign in to accept this invitation. Make sure to use the email address:{' '}
-                  <strong>{invitation.advisor_email}</strong>
+                  Sign in to accept this invitation, or create an account if you don&apos;t
+                  have one yet. Either way, use the email address{' '}
+                  <strong>{invitation.advisor_email}</strong>.
                 </AlertDescription>
               </Alert>
               <Button className="w-full" onClick={handleSignIn}>
                 <LogIn className="mr-2 h-4 w-4" />
-                Sign In to Accept
+                Sign In or Create Account
               </Button>
             </div>
           ) : emailMismatch ? (

@@ -147,20 +147,30 @@ Deno.serve(async (req: Request) => {
 
     // If not a member, check if user has advisor access
     let hasAccess = !!memberCheck;
+    let isReadOnlyAdvisor = false;
     if (!hasAccess) {
       const { data: advisorCheck } = await supabase
         .from("advisor_organization_access")
-        .select("id")
+        .select("id, access_level")
         .eq("organization_id", payload.organization_id)
         .eq("advisor_user_id", user.id)
         .eq("is_active", true)
         .maybeSingle();
       hasAccess = !!advisorCheck;
+      isReadOnlyAdvisor = advisorCheck?.access_level === "read_only";
     }
 
     if (!hasAccess) {
       return new Response(
         JSON.stringify({ error: "User does not have access to this organization" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // This endpoint writes facility activity entries; read-only advisors may not.
+    if (isReadOnlyAdvisor) {
+      return new Response(
+        JSON.stringify({ error: "Read-only advisors cannot modify this organisation's data." }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
