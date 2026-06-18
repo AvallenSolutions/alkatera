@@ -15,6 +15,14 @@ Tim Etherington-Judge, Co-Founder at alka**tera**.
 
 → Full glossary: memory/glossary.md
 
+## Local dev: NEVER point at production
+
+Local development runs against a **local Supabase** (`supabase start` + `supabase db reset`),
+never the production project. Production holds real customer data and a service-role key bypasses
+RLS entirely, so **no production credentials belong in this workspace** (incl. `.env.local`).
+Full setup + the squashed-migrations model: `LOCAL_DEV.md`. To inspect prod, use the Supabase
+dashboard with your own login — do not drop a prod service-role key into a dotfile here.
+
 ## Background work: ALWAYS use Inngest, never raw Netlify Schedule
 
 For anything that could take more than ~30 seconds — scraping, document
