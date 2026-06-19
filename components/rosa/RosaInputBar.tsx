@@ -1,13 +1,12 @@
 'use client'
 
 import { useCallback, useRef, useState } from 'react'
-import { Paperclip, Sparkles, ArrowUp } from 'lucide-react'
+import { Paperclip, ArrowUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useOrganization } from '@/lib/organizationContext'
-import { supabase } from '@/lib/supabaseClient'
 import { toast } from 'sonner'
-import { DocumentReviewModal, type ExtractResult, type ImportSummary } from '@/components/rosa/DocumentReviewModal'
+import { UniversalDropzone } from '@/components/layouts/UniversalDropzone'
 
 interface Props {
   /** Called when user submits text. Caller decides what to do (chat takeover). */
@@ -26,25 +25,14 @@ const SLASH_COMMANDS: Array<{ command: string; hint: string; href?: string; seed
   { command: '/deadlines', hint: 'upcoming regulatory deadlines', seed: 'List my upcoming regulatory deadlines and how prepared I am for each.' },
 ]
 
-// File types that go through the review modal (Claude vision extraction).
-const REVIEW_MIME_TYPES = new Set([
-  'application/pdf',
-  'image/png',
-  'image/jpeg',
-  'image/webp',
-  'image/gif',
-])
-
 /**
  * Persistent input bar at the bottom of the Rosa canvas.
  *
  * Three things go in:
  *   1. Free text → handed to onSubmit; caller switches to chat takeover
- *   2. File drop / paperclip:
- *      - PDF / image → upload to rosa-uploads, run Claude extraction,
- *        show DocumentReviewModal so the user can confirm + import
- *      - Spreadsheet / CSV → routed through /api/ingest/auto (existing
- *        pipeline); a toast confirms it landed in the queue
+ *   2. File drop / paperclip → handed to the shared smart-upload dialog
+ *      (UniversalDropzone), so every upload surface uses ONE classifier and
+ *      one review UI regardless of file type (PDF, image, or spreadsheet)
  *   3. Slash commands like /queue, /footprint
  */
 export function RosaInputBar({ onSubmit, placeholder, defaultValue }: Props) {
@@ -52,16 +40,10 @@ export function RosaInputBar({ onSubmit, placeholder, defaultValue }: Props) {
   const orgId = currentOrganization?.id
   const [value, setValue] = useState(defaultValue || '')
   const [showSlash, setShowSlash] = useState(false)
-  const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  // Review modal state
-  const [reviewOpen, setReviewOpen] = useState(false)
-  const [reviewFileId, setReviewFileId] = useState('')
-  const [reviewFilename, setReviewFilename] = useState('')
-  const [extracting, setExtracting] = useState(false)
-  const [extractResult, setExtractResult] = useState<ExtractResult | null>(null)
-  const [extractError, setExtractError] = useState<string | null>(null)
+  // File handed to the shared smart-upload dialog.
+  const [dropzoneFile, setDropzoneFile] = useState<File | null>(null)
 
   const submit = useCallback(() => {
     const trimmed = value.trim()
@@ -94,99 +76,15 @@ export function RosaInputBar({ onSubmit, placeholder, defaultValue }: Props) {
   }
 
   const handleFile = useCallback(
-    async (file: File) => {
+    (file: File) => {
       if (!orgId) {
         toast.error('No organisation context.')
         return
       }
-
-      // Non-vision files (spreadsheets, CSV) → existing ingest pipeline.
-      if (!REVIEW_MIME_TYPES.has(file.type)) {
-        setUploading(true)
-        try {
-          const session = (await supabase.auth.getSession()).data.session
-          const formData = new FormData()
-          formData.append('file', file)
-          formData.append('organizationId', orgId)
-          const res = await fetch('/api/ingest/auto', {
-            method: 'POST',
-            headers: session?.access_token
-              ? { Authorization: `Bearer ${session.access_token}` }
-              : undefined,
-            body: formData,
-          })
-          const body = await res.json().catch(() => ({}))
-          if (!res.ok) throw new Error(body?.error || 'Upload failed')
-          toast.success(`I'm reading ${file.name}…`, {
-            description: 'It will appear in your queue once classified.',
-          })
-        } catch (err: any) {
-          toast.error(err?.message || 'Upload failed')
-        } finally {
-          setUploading(false)
-        }
-        return
-      }
-
-      // PDF / image → upload to rosa-uploads, then run extraction.
-      setUploading(true)
-      let fileId: string
-      let filename: string
-      try {
-        const form = new FormData()
-        form.append('file', file)
-        const res = await fetch('/api/rosa/uploads', { method: 'POST', body: form })
-        const json = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(json.error || `Upload failed (${res.status})`)
-        fileId = json.file_id
-        filename = json.filename
-      } catch (err: any) {
-        toast.error(err?.message || 'Upload failed')
-        setUploading(false)
-        return
-      }
-      setUploading(false)
-
-      // Open modal immediately, extraction runs in background.
-      setReviewFileId(fileId)
-      setReviewFilename(filename)
-      setExtractResult(null)
-      setExtractError(null)
-      setExtracting(true)
-      setReviewOpen(true)
-
-      try {
-        const res = await fetch('/api/rosa/uploads/extract', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ file_id: fileId }),
-        })
-        const json: ExtractResult = await res.json().catch(() => ({
-          ok: false,
-          error: 'Could not parse extraction response',
-          document_type: 'other',
-          utility_type: '',
-          supplier_name: null,
-          account_number: null,
-          period_start: null,
-          period_end: null,
-          quantity_value: null,
-          quantity_unit: null,
-          total_cost: null,
-          currency: null,
-          notes: null,
-          facilities: [],
-        }))
-        if (!res.ok) {
-          setExtractError(json.error ?? `Extraction failed (${res.status})`)
-        } else {
-          setExtractResult(json)
-        }
-      } catch {
-        setExtractError('Network error during extraction.')
-      } finally {
-        setExtracting(false)
-      }
+      // One classifier, one review UI everywhere: hand the file to the shared
+      // smart-upload dialog (the same flow as the /rosa "Drop a document"
+      // button), instead of the old 3-type rosa-uploads extractor.
+      setDropzoneFile(file)
     },
     [orgId],
   )
@@ -199,26 +97,9 @@ export function RosaInputBar({ onSubmit, placeholder, defaultValue }: Props) {
 
   return (
     <>
-      <DocumentReviewModal
-        open={reviewOpen}
-        onOpenChange={setReviewOpen}
-        filename={reviewFilename}
-        fileId={reviewFileId}
-        extracting={extracting}
-        extractResult={extractResult}
-        extractError={extractError}
-        onImport={(summary: ImportSummary) => {
-          setReviewOpen(false)
-          toast.success(`Saved to ${summary.facilityName}`, {
-            description: `${summary.utilityLabel} · ${summary.quantity} ${summary.unit} · ${summary.periodStart} to ${summary.periodEnd}`,
-          })
-          // Signal that org data has changed so PriorityTiles re-curates.
-          window.dispatchEvent(new CustomEvent('rosa:data-updated', { detail: { source: 'document-import' } }))
-        }}
-        onSendToRosa={() => {
-          setReviewOpen(false)
-          onSubmit(`I've just uploaded ${reviewFilename} — can you read it and tell me what it contains?`)
-        }}
+      <UniversalDropzone
+        file={dropzoneFile}
+        onFileConsumed={() => setDropzoneFile(null)}
       />
       <div className="relative">
         {showSlash && (
@@ -261,12 +142,9 @@ export function RosaInputBar({ onSubmit, placeholder, defaultValue }: Props) {
             variant="ghost"
             className="h-9 w-9 flex-shrink-0"
             onClick={() => fileRef.current?.click()}
-            disabled={uploading}
             aria-label="Upload a document"
           >
-            {uploading
-              ? <Sparkles className="h-4 w-4 animate-pulse" />
-              : <Paperclip className="h-4 w-4" />}
+            <Paperclip className="h-4 w-4" />
           </Button>
           <textarea
             value={value}
@@ -291,10 +169,10 @@ export function RosaInputBar({ onSubmit, placeholder, defaultValue }: Props) {
             size="icon"
             className="h-9 w-9 flex-shrink-0 bg-[#ccff00] text-black hover:bg-[#b8e600] disabled:opacity-50"
             onClick={submit}
-            disabled={!value.trim() || uploading}
+            disabled={!value.trim()}
             aria-label="Send"
           >
-            {uploading ? <Sparkles className="h-4 w-4 animate-pulse" /> : <ArrowUp className="h-4 w-4" />}
+            <ArrowUp className="h-4 w-4" />
           </Button>
         </div>
       </div>

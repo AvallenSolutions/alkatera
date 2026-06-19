@@ -92,6 +92,7 @@ async function runInlineClassifier(
   serviceClient: any,
   jobId: string,
   file: File,
+  stashPath: string,
 ): Promise<void> {
   const updateJob = (patch: Record<string, any>) =>
     serviceClient
@@ -109,9 +110,11 @@ async function runInlineClassifier(
       fileName: file.name,
       fileMime: file.type || '',
     })
-    // Best-effort stashId — we already stashed it above; the inline path
-    // doesn't need the path back, but the shaper expects it.
-    const shaped = shapeIngestResult(result.type, result.payload, '')
+    // Pass the real stash path so the file carry-through works on the inline
+    // path too. Without it, historical-report source PDFs are never preserved
+    // and the bom / spray_diary / soil_carbon_evidence handoffs silently
+    // degrade to "re-upload the file" for every file under the inline ceiling.
+    const shaped = shapeIngestResult(result.type, result.payload, stashPath)
     await updateJob({
       status: 'completed',
       phase_message: null,
@@ -162,6 +165,12 @@ export type IngestResultType =
   | 'bulk_xlsx'
   | 'spray_diary'
   | 'bom'
+  | 'supplier_invoice'
+  | 'freight_invoice'
+  | 'refrigerant_service'
+  | 'packaging_spec'
+  | 'supplier_coa'
+  | 'certification'
   | 'soil_carbon_lab'
   | 'soil_carbon_evidence'
   | 'accounts_csv'
@@ -189,6 +198,74 @@ export interface IngestResponse {
     product_description?: string
     unit_size_value?: number
     unit_size_unit?: string
+    line_items?: Array<{
+      name?: string
+      quantity?: number
+      unit?: string
+      type?: 'ingredient' | 'packaging'
+    }>
+  }
+  supplierInvoice?: {
+    supplier_name?: string
+    invoice_date?: string
+    currency?: 'GBP' | 'USD' | 'EUR'
+    suggested_category?: string
+    line_items?: Array<{ description?: string; amount?: number; quantity?: number; unit?: string }>
+    invoice_total?: number
+    stashId?: string
+  }
+  freightInvoice?: {
+    carrier_name?: string
+    shipment_date?: string
+    transport_mode?: 'truck' | 'train' | 'ship' | 'air'
+    weight_kg?: number
+    distance_km?: number
+    origin?: string
+    destination?: string
+    amount?: number
+    currency?: 'GBP' | 'USD' | 'EUR'
+    stashId?: string
+  }
+  refrigerantService?: {
+    service_date?: string
+    refrigerant_type?: string
+    quantity_kg?: number
+    equipment?: string
+    engineer?: string
+    stashId?: string
+  }
+  packagingSpec?: {
+    product_hint?: string
+    components?: Array<{
+      component_name?: string
+      material?: string
+      role?: 'container' | 'label' | 'closure' | 'secondary' | 'shipment' | 'tertiary'
+      weight_g?: number
+      recycled_content_pct?: number
+      recyclability_pct?: number
+    }>
+    stashId?: string
+  }
+  supplierCoa?: {
+    supplier_name?: string
+    product_name?: string
+    document_type?: 'specification_sheet' | 'test_report' | 'carbon_certificate'
+    document_date?: string
+    expiry_date?: string
+    reference_number?: string
+    covers_climate?: boolean
+    covers_water?: boolean
+    covers_waste?: boolean
+    stashId?: string
+  }
+  certification?: {
+    framework_hint?: string
+    certificate_name?: string
+    issuer?: string
+    certificate_number?: string
+    issue_date?: string
+    expiry_date?: string
+    stashId?: string
   }
   soilCarbonLab?: {
     lab_name?: string
@@ -325,7 +402,7 @@ export async function POST(request: NextRequest) {
     // back to the background trigger for large PDFs that wouldn't finish
     // inside Netlify's 26s sync ceiling.
     if (file.size <= INLINE_FALLBACK_MAX_BYTES) {
-      await runInlineClassifier(serviceClient, job.id, file)
+      await runInlineClassifier(serviceClient, job.id, file, stashPath)
       return NextResponse.json({ jobId: job.id }, { status: 202 })
     }
 

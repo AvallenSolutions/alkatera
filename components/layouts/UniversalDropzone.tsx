@@ -62,10 +62,18 @@ const ACCEPT =
   '.pdf,.xlsx,.xls,image/jpeg,image/png,image/webp,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel'
 
 interface UniversalDropzoneProps {
-  trigger: React.ReactNode
+  /** Click target that opens the dialog. Optional when driven by `file`. */
+  trigger?: React.ReactNode
+  /** Externally-supplied file to classify (e.g. fed from the Rosa drawer).
+   *  When set, the dialog opens and processes it automatically, so every
+   *  upload surface shares one classifier and one review UI. */
+  file?: File | null
+  /** Fired once the supplied `file` has been picked up, so the parent can
+   *  clear its own state and avoid re-processing the same file. */
+  onFileConsumed?: () => void
 }
 
-export function UniversalDropzone({ trigger }: UniversalDropzoneProps) {
+export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDropzoneProps) {
   const { currentOrganization } = useOrganization()
   const orgId = currentOrganization?.id
 
@@ -86,6 +94,7 @@ export function UniversalDropzone({ trigger }: UniversalDropzoneProps) {
   const [periodEnd, setPeriodEnd] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const pollAbortRef = useRef<{ cancelled: boolean } | null>(null)
+  const externalFileRef = useRef<File | null>(null)
 
   const reset = useCallback(() => {
     if (pollAbortRef.current) pollAbortRef.current.cancelled = true
@@ -240,6 +249,17 @@ export function UniversalDropzone({ trigger }: UniversalDropzoneProps) {
     return true
   }, [queue, processFile])
 
+  // Externally-fed file (e.g. from the Rosa drawer): open the dialog and run
+  // it through the same classify → review flow as a manual drop. Guarded by a
+  // ref so the same File object is never processed twice.
+  useEffect(() => {
+    if (!file || externalFileRef.current === file) return
+    externalFileRef.current = file
+    setOpen(true)
+    startBatch([file])
+    onFileConsumed?.()
+  }, [file, startBatch, onFileConsumed])
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setDragOver(false)
@@ -312,7 +332,7 @@ export function UniversalDropzone({ trigger }: UniversalDropzoneProps) {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      {trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -320,8 +340,9 @@ export function UniversalDropzone({ trigger }: UniversalDropzoneProps) {
             Upload anything
           </DialogTitle>
           <DialogDescription>
-            Drop one or more utility bills, water bills, waste invoices, or product workbooks.
-            We&apos;ll figure out what each one is and file it in the right place.
+            Drop one or more documents. We handle utility, water and waste bills, supplier
+            invoices, soil lab reports, product workbooks, bills of materials, and prior
+            sustainability and LCA reports, then file each one in the right place.
           </DialogDescription>
           {queueTotal > 1 && (
             <p className="text-xs text-muted-foreground pt-1">
@@ -363,7 +384,7 @@ export function UniversalDropzone({ trigger }: UniversalDropzoneProps) {
               </div>
             </button>
             <p className="text-[11px] text-muted-foreground text-center">
-              Supports: utility / water / waste bills · product-ingredient-packaging workbooks
+              Supports: utility / water / waste bills · supplier & freight invoices · refrigerant records · packaging specs · supplier CoAs · certifications · soil lab reports · product workbooks · BOMs · historical reports
             </p>
           </div>
         )}
@@ -512,6 +533,42 @@ function ReviewPanel(props: ReviewPanelProps) {
         stashId={result.sprayDiary?.stashId}
         onClose={props.onClose}
       />
+    )
+  }
+
+  if (result.type === 'supplier_invoice') {
+    return (
+      <SupplierInvoicePanel invoice={result.supplierInvoice} onClose={props.onClose} />
+    )
+  }
+
+  if (result.type === 'freight_invoice') {
+    return (
+      <FreightInvoicePanel freight={result.freightInvoice} onClose={props.onClose} />
+    )
+  }
+
+  if (result.type === 'refrigerant_service') {
+    return (
+      <RefrigerantPanel service={result.refrigerantService} onClose={props.onClose} />
+    )
+  }
+
+  if (result.type === 'packaging_spec') {
+    return (
+      <PackagingSpecPanel spec={result.packagingSpec} onClose={props.onClose} />
+    )
+  }
+
+  if (result.type === 'supplier_coa') {
+    return (
+      <SupplierCoaPanel coa={result.supplierCoa} onClose={props.onClose} />
+    )
+  }
+
+  if (result.type === 'certification') {
+    return (
+      <CertificationPanel cert={result.certification} onClose={props.onClose} />
     )
   }
 
@@ -1156,6 +1213,30 @@ function BomHandoffPanel({ bom, onClose }: { bom?: BomPayload; onClose: () => vo
         </div>
       </div>
 
+      {/* Ingredient / packaging preview — what we read from the document. The
+          recipe editor parses the full detail when you open it. */}
+      {bom?.line_items && bom.line_items.length > 0 && (
+        <div className="rounded-md border border-border bg-muted/20 p-3">
+          <p className="text-[11px] font-medium text-muted-foreground mb-1.5">
+            {bom.line_items.length} component{bom.line_items.length === 1 ? '' : 's'} read
+          </p>
+          <ul className="space-y-0.5 text-xs">
+            {bom.line_items.slice(0, 6).map((li, i) => (
+              <li key={i} className="flex items-center justify-between gap-2">
+                <span className="truncate">{li.name}</span>
+                <span className="shrink-0 text-muted-foreground">
+                  {li.quantity != null ? `${li.quantity} ${li.unit || ''}`.trim() : ''}
+                  {li.type ? ` · ${li.type}` : ''}
+                </span>
+              </li>
+            ))}
+            {bom.line_items.length > 6 && (
+              <li className="text-muted-foreground">+ {bom.line_items.length - 6} more</li>
+            )}
+          </ul>
+        </div>
+      )}
+
       {/* Mode toggle — hidden if there are zero products (only Create makes sense). */}
       {products.length > 0 && (
         <div className="grid grid-cols-2 gap-2">
@@ -1658,6 +1739,1124 @@ function AssetHandoffPanel({ kind, detectedLabel, icon, description, extraNote, 
           ) : (
             <span>Open asset</span>
           )}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// SupplierInvoicePanel — supplier-invoice / delivery-note path. The classifier
+// parsed the priced line items; the user confirms them, picks a Scope 3 spend
+// category + currency, and we save each line to /api/spend/invoice as a
+// spend-based (Tier 4) corporate-overheads row the footprint reads.
+// ───────────────────────────────────────────────────────────────────────────────
+
+const SPEND_CATEGORY_OPTIONS: { value: string; label: string }[] = [
+  { value: 'purchased_services', label: 'Goods & services' },
+  { value: 'capital_goods', label: 'Equipment / capital goods' },
+  { value: 'upstream_transportation', label: 'Inbound freight / transport' },
+  { value: 'operational_waste', label: 'Waste services' },
+  { value: 'other', label: 'Other' },
+]
+const INVOICE_CURRENCIES = ['GBP', 'USD', 'EUR']
+const CURRENCY_SYMBOL: Record<string, string> = { GBP: '£', USD: '$', EUR: '€' }
+
+interface InvoiceLineDraft {
+  description: string
+  amount: string
+  quantity: string
+  unit: string
+}
+
+function SupplierInvoicePanel({
+  invoice,
+  onClose,
+}: {
+  invoice: NonNullable<IngestResponse['supplierInvoice']> | undefined
+  onClose: () => void
+}) {
+  const [supplierName] = useState(invoice?.supplier_name || '')
+  const [invoiceDate, setInvoiceDate] = useState(invoice?.invoice_date || '')
+  const [currency, setCurrency] = useState<string>(
+    invoice?.currency && INVOICE_CURRENCIES.includes(invoice.currency) ? invoice.currency : 'GBP',
+  )
+  const [category, setCategory] = useState(
+    invoice?.suggested_category &&
+      SPEND_CATEGORY_OPTIONS.some((o) => o.value === invoice.suggested_category)
+      ? invoice.suggested_category
+      : 'purchased_services',
+  )
+  const [rows, setRows] = useState<InvoiceLineDraft[]>(() =>
+    (invoice?.line_items || [])
+      .filter((l) => l && l.amount != null)
+      .map((l) => ({
+        description: l.description || '',
+        amount: String(l.amount),
+        quantity: l.quantity != null ? String(l.quantity) : '',
+        unit: l.unit || '',
+      })),
+  )
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState<{ count: number; spend: number; co2e: number } | null>(null)
+
+  const updateRow = (i: number, patch: Partial<InvoiceLineDraft>) =>
+    setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
+  const removeRow = (i: number) => setRows((rs) => rs.filter((_, idx) => idx !== i))
+  const addRow = () =>
+    setRows((rs) => [...rs, { description: '', amount: '', quantity: '', unit: '' }])
+
+  const validRows = rows.filter((r) => Number(r.amount) > 0)
+  const total = validRows.reduce((s, r) => s + Number(r.amount), 0)
+  const symbol = CURRENCY_SYMBOL[currency] || ''
+  const canSave = validRows.length > 0 && !saving
+
+  const save = async () => {
+    if (validRows.length === 0) {
+      toast.error('Add at least one line with an amount.')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch('/api/spend/invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          supplier_name: supplierName,
+          invoice_date: invoiceDate || null,
+          currency,
+          category,
+          line_items: validRows.map((r) => ({
+            // Fold the activity quantity into the description so the detail
+            // survives in the spend-based row.
+            description:
+              r.quantity && r.unit ? `${r.description} (${r.quantity} ${r.unit})`.trim() : r.description,
+            amount: Number(r.amount),
+          })),
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(json.error || 'Could not save the invoice.')
+        return
+      }
+      setSaved({ count: json.saved ?? validRows.length, spend: json.total_spend ?? total, co2e: json.total_co2e_kg ?? 0 })
+      toast.success(`Saved ${json.saved ?? validRows.length} spend line${(json.saved ?? validRows.length) === 1 ? '' : 's'}.`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (saved) {
+    const tonnes = saved.co2e / 1000
+    return (
+      <div className="space-y-4">
+        <div className="flex items-start gap-3 p-4 rounded-lg border border-emerald-400/30 bg-emerald-500/5">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-medium">
+              Saved {saved.count} spend line{saved.count === 1 ? '' : 's'} to your Scope 3 footprint.
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {symbol}{saved.spend.toLocaleString(undefined, { maximumFractionDigits: 0 })} spend ·
+              ~{tonnes < 1 ? `${Math.round(saved.co2e)} kg` : `${tonnes.toFixed(1)} t`} CO2e (spend-based estimate).
+              Map these to supplier or activity data later for a tighter number.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <Button asChild size="sm" variant="outline">
+            <Link href="/data/spend-data" onClick={onClose}>View spend data</Link>
+          </Button>
+          <Button size="sm" onClick={onClose}>Done</Button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start gap-3 p-4 rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5">
+        <FileText className="h-4 w-4 mt-0.5" />
+        <div className="text-sm">
+          <p className="font-medium">We read a supplier invoice{supplierName ? ` from ${supplierName}` : ''}.</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Confirm the lines and category. We&apos;ll add them to your Scope 3 spend as a
+            spend-based estimate you can refine later.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        <div>
+          <Label className="text-[11px] text-muted-foreground">Invoice date</Label>
+          <Input type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} />
+        </div>
+        <div>
+          <Label className="text-[11px] text-muted-foreground">Currency</Label>
+          <Select value={currency} onValueChange={setCurrency}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {INVOICE_CURRENCIES.map((c) => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="text-[11px] text-muted-foreground">Category</Label>
+          <Select value={category} onValueChange={setCategory}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {SPEND_CATEGORY_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-xs">Line items</Label>
+        {rows.map((r, i) => (
+          <div key={i} className="space-y-1">
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <Input
+                  placeholder="Description"
+                  value={r.description}
+                  onChange={(e) => updateRow(i, { description: e.target.value })}
+                />
+              </div>
+              <div className="w-28">
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder={`Amount (${symbol})`}
+                  value={r.amount}
+                  onChange={(e) => updateRow(i, { amount: e.target.value })}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => removeRow(i)}
+                className="h-9 w-9 p-0 text-muted-foreground hover:text-red-500"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            {r.quantity && r.unit && (
+              <p className="pl-1 text-[11px] text-muted-foreground">
+                Quantity read: {r.quantity} {r.unit} (kept with this line)
+              </p>
+            )}
+          </div>
+        ))}
+        <Button type="button" variant="outline" size="sm" onClick={addRow}>
+          Add line
+        </Button>
+      </div>
+
+      <div className="flex items-center justify-between rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
+        <span className="text-muted-foreground">Total spend</span>
+        <span className="font-medium">
+          {symbol}{total.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+        </span>
+      </div>
+
+      <div className="flex items-center justify-end gap-2 pt-1">
+        <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={saving}>
+          Cancel
+        </Button>
+        <Button type="button" size="sm" onClick={save} disabled={!canSave}>
+          {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+          Save to Scope 3
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// PackagingSpecPanel — packaging spec sheet → product_materials on a product.
+// Needs a product, since packaging is product-scoped.
+// ───────────────────────────────────────────────────────────────────────────────
+
+const PACKAGING_ROLES: { value: string; label: string }[] = [
+  { value: 'container', label: 'Container (bottle/can)' },
+  { value: 'closure', label: 'Closure (cap/cork)' },
+  { value: 'label', label: 'Label' },
+  { value: 'secondary', label: 'Secondary (case)' },
+  { value: 'shipment', label: 'Shipment' },
+  { value: 'tertiary', label: 'Tertiary (pallet)' },
+]
+
+interface PackagingDraft {
+  component_name: string
+  material: string
+  role: string
+  weight_g: string
+  recycled_content_pct: string
+  recyclability_pct: string
+}
+
+function PackagingSpecPanel({
+  spec,
+  onClose,
+}: {
+  spec: NonNullable<IngestResponse['packagingSpec']> | undefined
+  onClose: () => void
+}) {
+  const { currentOrganization } = useOrganization()
+  const orgId = currentOrganization?.id
+  const { products, loading } = useOrgProducts(orgId)
+  const [productId, setProductId] = useState('')
+  const [rows, setRows] = useState<PackagingDraft[]>(() =>
+    (spec?.components || [])
+      .filter((c) => c.component_name)
+      .map((c) => ({
+        component_name: c.component_name || '',
+        material: c.material || '',
+        role: c.role && PACKAGING_ROLES.some((r) => r.value === c.role) ? c.role : 'container',
+        weight_g: c.weight_g != null ? String(c.weight_g) : '',
+        recycled_content_pct: c.recycled_content_pct != null ? String(c.recycled_content_pct) : '',
+        recyclability_pct: c.recyclability_pct != null ? String(c.recyclability_pct) : '',
+      })),
+  )
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState<{ count: number } | null>(null)
+
+  const updateRow = (i: number, patch: Partial<PackagingDraft>) =>
+    setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
+  const removeRow = (i: number) => setRows((rs) => rs.filter((_, idx) => idx !== i))
+
+  const validRows = rows.filter((r) => r.component_name && Number(r.weight_g) > 0)
+  const canSave = !!productId && validRows.length > 0 && !saving
+
+  const save = async () => {
+    if (!productId) { toast.error('Pick which product this packaging is for.'); return }
+    if (validRows.length === 0) { toast.error('Each component needs a name and a weight.'); return }
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/products/${productId}/packaging`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          components: validRows.map((r) => ({
+            component_name: r.component_name,
+            material: r.material || null,
+            role: r.role,
+            weight_g: Number(r.weight_g),
+            recycled_content_pct: r.recycled_content_pct ? Number(r.recycled_content_pct) : null,
+            recyclability_pct: r.recyclability_pct ? Number(r.recyclability_pct) : null,
+          })),
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) { toast.error(json.error || 'Could not save the packaging.'); return }
+      setSaved({ count: json.saved ?? validRows.length })
+      toast.success(`Saved ${json.saved ?? validRows.length} packaging component${(json.saved ?? validRows.length) === 1 ? '' : 's'}.`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (saved) {
+    const product = products.find((p) => p.id === productId)
+    return (
+      <div className="space-y-4">
+        <div className="flex items-start gap-3 p-4 rounded-lg border border-emerald-400/30 bg-emerald-500/5">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-medium">
+              Saved {saved.count} component{saved.count === 1 ? '' : 's'} to {product?.name || 'the product'}.
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Recalculate the product LCA to fold the new packaging into its footprint.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-2 pt-1">
+          {product && (
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/products/${product.id}/recipe`} onClick={onClose}>Open recipe</Link>
+            </Button>
+          )}
+          <Button size="sm" onClick={onClose}>Done</Button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start gap-3 p-4 rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5">
+        <Package className="h-4 w-4 mt-0.5" />
+        <div className="text-sm">
+          <p className="font-medium">We read a packaging spec sheet.</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Confirm the components and pick which product they belong to. They&apos;ll be added to the
+            product&apos;s packaging for its LCA.
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-[11px] text-muted-foreground">Product</Label>
+        {loading ? (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+          </div>
+        ) : products.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            No products yet. <Link href="/products/new" className="underline">Add one</Link>.
+          </p>
+        ) : (
+          <Select value={productId} onValueChange={setProductId}>
+            <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
+            <SelectContent>
+              {products.map((p) => (
+                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <Label className="text-xs">Components</Label>
+        {rows.map((r, i) => (
+          <div key={i} className="space-y-2 rounded-lg border border-border p-3">
+            <div className="flex items-center justify-between">
+              <Input
+                className="mr-2 h-8"
+                placeholder="Component name"
+                value={r.component_name}
+                onChange={(e) => updateRow(i, { component_name: e.target.value })}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => removeRow(i)}
+                className="h-8 w-8 shrink-0 p-0 text-muted-foreground hover:text-red-500"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-[11px] text-muted-foreground">Material</Label>
+                <Input placeholder="glass, aluminium, pet…" value={r.material} onChange={(e) => updateRow(i, { material: e.target.value })} />
+              </div>
+              <div>
+                <Label className="text-[11px] text-muted-foreground">Role</Label>
+                <Select value={r.role} onValueChange={(v) => updateRow(i, { role: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PACKAGING_ROLES.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-[11px] text-muted-foreground">Weight (g)</Label>
+                <Input type="number" step="0.1" value={r.weight_g} onChange={(e) => updateRow(i, { weight_g: e.target.value })} />
+              </div>
+              <div>
+                <Label className="text-[11px] text-muted-foreground">Recycled %</Label>
+                <Input type="number" value={r.recycled_content_pct} onChange={(e) => updateRow(i, { recycled_content_pct: e.target.value })} />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center justify-end gap-2 pt-1">
+        <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
+        <Button type="button" size="sm" onClick={save} disabled={!canSave}>
+          {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+          Save packaging
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// SupplierCoaPanel — CoA / spec sheet → supplier_product_evidence. Needs a
+// supplier product to attach to; carries the stashed file across as the evidence.
+// ───────────────────────────────────────────────────────────────────────────────
+
+const COA_TYPES: { value: string; label: string }[] = [
+  { value: 'specification_sheet', label: 'Specification sheet' },
+  { value: 'test_report', label: 'Certificate of Analysis / test report' },
+  { value: 'carbon_certificate', label: 'Carbon / EPD certificate' },
+]
+
+function SupplierCoaPanel({
+  coa,
+  onClose,
+}: {
+  coa: NonNullable<IngestResponse['supplierCoa']> | undefined
+  onClose: () => void
+}) {
+  const [supplierProducts, setSupplierProducts] = useState<Array<{ id: string; name: string }>>([])
+  const [loading, setLoading] = useState(true)
+  const [supplierProductId, setSupplierProductId] = useState('')
+  const [docName, setDocName] = useState(coa?.product_name || '')
+  const [docType, setDocType] = useState<string>(
+    coa?.document_type && COA_TYPES.some((t) => t.value === coa.document_type) ? coa.document_type : 'specification_sheet',
+  )
+  const [docDate, setDocDate] = useState(coa?.document_date || '')
+  const [expiry, setExpiry] = useState(coa?.expiry_date || '')
+  const [reference, setReference] = useState(coa?.reference_number || '')
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState<{ attached: boolean } | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    fetch('/api/supplier-products/search')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status}`))))
+      .then((body) => {
+        if (cancelled) return
+        setSupplierProducts(((body?.results || []) as any[]).map((s) => ({ id: s.id, name: s.name })))
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  const canSave = !!supplierProductId && !saving
+
+  const save = async () => {
+    if (!supplierProductId) { toast.error('Pick which supplier product this is for.'); return }
+    setSaving(true)
+    try {
+      const res = await fetch('/api/supplier-products/evidence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          supplier_product_id: supplierProductId,
+          stash_id: coa?.stashId || null,
+          document_name: docName || null,
+          document_type: docType,
+          document_date: docDate || null,
+          expiry_date: expiry || null,
+          reference_number: reference || null,
+          covers_climate: !!coa?.covers_climate,
+          covers_water: !!coa?.covers_water,
+          covers_waste: !!coa?.covers_waste,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) { toast.error(json.error || 'Could not file the document.'); return }
+      setSaved({ attached: !!json.attached_file })
+      toast.success('Document filed against the supplier product.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (saved) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-start gap-3 p-4 rounded-lg border border-emerald-400/30 bg-emerald-500/5">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-medium">Filed against the supplier product, pending verification.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {saved.attached ? 'The document is attached as evidence.' : 'Saved as a metadata record.'}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <Button asChild size="sm" variant="outline">
+            <Link href="/suppliers" onClick={onClose}>View suppliers</Link>
+          </Button>
+          <Button size="sm" onClick={onClose}>Done</Button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start gap-3 p-4 rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5">
+        <FileText className="h-4 w-4 mt-0.5" />
+        <div className="text-sm">
+          <p className="font-medium">
+            We read a supplier {COA_TYPES.find((t) => t.value === docType)?.label.toLowerCase() || 'document'}
+            {coa?.supplier_name ? ` from ${coa.supplier_name}` : ''}.
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Pick the supplier product to file it against. We&apos;ll keep the file as evidence.
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-[11px] text-muted-foreground">Supplier product</Label>
+        {loading ? (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+          </div>
+        ) : supplierProducts.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            No supplier products yet. <Link href="/suppliers" className="underline">Add suppliers</Link>.
+          </p>
+        ) : (
+          <Select value={supplierProductId} onValueChange={setSupplierProductId}>
+            <SelectTrigger><SelectValue placeholder="Select supplier product" /></SelectTrigger>
+            <SelectContent>
+              {supplierProducts.map((s) => (
+                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div className="col-span-2">
+          <Label className="text-[11px] text-muted-foreground">Document name</Label>
+          <Input value={docName} onChange={(e) => setDocName(e.target.value)} />
+        </div>
+        <div className="col-span-2">
+          <Label className="text-[11px] text-muted-foreground">Type</Label>
+          <Select value={docType} onValueChange={setDocType}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {COA_TYPES.map((t) => (
+                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="text-[11px] text-muted-foreground">Document date</Label>
+          <Input type="date" value={docDate} onChange={(e) => setDocDate(e.target.value)} />
+        </div>
+        <div>
+          <Label className="text-[11px] text-muted-foreground">Expiry</Label>
+          <Input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
+        </div>
+        <div className="col-span-2">
+          <Label className="text-[11px] text-muted-foreground">Reference / batch no.</Label>
+          <Input value={reference} onChange={(e) => setReference(e.target.value)} />
+        </div>
+      </div>
+
+      <div className="flex items-center justify-end gap-2 pt-1">
+        <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
+        <Button type="button" size="sm" onClick={save} disabled={!canSave}>
+          {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+          File document
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// CertificationPanel — certification certificate → organization_certifications.
+// Resolves the extracted framework hint to a framework, with a picker fallback.
+// ───────────────────────────────────────────────────────────────────────────────
+
+const CERT_HINT_TO_CODE: Record<string, string> = {
+  bcorp: 'bcorp_21',
+  iso14001: 'iso14001',
+  iso50001: 'iso50001',
+  csrd: 'csrd',
+  sbti: 'sbti',
+  gri: 'gri',
+  cdp_climate: 'cdp_climate',
+  ecovadis: 'ecovadis',
+}
+
+function CertificationPanel({
+  cert,
+  onClose,
+}: {
+  cert: NonNullable<IngestResponse['certification']> | undefined
+  onClose: () => void
+}) {
+  const [frameworks, setFrameworks] = useState<Array<{ id: string; name: string; code: string }>>([])
+  const [loading, setLoading] = useState(true)
+  const [frameworkId, setFrameworkId] = useState('')
+  const [number, setNumber] = useState(cert?.certificate_number || '')
+  const [issueDate, setIssueDate] = useState(cert?.issue_date || '')
+  const [expiry, setExpiry] = useState(cert?.expiry_date || '')
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    fetch('/api/certifications/frameworks?active_only=true')
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status}`))))
+      .then((body) => {
+        if (cancelled) return
+        const list = ((body?.frameworks || []) as any[]).map((f) => ({ id: f.id, name: f.name, code: f.code }))
+        setFrameworks(list)
+        // Auto-match from the extracted hint.
+        const wantCode = cert?.framework_hint ? CERT_HINT_TO_CODE[cert.framework_hint] : undefined
+        const match = wantCode ? list.find((f) => f.code === wantCode) : undefined
+        if (match) setFrameworkId(match.id)
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [cert?.framework_hint])
+
+  const canSave = !!frameworkId && !saving
+
+  const save = async () => {
+    if (!frameworkId) { toast.error('Pick which certification this is.'); return }
+    setSaving(true)
+    try {
+      const res = await fetch('/api/certifications/frameworks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          framework_id: frameworkId,
+          status: 'certified',
+          certification_number: number || null,
+          certification_date: issueDate || null,
+          expiry_date: expiry || null,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) { toast.error(json.error || json.details || 'Could not save the certification.'); return }
+      setSaved(true)
+      toast.success('Certification recorded.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (saved) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-start gap-3 p-4 rounded-lg border border-emerald-400/30 bg-emerald-500/5">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-medium">Certification recorded as certified.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              You can track readiness and evidence on the Certifications page.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <Button asChild size="sm" variant="outline">
+            <Link href="/certifications" onClick={onClose}>View certifications</Link>
+          </Button>
+          <Button size="sm" onClick={onClose}>Done</Button>
+        </div>
+      </div>
+    )
+  }
+
+  const noMatch = !loading && cert?.framework_hint === 'other'
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start gap-3 p-4 rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5">
+        <ScrollText className="h-4 w-4 mt-0.5" />
+        <div className="text-sm">
+          <p className="font-medium">We read a certification certificate{cert?.certificate_name ? `: ${cert.certificate_name}` : ''}.</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Confirm the framework and dates. We&apos;ll record it as a held certification.
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-[11px] text-muted-foreground">Framework</Label>
+        {loading ? (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+          </div>
+        ) : (
+          <>
+            <Select value={frameworkId} onValueChange={setFrameworkId}>
+              <SelectTrigger><SelectValue placeholder="Select framework" /></SelectTrigger>
+              <SelectContent>
+                {frameworks.map((f) => (
+                  <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {noMatch && !frameworkId && (
+              <p className="text-[11px] text-amber-600">
+                We couldn&apos;t match this to a known framework. Pick the closest one, or skip if it isn&apos;t tracked here.
+              </p>
+            )}
+          </>
+        )}
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        <div>
+          <Label className="text-[11px] text-muted-foreground">Certificate no.</Label>
+          <Input value={number} onChange={(e) => setNumber(e.target.value)} />
+        </div>
+        <div>
+          <Label className="text-[11px] text-muted-foreground">Issued</Label>
+          <Input type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
+        </div>
+        <div>
+          <Label className="text-[11px] text-muted-foreground">Expires</Label>
+          <Input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
+        </div>
+      </div>
+
+      <div className="flex items-center justify-end gap-2 pt-1">
+        <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
+        <Button type="button" size="sm" onClick={save} disabled={!canSave}>
+          {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+          Record certification
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// FreightInvoicePanel — freight/logistics invoice → Scope 3 upstream transport.
+// Prefers activity (mode × weight × distance) and falls back to spend.
+// ───────────────────────────────────────────────────────────────────────────────
+
+const FREIGHT_MODES: { value: string; label: string }[] = [
+  { value: 'truck', label: 'Road (HGV)' },
+  { value: 'train', label: 'Rail' },
+  { value: 'ship', label: 'Sea' },
+  { value: 'air', label: 'Air' },
+]
+
+function FreightInvoicePanel({
+  freight,
+  onClose,
+}: {
+  freight: NonNullable<IngestResponse['freightInvoice']> | undefined
+  onClose: () => void
+}) {
+  const [carrier] = useState(freight?.carrier_name || '')
+  const [date, setDate] = useState(freight?.shipment_date || '')
+  const [mode, setMode] = useState(
+    freight?.transport_mode && FREIGHT_MODES.some((m) => m.value === freight.transport_mode)
+      ? freight.transport_mode
+      : '',
+  )
+  const [weight, setWeight] = useState(freight?.weight_kg != null ? String(freight.weight_kg) : '')
+  const [distance, setDistance] = useState(freight?.distance_km != null ? String(freight.distance_km) : '')
+  const [amount, setAmount] = useState(freight?.amount != null ? String(freight.amount) : '')
+  const [currency, setCurrency] = useState<string>(
+    freight?.currency && INVOICE_CURRENCIES.includes(freight.currency) ? freight.currency : 'GBP',
+  )
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState<{ method: string; co2e: number } | null>(null)
+
+  const hasActivity = !!mode && Number(weight) > 0 && Number(distance) > 0
+  const hasSpend = Number(amount) > 0
+  const canSave = (hasActivity || hasSpend) && !saving
+
+  const save = async () => {
+    if (!hasActivity && !hasSpend) {
+      toast.error('Add mode + weight + distance, or an invoice amount.')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch('/api/spend/freight', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          carrier_name: carrier,
+          shipment_date: date || null,
+          transport_mode: mode || null,
+          weight_kg: weight ? Number(weight) : null,
+          distance_km: distance ? Number(distance) : null,
+          amount: amount ? Number(amount) : null,
+          currency,
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(json.error || 'Could not save the freight invoice.')
+        return
+      }
+      setSaved({ method: json.method || 'spend', co2e: json.total_co2e_kg ?? 0 })
+      toast.success('Freight saved to Scope 3.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (saved) {
+    const tonnes = saved.co2e / 1000
+    return (
+      <div className="space-y-4">
+        <div className="flex items-start gap-3 p-4 rounded-lg border border-emerald-400/30 bg-emerald-500/5">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-medium">Freight saved to your Scope 3 footprint.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              ~{tonnes < 1 ? `${Math.round(saved.co2e)} kg` : `${tonnes.toFixed(1)} t`} CO2e
+              ({saved.method === 'activity' ? 'activity-based, tonne-km' : 'spend-based estimate'}).
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <Button asChild size="sm" variant="outline">
+            <Link href="/data/spend-data" onClick={onClose}>View spend data</Link>
+          </Button>
+          <Button size="sm" onClick={onClose}>Done</Button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start gap-3 p-4 rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5">
+        <FileText className="h-4 w-4 mt-0.5" />
+        <div className="text-sm">
+          <p className="font-medium">We read a freight invoice{carrier ? ` from ${carrier}` : ''}.</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Add mode, weight and distance for an activity-based estimate (most accurate). If you
+            only have the cost, we&apos;ll use a spend-based estimate.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <Label className="text-[11px] text-muted-foreground">Shipment date</Label>
+          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+        <div>
+          <Label className="text-[11px] text-muted-foreground">Mode</Label>
+          <Select value={mode} onValueChange={setMode}>
+            <SelectTrigger><SelectValue placeholder="Select mode" /></SelectTrigger>
+            <SelectContent>
+              {FREIGHT_MODES.map((m) => (
+                <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="text-[11px] text-muted-foreground">Weight (kg)</Label>
+          <Input type="number" value={weight} onChange={(e) => setWeight(e.target.value)} />
+        </div>
+        <div>
+          <Label className="text-[11px] text-muted-foreground">Distance (km)</Label>
+          <Input type="number" value={distance} onChange={(e) => setDistance(e.target.value)} />
+        </div>
+        <div>
+          <Label className="text-[11px] text-muted-foreground">Invoice amount (fallback)</Label>
+          <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
+        </div>
+        <div>
+          <Label className="text-[11px] text-muted-foreground">Currency</Label>
+          <Select value={currency} onValueChange={setCurrency}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {INVOICE_CURRENCIES.map((c) => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <p className="text-[11px] text-muted-foreground">
+        {hasActivity
+          ? 'Will be saved as activity-based (tonne-km).'
+          : hasSpend
+            ? 'Will be saved as a spend-based estimate. Add weight + distance for a tighter number.'
+            : 'Add weight + distance + mode, or an invoice amount.'}
+      </p>
+
+      <div className="flex items-center justify-end gap-2 pt-1">
+        <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
+        <Button type="button" size="sm" onClick={save} disabled={!canSave}>
+          {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+          Save to Scope 3
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// RefrigerantPanel — F-gas service record → Scope 1 fugitive (utility_data_entries).
+// Needs a facility, since refrigerant entries are facility-scoped.
+// ───────────────────────────────────────────────────────────────────────────────
+
+const REFRIGERANT_OPTIONS: { value: string; label: string }[] = [
+  { value: 'r134a', label: 'R-134a' },
+  { value: 'r404a', label: 'R-404A' },
+  { value: 'r410a', label: 'R-410A' },
+  { value: 'r407c', label: 'R-407C' },
+  { value: 'r507a', label: 'R-507A' },
+  { value: 'r32', label: 'R-32' },
+  { value: 'r1234yf', label: 'R-1234yf' },
+  { value: 'r717', label: 'R-717 (Ammonia)' },
+  { value: 'r744', label: 'R-744 (CO2)' },
+  { value: 'r290', label: 'R-290 (Propane)' },
+]
+
+function RefrigerantPanel({
+  service,
+  onClose,
+}: {
+  service: NonNullable<IngestResponse['refrigerantService']> | undefined
+  onClose: () => void
+}) {
+  const { currentOrganization } = useOrganization()
+  const orgId = currentOrganization?.id
+  const [facilities, setFacilities] = useState<Facility[]>([])
+  const [facilityId, setFacilityId] = useState('')
+  const [date, setDate] = useState(service?.service_date || '')
+  const [refrigerant, setRefrigerant] = useState(
+    service?.refrigerant_type && REFRIGERANT_OPTIONS.some((o) => o.value === service.refrigerant_type)
+      ? service.refrigerant_type
+      : 'r134a',
+  )
+  const [quantity, setQuantity] = useState(service?.quantity_kg != null ? String(service.quantity_kg) : '')
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    if (!orgId) return
+    let cancelled = false
+    supabase
+      .from('facilities')
+      .select('id, name')
+      .eq('organization_id', orgId)
+      .order('name')
+      .then(({ data }) => {
+        if (cancelled) return
+        const list = (data || []) as Facility[]
+        setFacilities(list)
+        if (list.length === 1) setFacilityId(list[0].id)
+      })
+    return () => { cancelled = true }
+  }, [orgId])
+
+  const canSave = !!facilityId && Number(quantity) > 0 && !saving
+
+  const save = async () => {
+    if (!facilityId) { toast.error('Pick which facility this is for.'); return }
+    if (!(Number(quantity) > 0)) { toast.error('Enter the recharged quantity in kg.'); return }
+    setSaving(true)
+    try {
+      const res = await fetch('/api/data/refrigerant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          facility_id: facilityId,
+          service_date: date || null,
+          refrigerant_type: refrigerant,
+          quantity_kg: Number(quantity),
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) { toast.error(json.error || 'Could not save the record.'); return }
+      setSaved(true)
+      toast.success('Refrigerant record saved to Scope 1.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (saved) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-start gap-3 p-4 rounded-lg border border-emerald-400/30 bg-emerald-500/5">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-medium">Refrigerant record saved as a Scope 1 fugitive emission.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {quantity} kg of {REFRIGERANT_OPTIONS.find((o) => o.value === refrigerant)?.label}. The
+              GWP is applied automatically in your footprint.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <Button asChild size="sm" variant="outline">
+            <Link href="/data/scope-1-2" onClick={onClose}>View Scope 1 & 2</Link>
+          </Button>
+          <Button size="sm" onClick={onClose}>Done</Button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start gap-3 p-4 rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5">
+        <Zap className="h-4 w-4 mt-0.5" />
+        <div className="text-sm">
+          <p className="font-medium">We read a refrigerant service record.</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Confirm the refrigerant and the mass recharged, and pick the facility. This is a Scope 1
+            fugitive emission.
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-[11px] text-muted-foreground">Facility</Label>
+        {facilities.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            No facilities yet. <Link href="/company/facilities" className="underline">Add one</Link>.
+          </p>
+        ) : (
+          <Select value={facilityId} onValueChange={setFacilityId}>
+            <SelectTrigger><SelectValue placeholder="Select facility" /></SelectTrigger>
+            <SelectContent>
+              {facilities.map((f) => (
+                <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        <div>
+          <Label className="text-[11px] text-muted-foreground">Service date</Label>
+          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+        <div>
+          <Label className="text-[11px] text-muted-foreground">Refrigerant</Label>
+          <Select value={refrigerant} onValueChange={setRefrigerant}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {REFRIGERANT_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="text-[11px] text-muted-foreground">Recharged (kg)</Label>
+          <Input type="number" step="0.01" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+        </div>
+      </div>
+
+      <div className="flex items-center justify-end gap-2 pt-1">
+        <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
+        <Button type="button" size="sm" onClick={save} disabled={!canSave}>
+          {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+          Save to Scope 1
         </Button>
       </div>
     </div>

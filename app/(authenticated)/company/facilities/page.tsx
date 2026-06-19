@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { SmartUploadButton } from '@/components/layouts/SmartUploadButton';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Table,
@@ -94,10 +95,13 @@ export default function FacilitiesPage() {
             Track emissions from your operational facilities
           </p>
         </div>
-        <Button onClick={() => setWizardOpen(true)} size="lg" className="gap-2">
-          <Plus className="h-5 w-5" />
-          Add Facility
-        </Button>
+        <div className="flex items-center gap-2">
+          <SmartUploadButton />
+          <Button onClick={() => setWizardOpen(true)} size="lg" className="gap-2">
+            <Plus className="h-5 w-5" />
+            Add Facility
+          </Button>
+        </div>
       </div>
 
       {facilities.length === 0 ? (

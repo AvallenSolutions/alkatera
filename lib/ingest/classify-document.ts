@@ -35,6 +35,49 @@ const WASTE_TREATMENT_VALUES = [
   'reuse',
   'other',
 ] as const;
+// Coarse Scope 3 spend categories a supplier invoice can map to. Subset of the
+// corporate_overheads.category CHECK enum that realistically applies to a
+// purchased-goods/services invoice; the spend save route maps each to a DEFRA
+// spend-based emission factor.
+const SPEND_CATEGORY_VALUES = [
+  'purchased_services',
+  'capital_goods',
+  'upstream_transportation',
+  'operational_waste',
+  'other',
+] as const;
+// Refrigerant keys recognised by REFRIGERANT_GWP in lib/ghg-constants.ts; the
+// save route clamps anything else to r134a.
+const REFRIGERANT_KEYS = [
+  'r134a',
+  'r404a',
+  'r410a',
+  'r407c',
+  'r507a',
+  'r32',
+  'r1234yf',
+  'r717',
+  'r744',
+  'r290',
+] as const;
+// Freight transport modes (DEFRA tonne-km factors).
+const TRANSPORT_MODE_VALUES = ['truck', 'train', 'ship', 'air'] as const;
+// Packaging component roles (product_materials.packaging_category). 'container'
+// is the primary bottle/can; there is no 'primary' value.
+const PACKAGING_ROLE_VALUES = ['container', 'label', 'closure', 'secondary', 'shipment', 'tertiary'] as const;
+// Certification frameworks the platform recognises (framework_code). Anything
+// without a matching framework row falls back to a picker / no-op.
+const CERTIFICATION_HINTS = [
+  'bcorp',
+  'iso14001',
+  'iso50001',
+  'csrd',
+  'sbti',
+  'gri',
+  'cdp_climate',
+  'ecovadis',
+  'other',
+] as const;
 
 export type ClassifierResultType =
   | 'utility_bill'
@@ -43,6 +86,12 @@ export type ClassifierResultType =
   | 'bulk_xlsx'
   | 'spray_diary'
   | 'bom'
+  | 'supplier_invoice'
+  | 'freight_invoice'
+  | 'refrigerant_service'
+  | 'packaging_spec'
+  | 'supplier_coa'
+  | 'certification'
   | 'soil_carbon_lab'
   | 'soil_carbon_evidence'
   | 'accounts_csv'
@@ -85,6 +134,36 @@ export function shapeIngestResult(
       return { result_type: type, result_payload: { type, sprayDiary: { ...payload, stashId } } };
     case 'bom':
       return { result_type: type, result_payload: { type, bom: { ...payload, stashId } } };
+    case 'supplier_invoice':
+      return {
+        result_type: type,
+        result_payload: { type, supplierInvoice: { ...payload, stashId } },
+      };
+    case 'freight_invoice':
+      return {
+        result_type: type,
+        result_payload: { type, freightInvoice: { ...payload, stashId } },
+      };
+    case 'refrigerant_service':
+      return {
+        result_type: type,
+        result_payload: { type, refrigerantService: { ...payload, stashId } },
+      };
+    case 'packaging_spec':
+      return {
+        result_type: type,
+        result_payload: { type, packagingSpec: { ...payload, stashId } },
+      };
+    case 'supplier_coa':
+      return {
+        result_type: type,
+        result_payload: { type, supplierCoa: { ...payload, stashId } },
+      };
+    case 'certification':
+      return {
+        result_type: type,
+        result_payload: { type, certification: { ...payload, stashId } },
+      };
     case 'soil_carbon_lab':
       return {
         result_type: type,
@@ -282,7 +361,7 @@ export async function classifyDocument(input: ClassifierInput): Promise<Classifi
       {
         name: 'identify_bom',
         description:
-          'Use for bills of materials (BOM), ingredient lists, or formulation sheets tied to a product. Return ONLY product-level metadata from the header — not line items.',
+          'Use for bills of materials (BOM), ingredient lists, or formulation sheets tied to a product. Capture the product header metadata AND the ingredient / packaging lines (name, quantity, unit) when they are visible, so the recipe can be pre-filled.',
         input_schema: {
           type: 'object',
           properties: {
@@ -297,6 +376,198 @@ export async function classifyDocument(input: ClassifierInput): Promise<Classifi
             product_description: { type: 'string' },
             unit_size_value: { type: 'number' },
             unit_size_unit: { type: 'string' },
+            line_items: {
+              type: 'array',
+              description: 'The ingredient and packaging components, if the document lists them. One entry per line.',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string', description: 'Ingredient or packaging component name.' },
+                  quantity: { type: 'number', description: 'Amount per unit of product, if stated.' },
+                  unit: { type: 'string', description: 'Unit, e.g. kg, g, L, ml, units.' },
+                  type: {
+                    type: 'string',
+                    enum: ['ingredient', 'packaging'],
+                    description: 'Whether the line is an ingredient or a packaging component.',
+                  },
+                },
+                required: ['name'],
+              },
+            },
+          },
+        },
+      },
+      {
+        name: 'extract_supplier_invoice',
+        description:
+          'Use for supplier invoices, purchase invoices, bills, or delivery notes for GOODS or SERVICES the company bought (ingredients, dry goods, packaging supplies, equipment, professional/IT services, freight). Extract the supplier, date, currency and the priced line items. Do NOT use this for energy/water/waste utility bills (use those tools) or for a bill of materials tied to a single product recipe (use identify_bom).',
+        input_schema: {
+          type: 'object',
+          properties: {
+            supplier_name: { type: 'string', description: 'The supplier / vendor name.' },
+            invoice_date: { type: 'string', description: 'Invoice date in YYYY-MM-DD.' },
+            currency: {
+              type: 'string',
+              enum: ['GBP', 'USD', 'EUR'],
+              description: 'Invoice currency. Default to GBP if not shown.',
+            },
+            suggested_category: {
+              type: 'string',
+              enum: SPEND_CATEGORY_VALUES,
+              description:
+                'Best-fit Scope 3 spend category for what was bought: purchased_services for most goods & services, capital_goods for equipment/machinery, upstream_transportation for inbound freight, operational_waste for waste services.',
+            },
+            line_items: {
+              type: 'array',
+              description: 'One entry per priced line. Use the line net total, not the unit price.',
+              items: {
+                type: 'object',
+                properties: {
+                  description: { type: 'string', description: 'What the line is for.' },
+                  amount: {
+                    type: 'number',
+                    description: 'Line total in the invoice currency, excluding tax if shown separately.',
+                  },
+                  quantity: {
+                    type: 'number',
+                    description: 'Quantity delivered on this line, if stated (enables activity-based detail).',
+                  },
+                  unit: {
+                    type: 'string',
+                    description: 'Unit for the quantity, e.g. kg, L, units, cases.',
+                  },
+                },
+                required: ['amount'],
+              },
+            },
+            invoice_total: {
+              type: 'number',
+              description: 'Invoice grand total (net of tax) as a fallback when the lines are not itemised.',
+            },
+          },
+        },
+      },
+      {
+        name: 'extract_freight_invoice',
+        description:
+          'Use for freight, shipping, courier, haulage, or logistics invoices for moving GOODS (inbound or outbound). Prefer the activity detail (mode, weight, distance) for an accurate tonne-km estimate; also capture the spend as a fallback.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            carrier_name: { type: 'string', description: 'The freight carrier / logistics provider.' },
+            shipment_date: { type: 'string', description: 'Shipment or invoice date in YYYY-MM-DD.' },
+            transport_mode: {
+              type: 'string',
+              enum: TRANSPORT_MODE_VALUES,
+              description: 'truck for road/HGV, train for rail, ship for sea, air for air freight.',
+            },
+            weight_kg: { type: 'number', description: 'Total shipment weight in kilograms.' },
+            distance_km: { type: 'number', description: 'Distance travelled in kilometres, if stated.' },
+            origin: { type: 'string', description: 'Origin location, if stated (helps estimate distance).' },
+            destination: { type: 'string', description: 'Destination location, if stated.' },
+            amount: { type: 'number', description: 'Invoice amount (spend fallback when weight/distance are missing).' },
+            currency: { type: 'string', enum: ['GBP', 'USD', 'EUR'], description: 'Invoice currency.' },
+          },
+        },
+      },
+      {
+        name: 'extract_refrigerant_service',
+        description:
+          'Use for refrigeration / air-conditioning / chiller / F-gas service records, gas logs, or maintenance sheets that report refrigerant recharged or topped up. This is a Scope 1 fugitive emission.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            service_date: { type: 'string', description: 'Service date in YYYY-MM-DD.' },
+            refrigerant_type: {
+              type: 'string',
+              enum: REFRIGERANT_KEYS,
+              description:
+                'Refrigerant recharged, mapped to its key: e.g. R-134a→r134a, R-410A→r410a, R-404A→r404a, R-407C→r407c, R-507A→r507a, R-32→r32, R-1234yf→r1234yf, ammonia/NH3→r717, CO2→r744, propane→r290.',
+            },
+            quantity_kg: {
+              type: 'number',
+              description: 'Mass of refrigerant added / recharged / topped up, in kilograms (not the total system charge).',
+            },
+            equipment: { type: 'string', description: 'Equipment or unit serviced, if named.' },
+            engineer: { type: 'string', description: 'Servicing company or engineer, if named.' },
+          },
+        },
+      },
+      {
+        name: 'extract_packaging_spec',
+        description:
+          'Use for packaging specification sheets / technical datasheets describing a packaging component (bottle, can, closure, label, carton, case) with its material and weight. Extract one entry per component. Do NOT use this for a full product BOM (use identify_bom).',
+        input_schema: {
+          type: 'object',
+          properties: {
+            product_hint: { type: 'string', description: 'Product or SKU the packaging is for, if named.' },
+            components: {
+              type: 'array',
+              description: 'One entry per packaging component.',
+              items: {
+                type: 'object',
+                properties: {
+                  component_name: { type: 'string', description: 'Name of the component, e.g. "750ml flint bottle".' },
+                  material: {
+                    type: 'string',
+                    description: 'Material as a lowercase key: glass, aluminium, pet, hdpe, steel, paperboard, cork, paper.',
+                  },
+                  role: {
+                    type: 'string',
+                    enum: PACKAGING_ROLE_VALUES,
+                    description: 'container for the primary bottle/can; closure for caps/corks; label; secondary/shipment/tertiary for outer packaging.',
+                  },
+                  weight_g: { type: 'number', description: 'Component weight in grams.' },
+                  recycled_content_pct: { type: 'number', description: 'Recycled content as a percentage, if stated.' },
+                  recyclability_pct: { type: 'number', description: 'Recyclability as a percentage, if stated.' },
+                },
+                required: ['component_name'],
+              },
+            },
+          },
+          required: ['components'],
+        },
+      },
+      {
+        name: 'extract_supplier_coa',
+        description:
+          'Use for a supplier Certificate of Analysis (CoA), product specification sheet, or test report for an INGREDIENT or material the company buys. Capture the header metadata so it can be filed against the supplier product.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            supplier_name: { type: 'string' },
+            product_name: { type: 'string', description: 'The supplier product the document describes.' },
+            document_type: {
+              type: 'string',
+              enum: ['specification_sheet', 'test_report', 'carbon_certificate'],
+              description: 'specification_sheet for a spec/datasheet, test_report for a CoA/lab test, carbon_certificate for a carbon/EPD claim.',
+            },
+            document_date: { type: 'string', description: 'Document / test date in YYYY-MM-DD.' },
+            expiry_date: { type: 'string', description: 'Expiry date in YYYY-MM-DD, if any.' },
+            reference_number: { type: 'string', description: 'Batch / lot / certificate reference, if shown.' },
+            covers_climate: { type: 'boolean', description: 'True if the document reports carbon / climate data.' },
+            covers_water: { type: 'boolean', description: 'True if it reports water data.' },
+            covers_waste: { type: 'boolean', description: 'True if it reports waste data.' },
+          },
+        },
+      },
+      {
+        name: 'extract_certification',
+        description:
+          'Use for an organisation-level certification certificate or audit summary (B Corp, ISO 14001, ISO 50001, CDP, SBTi, GRI, EcoVadis). Capture the framework, certificate number and dates.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            framework_hint: {
+              type: 'string',
+              enum: CERTIFICATION_HINTS,
+              description: 'bcorp for B Corp; iso14001 / iso50001 for ISO; csrd, sbti, gri, cdp_climate, ecovadis; other if none fit.',
+            },
+            certificate_name: { type: 'string', description: 'The certification name as printed.' },
+            issuer: { type: 'string', description: 'Certifying / awarding body.' },
+            certificate_number: { type: 'string' },
+            issue_date: { type: 'string', description: 'Issue / certified date in YYYY-MM-DD.' },
+            expiry_date: { type: 'string', description: 'Expiry date in YYYY-MM-DD.' },
           },
         },
       },
@@ -486,6 +757,34 @@ export async function classifyDocument(input: ClassifierInput): Promise<Classifi
       return { type: 'waste_bill', payload: toolUse.input as Record<string, unknown> };
     case 'identify_bom':
       return { type: 'bom', payload: (toolUse.input as Record<string, unknown>) || {} };
+    case 'extract_supplier_invoice': {
+      const payload = (toolUse.input as Record<string, unknown>) || {};
+      const items = Array.isArray((payload as any).line_items) ? (payload as any).line_items : [];
+      // Not itemised but a grand total was read → synthesise one spend line so
+      // the invoice is still saveable.
+      if (items.length === 0 && (payload as any).invoice_total != null) {
+        (payload as any).line_items = [
+          { description: 'Invoice total', amount: (payload as any).invoice_total },
+        ];
+      }
+      return { type: 'supplier_invoice', payload };
+    }
+    case 'extract_freight_invoice':
+      return { type: 'freight_invoice', payload: (toolUse.input as Record<string, unknown>) || {} };
+    case 'extract_refrigerant_service':
+      return { type: 'refrigerant_service', payload: (toolUse.input as Record<string, unknown>) || {} };
+    case 'extract_packaging_spec': {
+      const payload = (toolUse.input as Record<string, unknown>) || {};
+      const components = Array.isArray((payload as any).components) ? (payload as any).components : [];
+      if (components.length === 0) {
+        return { type: 'unsupported', payload: { reason: 'Packaging document detected, but no components could be read.' } };
+      }
+      return { type: 'packaging_spec', payload };
+    }
+    case 'extract_supplier_coa':
+      return { type: 'supplier_coa', payload: (toolUse.input as Record<string, unknown>) || {} };
+    case 'extract_certification':
+      return { type: 'certification', payload: (toolUse.input as Record<string, unknown>) || {} };
     case 'extract_soil_carbon_lab': {
       const payload = (toolUse.input as Record<string, unknown>) || {};
       const samples = Array.isArray((payload as any).samples) ? (payload as any).samples : [];

@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRosaPageContext } from "@/lib/rosa/RosaContextProvider";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { SmartUploadButton } from "@/components/layouts/SmartUploadButton";
 import { FlagThresholdBanner } from '@/components/flag/FlagThresholdBanner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -379,6 +380,7 @@ export default function ProductsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <SmartUploadButton />
           {products.length > 0 && (
             <Button
               size="lg"

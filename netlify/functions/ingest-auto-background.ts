@@ -40,14 +40,18 @@ export const handler = async (event: { body?: string | null; headers: Record<str
   const secret = process.env.INTERNAL_JOB_HMAC_SECRET;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-  const geminiKey = process.env.GEMINI_API_KEY;
+  // classifyDocument runs on Anthropic/Claude, not Gemini — so the hard
+  // requirement is ANTHROPIC_API_KEY. Requiring GEMINI_API_KEY here used to
+  // 500 the whole large-file path on any deploy without a Gemini key, even
+  // though the classifier never touches Gemini.
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
 
-  if (!secret || !supabaseUrl || !serviceKey || !geminiKey) {
+  if (!secret || !supabaseUrl || !serviceKey || !anthropicKey) {
     console.error('[ingest-auto-background] Missing required env vars', {
       hasSecret: !!secret,
       hasSupabaseUrl: !!supabaseUrl,
       hasServiceKey: !!serviceKey,
-      hasGeminiKey: !!geminiKey,
+      hasAnthropicKey: !!anthropicKey,
     });
     return { statusCode: 500, body: 'misconfigured' };
   }

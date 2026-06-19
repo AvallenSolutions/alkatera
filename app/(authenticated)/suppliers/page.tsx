@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { SmartUploadButton } from '@/components/layouts/SmartUploadButton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -829,8 +830,10 @@ export default function SuppliersPage() {
               : 'Find and add suppliers from our verified directory'}
           </p>
         </div>
-        {hasSuppliers && (
-          <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3">
+          <SmartUploadButton />
+          {hasSuppliers && (
+            <>
             {(canCreateSuppliers || canInviteSuppliers) && (
               <Button size="lg" variant="outline" onClick={() => setEsgSurveyOpen(true)}>
                 <ClipboardCheck className="h-5 w-5 mr-2" />
@@ -857,8 +860,9 @@ export default function SuppliersPage() {
                 </Tooltip>
               </TooltipProvider>
             )}
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* Spend-driven supplier insight: who carries the most impact, and which

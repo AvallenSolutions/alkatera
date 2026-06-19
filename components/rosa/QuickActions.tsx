@@ -1,20 +1,17 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Upload, Mail, Inbox, Copy, Check } from 'lucide-react'
+import { Upload, Inbox } from 'lucide-react'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
-import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
 /**
- * "Get data into Rosa" card. Three ways to feed her:
+ * "Get data into Rosa" card. Two ways to feed her:
  *   1. Drop a document (opens the same file picker the input bar uses)
- *   2. Forward an email (shows the org's inbox address, copyable)
- *   3. Open the queue (shortcut to the agent's pending items)
+ *   2. Open the queue (shortcut to the agent's pending items)
  *
- * The email row is only shown when managed_footprint is enabled and the
- * inbox address is set. For non-managed orgs, the row hides itself.
+ * Everything stays in the platform: upload only, no email-in.
  */
 interface Props {
   onOpenQueue?: () => void
@@ -23,30 +20,18 @@ interface Props {
 export function QuickActions({ onOpenQueue }: Props) {
   const { currentOrganization } = useOrganization()
   const orgId = currentOrganization?.id
-  const [inbox, setInbox] = useState<string | null>(null)
-  const [managedEnabled, setManagedEnabled] = useState(false)
-  const [copied, setCopied] = useState(false)
   const [openCount, setOpenCount] = useState<number | null>(null)
 
   useEffect(() => {
     if (!orgId) return
     let cancelled = false
     const load = async () => {
-      const [orgRes, exRes] = await Promise.all([
-        supabase
-          .from('organizations')
-          .select('agent_inbox_address, managed_footprint_enabled')
-          .eq('id', orgId)
-          .maybeSingle(),
-        supabase
-          .from('agent_exceptions')
-          .select('id', { count: 'exact', head: true })
-          .eq('organization_id', orgId)
-          .eq('status', 'open'),
-      ])
+      const exRes = await supabase
+        .from('agent_exceptions')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', orgId)
+        .eq('status', 'open')
       if (cancelled) return
-      setInbox(orgRes.data?.agent_inbox_address || null)
-      setManagedEnabled(!!orgRes.data?.managed_footprint_enabled)
       setOpenCount(exRes.count || 0)
     }
     load().catch(() => {})
@@ -58,14 +43,6 @@ export function QuickActions({ onOpenQueue }: Props) {
   const triggerFilePicker = () => {
     const input = document.querySelector<HTMLInputElement>('input[type=file]')
     input?.click()
-  }
-
-  const copyInbox = () => {
-    if (!inbox) return
-    navigator.clipboard.writeText(inbox)
-    setCopied(true)
-    toast.success('Inbox address copied')
-    setTimeout(() => setCopied(false), 1500)
   }
 
   return (
@@ -81,24 +58,6 @@ export function QuickActions({ onOpenQueue }: Props) {
           hint="PDFs, images, spreadsheets. I'll classify and queue it."
           onClick={triggerFilePicker}
         />
-
-        {managedEnabled && inbox && (
-          <ActionRow
-            icon={<Mail className="h-4 w-4" />}
-            title="Forward an email"
-            hint={
-              <span className="font-mono text-xs break-all">{inbox}</span>
-            }
-            onClick={copyInbox}
-            cta={
-              copied ? (
-                <Check className="h-4 w-4 text-emerald-400" />
-              ) : (
-                <Copy className="h-4 w-4 text-muted-foreground" />
-              )
-            }
-          />
-        )}
 
         <ActionRow
           icon={<Inbox className="h-4 w-4" />}
