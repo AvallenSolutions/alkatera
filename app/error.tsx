@@ -11,6 +11,15 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  // redirect() and notFound() work by throwing errors with these digests.
+  // A custom error boundary is the innermost boundary around the page, so it
+  // catches them first and would otherwise render this generic error UI with a
+  // 200 — silently breaking every redirect and 404. Re-throw so they propagate
+  // up to Next's own RedirectErrorBoundary / NotFoundErrorBoundary.
+  if (error?.digest === 'NEXT_NOT_FOUND' || error?.digest?.startsWith('NEXT_REDIRECT')) {
+    throw error;
+  }
+
   useEffect(() => {
     console.error('Unhandled error:', error);
   }, [error]);
