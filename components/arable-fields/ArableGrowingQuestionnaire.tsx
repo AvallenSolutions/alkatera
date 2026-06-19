@@ -45,6 +45,7 @@ import {
 import { toast } from 'sonner';
 import { useIngestStash } from '@/hooks/useIngestStash';
 import { calculateArableImpacts } from '@/lib/arable-calculator';
+import { SoilCarbonSamplesPanel } from '@/components/soil-carbon/SoilCarbonSamplesPanel';
 import {
   ARABLE_PESTICIDE_TYPE_LABELS,
   STRAW_MANAGEMENT_LABELS,
@@ -1048,6 +1049,18 @@ export function ArableGrowingQuestionnaire({
                     <Switch
                       checked={form.has_measured_soil_carbon}
                       onCheckedChange={(v) => updateForm({ has_measured_soil_carbon: v })}
+                    />
+                  </div>
+
+                  {/* Measured stock-change: repeated SOC samples over time */}
+                  <div className="mt-4">
+                    <SoilCarbonSamplesPanel
+                      landUnitType="arable_field"
+                      landUnitId={fieldId}
+                      practiceDefaultKgPerHa={SOIL_CARBON_REMOVAL_DEFAULTS[form.soil_management] ?? 0}
+                      practiceLabel={
+                        SOIL_PRACTICES.find((p) => p.value === form.soil_management)?.label ?? form.soil_management
+                      }
                     />
                   </div>
 

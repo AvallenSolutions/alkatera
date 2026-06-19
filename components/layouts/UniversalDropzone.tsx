@@ -515,6 +515,12 @@ function ReviewPanel(props: ReviewPanelProps) {
     )
   }
 
+  if (result.type === 'soil_carbon_lab') {
+    return (
+      <SoilCarbonLabPanel lab={result.soilCarbonLab} onClose={props.onClose} />
+    )
+  }
+
   if (result.type === 'soil_carbon_evidence') {
     return (
       <AssetHandoffPanel
@@ -1652,6 +1658,367 @@ function AssetHandoffPanel({ kind, detectedLabel, icon, description, extraNote, 
           ) : (
             <span>Open asset</span>
           )}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// SoilCarbonLabPanel — structured soil-carbon path. The classifier has parsed a
+// soil lab report into measured SOC samples; here the grower confirms the
+// values, picks which land unit they belong to, and we save each one straight
+// to /api/soil-carbon/samples (which recomputes the measured stock-change cache
+// + trajectory). No re-upload, no manual keying of the lab numbers.
+// ───────────────────────────────────────────────────────────────────────────────
+
+type LandUnitType = 'vineyard' | 'orchard' | 'arable_field'
+const LAND_UNIT_TYPE_BY_KIND: Record<AssetKind, LandUnitType> = {
+  vineyards: 'vineyard',
+  orchards: 'orchard',
+  'arable-fields': 'arable_field',
+}
+
+interface LabSampleDraft {
+  location_label: string
+  sample_date: string
+  depth_cm: string
+  soc_input_method: 'stock' | 'concentration'
+  soc_stock_tc_ha: string
+  soc_concentration_pct: string
+  bulk_density_g_cm3: string
+  sampling_points: string
+}
+
+function SoilCarbonLabPanel({
+  lab,
+  onClose,
+}: {
+  lab: NonNullable<IngestResponse['soilCarbonLab']> | undefined
+  onClose: () => void
+}) {
+  const [assetKind, setAssetKind] = useState<AssetKind | null>(null)
+  const [assets, setAssets] = useState<AssetOption[]>([])
+  const [assetId, setAssetId] = useState<string>('')
+  const [loadingAssets, setLoadingAssets] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState<{ count: number } | null>(null)
+
+  const defaultDate = lab?.default_sample_date || ''
+  const [rows, setRows] = useState<LabSampleDraft[]>(() =>
+    (lab?.samples || []).map((s) => ({
+      location_label: s.location_label || '',
+      sample_date: s.sample_date || defaultDate || '',
+      depth_cm: s.depth_cm != null ? String(s.depth_cm) : '30',
+      soc_input_method: s.soc_input_method === 'concentration' ? 'concentration' : 'stock',
+      soc_stock_tc_ha: s.soc_stock_tc_ha != null ? String(s.soc_stock_tc_ha) : '',
+      soc_concentration_pct: s.soc_concentration_pct != null ? String(s.soc_concentration_pct) : '',
+      bulk_density_g_cm3: s.bulk_density_g_cm3 != null ? String(s.bulk_density_g_cm3) : '',
+      sampling_points: s.sampling_points != null ? String(s.sampling_points) : '',
+    })),
+  )
+
+  useEffect(() => {
+    if (!assetKind) return
+    let cancelled = false
+    setLoadingAssets(true)
+    setLoadError(null)
+    setAssets([])
+    setAssetId('')
+    const typeMeta = ASSET_TYPES.find((t) => t.value === assetKind)!
+    fetch(typeMeta.apiPath)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status}`))))
+      .then((body) => {
+        if (cancelled) return
+        const list: AssetOption[] = (body?.data || []).map((a: any) => ({ id: a.id, name: a.name }))
+        setAssets(list)
+        if (list.length === 1) setAssetId(list[0].id)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setLoadError(`Couldn't load ${typeMeta.label.toLowerCase()}s. You may not have beta access for this asset type.`)
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingAssets(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [assetKind])
+
+  const updateRow = (i: number, patch: Partial<LabSampleDraft>) =>
+    setRows((rs) => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
+  const removeRow = (i: number) => setRows((rs) => rs.filter((_, idx) => idx !== i))
+
+  const typeMeta = assetKind ? ASSET_TYPES.find((t) => t.value === assetKind)! : null
+
+  const rowValid = (r: LabSampleDraft) => {
+    if (!r.sample_date) return false
+    if (!r.depth_cm || Number(r.depth_cm) <= 0) return false
+    if (r.soc_input_method === 'stock') return !!r.soc_stock_tc_ha
+    return !!r.soc_concentration_pct && !!r.bulk_density_g_cm3
+  }
+  const allValid = rows.length > 0 && rows.every(rowValid)
+  const canSave = !!assetId && allValid && !saving
+
+  const save = async () => {
+    if (!assetId || !assetKind) {
+      toast.error('Pick which asset these measurements are for.')
+      return
+    }
+    const invalid = rows.findIndex((r) => !rowValid(r))
+    if (invalid >= 0) {
+      toast.error(`Measurement ${invalid + 1} is missing a date, depth, or value.`)
+      return
+    }
+    setSaving(true)
+    const landUnitType = LAND_UNIT_TYPE_BY_KIND[assetKind]
+    let savedCount = 0
+    try {
+      for (const r of rows) {
+        const res = await fetch('/api/soil-carbon/samples', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            land_unit_type: landUnitType,
+            land_unit_id: assetId,
+            sample_date: r.sample_date,
+            depth_cm: Number(r.depth_cm),
+            soc_input_method: r.soc_input_method,
+            soc_stock_tc_ha: r.soc_input_method === 'stock' ? Number(r.soc_stock_tc_ha) : null,
+            soc_concentration_pct:
+              r.soc_input_method === 'concentration' ? Number(r.soc_concentration_pct) : null,
+            bulk_density_g_cm3:
+              r.soc_input_method === 'concentration' ? Number(r.bulk_density_g_cm3) : null,
+            sampling_points: r.sampling_points ? Number(r.sampling_points) : null,
+            lab_name: lab?.lab_name || null,
+            methodology: lab?.methodology || null,
+            verification_status: 'unverified',
+            notes: r.location_label ? `Sample location: ${r.location_label}` : null,
+          }),
+        })
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}))
+          toast.error(j.error || `Could not save measurement ${savedCount + 1}.`)
+          break
+        }
+        savedCount += 1
+      }
+    } finally {
+      setSaving(false)
+    }
+    if (savedCount > 0) {
+      setSaved({ count: savedCount })
+      toast.success(`Saved ${savedCount} soil carbon measurement${savedCount === 1 ? '' : 's'}.`)
+    }
+  }
+
+  if (saved) {
+    const link = typeMeta && assetId ? `${typeMeta.pageBase}/${assetId}` : null
+    return (
+      <div className="space-y-4">
+        <div className="flex items-start gap-3 p-4 rounded-lg border border-emerald-400/30 bg-emerald-500/5">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-medium">
+              Saved {saved.count} measurement{saved.count === 1 ? '' : 's'} to {typeMeta?.label.toLowerCase()}.
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Once two or more samples exist at a consistent depth, the measured stock-change becomes
+              your soil carbon removal. Existing products need a Recalculate LCA pass to pick up the
+              new value.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-2 pt-1">
+          {link && (
+            <Button asChild size="sm" variant="outline">
+              <Link href={link} onClick={onClose}>
+                View {typeMeta?.label.toLowerCase()}
+              </Link>
+            </Button>
+          )}
+          <Button size="sm" onClick={onClose}>
+            Done
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start gap-3 p-4 rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5">
+        <Leaf className="h-4 w-4 mt-0.5" />
+        <div className="text-sm">
+          <p className="font-medium">We read a soil carbon lab report.</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Confirm the {rows.length} measurement{rows.length === 1 ? '' : 's'} below and pick which
+            asset they belong to. We&apos;ll save them straight to the field&apos;s soil carbon record.
+          </p>
+          {(lab?.lab_name || lab?.methodology) && (
+            <p className="text-xs text-muted-foreground mt-1 italic">
+              {[lab?.lab_name, lab?.methodology].filter(Boolean).join(' · ')}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-xs">Which asset is this for?</Label>
+        <div className="grid grid-cols-3 gap-2">
+          {ASSET_TYPES.map((t) => (
+            <Button
+              key={t.value}
+              variant={assetKind === t.value ? 'default' : 'outline'}
+              size="sm"
+              className="h-auto py-2 flex-col gap-1"
+              onClick={() => setAssetKind(t.value)}
+            >
+              <div className="flex items-center gap-1.5">
+                {t.icon}
+                <span className="text-xs">{t.label}</span>
+              </div>
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      {assetKind && (
+        <div className="space-y-1.5">
+          <Label htmlFor="lab-asset" className="text-xs">
+            Select {typeMeta?.label.toLowerCase()}
+          </Label>
+          {loadingAssets ? (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+            </div>
+          ) : loadError ? (
+            <p className="text-xs text-amber-600 dark:text-amber-400">{loadError}</p>
+          ) : assets.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No {typeMeta?.label.toLowerCase()}s yet.{' '}
+              <Link href={typeMeta!.pageBase} className="underline">
+                Add one
+              </Link>
+              .
+            </p>
+          ) : (
+            <Select value={assetId} onValueChange={setAssetId}>
+              <SelectTrigger id="lab-asset">
+                <SelectValue placeholder={`Select ${typeMeta?.label.toLowerCase()}`} />
+              </SelectTrigger>
+              <SelectContent>
+                {assets.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+      )}
+
+      <div className="space-y-3">
+        <Label className="text-xs">Measurements</Label>
+        {rows.length === 0 && (
+          <p className="text-xs text-muted-foreground">No measurements left to save.</p>
+        )}
+        {rows.map((r, i) => (
+          <div key={i} className="space-y-3 rounded-lg border border-border p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-foreground">
+                {r.location_label || `Measurement ${i + 1}`}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => removeRow(i)}
+                className="h-7 w-7 p-0 text-muted-foreground hover:text-red-500"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-[11px] text-muted-foreground">Sample date</Label>
+                <Input
+                  type="date"
+                  value={r.sample_date}
+                  onChange={(e) => updateRow(i, { sample_date: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label className="text-[11px] text-muted-foreground">Depth (cm)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={r.depth_cm}
+                  onChange={(e) => updateRow(i, { depth_cm: e.target.value })}
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="text-[11px] text-muted-foreground">How was it measured?</Label>
+              <Select
+                value={r.soc_input_method}
+                onValueChange={(v) => updateRow(i, { soc_input_method: v as 'stock' | 'concentration' })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="stock">SOC stock (tonnes C per hectare)</SelectItem>
+                  <SelectItem value="concentration">Lab values (concentration % + bulk density)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {r.soc_input_method === 'stock' ? (
+              <div>
+                <Label className="text-[11px] text-muted-foreground">SOC stock (tonnes C / ha)</Label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={r.soc_stock_tc_ha}
+                  onChange={(e) => updateRow(i, { soc_stock_tc_ha: e.target.value })}
+                />
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-[11px] text-muted-foreground">SOC concentration (%)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={r.soc_concentration_pct}
+                    onChange={(e) => updateRow(i, { soc_concentration_pct: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label className="text-[11px] text-muted-foreground">Bulk density (g/cm³)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={r.bulk_density_g_cm3}
+                    onChange={(e) => updateRow(i, { bulk_density_g_cm3: e.target.value })}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center justify-end gap-2 pt-1">
+        <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={saving}>
+          Cancel
+        </Button>
+        <Button type="button" size="sm" onClick={save} disabled={!canSave}>
+          {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+          Save {rows.length} measurement{rows.length === 1 ? '' : 's'}
         </Button>
       </div>
     </div>

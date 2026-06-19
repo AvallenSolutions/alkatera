@@ -45,6 +45,7 @@ import { toast } from 'sonner';
 import { useIngestStash } from '@/hooks/useIngestStash';
 import { calculateViticultureImpacts } from '@/lib/viticulture-calculator';
 import { SOIL_CARBON_REMOVAL_DEFAULTS } from '@/lib/ghg-constants';
+import { SoilCarbonSamplesPanel } from '@/components/soil-carbon/SoilCarbonSamplesPanel';
 import type {
   VineyardGrowingProfile,
   VineyardSoilCarbonEvidence,
@@ -1066,6 +1067,18 @@ export function VineyardGrowingQuestionnaire({
                     <Switch
                       checked={form.has_measured_soil_carbon}
                       onCheckedChange={(v) => updateForm({ has_measured_soil_carbon: v })}
+                    />
+                  </div>
+
+                  {/* Measured stock-change: repeated SOC samples over time */}
+                  <div className="mt-4">
+                    <SoilCarbonSamplesPanel
+                      landUnitType="vineyard"
+                      landUnitId={vineyardId}
+                      practiceDefaultKgPerHa={SOIL_CARBON_REMOVAL_DEFAULTS[form.soil_management] ?? 0}
+                      practiceLabel={
+                        SOIL_PRACTICES.find((p) => p.value === form.soil_management)?.label ?? form.soil_management
+                      }
                     />
                   </div>
 

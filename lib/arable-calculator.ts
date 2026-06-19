@@ -347,7 +347,8 @@ export function calculateArableImpacts(
   // ========================================================================
 
   let soilCarbonCo2e: number;
-  let soilCarbonMethodology: 'practice_based_default' | 'measured';
+  let soilCarbonMethodology: 'practice_based_default' | 'measured' | 'measured_stock_change';
+  let soilCarbonConfidence: 'HIGH' | 'MEDIUM' | 'LOW' | undefined;
 
   const removalVerificationStatus = input.removal_verification_status ?? 'unverified';
   const verificationExpired = input.removal_verification_expiry
@@ -355,7 +356,14 @@ export function calculateArableImpacts(
     : false;
   const soilCarbonVerified = removalVerificationStatus === 'verified' && !verificationExpired;
 
-  if (input.soil_carbon_override_kg_co2e_per_ha != null) {
+  // Priority: measured stock-change (repeated SOC samples) > manual measured
+  // override > practice-based default. The stock-change flux is already net of
+  // the conservative confidence discount and never negative (see lib/soil-carbon).
+  if (input.soil_carbon_annual_change_kg_co2e_per_ha != null) {
+    soilCarbonCo2e = input.soil_carbon_annual_change_kg_co2e_per_ha * input.area_ha;
+    soilCarbonMethodology = 'measured_stock_change';
+    soilCarbonConfidence = input.soil_carbon_change_confidence ?? undefined;
+  } else if (input.soil_carbon_override_kg_co2e_per_ha != null) {
     soilCarbonCo2e = input.soil_carbon_override_kg_co2e_per_ha * input.area_ha;
     soilCarbonMethodology = 'measured';
   } else {
@@ -418,11 +426,16 @@ export function calculateArableImpacts(
   const totalEmissionsPerKg = grainYieldKg > 0 ? totalEmissions / grainYieldKg : 0;
   const removalsPerKg = grainYieldKg > 0 ? totalRemovals / grainYieldKg : 0;
 
-  const dataQualityGrade = assessDataQuality(input, soilCarbonMethodology);
+  const dataQualityGrade = assessDataQuality(
+    input,
+    soilCarbonMethodology === 'practice_based_default' ? 'practice_based_default' : 'measured',
+  );
   const methodologyNotes = buildMethodologyNotes(input, climateZone, cropType);
 
-  // LSR alignment
-  let removalsMeetLsrStandard = soilCarbonMethodology === 'measured' && soilCarbonVerified;
+  // LSR alignment (both measured paths require third-party verification)
+  let removalsMeetLsrStandard =
+    (soilCarbonMethodology === 'measured' || soilCarbonMethodology === 'measured_stock_change') &&
+    soilCarbonVerified;
   let removalsWarning: string | undefined;
 
   if (soilCarbonCo2e > 0) {
@@ -472,6 +485,7 @@ export function calculateArableImpacts(
     flag_removals: {
       soil_carbon_co2e: soilCarbonCo2e,
       methodology: soilCarbonMethodology,
+      confidence: soilCarbonConfidence,
       is_verified: soilCarbonVerified,
       removal_verification_status: removalVerificationStatus,
       removals_meet_lsr_standard: removalsMeetLsrStandard,

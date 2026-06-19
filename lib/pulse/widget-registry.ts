@@ -36,6 +36,7 @@ export type WidgetId =
   | 'regulatory-exposure'
   | 'macc'
   | 'carbon-budgets'
+  | 'soil-carbon-trajectory'
   // Financial subpage widgets. Exempt from the main grid but registered so
   // drill-overlay lookups (`?drill=top-cost-drivers`) find a label.
   | 'cost-intensity'
@@ -368,6 +369,21 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
       why: 'Keeps emissions on plan with a clear over-or-under signal.',
       todo: 'Set budgets from this card if you have none yet.',
       source: 'Budgets you set, compared against your metric history.',
+    },
+  }),
+  'soil-carbon-trajectory': withLayout({
+    id: 'soil-carbon-trajectory',
+    label: 'Soil carbon trajectory',
+    description:
+      'Measured soil organic carbon over time per field, with the annual change and a confidence grade.',
+    footprint: '2x2',
+    phase: 20,
+    explainer: {
+      what: 'How your measured soil carbon has changed over time, field by field.',
+      why: 'The credible removal claim is the measured direction and scale of change, not a single-day figure.',
+      todo: 'Add repeated soil samples (same depth, same lab) on your fields to populate this.',
+      source: 'Your soil carbon measurements, with a conservative discount for low-confidence sampling.',
+      isEstimate: false,
     },
   }),
   'cost-intensity': withLayout({

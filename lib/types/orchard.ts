@@ -173,6 +173,12 @@ export interface OrchardGrowingProfile {
   soil_carbon_methodology: string | null;
   soil_carbon_lab_name: string | null;
   soil_carbon_sampling_points: number | null;
+  sampling_depth_cm?: number | null;
+
+  // Measured stock-change cache (derived from soil_carbon_samples)
+  soil_carbon_annual_change_kg_co2e_per_ha?: number | null;
+  soil_carbon_change_methodology?: string | null;
+  soil_carbon_change_confidence?: 'HIGH' | 'MEDIUM' | 'LOW' | null;
 
   // Removal verification (FLAG compliance)
   removal_verification_status?: string | null;
@@ -238,6 +244,14 @@ export interface OrchardCalculatorInput {
   irrigation_energy_source: string; // IrrigationEnergySource
   fruit_yield_tonnes: number;
   soil_carbon_override_kg_co2e_per_ha: number | null;
+  /**
+   * Measured annual SOC stock-change flux (kg CO2e/ha/yr), derived from repeated
+   * soil_carbon_samples and cached on the growing profile. Net of the conservative
+   * confidence discount and never negative. Takes priority over the manual override.
+   */
+  soil_carbon_annual_change_kg_co2e_per_ha?: number | null;
+  soil_carbon_change_methodology?: string | null;
+  soil_carbon_change_confidence?: 'HIGH' | 'MEDIUM' | 'LOW' | null;
   /** AWARE water scarcity factor for the orchard location (caller resolves from DB) */
   aware_factor?: number;
 
@@ -325,7 +339,9 @@ export interface OrchardImpactResult {
     /** Soil carbon removed (positive value = CO2 removed from atmosphere) */
     soil_carbon_co2e: number;
     /** Source methodology for the removal estimate */
-    methodology: 'practice_based_default' | 'measured';
+    methodology: 'practice_based_default' | 'measured' | 'measured_stock_change';
+    /** Confidence grade when derived from measured stock-change samples */
+    confidence?: 'HIGH' | 'MEDIUM' | 'LOW';
     /** Whether the value has been independently verified (backward compat) */
     is_verified: boolean;
     /** Third-party verification status */

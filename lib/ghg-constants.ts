@@ -246,6 +246,55 @@ export const SOIL_CARBON_REMOVAL_DEFAULTS: Record<string, number> = {
 } as const;
 
 // ---------------------------------------------------------------------------
+// Measured Soil Carbon: Stock-Change Constants
+// ---------------------------------------------------------------------------
+// Constants supporting the measured stock-change approach, where the annual
+// removal flux is derived from repeated field measurements of soil organic
+// carbon (SOC) stock rather than a practice-based default.
+//
+// Methodology principle (per the maturing voluntary carbon market): the unit of
+// value is the measured DIRECTION and SCALE of change over time, sampled
+// consistently (same depth, same lab). Uncertainty lives in field
+// heterogeneity, not the lab analysis, so confidence scales with sampling
+// density and depth consistency, and a conservative discount is applied to
+// low-confidence claims to avoid over-claiming.
+
+/**
+ * Depth tolerance (cm) within which two samples are treated as the "same depth"
+ * for a valid stock-change comparison. Samples taken to materially different
+ * depths are not directly comparable.
+ */
+export const SOIL_CARBON_DEPTH_TOLERANCE_CM = 5;
+
+/**
+ * Minimum sampling points for a single measurement to reach HIGH confidence on
+ * field heterogeneity. Below this the estimate carries more spatial uncertainty.
+ */
+export const SOIL_CARBON_MIN_POINTS_HIGH = 12;
+
+/**
+ * Minimum sampling points for MEDIUM confidence. Below this is LOW confidence.
+ */
+export const SOIL_CARBON_MIN_POINTS_MEDIUM = 5;
+
+/**
+ * Minimum sampling depth (cm) expected for a credible SOC stock measurement.
+ * Shallower sampling misses carbon at depth and is treated as lower confidence.
+ */
+export const SOIL_CARBON_MIN_DEPTH_CM = 30;
+
+/**
+ * Conservative discount applied to the measured annual removal flux by
+ * confidence grade. Discounts a fraction of the claimed removal so that
+ * low-confidence claims are not over-stated. HIGH = no discount.
+ */
+export const SOIL_CARBON_CONFIDENCE_DISCOUNT: Record<string, number> = {
+  HIGH: 0,
+  MEDIUM: 0.2,
+  LOW: 0.4,
+} as const;
+
+// ---------------------------------------------------------------------------
 // Fuel Combustion Factors (DEFRA 2025)
 // ---------------------------------------------------------------------------
 // Subset of DEFRA factors relevant to viticulture field operations.

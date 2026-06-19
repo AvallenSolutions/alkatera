@@ -19,6 +19,7 @@ import { FinancialFootprintCard } from '@/components/pulse/widgets/financial-foo
 import { ScenarioSensitivityCard } from '@/components/pulse/widgets/scenario-sensitivity/ScenarioSensitivityCard';
 import { MaccCard } from '@/components/pulse/widgets/macc/MaccCard';
 import { CarbonBudgetsCard } from '@/components/pulse/widgets/carbon-budgets/CarbonBudgetsCard';
+import { SoilCarbonTrajectoryCard } from '@/components/pulse/widgets/SoilCarbonTrajectoryCard';
 import { RegulatoryExposureCard } from '@/components/pulse/widgets/regulatory-exposure/RegulatoryExposureCard';
 import { TargetTrajectoryCard } from '@/components/pulse/widgets/target-trajectory/TargetTrajectoryCard';
 import { FacilityImpactCard } from '@/components/pulse/widgets/facility-impact/FacilityImpactCard';
@@ -46,6 +47,7 @@ export const WIDGET_RENDERERS: Partial<Record<WidgetId, () => ReactNode>> = {
   'scenario-sensitivity': () => <ScenarioSensitivityCard />,
   macc: () => <MaccCard />,
   'carbon-budgets': () => <CarbonBudgetsCard />,
+  'soil-carbon-trajectory': () => <SoilCarbonTrajectoryCard />,
   'regulatory-exposure': () => <RegulatoryExposureCard />,
   'target-trajectory': () => <TargetTrajectoryCard />,
   'facility-impact': () => <FacilityImpactCard />,

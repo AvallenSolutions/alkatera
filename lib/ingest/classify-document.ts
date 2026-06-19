@@ -43,6 +43,7 @@ export type ClassifierResultType =
   | 'bulk_xlsx'
   | 'spray_diary'
   | 'bom'
+  | 'soil_carbon_lab'
   | 'soil_carbon_evidence'
   | 'accounts_csv'
   | 'historical_sustainability_report'
@@ -84,6 +85,11 @@ export function shapeIngestResult(
       return { result_type: type, result_payload: { type, sprayDiary: { ...payload, stashId } } };
     case 'bom':
       return { result_type: type, result_payload: { type, bom: { ...payload, stashId } } };
+    case 'soil_carbon_lab':
+      return {
+        result_type: type,
+        result_payload: { type, soilCarbonLab: { ...payload, stashId } },
+      };
     case 'soil_carbon_evidence':
       return {
         result_type: type,
@@ -191,7 +197,9 @@ export async function classifyDocument(input: ClassifierInput): Promise<Classifi
 
   const response = await anthropic.messages.create({
     model: 'claude-opus-4-6',
-    max_tokens: 1500,
+    // Soil lab reports can carry many sampling locations × depth layers, so the
+    // tool-call payload (a samples array) is larger than the single-object bills.
+    max_tokens: 4000,
     tools: [
       {
         name: 'extract_utility_bill',
@@ -293,9 +301,74 @@ export async function classifyDocument(input: ClassifierInput): Promise<Classifi
         },
       },
       {
+        name: 'extract_soil_carbon_lab',
+        description:
+          'Use for soil laboratory analysis reports / soil test results that report MEASURED soil organic carbon (SOC) for one or more sampling locations — typically a table of fields/blocks/paddocks with organic carbon %, organic matter %, bulk density, and/or a carbon stock figure. Extract one entry per sampling location AND depth layer. This is the structured measurement path; only use identify_soil_carbon_evidence for soil-carbon documents that carry NO numeric SOC measurements.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            lab_name: { type: 'string', description: 'Laboratory or testing provider name, if printed.' },
+            methodology: {
+              type: 'string',
+              description: 'Analytical method if stated (e.g. Dumas combustion, Walkley-Black, loss-on-ignition).',
+            },
+            default_sample_date: {
+              type: 'string',
+              description: 'Sampling or report date in YYYY-MM-DD, used for entries that do not state their own date.',
+            },
+            samples: {
+              type: 'array',
+              description: 'One entry per sampling location and depth layer.',
+              items: {
+                type: 'object',
+                properties: {
+                  location_label: {
+                    type: 'string',
+                    description: 'Field / block / paddock / sample ID exactly as printed, so the user can map it to a land unit.',
+                  },
+                  sample_date: {
+                    type: 'string',
+                    description: 'Sampling date in YYYY-MM-DD if this entry states its own; otherwise omit.',
+                  },
+                  depth_cm: {
+                    type: 'number',
+                    description: 'Thickness of the sampled layer in cm. For a depth range like "0-30 cm" use 30; for "0-10 cm" use 10.',
+                  },
+                  soc_input_method: {
+                    type: 'string',
+                    enum: ['stock', 'concentration'],
+                    description:
+                      'Use "stock" when a carbon stock (tC/ha or t C/ha) is reported directly; use "concentration" when reporting organic carbon % (ideally with bulk density).',
+                  },
+                  soc_stock_tc_ha: {
+                    type: 'number',
+                    description: 'Measured SOC stock in tonnes carbon per hectare, when the report gives it directly.',
+                  },
+                  soc_concentration_pct: {
+                    type: 'number',
+                    description:
+                      'Soil organic carbon as a percentage. If only organic MATTER % is reported, multiply by 0.58 to estimate organic carbon and record that value here.',
+                  },
+                  bulk_density_g_cm3: {
+                    type: 'number',
+                    description: 'Dry bulk density in g/cm3, if reported. Needed alongside concentration to compute a stock.',
+                  },
+                  sampling_points: {
+                    type: 'number',
+                    description: 'Number of cores / sub-samples composited for this entry, if stated.',
+                  },
+                },
+                required: ['depth_cm', 'soc_input_method'],
+              },
+            },
+          },
+          required: ['samples'],
+        },
+      },
+      {
         name: 'identify_soil_carbon_evidence',
         description:
-          'Use for soil carbon / carbon farming / regenerative agriculture evidence documents. Identification only.',
+          'Use ONLY for soil-carbon / carbon farming / regenerative agriculture documents that contain NO numeric SOC measurements — e.g. a verification certificate, a carbon farming plan, or a methodology description. If the document reports organic carbon %, organic matter %, bulk density, or a carbon stock, use extract_soil_carbon_lab instead. Identification only.',
         input_schema: {
           type: 'object',
           properties: {
@@ -413,6 +486,19 @@ export async function classifyDocument(input: ClassifierInput): Promise<Classifi
       return { type: 'waste_bill', payload: toolUse.input as Record<string, unknown> };
     case 'identify_bom':
       return { type: 'bom', payload: (toolUse.input as Record<string, unknown>) || {} };
+    case 'extract_soil_carbon_lab': {
+      const payload = (toolUse.input as Record<string, unknown>) || {};
+      const samples = Array.isArray((payload as any).samples) ? (payload as any).samples : [];
+      // A soil-carbon document with no readable measurements falls back to the
+      // evidence handoff rather than presenting an empty review table.
+      if (samples.length === 0) {
+        return {
+          type: 'soil_carbon_evidence',
+          payload: { note: 'Soil-carbon document detected, but no measurements could be read.' },
+        };
+      }
+      return { type: 'soil_carbon_lab', payload };
+    }
     case 'identify_soil_carbon_evidence':
       return { type: 'soil_carbon_evidence', payload: (toolUse.input as Record<string, unknown>) || {} };
     case 'extract_sustainability_report':

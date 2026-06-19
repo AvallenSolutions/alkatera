@@ -319,7 +319,8 @@ export function calculateOrchardImpacts(
   // ========================================================================
 
   let soilCarbonCo2e: number;
-  let soilCarbonMethodology: 'practice_based_default' | 'measured';
+  let soilCarbonMethodology: 'practice_based_default' | 'measured' | 'measured_stock_change';
+  let soilCarbonConfidence: 'HIGH' | 'MEDIUM' | 'LOW' | undefined;
 
   // Derive verification from removal_verification_status (replaces simple override check)
   const removalVerificationStatus = input.removal_verification_status ?? 'unverified';
@@ -328,7 +329,14 @@ export function calculateOrchardImpacts(
     : false;
   const soilCarbonVerified = removalVerificationStatus === 'verified' && !verificationExpired;
 
-  if (input.soil_carbon_override_kg_co2e_per_ha != null) {
+  // Priority: measured stock-change (repeated SOC samples) > manual measured
+  // override > practice-based default. The stock-change flux is already net of
+  // the conservative confidence discount and never negative (see lib/soil-carbon).
+  if (input.soil_carbon_annual_change_kg_co2e_per_ha != null) {
+    soilCarbonCo2e = input.soil_carbon_annual_change_kg_co2e_per_ha * input.area_ha;
+    soilCarbonMethodology = 'measured_stock_change';
+    soilCarbonConfidence = input.soil_carbon_change_confidence ?? undefined;
+  } else if (input.soil_carbon_override_kg_co2e_per_ha != null) {
     soilCarbonCo2e = input.soil_carbon_override_kg_co2e_per_ha * input.area_ha;
     soilCarbonMethodology = 'measured';
   } else {
@@ -388,11 +396,16 @@ export function calculateOrchardImpacts(
   const totalEmissionsPerKg = fruitYieldKg > 0 ? totalEmissions / fruitYieldKg : 0;
   const removalsPerKg = fruitYieldKg > 0 ? totalRemovals / fruitYieldKg : 0;
 
-  const dataQualityGrade = assessDataQuality(input, soilCarbonMethodology);
+  const dataQualityGrade = assessDataQuality(
+    input,
+    soilCarbonMethodology === 'practice_based_default' ? 'practice_based_default' : 'measured',
+  );
   const methodologyNotes = buildMethodologyNotes(input, climateZone, orchardType);
 
-  // LSR alignment: requires measured methodology AND third-party verification
-  let removalsMeetLsrStandard = soilCarbonMethodology === 'measured' && soilCarbonVerified;
+  // LSR alignment: requires a measured methodology AND third-party verification
+  let removalsMeetLsrStandard =
+    (soilCarbonMethodology === 'measured' || soilCarbonMethodology === 'measured_stock_change') &&
+    soilCarbonVerified;
   let removalsWarning: string | undefined;
 
   if (soilCarbonCo2e > 0) {
@@ -441,6 +454,7 @@ export function calculateOrchardImpacts(
     flag_removals: {
       soil_carbon_co2e: soilCarbonCo2e,
       methodology: soilCarbonMethodology,
+      confidence: soilCarbonConfidence,
       is_verified: soilCarbonVerified,
       removal_verification_status: removalVerificationStatus,
       removals_meet_lsr_standard: removalsMeetLsrStandard,

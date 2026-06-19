@@ -249,6 +249,44 @@ export function calculatePedigreeDqi(pedigree: PedigreeMatrix): number {
 }
 
 /**
+ * Map a measured soil carbon stock-change onto the Pedigree Matrix so the
+ * confidence treatment plugs into the same ISO 14044 data-quality system as the
+ * rest of the LCA. Uncertainty in soil carbon lives in field heterogeneity and
+ * sampling consistency, not the lab analysis, so:
+ *  - reliability   <- third-party verification status
+ *  - completeness  <- spatial sampling density (HIGH/MEDIUM/LOW confidence)
+ *  - technological <- measured-on-site (always strong: this is the actual land)
+ *  - temporal      <- years since the latest sample
+ *  - geographical  <- the field itself (always best)
+ */
+export function soilCarbonConfidenceToPedigree(args: {
+  confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+  verified: boolean;
+  yearsSinceLatestSample: number;
+}): PedigreeMatrix {
+  const { confidence, verified, yearsSinceLatestSample } = args;
+
+  const completeness: PedigreeMatrix['completeness'] =
+    confidence === 'HIGH' ? 1 : confidence === 'MEDIUM' ? 3 : 4;
+
+  const reliability: PedigreeMatrix['reliability'] = verified ? 1 : 3;
+
+  const temporal: PedigreeMatrix['temporal'] =
+    yearsSinceLatestSample <= 3 ? 1 :
+    yearsSinceLatestSample <= 6 ? 2 :
+    yearsSinceLatestSample <= 10 ? 3 :
+    yearsSinceLatestSample <= 15 ? 4 : 5;
+
+  return {
+    reliability,
+    completeness,
+    temporal,
+    geographical: 1, // measured on the field under study
+    technological: 1, // direct field measurement of the actual land
+  };
+}
+
+/**
  * Calculate uncertainty factors from pedigree scores
  * Returns geometric standard deviation and 95% confidence interval
  */

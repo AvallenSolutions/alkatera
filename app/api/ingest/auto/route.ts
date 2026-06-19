@@ -162,6 +162,7 @@ export type IngestResultType =
   | 'bulk_xlsx'
   | 'spray_diary'
   | 'bom'
+  | 'soil_carbon_lab'
   | 'soil_carbon_evidence'
   | 'accounts_csv'
   | 'historical_sustainability_report'
@@ -188,6 +189,22 @@ export interface IngestResponse {
     product_description?: string
     unit_size_value?: number
     unit_size_unit?: string
+  }
+  soilCarbonLab?: {
+    lab_name?: string
+    methodology?: string
+    default_sample_date?: string
+    samples?: Array<{
+      location_label?: string
+      sample_date?: string
+      depth_cm?: number
+      soc_input_method?: 'stock' | 'concentration'
+      soc_stock_tc_ha?: number
+      soc_concentration_pct?: number
+      bulk_density_g_cm3?: number
+      sampling_points?: number
+    }>
+    stashId?: string
   }
   soilCarbonEvidence?: { note?: string; stashId?: string }
   accountsCsv?: { note?: string }

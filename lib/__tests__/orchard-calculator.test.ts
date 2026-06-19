@@ -713,4 +713,43 @@ describe('calculateOrchardImpacts', () => {
       expect(result.flag_removals.biomass_carbon_co2e).toBeCloseTo(expected, 2);
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Measured stock-change priority
+  // -------------------------------------------------------------------------
+  describe('measured soil carbon stock-change', () => {
+    it('prefers the measured stock-change flux over override and practice default', () => {
+      const input: OrchardCalculatorInput = {
+        ...normandyApple, // cover_cropping default = 550 kg/ha
+        soil_carbon_override_kg_co2e_per_ha: 200,
+        soil_carbon_annual_change_kg_co2e_per_ha: 420,
+        soil_carbon_change_confidence: 'HIGH',
+      };
+      const result = calculateOrchardImpacts(input);
+      expect(result.flag_removals.methodology).toBe('measured_stock_change');
+      expect(result.flag_removals.confidence).toBe('HIGH');
+      expect(result.flag_removals.soil_carbon_co2e).toBeCloseTo(420 * 15, 6);
+    });
+
+    it('falls back to the manual override when no stock-change is present', () => {
+      const input: OrchardCalculatorInput = {
+        ...normandyApple,
+        soil_carbon_override_kg_co2e_per_ha: 200,
+      };
+      const result = calculateOrchardImpacts(input);
+      expect(result.flag_removals.methodology).toBe('measured');
+      expect(result.flag_removals.soil_carbon_co2e).toBeCloseTo(200 * 15, 6);
+    });
+
+    it('a verified measured stock-change can meet the LSR standard', () => {
+      const input: OrchardCalculatorInput = {
+        ...normandyApple,
+        soil_carbon_annual_change_kg_co2e_per_ha: 420,
+        soil_carbon_change_confidence: 'HIGH',
+        removal_verification_status: 'verified',
+      };
+      const result = calculateOrchardImpacts(input);
+      expect(result.flag_removals.removals_meet_lsr_standard).toBe(true);
+    });
+  });
 });

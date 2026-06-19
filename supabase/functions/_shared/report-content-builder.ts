@@ -585,6 +585,28 @@ Soil carbon removals are calculated from vineyard and orchard growing profiles w
 ## Verification Status: ${verifiedIndicator}
 `;
 
+  // Methodology mix: emphasise measured stock-change (the credible claim is the
+  // measured direction and scale of change over time, not a modelled default).
+  const measuredCount = flagRemovals.measuredStockChangeCount ?? 0;
+  const defaultCount = flagRemovals.practiceDefaultCount ?? 0;
+  if (measuredCount > 0 || defaultCount > 0 || (flagRemovals.measuredOverrideCount ?? 0) > 0) {
+    content += `
+---
+
+## How removals were quantified
+
+| Basis | Profiles |
+|-------|----------|
+| **Measured stock-change** (repeated soil samples over time) | ${measuredCount} |
+| **Single measured value** | ${flagRemovals.measuredOverrideCount ?? 0} |
+| **Practice-based default** (estimate) | ${defaultCount} |
+
+${measuredCount > 0
+  ? `${formatNumber(flagRemovals.measuredStockChangeRemovals ?? 0)} kg CO2e of removals are backed by a measured change in soil organic carbon, sampled consistently over time.`
+  : 'No removals are yet backed by a measured change in soil organic carbon over time. Repeated sampling at a consistent depth and laboratory is required to evidence the trajectory.'}
+`;
+  }
+
   if (!flagRemovals.allMeetLsr) {
     content += `
 > **Note:** One or more removal claims do not currently meet the requirements of the GHG Protocol Land Sector and Removals Standard v1.0. Third-party verification to ISO 14064-3 or equivalent is required for SBTi FLAG submission.

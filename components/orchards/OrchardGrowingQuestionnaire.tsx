@@ -45,6 +45,7 @@ import {
 import { toast } from 'sonner';
 import { useIngestStash } from '@/hooks/useIngestStash';
 import { calculateOrchardImpacts } from '@/lib/orchard-calculator';
+import { SoilCarbonSamplesPanel } from '@/components/soil-carbon/SoilCarbonSamplesPanel';
 import { ORCHARD_PESTICIDE_TYPE_LABELS } from '@/lib/orchard-utils';
 import type {
   OrchardGrowingProfile,
@@ -1002,6 +1003,18 @@ export function OrchardGrowingQuestionnaire({
                     <Switch
                       checked={form.has_measured_soil_carbon}
                       onCheckedChange={(v) => updateForm({ has_measured_soil_carbon: v })}
+                    />
+                  </div>
+
+                  {/* Measured stock-change: repeated SOC samples over time */}
+                  <div className="mt-4">
+                    <SoilCarbonSamplesPanel
+                      landUnitType="orchard"
+                      landUnitId={orchardId}
+                      practiceDefaultKgPerHa={SOIL_CARBON_REMOVAL_DEFAULTS[form.soil_management] ?? 0}
+                      practiceLabel={
+                        SOIL_PRACTICES.find((p) => p.value === form.soil_management)?.label ?? form.soil_management
+                      }
                     />
                   </div>
 

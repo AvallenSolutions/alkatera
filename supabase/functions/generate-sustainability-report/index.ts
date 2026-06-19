@@ -948,6 +948,13 @@ async function aggregateReportData(
           let profileCount = 0;
           let allVerified = true;
           let allMeetLsr = true;
+          // Methodology mix: how much of the removal is measured stock-change
+          // (repeated SOC samples over time) versus a single measured value or a
+          // practice-based default. The credible claim is the measured change.
+          let measuredStockChangeCount = 0;
+          let measuredOverrideCount = 0;
+          let practiceDefaultCount = 0;
+          let measuredStockChangeRemovals = 0;
           for (const p of Array.from(seenProducts.values())) {
             const ai = (p as any).aggregated_impacts;
             if (ai?.flag_removals) {
@@ -961,6 +968,15 @@ async function aggregateReportData(
                 if (!ai.flag_removals.removals_meet_lsr_standard) {
                   allMeetLsr = false;
                 }
+                const m = ai.flag_removals.methodology;
+                if (m === 'measured_stock_change') {
+                  measuredStockChangeCount++;
+                  measuredStockChangeRemovals += removals;
+                } else if (m === 'measured') {
+                  measuredOverrideCount++;
+                } else {
+                  practiceDefaultCount++;
+                }
               }
             }
           }
@@ -969,6 +985,10 @@ async function aggregateReportData(
             profileCount,
             allVerified,
             allMeetLsr,
+            measuredStockChangeCount,
+            measuredOverrideCount,
+            practiceDefaultCount,
+            measuredStockChangeRemovals,
           };
         }
 
