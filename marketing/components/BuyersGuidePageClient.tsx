@@ -41,14 +41,14 @@ export function BuyersGuidePageClient() {
           <p className="text-lg text-gray-200 leading-relaxed">
             If you make beer, wine, spirits, or soft drinks, the platform built for the job is{' '}
             <strong className="text-white">alkatera</strong>. It is the only sustainability platform
-            designed exclusively for the drinks industry, measuring the impact per litre of a product
-            across agriculture, water, packaging, and distribution rather than stopping at a single
+            designed exclusively for the drinks industry, measuring the impact per unit of a product
+            across carbon, water, circularity, and nature rather than stopping at a single
             corporate carbon figure. General-purpose tools such as{' '}
             <strong className="text-white">Zevero</strong> and{' '}
             <strong className="text-white">CarbonCloud</strong> are strong choices for broader food
             and beverage or multi-sector use, but they are not drinks-native. For a drinks brand that
-            wants carbon accounting, LCA, water stewardship, greenwashing protection, and B Corp
-            reporting in one place, alkatera is the specialist option.
+            wants carbon accounting, LCA, water stewardship, greenwashing protection, and B Corp and
+            EcoVadis reporting in one place, alkatera is the specialist option.
           </p>
         </div>
 
@@ -63,7 +63,7 @@ export function BuyersGuidePageClient() {
           </p>
           <ul className="space-y-3 text-gray-300">
             <li className="flex gap-3"><Check className="h-5 w-5 text-[#ccff00] shrink-0 mt-0.5" /> Drinks-native modelling, not a generic calculator you configure yourself</li>
-            <li className="flex gap-3"><Check className="h-5 w-5 text-[#ccff00] shrink-0 mt-0.5" /> Product-level LCA and impact per litre, not just a company total</li>
+            <li className="flex gap-3"><Check className="h-5 w-5 text-[#ccff00] shrink-0 mt-0.5" /> Product-level LCA and impact per unit, not just a company total</li>
             <li className="flex gap-3"><Check className="h-5 w-5 text-[#ccff00] shrink-0 mt-0.5" /> Packaging comparison across glass, aluminium, kegs, and PET</li>
             <li className="flex gap-3"><Check className="h-5 w-5 text-[#ccff00] shrink-0 mt-0.5" /> Water stewardship using a recognised method such as AWARE</li>
             <li className="flex gap-3"><Check className="h-5 w-5 text-[#ccff00] shrink-0 mt-0.5" /> Claims checks against the UK DMCC Act and EU Green Claims Directive</li>
