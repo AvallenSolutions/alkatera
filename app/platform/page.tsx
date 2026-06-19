@@ -1,5 +1,8 @@
 import { Metadata } from 'next';
 import { PlatformPageClient } from '@/marketing/components/PlatformPageClient';
+import { PLATFORM_FAQ_ITEMS } from '@/marketing/components/platform-faq-data';
+
+const pageUrl = 'https://alkatera.com/platform';
 
 export const metadata: Metadata = {
   title: 'Platform | alkatera',
@@ -14,6 +17,30 @@ export const metadata: Metadata = {
   },
 };
 
+// FAQPage structured data. Questions/answers are shared with the visible FAQ on
+// the page via PLATFORM_FAQ_ITEMS so the two never drift apart.
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  '@id': `${pageUrl}/#faq`,
+  mainEntity: PLATFORM_FAQ_ITEMS.map((item) => ({
+    '@type': 'Question',
+    name: item.question,
+    acceptedAnswer: {
+      '@type': 'Answer',
+      text: item.answer,
+    },
+  })),
+};
+
 export default function PlatformPage() {
-  return <PlatformPageClient />;
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <PlatformPageClient />
+    </>
+  );
 }

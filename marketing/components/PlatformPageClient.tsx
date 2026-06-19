@@ -40,6 +40,7 @@ import { Navigation } from '@/marketing/components/Navigation';
 import { Footer } from '@/marketing/components/Footer';
 import { cn } from '@/lib/utils';
 import { Brand } from '@/components/shared/Brand';
+import { PLATFORM_FAQ_ITEMS } from '@/marketing/components/platform-faq-data';
 
 /* ═══════════════════════════════════════════
    Hero
@@ -68,7 +69,7 @@ const Hero = () => (
       </h1>
       <p className="text-lg text-gray-400 max-w-[600px] mx-auto leading-relaxed font-light mb-4">
         The single platform that turns environmental complexity into competitive
-        clarity. From carbon to water to biodiversity — measure, report, and
+        clarity. From carbon to water to biodiversity, measure, report, and
         strategise with confidence.
       </p>
       <p className="font-mono text-xs text-[#ccff00] uppercase tracking-[4px] mb-12 opacity-80">
@@ -119,7 +120,7 @@ const painPoints = [
   },
   {
     title: 'Reporting Burden',
-    desc: "Writing reports is no fun and takes time away from running the business. CSRD, GRI, CDP — the acronyms never stop.",
+    desc: "Writing reports is no fun and takes time away from running the business. CSRD, GRI, CDP, the acronyms never stop.",
     icon: ClipboardList,
   },
   {
@@ -215,8 +216,8 @@ const SolutionOverview = () => (
       >
         <Brand /> replaces the spreadsheet chaos, the consultancy invoices, and
         the reporting headaches with a single intelligent platform. We go far
-        beyond carbon — measuring water, waste, land use, biodiversity, and
-        circularity — so you can build a sustainability programme that&apos;s
+        beyond carbon, measuring water, waste, land use, biodiversity, and
+        circularity, so you can build a sustainability programme that&apos;s
         genuinely defensible.
       </motion.p>
       <div className="flex flex-wrap justify-center gap-4">
@@ -247,21 +248,21 @@ const processSteps = [
     id: '01',
     title: 'Analyse',
     subtitle: 'Total visibility, zero guesswork',
-    desc: "We take your raw data and turn the lights on. Our engine organises your inputs against global scientific standards to reveal your brand's true footprint — not just carbon, but water, waste, land use, and biodiversity. We spot the high-impact hotspots that stay hidden in basic calculators.",
+    desc: "We take your raw data and turn the lights on. Our engine organises your inputs against global scientific standards to reveal your brand's true footprint, not just carbon, but water, waste, land use, and biodiversity. We spot the high-impact hotspots that stay hidden in basic calculators.",
     icon: Microscope,
   },
   {
     id: '02',
     title: 'Calculate',
     subtitle: "The 'Glass Box' standard",
-    desc: 'Quantify your impact across 10+ environmental categories with absolute confidence. Our transparent "Glass Box" approach means every number is traceable and audit-ready. No black-box guesswork — a verified data foundation that satisfies customers, retailers, and investors.',
+    desc: 'Quantify your impact across 10+ environmental categories with absolute confidence. Our transparent "Glass Box" approach means every number is traceable and audit-ready. No black-box guesswork. A verified data foundation that satisfies customers, retailers, and investors.',
     icon: Calculator,
   },
   {
     id: '03',
     title: 'Strategise',
     subtitle: 'Your roadmap to growth',
-    desc: 'Move beyond just reporting and start leading. We translate your data into a strategic roadmap — helping you set science-based targets, achieve certifications like B Corp, and turn sustainability from a cost centre into a genuine competitive advantage.',
+    desc: 'Move beyond just reporting and start leading. We translate your data into a strategic roadmap, helping you set science-based targets, achieve certifications like B Corp, and turn sustainability from a cost centre into a genuine competitive advantage.',
     icon: Compass,
   },
 ];
@@ -377,7 +378,7 @@ const modules = [
   {
     title: 'Vitality Score',
     label: 'Performance Benchmarking',
-    desc: 'Your sustainability health check at a glance. A four-pillar score across Climate, Water, Circularity, and Nature — benchmarked against your industry so you know exactly where you stand and where to focus.',
+    desc: 'Your sustainability health check at a glance. A four-pillar score across Climate, Water, Circularity, and Nature, benchmarked against your industry so you know exactly where you stand and where to focus.',
     icon: Activity,
     features: ['Climate Score', 'Water Score', 'Circularity', 'Nature & Biodiversity'],
     gradient: 'from-cyan-500/[0.06]',
@@ -538,7 +539,7 @@ const MeasureSection = () => (
           className="text-gray-400 max-w-[640px] leading-relaxed font-light"
         >
           While others count carbon alone, <Brand /> quantifies the full picture
-          — environmental, social, and governance — because genuine
+          (environmental, social, and governance) because genuine
           sustainability demands all three.
         </motion.p>
       </div>
@@ -623,7 +624,7 @@ const intelligenceTools = [
     badge: 'Greenwash Guardian',
     badgeIcon: Eye,
     title: 'Your Claims Defence System',
-    desc: 'Scan your marketing materials, website, and social posts against UK Green Claims Code and EU Green Claims Directive — before the regulators do. Get a risk score and plain-English fixes for every claim.',
+    desc: 'Scan your marketing materials, website, and social posts against UK Green Claims Code and EU Green Claims Directive, before the regulators do. Get a risk score and plain-English fixes for every claim.',
     features: [
       'Scans websites, PDFs, social posts, and documents',
       'Checks against UK CMA and EU legislation',
@@ -661,7 +662,7 @@ const IntelligenceSection = () => (
         className="text-gray-400 max-w-[640px] leading-relaxed font-light"
       >
         Two embedded tools that turn complex sustainability questions into clear,
-        actionable answers — without the consultancy fees.
+        actionable answers, without the consultancy fees.
       </motion.p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-14">
@@ -777,7 +778,7 @@ const FrameworksSection = () => (
 const drinksFeatures = [
   {
     title: 'Process Modelling',
-    desc: 'Specific calculations for brewing, distilling, fermentation, and bottling — not generic manufacturing assumptions.',
+    desc: 'Specific calculations for brewing, distilling, fermentation, and bottling, not generic manufacturing assumptions.',
     icon: FlaskConical,
   },
   {
@@ -792,7 +793,7 @@ const drinksFeatures = [
   },
   {
     title: 'Water Intelligence',
-    desc: 'Water-to-product ratios, scarcity-weighted footprints, and source-specific analysis — because water is your primary ingredient.',
+    desc: 'Water-to-product ratios, scarcity-weighted footprints, and source-specific analysis, because water is your primary ingredient.',
     icon: Droplets,
   },
 ];
@@ -946,6 +947,27 @@ const CTASection = () => (
    Main Page Component
    ═══════════════════════════════════════════ */
 
+/* ═══════════════════════════════════════════
+   FAQ — visible text mirrors the FAQPage JSON-LD in app/platform/page.tsx
+   (shared via platform-faq-data.ts) so structured data never drifts from copy.
+   ═══════════════════════════════════════════ */
+
+const FaqSection = () => (
+  <section className="py-28 px-6 md:px-10 border-t border-white/[0.06]">
+    <div className="max-w-3xl mx-auto">
+      <h2 className="font-serif text-4xl md:text-5xl mb-12">Frequently asked questions</h2>
+      <div className="space-y-8">
+        {PLATFORM_FAQ_ITEMS.map((item) => (
+          <div key={item.question} className="border-b border-white/10 pb-8 last:border-0">
+            <h3 className="text-xl font-semibold text-white mb-3">{item.question}</h3>
+            <p className="text-gray-300 leading-relaxed">{item.answer}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+);
+
 export function PlatformPageClient() {
   return (
     <div className="bg-[#050505] min-h-screen text-white selection:bg-[#ccff00] selection:text-black relative">
@@ -989,6 +1011,7 @@ export function PlatformPageClient() {
         <IntelligenceSection />
         <FrameworksSection />
         <DrinksSection />
+        <FaqSection />
         <CTASection />
         <Footer />
       </div>
