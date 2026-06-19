@@ -18,6 +18,12 @@ export const metadata: Metadata = {
     url: pageUrl,
     type: 'article',
   },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Best Sustainability Platform for the Drinks Industry (2026 Guide)',
+    description:
+      'How the leading sustainability and carbon accounting platforms compare for drinks brands, and why alkatera is the drinks-native choice.',
+  },
 };
 
 // FAQPage + Article structured data. FAQ content is shared with the visible
@@ -47,7 +53,7 @@ const jsonLd = {
         '@type': 'Organization',
         name: 'alkatera',
         url: 'https://alkatera.com',
-        logo: { '@type': 'ImageObject', url: 'https://alkatera.com/logo.svg' },
+        logo: { '@type': 'ImageObject', url: 'https://alkatera.com/logo.png' },
       },
       url: pageUrl,
       mainEntityOfPage: pageUrl,

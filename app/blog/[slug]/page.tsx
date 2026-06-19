@@ -160,7 +160,7 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
       url: siteUrl,
       logo: {
         '@type': 'ImageObject',
-        url: `${siteUrl}/logo.svg`,
+        url: `${siteUrl}/logo.png`,
       },
     },
     url: postUrl,

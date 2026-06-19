@@ -38,6 +38,20 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   poweredByHeader: false,
+  async redirects() {
+    return [
+      {
+        // The old /blog index was a thin client page that self-canonicalised to
+        // the homepage and listed no posts. Consolidate all SEO signals on the
+        // /knowledge hub with a permanent (308) routing-layer redirect. Done here
+        // rather than via redirect() in a page because the root app/error.tsx
+        // boundary swallows the NEXT_REDIRECT thrown by in-page redirects.
+        source: '/blog',
+        destination: '/knowledge',
+        permanent: true,
+      },
+    ];
+  },
   experimental: {
     optimizePackageImports: [
       'lucide-react',

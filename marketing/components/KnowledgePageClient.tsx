@@ -22,6 +22,34 @@ interface ContentItem {
   author?: string;
 }
 
+// Shape of a published post as fetched from Supabase (server) or /api/blog (client).
+export interface KnowledgePost {
+  id: string;
+  title: string;
+  slug?: string;
+  excerpt?: string;
+  tags?: string[];
+  read_time?: string;
+  featured_image_url?: string;
+  author_name?: string;
+  content_type?: ContentType;
+  published_at?: string;
+}
+
+function toContentItem(post: KnowledgePost): ContentItem {
+  return {
+    id: post.id,
+    type: post.content_type || 'article',
+    title: post.title,
+    slug: post.slug,
+    excerpt: post.excerpt,
+    tags: post.tags || [],
+    readTime: post.read_time,
+    image: post.featured_image_url,
+    author: post.author_name,
+  };
+}
+
 const ContentCard = ({ item, index }: { item: ContentItem; index: number }) => {
   const getIcon = () => {
     switch (item.type) {
@@ -46,7 +74,7 @@ const ContentCard = ({ item, index }: { item: ContentItem; index: number }) => {
         <blockquote className="text-3xl md:text-4xl font-serif italic leading-tight mb-6">
           &quot;{item.title}&quot;
         </blockquote>
-        <p className="font-mono text-xs text-gray-400 uppercase tracking-widest">— {item.author}</p>
+        <p className="font-mono text-xs text-gray-400 uppercase tracking-widest">by {item.author}</p>
       </motion.div>
     );
   }
@@ -124,12 +152,14 @@ const ContentCard = ({ item, index }: { item: ContentItem; index: number }) => {
   return cardContent;
 };
 
-export function KnowledgePageClient() {
+export function KnowledgePageClient({ initialPosts = [] }: { initialPosts?: KnowledgePost[] }) {
   const [activeFilter, setActiveFilter] = useState<string>('all');
-  const [blogPosts, setBlogPosts] = useState<ContentItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Seed from server-fetched posts so the post list (and its crawlable
+  // /blog/[slug] links) is present in the first-paint HTML for indexing.
+  const [blogPosts, setBlogPosts] = useState<ContentItem[]>(() => initialPosts.map(toContentItem));
+  const [isLoading, setIsLoading] = useState(initialPosts.length === 0);
 
-  // Fetch blog posts from API
+  // Client-side refresh so the list stays current between ISR revalidations.
   useEffect(() => {
     const fetchPosts = async () => {
       try {
@@ -137,20 +167,7 @@ export function KnowledgePageClient() {
         const data = await response.json();
 
         if (response.ok && data.posts) {
-          // Transform API posts to ContentItem format
-          const transformedPosts: ContentItem[] = data.posts.map((post: any) => ({
-            id: post.id,
-            type: post.content_type || 'article',
-            title: post.title,
-            slug: post.slug,
-            excerpt: post.excerpt,
-            tags: post.tags || [],
-            readTime: post.read_time,
-            image: post.featured_image_url,
-            author: post.author_name,
-          }));
-
-          setBlogPosts(transformedPosts);
+          setBlogPosts(data.posts.map(toContentItem));
         }
       } catch (error) {
         console.error('Error fetching blog posts:', error);
