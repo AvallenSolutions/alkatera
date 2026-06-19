@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 
@@ -49,7 +49,7 @@ function friendlyError(code: string | null, detail: string | null, provider: str
  *
  * We treat any of: ?connected=<provider>, ?xero=connected as success.
  */
-export default function OAuthCompletePage() {
+function OAuthCompleteContent() {
   const params = useSearchParams()
 
   useEffect(() => {
@@ -124,5 +124,15 @@ export default function OAuthCompletePage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function OAuthCompletePage() {
+  // useSearchParams must sit inside a Suspense boundary or static prerendering
+  // of this route (it has no force-dynamic ancestor) fails the build.
+  return (
+    <Suspense fallback={null}>
+      <OAuthCompleteContent />
+    </Suspense>
   )
 }

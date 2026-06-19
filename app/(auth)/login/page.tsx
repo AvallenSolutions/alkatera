@@ -1,9 +1,10 @@
 'use client'
 
 import { useSearchParams } from "next/navigation"
+import { Suspense } from "react"
 import { AuthForm } from "@/components/auth/AuthForm"
 
-export default function LoginPage() {
+function LoginContent() {
   const searchParams = useSearchParams()
   const tier = searchParams.get('tier')
 
@@ -15,4 +16,14 @@ export default function LoginPage() {
       : null
 
   return <AuthForm tier={tier} returnUrl={returnUrl} />
+}
+
+export default function LoginPage() {
+  // useSearchParams must sit inside a Suspense boundary or static prerendering
+  // of this route (it has no force-dynamic ancestor) fails the build.
+  return (
+    <Suspense fallback={null}>
+      <LoginContent />
+    </Suspense>
+  )
 }
