@@ -126,6 +126,9 @@ export default function ProductsPage() {
       const { data, error } = await supabase
         .from("products")
         .select("*")
+        // Only true products belong in this list — hospitality meals/drinks/room
+        // nights reuse the products table but are surfaced under Hospitality.
+        .eq("product_kind", "product")
         .eq("organization_id", currentOrganization!.id)
         .order("created_at", { ascending: false })
         .limit(200);

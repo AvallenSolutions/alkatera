@@ -21,6 +21,7 @@ import {
   Link2,
   Loader2,
   TreePine,
+  UtensilsCrossed,
   Wheat,
 } from "lucide-react";
 import { useFeatureGate, FeatureCode, TierName } from "@/hooks/useSubscription";
@@ -513,6 +514,18 @@ const featureInfo: Partial<Record<FeatureCode, FeatureInfo>> = {
     icon: Link2,
     category: "Platform",
   },
+  hospitality_beta: {
+    name: "Hospitality (Beta)",
+    description:
+      "Calculate the impact of meals, drinks, menus and room nights, and roll it into your total company footprint. Currently in private beta for venues that run restaurants, bars or accommodation.",
+    benefits: [
+      "Per-cover and per-room-night carbon, water and land impact",
+      "Own-wine drinks pull live impact straight from your product LCAs",
+      "Hospitality throughput feeds your company total without double-counting",
+    ],
+    icon: UtensilsCrossed,
+    category: "Operations",
+  },
   breww_integration_beta: {
     name: "Breww Integration (Beta)",
     description:
@@ -616,6 +629,7 @@ const featureNames: Record<FeatureCode, string> = {
   orchard_beta: "Orchards (Beta)",
   arable_beta: "Arable Fields (Beta)",
   pulse_beta: "Pulse (Beta)",
+  hospitality_beta: "Hospitality (Beta)",
   breww_integration_beta: "Breww Integration (Beta)",
 };
 

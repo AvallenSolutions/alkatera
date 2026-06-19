@@ -67,6 +67,11 @@ export interface AlkateraEvents {
   'ingredients/match.suggest': {
     data: { organization_id: string; supplier_product_ids?: string[] };
   };
+
+  // ─────────── Agribalyse food-factor backfill ───────────
+  'factors/agribalyse.backfill': {
+    data: { names?: string[] };
+  };
 }
 
 const eventKey = process.env.INNGEST_EVENT_KEY;

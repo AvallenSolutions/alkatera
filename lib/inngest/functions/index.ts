@@ -16,6 +16,7 @@ import { openlcaCertMonitor } from './monitoring';
 import { xeroSyncTick, xeroOrgSync } from './xero';
 import { reportPdfGenerate } from './reports';
 import { ingredientMatchSuggest } from './ingredient-match';
+import { agribalyseBackfillRun } from './factors';
 
 export const allFunctions: InngestFunction.Any[] = [
   scrapingQueueTick,
@@ -29,4 +30,5 @@ export const allFunctions: InngestFunction.Any[] = [
   xeroOrgSync,
   reportPdfGenerate,
   ingredientMatchSuggest,
+  agribalyseBackfillRun,
 ];

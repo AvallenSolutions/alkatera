@@ -55,6 +55,10 @@ import {
   ArrowUpCircle,
   TreePine,
   Wheat,
+  UtensilsCrossed,
+  Store,
+  Wine,
+  BedDouble,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
@@ -119,6 +123,23 @@ const navigationStructure: NavItem[] = [
       { name: 'Dashboard',         href: '/pulse/',                           icon: Activity,   minTier: 1 },
       { name: 'Financial',         href: '/pulse/financial/',                 icon: TrendingUp, minTier: 1 },
       { name: 'Targets',           href: '/pulse/targets/',                   icon: TrendingUp, minTier: 1 },
+    ],
+  },
+  {
+    name: 'Hospitality',
+    href: '/hospitality/',
+    icon: UtensilsCrossed,
+    minTier: 1,
+    betaBadge: true,
+    featureCode: 'hospitality_beta',
+    children: [
+      { name: 'Dashboard', href: '/hospitality/',        icon: LayoutDashboard, minTier: 1 },
+      { name: 'Venues',    href: '/hospitality/venues/',  icon: Store,           minTier: 1 },
+      { name: 'Meals',     href: '/hospitality/meals/',   icon: UtensilsCrossed, minTier: 1 },
+      { name: 'Drinks',    href: '/hospitality/drinks/',  icon: Wine,            minTier: 1 },
+      { name: 'Menus',     href: '/hospitality/menus/',   icon: BookOpen,        minTier: 1 },
+      { name: 'Rooms',     href: '/hospitality/rooms/',   icon: BedDouble,       minTier: 1 },
+      { name: 'Sales',     href: '/hospitality/sales/',   icon: BarChart3,       minTier: 1 },
     ],
   },
   {
@@ -929,6 +950,7 @@ export function Sidebar({ className }: SidebarProps) {
                     { href: '/admin/feedback/', icon: MessageSquare, label: 'User Feedback' },
                     { href: '/admin/rosa/', icon: Dog, label: 'Rosa Admin' },
                     { href: '/admin/factors/', icon: Database, label: 'Emission Factors' },
+                    { href: '/admin/agribalyse-backfill/', icon: UtensilsCrossed, label: 'Agribalyse Factors' },
                     { href: '/admin/impact-proxy-values/', icon: TrendingUp, label: 'Impact Proxy Values' },
                     { href: '/admin/beta-access/', icon: FlaskConical, label: 'Beta Access' },
                     { href: '/admin/emissions-trace/', icon: Eye, label: 'Emissions Trace' },

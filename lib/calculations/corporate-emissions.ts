@@ -18,6 +18,7 @@ import { overlapFraction } from './utility-factors';
 import { getXeroResolvedEmissions } from '@/lib/xero/resolved-emissions';
 import { getYearRangeForOrg } from '@/lib/log-data/period-utils';
 import { getOrgFyStartMonth } from '@/lib/log-data/org-fiscal-year';
+import { calculateHospitality } from './hospitality-emissions';
 
 // ============================================================================
 // TYPES
@@ -36,6 +37,9 @@ export interface Scope3Breakdown {
   upstream_transport: number;   // Category 4: Upstream Transportation
   downstream_transport: number; // Category 9: Downstream Transportation (distinct from logistics spend)
   use_phase: number;            // Category 11: Use of Sold Products
+  // Category 1 (hospitality): purchased food + room consumables served, throughput-
+  // weighted. Optional so existing Scope3Breakdown constructors don't need updating.
+  hospitality?: number;
   // UI-friendly aliases (for backward compatibility with existing components)
   logistics: number;      // alias for downstream_logistics
   waste: number;          // alias for operational_waste
@@ -323,6 +327,7 @@ export async function calculateScope3(
     upstream_transport: 0,    // Category 4
     downstream_transport: 0,  // Category 9
     use_phase: 0,             // Category 11
+    hospitality: 0,           // Category 1 — hospitality throughput
     // UI aliases (populated at the end)
     logistics: 0,
     waste: 0,
@@ -624,6 +629,18 @@ export async function calculateScope3(
     // Continue with zeros if calculations fail
   }
 
+  // =========================================================================
+  // Category 1 (hospitality): meals/drinks/room-nights served × throughput.
+  // Own-wine served and venue energy are excluded inside calculateHospitality
+  // so this adds no double count.
+  // =========================================================================
+  try {
+    const hospitality = await calculateHospitality(supabase, organizationId, yearStart, yearEnd);
+    breakdown.hospitality = hospitality.total;
+  } catch (err) {
+    console.warn('[calculateScope3] Could not calculate hospitality:', err);
+  }
+
   // Calculate total (now includes ALL categories)
   breakdown.total =
     breakdown.products +
@@ -636,7 +653,8 @@ export async function calculateScope3(
     breakdown.marketing_materials +
     breakdown.upstream_transport +     // Category 4
     breakdown.downstream_transport +   // Category 9
-    breakdown.use_phase;               // Category 11
+    breakdown.use_phase +              // Category 11
+    (breakdown.hospitality ?? 0);      // Category 1 — hospitality
 
   // Populate UI-friendly aliases for backward compatibility
   breakdown.logistics = breakdown.downstream_logistics;

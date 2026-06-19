@@ -111,6 +111,8 @@ export type FeatureCode =
   | "arable_beta"
   // Pulse (beta)
   | "pulse_beta"
+  // Hospitality (beta)
+  | "hospitality_beta"
   // Per-integration beta flags. Each integration in
   // lib/integrations/directory.ts gates on `${slug}_integration_beta`; we
   // accept any slug here so adding a provider doesn't require touching
@@ -455,6 +457,7 @@ export function useSubscription() {
         'orchard_beta',
         'arable_beta',
         'pulse_beta',
+        'hospitality_beta',
       ];
       const isIntegrationBeta =
         typeof featureCode === 'string' && featureCode.endsWith('_integration_beta');
@@ -579,6 +582,8 @@ function getRequiredTierForFeature(featureCode: FeatureCode): TierName {
     "arable_beta",
     // Pulse — admin-granted only during beta
     "pulse_beta",
+    // Hospitality — admin-granted only during beta
+    "hospitality_beta",
     // Breww brewery integration — canopy tier OR admin-granted via feature_flags
     "breww_integration_beta",
   ];

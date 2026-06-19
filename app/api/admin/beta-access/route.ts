@@ -26,6 +26,7 @@ const PRODUCT_BETA_CODES = [
   'arable_beta',
   'orchard_beta',
   'pulse_beta',
+  'hospitality_beta',
 ] as const;
 
 const ALLOWED_FEATURE_CODES = new Set<string>([
