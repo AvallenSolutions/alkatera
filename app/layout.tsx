@@ -98,7 +98,8 @@ const jsonLd = {
       "email": "hello@alkatera.com",
       "description": "Sustainability and carbon accounting platform built for the drinks industry. Provides carbon footprint analysis, Life Cycle Assessment (LCA), water stewardship, greenwashing protection, and compliance reporting for breweries, distilleries, and wineries.",
       "sameAs": [
-        "https://www.linkedin.com/company/alkatera"
+        "https://www.linkedin.com/company/alkatera",
+        "https://x.com/alkatera"
       ],
       "foundingDate": "2025",
       "contactPoint": {

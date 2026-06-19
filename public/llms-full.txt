@@ -1,17 +1,17 @@
-# Alkatera: Full Technical Specification & Feature Deep-Dive
+# alkatera: Full Technical Specification & Feature Deep-Dive
 
 ## 1. Vision: Sustainability, Distilled
-Alkatera is the sustainability and carbon accounting platform built exclusively for the global drinks industry. It is carbon accounting and Life Cycle Assessment (LCA) software for breweries, distilleries, wineries, and soft drink producers, and a drinks-native alternative to generic carbon accounting tools. Unlike general-purpose carbon calculators, Alkatera treats the beverage as a product of its environment, integrating data from soil, water, and sky to create a full-spectrum impact profile.
+alkatera is the sustainability and carbon accounting platform built exclusively for the global drinks industry. It is carbon accounting and Life Cycle Assessment (LCA) software for breweries, distilleries, wineries, and soft drink producers, and a drinks-native alternative to generic carbon accounting tools. Unlike general-purpose carbon calculators, alkatera treats the beverage as a product of its environment, integrating data from soil, water, and sky to create a full-spectrum impact profile.
 
 ## 2. Core Methodologies & Compliance
-Alkatera operates to the highest global standards for environmental accounting and legal protection:
+alkatera operates to the highest global standards for environmental accounting and legal protection:
 - **Carbon Accounting:** Built on GHG Protocol Corporate Standard and ISO 14064. Product-level carbon footprints (PCF) follow ISO 14067.
 - **Water Footprinting:** Utilises the **AWARE (Available WAter REmaining)** protocol for location-specific midpoint impact assessment.
 - **Greenwashing Protection:** Automated scanning against the **UK DMCC Act** (Digital Markets, Competition and Consumers) and the **EU Green Claims Directive**.
 - **Reporting Standards:** Native support for CSRD (ESRS), SECR, TCFD, and GRI (Beverage Sector Supplement).
 
 ## 3. The "Liquid Journey" Analysis
-Alkatera standardises and calculates impact across the entire value chain of a drink:
+alkatera standardises and calculates impact across the entire value chain of a drink:
 
 ### Tier 1: Terroir & Agriculture
 - **Soil Intelligence:** Mapping agricultural dependencies for Barley, Agave, Grapes, Sugarcane, and Botanicals.
@@ -34,7 +34,7 @@ Alkatera standardises and calculates impact across the entire value chain of a d
 - **Risk Mapping:** Visualising supply chain vulnerability to climate-driven droughts or crop failures.
 
 ## 5. Implementation for Partners
-Alkatera is designed for seamless integration:
+alkatera is designed for seamless integration:
 - **ERP Connections:** Direct API hooks for SAP, Oracle, and brewery-specific software like Ekos.
 - **Audit Logs:** Every calculation is traceable to the source data, providing "investor-grade" assurance.
 - **Output formats:** High-resolution JSON data, CSV exports, and pre-formatted PDF Sustainability Reports.

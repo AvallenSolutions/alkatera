@@ -20,6 +20,7 @@ interface BlogPost {
   content_type: string;
   status: string;
   published_at?: string;
+  updated_at?: string;
   read_time?: string;
   meta_title?: string;
   meta_description?: string;
@@ -150,6 +151,7 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
     description: post.meta_description || post.excerpt || '',
     image: imageUrl || undefined,
     datePublished: post.published_at || undefined,
+    dateModified: post.updated_at || post.published_at || undefined,
     author: {
       '@type': 'Person',
       name: post.author_name || 'alkatera',

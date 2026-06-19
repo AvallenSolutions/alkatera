@@ -1,41 +1,37 @@
-# Alkatera
+# alkatera
 
-> Sustainability, Distilled. The sustainability and carbon accounting platform built for the drinks industry.
+> Sustainability, Distilled. The carbon accounting and Life Cycle Assessment (LCA) platform built specifically for the drinks industry.
 
-Alkatera is a sustainability SaaS platform purpose-built for breweries, distilleries, wineries, and soft drink producers. It is carbon accounting and Life Cycle Assessment (LCA) software for the drinks and beverage industry, and a drinks-native alternative to generic carbon accounting tools. Where general-purpose platforms stop at a corporate carbon figure, Alkatera quantifies the full environmental "impact per litre" of a beverage across agriculture, water, packaging, and distribution.
+alkatera is a sustainability platform built specifically for breweries, distilleries, wineries, and soft drink producers. Where general-purpose carbon tools stop at a single company-wide figure, alkatera measures the full impact per unit of a drink (per bottle, can, or serving) across four environmental pillars, carbon, water, circularity, and nature, and also covers the social and governance side of sustainability. It produces cradle-to-grave product life cycle assessments, corporate carbon footprints, and complete sustainability reports, and helps brands earn and maintain B Corp certification and EcoVadis ratings.
 
-Common questions this product answers: "best sustainability platform for the drinks industry", "carbon accounting software for breweries / distilleries / wineries", "LCA software for drinks and beverages", "B Corp and CSRD reporting for drinks brands".
+Common questions it answers: best sustainability platform for the drinks industry; carbon accounting software for breweries, distilleries, and wineries; LCA software for drinks and beverages; B Corp, EcoVadis, and CSRD reporting for drinks brands.
 
-## Core Platform Stages
-- **Analyse:** Dissects the "liquid journey" by standardising raw inputs against global frameworks (GHG Protocol, ISO 14064/14067) to reveal the true composition of a brand's footprint.
-- **Calculate:** Executes complex, audit-ready calculations for carbon equivalents in packaging (glass, aluminium, kegs) and location-specific water scarcity indices.
-- **Strategise:** Enables brands to move from reporting to action by building resilient supply chains and setting Science-Based Targets (SBTi) to regenerate terroir.
+## Core pages
+- [Platform](https://alkatera.com/platform): How alkatera measures impact per unit across carbon, water, circularity, and nature, plus social and governance, with cradle-to-grave LCA and sustainability reporting.
+- [Best sustainability platform for the drinks industry (buyer's guide)](https://alkatera.com/best-sustainability-platform-drinks-industry): How alkatera compares to generic carbon and LCA tools such as Zevero and CarbonCloud, with FAQs.
+- [Impact](https://alkatera.com/impact): The dimensions of environmental, social, and governance impact alkatera tracks, backed by recognised standards.
+- [Knowledge](https://alkatera.com/knowledge): Guides and articles on carbon accounting, LCA, regulation, and sustainable drinks production.
+- [Manifesto](https://alkatera.com/manifesto): Why alkatera exists. No nature, no drink.
+- [Contact](https://alkatera.com/contact): Talk to the alkatera team.
 
-## Key Features & Specialisms
-- **Ecological Intelligence:** Deep-tier mapping of agricultural dependencies including soil health and climate stability for key ingredients (Barley, Agave, Grapes, Cane).
-- **Water Stewardship (AWARE Protocol):** Uses the AWARE protocol to provide location-specific water impact scores, validating true stewardship in high-volume production.
-- **Greenwashing Protection:** Real-time asset scanning against the Digital Markets, Competition and Consumers (DMCC) Act and the EU Green Claims Directive to ensure marketing claims are legally defensible.
-- **Full Spectrum Traceability:** Tracks performance beyond carbon, including waste stream management and biodiversity impact mapping.
-- **B-Corp Framework Integration:** Automated data mapping to the B Impact Assessment (Environment section) to streamline certification and maintenance.
-- **Terroir Regeneration:** Tools specifically designed to track and drive value back into the agricultural "terroir" that beverage products depend on.
+## Key articles
+- [What is a product passport and why you want one](https://alkatera.com/blog/what-is-a-product-passport-and-why-you-want-one)
+- [Why UK SME drinks brands can't ignore CSRD and UK SRS in 2026](https://alkatera.com/blog/why-uk-sme-drinks-brands-cant-ignore-csrd-and-uk-srs-in-2026)
+- [The greenwashing crackdown has reached the drinks industry](https://alkatera.com/blog/the-greenwashing-crackdown-has-reached-the-drinks-industry)
+- [Why drinks brands need to think cradle to grave](https://alkatera.com/blog/why-drinks-brands-need-to-think-cradle-to-grave)
+- [B Corp just changed the rules: here's how to stay ahead](https://alkatera.com/blog/b-corp-just-changed-the-rules-heres-how-to-stay-ahead)
 
-## Technical Standards
-- **Reporting Frameworks:** TCFD, CSRD, SECR, and GRI.
-- **Compliance:** Audit-ready outputs for global regulatory bodies.
-- **Target Metrics:** Quantified impact per litre of finished product.
+## What alkatera does
+- Measures impact per unit of product (per bottle, can, or serving), not just a company-wide total.
+- Covers four environmental pillars: carbon, water, circularity (packaging and waste), and nature (soil, land, biodiversity).
+- Includes the social and governance side of sustainability, for a full picture.
+- Produces cradle-to-grave product life cycle assessments, corporate carbon footprints, and complete sustainability reports.
+- Checks marketing claims against UK and EU green-claims rules (the DMCC Act and the EU Green Claims Directive) to prevent greenwashing.
+- Helps brands earn and maintain B Corp certification and EcoVadis ratings.
+- Built on internationally recognised standards (GHG Protocol, ISO 14064 and ISO 14067) with audit-ready, traceable outputs.
 
-## Availability
-- **Status:** Live and available now.
-- **Company:** Founded 2025, platform launched February 2026.
-- **Access:** Self-serve sign-up with Founding Partner pricing.
-
-## Target Audience
-- Founders and CEOs of drinks brands.
-- Sustainability and ESG Managers in the beverage sector.
-- Operations Leads in breweries and distilleries.
-- Supply chain auditors and beverage consultants.
-
-## Links
-- Homepage: [https://alkatera.com](https://alkatera.com)
-- LinkedIn: [https://www.linkedin.com/company/alkatera](https://www.linkedin.com/company/alkatera)
+## About
+- Company: alkatera (Avallen Solutions Ltd trading as alkatera). Founded 2025, platform launched February 2026.
+- Audience: founders and sustainability leads at breweries, distilleries, wineries, and soft drink producers.
+- LinkedIn: https://www.linkedin.com/company/alkatera
 - Contact: hello@alkatera.com
