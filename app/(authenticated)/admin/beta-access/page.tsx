@@ -40,6 +40,11 @@ const BETA_FEATURES = [
     description: 'Access to the Pulse analytics dashboard (financial, impact valuation, targets)',
   },
   {
+    code: 'hospitality_beta',
+    label: 'Hospitality',
+    description: 'Hospitality module: impact of meals, drinks, menus and room nights for venues with restaurants/bars/accommodation',
+  },
+  {
     code: 'impact_valuation_beta',
     label: 'Impact Valuation',
     description: 'Access to the Impact Valuation module and dashboard widget',
