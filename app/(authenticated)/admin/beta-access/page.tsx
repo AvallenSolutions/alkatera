@@ -45,11 +45,6 @@ const BETA_FEATURES = [
     description: 'Hospitality module: impact of meals, drinks, menus and room nights for venues with restaurants/bars/accommodation',
   },
   {
-    code: 'impact_valuation_beta',
-    label: 'Impact Valuation',
-    description: 'Access to the Impact Valuation module and dashboard widget',
-  },
-  {
     code: 'epr_beta',
     label: 'EPR Compliance',
     description: 'Access to the UK Extended Producer Responsibility compliance tools',
