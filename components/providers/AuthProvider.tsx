@@ -20,14 +20,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
-  const [isMounted, setIsMounted] = useState(false)
   const authStateCallbackRef = useRef<(() => void) | null>(null)
   const currentUserIdRef = useRef<string | null>(null)
   const router = useRouter()
-
-  useEffect(() => {
-    setIsMounted(true)
-  }, [])
 
   // Stable state updater - only triggers user state change if user ID actually changed
   // This prevents cascading refetches when just refreshing tokens
@@ -190,10 +185,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
   }
 
-  if (!isMounted) {
-    return <AuthContext.Provider value={value}>{null}</AuthContext.Provider>
-  }
-
+  // Render children unconditionally so every page is server-rendered (SSR).
+  // A previous `isMounted` gate returned `{null}` until a client effect fired,
+  // which matched server/client first paint to dodge hydration mismatches but
+  // disabled SSR for the entire app — leaving marketing pages with empty
+  // first-paint HTML and uncrawlable links (the homepage was the only indexed
+  // page). Server and client first render agree here anyway: `user` starts null
+  // and `loading` starts true on both, and auth state only updates post-mount.
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
