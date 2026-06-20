@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { hospitalitySectionFromHref, isHospitalitySectionEnabled, type HospitalitySettings } from '@/lib/hospitality/settings'
 import {
   LayoutDashboard,
   Package,
@@ -368,6 +369,7 @@ export function Sidebar({ className }: SidebarProps) {
   const { userRole, currentOrganization } = useOrganization()
   const [isAlkateraAdmin, setIsAlkateraAdmin] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
+  const [hospitalitySettings, setHospitalitySettings] = useState<HospitalitySettings | null>(null)
   const { usage, tierName, tierLevel, hasFeature, isLoading: subscriptionLoading } = useSubscription()
   const completedMilestones = useMemo(() => getCompletedMilestones(usage), [usage])
 
@@ -413,6 +415,11 @@ export function Sidebar({ className }: SidebarProps) {
           if (item.featureCode && !hasFeature(item.featureCode as any)) return false
           // Hide items restricted to specific orgs
           if (item.allowedOrgs && currentOrganization?.id && !item.allowedOrgs.includes(currentOrganization.id)) return false
+          // Hospitality: hide the sections the org didn't pick (once configured).
+          if (item.href && item.href.startsWith('/hospitality/')) {
+            const section = hospitalitySectionFromHref(item.href)
+            if (section && !isHospitalitySectionEnabled(section, hospitalitySettings)) return false
+          }
           return true
         })
         .map((item) => {
@@ -452,7 +459,22 @@ export function Sidebar({ className }: SidebarProps) {
       if (isAdvisor && item.href === '/settings/') return false
       return true
     })
-  }, [viticultureVisible, hasFeature, currentOrganization, tierLevel, completedMilestones, isAdvisor])
+  }, [viticultureVisible, hasFeature, currentOrganization, tierLevel, completedMilestones, isAdvisor, hospitalitySettings])
+
+  // Fetch the org's hospitality function selection so the nav only shows the
+  // sections they picked. Only when the hospitality beta is on for this org.
+  useEffect(() => {
+    if (!currentOrganization?.id || !hasFeature('hospitality_beta')) {
+      setHospitalitySettings(null)
+      return
+    }
+    let cancelled = false
+    fetch('/api/hospitality/settings', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((b) => { if (!cancelled && b?.settings) setHospitalitySettings(b.settings) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [currentOrganization?.id, hasFeature])
 
   // Fetch admin status and pending approvals in parallel.
   // No need for a separate getUser() call — the user is already in context.

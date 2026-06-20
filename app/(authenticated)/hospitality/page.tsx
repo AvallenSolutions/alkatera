@@ -2,9 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Store, UtensilsCrossed, Wine, BookOpen, BedDouble, BarChart3, Leaf, ArrowRight } from 'lucide-react';
+import { Store, UtensilsCrossed, Wine, BookOpen, BedDouble, BarChart3, Leaf, Settings2, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { HospitalitySetup } from '@/components/hospitality/HospitalitySetup';
+import { useHospitalitySettings } from '@/hooks/data/useHospitalitySettings';
+import { hospitalitySectionFromHref, isHospitalitySectionEnabled } from '@/lib/hospitality/settings';
 
 const SECTIONS = [
   { href: '/hospitality/venues/', icon: Store, title: 'Venues', blurb: 'Set up your restaurants, bars and accommodation. Each venue anchors its own impact reporting.' },
@@ -49,8 +54,11 @@ function ContributionCard() {
 }
 
 export default function HospitalityDashboard() {
-  return (
-    <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
+  const { settings, isLoading } = useHospitalitySettings();
+  const [editing, setEditing] = useState(false);
+
+  const header = (
+    <div className="flex items-start justify-between gap-3">
       <div className="flex items-center gap-3">
         <UtensilsCrossed className="h-7 w-7" />
         <div>
@@ -64,11 +72,54 @@ export default function HospitalityDashboard() {
           </p>
         </div>
       </div>
+      {settings?.configured && !editing && (
+        <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+          <Settings2 className="mr-2 h-4 w-4" />
+          Customise
+        </Button>
+      )}
+    </div>
+  );
+
+  if (isLoading || !settings) {
+    return (
+      <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
+        {header}
+        <Skeleton className="h-40 w-full rounded-lg" />
+      </div>
+    );
+  }
+
+  // First open (or "Customise") → show the function chooser.
+  if (!settings.configured || editing) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
+        {header}
+        <HospitalitySetup
+          initial={settings}
+          onSaved={() => {
+            // Reload so the sidebar nav picks up the new section selection.
+            window.location.reload();
+          }}
+          onCancel={settings.configured ? () => setEditing(false) : undefined}
+        />
+      </div>
+    );
+  }
+
+  const visibleSections = SECTIONS.filter((s) => {
+    const section = hospitalitySectionFromHref(s.href);
+    return section ? isHospitalitySectionEnabled(section, settings) : true;
+  });
+
+  return (
+    <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
+      {header}
 
       <ContributionCard />
 
       <div className="grid gap-3 sm:grid-cols-2">
-        {SECTIONS.map((s) => {
+        {visibleSections.map((s) => {
           const Icon = s.icon;
           return (
             <Link key={s.href} href={s.href} className="block">
