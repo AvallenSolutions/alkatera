@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import { Store, UtensilsCrossed, Wine, BookOpen, BedDouble, BarChart3, Leaf, Settings2, ArrowRight } from 'lucide-react';
+import { Store, UtensilsCrossed, Wine, BookOpen, BedDouble, BarChart3, Settings2, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { HospitalitySetup } from '@/components/hospitality/HospitalitySetup';
+import { HospitalityOverview } from '@/components/hospitality/dashboard/HospitalityOverview';
 import { useHospitalitySettings } from '@/hooks/data/useHospitalitySettings';
 import { hospitalitySectionFromHref, isHospitalitySectionEnabled } from '@/lib/hospitality/settings';
 
@@ -20,40 +21,8 @@ const SECTIONS = [
   { href: '/hospitality/sales/', icon: BarChart3, title: 'Sales', blurb: 'Record covers, drinks and room-nights served — this drives your company total.' },
 ] as const;
 
-function fmt(n: number): string {
-  return n.toLocaleString('en-GB', { maximumFractionDigits: 1 });
-}
-
-function ContributionCard() {
-  const [data, setData] = useState<{ year: number; total: number; food: number; supplies: number } | null>(null);
-
-  useEffect(() => {
-    fetch('/api/hospitality/summary', { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => d && setData(d))
-      .catch(() => {});
-  }, []);
-
-  if (!data || data.total <= 0) return null;
-
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center gap-2 space-y-0">
-        <Leaf className="h-5 w-5 text-primary" />
-        <CardTitle className="text-base">Contribution to your company total ({data.year})</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-3xl font-semibold">{fmt(data.total)} kg CO₂e</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {fmt(data.food)} kg from food &amp; drink · {fmt(data.supplies)} kg from room consumables.
-          Added to Scope 3 — own wines and venue energy are excluded to avoid double-counting.
-        </p>
-      </CardContent>
-    </Card>
-  );
-}
-
 export default function HospitalityDashboard() {
+  // Dashboard: rich impact overview (HospitalityOverview) + section shortcuts.
   const { settings, isLoading } = useHospitalitySettings();
   const [editing, setEditing] = useState(false);
 
@@ -116,9 +85,11 @@ export default function HospitalityDashboard() {
     <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
       {header}
 
-      <ContributionCard />
+      <HospitalityOverview />
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div>
+        <h2 className="mb-3 text-sm font-semibold text-muted-foreground">Manage</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
         {visibleSections.map((s) => {
           const Icon = s.icon;
           return (
@@ -138,6 +109,7 @@ export default function HospitalityDashboard() {
             </Link>
           );
         })}
+        </div>
       </div>
     </div>
   );

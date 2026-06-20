@@ -9,7 +9,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, UtensilsCrossed, Wine, Trash2, Leaf } from 'lucide-react'
+import { Plus, UtensilsCrossed, Wine, Trash2, Leaf, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -43,6 +43,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { useHospitalityRecipes } from '@/hooks/data/useHospitalityRecipes'
 import { useHospitalityVenues } from '@/hooks/data/useHospitalityVenues'
+import { MenuImportDialog } from '@/components/hospitality/MenuImportDialog'
 import type { HospitalityMealListItem } from '@/lib/hospitality/meal-types'
 import type { RecipeKindConfig } from '@/lib/hospitality/recipe-kinds'
 
@@ -54,14 +55,17 @@ function fmt(n: number, digits = 2): string {
 
 export function RecipeManager({ cfg }: { cfg: RecipeKindConfig }) {
   const router = useRouter()
-  const { recipes, isLoading, error, createRecipe, deleteRecipe } = useHospitalityRecipes(cfg)
+  const { recipes, isLoading, error, refresh, createRecipe, deleteRecipe } = useHospitalityRecipes(cfg)
   const { venues } = useHospitalityVenues()
   const { toast } = useToast()
 
   const Icon = cfg.kind === 'drink' ? Wine : UtensilsCrossed
   const portion = cfg.portionWord
   const lc = cfg.label.toLowerCase()
+  // Import only applies to meals and drinks (rooms reuse this component).
+  const canImport = cfg.kind === 'meal' || cfg.kind === 'drink'
 
+  const [importOpen, setImportOpen] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [name, setName] = useState('')
   const [venueId, setVenueId] = useState<string>(NO_VENUE)
@@ -130,10 +134,18 @@ export function RecipeManager({ cfg }: { cfg: RecipeKindConfig }) {
             Build a recipe from ingredients and see its carbon, water and land impact per {portion}.
           </p>
         </div>
-        <Button onClick={openCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          New {lc}
-        </Button>
+        <div className="flex items-center gap-2">
+          {canImport && (
+            <Button variant="outline" onClick={() => setImportOpen(true)}>
+              <Upload className="mr-2 h-4 w-4" />
+              Import
+            </Button>
+          )}
+          <Button onClick={openCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            New {lc}
+          </Button>
+        </div>
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -207,6 +219,15 @@ export function RecipeManager({ cfg }: { cfg: RecipeKindConfig }) {
             </div>
           ))}
         </div>
+      )}
+
+      {canImport && (
+        <MenuImportDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          lockKind={cfg.kind as 'meal' | 'drink'}
+          onComplete={() => refresh()}
+        />
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

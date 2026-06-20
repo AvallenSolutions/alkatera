@@ -4,7 +4,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, BookOpen, Trash2, Leaf } from 'lucide-react'
+import { Plus, BookOpen, Trash2, Leaf, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -38,6 +38,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { useHospitalityMenus } from '@/hooks/data/useHospitalityMenus'
 import { useHospitalityVenues } from '@/hooks/data/useHospitalityVenues'
+import { MenuImportDialog } from '@/components/hospitality/MenuImportDialog'
 import type { MenuListItem } from '@/lib/hospitality/menu-types'
 
 const NO_VENUE = '__none__'
@@ -48,10 +49,11 @@ function fmt(n: number, digits = 2): string {
 
 export function MenusManager() {
   const router = useRouter()
-  const { menus, isLoading, error, createMenu, deleteMenu } = useHospitalityMenus()
+  const { menus, isLoading, error, refresh, createMenu, deleteMenu } = useHospitalityMenus()
   const { venues } = useHospitalityVenues()
   const { toast } = useToast()
 
+  const [importOpen, setImportOpen] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [name, setName] = useState('')
   const [venueId, setVenueId] = useState<string>(NO_VENUE)
@@ -109,10 +111,16 @@ export function MenusManager() {
             Collect meals and drinks into a menu and see its average impact per cover.
           </p>
         </div>
-        <Button onClick={openCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          New menu
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import from menu
+          </Button>
+          <Button onClick={openCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            New menu
+          </Button>
+        </div>
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -187,6 +195,15 @@ export function MenusManager() {
           ))}
         </div>
       )}
+
+      <MenuImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onComplete={({ menuId }) => {
+          if (menuId) router.push(`/hospitality/menus/${menuId}`)
+          else refresh()
+        }}
+      />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">

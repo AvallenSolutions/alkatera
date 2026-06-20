@@ -16,7 +16,10 @@ import Link from 'next/link';
 import { ChevronLeft, Plus, Trash2, Calculator, Leaf, Droplets, Trees, Sparkles } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { calculateProductLCA } from '@/lib/product-lca-calculator';
+import { autoMatchEmissionFactor, type EmissionFactorMatch } from '@/lib/products/ef-auto-match';
+import { useOrganization } from '@/lib/organizationContext';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -47,6 +50,9 @@ import type { RecipeKindConfig } from '@/lib/hospitality/recipe-kinds';
 
 interface Row extends MealIngredient {
   key: string;
+  /** undefined = not checked yet, null = checked but no factor found. */
+  match?: EmissionFactorMatch | null;
+  matching?: boolean;
 }
 
 let rowSeq = 0;
@@ -59,6 +65,25 @@ function newRow(partial?: Partial<MealIngredient>): Row {
     unit: partial?.unit ?? 'g',
   };
 }
+
+type BadgeTone = 'ok' | 'warn' | 'muted';
+/** Map a row's factor-match state to a small status badge. */
+function matchStatus(row: Row): { label: string; tone: BadgeTone } | null {
+  if (row.matching) return { label: 'Checking factor…', tone: 'muted' };
+  if (row.match === undefined) return null;
+  if (row.match === null) return { label: 'No factor match', tone: 'warn' };
+  const grade = row.match.ef_data_quality_grade;
+  const source = row.match.ef_source_type;
+  if (source === 'primary' || grade === 'HIGH') return { label: 'Factor matched', tone: 'ok' };
+  if (grade === 'LOW') return { label: 'Approximate factor', tone: 'warn' };
+  return { label: 'Factor matched', tone: 'ok' };
+}
+
+const TONE_CLASS: Record<BadgeTone, string> = {
+  ok: 'border-transparent bg-primary/15 text-primary',
+  warn: 'border-transparent bg-amber-500/15 text-amber-600 dark:text-amber-400',
+  muted: 'text-muted-foreground',
+};
 
 function fmt(n: number, digits = 2): string {
   return n.toLocaleString('en-GB', { maximumFractionDigits: digits });
@@ -79,6 +104,8 @@ export function RecipeEditor({
   renderExtra?: (recipe: HospitalityMealDetail) => React.ReactNode
 }) {
   const { toast } = useToast();
+  const { currentOrganization } = useOrganization();
+  const orgId = currentOrganization?.id ?? null;
   const portion = cfg.portionWord;
   const portionTitle = `${portion[0].toUpperCase()}${portion.slice(1)}`;
 
@@ -94,6 +121,32 @@ export function RecipeEditor({
   const [aiText, setAiText] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  // Ingredient names already used across this org's recipes — powers autocomplete
+  // so common ingredients aren't retyped on every dish.
+  const [knownIngredients, setKnownIngredients] = useState<string[]>([]);
+
+  // Resolve an ingredient name to an emission factor so the user sees, before
+  // calculating, whether it matched a real factor or only an approximate one.
+  // The match is also persisted so the LCA uses the resolved factor (not just a
+  // name guess). Stale results (name changed mid-flight) are discarded.
+  const matchRow = useCallback(
+    async (key: string, name: string) => {
+      const q = name.trim();
+      if (!orgId || !q) {
+        setRows((prev) => prev.map((r) => (r.key === key ? { ...r, match: undefined, matching: false } : r)));
+        return;
+      }
+      setRows((prev) => prev.map((r) => (r.key === key ? { ...r, matching: true } : r)));
+      const match = await autoMatchEmissionFactor({ query: q, organizationId: orgId, materialType: 'ingredient' });
+      setRows((prev) =>
+        prev.map((r) => {
+          if (r.key !== key || r.material_name.trim() !== q) return r;
+          return { ...r, match: match ?? null, matching: false };
+        }),
+      );
+    },
+    [orgId],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -108,19 +161,37 @@ export function RecipeEditor({
       const m: HospitalityMealDetail = body.recipe;
       setRecipe(m);
       setCovers(String(m.covers));
-      setRows(m.ingredients.length ? m.ingredients.map((i) => newRow(i)) : [newRow()]);
+      const loaded = m.ingredients.length ? m.ingredients.map((i) => newRow(i)) : [newRow()];
+      setRows(loaded);
+      // Rebuild factor-match badges for the loaded ingredients.
+      loaded.forEach((r) => {
+        if (r.material_name.trim()) void matchRow(r.key, r.material_name);
+      });
     } catch (e: unknown) {
       setLoadError(e instanceof Error ? e.message : `Failed to load ${cfg.label.toLowerCase()}`);
     } finally {
       setLoading(false);
     }
-  }, [cfg.apiBase, cfg.label, recipeId]);
+  }, [cfg.apiBase, cfg.label, recipeId, matchRow]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const updateRow = (key: string, patch: Partial<MealIngredient>) => {
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/hospitality/ingredients', { credentials: 'include' })
+      .then((res) => (res.ok ? res.json() : { ingredients: [] }))
+      .then((body) => {
+        if (!cancelled) setKnownIngredients(body.ingredients ?? []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const updateRow = (key: string, patch: Partial<Row>) => {
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   };
   const addRow = () => setRows((prev) => [...prev, newRow()]);
@@ -146,10 +217,12 @@ export function RecipeEditor({
         return;
       }
       // Replace empty rows; append the parsed ingredients.
+      const added = parsed.map((p) => newRow(p));
       setRows((prev) => {
         const kept = prev.filter((r) => r.material_name.trim().length > 0);
-        return [...kept, ...parsed.map((p) => newRow(p))];
+        return [...kept, ...added];
       });
+      added.forEach((r) => { if (r.material_name.trim()) void matchRow(r.key, r.material_name); });
       setAiOpen(false);
       setAiText('');
     } catch (e: unknown) {
@@ -197,13 +270,31 @@ export function RecipeEditor({
     }
     if (clean.length > 0) {
       const { error: insErr } = await supabase.from('product_materials').insert(
-        clean.map((r) => ({
-          product_id: productId,
-          material_name: r.material_name,
-          quantity: r.quantity,
-          unit: r.unit,
-          material_type: 'ingredient',
-        })),
+        clean.map((r) => {
+          const base: Record<string, unknown> = {
+            product_id: productId,
+            material_name: r.material_name,
+            quantity: r.quantity,
+            unit: r.unit,
+            material_type: 'ingredient',
+          };
+          // Attach the resolved emission factor so the LCA uses it (the
+          // data_source_integrity CHECK requires the matching id alongside).
+          const m = r.match;
+          if (m && m.data_source === 'openlca' && m.data_source_id) {
+            base.data_source = 'openlca';
+            base.data_source_id = m.data_source_id;
+            base.openlca_database = m.openlca_database ?? 'ecoinvent';
+            base.matched_source_name = m.matched_source_name ?? null;
+            base.cached_co2_factor = m.carbon_intensity ?? null;
+          } else if (m && m.data_source === 'supplier' && m.supplier_product_id) {
+            base.data_source = 'supplier';
+            base.supplier_product_id = m.supplier_product_id;
+            base.matched_source_name = m.matched_source_name ?? null;
+            base.cached_co2_factor = m.carbon_intensity ?? null;
+          }
+          return base;
+        }),
       );
       if (insErr) {
         setCalcError(insErr.message);
@@ -338,6 +429,12 @@ export function RecipeEditor({
             />
           </div>
 
+          <datalist id="hospitality-known-ingredients">
+            {knownIngredients.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
+
           <div className="space-y-2">
             <div className="hidden grid-cols-[1fr,7rem,8rem,2.5rem] gap-2 px-1 text-xs font-medium text-muted-foreground sm:grid">
               <span>Ingredient</span>
@@ -347,13 +444,26 @@ export function RecipeEditor({
             </div>
             {rows.map((row) => (
               <div key={row.key} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr,7rem,8rem,2.5rem]">
-                <Input
-                  placeholder={
-                    cfg.kind === 'drink' ? 'e.g. Gin' : cfg.kind === 'room_night' ? 'e.g. Bread (breakfast)' : 'e.g. Beef mince'
-                  }
-                  value={row.material_name}
-                  onChange={(e) => updateRow(row.key, { material_name: e.target.value })}
-                />
+                <div className="space-y-1">
+                  <Input
+                    list="hospitality-known-ingredients"
+                    placeholder={
+                      cfg.kind === 'drink' ? 'e.g. Gin' : cfg.kind === 'room_night' ? 'e.g. Bread (breakfast)' : 'e.g. Beef mince'
+                    }
+                    value={row.material_name}
+                    onChange={(e) => updateRow(row.key, { material_name: e.target.value, match: undefined })}
+                    onBlur={() => matchRow(row.key, row.material_name)}
+                  />
+                  {(() => {
+                    const status = matchStatus(row);
+                    if (!status) return null;
+                    return (
+                      <Badge variant="outline" className={`text-[10px] font-normal ${TONE_CLASS[status.tone]}`}>
+                        {status.label}
+                      </Badge>
+                    );
+                  })()}
+                </div>
                 <Input
                   type="number"
                   min="0"
