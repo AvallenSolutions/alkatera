@@ -13,21 +13,24 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js'
+import { summariseWaste } from '@/lib/hospitality/waste-service'
 
 export interface HospitalityEmissionsResult {
-  /** Net-new Scope 3 from hospitality throughput, kg CO2e. */
+  /** Net-new Scope 3 from hospitality throughput + waste disposal, kg CO2e. */
   total: number
   /** Meals + made-drinks (purchased food/beverage ingredients). */
   food: number
   /** Room-night purchased consumables. */
   supplies: number
+  /** Waste disposal (food + dry), GHG Protocol Scope 3 Cat 5, kg CO2e. */
+  waste: number
   /** Number of service-volume rows that contributed. */
   volume_rows: number
 }
 
 const HOSPITALITY_KINDS = ['hospitality_meal', 'hospitality_drink', 'hospitality_room_night']
 
-const EMPTY: HospitalityEmissionsResult = { total: 0, food: 0, supplies: 0, volume_rows: 0 }
+const EMPTY: HospitalityEmissionsResult = { total: 0, food: 0, supplies: 0, waste: 0, volume_rows: 0 }
 
 /** Pull the Scope-3 figure from a PCF's aggregated_impacts (ingredient impact is all Scope 3). */
 function scope3Of(aggregated: any): number {
@@ -43,13 +46,18 @@ export async function calculateHospitality(
   yearEnd: string,
 ): Promise<HospitalityEmissionsResult> {
   const db = supabase as any
+
+  // Waste disposal (Scope 3 Cat 5) counts even when no service volumes are recorded.
+  const wasteSummary = await summariseWaste(db, organizationId, yearStart, yearEnd)
+  const waste = wasteSummary.total_co2e
+
   const { data: vols } = await db
     .from('hospitality_service_volumes')
     .select('product_id, units_sold')
     .eq('organization_id', organizationId)
     .lte('period_start', yearEnd)
     .gte('period_end', yearStart)
-  if (!vols || vols.length === 0) return { ...EMPTY }
+  if (!vols || vols.length === 0) return { ...EMPTY, total: waste, waste }
 
   const productIds = Array.from(new Set(vols.map((v: any) => v.product_id)))
 
@@ -89,5 +97,5 @@ export async function calculateHospitality(
     counted += 1
   }
 
-  return { total: food + supplies, food, supplies, volume_rows: counted }
+  return { total: food + supplies + waste, food, supplies, waste, volume_rows: counted }
 }

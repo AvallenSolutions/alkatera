@@ -14,10 +14,11 @@ import {
   Droplets,
   Recycle,
   TreePine,
+  Trash2,
   type LucideIcon
 } from 'lucide-react';
 
-export type PillarType = 'climate' | 'water' | 'circularity' | 'nature';
+export type PillarType = 'climate' | 'water' | 'circularity' | 'waste' | 'nature';
 
 interface PillarCardProps {
   pillar: PillarType;
@@ -35,6 +36,8 @@ interface PillarCardProps {
   };
   expanded?: boolean;
   onToggle?: () => void;
+  /** Hide the methodology explainer popover (its copy is company-LCA specific). */
+  showExplainer?: boolean;
   children?: React.ReactNode;
   className?: string;
 }
@@ -79,6 +82,16 @@ const pillarConfig: Record<PillarType, {
     borderColor: 'border-amber-200 dark:border-amber-800/50',
     iconBg: 'bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400',
   },
+  waste: {
+    name: 'Waste',
+    icon: Trash2,
+    emoji: '🗑️',
+    description: 'Food and dry waste sent off site',
+    gradientFrom: 'from-amber-50 dark:from-amber-950/20',
+    gradientTo: 'to-orange-50/50 dark:to-orange-950/10',
+    borderColor: 'border-amber-200 dark:border-amber-800/50',
+    iconBg: 'bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400',
+  },
   nature: {
     name: 'Nature',
     icon: TreePine,
@@ -102,6 +115,7 @@ export function PillarCard({
   benchmark,
   expanded = false,
   onToggle,
+  showExplainer = true,
   children,
   className,
 }: PillarCardProps) {
@@ -122,6 +136,7 @@ export function PillarCard({
       expanded && pillar === 'climate' && 'ring-emerald-500/50',
       expanded && pillar === 'water' && 'ring-blue-500/50',
       expanded && pillar === 'circularity' && 'ring-amber-500/50',
+      expanded && pillar === 'waste' && 'ring-amber-500/50',
       expanded && pillar === 'nature' && 'ring-green-500/50',
       className
     )}>
@@ -139,12 +154,14 @@ export function PillarCard({
               <div className="flex items-center gap-2">
                 <span className="text-xl">{config.emoji}</span>
                 <h3 className="font-semibold text-lg">{config.name}</h3>
-                <ScoreExplainer
-                  scoreType={pillar}
-                  currentScore={score}
-                  benchmark={benchmark}
-                  className="hover:bg-muted/50 text-muted-foreground hover:text-foreground"
-                />
+                {showExplainer && pillar !== 'waste' && (
+                  <ScoreExplainer
+                    scoreType={pillar}
+                    currentScore={score}
+                    benchmark={benchmark}
+                    className="hover:bg-muted/50 text-muted-foreground hover:text-foreground"
+                  />
+                )}
               </div>
               <p className="text-sm text-muted-foreground mt-0.5">
                 {config.description}

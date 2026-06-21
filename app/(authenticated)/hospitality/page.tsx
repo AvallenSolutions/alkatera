@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Store, UtensilsCrossed, Wine, BookOpen, BedDouble, BarChart3, Settings2, ArrowRight } from 'lucide-react';
+import { Store, UtensilsCrossed, Wine, BookOpen, BedDouble, BarChart3, Trash2, Settings2, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ const SECTIONS = [
   { href: '/hospitality/menus/', icon: BookOpen, title: 'Menus', blurb: 'Collect meals and drinks — including your own wines, pulled live from their LCA — and see the menu average per cover.' },
   { href: '/hospitality/rooms/', icon: BedDouble, title: 'Rooms', blurb: 'Per-room-night impact: purchased consumables plus allocated energy and water.' },
   { href: '/hospitality/sales/', icon: BarChart3, title: 'Sales', blurb: 'Record covers, drinks and room-nights served — this drives your company total.' },
+  { href: '/hospitality/waste/', icon: Trash2, title: 'Waste', blurb: 'Log food and dry waste with how it is treated; tracked separately and added to your footprint.' },
 ] as const;
 
 export default function HospitalityDashboard() {

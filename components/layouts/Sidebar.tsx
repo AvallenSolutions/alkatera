@@ -60,6 +60,7 @@ import {
   Store,
   Wine,
   BedDouble,
+  Trash2,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
@@ -141,6 +142,7 @@ const navigationStructure: NavItem[] = [
       { name: 'Menus',     href: '/hospitality/menus/',   icon: BookOpen,        minTier: 1 },
       { name: 'Rooms',     href: '/hospitality/rooms/',   icon: BedDouble,       minTier: 1 },
       { name: 'Sales',     href: '/hospitality/sales/',   icon: BarChart3,       minTier: 1 },
+      { name: 'Waste',     href: '/hospitality/waste/',   icon: Trash2,          minTier: 1 },
     ],
   },
   {

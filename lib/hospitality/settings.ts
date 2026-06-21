@@ -18,14 +18,14 @@ export const DEFAULT_HOSPITALITY_SETTINGS: HospitalitySettings = {
   configured: false,
 }
 
-export type HospitalitySection = 'dashboard' | 'venues' | 'meals' | 'drinks' | 'menus' | 'rooms' | 'sales'
+export type HospitalitySection = 'dashboard' | 'venues' | 'meals' | 'drinks' | 'menus' | 'rooms' | 'sales' | 'waste'
 
 /** Map a /hospitality/* href to its section (for nav filtering). */
 export function hospitalitySectionFromHref(href: string): HospitalitySection | null {
   const m = href.match(/^\/hospitality\/([a-z]+)\/?$/)
   if (!m) return href.replace(/\/+$/, '') === '/hospitality' ? 'dashboard' : null
   const seg = m[1]
-  if (['venues', 'meals', 'drinks', 'menus', 'rooms', 'sales'].includes(seg)) return seg as HospitalitySection
+  if (['venues', 'meals', 'drinks', 'menus', 'rooms', 'sales', 'waste'].includes(seg)) return seg as HospitalitySection
   return null
 }
 

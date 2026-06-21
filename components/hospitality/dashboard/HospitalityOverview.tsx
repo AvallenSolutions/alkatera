@@ -1,35 +1,21 @@
 'use client';
 
 /**
- * Hospitality impact overview — a Pulse-quality summary of the hospitality
- * footprint: headline contribution with a year-on-year verdict and monthly
- * trend, a food/room split, stat tiles, a per-kind breakdown, top products and
- * per-venue rankings, a monthly trend chart, and data-coverage nudges.
+ * Hospitality impact overview — mirrors the Company Vitality (/performance) page
+ * exactly: a vitality score ring + 12-week trend hero, then the same four
+ * PillarCards (Climate / Water / Waste / Nature) and a Strengths / Improvements
+ * summary. Reuses the vitality components so the two dashboards are identical.
  *
  * Reads the aggregated read model from /api/hospitality/dashboard.
  */
 
-import { useCallback, useEffect, useState } from 'react';
-import {
-  Leaf,
-  UtensilsCrossed,
-  Wine,
-  BedDouble,
-  BookOpen,
-  ChevronLeft,
-  ChevronRight,
-  TrendingDown,
-  TrendingUp,
-  Trophy,
-  Store,
-  AlertTriangle,
-  ArrowRight,
-} from 'lucide-react';
-import Link from 'next/link';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Calendar, UtensilsCrossed, Wine, BedDouble } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Sparkline } from '@/components/pulse/Sparkline';
-import { HospitalityStatCard, type StatTone } from './HospitalityStatCard';
-import { HospitalityRankList, type RankListRow } from './HospitalityRankList';
+import { Button } from '@/components/ui/button';
+import { VitalityRing } from '@/components/vitality/VitalityRing';
+import { PillarCard, PillarGrid, PerformanceSummary } from '@/components/vitality/PillarCard';
 
 type Kind = 'hospitality_meal' | 'hospitality_drink' | 'hospitality_room_night';
 
@@ -41,89 +27,99 @@ interface KindBreakdown {
   costed_count: number;
   avg_per_cover: number | null;
 }
-interface RankRow {
-  id: string;
-  name: string;
-  sub?: string | null;
-  contribution: number;
-  units: number;
+interface WasteSummary {
+  total_kg: number;
+  total_co2e: number;
+  food_kg: number;
+  dry_kg: number;
+  food_co2e: number;
+  dry_co2e: number;
+  diverted_kg: number;
+  diversion_rate: number;
 }
 interface Dashboard {
   year: number;
   total: number;
   food: number;
   supplies: number;
-  volume_rows: number;
   prev_total: number;
-  monthly: number[];
+  weekly: { label: string; value: number }[];
+  water_litres: number;
+  land_m2a: number;
+  waste: WasteSummary;
+  score: { value: number; label: string; tone: string };
+  pillar_scores: { climate: number | null; water: number | null; waste: number | null; nature: number | null };
   by_kind: KindBreakdown[];
-  by_venue: RankRow[];
-  top_products: Array<RankRow & { kind: Kind }>;
   coverage: {
     recipes_total: number;
     recipes_costed: number;
     menus: number;
-    menus_avg_co2e: number | null;
     venues: number;
     has_sales: boolean;
   };
 }
 
-const KIND_META: Record<Kind, { label: string; plural: string; icon: typeof UtensilsCrossed; href: string }> = {
-  hospitality_meal: { label: 'Meal', plural: 'Meals', icon: UtensilsCrossed, href: '/hospitality/meals/' },
-  hospitality_drink: { label: 'Drink', plural: 'Drinks', icon: Wine, href: '/hospitality/drinks/' },
-  hospitality_room_night: { label: 'Room night', plural: 'Rooms', icon: BedDouble, href: '/hospitality/rooms/' },
+const KIND_LABEL: Record<Kind, string> = {
+  hospitality_meal: 'Meals',
+  hospitality_drink: 'Drinks',
+  hospitality_room_night: 'Rooms',
+};
+const KIND_ICON: Record<Kind, typeof UtensilsCrossed> = {
+  hospitality_meal: UtensilsCrossed,
+  hospitality_drink: Wine,
+  hospitality_room_night: BedDouble,
 };
 
-/** Decimal places that keep small footprints legible (0.04 not 0). */
-function kgDigits(kg: number): number {
-  if (kg >= 100) return 0;
-  if (kg >= 1) return 1;
-  return 2;
+const AVAILABLE_YEARS = Array.from({ length: 4 }, (_, i) => new Date().getFullYear() - i);
+
+function formatValue(value: number): string {
+  if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+  if (value < 0.1 && value > 0) return value.toExponential(1);
+  return value.toFixed(1);
 }
 function fmtCo2(kg: number): string {
-  if (!Number.isFinite(kg)) return '0 kg';
-  if (kg >= 1000) return `${(kg / 1000).toLocaleString('en-GB', { maximumFractionDigits: 2 })} t CO₂e`;
-  return `${kg.toLocaleString('en-GB', { maximumFractionDigits: kgDigits(kg) })} kg CO₂e`;
-}
-function fmtKg(kg: number): string {
   if (kg >= 1000) return `${(kg / 1000).toLocaleString('en-GB', { maximumFractionDigits: 2 })} t`;
-  return `${kg.toLocaleString('en-GB', { maximumFractionDigits: kgDigits(kg) })} kg`;
+  return `${kg.toLocaleString('en-GB', { maximumFractionDigits: kg < 1 ? 2 : kg < 100 ? 1 : 0 })} kg`;
 }
 function fmtNum(n: number): string {
   return n.toLocaleString('en-GB', { maximumFractionDigits: 0 });
 }
-
-const MONTH_LABELS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
-
-function MonthlyBars({ values }: { values: number[] }) {
-  const max = Math.max(...values, 0) || 1;
-  return (
-    <div className="flex h-32 items-end gap-1.5">
-      {values.map((v, i) => (
-        <div key={i} className="flex flex-1 flex-col items-center gap-1">
-          <div className="flex w-full flex-1 items-end rounded-sm bg-muted/40">
-            <div
-              className="w-full rounded-sm bg-[#ccff00] transition-all"
-              style={{ height: `${Math.max((v / max) * 100, v > 0 ? 4 : 0)}%` }}
-              title={fmtCo2(v)}
-            />
-          </div>
-          <span className="text-[9px] text-muted-foreground">{MONTH_LABELS[i]}</span>
-        </div>
-      ))}
-    </div>
-  );
+function bandFor(score: number): string {
+  if (score >= 85) return 'excellent';
+  if (score >= 70) return 'good';
+  if (score >= 50) return 'fair';
+  if (score >= 30) return 'developing';
+  return 'critical';
 }
 
-function Panel({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
+/** 12-week trend bars — same pattern as the /performance composite chart. */
+function WeeklyTrend({ weekly }: { weekly: { label: string; value: number }[] }) {
+  const vals = weekly.map((w) => w.value);
+  const max = Math.max(...vals, 0) || 1;
+  let lastNonZero = -1;
+  for (let i = vals.length - 1; i >= 0; i--) if (vals[i] > 0) { lastNonZero = i; break; }
   return (
-    <div className="rounded-xl border border-border/60 bg-card/40 p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold">{title}</h3>
-        {action}
+    <div aria-label="12-week footprint trend">
+      <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">12-week trend</p>
+      <div className="flex items-end gap-1.5 h-20">
+        {vals.map((v, i) => {
+          const filled = v > 0;
+          const heightPct = filled ? Math.max(8, Math.min(100, (v / max) * 100)) : 5;
+          return (
+            <div key={i} className="flex-1 flex items-end h-full" aria-hidden="true">
+              <div
+                className={cn('w-full rounded-sm transition-colors', filled ? (i === lastNonZero ? 'opacity-100' : 'opacity-65') : 'opacity-15')}
+                style={{ height: `${heightPct}%`, backgroundColor: '#ccff00' }}
+              />
+            </div>
+          );
+        })}
       </div>
-      {children}
+      <div className="mt-2 flex items-center justify-between text-[10px] text-muted-foreground">
+        <span>{weekly[0]?.label ?? '12 weeks ago'}</span>
+        <span>{weekly[weekly.length - 1]?.label ?? 'Today'}</span>
+      </div>
     </div>
   );
 }
@@ -132,6 +128,7 @@ export function HospitalityOverview() {
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [data, setData] = useState<Dashboard | null>(null);
   const [loading, setLoading] = useState(true);
+  const [expandedPillar, setExpandedPillar] = useState<string | null>(null);
 
   const load = useCallback(async (y: number) => {
     setLoading(true);
@@ -139,7 +136,7 @@ export function HospitalityOverview() {
       const res = await fetch(`/api/hospitality/dashboard?year=${y}`, { credentials: 'include' });
       if (res.ok) setData(await res.json());
     } catch {
-      /* leave previous data */
+      /* keep previous */
     } finally {
       setLoading(false);
     }
@@ -149,252 +146,203 @@ export function HospitalityOverview() {
     load(year);
   }, [year, load]);
 
+  const { strengths, improvements } = useMemo(() => {
+    const strengths: Array<{ text: string }> = [];
+    const improvements: Array<{ text: string; priority?: 'high' | 'medium' }> = [];
+    if (!data) return { strengths, improvements };
+    const { coverage, waste, total, prev_total } = data;
+    const uncosted = coverage.recipes_total - coverage.recipes_costed;
+    if (coverage.recipes_total > 0 && uncosted === 0) strengths.push({ text: `All ${coverage.recipes_total} recipes have a calculated footprint` });
+    if (waste.total_kg > 0 && waste.diversion_rate >= 0.5) strengths.push({ text: `${(waste.diversion_rate * 100).toFixed(0)}% of waste diverted from disposal` });
+    if (prev_total > 0 && total < prev_total) strengths.push({ text: `Footprint down ${(((prev_total - total) / prev_total) * 100).toFixed(0)}% year on year` });
+    if (coverage.menus > 0) strengths.push({ text: `${coverage.menus} menu${coverage.menus === 1 ? '' : 's'} with live impact` });
+
+    if (coverage.recipes_total === 0) improvements.push({ text: 'Add your meals and drinks to measure their footprint', priority: 'high' });
+    else if (uncosted > 0) improvements.push({ text: `${uncosted} recipe${uncosted === 1 ? '' : 's'} need ingredient quantities`, priority: 'high' });
+    if (!coverage.has_sales) improvements.push({ text: `Record sales volumes for ${data.year} so hospitality counts toward your total`, priority: 'high' });
+    if (waste.total_kg === 0) improvements.push({ text: 'Log food and dry waste to track diversion and disposal emissions', priority: 'medium' });
+    else if (waste.diversion_rate < 0.5) improvements.push({ text: `Improve waste diversion (currently ${(waste.diversion_rate * 100).toFixed(0)}%)`, priority: 'medium' });
+    return { strengths: strengths.slice(0, 5), improvements: improvements.slice(0, 5) };
+  }, [data]);
+
   if (loading && !data) {
-    return <Skeleton className="h-64 w-full rounded-xl" />;
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-64 rounded-2xl" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-32 rounded-xl" />)}
+        </div>
+      </div>
+    );
   }
   if (!data) return null;
 
-  const { total, food, supplies, prev_total, monthly, by_kind, by_venue, top_products, coverage } = data;
-  const foodPct = total > 0 ? (food / total) * 100 : 0;
-  const deltaPct = prev_total > 0 ? ((total - prev_total) / prev_total) * 100 : null;
-  const yoyTone: StatTone = deltaPct == null ? 'neutral' : deltaPct <= 0 ? 'good' : 'bad';
-  const yoyLabel =
-    deltaPct == null ? 'No prior year' : `${deltaPct > 0 ? '+' : ''}${deltaPct.toFixed(0)}% YoY`;
+  const { total, prev_total, weekly, water_litres, land_m2a, waste, score, pillar_scores } = data;
+  const band = bandFor(score.value);
+  const togglePillar = (p: string) => setExpandedPillar(expandedPillar === p ? null : p);
 
-  const activeKinds = by_kind.filter((k) => k.product_count > 0 || k.contribution > 0);
-
-  // Coverage nudges — surface the most useful next step, Pulse-style.
-  const nudges: Array<{ tone: StatTone; text: string; href: string; cta: string }> = [];
-  const uncosted = coverage.recipes_total - coverage.recipes_costed;
-  if (coverage.recipes_total === 0) {
-    nudges.push({ tone: 'neutral', text: 'No recipes yet. Add your meals and drinks to measure their footprint.', href: '/hospitality/meals/', cta: 'Add recipes' });
-  } else if (uncosted > 0) {
-    nudges.push({ tone: 'warn', text: `${uncosted} recipe${uncosted === 1 ? '' : 's'} have no calculated footprint yet.`, href: '/hospitality/meals/', cta: 'Add quantities' });
-  }
-  if (!coverage.has_sales) {
-    nudges.push({ tone: 'warn', text: `No sales recorded for ${year}. Record volumes so hospitality counts toward your company total.`, href: '/hospitality/sales/', cta: 'Record sales' });
-  }
-  if (coverage.venues === 0) {
-    nudges.push({ tone: 'neutral', text: 'No venues set up. Add a venue to break impact down by location.', href: '/hospitality/venues/', cta: 'Add a venue' });
-  }
-
-  const topProductRows: RankListRow[] = top_products.map((p) => ({
-    key: p.id,
-    primary: p.name,
-    secondary: p.sub ?? null,
-    value: p.contribution,
-    meta: `${fmtNum(p.units)} served`,
-  }));
-  // Only worth a venue breakdown once sales are attributed to a named venue —
-  // otherwise it's a single "Unassigned" row that says nothing.
-  const hasNamedVenue = by_venue.some((v) => v.id !== '__none__');
-  const venueRows: RankListRow[] = hasNamedVenue
-    ? by_venue.map((v) => ({
-        key: v.id,
-        primary: v.name,
-        value: v.contribution,
-        meta: `${fmtNum(v.units)} served`,
-      }))
-    : [];
+  const waterValue = water_litres >= 1000 ? `${(water_litres / 1000).toFixed(1)}` : water_litres.toFixed(1);
+  const waterUnit = water_litres >= 1000 ? 'm³' : 'L';
 
   return (
-    <div className="space-y-4">
-      {/* Hero ---------------------------------------------------------------- */}
-      <div className="rounded-xl border border-border/60 bg-card/40 p-5">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <Leaf className="h-4 w-4 text-[#ccff00]" />
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Hospitality footprint
-              </span>
-              <div className="ml-1 flex items-center gap-1 rounded-md border border-border/60 text-muted-foreground">
-                <button onClick={() => setYear((y) => y - 1)} aria-label="Previous year" className="px-1.5 py-0.5 hover:text-foreground">
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                </button>
-                <span className="text-xs font-medium tabular-nums text-foreground">{year}</span>
-                <button onClick={() => setYear((y) => y + 1)} aria-label="Next year" className="px-1.5 py-0.5 hover:text-foreground">
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-            <div className="mt-2 flex flex-wrap items-baseline gap-3">
-              <span className="text-3xl font-semibold tabular-nums sm:text-4xl">{fmtCo2(total)}</span>
-              {deltaPct != null && (
-                <span className={`inline-flex items-center gap-1 text-sm font-medium ${yoyTone === 'good' ? 'text-emerald-500' : 'text-red-500'}`}>
-                  {yoyTone === 'good' ? <TrendingDown className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
-                  {yoyLabel}
-                </span>
-              )}
-            </div>
-            <p className="mt-1 max-w-xl text-xs text-muted-foreground">
-              Added to your Scope 3 total. Own wines and venue energy are excluded to avoid double-counting.
+    <div className="space-y-6">
+      {/* Vitality hero — identical structure to /performance EsgVitalityScoreHero */}
+      <div className="rounded-2xl border border-border bg-card p-6 sm:p-8">
+        <div className="mb-4">
+          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Hospitality vitality</p>
+          <h1 className="mt-1 text-2xl sm:text-3xl font-semibold leading-tight">
+            {score.value > 0 ? `Your hospitality vitality is ${band}.` : 'Awaiting more data to call your score.'}
+          </h1>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-center">
+          <div className="lg:col-span-2 flex flex-col items-center justify-center">
+            <VitalityRing score={score.value} size="xl" animated showLabel />
+          </div>
+          <div className="lg:col-span-3 flex flex-col gap-4">
+            {weekly.some((w) => w.value > 0) ? (
+              <WeeklyTrend weekly={weekly} />
+            ) : (
+              <p className="text-xs text-muted-foreground italic">Trend builds up as you record sales and waste over the weeks.</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Scope 3 from food &amp; drink, room consumables and waste. Own wines and venue energy are excluded to avoid double-counting.
             </p>
+          </div>
+        </div>
+      </div>
 
-            {/* Food vs room split */}
-            <div className="mt-4 max-w-md">
-              <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
-                <div className="bg-[#ccff00]" style={{ width: `${foodPct}%` }} />
-                <div className="bg-sky-400" style={{ width: `${100 - foodPct}%` }} />
+      {/* Action bar — year selector (matches /performance) */}
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+          <select
+            value={year}
+            onChange={(e) => setYear(parseInt(e.target.value))}
+            className="px-3 py-1.5 text-sm font-medium rounded-md border border-emerald-500 text-emerald-700 dark:text-emerald-400 bg-transparent hover:bg-emerald-50 dark:hover:bg-emerald-950/30 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          >
+            {AVAILABLE_YEARS.map((y) => (
+              <option key={y} value={y}>{y} Data</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Four pillars — same component as /performance, Circularity → Waste */}
+      <PillarGrid>
+        <PillarCard
+          pillar="climate"
+          score={pillar_scores.climate}
+          value={total > 0 ? formatValue(total / 1000) : '--'}
+          unit="tCO₂e"
+          showExplainer={false}
+          expanded={expandedPillar === 'climate'}
+          onToggle={() => togglePillar('climate')}
+        >
+          <ClimateDeepDive byKind={data.by_kind} total={total} />
+        </PillarCard>
+
+        <PillarCard
+          pillar="water"
+          score={pillar_scores.water}
+          value={water_litres > 0 ? waterValue : '--'}
+          unit={waterUnit}
+          showExplainer={false}
+          expanded={expandedPillar === 'water'}
+          onToggle={() => togglePillar('water')}
+        >
+          <p className="text-sm text-muted-foreground">
+            Embodied water in the food and drink you served, from each item&apos;s life-cycle assessment. {fmtNum(water_litres)} litres this year.
+          </p>
+        </PillarCard>
+
+        <PillarCard
+          pillar="waste"
+          score={pillar_scores.waste}
+          value={waste.total_kg > 0 ? (waste.diversion_rate * 100).toFixed(0) : '--'}
+          unit="% diverted"
+          showExplainer={false}
+          expanded={expandedPillar === 'waste'}
+          onToggle={() => togglePillar('waste')}
+        >
+          <WasteDeepDive waste={waste} />
+        </PillarCard>
+
+        <PillarCard
+          pillar="nature"
+          score={pillar_scores.nature}
+          value={land_m2a > 0 ? formatValue(land_m2a) : '--'}
+          unit="m²a"
+          showExplainer={false}
+          expanded={expandedPillar === 'nature'}
+          onToggle={() => togglePillar('nature')}
+        >
+          <p className="text-sm text-muted-foreground">
+            Land use embodied in the food and drink you served (ReCiPe 2016), a proxy for biodiversity pressure. {formatValue(land_m2a)} m²a this year.
+          </p>
+        </PillarCard>
+      </PillarGrid>
+
+      {/* Strengths & improvements — same component as /performance */}
+      <PerformanceSummary strengths={strengths} improvements={improvements} />
+    </div>
+  );
+}
+
+function ClimateDeepDive({ byKind, total }: { byKind: KindBreakdown[]; total: number }) {
+  const active = byKind.filter((k) => k.product_count > 0 || k.contribution > 0);
+  if (active.length === 0) return <p className="text-sm text-muted-foreground">No calculated recipes yet.</p>;
+  return (
+    <div className="space-y-3">
+      {active.map((k) => {
+        const Icon = KIND_ICON[k.kind];
+        const share = total > 0 ? (k.contribution / total) * 100 : 0;
+        return (
+          <div key={k.kind} className="space-y-1">
+            <div className="flex items-center gap-3">
+              <Icon className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">{KIND_LABEL[k.kind]}</p>
+                <p className="text-xs text-muted-foreground">
+                  {fmtNum(k.units)} served · {k.costed_count}/{k.product_count} costed
+                </p>
               </div>
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-[#ccff00]" /> Food &amp; drink{' '}
-                  <span className="font-medium tabular-nums">{fmtKg(food)}</span>
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-sky-400" /> Room consumables{' '}
-                  <span className="font-medium tabular-nums">{fmtKg(supplies)}</span>
-                </span>
-              </div>
+              <p className="flex-shrink-0 text-sm font-semibold tabular-nums">{fmtCo2(k.contribution)} CO₂e</p>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+              <div className="h-full rounded-full bg-emerald-500" style={{ width: `${share}%` }} />
             </div>
           </div>
+        );
+      })}
+    </div>
+  );
+}
 
-          {/* Trend sparkline */}
-          {monthly.some((v) => v > 0) && (
-            <div className="w-full max-w-xs shrink-0">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Monthly trend</span>
-              <div className="mt-2">
-                <Sparkline values={monthly} height={56} />
-              </div>
+function WasteDeepDive({ waste }: { waste: WasteSummary }) {
+  if (waste.total_kg === 0) {
+    return <p className="text-sm text-muted-foreground">No waste logged yet. Use the Waste section to record food and dry waste.</p>;
+  }
+  const rows = [
+    { label: 'Food waste', kg: waste.food_kg, co2e: waste.food_co2e },
+    { label: 'Dry waste', kg: waste.dry_kg, co2e: waste.dry_co2e },
+  ];
+  return (
+    <div className="space-y-3">
+      {rows.map((r) => {
+        const pct = waste.total_kg > 0 ? (r.kg / waste.total_kg) * 100 : 0;
+        return (
+          <div key={r.label} className="space-y-1">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium">{r.label}</span>
+              <span className="tabular-nums">{fmtCo2(r.kg)} · {fmtCo2(r.co2e)} CO₂e</span>
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* Stat tiles ---------------------------------------------------------- */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <HospitalityStatCard
-          icon={UtensilsCrossed}
-          label="Food &amp; drink"
-          headline={fmtKg(food)}
-          sub={total > 0 ? `${foodPct.toFixed(0)}% of hospitality` : 'CO₂e this year'}
-          status={deltaPct != null ? { tone: yoyTone, label: yoyLabel } : null}
-        />
-        <HospitalityStatCard
-          icon={BedDouble}
-          label="Room consumables"
-          headline={fmtKg(supplies)}
-          sub={total > 0 ? `${(100 - foodPct).toFixed(0)}% of hospitality` : 'CO₂e this year'}
-        />
-        <HospitalityStatCard
-          icon={Leaf}
-          label="Recipes costed"
-          headline={`${coverage.recipes_costed}/${coverage.recipes_total}`}
-          sub="have a calculated footprint"
-          status={
-            coverage.recipes_total === 0
-              ? null
-              : coverage.recipes_costed === coverage.recipes_total
-              ? { tone: 'good', label: 'Complete' }
-              : { tone: 'warn', label: `${coverage.recipes_total - coverage.recipes_costed} to do` }
-          }
-          href="/hospitality/meals/"
-        />
-        <HospitalityStatCard
-          icon={BookOpen}
-          label="Menus"
-          headline={fmtNum(coverage.menus)}
-          sub={coverage.menus_avg_co2e != null ? `${fmtKg(coverage.menus_avg_co2e)} avg / cover` : 'across your venues'}
-          href="/hospitality/menus/"
-        />
-      </div>
-
-      {/* By kind ------------------------------------------------------------- */}
-      {activeKinds.length > 0 && (
-        <Panel title="Impact by type">
-          <ul className="space-y-3">
-            {activeKinds.map((k) => {
-              const meta = KIND_META[k.kind];
-              const KindIcon = meta.icon;
-              const share = total > 0 ? (k.contribution / total) * 100 : 0;
-              return (
-                <li key={k.kind} className="space-y-1">
-                  <div className="flex items-center gap-3">
-                    <KindIcon className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium">{meta.plural}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {fmtNum(k.units)} served · {k.costed_count}/{k.product_count} costed
-                        {k.avg_per_cover != null && ` · ${fmtKg(k.avg_per_cover)} avg / cover`}
-                      </p>
-                    </div>
-                    <p className="flex-shrink-0 text-sm font-semibold tabular-nums">{fmtCo2(k.contribution)}</p>
-                  </div>
-                  <div className="flex items-center gap-2 pl-7">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                      <div className="h-full rounded-full bg-[#ccff00]" style={{ width: `${share}%` }} />
-                    </div>
-                    <span className="w-10 flex-shrink-0 text-right text-[10px] tabular-nums text-muted-foreground">
-                      {share.toFixed(0)}%
-                    </span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </Panel>
-      )}
-
-      {/* Rankings ------------------------------------------------------------ */}
-      {(topProductRows.length > 0 || venueRows.length > 0) && (
-        <div className={`grid gap-3 ${topProductRows.length > 0 && venueRows.length > 0 ? 'lg:grid-cols-2' : ''}`}>
-          {topProductRows.length > 0 && (
-            <Panel
-              title="Top contributors"
-              action={
-                <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  <Trophy className="h-3 w-3" /> by CO₂e
-                </span>
-              }
-            >
-              <HospitalityRankList rows={topProductRows} formatValue={fmtCo2} />
-            </Panel>
-          )}
-          {venueRows.length > 0 && (
-            <Panel
-              title="By venue"
-              action={
-                <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  <Store className="h-3 w-3" /> by CO₂e
-                </span>
-              }
-            >
-              <HospitalityRankList rows={venueRows} formatValue={fmtCo2} barClassName="bg-sky-400" />
-            </Panel>
-          )}
-        </div>
-      )}
-
-      {/* Monthly trend ------------------------------------------------------- */}
-      {monthly.some((v) => v > 0) && (
-        <Panel title={`Monthly contribution · ${year}`}>
-          <MonthlyBars values={monthly} />
-        </Panel>
-      )}
-
-      {/* Coverage nudges ----------------------------------------------------- */}
-      {nudges.length > 0 && (
-        <Panel title="Make it count">
-          <ul className="space-y-2">
-            {nudges.map((n, i) => (
-              <li key={i}>
-                <Link
-                  href={n.href}
-                  className="flex items-center gap-3 rounded-lg border border-border/60 bg-background/40 p-3 transition-colors hover:border-[#ccff00]/50"
-                >
-                  <AlertTriangle className={`h-4 w-4 flex-shrink-0 ${n.tone === 'warn' ? 'text-amber-500' : 'text-muted-foreground'}`} />
-                  <span className="min-w-0 flex-1 text-sm">{n.text}</span>
-                  <span className="flex flex-shrink-0 items-center gap-1 text-xs font-medium text-[#ccff00]/90">
-                    {n.cta}
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Panel>
-      )}
+            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+              <div className="h-full rounded-full bg-amber-500" style={{ width: `${pct}%` }} />
+            </div>
+          </div>
+        );
+      })}
+      <p className="text-xs text-muted-foreground">{(waste.diversion_rate * 100).toFixed(0)}% diverted from disposal.</p>
     </div>
   );
 }
