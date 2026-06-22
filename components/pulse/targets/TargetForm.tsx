@@ -14,7 +14,8 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabaseClient';
-import { ALL_METRIC_KEYS, METRIC_DEFINITIONS, type MetricKey } from '@/lib/pulse/metric-keys';
+import { useSubscription } from '@/hooks/useSubscription';
+import { metricKeysForTier, METRIC_DEFINITIONS, type MetricKey } from '@/lib/pulse/metric-keys';
 
 const REDUCTION_CHIPS = [10, 20, 30, 42, 50];
 
@@ -37,6 +38,15 @@ interface TargetFormProps {
  * evidence).
  */
 export function TargetForm({ organizationId, onCreated, onMetricKeyChange }: TargetFormProps) {
+  // Targetable metrics are gated by tier: Seed = carbon, Blossom adds water,
+  // Canopy adds circularity (waste diversion) + nature (land use). carbon is
+  // available to every tier, so the default metric is always selectable.
+  const { tierName } = useSubscription();
+  const accessibleMetricKeys = metricKeysForTier(tierName);
+  const accessiblePresets = TARGET_PRESETS.filter(p =>
+    accessibleMetricKeys.includes(p.metric as MetricKey),
+  );
+
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{ baselineValue?: string; targetDate?: string }>({});
@@ -178,7 +188,7 @@ export function TargetForm({ organizationId, onCreated, onMetricKeyChange }: Tar
         </h2>
 
         <div className="flex flex-wrap gap-2">
-          {TARGET_PRESETS.map(p => (
+          {accessiblePresets.map(p => (
             <Button
               key={p.label}
               size="sm"
@@ -199,7 +209,7 @@ export function TargetForm({ organizationId, onCreated, onMetricKeyChange }: Tar
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {ALL_METRIC_KEYS.map(k => (
+                {accessibleMetricKeys.map(k => (
                   <SelectItem key={k} value={k}>
                     {METRIC_DEFINITIONS[k].label} ({METRIC_DEFINITIONS[k].unit})
                   </SelectItem>

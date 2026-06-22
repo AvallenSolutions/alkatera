@@ -1229,13 +1229,11 @@ async function toolListInsights(
   };
 }
 
-async function hasPulseBeta(ctx: ToolContext): Promise<boolean> {
-  const { data } = await ctx.supabase
-    .from('organizations')
-    .select('feature_flags')
-    .eq('id', ctx.organizationId)
-    .maybeSingle();
-  return Boolean((data as any)?.feature_flags?.pulse_beta === true);
+// Pulse is GA for every tier — these tools are available to all orgs. Kept as a
+// helper (rather than deleting the three call-site guards) so the Pulse Rosa
+// tools keep an obvious, single on/off point if access ever needs narrowing.
+async function hasPulseBeta(_ctx: ToolContext): Promise<boolean> {
+  return true;
 }
 
 // ─── Deep-read tools ────────────────────────────────────────────────────────

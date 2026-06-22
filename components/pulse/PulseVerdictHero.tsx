@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
 import { cn } from '@/lib/utils';
+import { isFiniteNumber, safePct } from '@/lib/pulse/format';
 import { METRIC_DEFINITIONS, type MetricKey } from '@/lib/pulse/metric-keys';
 import { forecastTrajectory, type TrajectoryPoint } from '@/lib/pulse/forecast';
 import {
@@ -270,12 +271,11 @@ export function PulseVerdictHero() {
                       <p className="text-xs text-muted-foreground">
                         Emissions now:{' '}
                         <span className="font-semibold tabular-nums text-foreground">
-                          {Math.round(emissionsNow.value).toLocaleString('en-GB')} kg CO2e
+                          {Math.round(emissionsNow.value).toLocaleString('en-GB')} kg CO₂e
                         </span>
-                        {emissionsNow.deltaPct !== null && (
+                        {isFiniteNumber(emissionsNow.deltaPct) && (
                           <span className={cn('ml-1.5', emissionsNow.deltaPct <= 0 ? 'text-emerald-500' : 'text-red-500')}>
-                            {emissionsNow.deltaPct <= 0 ? '' : '+'}
-                            {emissionsNow.deltaPct.toFixed(0)}% vs a year ago
+                            {safePct(emissionsNow.deltaPct, 0, { sign: true })} vs a year ago
                           </span>
                         )}
                       </p>

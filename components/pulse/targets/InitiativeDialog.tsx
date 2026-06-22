@@ -281,7 +281,7 @@ export function InitiativeDialog({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="init-unit">Unit</Label>
-              <Input id="init-unit" value={expectedUnit} onChange={(e) => setExpectedUnit(e.target.value)} placeholder="e.g. tCO2e per year" />
+              <Input id="init-unit" value={expectedUnit} onChange={(e) => setExpectedUnit(e.target.value)} placeholder="e.g. tCO₂e per year" />
             </div>
           </div>
 

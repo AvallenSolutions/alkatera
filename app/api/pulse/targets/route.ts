@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { metricKeysForTier, type MetricKey } from '@/lib/pulse/metric-keys';
+import type { TierName } from '@/lib/subscription/feature-catalog';
 
 /**
  * GET /api/pulse/targets?organization_id=...   list active targets
@@ -64,6 +66,24 @@ export async function POST(request: NextRequest) {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Tier backstop: targets are gated by subscription tier (Seed = carbon,
+  // Blossom adds water, Canopy adds circularity + nature). Mirror the client
+  // gate server-side so a downgraded/forged request can't create a target on a
+  // metric the org's tier doesn't include. Default to the most restrictive
+  // tier if the org row can't be read.
+  const { data: orgRow } = await supabase
+    .from('organizations')
+    .select('subscription_tier')
+    .eq('id', body.organization_id)
+    .maybeSingle();
+  const tier = (orgRow?.subscription_tier ?? 'seed') as TierName;
+  if (!metricKeysForTier(tier).includes(body.metric_key as MetricKey)) {
+    return NextResponse.json(
+      { error: `The ${tier} plan can't set a target on this metric`, upgrade_required: true },
+      { status: 403 },
+    );
   }
 
   const { data, error } = await supabase

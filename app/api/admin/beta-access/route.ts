@@ -25,7 +25,6 @@ const PRODUCT_BETA_CODES = [
   'viticulture_beta',
   'arable_beta',
   'orchard_beta',
-  'pulse_beta',
   'hospitality_beta',
 ] as const;
 

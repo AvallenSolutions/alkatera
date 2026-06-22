@@ -9,9 +9,17 @@
  * at shell level, so this grid can live anywhere (tab panels, sub-pages).
  */
 
-import { WIDGET_REGISTRY, type Footprint, type WidgetId } from '@/lib/pulse/widget-registry';
+import {
+  WIDGET_REGISTRY,
+  WIDGET_MIN_TIER,
+  isWidgetAllowedForTier,
+  type Footprint,
+  type WidgetId,
+} from '@/lib/pulse/widget-registry';
 import { WIDGET_RENDERERS } from '@/components/pulse/widgetRenderers';
 import { WidgetCardProvider } from '@/components/pulse/WidgetCardContext';
+import { WidgetLockCard } from '@/components/pulse/WidgetLockCard';
+import { useSubscription } from '@/hooks/useSubscription';
 
 /** Footprint -> Tailwind span classes at the `sm`+ breakpoint (4-col grid). */
 function spanClass(footprint: Footprint): string {
@@ -26,6 +34,7 @@ function spanClass(footprint: Footprint): string {
 }
 
 export function PulseWidgetGrid({ widgets, ariaLabel }: { widgets: WidgetId[]; ariaLabel?: string }) {
+  const { tierName } = useSubscription();
   return (
     <div
       className="grid auto-rows-[200px] grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"
@@ -34,8 +43,18 @@ export function PulseWidgetGrid({ widgets, ariaLabel }: { widgets: WidgetId[]; a
     >
       {widgets.map(id => {
         const meta = WIDGET_REGISTRY[id];
+        if (!meta) return null;
+        // Hybrid gating: in the curated tabs, widgets above the org's tier show
+        // a locked upsell tile rather than disappearing.
+        if (!isWidgetAllowedForTier(id, tierName)) {
+          return (
+            <div key={id} className={spanClass(meta.footprint)}>
+              <WidgetLockCard label={meta.label} minTier={WIDGET_MIN_TIER[id]} />
+            </div>
+          );
+        }
         const renderer = WIDGET_RENDERERS[id];
-        if (!meta || !renderer) return null;
+        if (!renderer) return null;
         return (
           <div key={id} className={spanClass(meta.footprint)}>
             <WidgetCardProvider id={id}>{renderer()}</WidgetCardProvider>

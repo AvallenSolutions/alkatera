@@ -69,10 +69,15 @@ const STATUS_CLASSES: Record<PulseCardStatusTone, string> = {
   neutral: 'bg-muted text-muted-foreground border-border/60',
 };
 
-/** Height (px) for the supporting-visual row, by footprint. */
+/**
+ * Height (px) for the supporting-visual row, by footprint.
+ * `min-h-0` on 2x1 lets the visual shrink when a footer line needs the room,
+ * so the footer is never clipped by the card's overflow-hidden shell; it still
+ * keeps the full 120px whenever there is space.
+ */
 const VISUAL_HEIGHT: Record<PulseCardFootprint, string> = {
   '1x1': 'h-16',
-  '2x1': 'h-[120px]',
+  '2x1': 'h-[120px] min-h-0',
   '2x2': 'flex-1 min-h-[120px]',
 };
 

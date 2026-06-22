@@ -517,7 +517,7 @@ function GasTab({ months }: { months: MonthBucket[] }) {
           <Flame className="mr-1 inline h-3 w-3" />
           Winter gas use averaged{' '}
           <span className="font-medium tabular-nums">{Math.round(heatingDelta)}%</span> higher than
-          summer — typical of heating-driven facilities. Heat-recovery, building insulation, or a
+          summer, typical of heating-driven facilities. Heat-recovery, building insulation, or a
           heat pump retrofit are the highest-leverage interventions.
         </div>
       )}
@@ -567,7 +567,7 @@ function WaterTab({ months }: { months: MonthBucket[] }) {
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Monthly intake · m³
           </p>
-          <p className="text-[10px] text-muted-foreground">CSRD ESRS E3 — water consumption</p>
+          <p className="text-[10px] text-muted-foreground">CSRD ESRS E3: water consumption</p>
         </div>
         <div className="h-64 -mx-1">
           <ResponsiveContainer width="100%" height="100%">
@@ -768,7 +768,7 @@ function WasteTab({ months }: { months: MonthBucket[] }) {
           <Recycle className="mr-1 inline h-3 w-3" />
           Recovery rate has improved by{' '}
           <span className="font-medium tabular-nums">{recoveryTrendPp.toFixed(1)} pp</span> over
-          the period — keep going. CSRD ESRS E5 reporters should document the operational changes
+          the period. Keep going. CSRD ESRS E5 reporters should document the operational changes
           driving the improvement.
         </div>
       )}
@@ -867,7 +867,7 @@ function SeasonalityCallout({
             <span className="font-medium tabular-nums">
               {Math.round(cleanest.grid_intensity_avg_g_per_kwh)} g/kWh
             </span>{' '}
-            in {fmt(cleanest.month)} — solar generation drops sharply in winter while gas peakers
+            in {fmt(cleanest.month)}. Solar generation drops sharply in winter while gas peakers
             cover heating demand. Time-shifting energy-intensive operations into the summer
             months reduces real impact even at flat consumption.
           </p>

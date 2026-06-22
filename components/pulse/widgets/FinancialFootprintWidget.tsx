@@ -27,6 +27,7 @@ import { useOrganization } from '@/lib/organizationContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { METRIC_DEFINITIONS, type MetricKey } from '@/lib/pulse/metric-keys';
 import { cn } from '@/lib/utils';
+import { clampPctWidth, safePct } from '@/lib/pulse/format';
 
 interface PriceProvenance {
   rate: number;
@@ -290,8 +291,8 @@ function Breakdown({
         {rows.map(r => (
           <div
             key={r.metric}
-            style={{ width: `${r.pct}%`, backgroundColor: r.colour }}
-            title={`${r.label}: ${r.pct.toFixed(0)}% (${formatGbp(r.gbp)})`}
+            style={{ width: `${clampPctWidth(r.pct)}%`, backgroundColor: r.colour }}
+            title={`${r.label}: ${safePct(r.pct, 0)} (${formatGbp(r.gbp)})`}
           />
         ))}
       </div>

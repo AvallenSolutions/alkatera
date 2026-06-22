@@ -76,17 +76,17 @@ export async function GET() {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  // Only orgs with the pulse_beta flag get insight/anomaly tiles — they read
-  // from Pulse-only tables that shouldn't leak into the UI for non-Pulse orgs.
-  // Same row also tells us which regulatory regimes this org is in scope for
-  // so we don't fire ETS / CBAM / CSRD / SECR deadlines at non-applicable orgs.
+  // Pulse is GA for every tier, so all orgs get the insight/anomaly tiles (the
+  // snapshot/anomaly crons run for every org). We still read feature_flags for
+  // the regulatory-regime applicability flags below, so we don't fire
+  // ETS / CBAM / CSRD / SECR deadlines at non-applicable orgs.
   const { data: orgRow } = await service
     .from('organizations')
     .select('feature_flags')
     .eq('id', organizationId)
     .maybeSingle();
   const flags = ((orgRow as any)?.feature_flags ?? {}) as Record<string, unknown>;
-  const pulseEnabled = flags.pulse_beta === true;
+  const pulseEnabled = true;
   const deadlineFlags: DeadlineApplicabilityFlags = {
     uk_ets_operator: flags.uk_ets_operator === true,
     cbam_imports: flags.cbam_imports === true,

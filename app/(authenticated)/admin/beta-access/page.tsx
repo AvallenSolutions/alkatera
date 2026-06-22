@@ -35,11 +35,6 @@ interface Organization {
 /** The beta features that can be toggled */
 const BETA_FEATURES = [
   {
-    code: 'pulse_beta',
-    label: 'Pulse',
-    description: 'Access to the Pulse analytics dashboard (financial, impact valuation, targets)',
-  },
-  {
     code: 'hospitality_beta',
     label: 'Hospitality',
     description: 'Hospitality module: impact of meals, drinks, menus and room nights for venues with restaurants/bars/accommodation',

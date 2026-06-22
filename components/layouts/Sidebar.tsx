@@ -35,6 +35,7 @@ import {
   AlertCircle,
   CheckSquare,
   Activity,
+  Target,
   CreditCard,
   FileEdit,
   Leaf,
@@ -118,32 +119,21 @@ const navigationStructure: NavItem[] = [
     href: '/pulse/',
     icon: Activity,
     minTier: 1,
-    betaBadge: true,
-    featureCode: 'pulse_beta',
+    // Pulse is GA, available from Seed up; gating is per-widget by tier inside
+    // the dashboard (WIDGET_MIN_TIER), not an admin-only pulse_beta route flag.
     requiresMilestone: 'has_product',
     children: [
       { name: 'Dashboard',         href: '/pulse/',                           icon: Activity,   minTier: 1 },
       { name: 'Financial',         href: '/pulse/financial/',                 icon: TrendingUp, minTier: 1 },
-      { name: 'Targets',           href: '/pulse/targets/',                   icon: TrendingUp, minTier: 1 },
     ],
   },
   {
-    name: 'Hospitality',
-    href: '/hospitality/',
-    icon: UtensilsCrossed,
+    // Targets are available on every tier (gated per-metric by tier inside the
+    // form), surfaced as their own top-level entry alongside Pulse.
+    name: 'Targets',
+    href: '/pulse/targets/',
+    icon: Target,
     minTier: 1,
-    betaBadge: true,
-    featureCode: 'hospitality_beta',
-    children: [
-      { name: 'Dashboard', href: '/hospitality/',        icon: LayoutDashboard, minTier: 1 },
-      { name: 'Venues',    href: '/hospitality/venues/',  icon: Store,           minTier: 1 },
-      { name: 'Meals',     href: '/hospitality/meals/',   icon: UtensilsCrossed, minTier: 1 },
-      { name: 'Drinks',    href: '/hospitality/drinks/',  icon: Wine,            minTier: 1 },
-      { name: 'Menus',     href: '/hospitality/menus/',   icon: BookOpen,        minTier: 1 },
-      { name: 'Rooms',     href: '/hospitality/rooms/',   icon: BedDouble,       minTier: 1 },
-      { name: 'Sales',     href: '/hospitality/sales/',   icon: BarChart3,       minTier: 1 },
-      { name: 'Waste',     href: '/hospitality/waste/',   icon: Trash2,          minTier: 1 },
-    ],
   },
   {
     name: 'Capture Data',
@@ -157,6 +147,24 @@ const navigationStructure: NavItem[] = [
       { name: 'Arable Fields', href: '/arable-fields/',    icon: Wheat,          minTier: 1, featureCode: 'arable_beta' },
       { name: 'Fleet',        href: '/company/fleet/',      icon: Truck,          minTier: 2, featureCode: 'vehicle_registry' },
       { name: 'Suppliers',    href: '/suppliers/',          icon: Users,          minTier: 1 },
+      {
+        name: 'Hospitality',
+        href: '/hospitality/',
+        icon: UtensilsCrossed,
+        minTier: 1,
+        betaBadge: true,
+        featureCode: 'hospitality_beta',
+        children: [
+          { name: 'Dashboard', href: '/hospitality/',        icon: LayoutDashboard, minTier: 1 },
+          { name: 'Venues',    href: '/hospitality/venues/',  icon: Store,           minTier: 1 },
+          { name: 'Meals',     href: '/hospitality/meals/',   icon: UtensilsCrossed, minTier: 1 },
+          { name: 'Drinks',    href: '/hospitality/drinks/',  icon: Wine,            minTier: 1 },
+          { name: 'Menus',     href: '/hospitality/menus/',   icon: BookOpen,        minTier: 1 },
+          { name: 'Rooms',     href: '/hospitality/rooms/',   icon: BedDouble,       minTier: 1 },
+          { name: 'Sales',     href: '/hospitality/sales/',   icon: BarChart3,       minTier: 1 },
+          { name: 'Waste',     href: '/hospitality/waste/',   icon: Trash2,          minTier: 1 },
+        ],
+      },
     ],
   },
   {

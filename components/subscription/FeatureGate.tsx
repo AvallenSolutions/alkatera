@@ -25,6 +25,7 @@ import {
   Wheat,
 } from "lucide-react";
 import { useFeatureGate, FeatureCode, TierName } from "@/hooks/useSubscription";
+import { isBetaFeature } from "@/lib/subscription/feature-catalog";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -502,18 +503,6 @@ const featureInfo: Partial<Record<FeatureCode, FeatureInfo>> = {
     icon: Wheat,
     category: "Products & LCA",
   },
-  pulse_beta: {
-    name: "Pulse (Beta)",
-    description:
-      "Real-time sustainability signals, shadow prices, and year-over-year trend widgets. Currently in private beta.",
-    benefits: [
-      "Live metric snapshots and shadow-price feeds",
-      "Drill-down trend analysis across scope 1/2/3",
-      "Early-access to new Pulse widgets as they ship",
-    ],
-    icon: Link2,
-    category: "Platform",
-  },
   hospitality_beta: {
     name: "Hospitality (Beta)",
     description:
@@ -628,7 +617,6 @@ const featureNames: Record<FeatureCode, string> = {
   viticulture_beta: "Viticulture (Beta)",
   orchard_beta: "Orchards (Beta)",
   arable_beta: "Arable Fields (Beta)",
-  pulse_beta: "Pulse (Beta)",
   hospitality_beta: "Hospitality (Beta)",
   breww_integration_beta: "Breww Integration (Beta)",
 };
@@ -702,8 +690,9 @@ function LockedFeaturePage({
   const highlights = tierHighlights[requiredTier] || [];
 
   // Beta features require an explicit admin grant — the user already has the right
-  // tier but the flag hasn't been enabled for their org yet.
-  const isBetaFeature = feature.endsWith('_beta');
+  // tier but the flag hasn't been enabled for their org yet. Beta-ness is decided
+  // by the catalog (lib/subscription/feature-catalog.ts), the single source of truth.
+  const isBeta = isBetaFeature(feature);
 
   return (
     <div className={cn("flex h-full flex-col items-center justify-center px-6 py-8 max-w-4xl mx-auto", className)}>
@@ -747,7 +736,7 @@ function LockedFeaturePage({
         )}
 
         {/* Upgrade card — or Beta access card if the feature is beta-gated */}
-        {isBetaFeature ? (
+        {isBeta ? (
           <div className="rounded-lg border border-neon-lime/30 bg-neon-lime/5 p-5 flex flex-col">
             <div className="mb-3 flex items-center justify-between">
               <div>

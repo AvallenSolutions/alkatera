@@ -12,6 +12,7 @@ import { Flame } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { useWidgetDrill } from '@/lib/pulse/MetricDrillContext';
 import { PulseCard } from '@/components/pulse/PulseCard';
+import { clampPctWidth } from '@/lib/pulse/format';
 
 interface LineItem {
   category_label: string;
@@ -85,7 +86,7 @@ export function TopCostDriversCard() {
                 <div className="mt-0.5 h-1 w-full overflow-hidden rounded-full bg-muted">
                   <div
                     className="h-full bg-[#ccff00]"
-                    style={{ width: `${(item.gbp / maxGbp) * 100}%` }}
+                    style={{ width: `${clampPctWidth((item.gbp / maxGbp) * 100)}%` }}
                   />
                 </div>
               </div>

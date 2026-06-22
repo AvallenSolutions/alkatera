@@ -69,14 +69,17 @@ export function ScenarioSensitivityCard() {
       footprint="2x1"
       loading={loading}
       onExpand={() => openDrill({ kind: 'widget', id: 'scenario-sensitivity' })}
-      footer={
-        data
-          ? `${data.annual_tonnes_co2e.toLocaleString('en-GB', { maximumFractionDigits: 0 })} tCO₂e at £${data.current_price_gbp_per_tonne}/t today`
-          : undefined
-      }
     >
       {data && data.scenarios.length > 0 ? (
-        <ScenarioPips scenarios={data.scenarios} />
+        <div className="flex h-full flex-col justify-center gap-3">
+          <div className="h-12">
+            <ScenarioPips scenarios={data.scenarios} />
+          </div>
+          <p className="truncate text-[10px] text-muted-foreground/80">
+            {data.annual_tonnes_co2e.toLocaleString('en-GB', { maximumFractionDigits: 0 })} tCO₂e at £
+            {data.current_price_gbp_per_tonne}/t today
+          </p>
+        </div>
       ) : (
         <div className="flex h-full items-center justify-center text-[10px] uppercase tracking-wider text-muted-foreground/50">
           No data yet

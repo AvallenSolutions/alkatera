@@ -16,6 +16,7 @@ import Link from 'next/link';
 import { ArrowRight, Loader2, Package } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { Card, CardContent } from '@/components/ui/card';
+import { clampPctWidth } from '@/lib/pulse/format';
 
 interface ProductRow {
   pcf_id: string;
@@ -172,7 +173,7 @@ function ProductRowEl({
   product: ProductRow;
   maxGbp: number;
 }) {
-  const widthPct = (product.gbp_per_unit / maxGbp) * 100;
+  const widthPct = clampPctWidth((product.gbp_per_unit / maxGbp) * 100);
   const { raw_materials, packaging, transport } = product.breakdown_gbp;
   const breakdownTotal = raw_materials + packaging + transport;
   return (

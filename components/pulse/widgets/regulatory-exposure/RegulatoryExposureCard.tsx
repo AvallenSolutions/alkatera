@@ -97,11 +97,6 @@ export function RegulatoryExposureCard() {
       footprint="2x1"
       loading={loading}
       onExpand={() => openDrill({ kind: 'widget', id: 'regulatory-exposure' })}
-      footer={
-        data && data.total_annual_gbp === 0
-          ? 'Fill in packaging tonnage + ETS allowance to populate'
-          : undefined
-      }
     >
       {data && data.total_annual_gbp > 0 ? (
         <div className="flex h-full flex-col justify-center gap-2">
@@ -134,8 +129,13 @@ export function RegulatoryExposureCard() {
           </div>
         </div>
       ) : (
-        <div className="flex h-full items-center justify-center text-[10px] uppercase tracking-wider text-muted-foreground/50">
-          Needs data
+        <div className="flex h-full flex-col items-center justify-center gap-1 text-center">
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground/50">
+            Needs data
+          </span>
+          <span className="text-[10px] text-muted-foreground/70">
+            Fill in packaging tonnage + ETS allowance to populate
+          </span>
         </div>
       )}
     </PulseCard>

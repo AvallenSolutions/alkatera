@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { METRIC_DEFINITIONS, type MetricKey } from '@/lib/pulse/metric-keys';
+import { safeDateTime, safeFixed, safePct } from '@/lib/pulse/format';
 
 interface Explanation {
   headline: string;
@@ -160,7 +161,7 @@ export function AlertsInbox() {
                         </span>
                       </div>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        {direction} {Math.abs(deltaPct).toFixed(1)}% vs baseline · z = {a.z_score.toFixed(1)} · {new Date(a.detected_at).toLocaleString('en-GB')}
+                        {direction} {safePct(Math.abs(deltaPct), 1)} vs baseline · z = {safeFixed(a.z_score, 1)} · {safeDateTime(a.detected_at)}
                       </p>
                     </div>
                     <div className="flex items-center gap-1">

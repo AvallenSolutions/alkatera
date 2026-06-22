@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { safeDateTime } from '@/lib/pulse/format';
 
 interface Disclosure {
   meta: {
@@ -211,7 +212,7 @@ export function IssbDisclosureCard() {
             </Section>
 
             <p className="text-[10px] text-muted-foreground/70">
-              Generated {new Date(disclosure.meta.generatedAt).toLocaleString('en-GB')} for{' '}
+              Generated {safeDateTime(disclosure.meta.generatedAt)} for{' '}
               {disclosure.meta.organizationName} ({disclosure.meta.reportingPeriod}).
               Auditor-reviewable numbers; placeholders in [BRACKETS] need manual
               completion. IFRS S2 references are indicative.

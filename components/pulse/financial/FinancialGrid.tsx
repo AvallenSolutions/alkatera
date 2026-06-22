@@ -65,7 +65,7 @@ function PulseFinancialShellBody() {
   const rosaSlice = useMemo(
     () => ({
       id: 'pulse-financial',
-      label: 'Pulse — Financial (CFO view)',
+      label: 'Pulse Financial (CFO view)',
       priority: 7,
       data: {
         activeDrill: drillOpen && activeTarget ? activeTarget : null,

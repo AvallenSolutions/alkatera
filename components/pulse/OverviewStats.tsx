@@ -16,10 +16,14 @@ import { ArrowUpRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
+import { useSubscription } from '@/hooks/useSubscription';
+import { isWidgetAllowedForTier, WIDGET_MIN_TIER } from '@/lib/pulse/widget-registry';
+import { WidgetLockCard } from '@/components/pulse/WidgetLockCard';
 import { useMetricDrill } from '@/lib/pulse/MetricDrillContext';
 import { useAnimatedNumber } from '@/hooks/useAnimatedNumber';
 import { Sparkline } from '@/components/pulse/Sparkline';
 import { cn } from '@/lib/utils';
+import { isFiniteNumber, safePct } from '@/lib/pulse/format';
 
 function formatGbp(value: number): string {
   return new Intl.NumberFormat('en-GB', {
@@ -45,6 +49,10 @@ export function OverviewStats({ onOpenMoneyTab }: { onOpenMoneyTab?: () => void 
   const { currentOrganization } = useOrganization();
   const orgId = currentOrganization?.id;
   const { openDrill } = useMetricDrill();
+  const { tierName } = useSubscription();
+  // The £ cost stat is the financial-footprint (Canopy) value surfaced on the
+  // all-tier Overview, so it's locked below Canopy (hybrid gating).
+  const canSeeCost = isWidgetAllowedForTier('financial-footprint', tierName);
   const [stats, setStats] = useState<Stats | null>(null);
 
   useEffect(() => {
@@ -143,25 +151,28 @@ export function OverviewStats({ onOpenMoneyTab }: { onOpenMoneyTab?: () => void 
         {stats && stats.emissionsSeries.length >= 2 && (
           <Sparkline values={stats.emissionsSeries} stroke="#ccff00" height={24} />
         )}
-        {stats?.emissionsDeltaPct != null && (
+        {stats && isFiniteNumber(stats.emissionsDeltaPct) && (
           <p className={cn('text-xs', stats.emissionsDeltaPct <= 0 ? 'text-emerald-500' : 'text-red-500')}>
-            {stats.emissionsDeltaPct <= 0 ? '' : '+'}
-            {stats.emissionsDeltaPct.toFixed(0)}% vs a year ago
+            {safePct(stats.emissionsDeltaPct, 0, { sign: true })} vs a year ago
           </p>
         )}
       </StatTile>
 
-      <StatTile label="What it costs each year" onClick={onOpenMoneyTab}>
-        <AnimatedGbp value={stats?.annualCostGbp ?? null} />
-        {stats && stats.costSeries.length >= 2 && (
-          <Sparkline values={stats.costSeries} stroke="#a78bfa" height={24} />
-        )}
-        {stats?.costDirection && stats.costDirection !== 'flat' && (
-          <p className={cn('text-xs', stats.costDirection === 'improving' ? 'text-emerald-500' : 'text-red-500')}>
-            {stats.costDirection === 'improving' ? 'Falling year on year' : 'Rising year on year'}
-          </p>
-        )}
-      </StatTile>
+      {canSeeCost ? (
+        <StatTile label="What it costs each year" onClick={onOpenMoneyTab}>
+          <AnimatedGbp value={stats?.annualCostGbp ?? null} />
+          {stats && stats.costSeries.length >= 2 && (
+            <Sparkline values={stats.costSeries} stroke="#a78bfa" height={24} />
+          )}
+          {stats?.costDirection && stats.costDirection !== 'flat' && (
+            <p className={cn('text-xs', stats.costDirection === 'improving' ? 'text-emerald-500' : 'text-red-500')}>
+              {stats.costDirection === 'improving' ? 'Falling year on year' : 'Rising year on year'}
+            </p>
+          )}
+        </StatTile>
+      ) : (
+        <WidgetLockCard label="What it costs each year" minTier={WIDGET_MIN_TIER['financial-footprint']} />
+      )}
 
       <StatTile
         label="Needs attention"
@@ -262,7 +273,7 @@ function AnimatedCo2({ kg }: { kg: number | null }) {
       {tonnes
         ? `${(animated / 1000).toLocaleString('en-GB', { maximumFractionDigits: 1 })} t`
         : `${Math.round(animated).toLocaleString('en-GB')} kg`}{' '}
-      <span className="text-sm font-normal text-muted-foreground">CO2e</span>
+      <span className="text-sm font-normal text-muted-foreground">CO₂e</span>
     </p>
   );
 }

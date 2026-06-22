@@ -27,6 +27,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { safeNum, safePct } from '@/lib/pulse/format';
 
 interface BudgetRow {
   id: string;
@@ -207,15 +208,14 @@ function BudgetRowEl({
             {SCOPE_LABELS[budget.scope]} · {PERIOD_LABELS[budget.period]}
           </p>
           <p className="text-[11px] text-muted-foreground">
-            {budget.actual_tco2e.toLocaleString('en-GB', { maximumFractionDigits: 1 })} t actual
-            {' '}/ {budget.budget_tco2e.toLocaleString('en-GB', { maximumFractionDigits: 1 })} t budgeted
+            {safeNum(budget.actual_tco2e, { maximumFractionDigits: 1 })} t actual
+            {' '}/ {safeNum(budget.budget_tco2e, { maximumFractionDigits: 1 })} t budgeted
             {budget.notes && ` · ${budget.notes}`}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <span className={cn('text-sm font-semibold tabular-nums', tone)}>
-            {budget.variance_pct >= 0 ? '+' : ''}
-            {budget.variance_pct.toFixed(0)}%
+            {safePct(budget.variance_pct, 0, { sign: true })}
           </span>
           {canEdit && (
             <button

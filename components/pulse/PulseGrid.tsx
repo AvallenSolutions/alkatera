@@ -36,7 +36,8 @@ import { GripVertical, Pin, PinOff, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { usePulseLayout } from '@/hooks/usePulseLayout';
-import { WIDGET_REGISTRY, type WidgetId } from '@/lib/pulse/widget-registry';
+import { WIDGET_REGISTRY, widgetIdsForTier, type WidgetId } from '@/lib/pulse/widget-registry';
+import { useSubscription } from '@/hooks/useSubscription';
 import type { LayoutItem } from '@/lib/pulse/layout';
 import { applyAdaptiveOrder } from '@/lib/pulse/ranking';
 import { usePulseEngagement } from '@/hooks/usePulseEngagement';
@@ -95,6 +96,10 @@ function useContainerWidthStable(): {
 
 export function PulseGrid() {
   const { layout, ready, setLayout, hideWidget, showWidget, resetToDefault } = usePulseLayout();
+  const { tierName } = useSubscription();
+  // Advanced grid hides tier-locked widgets entirely (the hybrid choice):
+  // they don't render and can't be added until the org upgrades.
+  const allowedIds = useMemo(() => new Set(widgetIdsForTier(tierName)), [tierName]);
   const [editMode, setEditMode] = useState(false);
   const { width, containerRef } = useContainerWidthStable();
   const { scores, loaded: scoresLoaded, adaptiveEnabled, setAdaptiveEnabled } =
@@ -110,10 +115,10 @@ export function PulseGrid() {
     () =>
       (layout.layout.lg ?? []).filter(item => {
         const meta = WIDGET_REGISTRY[item.i];
-        // Drop exempt widgets silently -- they render elsewhere.
-        return meta && !meta.exempt;
+        // Drop exempt widgets (render elsewhere) and tier-locked widgets.
+        return meta && !meta.exempt && allowedIds.has(item.i);
       }),
-    [layout],
+    [layout, allowedIds],
   );
 
   // Items the grid actually renders. Once per session, after scores load,
@@ -181,7 +186,7 @@ export function PulseGrid() {
       <PulseEditToolbar
         editMode={editMode}
         onToggleEdit={() => setEditMode(v => !v)}
-        hiddenWidgets={layout.hiddenWidgets}
+        hiddenWidgets={layout.hiddenWidgets.filter(id => allowedIds.has(id))}
         onAddWidget={showWidget}
         onResetToDefault={resetToDefault}
         adaptiveEnabled={adaptiveEnabled}

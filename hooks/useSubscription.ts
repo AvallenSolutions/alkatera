@@ -4,6 +4,15 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useOrganization } from "@/lib/organizationContext";
 import { peekBootstrapSubscription } from "@/lib/auth/bootstrap-cache";
+import {
+  getRequiredTierForFeature,
+  type TierName,
+  type TierLevel,
+} from "@/lib/subscription/feature-catalog";
+
+// Tier types live in the feature catalog (the single source of truth); re-export
+// here so existing `@/hooks/useSubscription` importers keep working.
+export type { TierName, TierLevel };
 
 // ── Module-level cache for subscription_tier_limits (static reference data) ──
 let _cachedTiers: TierLimits[] | null = null;
@@ -112,8 +121,6 @@ export type FeatureCode =
   | "orchard_beta"
   // Arable Fields / Grain Growing (beta)
   | "arable_beta"
-  // Pulse (beta)
-  | "pulse_beta"
   // Hospitality (beta)
   | "hospitality_beta"
   // Per-integration beta flags. Each integration in
@@ -122,9 +129,6 @@ export type FeatureCode =
   // this union. The admin whitelist in /api/admin/beta-access keeps the
   // server-side guard tight.
   | `${string}_integration_beta`;
-
-export type TierName = "seed" | "blossom" | "canopy";
-export type TierLevel = 1 | 2 | 3;
 
 export interface UsageInfo {
   current: number;
@@ -448,37 +452,15 @@ export function useSubscription() {
   }, [currentOrganization?.id]);
 
   const hasFeature = useCallback(
-    (featureCode: FeatureCode): boolean => {
-      // Beta features require explicit admin grant via feature_flags — tier
-      // fallback is intentionally skipped. Product betas are enumerated
-      // explicitly; integration betas use the `*_integration_beta` suffix so
-      // we don't have to maintain a parallel list as the directory grows.
-      const productBetas: FeatureCode[] = [
-        'impact_valuation_beta',
-        'epr_beta',
-        'viticulture_beta',
-        'orchard_beta',
-        'arable_beta',
-        'pulse_beta',
-        'hospitality_beta',
-      ];
-      const isIntegrationBeta =
-        typeof featureCode === 'string' && featureCode.endsWith('_integration_beta');
-      if (productBetas.includes(featureCode) || isIntegrationBeta) {
-        return state.usage?.features?.includes(featureCode) ?? false;
-      }
-      // Check the DB features list first
-      if (state.usage?.features?.includes(featureCode)) return true;
-      // Fallback: check if user's tier level meets the requirement for this feature
-      // This ensures higher-tier users always have access to lower-tier features
-      // even if the DB features_enabled array hasn't been updated
-      const currentLevel = state.usage?.tier?.level || 0;
-      if (currentLevel === 0) return false;
-      const requiredTier = getRequiredTierForFeature(featureCode);
-      const tierLevels: Record<TierName, TierLevel> = { seed: 1, blossom: 2, canopy: 3 };
-      return currentLevel >= tierLevels[requiredTier];
-    },
-    [state.usage?.features, state.usage?.tier?.level]
+    // Single runtime authority: the DB-derived feature list. `get_organization_usage`
+    // builds it from the tier's `features_enabled` (cumulative arrays generated from
+    // lib/subscription/feature-catalog.ts) merged with admin-granted `feature_flags`,
+    // which is exactly what the server `check_feature_access` RPC checks. Tier
+    // inheritance lives in the data (each tier's array includes lower tiers), so no
+    // code-side tier fallback is needed — UI and server agree by construction.
+    (featureCode: FeatureCode): boolean =>
+      state.usage?.features?.includes(featureCode) ?? false,
+    [state.usage?.features]
   );
 
   const getTierLevel = useCallback((): TierLevel => {
@@ -560,68 +542,6 @@ export function useFeatureGate(featureCode: FeatureCode) {
     upgradeTier,
     requiredTierForFeature: getRequiredTierForFeature(featureCode),
   };
-}
-
-function getRequiredTierForFeature(featureCode: FeatureCode): TierName {
-  const canopyFeatures: FeatureCode[] = [
-    // Legacy
-    "custom_weighting", "white_label", "biodiversity_tracking", "b_corp_assessment",
-    "sandbox_analytics", "priority_chat", "verified_data", "pef_reports", "api_access",
-    // Products & LCA (Canopy only)
-    "year_over_year", "advanced_data_quality", "ef_31_single_score",
-    // LCA Boundary (Canopy only)
-    "lca_use_phase", "lca_end_of_life",
-    // AI (Canopy only)
-    "rosa_ai_unlimited", "greenwash_unlimited",
-    // ESG (Canopy only)
-    "people_wellbeing", "people_training", "governance_ethics",
-    "community_impact_stories",
-    // Certifications (Canopy only)
-    "csrd_compliance", "gri_standards",
-    "iso_14001", "iso_50001", "sbti_targets",
-    "gap_analysis", "audit_packages", "third_party_verification",
-    // Impact Valuation — canopy tier OR admin-granted via feature_flags
-    "impact_valuation_beta",
-    // EPR Compliance — canopy tier OR admin-granted via feature_flags
-    "epr_beta",
-    // Viticulture — canopy tier OR admin-granted via feature_flags
-    "viticulture_beta",
-    // Orchards — canopy tier OR admin-granted via feature_flags
-    "orchard_beta",
-    // Arable fields — canopy tier OR admin-granted via feature_flags
-    "arable_beta",
-    // Pulse — admin-granted only during beta
-    "pulse_beta",
-    // Hospitality — admin-granted only during beta
-    "hospitality_beta",
-    // Breww brewery integration — canopy tier OR admin-granted via feature_flags
-    "breww_integration_beta",
-  ];
-
-  const blossomFeatures: FeatureCode[] = [
-    // Legacy
-    "ef_31", "water_footprint", "waste_circularity",
-    "monthly_analytics", "product_comparison", "vehicle_registry", "fleet_reporting",
-    // Core (Blossom+)
-    "supply_chain_mapping", "full_scope_3",
-    // Products & LCA (Blossom+)
-    "land_use_impact", "resource_use_tracking",
-    // LCA Boundary (Blossom+)
-    "lca_distribution",
-    // AI (Blossom+)
-    "rosa_ai_100", "greenwash_documents",
-    // ESG (Blossom+)
-    "people_fair_work", "people_diversity_inclusion",
-    "community_charitable_giving", "community_volunteering", "community_local_impact",
-    // Certifications (Blossom+)
-    "bcorp_tracking", "cdp_tracking",
-    // Resources (Blossom+)
-    "knowledge_bank_manage",
-  ];
-
-  if (canopyFeatures.includes(featureCode)) return "canopy";
-  if (blossomFeatures.includes(featureCode)) return "blossom";
-  return "seed";
 }
 
 export function useProductLimit() {

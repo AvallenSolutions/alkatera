@@ -17,8 +17,10 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { METRIC_DEFINITIONS, type MetricKey } from './metric-keys';
-import { normaliseToCubicMetres } from '@/lib/calculations/utility-factors';
+import { normaliseToCubicMetres, normaliseToKg } from '@/lib/calculations/utility-factors';
 import { calculateCorporateEmissions } from '@/lib/calculations/corporate-emissions';
+import { calculateDiversionRate, isCircularTreatment } from '@/lib/calculations/waste-circularity';
+import { aggregateImpacts, type PcfRowForAggregator } from '@/lib/vitality/environmental';
 
 export interface SnapshotRow {
   organization_id: string;
@@ -177,6 +179,94 @@ export async function computeOrgSnapshots(
     value: round(completenessPct, 1),
     unit: METRIC_DEFINITIONS.lca_completeness_pct.unit,
   });
+
+  // ── 5. waste_diversion_rate ─────────────────────────────────────────────
+  // Trailing-365-day share of waste kept out of disposal: circular (reuse,
+  // recycling, composting, AD) mass ÷ total waste mass × 100. Classification
+  // reuses the EU waste-hierarchy logic in lib/calculations/waste-circularity.
+  // A row is only written when there is waste data — an org with no waste
+  // entries should read as "no data", not a misleading 0% diverted.
+  const { data: wasteRows, error: wasteErr } = await supabase
+    .from('facility_activity_entries')
+    .select('quantity, unit, waste_treatment_method')
+    .eq('organization_id', orgId)
+    .in('activity_category', ['waste_general', 'waste_hazardous', 'waste_recycling'])
+    .gte('reporting_period_start', windowStart)
+    .lte('reporting_period_start', snapshotDate);
+
+  if (wasteErr) {
+    console.error(`[Pulse snapshots] waste query failed for org ${orgId}:`, wasteErr.message);
+  }
+
+  let circularWasteKg = 0;
+  let totalWasteKg = 0;
+  for (const row of wasteRows ?? []) {
+    const kg = normaliseToKg(Number((row as any).quantity) || 0, (row as any).unit as string);
+    totalWasteKg += kg;
+    if (isCircularTreatment(((row as any).waste_treatment_method as string) || 'other')) {
+      circularWasteKg += kg;
+    }
+  }
+  if (totalWasteKg > 0) {
+    rows.push({
+      organization_id: orgId,
+      metric_key: 'waste_diversion_rate',
+      snapshot_date: snapshotDate,
+      value: round(calculateDiversionRate(circularWasteKg, totalWasteKg), 1),
+      unit: METRIC_DEFINITIONS.waste_diversion_rate.unit,
+    });
+  }
+
+  // ── 6. land_use ─────────────────────────────────────────────────────────
+  // Org-level embedded land use (m²·yr) across products with a completed LCA.
+  // aggregated_impacts.land_use is per functional unit, so it's scaled by the
+  // product's annual_production_volume (a single, server-friendly volume
+  // source; the richer multi-source resolution in useCompanyMetrics isn't
+  // needed for a trajectory, which cares about consistent change over time).
+  // aggregateImpacts treats a missing/zero volume as 1 unit. Skipped when
+  // there is no completed-LCA land-use data.
+  const { data: landPcfs, error: landErr } = await supabase
+    .from('product_carbon_footprints')
+    .select('id, product_id, status, aggregated_impacts')
+    .eq('organization_id', orgId)
+    .eq('status', 'completed');
+
+  if (landErr) {
+    console.error(`[Pulse snapshots] land-use query failed for org ${orgId}:`, landErr.message);
+  }
+
+  const landProductIds = Array.from(
+    new Set((landPcfs ?? []).map((r: any) => r.product_id).filter(Boolean) as string[]),
+  );
+  const volumeByProduct = new Map<string, number>();
+  if (landProductIds.length > 0) {
+    const { data: prods } = await supabase
+      .from('products')
+      .select('id, annual_production_volume')
+      .in('id', landProductIds);
+    for (const p of prods ?? []) {
+      volumeByProduct.set((p as any).id, Number((p as any).annual_production_volume) || 0);
+    }
+  }
+
+  const landRows: PcfRowForAggregator[] = (landPcfs ?? []).map((r: any) => ({
+    id: r.id,
+    product_id: r.product_id,
+    status: r.status,
+    aggregated_impacts: r.aggregated_impacts,
+    production_volume: r.product_id ? volumeByProduct.get(r.product_id) ?? null : null,
+  }));
+
+  const landUseM2a = aggregateImpacts(landRows).land_use;
+  if (landUseM2a > 0) {
+    rows.push({
+      organization_id: orgId,
+      metric_key: 'land_use',
+      snapshot_date: snapshotDate,
+      value: round(landUseM2a, 1),
+      unit: METRIC_DEFINITIONS.land_use.unit,
+    });
+  }
 
   return rows;
 }

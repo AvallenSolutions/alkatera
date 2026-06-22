@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, LayoutGrid, MessageSquare, RefreshCw } from 'lucide-react';
 import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { PulseGrid } from '@/components/pulse/PulseGrid';
 import { PulseTabbedView } from '@/components/pulse/PulseTabbedView';
 import { PulseVerdictHero } from '@/components/pulse/PulseVerdictHero';
@@ -107,7 +106,7 @@ function PulseShellBody() {
   const rosaSlice = useMemo(
     () => ({
       id: 'pulse-insights',
-      label: 'Pulse — main dashboard',
+      label: 'Pulse main dashboard',
       priority: 6,
       data: {
         activeDrill: drillOpen && activeTarget ? activeTarget : null,
@@ -182,12 +181,6 @@ function PulseHeader({
           <h1 className="text-3xl font-semibold tracking-tight text-foreground">
             Pulse
           </h1>
-          <Badge
-            variant="outline"
-            className="border-[#ccff00]/40 bg-[#ccff00]/10 text-[10px] font-semibold uppercase tracking-wider text-[#ccff00]"
-          >
-            Beta
-          </Badge>
         </div>
         <p className="mt-1 max-w-xl text-sm text-muted-foreground">{subtitle}</p>
       </div>
@@ -203,10 +196,10 @@ function PulseHeader({
           <LayoutGrid className="mr-2 h-4 w-4" />
           {view === 'advanced' ? 'Back to simple view' : 'Customise'}
         </Button>
-        <Button asChild variant="ghost" size="icon" title="Beta feedback">
+        <Button asChild variant="ghost" size="icon" title="Send feedback">
           <Link href="/settings/feedback/">
             <MessageSquare className="h-4 w-4" />
-            <span className="sr-only">Beta feedback</span>
+            <span className="sr-only">Send feedback</span>
           </Link>
         </Button>
       </div>

@@ -5,6 +5,7 @@ import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recha
 import { Leaf, Zap } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { Card, CardContent } from '@/components/ui/card';
+import { isFiniteNumber } from '@/lib/pulse/format';
 
 interface Reading {
   recorded_at: string;
@@ -149,7 +150,8 @@ function findCleanestWindow(
   }
   const avg = bestSum / windowSize;
   const peakAvg = peakSum / windowSize;
-  const savingsPct = peakAvg === 0 ? 0 : ((peakAvg - avg) / peakAvg) * 100;
+  const savingsPct =
+    !isFiniteNumber(peakAvg) || peakAvg === 0 ? 0 : ((peakAvg - avg) / peakAvg) * 100;
   return {
     startTime: readings[bestStart].recorded_at.slice(11, 16),
     endTime: readings[bestStart + windowSize - 1].recorded_at.slice(11, 16),

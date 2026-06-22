@@ -153,7 +153,7 @@ function CropRow({ crop, currentMonth }: { crop: CropSeason; currentMonth: numbe
       <p className="mt-1.5 text-[11px] text-muted-foreground">{crop.notes}</p>
       {inWindow && !inPeak && (
         <p className="mt-1 text-[11px] text-amber-500">
-          In harvest window — expect inbound emissions and material variability now.
+          In harvest window: expect inbound emissions and material variability now.
         </p>
       )}
     </div>

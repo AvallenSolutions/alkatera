@@ -16,6 +16,8 @@
  * read.
  */
 
+import { TIER_LEVELS, type TierName } from '@/lib/subscription/feature-catalog';
+
 export type WidgetId =
   | 'insight-card'
   | 'live-metrics-strip'
@@ -301,7 +303,7 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
     explainer: {
       what: 'The cost of your environmental impact over the last 12 months, in pounds.',
       why: 'Turns emissions and resource use into a number the whole business understands.',
-      source: 'Your live impact data multiplied by recognised damage-cost prices (what a tonne of CO2e or cubic metre of water costs society).',
+      source: 'Your live impact data multiplied by recognised damage-cost prices (what a tonne of CO₂e or cubic metre of water costs society).',
     },
   }),
   'scenario-sensitivity': withLayout({
@@ -435,3 +437,51 @@ export const ALL_WIDGET_IDS = Object.keys(WIDGET_REGISTRY) as WidgetId[];
 
 /** Widgets that go in the draggable grid (not exempt). */
 export const GRID_WIDGET_IDS = ALL_WIDGET_IDS.filter(id => !WIDGET_REGISTRY[id].exempt);
+
+/**
+ * Minimum subscription tier that unlocks each widget. Single source of truth
+ * for Pulse tier gating — mirrors FEATURE_MIN_TIER (feature-catalog) and the
+ * metric `minTier` map. Seed is the entry tier (live awareness + targets),
+ * Blossom adds operational analytics, Canopy adds the financial-valuation and
+ * compliance band. The Record<WidgetId, …> type forces every widget to be
+ * classified.
+ */
+export const WIDGET_MIN_TIER: Record<WidgetId, TierName> = {
+  // Seed — live awareness + the targets anchor
+  'target-trajectory': 'seed',
+  'insight-card': 'seed',
+  'live-metrics-strip': 'seed',
+  'grid-carbon': 'seed',
+  'live-activity': 'seed',
+  'ask-rosa': 'seed',
+  // Blossom — operational analytics
+  'alerts-inbox': 'blossom',
+  'peer-benchmark': 'blossom',
+  'facility-impact': 'blossom',
+  'supplier-hotspots': 'blossom',
+  'harvest-seasons': 'blossom',
+  'carbon-budgets': 'blossom',
+  // Canopy — financial valuation + compliance
+  'financial-footprint': 'canopy',
+  'cost-intensity': 'canopy',
+  'top-cost-drivers': 'canopy',
+  'product-env-cost': 'canopy',
+  'scenario-sensitivity': 'canopy',
+  'regulatory-exposure': 'canopy',
+  'macc': 'canopy',
+  'what-if': 'canopy',
+  'csrd-gaps': 'canopy',
+  'issb-disclosure': 'canopy',
+  'soil-carbon-trajectory': 'canopy',
+};
+
+/** Widget ids an org on `tier` can see (cumulative: higher tiers inherit). */
+export function widgetIdsForTier(tier: TierName): WidgetId[] {
+  const level = TIER_LEVELS[tier];
+  return ALL_WIDGET_IDS.filter(id => TIER_LEVELS[WIDGET_MIN_TIER[id]] <= level);
+}
+
+/** True when `tier` unlocks `id`. */
+export function isWidgetAllowedForTier(id: WidgetId, tier: TierName): boolean {
+  return TIER_LEVELS[WIDGET_MIN_TIER[id]] <= TIER_LEVELS[tier];
+}
