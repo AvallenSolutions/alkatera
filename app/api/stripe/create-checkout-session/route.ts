@@ -131,46 +131,49 @@ export async function POST(request: NextRequest) {
     // Get the base URL for redirects (use custom domain if available)
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin;
 
-    // Create Checkout Session
-    const session = await stripe.checkout.sessions.create({
-      customer: customerId,
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
-      mode: 'subscription',
-      success_url: `${baseUrl}/complete-subscription?success=true&tier=${tier}${isTrial ? '&trial=true' : ''}`,
-      cancel_url: `${baseUrl}/complete-subscription?canceled=true`,
-      metadata: {
-        organizationId: org.id,
-        tier,
-        billingInterval: interval,
-        trial: isTrial ? 'true' : 'false',
-      },
-      subscription_data: {
-        metadata: {
-          organizationId: org.id,
-          tier,
-          billingInterval: interval,
-        },
-        // Free trial: collect the card now, charge nothing for 30 days. Stripe
-        // emits a `trialing` subscription which the webhook maps to status 'trial'.
-        // If the card is missing when the trial ends, cancel rather than charge.
-        ...(isTrial
-          ? {
-              trial_period_days: 30,
-              trial_settings: { end_behavior: { missing_payment_method: 'cancel' as const } },
-            }
-          : {}),
-      },
-      // Always capture the card up front so the trial can auto-convert to paid.
-      ...(isTrial ? { payment_method_collection: 'always' as const } : {}),
-      allow_promotion_codes: true,
-      billing_address_collection: 'auto',
-    });
+    // Create Checkout Session.
+    //
+    // Trials use SETUP mode: this saves a card on file with NO price and none of Stripe's
+    // "you'll be charged £X/month after the trial" language, because we never auto-charge.
+    // The trial itself (status + 30-day expiry) is recorded by the webhook, and the saved
+    // card makes choosing a plan later a single click. Paid plans use normal subscription mode.
+    const session = isTrial
+      ? await stripe.checkout.sessions.create({
+          customer: customerId,
+          mode: 'setup',
+          payment_method_types: ['card'],
+          success_url: `${baseUrl}/complete-subscription?success=true&tier=${tier}&trial=true`,
+          cancel_url: `${baseUrl}/complete-subscription?canceled=true`,
+          metadata: {
+            organizationId: org.id,
+            tier,
+            billingInterval: interval,
+            trial: 'true',
+          },
+          setup_intent_data: {
+            metadata: { organizationId: org.id, tier },
+          },
+          billing_address_collection: 'auto',
+        })
+      : await stripe.checkout.sessions.create({
+          customer: customerId,
+          payment_method_types: ['card'],
+          line_items: [{ price: priceId, quantity: 1 }],
+          mode: 'subscription',
+          success_url: `${baseUrl}/complete-subscription?success=true&tier=${tier}`,
+          cancel_url: `${baseUrl}/complete-subscription?canceled=true`,
+          metadata: {
+            organizationId: org.id,
+            tier,
+            billingInterval: interval,
+            trial: 'false',
+          },
+          subscription_data: {
+            metadata: { organizationId: org.id, tier, billingInterval: interval },
+          },
+          allow_promotion_codes: true,
+          billing_address_collection: 'auto',
+        });
 
     return NextResponse.json({ url: session.url });
   } catch (error: any) {

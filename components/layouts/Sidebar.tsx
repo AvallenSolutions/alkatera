@@ -372,7 +372,7 @@ export function Sidebar({ className }: SidebarProps) {
   const [isAlkateraAdmin, setIsAlkateraAdmin] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
   const [hospitalitySettings, setHospitalitySettings] = useState<HospitalitySettings | null>(null)
-  const { usage, tierName, tierLevel, hasFeature, isLoading: subscriptionLoading } = useSubscription()
+  const { usage, tierName, tierLevel, subscriptionStatus, hasFeature, isLoading: subscriptionLoading } = useSubscription()
   const completedMilestones = useMemo(() => getCompletedMilestones(usage), [usage])
 
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -1094,7 +1094,7 @@ export function Sidebar({ className }: SidebarProps) {
             className="block rounded-lg p-3 hover:bg-secondary/50 transition-colors"
           >
             <div className="flex items-center justify-between mb-2">
-              <TierBadge tier={tierName} size="sm" />
+              <TierBadge tier={tierName} size="sm" status={subscriptionStatus} />
               <CreditCard className="h-4 w-4 text-muted-foreground" />
             </div>
             <div className="space-y-1.5">

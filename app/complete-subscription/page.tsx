@@ -97,6 +97,7 @@ function CompleteSubscriptionContent() {
   const isPaymentSuccess = searchParams.get('success') === 'true'
   const isCanceled = searchParams.get('canceled') === 'true'
   const tierParam = searchParams.get('tier')
+  const isTrialParam = searchParams.get('trial') === 'true'
 
   // Suppliers should never see the subscription page - redirect to their portal
   useEffect(() => {
@@ -132,8 +133,10 @@ function CompleteSubscriptionContent() {
         clearInterval(pollInterval)
         // Refresh org context so dashboard has fresh data
         if (mutate) await mutate()
-        toast.success('Subscription activated successfully!', {
-          description: `Welcome to the ${tierParam || ''} plan.`,
+        toast.success(isTrialParam ? 'Your free trial is ready!' : 'Subscription activated successfully!', {
+          description: isTrialParam
+            ? 'Welcome to alkatera. Add a facility and build your first LCA.'
+            : `Welcome to the ${tierParam || ''} plan.`,
         })
         router.push('/dashboard')
         return
@@ -285,9 +288,11 @@ function CompleteSubscriptionContent() {
             <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-neon-lime/20">
               <CheckCircle2 className="h-10 w-10 text-neon-lime" />
             </div>
-            <h1 className="text-3xl font-bold text-white">Payment Successful!</h1>
+            <h1 className="text-3xl font-bold text-white">{isTrialParam ? "You're all set!" : 'Payment Successful!'}</h1>
             <p className="text-lg text-slate-300 max-w-md">
-              Setting up your {tierParam ? tierParam.charAt(0).toUpperCase() + tierParam.slice(1) : ''} subscription...
+              {isTrialParam
+                ? 'Setting up your free trial...'
+                : `Setting up your ${tierParam ? tierParam.charAt(0).toUpperCase() + tierParam.slice(1) : ''} subscription...`}
             </p>
             <Loader2 className="h-8 w-8 animate-spin text-neon-lime" />
             <p className="text-sm text-slate-500">This should only take a moment.</p>

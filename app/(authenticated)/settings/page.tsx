@@ -419,10 +419,12 @@ export default function SettingsPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Sparkles className="h-5 w-5" />
-                  Current Plan
+                  {subscriptionStatus === 'trial' ? 'Free Trial' : 'Current Plan'}
                 </CardTitle>
                 <CardDescription>
-                  Your subscription details and status
+                  {subscriptionStatus === 'trial'
+                    ? 'Explore the platform, then choose a plan to continue'
+                    : 'Your subscription details and status'}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -431,6 +433,20 @@ export default function SettingsPage() {
                     <div className="h-8 w-32 bg-muted rounded" />
                     <div className="h-4 w-48 bg-muted rounded" />
                   </div>
+                ) : subscriptionStatus === 'trial' ? (
+                  <>
+                    <span className="inline-block text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                      Free Trial
+                    </span>
+                    <p className="text-sm text-muted-foreground">
+                      You&apos;re on a 30-day free trial with full Seed features.
+                      {organizationData?.subscription_expires_at
+                        ? ` Your trial ends on ${new Date(organizationData.subscription_expires_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}.`
+                        : ''}
+                      {' '}Choose a plan below to keep your access when your trial ends. Your card is
+                      already on file, so it&apos;s a single click.
+                    </p>
+                  </>
                 ) : (
                   <>
                     <div className="flex items-center gap-3">
@@ -539,7 +555,11 @@ export default function SettingsPage() {
             <CardContent>
               <div className="grid gap-6 md:grid-cols-3">
                 {allTiers.map((tier) => {
-                  const isCurrent = tier.tier_name === tierName
+                  // On a free trial the org carries tier 'seed' for feature visibility, but
+                  // isn't actually subscribed to any paid plan — so nothing is the "current"
+                  // plan and every tier is selectable as a subscription.
+                  const onTrial = subscriptionStatus === 'trial'
+                  const isCurrent = !onTrial && tier.tier_name === tierName
                   const currentTierLevel = allTiers.find(t => t.tier_name === tierName)?.tier_level || 1
                   const isUpgrade = tier.tier_level > currentTierLevel
                   const isDowngrade = tier.tier_level < currentTierLevel
@@ -683,13 +703,14 @@ export default function SettingsPage() {
                         <Button variant="outline" className="w-full mt-auto" disabled>
                           Current Plan
                         </Button>
-                      ) : tier.tier_name === 'canopy' ? (
+                      ) : onTrial ? (
                         <Button
-                          variant="outline"
+                          variant={tier.tier_name === 'blossom' ? 'default' : 'outline'}
                           className="w-full mt-auto"
-                          onClick={() => router.push('/contact?tier=Canopy')}
+                          onClick={() => handleUpgrade(tier.tier_name)}
+                          disabled={processingCheckout}
                         >
-                          Contact Sales
+                          {processingCheckout ? 'Processing...' : `Subscribe to ${tier.display_name}`}
                         </Button>
                       ) : (
                         <Button

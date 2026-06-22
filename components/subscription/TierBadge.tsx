@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Leaf, Flower2, TreeDeciduous } from "lucide-react";
+import { Leaf, Flower2, TreeDeciduous, Sparkles } from "lucide-react";
 import { TierName, TierLevel } from "@/hooks/useSubscription";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,8 @@ interface TierBadgeProps {
   size?: "sm" | "md" | "lg";
   showIcon?: boolean;
   className?: string;
+  /** When 'trial', the badge shows "Trial" instead of the underlying tier. */
+  status?: string;
 }
 
 export function TierBadge({
@@ -18,6 +20,7 @@ export function TierBadge({
   size = "md",
   showIcon = true,
   className,
+  status,
 }: TierBadgeProps) {
   const tierName: TierName =
     typeof tier === "number"
@@ -46,7 +49,14 @@ export function TierBadge({
     },
   };
 
-  const { label, icon: Icon, className: tierClassName } = config[tierName];
+  const trialConfig = {
+    label: "Trial",
+    icon: Sparkles,
+    className: "bg-blue-50 text-blue-700 border-blue-200",
+  };
+
+  const { label, icon: Icon, className: tierClassName } =
+    status === "trial" ? trialConfig : config[tierName];
 
   const sizeClasses = {
     sm: "text-xs px-1.5 py-0.5",

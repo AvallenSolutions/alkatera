@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe, getBillingIntervalFromPriceId, getTierFromPriceId } from '@/lib/stripe-config';
+import { stripe, getBillingIntervalFromPriceId } from '@/lib/stripe-config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/db_types';
 import Stripe from 'stripe';
@@ -240,8 +240,62 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   }
 
   const customerId = session.customer as string;
+
+  // ── Free trial (Stripe SETUP mode) ──
+  // A card is saved on file, but NO subscription is created and nothing is ever charged
+  // automatically. We record the trial ourselves: status 'trial' + a 30-day expiry. The
+  // daily sweep flips it to read-only at expiry and emails "choose a plan". The saved card
+  // is set as the customer's default so subscribing later is a single click.
+  if (session.mode === 'setup' || session.metadata?.trial === 'true') {
+    try {
+      const setupIntentId = session.setup_intent as string;
+      if (setupIntentId) {
+        const si = await stripe.setupIntents.retrieve(setupIntentId);
+        const pmId = (si.payment_method as string) || null;
+        if (pmId) {
+          await stripe.customers.update(customerId, {
+            invoice_settings: { default_payment_method: pmId },
+          });
+        }
+      }
+    } catch (pmErr: any) {
+      console.error('Error saving trial default payment method:', pmErr?.message);
+    }
+
+    const trialEndsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const trialUpdate: Record<string, any> = {
+      stripe_customer_id: customerId,
+      subscription_status: 'trial',
+      subscription_tier: session.metadata?.tier || 'seed',
+      subscription_expires_at: trialEndsAt,
+      subscription_started_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    if (session.customer_details?.email) trialUpdate.billing_email = session.customer_details.email;
+    if (session.customer_details?.name) trialUpdate.billing_name = session.customer_details.name;
+    if (session.customer_details?.address) {
+      const addr = session.customer_details.address;
+      if (addr.line1) trialUpdate.billing_address_line1 = addr.line1;
+      if (addr.city) trialUpdate.billing_address_city = addr.city;
+      if (addr.country) trialUpdate.billing_address_country = addr.country;
+      if (addr.postal_code) trialUpdate.billing_address_postal_code = addr.postal_code;
+    }
+
+    const { error: trialErr } = await getSupabaseAdmin()
+      .from('organizations')
+      .update(trialUpdate)
+      .eq('id', organizationId);
+    if (trialErr) console.error('Error provisioning trial org:', trialErr.message);
+
+    await sendSubscriptionEmail(organizationId, 'trial_started', {
+      tier: session.metadata?.tier || 'seed',
+      trialEndsAt,
+    });
+    return;
+  }
+
+  // ── Paid plan (subscription mode) ──
   const subscriptionId = session.subscription as string;
-  // Get subscription details to get the price
   const subscription = await stripe.subscriptions.retrieve(subscriptionId) as Stripe.Subscription;
   const priceId = subscription.items.data[0]?.price.id;
   if (!priceId) {
@@ -249,7 +303,6 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     return;
   }
 
-  // Update organization using the database function (including current_period_end)
   // In Stripe API v2025+, current_period_end is on subscription items, not the subscription
   const itemPeriodEnd = subscription.items.data[0]?.current_period_end;
   const currentPeriodEnd = itemPeriodEnd
@@ -268,24 +321,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   });
 
   if (error) {
-    console.error('ERROR updating organization after checkout:');
-    console.error('  Message:', error.message);
-    console.error('  Details:', error.details);
-    console.error('  Hint:', error.hint);
-    console.error('  Full error:', JSON.stringify(error, null, 2));
-  }
-
-  // Free trial: mirror Stripe's authoritative trial_end into subscription_expires_at
-  // so the in-app countdown banner and the expiring_trials admin aggregate have a
-  // source of truth. (update_subscription_from_stripe already maps 'trialing' -> 'trial'.)
-  if (subscription.status === 'trialing' && subscription.trial_end) {
-    const { error: trialError } = await getSupabaseAdmin()
-      .from('organizations')
-      .update({ subscription_expires_at: new Date(subscription.trial_end * 1000).toISOString() })
-      .eq('id', organizationId);
-    if (trialError) {
-      console.error('Error mirroring trial_end to subscription_expires_at:', trialError.message);
-    }
+    console.error('ERROR updating organization after checkout:', error.message, error.details, error.hint);
   }
 
   // Import billing details from checkout session
@@ -319,24 +355,6 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     }
   } catch (billingError) {
     console.error('Error importing billing details from checkout:', billingError);
-  }
-
-  // Card-on-file trial that does NOT auto-convert. We keep the card (anti-fraud + one-click
-  // conversion later) but set the subscription to cancel at the trial end so Stripe never
-  // charges automatically. At trial end Stripe fires customer.subscription.deleted, which
-  // flips the org to read-only and emails "trial ended, choose a plan". The saved card stays
-  // on the Stripe customer, so subscribing later is a single click.
-  if (subscription.status === 'trialing') {
-    try {
-      await stripe.subscriptions.update(subscriptionId, { cancel_at_period_end: true });
-    } catch (cancelErr: any) {
-      console.error('Error setting trial to cancel at period end:', cancelErr?.message);
-    }
-    // Welcome email — sets expectations: 30 days free, no automatic charge, choose a plan to continue.
-    await sendSubscriptionEmail(organizationId, 'trial_started', {
-      tier: getTierFromPriceId(priceId),
-      trialEndsAt: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
-    });
   }
 }
 

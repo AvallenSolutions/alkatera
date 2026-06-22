@@ -192,7 +192,7 @@ const tiers = [
       "Advanced Data Quality Scoring & EF 3.1",
       "Unlimited Rosa AI & Greenwash Guardian",
     ],
-    buttonText: "Contact Sales",
+    buttonText: "Select Plan",
     highlight: false,
   },
 ];
@@ -369,7 +369,7 @@ export default function GetAccessPage() {
                 </ul>
 
                 <a
-                  href={tier.name === 'Canopy' ? `/contact?tier=${tier.name}` : `/getaccess/signup?tier=${tier.name}`}
+                  href={`/getaccess/signup?tier=${tier.name}`}
                   className={cn(
                     "w-full py-5 font-mono uppercase text-xs tracking-widest font-bold transition-all duration-300 text-center block rounded-xl",
                     tier.highlight

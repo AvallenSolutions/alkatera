@@ -84,7 +84,7 @@ export function TrialBanner({
       </div>
 
       <Button size="sm" asChild className={urgent ? '' : 'bg-[#ccff00] text-black hover:bg-[#ccff00]/90'}>
-        <Link href="/settings?tab=billing">
+        <Link href="/settings?tab=subscription">
           Subscribe now
           <ArrowRight className="ml-1 h-4 w-4" />
         </Link>
