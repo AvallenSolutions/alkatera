@@ -24,6 +24,7 @@ import { loadShadowPrices } from '@/lib/pulse/shadow-prices';
 import { calculateRegulatoryExposure } from '@/lib/pulse/regulatory-exposure';
 import { buildIssbDisclosure } from '@/lib/pulse/issb-disclosure';
 import { latestValue } from '@/lib/pulse/snapshot-latest';
+import { enforceExportAllowed } from '@/middleware/subscription-check';
 
 export const runtime = 'nodejs';
 
@@ -57,6 +58,12 @@ export async function GET(request: NextRequest) {
     }
 
     const format = request.nextUrl.searchParams.get('format') ?? 'json';
+
+    // CSV is a download (blocked on trial / read-only); the JSON preview stays open.
+    if (format === 'csv') {
+      const exportBlocked = await enforceExportAllowed(organizationId);
+      if (exportBlocked) return exportBlocked;
+    }
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY!;

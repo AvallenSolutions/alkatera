@@ -9,6 +9,7 @@ import {
 } from '@/lib/epr/hmrc-csv-generator'
 import { calculateCSVChecksum } from '@/lib/epr/csv-generator'
 import type { HMRCOrgDetails, HMRCAddress, HMRCContact, HMRCBrand, HMRCPartner, EPROrganizationSettings } from '@/lib/epr/types'
+import { enforceExportAllowed } from '@/middleware/subscription-check'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -90,6 +91,9 @@ export async function POST(request: NextRequest) {
     const { user, authorized } = await authenticateAndAuthorize(organizationId)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!authorized) return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+
+    const exportBlocked = await enforceExportAllowed(organizationId)
+    if (exportBlocked) return exportBlocked
 
     const supabase = getServiceClient()
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { inngest } from '@/lib/inngest/client';
+import { enforceExportAllowed } from '@/middleware/subscription-check';
 
 /**
  * Generate Sustainability Report PDF (dispatch only)
@@ -48,12 +49,16 @@ export async function POST(
     // RLS-scoped fetch: returns nothing unless the caller can see the report.
     const { data: report, error: reportError } = await supabase
       .from('generated_reports')
-      .select('id')
+      .select('id, organization_id')
       .eq('id', reportId)
       .single();
     if (reportError || !report) {
       return NextResponse.json({ error: 'Report not found' }, { status: 404 });
     }
+
+    // Report PDF generation is a paid feature — blocked on trial / read-only.
+    const exportBlocked = await enforceExportAllowed(report.organization_id);
+    if (exportBlocked) return exportBlocked;
 
     await supabase
       .from('generated_reports')

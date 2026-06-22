@@ -171,6 +171,48 @@ function CompleteSubscriptionContent() {
     }
   }, [isOrgLoading, currentOrganization, hasShownToast, isPaymentSuccess, isCanceled])
 
+  async function handleStartTrial() {
+    if (!currentOrganization) {
+      toast.error('No organisation found. Please try again.')
+      router.push('/create-organization')
+      return
+    }
+
+    setProcessingCheckout(true)
+    setProcessingTier('trial')
+
+    try {
+      const response = await fetch('/api/stripe/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trial: true,
+          tierName: 'seed',
+          billingInterval: 'monthly',
+          organizationId: currentOrganization.id,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to start free trial')
+      }
+
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        throw new Error('No checkout URL returned')
+      }
+    } catch (error: any) {
+      console.error('Error starting free trial:', error)
+      toast.error(error.message || 'Failed to start free trial')
+    } finally {
+      setProcessingCheckout(false)
+      setProcessingTier(null)
+    }
+  }
+
   async function handleSelectPlan(tierName: string) {
     console.log('[CompleteSubscription] handleSelectPlan called:', { tierName, currentOrganization: currentOrganization?.id, billingInterval })
 
@@ -311,6 +353,49 @@ function CompleteSubscriptionContent() {
             Your organisation <strong className="text-white">{currentOrganization?.name}</strong> has been created.
             Choose a plan below to start your sustainability journey.
           </p>
+        </div>
+
+        {/* Free Trial Hero — primary path for new orgs */}
+        <div className="relative z-10 max-w-3xl mx-auto mb-12">
+          <div className="border border-[#ccff00] bg-[#ccff00]/5 rounded-2xl p-8 text-center backdrop-blur-md shadow-[0_20px_50px_rgba(204,255,0,0.1)]">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 border border-[#ccff00]/30 bg-[#ccff00]/10 rounded-full mb-4">
+              <span className="font-mono text-[#ccff00] text-[10px] tracking-widest uppercase font-bold">
+                Not ready to commit?
+              </span>
+            </div>
+            <h2 className="font-serif text-3xl md:text-4xl text-white mb-3">
+              Start your 30-day free trial
+            </h2>
+            <p className="text-white/70 text-sm md:text-base max-w-xl mx-auto mb-6 leading-relaxed">
+              Add a facility, build a product LCA and explore the platform. We ask for a card to keep
+              things secure, but you won&apos;t be charged anything automatically. Choose a plan
+              whenever you&apos;re ready.
+            </p>
+            <button
+              onClick={handleStartTrial}
+              disabled={processingCheckout}
+              className="px-10 py-4 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:opacity-90 hover:scale-[1.02] transition-all"
+            >
+              {processingTier === 'trial' ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Starting trial...
+                </span>
+              ) : (
+                'Start free trial'
+              )}
+            </button>
+            <p className="text-white/40 text-[11px] mt-4">
+              30 days free. No automatic charge. Your card stays on file so choosing a plan later is one click.
+            </p>
+          </div>
+          <div className="flex items-center gap-4 mt-10">
+            <div className="flex-1 h-px bg-white/10" />
+            <span className="font-mono text-[10px] uppercase tracking-widest text-white/40">
+              Or choose a plan now
+            </span>
+            <div className="flex-1 h-px bg-white/10" />
+          </div>
         </div>
 
         {/* Billing Toggle */}

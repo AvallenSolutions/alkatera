@@ -23,6 +23,7 @@ import { transformLCADataForReport } from '@/lib/utils/lca-report-transformer';
 import { renderLcaReportHtml } from '@/lib/pdf/render-lca-html';
 import { convertHtmlToPdf } from '@/lib/pdf/pdfshift-client';
 import { generateNarratives, type LcaContext } from '@/lib/claude/lca-assistant';
+import { enforceExportAllowed } from '@/middleware/subscription-check';
 
 // ============================================================================
 // TYPES
@@ -106,6 +107,10 @@ export async function POST(
     if (!membership) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    // Trial/read-only orgs cannot download — block before doing any work.
+    const exportBlocked = await enforceExportAllowed(pcf.organization_id);
+    if (exportBlocked) return exportBlocked;
 
     // Fetch materials
     const { data: materials } = await supabase

@@ -228,7 +228,7 @@ export default function GetAccessPage() {
         >
           <div className="inline-block mb-6 px-5 py-2 border border-[#ccff00]/30 bg-[#ccff00]/5 rounded-full">
             <span className="font-mono text-[#ccff00] text-xs tracking-widest uppercase">
-              Founding Partner Pricing — Limited Availability
+              Founding Partner Pricing: Limited Availability
             </span>
           </div>
           <h1 className="font-serif text-4xl md:text-6xl lg:text-7xl mb-4">
@@ -381,6 +381,23 @@ export default function GetAccessPage() {
                 </a>
               </motion.div>
             ))}
+          </div>
+
+          {/* Free Trial CTA band */}
+          <div className="mt-12 max-w-3xl mx-auto text-center border border-[#ccff00]/30 bg-[#ccff00]/5 rounded-2xl p-8">
+            <h3 className="font-serif text-2xl md:text-3xl text-white mb-2">
+              Prefer to try before you buy?
+            </h3>
+            <p className="text-white/60 text-sm max-w-xl mx-auto mb-6">
+              Start a 30-day free trial. Add a facility, build a product LCA and explore the
+              platform. No charge for 30 days, cancel anytime.
+            </p>
+            <a
+              href="/getaccess/signup?trial=true"
+              className="inline-block px-10 py-4 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:opacity-90 hover:scale-[1.02] transition-all"
+            >
+              Start free trial
+            </a>
           </div>
 
           {/* Feature Matrix Toggle */}

@@ -56,6 +56,9 @@ export interface AlkateraEvents {
   // ─────────── Monitoring ───────────
   'monitoring/openlca-cert.check': { data: Record<string, never> };
 
+  // ─────────── Free-trial reminders ───────────
+  'subscriptions/trial-reminder.sweep': { data: Record<string, never> };
+
   // ─────────── Xero scheduled sync ───────────
   'xero/sync.tick': { data: Record<string, never> };
   'xero/org.sync': { data: { organization_id: string } };

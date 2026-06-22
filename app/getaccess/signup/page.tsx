@@ -9,6 +9,7 @@ import Image from 'next/image'
 function SignupContent() {
   const searchParams = useSearchParams()
   const tier = searchParams.get('tier')
+  const isTrial = searchParams.get('trial') === 'true'
 
   return (
     <div className="relative min-h-screen text-white flex flex-col items-center justify-center px-4 py-12">
@@ -40,11 +41,11 @@ function SignupContent() {
         <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-8 space-y-6">
           {/* Header */}
           <div className="text-center space-y-3">
-            {tier && (
+            {(tier || isTrial) && (
               <div className="flex justify-center">
                 <div className="inline-flex items-center gap-2 px-4 py-2 border border-[#ccff00]/30 bg-[#ccff00]/5 rounded-full">
                   <span className="font-mono text-[#ccff00] text-xs tracking-widest uppercase">
-                    {tier} Plan Selected
+                    {isTrial ? '30-Day Free Trial' : `${tier} Plan Selected`}
                   </span>
                 </div>
               </div>
@@ -52,10 +53,16 @@ function SignupContent() {
 
             <div>
               <h2 className="font-serif text-xl text-white">
-                {tier ? `Create your account to start ${tier}` : 'Create your account'}
+                {isTrial
+                  ? 'Create your account to start your free trial'
+                  : tier
+                  ? `Create your account to start ${tier}`
+                  : 'Create your account'}
               </h2>
               <p className="text-white/50 text-sm mt-1">
-                {tier
+                {isTrial
+                  ? "Sign up, set up your organisation, then start exploring. No charge for 30 days."
+                  : tier
                   ? "Sign up, then you'll set up your organisation and complete your subscription."
                   : 'Sign up to get started with alkatera.'}
               </p>

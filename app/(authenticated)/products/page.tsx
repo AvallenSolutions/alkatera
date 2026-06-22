@@ -18,6 +18,7 @@ import { duplicateProduct } from "@/lib/products";
 import { useRouter } from "next/navigation";
 import { boundaryFromDbEnum, getBoundaryLabel, SYSTEM_BOUNDARIES } from "@/lib/system-boundaries";
 import { useOrganization } from "@/lib/organizationContext";
+import { useSubscription } from "@/hooks/useSubscription";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -66,6 +67,7 @@ interface Product {
 export default function ProductsPage() {
   const { currentOrganization } = useOrganization();
   const router = useRouter();
+  const { isReadOnly } = useSubscription();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -405,12 +407,19 @@ export default function ProductsPage() {
             <Globe className="h-4 w-4" />
             Import from Website
           </Button>
-          <Link href="/products/new">
-            <Button size="lg" className="gap-2">
+          {isReadOnly ? (
+            <Button size="lg" className="gap-2" onClick={() => router.push('/complete-subscription')}>
               <Plus className="h-5 w-5" />
-              Add New Product
+              Subscribe to add
             </Button>
-          </Link>
+          ) : (
+            <Link href="/products/new">
+              <Button size="lg" className="gap-2">
+                <Plus className="h-5 w-5" />
+                Add New Product
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
 

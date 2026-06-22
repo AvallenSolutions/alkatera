@@ -6,6 +6,7 @@ import { topActions } from '@/lib/certifications/roadmap';
 import { getRecertDelta } from '@/lib/certifications/recert-deltas';
 import { convertHtmlToPdf } from '@/lib/pdf/pdfshift-client';
 import { renderBcorpOnePagerHtml } from '@/lib/pdf/render-bcorp-onepager-html';
+import { enforceExportAllowed } from '@/middleware/subscription-check';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -26,6 +27,9 @@ export async function POST() {
     if (orgError || !organizationId) {
       return NextResponse.json({ error: orgError || 'No organisation found' }, { status: 403 });
     }
+
+    const exportBlocked = await enforceExportAllowed(organizationId);
+    if (exportBlocked) return exportBlocked;
 
     const readiness = await calculateCertificationReadiness(supabase, organizationId);
     if (!readiness.hasCertification) {

@@ -17,7 +17,10 @@ async function getCachedTierLimits(): Promise<TierLimits[]> {
   const { data, error } = await supabase
     .from("subscription_tier_limits")
     .select("*")
+    // 'trial' is a server-side limits pseudo-tier (read by the check_*_limit RPCs);
+    // it must never surface in client tier lists (pricing cards, upgrade/downgrade UI).
     .eq("is_active", true)
+    .neq("tier_name", "trial")
     .order("tier_level");
   if (!error && data) {
     _cachedTiers = data as TierLimits[];
@@ -515,12 +518,19 @@ export function useSubscription() {
     setRefreshKey(k => k + 1);
   }, []);
 
+  const subscriptionStatus = state.usage?.tier?.status || "pending";
+
   return {
     ...state,
     tierName: state.usage?.tier?.name || "seed",
     tierLevel: state.usage?.tier?.level || 1,
     tierDisplayName: state.usage?.tier?.display_name || "Seed",
-    subscriptionStatus: state.usage?.tier?.status || "pending",
+    subscriptionStatus,
+    // Derived gating flags (status-driven). Trial = full app but no downloads;
+    // cancelled = expired trial / churned -> read-only behind a paywall.
+    isTrial: subscriptionStatus === "trial",
+    isReadOnly: subscriptionStatus === "cancelled",
+    exportsLocked: subscriptionStatus === "trial" || subscriptionStatus === "cancelled",
     hasFeature,
     getTierLevel,
     isAtLeastTier,

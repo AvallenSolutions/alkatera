@@ -8,6 +8,7 @@ import {
   renderSupplierEsgReportHtml,
   type ReportSupplier,
 } from '@/lib/pdf/render-supplier-esg-html';
+import { enforceExportAllowed } from '@/middleware/subscription-check';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -31,6 +32,9 @@ export async function POST() {
     if (orgError || !organizationId) {
       return NextResponse.json({ error: orgError || 'No organisation found' }, { status: 403 });
     }
+
+    const exportBlocked = await enforceExportAllowed(organizationId);
+    if (exportBlocked) return exportBlocked;
 
     // Fetch the org's suppliers + their assessments (service-role bypasses RLS).
     const { data: supplierRows } = await supabase

@@ -19,6 +19,7 @@ import { Resend } from 'resend';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { renderInsightShareHtml } from '@/lib/pulse/insight-share';
 import { convertHtmlToPdf } from '@/lib/pdf/pdfshift-client';
+import { enforceExportAllowed } from '@/middleware/subscription-check';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -75,6 +76,10 @@ export async function POST(
     if (!membership) {
       return NextResponse.json({ error: 'Not a member of this organisation' }, { status: 403 });
     }
+
+    // Sharing/exporting an insight (email or PDF) is a paid feature.
+    const exportBlocked = await enforceExportAllowed(insight.organization_id);
+    if (exportBlocked) return exportBlocked;
 
     const { data: org } = await svc
       .from('organizations')

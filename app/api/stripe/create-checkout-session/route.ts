@@ -36,7 +36,8 @@ export async function POST(request: NextRequest) {
     }
     // Parse request body
     const body = await request.json();
-    const { priceId: directPriceId, tierName, billingInterval: requestedInterval, organizationId } = body;
+    const { priceId: directPriceId, tierName, billingInterval: requestedInterval, organizationId, trial } = body;
+    const isTrial = trial === true;
     // Determine priceId - either directly provided or derived from tier/interval
     let priceId = directPriceId;
     if (!priceId && tierName && requestedInterval) {
@@ -141,12 +142,13 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: 'subscription',
-      success_url: `${baseUrl}/complete-subscription?success=true&tier=${tier}`,
+      success_url: `${baseUrl}/complete-subscription?success=true&tier=${tier}${isTrial ? '&trial=true' : ''}`,
       cancel_url: `${baseUrl}/complete-subscription?canceled=true`,
       metadata: {
         organizationId: org.id,
         tier,
         billingInterval: interval,
+        trial: isTrial ? 'true' : 'false',
       },
       subscription_data: {
         metadata: {
@@ -154,7 +156,18 @@ export async function POST(request: NextRequest) {
           tier,
           billingInterval: interval,
         },
+        // Free trial: collect the card now, charge nothing for 30 days. Stripe
+        // emits a `trialing` subscription which the webhook maps to status 'trial'.
+        // If the card is missing when the trial ends, cancel rather than charge.
+        ...(isTrial
+          ? {
+              trial_period_days: 30,
+              trial_settings: { end_behavior: { missing_payment_method: 'cancel' as const } },
+            }
+          : {}),
       },
+      // Always capture the card up front so the trial can auto-convert to paid.
+      ...(isTrial ? { payment_method_collection: 'always' as const } : {}),
       allow_promotion_codes: true,
       billing_address_collection: 'auto',
     });

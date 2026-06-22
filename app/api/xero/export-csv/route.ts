@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sanitizePostgrestSearch } from '@/lib/utils/sanitize-search'
 import { getSupabaseServerClient } from '@/lib/supabase/server-client'
 import { getMemberRole } from '@/app/api/stripe/_helpers/get-member-role'
+import { enforceExportAllowed } from '@/middleware/subscription-check'
 import { generateTransactionCSV, type TransactionExportRow } from '@/lib/xero/csv-export'
 import {
   CATEGORY_LABELS,
@@ -39,6 +40,9 @@ export async function GET(request: NextRequest) {
     if (!role) {
       return NextResponse.json({ error: 'Not a member of this organisation' }, { status: 403 })
     }
+
+    const exportBlocked = await enforceExportAllowed(organizationId)
+    if (exportBlocked) return exportBlocked
 
     // 4. Build query with filters
     const category = params.get('category')

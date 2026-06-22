@@ -27,6 +27,7 @@ import { calculateRegulatoryExposure } from '@/lib/pulse/regulatory-exposure';
 import { renderBoardPackHtml, type BoardPackInput } from '@/lib/pulse/board-pack-template';
 import { latestValuePerMetric, reliableYoyPct } from '@/lib/pulse/snapshot-latest';
 import { convertHtmlToPdf } from '@/lib/pdf/pdfshift-client';
+import { enforceExportAllowed } from '@/middleware/subscription-check';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -69,6 +70,9 @@ export async function POST(request: NextRequest) {
     if (!organizationId) {
       return NextResponse.json({ error: 'No organisation' }, { status: 400 });
     }
+
+    const exportBlocked = await enforceExportAllowed(organizationId);
+    if (exportBlocked) return exportBlocked;
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY!;

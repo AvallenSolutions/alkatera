@@ -21,7 +21,10 @@ type EmailEventType =
   | "subscription_cancelled"
   | "subscription_reactivated"
   | "subscription_suspended"
-  | "annual_renewal_reminder";
+  | "annual_renewal_reminder"
+  | "trial_started"
+  | "trial_ending_soon"
+  | "trial_ended";
 
 interface EmailRequest {
   organizationId: string;
@@ -141,6 +144,58 @@ function formatResourceType(type: string): string {
     suppliers: "Suppliers",
   };
   return labels[type] || type;
+}
+
+// alkatera brand assets for fully-branded emails (dark theme + neon lime #ccff00).
+const BRAND_LOGO_URL =
+  "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png";
+const BRAND_LIME = "#ccff00";
+const BRAND_BG = "#0a0d08";
+const BRAND_PANEL = "#14181a";
+const BRAND_BORDER = "#262b2e";
+
+/**
+ * Render a fully alkatera-branded email: dark canvas, logo lockup, neon-lime accents,
+ * the alka**tera** wordmark, and a lime primary button. Table-based + inline styles so it
+ * survives Outlook/Gmail. `accent` tints the heading rule (lime for good news, amber for
+ * urgency); the primary button stays brand lime.
+ */
+function renderBrandedEmail(opts: {
+  preheader: string;
+  title: string;
+  accent: string;
+  bodyHtml: string;
+  ctaLabel: string;
+  ctaHref: string;
+  secondaryHtml?: string;
+}): string {
+  return `
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${escapeHtml(opts.preheader)}</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0;padding:0;background:${BRAND_BG};">
+      <tr><td align="center" style="padding:32px 16px;background:${BRAND_BG};">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:100%;">
+          <tr><td align="center" style="padding:4px 0 26px;">
+            <img src="${BRAND_LOGO_URL}" width="150" alt="alkatera" style="display:block;width:150px;max-width:60%;height:auto;" />
+          </td></tr>
+          <tr><td style="background:${BRAND_PANEL};border:1px solid ${BRAND_BORDER};border-radius:16px;padding:34px 32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+            <h1 style="margin:0 0 22px;font-family:Georgia,'Times New Roman',serif;font-weight:normal;font-size:25px;line-height:1.25;color:#ffffff;">
+              <span style="display:inline-block;border-bottom:3px solid ${opts.accent};padding-bottom:5px;">${opts.title}</span>
+            </h1>
+            <div style="font-size:15px;line-height:1.7;color:#c7ccd1;">${opts.bodyHtml}</div>
+            <table role="presentation" cellpadding="0" cellspacing="0" style="margin:26px 0 2px;"><tr>
+              <td style="border-radius:10px;background:${BRAND_LIME};">
+                <a href="${opts.ctaHref}" style="display:inline-block;padding:14px 30px;font-size:14px;font-weight:bold;color:#0a0d08;text-decoration:none;border-radius:10px;">${opts.ctaLabel}</a>
+              </td>
+            </tr></table>
+            ${opts.secondaryHtml || ''}
+          </td></tr>
+          <tr><td align="center" style="padding:26px 8px 4px;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;">
+            <p style="margin:0;font-size:13px;color:#8b9197;">alka<strong style="color:${BRAND_LIME};font-weight:bold;">tera</strong> &middot; Sustainability platform for the drinks industry</p>
+            <p style="margin:9px 0 0;font-size:11px;color:#565b60;">You're receiving this because you started a free trial with alkatera.</p>
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>`;
 }
 
 function buildEmailContent(
@@ -508,6 +563,85 @@ function buildEmailContent(
           </div>
         `,
       };
+
+    case "trial_started": {
+      const trialEnd = metadata.trialEndsAt
+        ? new Date(metadata.trialEndsAt).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+        : 'in 30 days';
+      return {
+        subject: `Your free trial has started - alkatera`,
+        html: renderBrandedEmail({
+          preheader: `30 days free. We never charge automatically - you choose if and when to continue.`,
+          title: `Your free trial has started`,
+          accent: BRAND_LIME,
+          ctaLabel: `Go to your dashboard`,
+          ctaHref: `${siteUrl}/dashboard`,
+          bodyHtml: `
+            <p style="margin:0 0 14px;">Hi ${safeName},</p>
+            <p style="margin:0 0 14px;">Welcome to alka<strong style="color:${BRAND_LIME};">tera</strong>. Your 30-day free trial is now live. Add a facility, build a product life cycle assessment and explore the platform.</p>
+            <div style="background:#10160a;border-left:3px solid ${BRAND_LIME};border-radius:0 8px 8px 0;padding:14px 16px;margin:18px 0;">
+              <p style="margin:0 0 6px;color:#eef7d8;font-weight:bold;">How your trial works</p>
+              <p style="margin:0;color:#c7ccd1;">Your trial runs until <strong style="color:#ffffff;">${trialEnd}</strong>. We never charge your card automatically. To carry on after that, simply choose a plan, and because your card is already on file it's a single click.</p>
+              <p style="margin:8px 0 0;color:#c7ccd1;">We'll remind you before your trial ends. Whatever you decide, your data is always kept safe.</p>
+            </div>
+          `,
+          secondaryHtml: `<p style="margin:16px 0 0;font-size:13px;color:#8b9197;">Manage your trial anytime from <a href="${settingsUrl}" style="color:${BRAND_LIME};">billing settings</a>.</p>`,
+        }),
+      };
+    }
+
+    case "trial_ending_soon": {
+      const days = metadata.daysRemaining ?? 3;
+      const dayLabel = `${days} day${days === 1 ? '' : 's'}`;
+      const trialEnd = metadata.trialEndsAt
+        ? new Date(metadata.trialEndsAt).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+        : `in ${dayLabel}`;
+      return {
+        subject: `Your free trial ends in ${dayLabel} - alkatera`,
+        html: renderBrandedEmail({
+          preheader: `Choose a plan to keep going. We won't charge you automatically.`,
+          title: `Your free trial ends in ${dayLabel}`,
+          accent: '#f59e0b',
+          ctaLabel: `Choose your plan`,
+          ctaHref: settingsUrl,
+          bodyHtml: `
+            <p style="margin:0 0 14px;">Hi ${safeName},</p>
+            <div style="background:#1c1606;border-left:3px solid #f59e0b;border-radius:0 8px 8px 0;padding:14px 16px;margin:0 0 18px;">
+              <p style="margin:0 0 6px;color:#fce9c0;font-weight:bold;">Your free trial ends on ${trialEnd}.</p>
+              <p style="margin:0;color:#c7ccd1;">We won't charge you automatically. When the trial ends your account pauses to read-only until you choose a plan, and all your data stays safe.</p>
+            </div>
+            <p style="margin:0 0 14px;">Enjoying alka<strong style="color:${BRAND_LIME};">tera</strong>? Choose a plan to keep everything you've built and unlock downloads and reports. Your card is already on file, so it's a single click.</p>
+          `,
+          secondaryHtml: `<p style="margin:16px 0 0;font-size:13px;color:#8b9197;">No pressure either way, you're always in control.</p>`,
+        }),
+      };
+    }
+
+    case "trial_ended": {
+      const trialEnd = metadata.trialEndsAt
+        ? new Date(metadata.trialEndsAt).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+        : 'today';
+      return {
+        subject: `Your free trial has ended - choose a plan to continue`,
+        html: renderBrandedEmail({
+          preheader: `Your data is safe. Choose a plan to pick up where you left off.`,
+          title: `Your free trial has ended`,
+          accent: '#f59e0b',
+          ctaLabel: `Choose your plan`,
+          ctaHref: `${siteUrl}/complete-subscription`,
+          bodyHtml: `
+            <p style="margin:0 0 14px;">Hi ${safeName},</p>
+            <p style="margin:0 0 14px;">Your 30-day free trial ended on <strong style="color:#ffffff;">${trialEnd}</strong>. We hope you enjoyed exploring alka<strong style="color:${BRAND_LIME};">tera</strong>.</p>
+            <div style="background:#1c1606;border-left:3px solid #f59e0b;border-radius:0 8px 8px 0;padding:14px 16px;margin:0 0 18px;">
+              <p style="margin:0 0 6px;color:#fce9c0;font-weight:bold;">Your data is safe and waiting</p>
+              <p style="margin:0;color:#c7ccd1;">Your account is now read-only. Everything you built during the trial, your facility, products and life cycle assessments, is kept exactly as you left it.</p>
+            </div>
+            <p style="margin:0 0 14px;">To pick up where you left off and unlock downloads and reports, choose a plan. Your card is already on file, so it's a single click, and we still won't charge anything until you confirm.</p>
+          `,
+          secondaryHtml: `<p style="margin:16px 0 0;font-size:13px;color:#8b9197;">Questions before you decide? Just reply to this email.</p>`,
+        }),
+      };
+    }
 
     default:
       return {

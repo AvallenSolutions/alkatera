@@ -11,6 +11,8 @@ import { SupplierLayout } from './SupplierLayout'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { PaymentWarningBanner } from '@/components/subscription/PaymentWarningBanner'
+import { TrialBanner } from '@/components/subscription/TrialBanner'
+import { ReadOnlyPaywallBanner } from '@/components/subscription/ReadOnlyPaywallBanner'
 import { UnreadRepliesBanner } from '@/components/feedback/UnreadRepliesBanner'
 import { IntegrationHealthBanner } from '@/components/layouts/IntegrationHealthBanner'
 import { OnboardingProvider } from '@/lib/onboarding'
@@ -157,6 +159,10 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
         return
       }
 
+      // Expired trial / churned: allow into the app in READ-ONLY mode (data stays
+      // viewable, writes are blocked + a paywall banner is shown). Do not redirect.
+      if (subscriptionStatus === 'cancelled') return
+
       if (subscriptionStatus !== 'active' && subscriptionStatus !== 'trial') {
         router.push('/complete-subscription')
       }
@@ -229,6 +235,12 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
             <UnreadRepliesBanner />
             {subscriptionStatus === 'past_due' && currentOrganization && (
               <PaymentWarningBanner organizationId={currentOrganization.id} />
+            )}
+            {subscriptionStatus === 'trial' && currentOrganization && (
+              <TrialBanner organizationId={currentOrganization.id} />
+            )}
+            {subscriptionStatus === 'cancelled' && (
+              <ReadOnlyPaywallBanner />
             )}
             <div className="container mx-auto px-4 py-6 sm:px-6 lg:px-8">
               {children}

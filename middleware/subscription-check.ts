@@ -191,6 +191,89 @@ export async function enforceFeatureAccess(
   return null;
 }
 
+/**
+ * Read an organization's subscription status (service-role; bypasses RLS).
+ */
+async function getSubscriptionStatus(organizationId: string): Promise<string> {
+  const { createClient } = await import('@supabase/supabase-js');
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+  const { data } = await supabase
+    .from('organizations')
+    .select('subscription_status')
+    .eq('id', organizationId)
+    .single();
+  return data?.subscription_status || 'unknown';
+}
+
+/**
+ * Block file exports/downloads for orgs that have not subscribed.
+ *
+ * Downloads are a paid feature: trial orgs can explore and build, but cannot export
+ * reports/PDFs/CSVs until they subscribe ('active'). Expired trials ('cancelled') are
+ * read-only and equally blocked. Returns a 403 NextResponse when blocked, null when allowed.
+ *
+ * Apply at the top of every export route (LCA PDF, sustainability report, board pack,
+ * ISSB CSV, EPR/Xero CSV, certification PDFs, etc.).
+ */
+export async function enforceExportAllowed(
+  organizationId: string
+): Promise<NextResponse | null> {
+  const status = await getSubscriptionStatus(organizationId);
+
+  if (status === 'trial') {
+    return NextResponse.json(
+      {
+        error: 'Exports are not available during the free trial',
+        message: 'Subscribe to download reports, PDFs and data exports.',
+        reason: 'trial',
+        upgrade_required: true,
+      },
+      { status: 403 }
+    );
+  }
+
+  if (status === 'cancelled') {
+    return NextResponse.json(
+      {
+        error: 'Your trial has ended',
+        message: 'Subscribe to download reports, PDFs and data exports.',
+        reason: 'read_only',
+        upgrade_required: true,
+      },
+      { status: 403 }
+    );
+  }
+
+  return null;
+}
+
+/**
+ * Block create/edit operations for read-only orgs (expired trial -> 'cancelled').
+ * Returns a 403 NextResponse when blocked, null when allowed.
+ */
+export async function enforceWriteAccess(
+  organizationId: string
+): Promise<NextResponse | null> {
+  const status = await getSubscriptionStatus(organizationId);
+
+  if (status === 'cancelled') {
+    return NextResponse.json(
+      {
+        error: 'Your account is read-only',
+        message: 'Your trial has ended. Subscribe to continue creating and editing.',
+        reason: 'read_only',
+        upgrade_required: true,
+      },
+      { status: 403 }
+    );
+  }
+
+  return null;
+}
+
 // ============================================================================
 // Subscription Status Checks
 // ============================================================================

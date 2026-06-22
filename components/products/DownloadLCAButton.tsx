@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 import { useAllocationStatus } from "@/hooks/data/useAllocationStatus";
 import { useReportLimit } from "@/hooks/useSubscription";
+import { useExportGate } from "@/hooks/useExportGate";
 import { UpgradePromptModal } from "@/components/subscription";
 
 interface DownloadLCAButtonProps {
@@ -36,6 +37,7 @@ export function DownloadLCAButton({
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const allocationStatus = useAllocationStatus(productId || null);
   const { currentCount, maxCount, isUnlimited, checkLimit } = useReportLimit();
+  const { exportsLocked, reason: exportReason, message: exportMessage } = useExportGate();
 
   const isBlocked = !allowProvisional && allocationStatus.hasProvisionalAllocations;
   const isAtReportLimit = !isUnlimited && maxCount !== null && maxCount !== undefined && currentCount >= maxCount;
@@ -104,6 +106,40 @@ export function DownloadLCAButton({
       setIsGenerating(false);
     }
   };
+
+  // Trial / read-only: downloads are a paid feature. Show a locked button that
+  // opens the upgrade prompt rather than letting the request 403 silently.
+  if (exportsLocked) {
+    return (
+      <>
+        <UpgradePromptModal
+          open={showUpgradeModal}
+          onOpenChange={setShowUpgradeModal}
+          reason={exportMessage}
+        />
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <Button
+                  variant={variant}
+                  size={size}
+                  onClick={() => setShowUpgradeModal(true)}
+                  className="border-[#ccff00]/50"
+                >
+                  <Lock className="h-4 w-4 mr-2 text-[#ccff00]" />
+                  {exportReason === "read_only" ? "Subscribe to download" : "Download (trial)"}
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              <p>{exportMessage}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </>
+    );
+  }
 
   if (isBlocked) {
     return (

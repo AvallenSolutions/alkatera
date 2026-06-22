@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe, getBillingIntervalFromPriceId } from '@/lib/stripe-config';
+import { stripe, getBillingIntervalFromPriceId, getTierFromPriceId } from '@/lib/stripe-config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/db_types';
 import Stripe from 'stripe';
@@ -275,6 +275,19 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     console.error('  Full error:', JSON.stringify(error, null, 2));
   }
 
+  // Free trial: mirror Stripe's authoritative trial_end into subscription_expires_at
+  // so the in-app countdown banner and the expiring_trials admin aggregate have a
+  // source of truth. (update_subscription_from_stripe already maps 'trialing' -> 'trial'.)
+  if (subscription.status === 'trialing' && subscription.trial_end) {
+    const { error: trialError } = await getSupabaseAdmin()
+      .from('organizations')
+      .update({ subscription_expires_at: new Date(subscription.trial_end * 1000).toISOString() })
+      .eq('id', organizationId);
+    if (trialError) {
+      console.error('Error mirroring trial_end to subscription_expires_at:', trialError.message);
+    }
+  }
+
   // Import billing details from checkout session
   try {
     const billingUpdate: Record<string, any> = {
@@ -306,6 +319,24 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     }
   } catch (billingError) {
     console.error('Error importing billing details from checkout:', billingError);
+  }
+
+  // Card-on-file trial that does NOT auto-convert. We keep the card (anti-fraud + one-click
+  // conversion later) but set the subscription to cancel at the trial end so Stripe never
+  // charges automatically. At trial end Stripe fires customer.subscription.deleted, which
+  // flips the org to read-only and emails "trial ended, choose a plan". The saved card stays
+  // on the Stripe customer, so subscribing later is a single click.
+  if (subscription.status === 'trialing') {
+    try {
+      await stripe.subscriptions.update(subscriptionId, { cancel_at_period_end: true });
+    } catch (cancelErr: any) {
+      console.error('Error setting trial to cancel at period end:', cancelErr?.message);
+    }
+    // Welcome email — sets expectations: 30 days free, no automatic charge, choose a plan to continue.
+    await sendSubscriptionEmail(organizationId, 'trial_started', {
+      tier: getTierFromPriceId(priceId),
+      trialEndsAt: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
+    });
   }
 }
 
@@ -477,10 +508,20 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
       p_new_status: 'cancelled',
     });
 
-    // Send email notification about cancellation
-    await sendSubscriptionEmail(org.id, 'subscription_cancelled', {
-      previousTier,
-    });
+    // A trial that ends without converting reaches here too (the trial sub is set to
+    // cancel at period end). Distinguish it from a paying customer churning so we send the
+    // right message: "trial ended, choose a plan" vs the generic cancellation note.
+    if (previousStatus === 'trial') {
+      await sendSubscriptionEmail(org.id, 'trial_ended', {
+        trialEndsAt: new Date().toISOString(),
+      });
+    } else if (previousStatus !== 'cancelled') {
+      await sendSubscriptionEmail(org.id, 'subscription_cancelled', {
+        previousTier,
+      });
+    }
+    // If already 'cancelled', the daily sweep's expiry backstop handled this first —
+    // don't send a duplicate email.
   }
 }
 

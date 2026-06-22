@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, Building2, Plus, AlertCircle, MapPin, Leaf } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
+import { useSubscription } from '@/hooks/useSubscription';
 import { PageLoader } from '@/components/ui/page-loader';
 import { AddFacilityWizard } from '@/components/facilities/AddFacilityWizard';
 import Link from 'next/link';
@@ -41,6 +42,7 @@ export default function FacilitiesPage() {
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const { isReadOnly } = useSubscription();
 
   const fetchFacilities = useCallback(async () => {
     if (!currentOrganization?.id) {
@@ -97,9 +99,13 @@ export default function FacilitiesPage() {
         </div>
         <div className="flex items-center gap-2">
           <SmartUploadButton />
-          <Button onClick={() => setWizardOpen(true)} size="lg" className="gap-2">
+          <Button
+            onClick={() => (isReadOnly ? router.push('/complete-subscription') : setWizardOpen(true))}
+            size="lg"
+            className="gap-2"
+          >
             <Plus className="h-5 w-5" />
-            Add Facility
+            {isReadOnly ? 'Subscribe to add' : 'Add Facility'}
           </Button>
         </div>
       </div>

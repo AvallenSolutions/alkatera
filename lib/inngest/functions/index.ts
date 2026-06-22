@@ -17,6 +17,7 @@ import { xeroSyncTick, xeroOrgSync } from './xero';
 import { reportPdfGenerate } from './reports';
 import { ingredientMatchSuggest } from './ingredient-match';
 import { agribalyseBackfillRun } from './factors';
+import { trialReminderSweep } from './trial-reminders';
 
 export const allFunctions: InngestFunction.Any[] = [
   scrapingQueueTick,
@@ -31,4 +32,5 @@ export const allFunctions: InngestFunction.Any[] = [
   reportPdfGenerate,
   ingredientMatchSuggest,
   agribalyseBackfillRun,
+  trialReminderSweep,
 ];
