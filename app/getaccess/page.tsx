@@ -390,7 +390,8 @@ export default function GetAccessPage() {
             </h3>
             <p className="text-white/60 text-sm max-w-xl mx-auto mb-6">
               Start a 30-day free trial. Add a facility, build a product LCA and explore the
-              platform. No charge for 30 days, cancel anytime.
+              platform. We never charge automatically when your trial ends, you choose if and
+              when to continue.
             </p>
             <a
               href="/getaccess/signup?trial=true"

@@ -55,6 +55,12 @@ export const Navigation = ({ onOpenContact }: NavigationProps) => {
         >
           Get Access
         </Link>
+        <Link
+          href="/getaccess/signup?trial=true"
+          className="bg-[#ccff00] text-black px-6 py-2 rounded-full hover:opacity-90 transition-opacity duration-300"
+        >
+          Start free trial
+        </Link>
       </div>
 
       <button
@@ -91,6 +97,13 @@ export const Navigation = ({ onOpenContact }: NavigationProps) => {
               className="mt-8 text-[#ccff00] font-mono uppercase tracking-widest border border-[#ccff00] px-8 py-4 rounded-full"
             >
               Get Access
+            </Link>
+            <Link
+              href="/getaccess/signup?trial=true"
+              onClick={() => setIsOpen(false)}
+              className="text-black bg-[#ccff00] font-mono uppercase tracking-widest px-8 py-4 rounded-full"
+            >
+              Start free trial
             </Link>
           </motion.div>
         )}
