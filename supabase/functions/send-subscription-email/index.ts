@@ -168,6 +168,7 @@ function renderBrandedEmail(opts: {
   ctaLabel: string;
   ctaHref: string;
   secondaryHtml?: string;
+  footerNote?: string;
 }): string {
   return `
     <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${escapeHtml(opts.preheader)}</div>
@@ -191,11 +192,24 @@ function renderBrandedEmail(opts: {
           </td></tr>
           <tr><td align="center" style="padding:26px 8px 4px;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;">
             <p style="margin:0;font-size:13px;color:#8b9197;">alka<strong style="color:${BRAND_LIME};font-weight:bold;">tera</strong> &middot; Sustainability platform for the drinks industry</p>
-            <p style="margin:9px 0 0;font-size:11px;color:#565b60;">You're receiving this because you started a free trial with alkatera.</p>
+            <p style="margin:9px 0 0;font-size:11px;color:#565b60;">${opts.footerNote || 'This is a notification about your alkatera account.'}</p>
           </td></tr>
         </table>
       </td></tr>
     </table>`;
+}
+
+/** Dark-theme accent box used inside branded email bodies. */
+function noticeBox(tone: 'lime' | 'amber' | 'danger', title: string, body: string): string {
+  const c =
+    tone === 'amber'
+      ? { bg: '#1c1606', border: '#f59e0b', title: '#fce9c0' }
+      : tone === 'danger'
+      ? { bg: '#1f0d0d', border: '#ef4444', title: '#f7c4c4' }
+      : { bg: '#10160a', border: BRAND_LIME, title: '#eef7d8' };
+  return `<div style="background:${c.bg};border-left:3px solid ${c.border};border-radius:0 8px 8px 0;padding:14px 16px;margin:0 0 16px;">${
+    title ? `<p style="margin:0 0 6px;color:${c.title};font-weight:bold;">${title}</p>` : ''
+  }<p style="margin:0;color:#c7ccd1;">${body}</p></div>`;
 }
 
 function buildEmailContent(
@@ -207,361 +221,220 @@ function buildEmailContent(
   const settingsUrl = `${siteUrl}/settings?tab=billing`;
   const safeName = escapeHtml(org.name);
 
-  const baseStyles = `
-    <style>
-      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }
-      .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-      .header { background: linear-gradient(135deg, #10B981, #14B8A6); color: white; padding: 20px; border-radius: 8px 8px 0 0; }
-      .header-warning { background: linear-gradient(135deg, #f59e0b, #d97706); }
-      .header-danger { background: linear-gradient(135deg, #ef4444, #dc2626); }
-      .header-success { background: linear-gradient(135deg, #22c55e, #16a34a); }
-      .content { background: #f9fafb; padding: 20px; border-radius: 0 0 8px 8px; border: 1px solid #e5e7eb; border-top: none; }
-      .button { display: inline-block; background: #10B981; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; margin: 16px 0; }
-      .button-warning { background: #f59e0b; }
-      .footer { text-align: center; color: #6b7280; font-size: 12px; margin-top: 20px; }
-      .badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 14px; font-weight: 500; }
-      .badge-green { background: #d1fae5; color: #047857; }
-      .badge-amber { background: #fef3c7; color: #b45309; }
-      .badge-red { background: #fee2e2; color: #b91c1c; }
-      .info-box { background: #e0f2fe; border-left: 4px solid #0ea5e9; padding: 12px 16px; margin: 16px 0; border-radius: 0 4px 4px 0; }
-      .warning-box { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px 16px; margin: 16px 0; border-radius: 0 4px 4px 0; }
-      .danger-box { background: #fee2e2; border-left: 4px solid #ef4444; padding: 12px 16px; margin: 16px 0; border-radius: 0 4px 4px 0; }
-    </style>
-  `;
-
   switch (eventType) {
     case "plan_upgraded":
       return {
-        subject: `Plan Upgraded to ${formatTierName(metadata.newTier)} - alkatera`,
-        html: `
-          ${baseStyles}
-          <div class="container">
-            <div class="header header-success">
-              <h2 style="margin: 0;">🎉 Plan Upgraded Successfully</h2>
-            </div>
-            <div class="content">
-              <p>Hi ${safeName},</p>
-              <p>Great news! Your subscription has been upgraded.</p>
-              <div style="display: flex; align-items: center; gap: 12px; margin: 20px 0;">
-                <span class="badge badge-amber">${formatTierName(metadata.previousTier || 'seed')}</span>
-                <span style="font-size: 20px;">→</span>
-                <span class="badge badge-green">${formatTierName(metadata.newTier)}</span>
-              </div>
-              <p>You now have access to increased limits and new features. Here's what's new:</p>
-              <ul>
-                <li>Increased product and LCA limits</li>
-                <li>More team members and facilities</li>
-                <li>Enhanced reporting capabilities</li>
-              </ul>
-              <a href="${settingsUrl}" class="button">View Your Subscription</a>
-            </div>
-            <div class="footer">
-              <p>alka<strong>tera</strong> - Sustainability Platform</p>
-            </div>
-          </div>
-        `,
+        subject: `Plan upgraded to ${formatTierName(metadata.newTier)} - alkatera`,
+        html: renderBrandedEmail({
+          preheader: `You've been upgraded to ${formatTierName(metadata.newTier)}.`,
+          title: `Plan upgraded to ${formatTierName(metadata.newTier)}`,
+          accent: BRAND_LIME,
+          ctaLabel: `View your subscription`,
+          ctaHref: settingsUrl,
+          bodyHtml: `
+            <p style="margin:0 0 14px;">Hi ${safeName},</p>
+            <p style="margin:0 0 14px;">Good news, your subscription has been upgraded${metadata.previousTier ? ` from ${formatTierName(metadata.previousTier)}` : ''} to <strong style="color:#ffffff;">${formatTierName(metadata.newTier)}</strong>.</p>
+            ${noticeBox('lime', `What's included now`, `Higher product and LCA limits, more team members and facilities, and the full ${formatTierName(metadata.newTier)} feature set.`)}
+          `,
+        }),
       };
 
     case "plan_downgraded":
       return {
-        subject: `Plan Changed to ${formatTierName(metadata.newTier)} - alkatera`,
-        html: `
-          ${baseStyles}
-          <div class="container">
-            <div class="header">
-              <h2 style="margin: 0;">Plan Changed</h2>
-            </div>
-            <div class="content">
-              <p>Hi ${safeName},</p>
-              <p>Your subscription has been changed.</p>
-              <div style="display: flex; align-items: center; gap: 12px; margin: 20px 0;">
-                <span class="badge badge-green">${formatTierName(metadata.previousTier || 'canopy')}</span>
-                <span style="font-size: 20px;">→</span>
-                <span class="badge badge-amber">${formatTierName(metadata.newTier)}</span>
-              </div>
-              ${metadata.gracePeriod ? `
-                <div class="warning-box">
-                  <strong>⚠️ Grace Period Active</strong>
-                  <p style="margin: 8px 0 0 0;">Your current usage exceeds your new plan limits. You have <strong>7 days</strong> to reduce your usage, or the oldest items will be automatically removed.</p>
-                </div>
-              ` : ''}
-              <p>Your new plan limits are now in effect. Please review your subscription details.</p>
-              <a href="${settingsUrl}" class="button">View Your Subscription</a>
-            </div>
-            <div class="footer">
-              <p>alka<strong>tera</strong> - Sustainability Platform</p>
-            </div>
-          </div>
-        `,
+        subject: `Plan changed to ${formatTierName(metadata.newTier)} - alkatera`,
+        html: renderBrandedEmail({
+          preheader: `Your plan is now ${formatTierName(metadata.newTier)}.`,
+          title: `Your plan has changed`,
+          accent: '#f59e0b',
+          ctaLabel: `View your subscription`,
+          ctaHref: settingsUrl,
+          bodyHtml: `
+            <p style="margin:0 0 14px;">Hi ${safeName},</p>
+            <p style="margin:0 0 14px;">Your subscription has changed${metadata.previousTier ? ` from ${formatTierName(metadata.previousTier)}` : ''} to <strong style="color:#ffffff;">${formatTierName(metadata.newTier)}</strong>. Your new plan limits are now in effect.</p>
+            ${metadata.gracePeriod ? noticeBox('amber', `Grace period active`, `Your current usage exceeds your new plan limits. You have <strong style="color:#ffffff;">7 days</strong> to reduce it, or the oldest items will be automatically removed.`) : ''}
+          `,
+        }),
       };
 
-    case "grace_period_started":
+    case "grace_period_started": {
+      const resource = formatResourceType(org.grace_period_resource_type || 'items');
+      const endsOn = org.grace_period_end ? new Date(org.grace_period_end).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '7 days from now';
       return {
-        subject: `Action Required: Reduce Your ${formatResourceType(org.grace_period_resource_type || 'items')} - alkatera`,
-        html: `
-          ${baseStyles}
-          <div class="container">
-            <div class="header header-warning">
-              <h2 style="margin: 0;">⚠️ Grace Period Started</h2>
-            </div>
-            <div class="content">
-              <p>Hi ${safeName},</p>
-              <p>Your recent plan change means your current usage exceeds your new plan limits.</p>
-              <div class="warning-box">
-                <strong>You have 7 days to take action</strong>
-                <p style="margin: 8px 0 0 0;">
-                  <strong>${formatResourceType(org.grace_period_resource_type || 'items')}:</strong>
-                  ${metadata.currentUsage || 'N/A'} / ${metadata.newLimit || 'N/A'}
-                  (${metadata.excessCount || 0} over limit)
-                </p>
-              </div>
-              <p>Please reduce your ${formatResourceType(org.grace_period_resource_type || 'items').toLowerCase()} to fit within your plan limits. If no action is taken, the oldest items will be automatically removed after the grace period ends.</p>
-              <p><strong>Grace period ends:</strong> ${org.grace_period_end ? new Date(org.grace_period_end).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : '7 days from now'}</p>
-              <a href="${settingsUrl}" class="button button-warning">Manage Your Usage</a>
-            </div>
-            <div class="footer">
-              <p>alka<strong>tera</strong> - Sustainability Platform</p>
-            </div>
-          </div>
-        `,
+        subject: `Action required: reduce your ${resource} - alkatera`,
+        html: renderBrandedEmail({
+          preheader: `You have 7 days to bring your ${resource.toLowerCase()} within your plan limits.`,
+          title: `Action needed on your ${resource.toLowerCase()}`,
+          accent: '#f59e0b',
+          ctaLabel: `Manage your usage`,
+          ctaHref: settingsUrl,
+          bodyHtml: `
+            <p style="margin:0 0 14px;">Hi ${safeName},</p>
+            <p style="margin:0 0 14px;">Your recent plan change means your usage now exceeds your plan limits.</p>
+            ${noticeBox('amber', `You have 7 days to take action`, `<strong style="color:#ffffff;">${resource}:</strong> ${metadata.currentUsage ?? 'N/A'} / ${metadata.newLimit ?? 'N/A'} (${metadata.excessCount || 0} over limit). Grace period ends ${endsOn}.`)}
+            <p style="margin:0;">Please reduce your ${resource.toLowerCase()} to fit your plan. If no action is taken, the oldest items are automatically removed when the grace period ends.</p>
+          `,
+        }),
       };
+    }
 
-    case "grace_period_warning":
+    case "grace_period_warning": {
+      const resource = formatResourceType(org.grace_period_resource_type || 'items');
       return {
-        subject: `⚠️ 3 Days Left: Reduce Your ${formatResourceType(org.grace_period_resource_type || 'items')} - alkatera`,
-        html: `
-          ${baseStyles}
-          <div class="container">
-            <div class="header header-warning">
-              <h2 style="margin: 0;">⏰ Only 3 Days Left</h2>
-            </div>
-            <div class="content">
-              <p>Hi ${safeName},</p>
-              <div class="danger-box">
-                <strong>Your grace period ends in 3 days!</strong>
-                <p style="margin: 8px 0 0 0;">After this time, ${metadata.itemsToDelete || 'excess items'} will be automatically removed from your account.</p>
-              </div>
-              <p>
-                <strong>${formatResourceType(org.grace_period_resource_type || 'items')}:</strong>
-                ${metadata.currentUsage || 'N/A'} / ${metadata.newLimit || 'N/A'}
-              </p>
-              <p>To avoid losing data, please remove the excess ${formatResourceType(org.grace_period_resource_type || 'items').toLowerCase()} before the grace period ends.</p>
-              <a href="${settingsUrl}" class="button button-warning">Take Action Now</a>
-            </div>
-            <div class="footer">
-              <p>alka<strong>tera</strong> - Sustainability Platform</p>
-            </div>
-          </div>
-        `,
+        subject: `3 days left: reduce your ${resource} - alkatera`,
+        html: renderBrandedEmail({
+          preheader: `${metadata.itemsToDelete || 'Excess items'} will be removed in 3 days.`,
+          title: `Only 3 days left`,
+          accent: '#ef4444',
+          ctaLabel: `Take action now`,
+          ctaHref: settingsUrl,
+          bodyHtml: `
+            <p style="margin:0 0 14px;">Hi ${safeName},</p>
+            ${noticeBox('danger', `Your grace period ends in 3 days`, `After that, ${metadata.itemsToDelete || 'excess items'} will be automatically removed. <strong style="color:#ffffff;">${resource}:</strong> ${metadata.currentUsage ?? 'N/A'} / ${metadata.newLimit ?? 'N/A'}.`)}
+            <p style="margin:0;">To avoid losing data, remove the excess ${resource.toLowerCase()} before the grace period ends.</p>
+          `,
+        }),
       };
+    }
 
     case "grace_period_expired":
       return {
-        subject: `Items Removed: Grace Period Expired - alkatera`,
-        html: `
-          ${baseStyles}
-          <div class="container">
-            <div class="header header-danger">
-              <h2 style="margin: 0;">Grace Period Expired</h2>
-            </div>
-            <div class="content">
-              <p>Hi ${safeName},</p>
-              <p>Your grace period has expired and the following items have been automatically removed to bring your account within your plan limits:</p>
-              <div class="info-box">
-                <strong>${metadata.itemsDeleted || 0} ${formatResourceType(metadata.resourceType || 'items')}</strong> removed
-              </div>
-              <p>The oldest items were selected for removal. If you need to recover any data or upgrade your plan, please contact our support team.</p>
-              <a href="${settingsUrl}" class="button">View Your Account</a>
-            </div>
-            <div class="footer">
-              <p>alka<strong>tera</strong> - Sustainability Platform</p>
-            </div>
-          </div>
-        `,
+        subject: `Items removed: grace period expired - alkatera`,
+        html: renderBrandedEmail({
+          preheader: `Some items were removed to fit your plan limits.`,
+          title: `Grace period expired`,
+          accent: '#ef4444',
+          ctaLabel: `View your account`,
+          ctaHref: settingsUrl,
+          bodyHtml: `
+            <p style="margin:0 0 14px;">Hi ${safeName},</p>
+            <p style="margin:0 0 14px;">Your grace period has expired and some items were automatically removed to bring your account within its plan limits.</p>
+            ${noticeBox('danger', `${metadata.itemsDeleted || 0} ${formatResourceType(metadata.resourceType || 'items')} removed`, `The oldest items were selected. To recover data or raise your limits, upgrade your plan or contact support.`)}
+          `,
+        }),
       };
 
     case "payment_failed":
       return {
-        subject: `⚠️ Payment Failed - Action Required - alkatera`,
-        html: `
-          ${baseStyles}
-          <div class="container">
-            <div class="header header-danger">
-              <h2 style="margin: 0;">Payment Failed</h2>
-            </div>
-            <div class="content">
-              <p>Hi ${safeName},</p>
-              <p>We were unable to process your subscription payment.</p>
-              <div class="danger-box">
-                <strong>You have 7 days to update your payment method</strong>
-                <p style="margin: 8px 0 0 0;">Your account will remain fully accessible during this grace period. If payment is not resolved within 7 days${metadata.gracePeriodEnd ? ` (by ${new Date(metadata.gracePeriodEnd).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })})` : ''}, your account will be suspended.</p>
-              </div>
-              <p>Your data will always be kept safe, but you won't be able to access the platform until payment is resolved.</p>
-              <a href="${settingsUrl}" class="button">Update Payment Method</a>
-              <p style="margin-top: 20px; font-size: 14px; color: #6b7280;">If you believe this is an error, please contact your bank or our support team.</p>
-            </div>
-            <div class="footer">
-              <p>alka<strong>tera</strong> - Sustainability Platform</p>
-            </div>
-          </div>
-        `,
+        subject: `Payment failed - action required - alkatera`,
+        html: renderBrandedEmail({
+          preheader: `Update your payment method within 7 days to keep your access.`,
+          title: `Payment failed`,
+          accent: '#ef4444',
+          ctaLabel: `Update payment method`,
+          ctaHref: settingsUrl,
+          bodyHtml: `
+            <p style="margin:0 0 14px;">Hi ${safeName},</p>
+            <p style="margin:0 0 14px;">We couldn't process your subscription payment.</p>
+            ${noticeBox('danger', `You have 7 days to update your payment method`, `Your account stays fully accessible during this grace period. If it isn't resolved${metadata.gracePeriodEnd ? ` by ${new Date(metadata.gracePeriodEnd).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}` : ' within 7 days'}, your account will be suspended.`)}
+            <p style="margin:0;">Your data is always kept safe. If you think this is an error, please contact your bank or our support team.</p>
+          `,
+        }),
       };
 
     case "payment_succeeded":
       return {
-        subject: `Payment Received - alkatera`,
-        html: `
-          ${baseStyles}
-          <div class="container">
-            <div class="header header-success">
-              <h2 style="margin: 0;">✓ Payment Successful</h2>
-            </div>
-            <div class="content">
-              <p>Hi ${safeName},</p>
-              <p>Thank you! Your payment has been processed successfully.</p>
-              ${metadata.amount ? `
-                <div class="info-box">
-                  <strong>Amount:</strong> £${(metadata.amount / 100).toFixed(2)}
-                </div>
-              ` : ''}
-              ${metadata.wasReactivated ? `
-                <p>Your subscription has been reactivated and all features are now available again.</p>
-              ` : ''}
-              <a href="${settingsUrl}" class="button">View Billing Details</a>
-            </div>
-            <div class="footer">
-              <p>alka<strong>tera</strong> - Sustainability Platform</p>
-            </div>
-          </div>
-        `,
+        subject: `Payment received - alkatera`,
+        html: renderBrandedEmail({
+          preheader: `Thanks, your payment went through.`,
+          title: `Payment received`,
+          accent: BRAND_LIME,
+          ctaLabel: `View billing details`,
+          ctaHref: settingsUrl,
+          bodyHtml: `
+            <p style="margin:0 0 14px;">Hi ${safeName},</p>
+            <p style="margin:0 0 14px;">Thank you, your payment has been processed successfully.</p>
+            ${metadata.amount ? noticeBox('lime', `Amount paid`, `&pound;${(metadata.amount / 100).toFixed(2)}`) : ''}
+            ${metadata.wasReactivated ? `<p style="margin:0;">Your subscription is reactivated and all features are available again.</p>` : ''}
+          `,
+        }),
       };
 
     case "payment_method_updated":
       return {
-        subject: `Payment Method Updated - alkatera`,
-        html: `
-          ${baseStyles}
-          <div class="container">
-            <div class="header header-success">
-              <h2 style="margin: 0;">Payment Method Updated</h2>
-            </div>
-            <div class="content">
-              <p>Hi ${safeName},</p>
-              <p>Your payment method has been successfully updated.</p>
-              ${metadata.cardLast4 ? `
-                <div class="info-box">
-                  <strong>New card ending in:</strong> •••• ${metadata.cardLast4}
-                </div>
-              ` : ''}
-              <p>Your future payments will be charged to this payment method.</p>
-              <a href="${settingsUrl}" class="button">View Billing Details</a>
-            </div>
-            <div class="footer">
-              <p>alka<strong>tera</strong> - Sustainability Platform</p>
-            </div>
-          </div>
-        `,
+        subject: `Payment method updated - alkatera`,
+        html: renderBrandedEmail({
+          preheader: `Your new card is saved for future payments.`,
+          title: `Payment method updated`,
+          accent: BRAND_LIME,
+          ctaLabel: `View billing details`,
+          ctaHref: settingsUrl,
+          bodyHtml: `
+            <p style="margin:0 0 14px;">Hi ${safeName},</p>
+            <p style="margin:0 0 14px;">Your payment method has been updated successfully.</p>
+            ${metadata.cardLast4 ? noticeBox('lime', `New card`, `Ending in &bull;&bull;&bull;&bull; ${metadata.cardLast4}`) : ''}
+            <p style="margin:0;">Future payments will use this card.</p>
+          `,
+        }),
       };
 
     case "subscription_cancelled":
       return {
-        subject: `Subscription Cancelled - alkatera`,
-        html: `
-          ${baseStyles}
-          <div class="container">
-            <div class="header">
-              <h2 style="margin: 0;">Subscription Cancelled</h2>
-            </div>
-            <div class="content">
-              <p>Hi ${safeName},</p>
-              <p>Your alkatera subscription has been cancelled.</p>
-              <p>Your account has been downgraded to the Seed (free) tier. You still have access to basic features, but some advanced functionality may be limited.</p>
-              <p>We're sorry to see you go! If you change your mind, you can upgrade again at any time.</p>
-              <a href="${settingsUrl}" class="button">Resubscribe</a>
-            </div>
-            <div class="footer">
-              <p>alka<strong>tera</strong> - Sustainability Platform</p>
-            </div>
-          </div>
-        `,
+        subject: `Subscription cancelled - alkatera`,
+        html: renderBrandedEmail({
+          preheader: `You've moved to the Seed (free) tier. Resubscribe anytime.`,
+          title: `Subscription cancelled`,
+          accent: '#f59e0b',
+          ctaLabel: `Resubscribe`,
+          ctaHref: settingsUrl,
+          bodyHtml: `
+            <p style="margin:0 0 14px;">Hi ${safeName},</p>
+            <p style="margin:0 0 14px;">Your alka<strong style="color:${BRAND_LIME};">tera</strong> subscription has been cancelled and your account has moved to the Seed (free) tier. You still have the basics, though some advanced features are limited.</p>
+            <p style="margin:0;">We're sorry to see you go. You can resubscribe whenever you're ready, and your data stays safe in the meantime.</p>
+          `,
+        }),
       };
 
     case "subscription_reactivated":
       return {
-        subject: `Welcome Back! Subscription Reactivated - alkatera`,
-        html: `
-          ${baseStyles}
-          <div class="container">
-            <div class="header header-success">
-              <h2 style="margin: 0;">🎉 Welcome Back!</h2>
-            </div>
-            <div class="content">
-              <p>Hi ${safeName},</p>
-              <p>Great news! Your alkatera subscription has been reactivated.</p>
-              <p>All your features and data are available again. Thank you for continuing to use alkatera for your sustainability tracking.</p>
-              <a href="${siteUrl}/dashboard" class="button">Go to Dashboard</a>
-            </div>
-            <div class="footer">
-              <p>alka<strong>tera</strong> - Sustainability Platform</p>
-            </div>
-          </div>
-        `,
+        subject: `Welcome back - subscription reactivated - alkatera`,
+        html: renderBrandedEmail({
+          preheader: `All your features and data are available again.`,
+          title: `Welcome back`,
+          accent: BRAND_LIME,
+          ctaLabel: `Go to your dashboard`,
+          ctaHref: `${siteUrl}/dashboard`,
+          bodyHtml: `
+            <p style="margin:0 0 14px;">Hi ${safeName},</p>
+            <p style="margin:0 0 14px;">Good news, your alka<strong style="color:${BRAND_LIME};">tera</strong> subscription has been reactivated.</p>
+            <p style="margin:0;">All your features and data are available again. Thank you for continuing with alkatera.</p>
+          `,
+        }),
       };
 
     case "subscription_suspended":
       return {
-        subject: `Account Suspended - Action Required - alkatera`,
-        html: `
-          ${baseStyles}
-          <div class="container">
-            <div class="header header-danger">
-              <h2 style="margin: 0;">Account Suspended</h2>
-            </div>
-            <div class="content">
-              <p>Hi ${safeName},</p>
-              <p>Your alkatera account has been suspended because your payment could not be processed and the 7-day grace period has expired.</p>
-              <div class="danger-box">
-                <strong>Your data is safe</strong>
-                <p style="margin: 8px 0 0 0;">All your products, LCAs, reports and organisation data are kept intact. Once you update your payment method, access will be restored immediately.</p>
-              </div>
-              <a href="${settingsUrl}" class="button">Update Payment Method</a>
-              <p style="margin-top: 20px; font-size: 14px; color: #6b7280;">If you believe this is an error, please contact our support team at support@alkatera.com.</p>
-            </div>
-            <div class="footer">
-              <p>alka<strong>tera</strong> - Sustainability Platform</p>
-            </div>
-          </div>
-        `,
+        subject: `Account suspended - action required - alkatera`,
+        html: renderBrandedEmail({
+          preheader: `Update your payment method to restore access.`,
+          title: `Account suspended`,
+          accent: '#ef4444',
+          ctaLabel: `Update payment method`,
+          ctaHref: settingsUrl,
+          bodyHtml: `
+            <p style="margin:0 0 14px;">Hi ${safeName},</p>
+            <p style="margin:0 0 14px;">Your alka<strong style="color:${BRAND_LIME};">tera</strong> account has been suspended because a payment couldn't be processed and the 7-day grace period has passed.</p>
+            ${noticeBox('danger', `Your data is safe`, `All your products, LCAs, reports and organisation data are intact. Update your payment method and access is restored immediately.`)}
+            <p style="margin:0;">If you think this is an error, contact us at support@alkatera.com.</p>
+          `,
+        }),
       };
 
     case "annual_renewal_reminder":
       return {
-        subject: `Upcoming Annual Renewal - alkatera`,
-        html: `
-          ${baseStyles}
-          <div class="container">
-            <div class="header">
-              <h2 style="margin: 0;">Annual Subscription Renewal</h2>
-            </div>
-            <div class="content">
-              <p>Hi ${safeName},</p>
-              <p>This is a friendly reminder that your annual alkatera subscription will renew soon.</p>
-              <div class="info-box">
-                <strong>Renewal Details</strong>
-                <p style="margin: 8px 0 0 0;">
-                  <strong>Plan:</strong> ${formatTierName(metadata.tier || 'seed')}<br/>
-                  <strong>Amount:</strong> &pound;${metadata.amount ? (metadata.amount / 100).toFixed(2) : 'N/A'}<br/>
-                  <strong>Renewal Date:</strong> ${metadata.renewalDate ? new Date(metadata.renewalDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'Within 7 days'}
-                </p>
-              </div>
-              <p>If you'd like to make any changes to your subscription or payment method before renewal, you can do so from your billing settings.</p>
-              <a href="${settingsUrl}" class="button">Manage Subscription</a>
-            </div>
-            <div class="footer">
-              <p>alka<strong>tera</strong> - Sustainability Platform</p>
-            </div>
-          </div>
-        `,
+        subject: `Upcoming annual renewal - alkatera`,
+        html: renderBrandedEmail({
+          preheader: `Your annual ${formatTierName(metadata.tier || 'seed')} plan renews soon.`,
+          title: `Your annual plan renews soon`,
+          accent: '#f59e0b',
+          ctaLabel: `Manage subscription`,
+          ctaHref: settingsUrl,
+          bodyHtml: `
+            <p style="margin:0 0 14px;">Hi ${safeName},</p>
+            <p style="margin:0 0 14px;">A friendly reminder that your annual alka<strong style="color:${BRAND_LIME};">tera</strong> subscription will renew soon.</p>
+            ${noticeBox('lime', `Renewal details`, `<strong style="color:#ffffff;">Plan:</strong> ${formatTierName(metadata.tier || 'seed')}<br/><strong style="color:#ffffff;">Amount:</strong> &pound;${metadata.amount ? (metadata.amount / 100).toFixed(2) : 'N/A'}<br/><strong style="color:#ffffff;">Renews:</strong> ${metadata.renewalDate ? new Date(metadata.renewalDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'within 7 days'}`)}
+            <p style="margin:0;">To change your plan or payment method before then, visit your billing settings.</p>
+          `,
+        }),
       };
 
     case "trial_started": {
@@ -645,23 +518,18 @@ function buildEmailContent(
 
     default:
       return {
-        subject: `Subscription Update - alkatera`,
-        html: `
-          ${baseStyles}
-          <div class="container">
-            <div class="header">
-              <h2 style="margin: 0;">Subscription Update</h2>
-            </div>
-            <div class="content">
-              <p>Hi ${safeName},</p>
-              <p>There's been an update to your alkatera subscription.</p>
-              <a href="${settingsUrl}" class="button">View Details</a>
-            </div>
-            <div class="footer">
-              <p>alka<strong>tera</strong> - Sustainability Platform</p>
-            </div>
-          </div>
-        `,
+        subject: `Subscription update - alkatera`,
+        html: renderBrandedEmail({
+          preheader: `An update about your alkatera account.`,
+          title: `Subscription update`,
+          accent: BRAND_LIME,
+          ctaLabel: `View details`,
+          ctaHref: settingsUrl,
+          bodyHtml: `
+            <p style="margin:0 0 14px;">Hi ${safeName},</p>
+            <p style="margin:0;">There's been an update to your alka<strong style="color:${BRAND_LIME};">tera</strong> subscription.</p>
+          `,
+        }),
       };
   }
 }
