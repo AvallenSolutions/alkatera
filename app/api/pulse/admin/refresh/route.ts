@@ -1,36 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { getMemberRole } from '@/app/api/stripe/_helpers/get-member-role';
+import { inngest } from '@/lib/inngest/client';
+import { seedPulseJobs } from '@/lib/pulse/refresh-jobs';
+import { runPulseRefreshInline } from '@/lib/pulse/run-refresh';
 
 /**
  * POST /api/pulse/admin/refresh
  *
- * On-demand trigger for the four Pulse cron jobs. Exists so owners/admins can
- * kick a refresh from the UI without waiting for the Netlify schedule, and so
- * we have a UI-first path during development (the scheduled functions require
- * a deploy).
+ * On-demand trigger for the Pulse data jobs. Owners/admins kick a refresh from
+ * the UI without waiting for the Netlify schedule.
  *
- * Auth: caller must be an authenticated member of the organisation with role
- * 'owner' or 'admin'. The downstream cron routes are Bearer-protected with
- * CRON_SECRET; we attach that server-side so the secret never reaches the
- * browser.
+ * These jobs are heavy (snapshots iterate every org; insights make a Gemini
+ * call per org), so running them synchronously inside this request blew past
+ * the platform's sync-function timeout — the gateway returned an HTML 502/504
+ * page and the browser's `res.json()` failed with "Unexpected token '<'". They
+ * now run in the background:
+ *   1. We record a `pulse_refresh_runs` row (the unit of progress).
+ *   2. We dispatch `pulse/refresh.requested`; the Inngest function runs each
+ *      job in its own step (fresh invocation budget + retries, no timeout).
+ *   3. The UI polls GET /api/pulse/admin/refresh/status for live per-job state.
  *
- * Runs sequentially (snapshots → anomalies → grid-carbon → insights) because
- * insights read from the tables the earlier jobs populate; a fresh snapshot
- * means a meaningful narrative. Each job's status is returned individually so
- * partial success is visible in the UI.
+ * Local dev / no Inngest: when INNGEST_EVENT_KEY is unset, `inngest.send` no-ops,
+ * so we fall back to running the jobs in-process (fire-and-forget). No gateway
+ * sits in front of a local node server, so the long runtime is harmless there.
+ *
+ * Auth: caller must be an authenticated owner/admin of some org. The downstream
+ * cron routes are Bearer-protected with CRON_SECRET, attached server-side so the
+ * secret never reaches the browser.
  */
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
-const JOBS = [
-  { key: 'snapshots', path: '/api/cron/generate-snapshots' },
-  { key: 'anomalies', path: '/api/cron/detect-anomalies' },
-  { key: 'grid_carbon', path: '/api/cron/refresh-grid-carbon' },
-  { key: 'insights', path: '/api/cron/generate-insights' },
-  { key: 'shadow_prices', path: '/api/cron/refresh-shadow-prices' },
-] as const;
+function serviceClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+  if (!url || !key) throw new Error('Missing Supabase service-role config');
+  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,10 +52,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
     }
 
-    // Caller's active organisation via organization_members. We just need any
-    // org where they have an admin/owner role; Pulse refresh is org-agnostic
-    // (the crons iterate every org), so we use membership purely as an authz
-    // gate rather than to parameterise the job.
+    // Membership is purely an authz gate here — Pulse refresh is org-agnostic
+    // (the crons iterate every org), so we just need an org where the caller is
+    // an admin/owner.
     const { data: membership } = await supabase
       .from('organization_members')
       .select('organization_id')
@@ -66,42 +74,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const cronSecret = process.env.CRON_SECRET;
-    if (!cronSecret) {
-      return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
-    }
-
-    // Resolve base URL. In prod this is the request's own origin; in dev it's
-    // http://localhost:3000. We call ourselves so the cron routes execute in
-    // the same runtime with the same env.
     const baseUrl = request.nextUrl.origin;
+    const service = serviceClient();
 
-    const results: Record<string, { ok: boolean; status: number; body: unknown }> = {};
-    for (const job of JOBS) {
-      try {
-        const res = await fetch(`${baseUrl}${job.path}`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${cronSecret}`,
-            'Content-Type': 'application/json',
-          },
-        });
-        const body = await res.json().catch(() => ({}));
-        results[job.key] = { ok: res.ok, status: res.status, body };
-      } catch (err: any) {
-        results[job.key] = {
-          ok: false,
-          status: 0,
-          body: { error: err?.message ?? 'fetch failed' },
-        };
-      }
+    // Record the run up front (seeded with every job pending) so the UI has a
+    // row to poll the moment it gets the id back.
+    const { data: run, error: insertErr } = await service
+      .from('pulse_refresh_runs')
+      .insert({
+        requested_by: user.id,
+        status: 'queued',
+        jobs: seedPulseJobs(),
+      })
+      .select('id')
+      .single();
+
+    if (insertErr || !run) {
+      return NextResponse.json(
+        { error: insertErr?.message ?? 'Failed to create refresh run' },
+        { status: 500 },
+      );
     }
 
-    const allOk = Object.values(results).every(r => r.ok);
-    return NextResponse.json(
-      { ok: allOk, results },
-      { status: allOk ? 200 : 207 },
-    );
+    if (process.env.INNGEST_EVENT_KEY) {
+      await inngest.send({
+        name: 'pulse/refresh.requested',
+        data: { run_id: run.id, base_url: baseUrl },
+      });
+    } else {
+      // No Inngest configured (local dev): run in-process, fire-and-forget.
+      void runPulseRefreshInline(service, run.id, baseUrl, process.env.CRON_SECRET).catch(
+        (err) => console.error('[pulse admin refresh] inline run failed', err),
+      );
+    }
+
+    return NextResponse.json({ ok: true, runId: run.id }, { status: 202 });
   } catch (err: any) {
     console.error('[pulse admin refresh]', err);
     return NextResponse.json(

@@ -18,6 +18,7 @@ import { reportPdfGenerate } from './reports';
 import { ingredientMatchSuggest } from './ingredient-match';
 import { agribalyseBackfillRun } from './factors';
 import { trialReminderSweep } from './trial-reminders';
+import { pulseRefreshRun } from './pulse-refresh';
 
 export const allFunctions: InngestFunction.Any[] = [
   scrapingQueueTick,
@@ -33,4 +34,5 @@ export const allFunctions: InngestFunction.Any[] = [
   ingredientMatchSuggest,
   agribalyseBackfillRun,
   trialReminderSweep,
+  pulseRefreshRun,
 ];

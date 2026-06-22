@@ -75,6 +75,11 @@ export interface AlkateraEvents {
   'factors/agribalyse.backfill': {
     data: { names?: string[] };
   };
+
+  // ─────────── Pulse on-demand refresh ───────────
+  'pulse/refresh.requested': {
+    data: { run_id: string; base_url: string };
+  };
 }
 
 const eventKey = process.env.INNGEST_EVENT_KEY;

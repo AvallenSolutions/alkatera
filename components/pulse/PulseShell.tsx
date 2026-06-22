@@ -2,7 +2,15 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, LayoutGrid, MessageSquare, RefreshCw } from 'lucide-react';
+import {
+  Activity,
+  CheckCircle2,
+  Loader2,
+  LayoutGrid,
+  MessageSquare,
+  RefreshCw,
+  XCircle,
+} from 'lucide-react';
 import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider';
 import { Button } from '@/components/ui/button';
 import { PulseGrid } from '@/components/pulse/PulseGrid';
@@ -43,6 +51,11 @@ import { AskRosaWidget } from '@/components/pulse/widgets/AskRosaWidget';
 import { useOrganization } from '@/lib/organizationContext';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import {
+  PULSE_REFRESH_JOBS,
+  type PulseJobState,
+  type PulseRefreshRun,
+} from '@/lib/pulse/refresh-jobs';
 
 /**
  * Pulse — top-level shell.
@@ -208,9 +221,45 @@ function PulseHeader({
 }
 
 /**
- * Admin-only "Refresh data" button. Fires all four Pulse cron jobs on demand
- * via /api/pulse/admin/refresh. Useful during development (scheduled functions
- * need a deploy) and for impatient owners who want numbers to move right now.
+ * Read a fetch Response as JSON without throwing on HTML error pages. A gateway
+ * timeout / proxy error returns `<HTML>…`, which `res.json()` would choke on
+ * with "Unexpected token '<'"; this surfaces the real status instead.
+ */
+async function safeJson(res: Response): Promise<any> {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: `Server returned ${res.status} (${res.statusText || 'non-JSON response'})` };
+  }
+}
+
+/** Per-job status row inside the progress panel. */
+function JobRow({ label, state }: { label: string; state?: PulseJobState }) {
+  const status = state?.status ?? 'pending';
+  const icon =
+    status === 'completed' ? (
+      <CheckCircle2 className="h-3.5 w-3.5 text-[#ccff00]" />
+    ) : status === 'failed' ? (
+      <XCircle className="h-3.5 w-3.5 text-red-500" />
+    ) : status === 'running' ? (
+      <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+    ) : (
+      <div className="h-3.5 w-3.5 rounded-full border border-muted-foreground/40" />
+    );
+  return (
+    <div className="flex items-center gap-2 py-1 text-xs">
+      {icon}
+      <span className={cn(status === 'failed' && 'text-red-500')}>{label}</span>
+    </div>
+  );
+}
+
+/**
+ * Admin-only "Refresh data" button. Kicks off all five Pulse data jobs in the
+ * background (via /api/pulse/admin/refresh → Inngest) and polls for live
+ * per-job progress. Running them synchronously here used to time out the
+ * platform gateway and crash with a JSON-parse error.
  *
  * Visible only to role 'owner' or 'admin' — the endpoint enforces the same
  * check, this is just UX hiding.
@@ -218,30 +267,77 @@ function PulseHeader({
 function RefreshPulseButton() {
   const { userRole } = useOrganization();
   const { toast } = useToast();
-  const [busy, setBusy] = useState(false);
+  const [runId, setRunId] = useState<string | null>(null);
+  const [jobs, setJobs] = useState<Record<string, PulseJobState>>({});
+  const [starting, setStarting] = useState(false);
+
+  const busy = starting || runId !== null;
+
+  // Poll the run's status while one is active; reload when it finishes.
+  useEffect(() => {
+    if (!runId) return;
+    let cancelled = false;
+
+    async function poll() {
+      try {
+        const res = await fetch(`/api/pulse/admin/refresh/status?runId=${runId}`);
+        const data: PulseRefreshRun = await safeJson(res);
+        if (cancelled) return;
+        if (data?.jobs) setJobs(data.jobs);
+
+        if (data?.status === 'completed' || data?.status === 'failed') {
+          setRunId(null);
+          if (data.status === 'completed') {
+            toast({
+              title: 'Pulse refreshed',
+              description: 'Snapshots, anomalies, grid carbon and insights all updated.',
+            });
+            setTimeout(() => window.location.reload(), 800);
+          } else {
+            const failed = Object.entries(data.jobs ?? {})
+              .filter(([, j]) => j.status === 'failed')
+              .map(([k]) => k)
+              .join(', ');
+            toast({
+              title: 'Refresh failed',
+              description: failed
+                ? `Failed: ${failed}`
+                : data.error ?? 'One or more jobs failed.',
+              variant: 'destructive',
+            });
+          }
+        }
+      } catch {
+        // Transient network blip — keep polling.
+      }
+    }
+
+    poll();
+    const interval = setInterval(poll, 1500);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [runId, toast]);
 
   if (userRole !== 'owner' && userRole !== 'admin') return null;
 
   async function handleClick() {
-    setBusy(true);
+    setStarting(true);
+    setJobs({});
     try {
       const res = await fetch('/api/pulse/admin/refresh', { method: 'POST' });
-      const data = await res.json();
-      if (res.ok && data.ok) {
+      const data = await safeJson(res);
+      if (res.ok && data.runId) {
+        setRunId(data.runId);
         toast({
-          title: 'Pulse refreshed',
-          description: 'Snapshots, anomalies, grid carbon and insights all updated.',
+          title: 'Refresh started',
+          description: 'Running the data jobs now — this takes a couple of minutes.',
         });
-        // Nudge the page so widgets re-fetch cleanly.
-        setTimeout(() => window.location.reload(), 600);
       } else {
-        const failed = Object.entries(data.results ?? {})
-          .filter(([, r]: [string, any]) => !r.ok)
-          .map(([k]) => k)
-          .join(', ');
         toast({
-          title: res.ok ? 'Partial refresh' : 'Refresh failed',
-          description: failed ? `Failed: ${failed}` : data.error ?? 'Unknown error',
+          title: 'Refresh failed',
+          description: data.error ?? 'Could not start the refresh.',
           variant: 'destructive',
         });
       }
@@ -252,21 +348,32 @@ function RefreshPulseButton() {
         variant: 'destructive',
       });
     } finally {
-      setBusy(false);
+      setStarting(false);
     }
   }
 
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={handleClick}
-      disabled={busy}
-      title="Run all Pulse data jobs now"
-    >
-      <RefreshCw className={cn('mr-2 h-4 w-4', busy && 'animate-spin')} />
-      {busy ? 'Refreshing…' : 'Refresh data'}
-    </Button>
+    <div className="relative">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleClick}
+        disabled={busy}
+        title="Run all Pulse data jobs now"
+      >
+        <RefreshCw className={cn('mr-2 h-4 w-4', busy && 'animate-spin')} />
+        {busy ? 'Refreshing…' : 'Refresh data'}
+      </Button>
+
+      {runId && (
+        <div className="absolute right-0 z-50 mt-2 w-56 rounded-md border bg-popover p-3 shadow-md">
+          <p className="mb-1 text-xs font-medium text-muted-foreground">Refreshing Pulse data…</p>
+          {PULSE_REFRESH_JOBS.map((job) => (
+            <JobRow key={job.key} label={job.label} state={jobs[job.key]} />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
