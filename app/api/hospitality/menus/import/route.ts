@@ -12,7 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
-import { resolveUserOrganization } from '@/lib/supabase/resolve-organization'
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access'
 import { extractMenu } from '@/lib/hospitality/menu-import'
 
 export const runtime = 'nodejs'
@@ -50,8 +50,8 @@ function needsVision(name: string, mime: string): boolean {
 export async function POST(request: NextRequest) {
   const { client, user, error: authError } = await getSupabaseAPIClient()
   if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { organizationId, error: orgErr } = await resolveUserOrganization(client as any, user)
-  if (orgErr || !organizationId) return NextResponse.json({ error: orgErr || 'No organisation' }, { status: 403 })
+  const organizationId = await resolveAccessibleOrg(client as any, user)
+  if (!organizationId) return NextResponse.json({ error: 'No organisation' }, { status: 403 })
 
   let form: FormData
   try {

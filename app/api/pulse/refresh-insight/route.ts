@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 import {
   gatherInsightContext,
   generateInsight,
@@ -58,16 +59,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { data: membership } = await userClient
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', userData.user.id)
-    .eq('organization_id', orgId)
-    .maybeSingle();
-  if (!membership) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
   // Service-role client for the gather + write (it bypasses RLS so the
   // insight builder can read all the cross-table context efficiently).
   const adminClient = createClient(
@@ -75,6 +66,12 @@ export async function POST(request: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } },
   );
+
+  // Member OR active advisor for the requested org.
+  const accessibleOrg = await resolveAccessibleOrg(adminClient, userData.user, orgId);
+  if (!accessibleOrg) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
 
   // Rate limit: one refresh per org per hour.
   const sinceStr = new Date(Date.now() - 60 * 60_000).toISOString();

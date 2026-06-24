@@ -21,6 +21,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 import { runToolLoop } from '@/lib/rosa/run-tool-loop';
 import { GEMINI_ROSA_MODEL } from '@/lib/ai/models';
 import { METRIC_DEFINITIONS, type MetricKey } from '@/lib/pulse/metric-keys';
@@ -79,14 +80,9 @@ export async function POST(
       return NextResponse.json({ error: 'Anomaly not found' }, { status: 404 });
     }
 
-    // Verify caller is a member of the anomaly's org.
-    const { data: membership } = await userSupabase
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', user.id)
-      .eq('organization_id', anomaly.organization_id)
-      .maybeSingle();
-    if (!membership) {
+    // Member OR active advisor for the anomaly's org.
+    const accessibleOrg = await resolveAccessibleOrg(svc, user, anomaly.organization_id);
+    if (!accessibleOrg) {
       return NextResponse.json({ error: 'Not a member of this organisation' }, { status: 403 });
     }
 

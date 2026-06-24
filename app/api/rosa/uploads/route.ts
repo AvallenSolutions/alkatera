@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 import { buildUploadPath, inferMediaType, isSupportedMediaType } from '@/lib/rosa/document-extraction';
 import { checkRateLimit } from '@/lib/rosa/rate-limiter';
 
@@ -35,16 +36,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { data: membership } = await userSupabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .limit(1)
-    .maybeSingle();
-  if (!membership) {
-    return NextResponse.json({ error: 'No organisation membership' }, { status: 403 });
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+  if (!supabaseUrl || !supabaseKey) {
+    return NextResponse.json({ error: 'Supabase service role not configured' }, { status: 500 });
   }
-  const organizationId = (membership as any).organization_id as string;
+  const service = createClient(supabaseUrl, supabaseKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  // Member OR active advisor for the caller's selected org (advisor reads honoured).
+  const organizationId = await resolveAccessibleOrg(service, user);
+  if (!organizationId) {
+    return NextResponse.json({ error: 'No organisation' }, { status: 403 });
+  }
 
   let form: FormData;
   try {
@@ -67,15 +72,6 @@ export async function POST(request: NextRequest) {
       { status: 415 },
     );
   }
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-  if (!supabaseUrl || !supabaseKey) {
-    return NextResponse.json({ error: 'Supabase service role not configured' }, { status: 500 });
-  }
-  const service = createClient(supabaseUrl, supabaseKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 
   const fileUuid = randomUUID();
   const path = buildUploadPath(organizationId, user.id, fileUuid, file.name);

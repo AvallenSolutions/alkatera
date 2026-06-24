@@ -7,7 +7,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
-import { resolveUserOrganization } from '@/lib/supabase/resolve-organization'
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access'
+import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access'
 import { getMenu, updateMenu, deleteMenu } from '@/lib/hospitality/menu-service'
 
 export const runtime = 'nodejs'
@@ -15,9 +16,9 @@ export const runtime = 'nodejs'
 async function auth() {
   const { client, user, error } = await getSupabaseAPIClient()
   if (error || !user) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
-  const { organizationId, error: orgErr } = await resolveUserOrganization(client as any, user)
-  if (orgErr || !organizationId) return { error: NextResponse.json({ error: orgErr || 'No organisation' }, { status: 403 }) }
-  return { db: client as any, organizationId }
+  const organizationId = await resolveAccessibleOrg(client as any, user)
+  if (!organizationId) return { error: NextResponse.json({ error: 'No organisation' }, { status: 403 }) }
+  return { db: client as any, organizationId, userId: user.id }
 }
 
 export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
@@ -31,6 +32,8 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
   const a = await auth()
   if ('error' in a) return a.error
+  const denied = await denyReadOnlyAdvisor(a.db, { id: a.userId }, a.organizationId)
+  if (denied) return denied
   let body: any
   try {
     body = await request.json()
@@ -44,6 +47,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 export async function DELETE(_request: NextRequest, { params }: { params: { id: string } }) {
   const a = await auth()
   if ('error' in a) return a.error
+  const denied = await denyReadOnlyAdvisor(a.db, { id: a.userId }, a.organizationId)
+  if (denied) return denied
   const r = await deleteMenu(a.db, a.organizationId, params.id)
   return r.ok ? NextResponse.json(r.data) : NextResponse.json({ error: r.error }, { status: r.status })
 }

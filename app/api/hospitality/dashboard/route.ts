@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
-import { resolveUserOrganization } from '@/lib/supabase/resolve-organization'
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access'
 import { getHospitalityDashboard } from '@/lib/hospitality/dashboard-service'
 
 export const runtime = 'nodejs'
@@ -15,8 +15,8 @@ export const runtime = 'nodejs'
 export async function GET(request: NextRequest) {
   const { client, user, error: authError } = await getSupabaseAPIClient()
   if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { organizationId, error: orgErr } = await resolveUserOrganization(client as any, user)
-  if (orgErr || !organizationId) return NextResponse.json({ error: orgErr || 'No organisation' }, { status: 403 })
+  const organizationId = await resolveAccessibleOrg(client as any, user)
+  if (!organizationId) return NextResponse.json({ error: 'No organisation' }, { status: 403 })
 
   const yearParam = Number(new URL(request.url).searchParams.get('year'))
   const year = Number.isInteger(yearParam) && yearParam > 2000 && yearParam < 3000 ? yearParam : new Date().getFullYear()

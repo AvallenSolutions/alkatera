@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
+import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access';
 import { assembleImpactValuationInputs } from '@/lib/services/impact-valuation-assembler';
 import { calculateImpactValuation } from '@/lib/calculations/impact-valuation';
 import type { ImpactValuationResult } from '@/lib/calculations/impact-valuation';
@@ -24,6 +25,9 @@ export async function POST(request: NextRequest) {
     if (!organizationId) {
       return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
     }
+    // Calculation caches results on the org — read-only advisors are blocked.
+    const denied = await denyReadOnlyAdvisor(supabase, user, organizationId);
+    if (denied) return denied;
 
     // ── Feature gate ─────────────────────────────────────────────────────
     // impact_valuation_beta requires canopy tier OR admin-granted feature_flags override

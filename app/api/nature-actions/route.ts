@@ -10,7 +10,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
-import { resolveUserOrganization } from '@/lib/supabase/resolve-organization'
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access'
+import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access'
 import { NATURE_ACTION_TYPES, type NatureActionType } from '@/lib/nature-actions/action-types'
 
 export const runtime = 'nodejs'
@@ -30,12 +31,12 @@ const ACTIVE_STATUSES = ['planned', 'in_progress', 'established', 'paused']
 export async function GET(request: NextRequest) {
   const { client, user, error: authError } = await getSupabaseAPIClient()
   if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { organizationId, error: orgErr } = await resolveUserOrganization(client as any, user)
-  if (orgErr || !organizationId) {
-    return NextResponse.json({ error: orgErr || 'No organisation' }, { status: 403 })
+  const url = new URL(request.url)
+  const organizationId = await resolveAccessibleOrg(client as any, user, url.searchParams.get('organization_id'))
+  if (!organizationId) {
+    return NextResponse.json({ error: 'No organisation' }, { status: 403 })
   }
 
-  const url = new URL(request.url)
   const status = url.searchParams.get('status') || 'active'
   const limit = Math.min(Number(url.searchParams.get('limit') || '200'), 500)
 
@@ -60,17 +61,19 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const { client, user, error: authError } = await getSupabaseAPIClient()
   if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { organizationId, error: orgErr } = await resolveUserOrganization(client as any, user)
-  if (orgErr || !organizationId) {
-    return NextResponse.json({ error: orgErr || 'No organisation' }, { status: 403 })
-  }
-
   let body: any
   try {
     body = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
+
+  const organizationId = await resolveAccessibleOrg(client as any, user, body?.organization_id)
+  if (!organizationId) {
+    return NextResponse.json({ error: 'No organisation' }, { status: 403 })
+  }
+  const denied = await denyReadOnlyAdvisor(client as any, user, organizationId)
+  if (denied) return denied
 
   const name = String(body?.name ?? '').trim()
   const action_type = String(body?.action_type ?? '').trim()

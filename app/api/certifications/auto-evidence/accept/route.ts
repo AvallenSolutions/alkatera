@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
-import { resolveUserOrganization } from '@/lib/supabase/resolve-organization';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
+import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access';
 import { getBcorpFrameworkId } from '@/lib/certifications/readiness';
 import { recalculateAndNotify } from '@/lib/certifications/recalculate';
 
@@ -14,16 +15,16 @@ export async function POST(request: NextRequest) {
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const { organizationId, error: orgError } = await resolveUserOrganization(
-      supabase,
-      user,
-    );
-    if (orgError || !organizationId) {
+    const organizationId = await resolveAccessibleOrg(supabase, user);
+    if (!organizationId) {
       return NextResponse.json(
-        { error: orgError || 'No organisation found' },
+        { error: 'No organisation found' },
         { status: 403 },
       );
     }
+
+    const denied = await denyReadOnlyAdvisor(supabase, user, organizationId);
+    if (denied) return denied;
 
     const body = await request.json();
     if (!body.auto_evidence_id) {

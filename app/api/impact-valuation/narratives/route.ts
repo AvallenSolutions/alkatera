@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
+import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access';
 import {
   generateImpactValuationNarratives,
   type ImpactValuationNarrativeContext,
@@ -27,6 +28,9 @@ export async function POST(request: NextRequest) {
     if (!organizationId) {
       return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
     }
+    // Generation caches narratives on the org — read-only advisors are blocked.
+    const denied = await denyReadOnlyAdvisor(supabase, user, organizationId);
+    if (denied) return denied;
 
     // ── Feature gate ─────────────────────────────────────────────────────
     const { data: org, error: orgError } = await supabase

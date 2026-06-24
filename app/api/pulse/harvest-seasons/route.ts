@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 import { HARVEST_SEASONS, relevantCrops } from '@/lib/pulse/harvest-seasons';
 
 export const runtime = 'nodejs';
@@ -23,33 +24,18 @@ export async function GET(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
 
     const orgIdParam = request.nextUrl.searchParams.get('organization_id');
-    let organizationId = orgIdParam;
-    if (!organizationId) {
-      const { data: m } = await userSupabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-      organizationId = m?.organization_id ?? null;
-    } else {
-      const { data: m } = await userSupabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .eq('organization_id', organizationId)
-        .maybeSingle();
-      if (!m) return NextResponse.json({ error: 'Not a member' }, { status: 403 });
-    }
-    if (!organizationId) {
-      return NextResponse.json({ error: 'No organisation' }, { status: 400 });
-    }
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY!;
     const svc = createClient(url, key, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
+
+    // Member OR active advisor for the requested/selected org.
+    const organizationId = await resolveAccessibleOrg(svc, user, orgIdParam);
+    if (!organizationId) {
+      return NextResponse.json({ error: 'No organisation' }, { status: 403 });
+    }
 
     // Pull a corpus of free-text names for fuzzy matching:
     //   1. product names + product_type

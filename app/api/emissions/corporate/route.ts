@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 import { calculateCorporateEmissions } from '@/lib/calculations/corporate-emissions';
 import {
   fetchHistoricalSustainabilityMetrics,
@@ -38,34 +39,18 @@ export async function GET(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
 
     const orgIdParam = request.nextUrl.searchParams.get('organization_id');
-    let organizationId = orgIdParam ?? null;
-    if (!organizationId) {
-      const { data: m } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-      organizationId = m?.organization_id ?? null;
-    } else {
-      // A caller-supplied org id must never be trusted without verifying
-      // membership: the calculation below runs with the service-role client.
-      const { data: m } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .eq('organization_id', organizationId)
-        .maybeSingle();
-      if (!m) return NextResponse.json({ error: 'Not a member' }, { status: 403 });
-    }
+
+    const svc = serviceClient();
+
+    // Member OR active advisor of the (optionally) requested org; the
+    // calculation below runs with the service-role client which bypasses RLS.
+    const organizationId = await resolveAccessibleOrg(svc, user, orgIdParam);
     if (!organizationId) return NextResponse.json({ error: 'No organisation' }, { status: 403 });
 
     const yearParam = Number(request.nextUrl.searchParams.get('year'));
     const year = Number.isInteger(yearParam) && yearParam >= 2000 && yearParam <= 2100
       ? yearParam
       : new Date().getFullYear();
-
-    const svc = serviceClient();
     const result = await calculateCorporateEmissions(svc, organizationId, year);
 
     if (result.hasData) {

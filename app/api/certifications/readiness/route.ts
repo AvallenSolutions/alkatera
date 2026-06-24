@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
-import { resolveUserOrganization } from '@/lib/supabase/resolve-organization';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 import {
   calculateCertificationReadiness,
   persistScoreHistory,
@@ -21,13 +21,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { organizationId, error: orgError } = await resolveUserOrganization(
-      supabase,
-      user,
-    );
-    if (orgError || !organizationId) {
+    const organizationId = await resolveAccessibleOrg(supabase, user);
+    if (!organizationId) {
       return NextResponse.json(
-        { error: orgError || 'No organisation found' },
+        { error: 'No organisation found' },
         { status: 403 },
       );
     }

@@ -14,6 +14,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 import {
   expandDeadlinesForOrg,
   COMPLIANCE_DEADLINES,
@@ -56,17 +57,6 @@ export async function GET() {
   if (userErr || !user) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
-  const { data: membership } = await userSupabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .limit(1)
-    .maybeSingle();
-  if (!membership) {
-    return NextResponse.json({ error: 'No organisation membership' }, { status: 403 });
-  }
-  const organizationId = (membership as any).organization_id as string;
-
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
   if (!supabaseUrl || !supabaseKey) {
@@ -75,6 +65,12 @@ export async function GET() {
   const service = createClient(supabaseUrl, supabaseKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+
+  // Member OR active advisor for the caller's selected org (advisor reads honoured).
+  const organizationId = await resolveAccessibleOrg(service, user);
+  if (!organizationId) {
+    return NextResponse.json({ error: 'No organisation' }, { status: 403 });
+  }
 
   // Pulse is GA for every tier, so all orgs get the insight/anomaly tiles (the
   // snapshot/anomaly crons run for every org). We still read feature_flags for

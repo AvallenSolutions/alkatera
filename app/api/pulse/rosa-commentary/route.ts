@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 import { runToolLoop } from '@/lib/rosa/run-tool-loop';
 
 export const runtime = 'nodejs';
@@ -72,18 +73,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
     }
 
-    // Resolve org.
-    const { data: m } = await userSupabase
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', user.id)
-      .limit(1)
-      .maybeSingle();
-    const organizationId = m?.organization_id;
-    if (!organizationId) {
-      return NextResponse.json({ error: 'No organisation' }, { status: 403 });
-    }
-
     let body: { widget_id?: string; context?: unknown };
     try {
       body = await request.json();
@@ -105,6 +94,12 @@ export async function POST(request: NextRequest) {
     const svc = createClient(url, key, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
+
+    // Resolve org -- member OR active advisor for the selected org.
+    const organizationId = await resolveAccessibleOrg(svc, user);
+    if (!organizationId) {
+      return NextResponse.json({ error: 'No organisation' }, { status: 403 });
+    }
 
     const userMessage = `${spec.userPrefix}\n\n<context>\n${JSON.stringify(body.context ?? {}, null, 2)}\n</context>\n\nReply with three to four short bullets, nothing else.`;
 

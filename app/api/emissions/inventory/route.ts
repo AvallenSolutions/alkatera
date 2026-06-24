@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
-import { resolveUserOrganization } from '@/lib/supabase/resolve-organization'
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -44,9 +44,9 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
     }
 
-    const { organizationId, error: orgError } = await resolveUserOrganization(client, user)
-    if (orgError || !organizationId) {
-      return NextResponse.json({ error: orgError || 'No organisation' }, { status: 400 })
+    const organizationId = await resolveAccessibleOrg(client as any, user)
+    if (!organizationId) {
+      return NextResponse.json({ error: 'No organisation' }, { status: 403 })
     }
 
     const [ingredientsRes, linksRes, xeroRes, receiptsRes, consumptionsRes] = await Promise.all([

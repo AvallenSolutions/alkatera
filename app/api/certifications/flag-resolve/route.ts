@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 
 /**
  * GET /api/certifications/flag-resolve?organization_id=...
@@ -18,9 +19,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const organizationId = request.nextUrl.searchParams.get('organization_id');
+    // Verify the caller may access the requested org (member or active advisor).
+    // Previously this trusted the organization_id query param with no check.
+    const organizationId = await resolveAccessibleOrg(
+      supabase,
+      user,
+      request.nextUrl.searchParams.get('organization_id'),
+    );
     if (!organizationId) {
-      return NextResponse.json({ error: 'organization_id is required' }, { status: 400 });
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
     }
 
     // Look up SBTi framework and its FLAG requirements

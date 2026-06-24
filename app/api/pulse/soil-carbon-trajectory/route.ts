@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 import {
   computeAnnualStockChange,
   buildSoilCarbonTrajectory,
@@ -37,24 +38,9 @@ async function resolveOrg(request: NextRequest) {
   if (!user) return { error: 'Unauthenticated', status: 401 as const };
 
   const orgIdParam = request.nextUrl.searchParams.get('organization_id');
-  let organizationId = orgIdParam ?? null;
-  if (!organizationId) {
-    const { data: m } = await supabase
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', user.id)
-      .limit(1)
-      .maybeSingle();
-    organizationId = m?.organization_id ?? null;
-  } else {
-    const { data: m } = await supabase
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', user.id)
-      .eq('organization_id', organizationId)
-      .maybeSingle();
-    if (!m) return { error: 'Not a member', status: 403 as const };
-  }
+
+  // Member OR active advisor for the requested/selected org.
+  const organizationId = await resolveAccessibleOrg(serviceClient(), user, orgIdParam);
   if (!organizationId) return { error: 'No organisation', status: 403 as const };
   return { organizationId };
 }

@@ -22,6 +22,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 import { METRIC_DEFINITIONS, type MetricKey } from '@/lib/pulse/metric-keys';
 
 export const runtime = 'nodejs';
@@ -76,26 +77,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unknown metric' }, { status: 400 });
     }
 
-    let organizationId = orgIdParam;
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY!;
+    const svc = createClient(url, key, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    // Member OR active advisor for the requested/selected org.
+    const organizationId = await resolveAccessibleOrg(svc, user, orgIdParam);
     if (!organizationId) {
-      const { data: m } = await userSupabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-      organizationId = m?.organization_id ?? null;
-    } else {
-      const { data: m } = await userSupabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .eq('organization_id', organizationId)
-        .maybeSingle();
-      if (!m) return NextResponse.json({ error: 'Not a member' }, { status: 403 });
-    }
-    if (!organizationId) {
-      return NextResponse.json({ error: 'No organisation' }, { status: 400 });
+      return NextResponse.json({ error: 'No organisation' }, { status: 403 });
     }
 
     const cats = categoriesForMetric(metricParam);
@@ -110,12 +101,6 @@ export async function GET(request: NextRequest) {
         empty_reason: 'No activity-category breakdown available for this metric.',
       });
     }
-
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY!;
-    const svc = createClient(url, key, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
 
     // Define windows.
     const now = new Date();

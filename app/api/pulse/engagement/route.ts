@@ -17,6 +17,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 
 export const runtime = 'nodejs';
 
@@ -29,26 +30,11 @@ async function resolveContext(request: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) return { error: 'Unauthenticated', status: 401 as const };
 
-  // Resolve current organisation from ?organization_id= or first membership.
+  // Resolve current organisation from ?organization_id= or selected/first org.
+  // Member OR active advisor. This route uses only the RLS cookie client, so
+  // we pass it to the resolver (advisor rows are readable under RLS).
   const param = request.nextUrl.searchParams.get('organization_id');
-  let organizationId = param ?? null;
-  if (!organizationId) {
-    const { data: m } = await supabase
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', user.id)
-      .limit(1)
-      .maybeSingle();
-    organizationId = m?.organization_id ?? null;
-  } else {
-    const { data: m } = await supabase
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', user.id)
-      .eq('organization_id', organizationId)
-      .maybeSingle();
-    if (!m) return { error: 'Not a member', status: 403 as const };
-  }
+  const organizationId = await resolveAccessibleOrg(supabase, user, param);
   if (!organizationId) return { error: 'No organisation', status: 403 as const };
 
   return { userId: user.id, organizationId, supabase };

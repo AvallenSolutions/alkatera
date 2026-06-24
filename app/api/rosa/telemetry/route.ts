@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getSupabaseServerClient } from '@/lib/supabase/server-client'
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access'
 import { logRosaTelemetry } from '@/lib/rosa/budget'
 
 export const runtime = 'nodejs'
@@ -49,16 +50,6 @@ export async function POST(req: NextRequest) {
   if (userErr || !user) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
   }
-  const { data: membership } = await userSupabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .limit(1)
-    .maybeSingle()
-  if (!membership) {
-    return NextResponse.json({ error: 'No organisation' }, { status: 403 })
-  }
-
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
   if (!supabaseUrl || !serviceKey) {
@@ -68,11 +59,17 @@ export async function POST(req: NextRequest) {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
+  // Member OR active advisor for the caller's selected org (advisor reads honoured).
+  const organizationId = await resolveAccessibleOrg(service, user)
+  if (!organizationId) {
+    return NextResponse.json({ error: 'No organisation' }, { status: 403 })
+  }
+
   // Trim payload to keep events small
   const payload = body.payload && typeof body.payload === 'object' ? body.payload : {}
   await logRosaTelemetry(
     service,
-    (membership as any).organization_id,
+    organizationId,
     user.id,
     event,
     payload,

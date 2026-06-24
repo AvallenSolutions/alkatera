@@ -11,7 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
-import { resolveUserOrganization } from '@/lib/supabase/resolve-organization'
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access'
 import { runJsonPrompt } from '@/lib/ai/gemini'
 
 export const runtime = 'nodejs'
@@ -21,8 +21,8 @@ const ALLOWED_UNITS = new Set(['g', 'kg', 'ml', 'l', 'unit'])
 export async function POST(request: NextRequest) {
   const { client, user, error: authError } = await getSupabaseAPIClient()
   if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { organizationId, error: orgErr } = await resolveUserOrganization(client as any, user)
-  if (orgErr || !organizationId) return NextResponse.json({ error: orgErr || 'No organisation' }, { status: 403 })
+  const organizationId = await resolveAccessibleOrg(client as any, user)
+  if (!organizationId) return NextResponse.json({ error: 'No organisation' }, { status: 403 })
 
   const apiKey = process.env.GEMINI_API_KEY?.trim()
   if (!apiKey) {

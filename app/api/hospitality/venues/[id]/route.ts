@@ -10,7 +10,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
-import { resolveUserOrganization } from '@/lib/supabase/resolve-organization'
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access'
+import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access'
 import {
   VENUE_TYPE_VALUES,
   VENUE_STATUS_VALUES,
@@ -29,10 +30,12 @@ export async function PATCH(
   if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  const { organizationId, error: orgErr } = await resolveUserOrganization(client as any, user)
-  if (orgErr || !organizationId) {
-    return NextResponse.json({ error: orgErr || 'No organisation' }, { status: 403 })
+  const organizationId = await resolveAccessibleOrg(client as any, user)
+  if (!organizationId) {
+    return NextResponse.json({ error: 'No organisation' }, { status: 403 })
   }
+  const denied = await denyReadOnlyAdvisor(client as any, user, organizationId)
+  if (denied) return denied
 
   let body: any
   try {
@@ -93,10 +96,12 @@ export async function DELETE(
   if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  const { organizationId, error: orgErr } = await resolveUserOrganization(client as any, user)
-  if (orgErr || !organizationId) {
-    return NextResponse.json({ error: orgErr || 'No organisation' }, { status: 403 })
+  const organizationId = await resolveAccessibleOrg(client as any, user)
+  if (!organizationId) {
+    return NextResponse.json({ error: 'No organisation' }, { status: 403 })
   }
+  const denied = await denyReadOnlyAdvisor(client as any, user, organizationId)
+  if (denied) return denied
 
   const { error } = await (client as any)
     .from('hospitality_venues')

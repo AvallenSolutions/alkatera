@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getSupabaseServerClient } from '@/lib/supabase/server-client'
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access'
 
 export const runtime = 'nodejs'
 
@@ -32,17 +33,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
   }
 
-  const { data: membership } = await userSupabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .limit(1)
-    .maybeSingle()
-  if (!membership) {
-    return NextResponse.json({ error: 'No organisation' }, { status: 403 })
-  }
-  const organizationId = (membership as any).organization_id as string
-
   const url = new URL(request.url)
   const kind = url.searchParams.get('kind')
   const format = url.searchParams.get('format') ?? 'csv'
@@ -58,6 +48,12 @@ export async function GET(request: NextRequest) {
   const service = createClient(supabaseUrl, supabaseKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
+
+  // Member OR active advisor for the caller's selected org (advisor reads honoured).
+  const organizationId = await resolveAccessibleOrg(service, user)
+  if (!organizationId) {
+    return NextResponse.json({ error: 'No organisation' }, { status: 403 })
+  }
 
   let csv: string
   let filename: string

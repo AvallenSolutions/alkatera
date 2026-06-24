@@ -10,7 +10,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
-import { resolveUserOrganization } from '@/lib/supabase/resolve-organization'
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access'
+import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access'
 import { computeAllocatedImpact, DEFAULT_ROOM_ALLOCATION } from '@/lib/hospitality/room-allocation'
 
 export const runtime = 'nodejs'
@@ -18,8 +19,8 @@ export const runtime = 'nodejs'
 async function ctx(productId: string) {
   const { client, user, error } = await getSupabaseAPIClient()
   if (error || !user) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
-  const { organizationId, error: orgErr } = await resolveUserOrganization(client as any, user)
-  if (orgErr || !organizationId) return { error: NextResponse.json({ error: orgErr || 'No organisation' }, { status: 403 }) }
+  const organizationId = await resolveAccessibleOrg(client as any, user)
+  if (!organizationId) return { error: NextResponse.json({ error: 'No organisation' }, { status: 403 }) }
   const db = client as any
   const { data: product } = await db
     .from('products')
@@ -29,7 +30,7 @@ async function ctx(productId: string) {
     .eq('product_kind', 'hospitality_room_night')
     .maybeSingle()
   if (!product) return { error: NextResponse.json({ error: 'Room not found' }, { status: 404 }) }
-  return { db, organizationId, productId: Number(productId) }
+  return { db, organizationId, productId: Number(productId), userId: user.id }
 }
 
 function withImpact(row: { occupancy: number; electricity_kwh: number; gas_kwh: number; water_litres: number; country: string }) {
@@ -59,6 +60,8 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   const c = await ctx(params.id)
   if ('error' in c) return c.error
+  const denied = await denyReadOnlyAdvisor(c.db, { id: c.userId }, c.organizationId)
+  if (denied) return denied
 
   let body: any
   try {

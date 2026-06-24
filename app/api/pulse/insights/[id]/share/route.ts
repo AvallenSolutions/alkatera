@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 import { renderInsightShareHtml } from '@/lib/pulse/insight-share';
 import { convertHtmlToPdf } from '@/lib/pdf/pdfshift-client';
 import { enforceExportAllowed } from '@/middleware/subscription-check';
@@ -67,13 +68,9 @@ export async function POST(
       return NextResponse.json({ error: 'Insight not found' }, { status: 404 });
     }
 
-    const { data: membership } = await userSupabase
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', user.id)
-      .eq('organization_id', insight.organization_id)
-      .maybeSingle();
-    if (!membership) {
+    // Member OR active advisor for the insight's org.
+    const accessibleOrg = await resolveAccessibleOrg(svc, user, insight.organization_id);
+    if (!accessibleOrg) {
       return NextResponse.json({ error: 'Not a member of this organisation' }, { status: 403 });
     }
 

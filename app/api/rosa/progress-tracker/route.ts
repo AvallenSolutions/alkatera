@@ -13,6 +13,7 @@ import { createHash } from 'crypto'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { FunctionCallingMode } from '@google/generative-ai'
 import { getSupabaseServerClient } from '@/lib/supabase/server-client'
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access'
 import { rateLimit } from '@/lib/rate-limit'
 import {
   getGeminiClient,
@@ -306,15 +307,6 @@ async function resolveContext(req: NextRequest) {
   if (userErr || !user) {
     return { error: NextResponse.json({ error: 'Unauthenticated' }, { status: 401 }) }
   }
-  const { data: membership } = await userSupabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .limit(1)
-    .maybeSingle()
-  if (!membership) {
-    return { error: NextResponse.json({ error: 'No organisation' }, { status: 403 }) }
-  }
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
   if (!supabaseUrl || !serviceKey) {
@@ -323,9 +315,15 @@ async function resolveContext(req: NextRequest) {
   const service = createClient(supabaseUrl, serviceKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
+  // Member OR active advisor for the caller's selected org. Honours advisor
+  // reads and respects the org the user switched into (app/user metadata).
+  const organizationId = await resolveAccessibleOrg(service, user)
+  if (!organizationId) {
+    return { error: NextResponse.json({ error: 'No organisation' }, { status: 403 }) }
+  }
   return {
     userId: user.id,
-    organizationId: (membership as any).organization_id as string,
+    organizationId,
     service,
   }
 }

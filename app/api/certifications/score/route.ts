@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
-import { resolveUserOrganization } from '@/lib/supabase/resolve-organization';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 
 export async function GET(request: NextRequest) {
@@ -12,16 +11,16 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams;
-    const organizationId = searchParams.get('organization_id');
+    const requestedOrgId = searchParams.get('organization_id');
     const frameworkId = searchParams.get('framework_id');
 
-    if (!organizationId) {
+    if (!requestedOrgId) {
       return NextResponse.json({ error: 'organization_id is required' }, { status: 400 });
     }
 
-    // Verify user belongs to the requested organisation
-    const { organizationId: userOrgId } = await resolveUserOrganization(supabase, user);
-    if (organizationId !== userOrgId) {
+    // Verify the caller (member or active advisor) can access the requested org
+    const organizationId = await resolveAccessibleOrg(supabase, user, requestedOrgId);
+    if (!organizationId) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 

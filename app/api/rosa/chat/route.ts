@@ -26,6 +26,7 @@ import { NextRequest } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Content, FunctionCall, Part } from '@google/generative-ai';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 import { executeTool, ROSA_TOOLS, ACTION_TOOL_NAMES, type ToolContext } from '@/lib/rosa/tools';
 import { buildMemoryBlock } from '@/lib/rosa/memory';
 import { loadAttachment } from '@/lib/rosa/document-extraction';
@@ -120,15 +121,23 @@ export async function POST(request: NextRequest) {
   } = await userSupabase.auth.getUser();
   if (userErr || !user) return errorResponse('Unauthenticated', 401);
 
-  const { data: membership } = await userSupabase
-    .from('organization_members')
-    .select('organization_id')
-    .eq('user_id', user.id)
-    .limit(1)
-    .maybeSingle();
-  if (!membership) return errorResponse('No organisation membership', 403);
+  // Service-role client for tool execution + persistence (RLS is irrelevant
+  // once we've verified org access; tools enforce org scoping directly).
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+  if (!supabaseUrl || !supabaseKey) {
+    return errorResponse('Supabase service role not configured', 500);
+  }
+  const serviceSupabase: SupabaseClient = createClient(supabaseUrl, supabaseKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
 
-  const organizationId = membership.organization_id;
+  // Member OR active advisor for the caller's selected org (advisor reads
+  // honoured). Read-only advisors may chat and propose, but applying a
+  // proposed action is blocked in executeAction().
+  const organizationId = await resolveAccessibleOrg(serviceSupabase, user);
+  if (!organizationId) return errorResponse('No organisation', 403);
 
   // Rate limit AI usage per user to cap cost-abuse (durable when Upstash is configured).
   const rl = await rateLimit(`rosa-chat:${user.id}`, 30, 60_000);
@@ -156,18 +165,6 @@ export async function POST(request: NextRequest) {
   if (!userMessage && attachmentIds.length === 0) {
     return errorResponse('message or attachments required', 400);
   }
-
-  // Service-role client for tool execution + persistence (RLS is irrelevant
-  // once we've verified org membership; tools enforce org scoping directly).
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
-  if (!supabaseUrl || !supabaseKey) {
-    return errorResponse('Supabase service role not configured', 500);
-  }
-  const serviceSupabase: SupabaseClient = createClient(supabaseUrl, supabaseKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 
   // conversation id filled in below once resolved
   const toolCtx: ToolContext = {

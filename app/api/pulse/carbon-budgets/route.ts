@@ -20,6 +20,7 @@ import { getOrgFyStartMonth } from '@/lib/log-data/org-fiscal-year';
 import { getYearRangeForOrg, getLabelYearForDate } from '@/lib/log-data/period-utils';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 import { getMemberRole } from '@/app/api/stripe/_helpers/get-member-role';
 import { latestValue } from '@/lib/pulse/snapshot-latest';
 
@@ -43,27 +44,11 @@ async function resolveOrg(request: NextRequest) {
   if (!user) return { error: 'Unauthenticated', status: 401 as const };
 
   const orgIdParam = request.nextUrl.searchParams.get('organization_id');
-  let organizationId = orgIdParam ?? null;
-  if (!organizationId) {
-    const { data: m } = await supabase
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', user.id)
-      .limit(1)
-      .maybeSingle();
-    organizationId = m?.organization_id ?? null;
-  } else {
-    // A caller-supplied org id must never be trusted without verifying
-    // membership: queries below run with the service-role client, so this
-    // check is the only thing standing between tenants.
-    const { data: m } = await supabase
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', user.id)
-      .eq('organization_id', organizationId)
-      .maybeSingle();
-    if (!m) return { error: 'Not a member', status: 403 as const };
-  }
+
+  // Member OR active advisor for the requested/selected org. Reads are open to
+  // advisors; the POST/DELETE handlers separately require an owner/admin role,
+  // which an advisor (non-member) never holds, so writes stay member-only.
+  const organizationId = await resolveAccessibleOrg(serviceClient(), user, orgIdParam);
   if (!organizationId) return { error: 'No organisation', status: 403 as const };
 
   const role = await getMemberRole(supabase, organizationId, user.id);

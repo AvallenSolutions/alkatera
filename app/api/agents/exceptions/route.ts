@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
-import { resolveUserOrganization } from '@/lib/supabase/resolve-organization'
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access'
+import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access'
 import { titleAndSummaryForExceptionPayload } from '@/lib/agents/exception-format'
 
 export const runtime = 'nodejs'
@@ -17,9 +18,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { organizationId, error: orgErr } = await resolveUserOrganization(client as any, user)
-  if (orgErr || !organizationId) {
-    return NextResponse.json({ error: orgErr || 'No organisation' }, { status: 403 })
+  const organizationId = await resolveAccessibleOrg(client as any, user)
+  if (!organizationId) {
+    return NextResponse.json({ error: 'No organisation' }, { status: 403 })
   }
 
   const url = new URL(request.url)
@@ -60,10 +61,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { organizationId, error: orgErr } = await resolveUserOrganization(client as any, user)
-  if (orgErr || !organizationId) {
-    return NextResponse.json({ error: orgErr || 'No organisation' }, { status: 403 })
+  const organizationId = await resolveAccessibleOrg(client as any, user)
+  if (!organizationId) {
+    return NextResponse.json({ error: 'No organisation' }, { status: 403 })
   }
+
+  const denied = await denyReadOnlyAdvisor(client as any, user, organizationId)
+  if (denied) return denied
 
   const body = await request.json().catch(() => ({}))
   const ingestJobId: string | undefined = body?.ingestJobId

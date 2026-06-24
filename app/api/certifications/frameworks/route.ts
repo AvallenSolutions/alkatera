@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
-import { resolveUserOrganization } from '@/lib/supabase/resolve-organization';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
+import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access';
 
 // Transform database framework to API format expected by UI
 function transformFramework(dbFramework: any) {
@@ -177,10 +178,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { organizationId, error: orgError } = await resolveUserOrganization(supabase, user);
-    if (orgError || !organizationId) {
-      return NextResponse.json({ error: orgError || 'No organisation found' }, { status: 403 });
+    const organizationId = await resolveAccessibleOrg(supabase, user);
+    if (!organizationId) {
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
     }
+
+    const denied = await denyReadOnlyAdvisor(supabase, user, organizationId);
+    if (denied) return denied;
 
     const body = await request.json();
 

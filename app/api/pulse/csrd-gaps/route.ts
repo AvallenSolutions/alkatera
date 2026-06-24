@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 import { evaluateCsrdGaps } from '@/lib/pulse/csrd-gaps';
 
 export const runtime = 'nodejs';
@@ -29,30 +30,15 @@ export async function GET(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
 
     const orgIdParam = request.nextUrl.searchParams.get('organization_id');
-    let organizationId = orgIdParam;
-    if (!organizationId) {
-      const { data: m } = await userSupabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-      organizationId = m?.organization_id ?? null;
-    } else {
-      // Verify membership.
-      const { data: m } = await userSupabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .eq('organization_id', organizationId)
-        .maybeSingle();
-      if (!m) return NextResponse.json({ error: 'Not a member' }, { status: 403 });
-    }
-    if (!organizationId) {
-      return NextResponse.json({ error: 'No organisation' }, { status: 400 });
-    }
 
     const svc = serviceClient();
+
+    // Member OR active advisor for the requested/selected org.
+    const organizationId = await resolveAccessibleOrg(svc, user, orgIdParam);
+    if (!organizationId) {
+      return NextResponse.json({ error: 'No organisation' }, { status: 403 });
+    }
+
     const { results, summary } = await evaluateCsrdGaps(svc, organizationId);
 
     return NextResponse.json({

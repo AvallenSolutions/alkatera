@@ -12,6 +12,7 @@
  * stores the result on the row for audit. One confirmation = one mutation.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { isReadOnlyAdvisor } from '@/lib/auth/advisor-access';
 
 export interface ProposeInput {
   organizationId: string;
@@ -101,6 +102,12 @@ export async function executeAction(
   const row = await loadPendingAction(supabase, actionId, userId);
   if (!row) return { ok: false, error: 'Action not found' };
   if (row.status !== 'pending') return { ok: false, error: `Action already ${row.status}` };
+
+  // Read-only advisors may propose actions but must never apply them — the
+  // dispatch below mutates org data via the service-role client, bypassing RLS.
+  if (await isReadOnlyAdvisor(supabase, userId, row.organization_id)) {
+    return { ok: false, error: 'Read-only advisors cannot apply changes to this organisation.' };
+  }
 
   // Flag confirmed first so we never double-execute.
   await supabase

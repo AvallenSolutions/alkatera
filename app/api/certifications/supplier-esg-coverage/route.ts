@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
-import { resolveUserOrganization } from '@/lib/supabase/resolve-organization';
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 import {
   getSupplierEsgCoverage,
   getSupplierClimateCoverage,
@@ -16,7 +16,7 @@ import {
  *
  * getSupabaseAPIClient() returns a service-role DB client after verifying the user,
  * which is required because supplier_esg_assessments is RLS-protected to the
- * supplier's own org. Org scoping is enforced via resolveUserOrganization().
+ * supplier's own org. Org scoping is enforced via resolveAccessibleOrg().
  */
 export async function GET(_request: NextRequest) {
   try {
@@ -26,13 +26,10 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { organizationId, error: orgError } = await resolveUserOrganization(
-      supabase,
-      user,
-    );
-    if (orgError || !organizationId) {
+    const organizationId = await resolveAccessibleOrg(supabase, user);
+    if (!organizationId) {
       return NextResponse.json(
-        { error: orgError || 'No organisation found' },
+        { error: 'No organisation found' },
         { status: 403 },
       );
     }

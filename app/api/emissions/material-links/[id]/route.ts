@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
-import { resolveUserOrganization } from '@/lib/supabase/resolve-organization'
+import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access'
+import { denyReadOnlyAdvisor } from '@/lib/auth/advisor-access'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -12,10 +13,13 @@ export async function DELETE(_request: NextRequest, { params }: { params: { id: 
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
     }
 
-    const { organizationId, error: orgError } = await resolveUserOrganization(client, user)
-    if (orgError || !organizationId) {
-      return NextResponse.json({ error: orgError || 'No organisation' }, { status: 400 })
+    const organizationId = await resolveAccessibleOrg(client as any, user)
+    if (!organizationId) {
+      return NextResponse.json({ error: 'No organisation' }, { status: 403 })
     }
+
+    const denied = await denyReadOnlyAdvisor(client as any, user, organizationId)
+    if (denied) return denied
 
     // Read the link first so we can find the paired receipt and verify org.
     const { data: link } = await client
