@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { INITIAL_ONBOARDING_STATE, INITIAL_MEMBER_ONBOARDING_STATE, INITIAL_FAST_TRACK_STATE } from '@/lib/onboarding/types'
+import { INITIAL_ONBOARDING_STATE, INITIAL_MEMBER_ONBOARDING_STATE, INITIAL_FAST_TRACK_STATE, INITIAL_ADVISOR_ONBOARDING_STATE } from '@/lib/onboarding/types'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -84,6 +84,7 @@ export async function GET(request: NextRequest) {
 
   const supabase = getServiceClient()
   const isOwner = orgRole === 'owner'
+  const isAdvisor = orgRole === 'advisor'
 
   try {
     // Fetch the user's own onboarding state (per-user, per-org)
@@ -146,6 +147,14 @@ export async function GET(request: NextRequest) {
         })
       }
 
+      // External advisor — return the advisor orientation flow.
+      if (isAdvisor) {
+        return NextResponse.json({
+          state: { ...INITIAL_ADVISOR_ONBOARDING_STATE, startedAt: new Date().toISOString() },
+          flow: 'advisor',
+        })
+      }
+
       // Non-owner (invited member) — return initial member state
       return NextResponse.json({
         state: { ...INITIAL_MEMBER_ONBOARDING_STATE, startedAt: new Date().toISOString() },
@@ -155,7 +164,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       state: data.state,
-      flow: data.onboarding_flow || (isOwner ? 'owner' : 'member'),
+      flow: data.onboarding_flow || (isOwner ? 'owner' : isAdvisor ? 'advisor' : 'member'),
     })
   } catch (err) {
     console.error('Onboarding GET error:', err)
@@ -186,7 +195,7 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getServiceClient()
-    const onboardingFlow = flow || (orgRole === 'owner' ? 'owner' : 'member')
+    const onboardingFlow = flow || (orgRole === 'owner' ? 'owner' : orgRole === 'advisor' ? 'advisor' : 'member')
 
     const { error } = await supabase
       .from('onboarding_state')

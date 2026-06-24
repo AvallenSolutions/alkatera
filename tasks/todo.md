@@ -1,45 +1,73 @@
-# Smart Upload: close the remaining gaps
+# Advisor onboarding flow
 
-Driven by the platform-wide audit. Everything stays **upload-only** (no email-in).
+## Problem
+When an external advisor accepts an invite and switches into the org they advise,
+they get shown the standard new-user onboarding (the company-setup wizard / member
+"welcome to the team" flow). That's wrong — an advisor isn't setting up a company,
+they're an external sustainability expert coming to help an existing org.
 
-## Phase 1 — Remove the email function (keep it upload-only)
-- [ ] Delete `app/api/ingest/email/route.ts`.
-- [ ] Remove the "Forward documents to Rosa" inbox card + `agent_inbox_address` from `components/agents/RosaQueue.tsx`.
-- [ ] Remove the "Forward an email" row + inbox logic from `components/rosa/QuickActions.tsx`.
+## Root cause
+`OnboardingContext.shouldShowOnboarding` has no role awareness, and the
+`/api/onboarding` GET falls back to the `member` flow for any non-owner — which
+includes advisors. There is no `advisor` flow.
 
-## Phase 2 — Extraction depth (gap #2)
-- [ ] **BOM line items**: give `identify_bom` a `line_items` array (ingredient/packaging name, qty, unit) so image BOMs work and the user previews ingredients before handoff; pass them through to the recipe editor / `BOMImportFlow`.
-- [ ] **Invoice quantities**: add optional `quantity` + `unit` to `extract_supplier_invoice` line items; show them in `SupplierInvoicePanel`; persist qty/unit on the saved spend row so the activity detail is not lost.
+## Design — new `advisor` flow (4 steps, 2 phases), mirrors the member flow shell
+Reuses the existing wizard chrome (glassmorphism, lime, phase bar, save indicator).
 
-## Phase 3 — New classifier tools (gap #3, by value)
-- [ ] **Freight / transport invoice** → `extract_freight_invoice` + `POST /api/spend/freight`: activity-based (mode, weight_kg, distance_km → tonne-km factor) writing `corporate_overheads` (`upstream_transportation`); spend fallback when distance absent. Reuse `lib/utils/transport-emissions-calculator.ts` + `getOrCreateCorporateReport`.
-- [ ] **Refrigerant / F-gas service record** → `extract_refrigerant_service` + `POST /api/data/refrigerant`: write `utility_data_entries` (`utility_type:'refrigerant_leakage'`, `refrigerant_type` clamped to `REFRIGERANT_GWP` key, `quantity` kg). Review UI needs a **facility picker**.
-- [ ] **Packaging spec sheet** → `extract_packaging_spec`: components (epr_material_type, weight_g, recyclability) via `buildPackagingMaterialData()`. Review UI needs a **product picker**. (Heavier — may follow.)
-- [ ] **Certificate of Analysis / spec sheet** → `extract_supplier_coa`: attach to `supplier_product_evidence` (`evidence_type:'specification_sheet'`). Needs a **supplier-product picker**. (Heavier — may follow.)
-- [ ] **Certification certificate** → `extract_certification`: resolve `framework_code → framework_id`, upsert `organization_certifications` via `POST /api/certifications/frameworks`; fall back to evidence library when no framework matches. (Heavier — may follow.)
+1. **advisor-welcome** (welcome) — "Welcome, you're now advising {orgName}". Frames
+   them as an external expert, not a new account owner.
+2. **advisor-capabilities** (welcome) — what advisor access means + their access
+   level (read & write vs read-only, fetched from `advisor_organization_access`).
+   Sets expectations: they work inside the client's data, the owner keeps control.
+3. **advisor-org-overview** (quick-wins) — snapshot of the client org (name, product
+   type, location, size) so the advisor understands who they're helping. Reuses the
+   MemberOrgOverview card pattern, advisor-framed copy.
+4. **advisor-completion** (quick-wins) — "You're set up to advise {orgName}" with
+   quick actions geared to advising (dashboard, products/LCAs, reports, ask Rosa).
 
-## Phase 4 — Surfacing (gap #4)
-- [ ] Add the shared `UniversalDropzone` trigger to the main data-entry journeys (facilities, products, suppliers) so smart upload is discoverable, not just on the `/rosa` Queue tab. Leave the existing per-page bill dialogs in place (own extraction) but offer the universal dropzone alongside.
+## Files to change
+- [ ] `lib/onboarding/types.ts` — add `'advisor'` to `OnboardingFlow`; add 4 advisor
+      step ids; `ADVISOR_ONBOARDING_STEPS`, `INITIAL_ADVISOR_ONBOARDING_STATE`,
+      `ADVISOR_PHASES`, `TOTAL_ADVISOR_STEPS`; handle `'advisor'` in
+      `getStepsForFlow` / `getInitialStateForFlow` / `getStepConfig`.
+- [ ] `lib/onboarding/index.ts` — re-export the new advisor symbols.
+- [ ] `lib/onboarding/OnboardingContext.tsx` — `isAdvisor = userRole === 'advisor'`;
+      flow fallback `advisor → fast_track(owner) → member`; advisor completion step.
+- [ ] `components/onboarding/OnboardingWizard.tsx` — register advisor step components;
+      advisor phases/steps in the top bar; treat `advisor-welcome` as welcome and
+      `advisor-completion` as completion.
+- [ ] `app/api/onboarding/route.ts` — GET returns advisor initial state+flow for
+      `orgRole === 'advisor'`; POST persists `advisor` flow for advisors.
+- [ ] New steps: `AdvisorWelcomeScreen.tsx`, `AdvisorCapabilitiesStep.tsx`,
+      `AdvisorOrgOverview.tsx`, `AdvisorCompletionStep.tsx`.
+
+## Notes
+- No DB migration needed — `onboarding_state.onboarding_flow` is free-text and
+  per-user-per-org; an `'advisor'` value just works. State persists so it shows once.
+- Owners/members/fast-track flows are untouched.
 
 ## Verification
-- [ ] `tsc` clean; scoped tests; dev-main compiles the touched routes.
-- [ ] Each new save endpoint auth-gates and writes the right table.
+- [ ] Seed an advisor-access row locally, switch into that org, confirm the advisor
+      flow renders (not the member flow), walk all 4 steps, confirm completion
+      persists and it doesn't re-show on reload.
+- [ ] Confirm an owner still gets fast_track and a member still gets member flow.
 
-## Review (2026-06-19)
+## Review — DONE
+Implemented the `advisor` onboarding flow (4 steps, 2 phases) end-to-end and
+verified it live in the local preview as a real signed-in advisor:
+- Flow correctly resolves to `advisor` (not member) from role.
+- All 4 steps render with advisor-specific copy: welcome ("You're advising X"),
+  capabilities (fetches + shows the real access level — verified "Read & write
+  advisor"), client snapshot, completion with advising-focused quick actions.
+- Phase bar / progress / duration all correct; completion persists
+  `completed: true` and the wizard does not re-show on reload.
+- Also fixed: advisors were hitting the subscription paywall like new owners.
+  Added an advisor bypass in AppLayout's payment gate (mirrors suppliers).
+- Owner (fast_track) and member flows untouched. `tsc --noEmit`: 0 errors.
 
-Done & type-clean (tsc 0 errors; facilities/products/suppliers/rosa compile 200; new endpoints auth-gate 401):
-- **Phase 1 — email removed.** Deleted `app/api/ingest/email/route.ts`; removed the inbox card + `agent_inbox_address` from `RosaQueue.tsx` and the "Forward an email" row from `QuickActions.tsx`. Upload-only now.
-- **Phase 2 — depth.** BOM `identify_bom` now extracts `line_items` (name/qty/unit/type) + a preview in `BomHandoffPanel`. Supplier-invoice lines now carry `quantity`+`unit`, folded into the saved spend description.
-- **Phase 3 (partial) — new tools.** Freight invoice (`extract_freight_invoice` → `FreightInvoicePanel` → `POST /api/spend/freight`, activity tonne-km with spend fallback) and refrigerant service (`extract_refrigerant_service` → `RefrigerantPanel` → `POST /api/data/refrigerant`, utility_data_entries, facility picker).
-- **Phase 4 — surfacing.** `SmartUploadButton` added to facilities, products, suppliers headers.
-
-### Picker-based tools (built 2026-06-19, batch 3 — tsc 0 errors; endpoints auth-gate 401)
-- **Packaging spec** → `extract_packaging_spec` → `PackagingSpecPanel` (product picker) → `POST /api/products/[id]/packaging` (builds rows via `buildPackagingMaterialData`, user-client insert under RLS).
-- **Certificate of Analysis** → `extract_supplier_coa` → `SupplierCoaPanel` (supplier-product picker via `/api/supplier-products/search`) → `POST /api/supplier-products/evidence` (copies stashed file ingest-staging → supplier-product-evidence, inserts metadata).
-- **Certification** → `extract_certification` → `CertificationPanel` (framework picker via `/api/certifications/frameworks`, auto-matched from hint) → reuses `POST /api/certifications/frameworks` with `status:'certified'`.
-
-Still deferred:
-- Full BOM `line_items` carry-through into `BOMImportFlow` match step (today shows a preview; recipe editor still re-parses via `/api/bom/parse`).
-- No `organic` / `Fairtrade` framework rows exist, so those certs fall to the "other" picker fallback.
-
-After deploy: no migration needed. New saves write existing tables.
+## Follow-up (separate, NOT done here)
+- Advisor lands on a mostly-blank dashboard because several Rosa/vitality API
+  routes return 403 for advisors (`/api/rosa/*`, `/api/vitality/composite`,
+  `/api/certifications/health-score`, `/api/byproducts`, `/api/nature-actions`).
+  This is a pre-existing access-scoping gap, not part of onboarding. Worth a
+  dedicated pass to grant advisors read access to the client's dashboard data.

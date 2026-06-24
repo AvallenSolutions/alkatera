@@ -87,6 +87,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const { user } = useAuth()
   const { currentOrganization, userRole } = useOrganization()
   const isOwner = userRole === 'owner'
+  const isAdvisor = userRole === 'advisor'
 
   // Track which org ID we've loaded state for to avoid re-fetching on every render
   const loadedOrgIdRef = useRef<string | null>(null)
@@ -181,7 +182,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         if (res.ok) {
           const data = await res.json()
           // Set the flow from the API response
-          const serverFlow: OnboardingFlow = data.flow || (isOwner ? 'fast_track' : 'member')
+          const serverFlow: OnboardingFlow = data.flow || (isAdvisor ? 'advisor' : isOwner ? 'fast_track' : 'member')
           setOnboardingFlow(serverFlow)
 
           if (data.state) {
@@ -214,7 +215,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         }
       }
     })()
-  }, [currentOrganization?.id, isOwner, saveState])
+  }, [currentOrganization?.id, isOwner, isAdvisor, saveState])
 
   // Helper: update state in memory and persist immediately.
   // If a fetch is in-flight, queue the updater so it can be replayed
@@ -311,6 +312,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     const completionStep =
       flowRef.current === 'member' ? 'member-completion' :
       flowRef.current === 'fast_track' ? 'fast-track-completion' :
+      flowRef.current === 'advisor' ? 'advisor-completion' :
       'completion'
     const completedState: OnboardingState = {
       ...state,

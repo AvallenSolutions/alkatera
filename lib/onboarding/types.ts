@@ -9,7 +9,7 @@
  * Fast track flow: 5-step "see your footprint in 10 min" path
  */
 
-export type OnboardingFlow = 'owner' | 'member' | 'fast_track'
+export type OnboardingFlow = 'owner' | 'member' | 'fast_track' | 'advisor'
 
 export type OnboardingPhase =
   | 'welcome'           // Phase 1: Welcome & Orientation
@@ -43,6 +43,11 @@ export type OnboardingStep =
   | 'member-org-overview'
   | 'member-platform-tour'
   | 'member-completion'
+  // Advisor-specific steps
+  | 'advisor-welcome'
+  | 'advisor-capabilities'
+  | 'advisor-org-overview'
+  | 'advisor-completion'
   // Fast Track flow steps
   | 'fast-track-setup'
   | 'fast-track-import'
@@ -95,8 +100,17 @@ export const MEMBER_ONBOARDING_STEPS: OnboardingStepConfig[] = [
   { id: 'member-completion', phase: 'quick-wins', title: 'Complete', description: 'You are all set!', skippable: false, index: 5 },
 ]
 
+/** Advisor onboarding: 4-step orientation for external sustainability advisors */
+export const ADVISOR_ONBOARDING_STEPS: OnboardingStepConfig[] = [
+  { id: 'advisor-welcome', phase: 'welcome', title: 'Welcome', description: 'You’re now an advisor', skippable: false, index: 0 },
+  { id: 'advisor-capabilities', phase: 'welcome', title: 'Your Access', description: 'What you can do here', skippable: false, index: 1 },
+  { id: 'advisor-org-overview', phase: 'quick-wins', title: 'Your Client', description: 'Who you’re advising', skippable: false, index: 2 },
+  { id: 'advisor-completion', phase: 'quick-wins', title: 'Complete', description: 'Ready to advise', skippable: false, index: 3 },
+]
+
 export const TOTAL_STEPS = ONBOARDING_STEPS.length
 export const TOTAL_MEMBER_STEPS = MEMBER_ONBOARDING_STEPS.length
+export const TOTAL_ADVISOR_STEPS = ADVISOR_ONBOARDING_STEPS.length
 
 /** Fast Track onboarding: 8-step path that populates real account data */
 export const FAST_TRACK_STEPS: OnboardingStepConfig[] = [
@@ -125,6 +139,9 @@ export const PHASE_CONFIG: Record<OnboardingPhase, { label: string; duration: st
 
 /** Phases used in the member onboarding flow */
 export const MEMBER_PHASES: OnboardingPhase[] = ['welcome', 'quick-wins']
+
+/** Phases used in the advisor onboarding flow */
+export const ADVISOR_PHASES: OnboardingPhase[] = ['welcome', 'quick-wins']
 
 export type UserRole =
   | 'sustainability_manager'
@@ -268,6 +285,21 @@ export const INITIAL_FAST_TRACK_STATE: OnboardingState = {
   factorInfoHintCompleted: false,
 }
 
+export const INITIAL_ADVISOR_ONBOARDING_STATE: OnboardingState = {
+  completed: false,
+  dismissed: false,
+  currentStep: 'advisor-welcome',
+  completedSteps: [],
+  personalization: {},
+  dashboardGuideCompleted: false,
+  searchGuideCompleted: false,
+  productGuideCompleted: false,
+  emissionsGuideCompleted: false,
+  emissionsGuideDismissed: false,
+  recipeSidebarTourCompleted: false,
+  factorInfoHintCompleted: false,
+}
+
 // ---------------------------------------------------------------------------
 // Helper functions
 // ---------------------------------------------------------------------------
@@ -276,6 +308,7 @@ export const INITIAL_FAST_TRACK_STATE: OnboardingState = {
 export function getStepsForFlow(flow: OnboardingFlow): OnboardingStepConfig[] {
   if (flow === 'member') return MEMBER_ONBOARDING_STEPS
   if (flow === 'fast_track') return FAST_TRACK_STEPS
+  if (flow === 'advisor') return ADVISOR_ONBOARDING_STEPS
   return ONBOARDING_STEPS
 }
 
@@ -283,6 +316,7 @@ export function getStepsForFlow(flow: OnboardingFlow): OnboardingStepConfig[] {
 export function getInitialStateForFlow(flow: OnboardingFlow): OnboardingState {
   if (flow === 'member') return { ...INITIAL_MEMBER_ONBOARDING_STATE }
   if (flow === 'fast_track') return { ...INITIAL_FAST_TRACK_STATE }
+  if (flow === 'advisor') return { ...INITIAL_ADVISOR_ONBOARDING_STATE }
   return { ...INITIAL_ONBOARDING_STATE }
 }
 
@@ -294,6 +328,8 @@ export function getStepConfig(step: OnboardingStep): OnboardingStepConfig {
   if (memberStep) return memberStep
   const fastTrackStep = FAST_TRACK_STEPS.find(s => s.id === step)
   if (fastTrackStep) return fastTrackStep
+  const advisorStep = ADVISOR_ONBOARDING_STEPS.find(s => s.id === step)
+  if (advisorStep) return advisorStep
   // Fallback — should never happen
   return ONBOARDING_STEPS[0]
 }

@@ -163,11 +163,16 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
       // viewable, writes are blocked + a paywall banner is shown). Do not redirect.
       if (subscriptionStatus === 'cancelled') return
 
+      // External advisors never manage the client's billing, so never send them
+      // to choose/pay for a plan. Their access is governed by
+      // advisor_organization_access (read-only advisors are restricted server-side).
+      if (userRole === 'advisor') return
+
       if (subscriptionStatus !== 'active' && subscriptionStatus !== 'trial') {
         router.push('/complete-subscription')
       }
     }
-  }, [user, authLoading, isOrganizationLoading, isSupplier, isSupplierRoute, currentOrganization, requireOrganization, subscriptionLoading, subscriptionStatus, pathname, router])
+  }, [user, authLoading, isOrganizationLoading, isSupplier, isSupplierRoute, userRole, currentOrganization, requireOrganization, subscriptionLoading, subscriptionStatus, pathname, router])
 
   // --- Render gates: show loading spinner until we KNOW who the user is ---
 

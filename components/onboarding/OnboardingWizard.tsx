@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import Image from 'next/image'
-import { useOnboarding, ONBOARDING_STEPS, MEMBER_ONBOARDING_STEPS, FAST_TRACK_STEPS, FAST_TRACK_PHASES, PHASE_CONFIG, MEMBER_PHASES, getStepConfig } from '@/lib/onboarding'
+import { useOnboarding, ONBOARDING_STEPS, MEMBER_ONBOARDING_STEPS, FAST_TRACK_STEPS, ADVISOR_ONBOARDING_STEPS, FAST_TRACK_PHASES, PHASE_CONFIG, MEMBER_PHASES, ADVISOR_PHASES, getStepConfig } from '@/lib/onboarding'
 import { trackOnboarding } from '@/lib/onboarding/telemetry'
 import type { OnboardingPhase } from '@/lib/onboarding'
 import { useOrganization } from '@/lib/organizationContext'
@@ -32,6 +32,12 @@ import { MemberWelcomeScreen } from './steps/MemberWelcomeScreen'
 import { MemberOrgOverview } from './steps/MemberOrgOverview'
 import { MemberPlatformTour } from './steps/MemberPlatformTour'
 import { MemberCompletionStep } from './steps/MemberCompletionStep'
+
+// Step components — advisor flow
+import { AdvisorWelcomeScreen } from './steps/AdvisorWelcomeScreen'
+import { AdvisorCapabilitiesStep } from './steps/AdvisorCapabilitiesStep'
+import { AdvisorOrgOverview } from './steps/AdvisorOrgOverview'
+import { AdvisorCompletionStep } from './steps/AdvisorCompletionStep'
 
 // Step components — fast track flow
 import { FastTrackSetupStep } from './steps/FastTrackSetupStep'
@@ -63,6 +69,11 @@ const STEP_COMPONENTS: Record<string, React.ComponentType> = {
   'member-org-overview': MemberOrgOverview,
   'member-platform-tour': MemberPlatformTour,
   'member-completion': MemberCompletionStep,
+  // Advisor steps
+  'advisor-welcome': AdvisorWelcomeScreen,
+  'advisor-capabilities': AdvisorCapabilitiesStep,
+  'advisor-org-overview': AdvisorOrgOverview,
+  'advisor-completion': AdvisorCompletionStep,
   // Fast Track steps
   'fast-track-setup': FastTrackSetupStep,
   'fast-track-import': FastTrackImportStep,
@@ -126,11 +137,12 @@ export function OnboardingWizard() {
   // Use flow-appropriate phases and steps for the top bar
   const isMemberFlow = onboardingFlow === 'member'
   const isFastTrack = onboardingFlow === 'fast_track'
-  const phases = isMemberFlow ? MEMBER_PHASES : isFastTrack ? FAST_TRACK_PHASES : OWNER_PHASES
-  const flowSteps = isMemberFlow ? MEMBER_ONBOARDING_STEPS : isFastTrack ? FAST_TRACK_STEPS : ONBOARDING_STEPS
+  const isAdvisorFlow = onboardingFlow === 'advisor'
+  const phases = isMemberFlow ? MEMBER_PHASES : isFastTrack ? FAST_TRACK_PHASES : isAdvisorFlow ? ADVISOR_PHASES : OWNER_PHASES
+  const flowSteps = isMemberFlow ? MEMBER_ONBOARDING_STEPS : isFastTrack ? FAST_TRACK_STEPS : isAdvisorFlow ? ADVISOR_ONBOARDING_STEPS : ONBOARDING_STEPS
 
-  const isWelcome = state.currentStep === 'welcome-screen' || state.currentStep === 'member-welcome'
-  const isCompletion = state.currentStep === 'completion' || state.currentStep === 'member-completion' || state.currentStep === 'fast-track-completion'
+  const isWelcome = state.currentStep === 'welcome-screen' || state.currentStep === 'member-welcome' || state.currentStep === 'advisor-welcome'
+  const isCompletion = state.currentStep === 'completion' || state.currentStep === 'member-completion' || state.currentStep === 'fast-track-completion' || state.currentStep === 'advisor-completion'
 
   return (
     <div className="fixed inset-0 z-[60] overflow-y-auto" role="dialog" aria-label="Onboarding wizard">
@@ -233,7 +245,7 @@ export function OnboardingWizard() {
             <Progress value={progress} indicatorColor="lime" className="h-1 bg-white/10" />
             <div className="flex items-center justify-between mt-1">
               <p className="text-xs text-white/40">
-                {currentStepConfig.title} &mdash; {isMemberFlow ? '~3 min' : phaseConfig.duration}
+                {currentStepConfig.title} &mdash; {isAdvisorFlow ? '~1 min' : isMemberFlow ? '~3 min' : phaseConfig.duration}
               </p>
               <p className="text-xs text-white/40">{progress}%</p>
             </div>
