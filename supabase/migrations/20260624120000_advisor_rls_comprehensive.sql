@@ -79,6 +79,15 @@ DECLARE
   ];
 BEGIN
   FOREACH t IN ARRAY tables_to_fix LOOP
+    -- Skip tables that do not yet exist on this environment (e.g. hospitality
+    -- tables pending migration on production).
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = t
+    ) THEN
+      CONTINUE;
+    END IF;
+
     -- Drop simple org_members-based permissive policies for all four commands.
     -- Filter keeps role-check and draft/status-check policies untouched:
     --   contract_manufacturer_allocations UPDATE/DELETE (admin role)
