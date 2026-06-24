@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
+import Image from 'next/image';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Loader2,
   CheckCircle2,
@@ -15,6 +15,9 @@ import {
   Briefcase,
   LogIn,
 } from 'lucide-react';
+
+const ALKATERA_LOGO =
+  'https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png';
 
 interface InvitationDetails {
   id: string;
@@ -148,12 +151,35 @@ export default function AdvisorInvitePage() {
         return;
       }
 
+      // The OrganizationProvider lives in the root layout and only re-fetches its
+      // org list when the user ID changes, so a plain client-side redirect would
+      // land the advisor back on their previous org with the new one invisible in
+      // the switcher. Make the newly-granted org active via the server-trusted
+      // switch route, refresh the session so the JWT carries it, then do a
+      // full-page navigation so the provider bootstraps a fresh session that both
+      // includes and resolves to the org they just accepted.
+      if (result.organization_id) {
+        try {
+          await fetch('/api/organizations/switch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ organization_id: result.organization_id }),
+          });
+          await supabase.auth.refreshSession();
+        } catch (switchErr) {
+          // Non-fatal: the access grant succeeded, so the org will still appear in
+          // the switcher after the reload even if making it active failed here.
+          console.error('Failed to set newly-accepted org as active:', switchErr);
+        }
+      }
+
       setSuccess(true);
 
-      // Redirect to dashboard after a short delay
+      // Full-page navigation (not router.push) to force a fresh organisation
+      // bootstrap that picks up the new advisor access.
       setTimeout(() => {
-        router.push('/dashboard');
-      }, 3000);
+        window.location.href = '/dashboard';
+      }, 1500);
     } catch (err) {
       console.error('Error accepting invitation:', err);
       setError('Failed to accept invitation. Please try again.');
@@ -171,64 +197,124 @@ export default function AdvisorInvitePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-blue-500 mb-4" />
-              <p className="text-slate-500">Loading invitation details...</p>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="relative min-h-screen text-white">
+        <Image
+          src="/images/agave.jpg"
+          alt="Agave plants"
+          fill
+          className="object-cover"
+          priority
+          quality={85}
+        />
+        <div className="absolute inset-0 bg-black/60" />
+        <div className="relative z-10 flex min-h-screen flex-col items-center justify-center p-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="flex flex-col items-center"
+          >
+            <Loader2 className="h-10 w-10 animate-spin text-[#ccff00] mb-4" />
+            <p className="text-white/60 font-mono text-sm uppercase tracking-widest">
+              Loading invitation...
+            </p>
+          </motion.div>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <div className="flex items-center gap-2 text-red-500">
-              <XCircle className="h-6 w-6" />
-              <CardTitle>Invitation Error</CardTitle>
+      <div className="relative min-h-screen text-white">
+        <Image
+          src="/images/agave.jpg"
+          alt="Agave plants"
+          fill
+          className="object-cover"
+          priority
+          quality={85}
+        />
+        <div className="absolute inset-0 bg-black/60" />
+        <div className="relative z-10 flex min-h-screen flex-col items-center justify-center p-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="w-full max-w-md"
+          >
+            <div className="mb-8 flex justify-center">
+              <img src={ALKATERA_LOGO} alt="alkatera" className="h-12 md:h-14 w-auto object-contain" />
             </div>
-          </CardHeader>
-          <CardContent>
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-            <div className="mt-6">
-              <Button variant="outline" className="w-full" onClick={() => router.push('/')}>
+
+            <div className="border border-white/10 bg-white/5 backdrop-blur-md rounded-2xl p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-3 rounded-xl bg-red-500/20 border border-red-500/30">
+                  <XCircle className="h-6 w-6 text-red-400" />
+                </div>
+                <h2 className="font-serif text-2xl text-white">Invitation Error</h2>
+              </div>
+
+              <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl mb-6">
+                <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-300">{error}</p>
+              </div>
+
+              <Link
+                href="/"
+                className="block w-full py-4 bg-white/10 text-white font-mono uppercase text-xs tracking-widest font-bold rounded-xl text-center hover:bg-white/20 transition-all"
+              >
                 Return to Home
-              </Button>
+              </Link>
             </div>
-          </CardContent>
-        </Card>
+          </motion.div>
+        </div>
       </div>
     );
   }
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <div className="flex items-center gap-2 text-green-500">
-              <CheckCircle2 className="h-6 w-6" />
-              <CardTitle>Invitation Accepted!</CardTitle>
+      <div className="relative min-h-screen text-white">
+        <Image
+          src="/images/agave.jpg"
+          alt="Agave plants"
+          fill
+          className="object-cover"
+          priority
+          quality={85}
+        />
+        <div className="absolute inset-0 bg-black/60" />
+        <div className="relative z-10 flex min-h-screen flex-col items-center justify-center p-6">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5 }}
+            className="w-full max-w-md"
+          >
+            <div className="mb-8 flex justify-center">
+              <img src={ALKATERA_LOGO} alt="alkatera" className="h-12 md:h-14 w-auto object-contain" />
             </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-slate-600 dark:text-slate-300 mb-4">
-              You now have advisor access to <strong>{invitation?.organization_name}</strong>.
-            </p>
-            <p className="text-sm text-slate-500">
-              Redirecting you to the dashboard...
-            </p>
-          </CardContent>
-        </Card>
+
+            <div className="border border-[#ccff00]/30 bg-[#ccff00]/5 backdrop-blur-md rounded-2xl p-8 text-center">
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
+                className="inline-flex p-4 rounded-full bg-[#ccff00]/20 border border-[#ccff00]/30 mb-6"
+              >
+                <CheckCircle2 className="h-10 w-10 text-[#ccff00]" />
+              </motion.div>
+
+              <h2 className="font-serif text-3xl text-white mb-3">Invitation accepted!</h2>
+              <p className="text-white/60 mb-6">
+                You now have advisor access to <strong className="text-white">{invitation?.organization_name}</strong>.
+                Taking you there now...
+              </p>
+              <Loader2 className="h-6 w-6 animate-spin text-[#ccff00] mx-auto" />
+            </div>
+          </motion.div>
+        </div>
       </div>
     );
   }
@@ -242,127 +328,182 @@ export default function AdvisorInvitePage() {
     userEmail.toLowerCase() !== invitation.advisor_email.toLowerCase();
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4">
-      <Card className="w-full max-w-lg">
-        <CardHeader>
-          <div className="flex items-center gap-2 text-blue-500 mb-2">
-            <Briefcase className="h-6 w-6" />
-            <CardTitle>Advisor Invitation</CardTitle>
+    <div className="relative min-h-screen text-white">
+      <Image
+        src="/images/vineyard-autumn.jpg"
+        alt="Autumn vineyard"
+        fill
+        className="object-cover"
+        priority
+        quality={85}
+      />
+      <div className="absolute inset-0 bg-black/60" />
+
+      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center p-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="w-full max-w-lg"
+        >
+          {/* Logo */}
+          <div className="mb-8 flex justify-center">
+            <img src={ALKATERA_LOGO} alt="alkatera" className="h-12 md:h-14 w-auto object-contain" />
           </div>
-          <CardDescription>
-            You&apos;ve been invited to be a sustainability advisor
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Organization Info */}
-          <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-lg">
-            <div className="flex items-center gap-3">
-              <Building2 className="h-10 w-10 text-blue-500" />
-              <div>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Organization</p>
-                <p className="text-lg font-semibold">{invitation.organization_name}</p>
+
+          {/* Hero headline */}
+          <h1 className="font-serif text-4xl md:text-5xl text-white text-center mb-4">
+            You&apos;re invited.
+          </h1>
+          <p className="text-white/50 text-center mb-8">
+            Become a sustainability advisor for {invitation.organization_name}
+          </p>
+
+          {/* Glassmorphism Card */}
+          <div className="border border-white/10 bg-white/5 backdrop-blur-md rounded-2xl p-8 space-y-6">
+            {/* Organisation Info */}
+            <div className="flex items-center gap-4 p-4 bg-white/5 border border-white/10 rounded-xl">
+              <div className="p-3 rounded-xl bg-[#ccff00]/10 border border-[#ccff00]/20">
+                <Building2 className="h-6 w-6 text-[#ccff00]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-mono text-white/40 uppercase tracking-widest mb-1">
+                  Organisation
+                </p>
+                <p className="text-lg font-semibold text-white truncate">
+                  {invitation.organization_name}
+                </p>
               </div>
             </div>
+
+            {/* Invitation Details */}
+            <div className="grid grid-cols-1 gap-3 text-sm">
+              <div className="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-xl">
+                <span className="text-xs font-mono text-white/40 uppercase tracking-widest">
+                  Invited Email
+                </span>
+                <span className="font-medium text-white truncate ml-3">{invitation.advisor_email}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-white/5 border border-white/10 rounded-xl">
+                  <p className="text-xs font-mono text-white/40 uppercase tracking-widest mb-1">Sent</p>
+                  <p className="font-medium text-white">
+                    {new Date(invitation.invited_at).toLocaleDateString('en-GB', {
+                      day: 'numeric',
+                      month: 'short',
+                    })}
+                  </p>
+                </div>
+                <div className="p-3 bg-white/5 border border-white/10 rounded-xl">
+                  <p className="text-xs font-mono text-white/40 uppercase tracking-widest mb-1">Expires</p>
+                  <p className="font-medium text-white">
+                    {new Date(invitation.expires_at).toLocaleDateString('en-GB', {
+                      day: 'numeric',
+                      month: 'short',
+                    })}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Access Notes */}
+            {invitation.access_notes && (
+              <div className="p-4 bg-white/5 border border-white/10 rounded-xl">
+                <p className="text-xs font-mono text-white/40 uppercase tracking-widest mb-2">
+                  Message from the organisation
+                </p>
+                <p className="text-sm text-white/80">{invitation.access_notes}</p>
+              </div>
+            )}
+
+            {/* What advisors can do (depends on the access level granted) */}
+            <div className="p-4 bg-[#ccff00]/5 border border-[#ccff00]/20 rounded-xl">
+              <div className="flex items-center gap-2 mb-3">
+                <Briefcase className="h-4 w-4 text-[#ccff00]" />
+                <p className="text-sm font-medium text-white">
+                  {invitation.access_level === 'read_only'
+                    ? 'You have been granted read-only access. You will be able to:'
+                    : 'You have been granted read & write access. You will be able to:'}
+                </p>
+              </div>
+              <ul className="text-sm text-white/70 space-y-1.5">
+                {(invitation.access_level === 'read_only'
+                  ? ['View sustainability data and LCA assessments', 'Generate reports', 'Message the team with advice']
+                  : [
+                      'View and edit sustainability data',
+                      'Create and manage LCA assessments',
+                      'Generate and publish reports',
+                      'View audit logs',
+                    ]
+                ).map((item) => (
+                  <li key={item} className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-[#ccff00] flex-shrink-0 mt-0.5" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Error message */}
+            {error && (
+              <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+                <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-300">{error}</p>
+              </div>
+            )}
+
+            {/* Authentication & Accept */}
+            {!isAuthenticated ? (
+              <div className="space-y-4">
+                <div className="flex items-start gap-3 p-4 bg-white/5 border border-white/10 rounded-xl">
+                  <AlertCircle className="h-5 w-5 text-white/40 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-white/70">
+                    Sign in to accept this invitation, or create an account if you don&apos;t
+                    have one yet. Either way, use the email address{' '}
+                    <strong className="text-white">{invitation.advisor_email}</strong>.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSignIn}
+                  className="w-full py-4 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:opacity-90 hover:scale-[1.02] transition-all duration-300 flex items-center justify-center gap-2"
+                >
+                  <LogIn className="h-4 w-4" />
+                  Sign In or Create Account
+                </button>
+              </div>
+            ) : emailMismatch ? (
+              <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+                <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-300">
+                  This invitation was sent to <strong className="text-white">{invitation.advisor_email}</strong>, but you
+                  are signed in as <strong className="text-white">{userEmail}</strong>. Please sign in with the correct
+                  account.
+                </p>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleAcceptInvitation}
+                disabled={isAccepting}
+                className="w-full py-4 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:opacity-90 hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
+              >
+                {isAccepting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Accepting...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-4 w-4" />
+                    Accept Invitation
+                  </>
+                )}
+              </button>
+            )}
           </div>
-
-          {/* Invitation Details */}
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-slate-500">Invited Email:</span>
-              <span className="font-medium">{invitation.advisor_email}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Sent:</span>
-              <span>{new Date(invitation.invited_at).toLocaleDateString()}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Expires:</span>
-              <span>{new Date(invitation.expires_at).toLocaleDateString()}</span>
-            </div>
-          </div>
-
-          {/* Access Notes */}
-          {invitation.access_notes && (
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-              <p className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
-                Message from the organisation:
-              </p>
-              <p className="text-sm text-blue-600 dark:text-blue-400">
-                {invitation.access_notes}
-              </p>
-            </div>
-          )}
-
-          {/* What advisors can do (depends on the access level granted) */}
-          <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-            <p className="text-sm font-medium text-green-700 dark:text-green-300 mb-2">
-              {invitation.access_level === 'read_only'
-                ? 'You have been granted read-only access. You will be able to:'
-                : 'You have been granted read & write access. You will be able to:'}
-            </p>
-            <ul className="text-sm text-green-600 dark:text-green-400 space-y-1 list-disc list-inside">
-              {invitation.access_level === 'read_only' ? (
-                <>
-                  <li>View sustainability data and LCA assessments</li>
-                  <li>Generate reports</li>
-                  <li>Message the team with advice</li>
-                </>
-              ) : (
-                <>
-                  <li>View and edit sustainability data</li>
-                  <li>Create and manage LCA assessments</li>
-                  <li>Generate and publish reports</li>
-                  <li>View audit logs</li>
-                </>
-              )}
-            </ul>
-          </div>
-
-          {/* Authentication & Accept */}
-          {!isAuthenticated ? (
-            <div className="space-y-4">
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  Sign in to accept this invitation, or create an account if you don&apos;t
-                  have one yet. Either way, use the email address{' '}
-                  <strong>{invitation.advisor_email}</strong>.
-                </AlertDescription>
-              </Alert>
-              <Button className="w-full" onClick={handleSignIn}>
-                <LogIn className="mr-2 h-4 w-4" />
-                Sign In or Create Account
-              </Button>
-            </div>
-          ) : emailMismatch ? (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                This invitation was sent to <strong>{invitation.advisor_email}</strong>, but you are
-                signed in as <strong>{userEmail}</strong>. Please sign in with the correct account.
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <Button
-              className="w-full"
-              onClick={handleAcceptInvitation}
-              disabled={isAccepting}
-            >
-              {isAccepting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Accepting...
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="mr-2 h-4 w-4" />
-                  Accept Invitation
-                </>
-              )}
-            </Button>
-          )}
-        </CardContent>
-      </Card>
+        </motion.div>
+      </div>
     </div>
   );
 }
