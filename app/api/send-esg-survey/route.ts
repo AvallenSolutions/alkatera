@@ -225,7 +225,8 @@ export async function POST(request: NextRequest) {
         const resend = new Resend(resendApiKey);
         const logoUrl = 'https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png';
         const emailSubject = `${organizationName} has invited you to complete a sustainability survey on alkatera`;
-        const greeting = escapeHtml(contactPersonName || supplierName || 'there');
+        const greetingName = contactPersonName || supplierName;
+        const greeting = greetingName ? escapeHtml(greetingName) : null;
         const safeInviterName = escapeHtml(inviterName || '');
         const safeOrgName = escapeHtml(organizationName || '');
         const safePersonalMessage = personalMessage ? escapeHtml(personalMessage) : '';
@@ -279,7 +280,7 @@ export async function POST(request: NextRequest) {
                 <h1 style="color: #ccff00; font-family: 'Courier New', monospace; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; margin: 0;">Sustainability Survey</h1>
               </div>
               <p style="color: #e8e8e8; font-size: 15px; line-height: 1.7; margin: 0 0 16px 0;">
-                Dear ${greeting},
+                ${greeting ? `Dear ${greeting},` : 'Welcome,'}
               </p>
               <p style="color: #e8e8e8; font-size: 15px; line-height: 1.7; margin: 0 0 16px 0;">
                 ${inviterDisplayHtml} at <strong style="color: #fff;">${safeOrgName}</strong> has invited you to complete a short sustainability survey (ESG self-assessment) on the alka<strong style="color: #fff;">tera</strong> platform. Your responses help ${safeOrgName} gather the supplier evidence they need, including for B Corp certification.

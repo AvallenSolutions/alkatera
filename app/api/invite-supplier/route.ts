@@ -175,7 +175,8 @@ export async function POST(request: NextRequest) {
         const resend = new Resend(resendApiKey);
         const logoUrl = 'https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png';
         const emailSubject = `${organizationName} has invited you to share sustainability data on alkatera`;
-        const greeting = escapeHtml(contactPersonName || supplierName || 'there');
+        const greetingName = contactPersonName || supplierName;
+        const greeting = greetingName ? escapeHtml(greetingName) : null;
         const safeInviterName = escapeHtml(inviterName || '');
         const safeOrgName = escapeHtml(organizationName || '');
         const safeMaterialName = materialName ? escapeHtml(materialName) : '';
@@ -192,7 +193,7 @@ export async function POST(request: NextRequest) {
               <h1 style="color: #ccff00; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; margin: 0;">Supplier Invitation</h1>
             </div>
             <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
-              Dear ${greeting},
+              ${greeting ? `Dear ${greeting},` : 'Welcome,'}
             </p>
             <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
               <strong style="color: #fff;">${safeInviterName}</strong> at <strong style="color: #fff;">${safeOrgName}</strong> has invited you to join the alka<strong style="color: #fff;">tera</strong> platform to ${safeMaterialName ? `provide verified sustainability data for <strong style="color: #fff;">${safeMaterialName}</strong>` : 'share your sustainability data'}.
