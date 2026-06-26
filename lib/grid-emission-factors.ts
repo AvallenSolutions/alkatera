@@ -25,6 +25,8 @@
  *   - Country codes follow ISO 3166-1 alpha-2
  */
 
+import { getCachedFactor } from '@/lib/external-data/cache';
+
 export const FACTOR_DATA_YEAR = 2023;
 
 /**
@@ -122,6 +124,12 @@ export function getGridFactor(
 ): { factor: number; source: string; isEstimated: boolean; dataGapWarning?: string } {
   if (countryCode) {
     const normalized = countryCode.toUpperCase().trim();
+    // Foundation A: a loaded reference-data set (e.g. DESNZ) takes precedence.
+    // Cold cache (nothing loaded / client-side) → falls through to the constants.
+    const cached = getCachedFactor('grid', normalized, normalized);
+    if (cached) {
+      return { factor: cached.factor, source: cached.source, isEstimated: false };
+    }
     const factor = GRID_FACTORS_BY_COUNTRY[normalized];
     if (factor !== undefined) {
       return {

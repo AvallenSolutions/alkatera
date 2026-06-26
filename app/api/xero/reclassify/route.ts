@@ -4,6 +4,7 @@ import { getSupabaseServerClient } from '@/lib/supabase/server-client'
 import { getMemberRole } from '@/app/api/stripe/_helpers/get-member-role'
 import { classifyTransaction, type AccountMapping, type SupplierRule } from '@/lib/xero/classifier'
 import { calculateSpendBasedEmissions } from '@/lib/xero/spend-factors'
+import { warmFactorCache } from '@/lib/external-data/cache'
 import { extractFromDescription, hasExtractedData } from '@/lib/xero/description-extractor'
 
 export const dynamic = 'force-dynamic'
@@ -53,6 +54,10 @@ export async function POST(request: NextRequest) {
 
     // 4. Use service client for bulk updates
     const db = getServiceClient()
+
+    // Foundation A: load any active reference set (USEEIO for USD spend, etc.)
+    // before recomputing spend-based emissions.
+    await warmFactorCache(db)
 
     // 5. Load classification data
     const { data: accountMappings } = await db

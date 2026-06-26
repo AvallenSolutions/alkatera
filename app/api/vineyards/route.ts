@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
+import { dispatchSoilBaseline } from '@/lib/geo/dispatch';
 
 /**
  * Check viticulture beta access for the given organisation.
@@ -126,6 +127,15 @@ export async function POST(request: NextRequest) {
       console.error('[Vineyards POST] Insert error:', error);
       return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
+
+    // Auto-fill a soil-carbon baseline from coordinates (background, best-effort).
+    await dispatchSoilBaseline({
+      organizationId,
+      landUnitType: 'vineyard',
+      landUnitId: data.id,
+      lat: data.address_lat,
+      lng: data.address_lng,
+    });
 
     return NextResponse.json({ success: true, data }, { status: 201 });
   } catch (err: any) {

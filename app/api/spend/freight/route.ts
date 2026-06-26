@@ -3,6 +3,7 @@ import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 import { getOrCreateCorporateReport, deriveReportingYear } from '@/lib/xero/report-helper';
 import { getSpendFactor, calculateSpendBasedEmissions } from '@/lib/xero/spend-factors';
+import { warmFactorCache } from '@/lib/external-data/cache';
 
 /**
  * POST /api/spend/freight
@@ -39,6 +40,9 @@ export async function POST(request: NextRequest) {
     if (!organizationId) {
       return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
     }
+
+    // Foundation A: load any active reference set (USEEIO for USD spend, etc.).
+    await warmFactorCache(supabase);
 
     const body = await request.json();
     const carrierName: string = (body.carrier_name || '').toString().trim();

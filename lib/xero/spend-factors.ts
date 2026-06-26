@@ -8,6 +8,8 @@
  * Source: UK DEFRA Environmental Reporting Guidelines, Table 13c
  */
 
+import { getCachedFactor } from '@/lib/external-data/cache'
+
 export const SPEND_EMISSION_FACTORS: Record<string, { factor: number; source: string; uncertainty: number }> = {
   // Energy
   grid_electricity: { factor: 0.49, source: 'DEFRA 2024 Table 13c: Electricity', uncertainty: 0.6 },
@@ -55,9 +57,31 @@ export const SPEND_EMISSION_FACTORS: Record<string, { factor: number; source: st
 /**
  * Get the spend-based emission factor for a category.
  * Returns kg CO2e per GBP spent.
+ *
+ * Foundation A: when a reference-data set is loaded (DESNZ for GB, USEEIO for
+ * US), the cached factor for this (category, geo) takes precedence. Cold cache
+ * (nothing loaded / not warmed) falls back to the built-in DEFRA constants, so
+ * behaviour is unchanged until a set is loaded.
  */
-export function getSpendFactor(category: string): number {
+export function getSpendFactor(category: string, geo: string = 'GB'): number {
+  const cached = getCachedFactor('spend', category, geo)
+  if (cached) return cached.factor
   return SPEND_EMISSION_FACTORS[category]?.factor ?? SPEND_EMISSION_FACTORS.other.factor
+}
+
+/**
+ * Like getSpendFactor but returns the factor's unit and source too, so the
+ * caller can handle per-USD (USEEIO) vs per-GBP (DEFRA) correctly. On a cold
+ * cache / miss, returns the built-in DEFRA constant (per GBP).
+ */
+export function getSpendFactorDetail(
+  category: string,
+  geo: string = 'GB',
+): { factor: number; unit: string; source: string } {
+  const cached = getCachedFactor('spend', category, geo)
+  if (cached) return { factor: cached.factor, unit: cached.unit, source: cached.source }
+  const def = SPEND_EMISSION_FACTORS[category] ?? SPEND_EMISSION_FACTORS.other
+  return { factor: def.factor, unit: 'kgCO2e/GBP', source: def.source }
 }
 
 /**
@@ -89,10 +113,23 @@ const CURRENCY_TO_GBP: Record<string, number> = {
 
 /**
  * Calculate spend-based emissions for a transaction amount.
- * Converts non-GBP amounts using approximate FX rates since DEFRA factors are per GBP.
+ *
+ * For USD-denominated spend, prefers EPA USEEIO factors (per USD) applied
+ * directly with NO FX conversion, when a US reference set is loaded and warmed.
+ * Otherwise uses the UK DEFRA factors (per GBP) with FX conversion, exactly as
+ * before. With nothing loaded (cold cache), behaviour is unchanged.
  */
 export function calculateSpendBasedEmissions(amount: number, category: string, currency: string = 'GBP'): number {
-  const factor = getSpendFactor(category)
-  const fxRate = CURRENCY_TO_GBP[currency.toUpperCase()] ?? 1.0
+  const cur = currency.toUpperCase()
+  if (cur === 'USD') {
+    const us = getSpendFactorDetail(category, 'US')
+    // Only use a genuine per-USD (USEEIO) factor directly; a DEFRA fallback
+    // (per GBP) drops through to the FX path below.
+    if (us.unit === 'kgCO2e/USD') {
+      return Math.abs(amount) * us.factor
+    }
+  }
+  const factor = getSpendFactor(category, 'GB')
+  const fxRate = CURRENCY_TO_GBP[cur] ?? 1.0
   return Math.abs(amount) * fxRate * factor
 }

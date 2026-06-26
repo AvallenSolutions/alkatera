@@ -76,6 +76,22 @@ export interface AlkateraEvents {
     data: { names?: string[] };
   };
 
+  // ─────────── External reference-data loaders (Foundation A) ───────────
+  'reference-data/load.requested': {
+    data: { loaderKey: string };
+  };
+
+  // ─────────── Geospatial soil-carbon baseline (Foundation B) ───────────
+  'geo/soil-baseline.requested': {
+    data: {
+      organization_id: string;
+      land_unit_type: 'vineyard' | 'orchard' | 'arable_field';
+      land_unit_id: string;
+      lat: number;
+      lng: number;
+    };
+  };
+
   // ─────────── Pulse on-demand refresh ───────────
   'pulse/refresh.requested': {
     data: { run_id: string; base_url: string };

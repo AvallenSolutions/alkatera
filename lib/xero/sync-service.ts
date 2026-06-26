@@ -4,6 +4,7 @@ import { getAuthenticatedClient } from './client'
 import { updateSyncStatus } from './token-store'
 import { classifyTransaction, type AccountMapping, type SupplierRule } from './classifier'
 import { calculateSpendBasedEmissions } from './spend-factors'
+import { warmFactorCache } from '@/lib/external-data/cache'
 import { extractFromDescription, hasExtractedData } from './description-extractor'
 import { classifyWithAI } from './ai-classifier'
 import { getLabelYearForDate } from '../log-data/period-utils'
@@ -67,6 +68,9 @@ export async function syncStage(
   cursor?: any
 ): Promise<StageResult> {
   const db = getServiceClient()
+  // Foundation A: load any active reference set (USEEIO for USD spend, etc.) so
+  // spend-based emissions written during the sync reflect the loaded factors.
+  await warmFactorCache(db)
 
   try {
     switch (stage) {

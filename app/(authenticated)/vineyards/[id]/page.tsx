@@ -21,6 +21,7 @@ import { VineyardImpactOverview } from '@/components/vineyards/VineyardImpactOve
 import { VineyardTrendCharts } from '@/components/vineyards/VineyardTrendCharts';
 import { VintageHistoryTable } from '@/components/vineyards/VintageHistoryTable';
 import { VineyardGrowingQuestionnaire } from '@/components/vineyards/VineyardGrowingQuestionnaire';
+import { LandUnitMap } from '@/components/geo/LandUnitMap';
 import type { VineyardClimateZone, VineyardCertification } from '@/lib/types/viticulture';
 
 const CERTIFICATION_LABELS: Record<string, string> = {
@@ -212,6 +213,7 @@ export default function VineyardDetailPage() {
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="trends">Trends</TabsTrigger>
             <TabsTrigger value="history">Vintage History</TabsTrigger>
+            <TabsTrigger value="map">Map</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="mt-6">
@@ -232,6 +234,10 @@ export default function VineyardDetailPage() {
               onEditVintage={handleEditVintage}
               onAddVintage={handleAddVintage}
             />
+          </TabsContent>
+
+          <TabsContent value="map" className="mt-6">
+            <LandUnitMap type="vineyard" id={vineyard.id} />
           </TabsContent>
         </Tabs>
       </div>

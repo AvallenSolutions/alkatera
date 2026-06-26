@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 import { resolveUserOrganization } from '@/lib/supabase/resolve-organization';
+import { dispatchSoilBaseline } from '@/lib/geo/dispatch';
 
 /**
  * GET /api/orchards/[id]
@@ -87,6 +88,17 @@ export async function PATCH(
     if (error) {
       console.error('[Orchard PATCH] Update error:', error);
       return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    }
+
+    // Re-fill the soil-carbon baseline if coordinates were part of this update.
+    if ('address_lat' in body || 'address_lng' in body) {
+      await dispatchSoilBaseline({
+        organizationId,
+        landUnitType: 'orchard',
+        landUnitId: params.id,
+        lat: data.address_lat,
+        lng: data.address_lng,
+      });
     }
 
     return NextResponse.json({ success: true, data });

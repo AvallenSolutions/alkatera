@@ -3,6 +3,7 @@ import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access';
 import { getOrCreateCorporateReport, deriveReportingYear } from '@/lib/xero/report-helper';
 import { getSpendFactor, calculateSpendBasedEmissions } from '@/lib/xero/spend-factors';
+import { warmFactorCache } from '@/lib/external-data/cache';
 
 /**
  * POST /api/spend/invoice
@@ -77,6 +78,9 @@ export async function POST(request: NextRequest) {
 
     const year = deriveReportingYear(invoiceDate);
     const reportId = await getOrCreateCorporateReport(supabase, organizationId, year);
+
+    // Foundation A: load any active reference set (USEEIO for USD spend, etc.).
+    await warmFactorCache(supabase);
 
     const spendKey = SPEND_FACTOR_KEY_BY_CATEGORY[category];
     const emissionFactor = getSpendFactor(spendKey);

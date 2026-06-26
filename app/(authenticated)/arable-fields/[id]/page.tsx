@@ -23,6 +23,7 @@ import { ArableImpactOverview } from '@/components/arable-fields/ArableImpactOve
 import { ArableTrendCharts } from '@/components/arable-fields/ArableTrendCharts';
 import { HarvestHistoryTable } from '@/components/arable-fields/HarvestHistoryTable';
 import { AddArableFieldDialog } from '@/components/arable-fields/AddArableFieldDialog';
+import { LandUnitMap } from '@/components/geo/LandUnitMap';
 import { calculateArableImpacts } from '@/lib/arable-calculator';
 import type {
   ArableField,
@@ -327,6 +328,14 @@ export default function ArableFieldDetailPage() {
               Add harvest year
             </Button>
           </div>
+        </div>
+
+        <Separator />
+
+        {/* Map & location */}
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold">Map &amp; location</h2>
+          <LandUnitMap type="arable_field" id={field.id} />
         </div>
 
         <Separator />

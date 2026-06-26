@@ -17,6 +17,8 @@ import { xeroSyncTick, xeroOrgSync } from './xero';
 import { reportPdfGenerate } from './reports';
 import { ingredientMatchSuggest } from './ingredient-match';
 import { agribalyseBackfillRun } from './factors';
+import { referenceDataLoadRun } from './reference-data';
+import { geoSoilBaselineRun } from './geo';
 import { trialReminderSweep } from './trial-reminders';
 import { pulseRefreshRun } from './pulse-refresh';
 
@@ -33,6 +35,8 @@ export const allFunctions: InngestFunction.Any[] = [
   reportPdfGenerate,
   ingredientMatchSuggest,
   agribalyseBackfillRun,
+  referenceDataLoadRun,
+  geoSoilBaselineRun,
   trialReminderSweep,
   pulseRefreshRun,
 ];

@@ -14,11 +14,13 @@
 
 import { SupabaseClient } from '@supabase/supabase-js';
 import { GRID_FACTORS_BY_COUNTRY } from '@/lib/grid-emission-factors';
+import { warmFactorCache, getCachedFactor } from '@/lib/external-data/cache';
 import { overlapFraction } from './utility-factors';
 import { getXeroResolvedEmissions } from '@/lib/xero/resolved-emissions';
 import { getYearRangeForOrg } from '@/lib/log-data/period-utils';
 import { getOrgFyStartMonth } from '@/lib/log-data/org-fiscal-year';
 import { calculateHospitality } from './hospitality-emissions';
+import { HOSPITALITY_KINDS } from '@/lib/hospitality/constants';
 
 // ============================================================================
 // TYPES
@@ -40,6 +42,12 @@ export interface Scope3Breakdown {
   // Category 1 (hospitality): purchased food + room consumables served, throughput-
   // weighted. Optional so existing Scope3Breakdown constructors don't need updating.
   hospitality?: number;
+  // Hospitality sub-breakdown, so it can be reported as its own line independently.
+  // Populated only when hospitality is counted in the company total; when the org
+  // excludes it these stay 0 here and it's reported on the /hospitality dashboard.
+  hospitality_food?: number;       // meals + made-drinks
+  hospitality_supplies?: number;   // room-night consumables
+  hospitality_waste?: number;      // food + dry waste disposal (Scope 3 Cat 5)
   // UI-friendly aliases (for backward compatibility with existing components)
   logistics: number;      // alias for downstream_logistics
   waste: number;          // alias for operational_waste
@@ -58,6 +66,35 @@ export interface CorporateEmissionsResult {
   year: number;
   breakdown: ScopeBreakdown;
   hasData: boolean;
+}
+
+export interface CorporateEmissionsOptions {
+  /**
+   * Whether the hospitality element is counted in the company total. When
+   * omitted, the org setting `organizations.report_defaults.include_hospitality`
+   * is read (default true). The hospitality figure is always computed and
+   * returned regardless, so it can be reported independently.
+   */
+  includeHospitality?: boolean;
+}
+
+/** Resolve the effective include-hospitality flag (option → org setting → true). */
+async function resolveIncludeHospitality(
+  supabase: SupabaseClient,
+  organizationId: string,
+  options?: CorporateEmissionsOptions
+): Promise<boolean> {
+  if (typeof options?.includeHospitality === 'boolean') return options.includeHospitality;
+  try {
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('report_defaults')
+      .eq('id', organizationId)
+      .maybeSingle();
+    return (org?.report_defaults as any)?.include_hospitality !== false;
+  } catch {
+    return true;
+  }
 }
 
 // ============================================================================
@@ -79,6 +116,22 @@ const UTILITY_EMISSION_FACTORS: Record<string, { factor: number; scope: 'Scope 1
   electricity_grid: { factor: 0.207, scope: 'Scope 2' },
   heat_steam_purchased: { factor: 0.1662, scope: 'Scope 2' },
 };
+
+/**
+ * Resolve a utility emission factor, preferring a loaded reference-data set
+ * (Foundation A, e.g. DESNZ) over the built-in constants. On a cold cache, or
+ * when the cached factor lacks a Scope 1/2 marker, falls back to the built-in
+ * map so behaviour is unchanged until a factor set is loaded.
+ */
+function resolveUtilityFactor(
+  utilityType: string,
+): { factor: number; scope: 'Scope 1' | 'Scope 2' } | undefined {
+  const cached = getCachedFactor('utility', utilityType);
+  if (cached && (cached.scope === 'Scope 1' || cached.scope === 'Scope 2')) {
+    return { factor: cached.factor, scope: cached.scope };
+  }
+  return UTILITY_EMISSION_FACTORS[utilityType];
+}
 
 // ============================================================================
 // SCOPE 1 CALCULATIONS
@@ -102,6 +155,9 @@ export async function calculateScope1(
   yearEnd: string
 ): Promise<number> {
   let scope1Total = 0;
+  // Foundation A: load any active reference-data factor set (e.g. DESNZ) into the
+  // sync cache. No-op when nothing is loaded, so totals are unchanged by default.
+  await warmFactorCache(supabase);
 
   // 1. First, fetch ALL facilities for this organization to ensure complete coverage
   const { data: allFacilities } = await supabase
@@ -133,7 +189,7 @@ export async function calculateScope1(
 
     if (utilityData) {
       for (const entry of utilityData) {
-        const emissionConfig = UTILITY_EMISSION_FACTORS[(entry as any).utility_type];
+        const emissionConfig = resolveUtilityFactor((entry as any).utility_type);
         if (!emissionConfig || emissionConfig.scope !== 'Scope 1') continue;
 
         const fraction = overlapFraction(
@@ -204,6 +260,8 @@ export async function calculateScope2(
   yearEnd: string
 ): Promise<number> {
   let scope2Total = 0;
+  // Foundation A: load any active reference-data factor set (e.g. DESNZ).
+  await warmFactorCache(supabase);
 
   // 1. First, fetch ALL facilities for this organization to ensure complete coverage
   const { data: allFacilities } = await supabase
@@ -244,7 +302,7 @@ export async function calculateScope2(
 
     if (utilityData) {
       for (const entry of utilityData) {
-        const emissionConfig = UTILITY_EMISSION_FACTORS[(entry as any).utility_type];
+        const emissionConfig = resolveUtilityFactor((entry as any).utility_type);
         if (!emissionConfig || emissionConfig.scope !== 'Scope 2') continue;
 
         // Use country-specific grid factor for electricity, falling back to UK default
@@ -312,8 +370,14 @@ export async function calculateScope3(
   organizationId: string,
   year: number,
   yearStart: string,
-  yearEnd: string
+  yearEnd: string,
+  options?: CorporateEmissionsOptions
 ): Promise<Scope3Breakdown> {
+  // Whether hospitality counts toward the company total. Explicit option wins;
+  // otherwise read the org setting (organizations.report_defaults.include_hospitality),
+  // defaulting to true so existing orgs' numbers are unchanged.
+  const includeHospitality = await resolveIncludeHospitality(supabase, organizationId, options);
+
   const breakdown: Scope3Breakdown = {
     products: 0,
     business_travel: 0,
@@ -328,6 +392,9 @@ export async function calculateScope3(
     downstream_transport: 0,  // Category 9
     use_phase: 0,             // Category 11
     hospitality: 0,           // Category 1 — hospitality throughput
+    hospitality_food: 0,
+    hospitality_supplies: 0,
+    hospitality_waste: 0,
     // UI aliases (populated at the end)
     logistics: 0,
     waste: 0,
@@ -349,6 +416,17 @@ export async function calculateScope3(
     .eq('organization_id', organizationId)
     .gte('date', yearStart)
     .lte('date', yearEnd);
+
+  // Hospitality products (meals/drinks/room-nights) are counted via
+  // calculateHospitality (throughput × per-serving), NOT through the product-LCA
+  // rollup below. Exclude them here so they aren't double-counted — this matters
+  // for the fallback path, which otherwise sums every completed PCF for the org.
+  const { data: hospitalityProductRows } = await supabase
+    .from('products')
+    .select('id')
+    .eq('organization_id', organizationId)
+    .in('product_kind', HOSPITALITY_KINDS as unknown as string[]);
+  const hospitalityProductIds = new Set((hospitalityProductRows ?? []).map((p: any) => String(p.id)));
 
   if (productionData && productionData.length > 0) {
     // Use production logs when available.
@@ -378,6 +456,7 @@ export async function calculateScope3(
 
     for (const log of productionData) {
       if (!log.units_produced || log.units_produced <= 0) continue;
+      if (hospitalityProductIds.has(String(log.product_id))) continue; // counted via hospitality
       const scope3PerUnit = scope3PerUnitByProduct.get(String(log.product_id)) || 0;
       if (scope3PerUnit > 0) {
         breakdown.products += scope3PerUnit * log.units_produced;
@@ -393,10 +472,12 @@ export async function calculateScope3(
       .order('created_at', { ascending: false });
 
     if (allPEIs && allPEIs.length > 0) {
-      // Deduplicate: keep only latest PEI per product
+      // Deduplicate: keep only latest PEI per product, excluding hospitality
+      // products (counted via calculateHospitality, not the product-LCA rollup).
       const latestByProduct = new Map<string, any>();
       for (const pei of allPEIs) {
         const pid = String(pei.product_id);
+        if (hospitalityProductIds.has(pid)) continue;
         if (!latestByProduct.has(pid)) {
           latestByProduct.set(pid, pei);
         }
@@ -632,11 +713,19 @@ export async function calculateScope3(
   // =========================================================================
   // Category 1 (hospitality): meals/drinks/room-nights served × throughput.
   // Own-wine served and venue energy are excluded inside calculateHospitality
-  // so this adds no double count.
+  // so this adds no double count. Always computed + reported (so it can be shown
+  // independently); only added to the total when includeHospitality is true.
   // =========================================================================
   try {
     const hospitality = await calculateHospitality(supabase, organizationId, yearStart, yearEnd);
-    breakdown.hospitality = hospitality.total;
+    // Only surface in the company breakdown when counted in the total; otherwise it
+    // stays 0 here and is reported independently on the /hospitality dashboard.
+    if (includeHospitality) {
+      breakdown.hospitality = hospitality.total;
+      breakdown.hospitality_food = hospitality.food;
+      breakdown.hospitality_supplies = hospitality.supplies;
+      breakdown.hospitality_waste = hospitality.waste;
+    }
   } catch (err) {
     console.warn('[calculateScope3] Could not calculate hospitality:', err);
   }
@@ -654,7 +743,7 @@ export async function calculateScope3(
     breakdown.upstream_transport +     // Category 4
     breakdown.downstream_transport +   // Category 9
     breakdown.use_phase +              // Category 11
-    (breakdown.hospitality ?? 0);      // Category 1 — hospitality
+    (breakdown.hospitality ?? 0);      // Category 1 — hospitality (0 when excluded)
 
   // Populate UI-friendly aliases for backward compatibility
   breakdown.logistics = breakdown.downstream_logistics;
@@ -677,7 +766,8 @@ export async function calculateScope3(
 export async function calculateCorporateEmissions(
   supabase: SupabaseClient,
   organizationId: string,
-  year: number
+  year: number,
+  options?: CorporateEmissionsOptions
 ): Promise<CorporateEmissionsResult> {
   // `year` is the org's reporting *label* year. Resolve the actual window from
   // the org's financial-year start month so non-calendar FY orgs (and the
@@ -691,7 +781,7 @@ export async function calculateCorporateEmissions(
   const [scope1Base, scope2Base, scope3Base, xero] = await Promise.all([
     calculateScope1(supabase, organizationId, yearStart, yearEnd),
     calculateScope2(supabase, organizationId, yearStart, yearEnd),
-    calculateScope3(supabase, organizationId, year, yearStart, yearEnd),
+    calculateScope3(supabase, organizationId, year, yearStart, yearEnd, options),
     getXeroResolvedEmissions(supabase, organizationId, yearStart, yearEnd),
   ]);
 
