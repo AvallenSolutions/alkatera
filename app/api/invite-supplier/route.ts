@@ -193,7 +193,7 @@ export async function POST(request: NextRequest) {
               <h1 style="color: #ccff00; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; margin: 0;">Supplier Invitation</h1>
             </div>
             <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
-              ${greeting ? `Dear ${greeting},` : 'Welcome,'}
+              ${greeting ? `Dear ${greeting},` : 'Hello,'}
             </p>
             <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
               <strong style="color: #fff;">${safeInviterName}</strong> at <strong style="color: #fff;">${safeOrgName}</strong> has invited you to join the alka<strong style="color: #fff;">tera</strong> platform to ${safeMaterialName ? `provide verified sustainability data for <strong style="color: #fff;">${safeMaterialName}</strong>` : 'share your sustainability data'}.

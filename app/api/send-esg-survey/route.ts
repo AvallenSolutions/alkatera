@@ -280,7 +280,7 @@ export async function POST(request: NextRequest) {
                 <h1 style="color: #ccff00; font-family: 'Courier New', monospace; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; margin: 0;">Sustainability Survey</h1>
               </div>
               <p style="color: #e8e8e8; font-size: 15px; line-height: 1.7; margin: 0 0 16px 0;">
-                ${greeting ? `Dear ${greeting},` : 'Welcome,'}
+                ${greeting ? `Dear ${greeting},` : 'Hello,'}
               </p>
               <p style="color: #e8e8e8; font-size: 15px; line-height: 1.7; margin: 0 0 16px 0;">
                 ${inviterDisplayHtml} at <strong style="color: #fff;">${safeOrgName}</strong> has invited you to complete a short sustainability survey (ESG self-assessment) on the alka<strong style="color: #fff;">tera</strong> platform. Your responses help ${safeOrgName} gather the supplier evidence they need, including for B Corp certification.
