@@ -37,6 +37,7 @@ export function UtilityBillImportDialog({
   const [periodEnd, setPeriodEnd] = useState('')
   const [billName, setBillName] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [smConflict, setSmConflict] = useState<{ existing: { utilityType: string; from: string; to: string; quantity: number }[]; span: { from: string; to: string } } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const reset = () => {
@@ -135,7 +136,7 @@ export function UtilityBillImportDialog({
 
   const removeEntry = (i: number) => setEntries(prev => prev.filter((_, idx) => idx !== i))
 
-  const handleSave = async () => {
+  const handleSave = async (resolution?: 'replace') => {
     if (!periodStart || !periodEnd) {
       toast.error('Please set the billing period')
       return
@@ -151,7 +152,8 @@ export function UtilityBillImportDialog({
       // Route through server API so the insert runs on the service-role
       // client — avoids the PostgREST schema cache miss on enrichment columns
       // that previously produced "Could not find account_number" errors.
-      const res = await fetch('/api/utilities/save-bill', {
+      const url = '/api/utilities/save-bill' + (resolution ? `?resolution=${resolution}` : '')
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -166,10 +168,19 @@ export function UtilityBillImportDialog({
           },
         }),
       })
+      if (res.status === 409) {
+        const body = await res.json().catch(() => ({}))
+        if (body?.conflict) {
+          setSmConflict(body)
+          setIsSaving(false)
+          return
+        }
+      }
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
         throw new Error(body.error || 'Failed to save utility bill')
       }
+      setSmConflict(null)
 
       // Trigger emissions calculation
       try {
@@ -355,21 +366,42 @@ export function UtilityBillImportDialog({
               </div>
             )}
 
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={() => setStep('upload')} disabled={isSaving}>
-                Upload different bill
-              </Button>
-              <Button onClick={handleSave} disabled={isSaving || !periodStart || !periodEnd} className="flex-1">
-                {isSaving ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</>
-                ) : (
-                  <>
-                    <FileText className="w-4 h-4 mr-2" />
-                    Add {entries.length} {entries.length === 1 ? 'entry' : 'entries'} to records
-                  </>
-                )}
-              </Button>
-            </div>
+            {smConflict ? (
+              <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
+                <div className="font-medium text-amber-800">
+                  You already have smart-meter data for these months
+                </div>
+                <p className="mt-1 text-xs text-amber-800/90">
+                  Half-hourly meter data already covers {smConflict.span.from} → {smConflict.span.to}. Saving this bill
+                  as well would count the same energy twice. You can replace the smart-meter data with this bill, or
+                  cancel and keep the (more detailed) smart-meter data.
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button size="sm" disabled={isSaving} onClick={() => handleSave('replace')}>
+                    {isSaving ? 'Saving…' : 'Replace smart-meter data with this bill'}
+                  </Button>
+                  <Button size="sm" variant="ghost" disabled={isSaving} onClick={() => setSmConflict(null)}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={() => setStep('upload')} disabled={isSaving}>
+                  Upload different bill
+                </Button>
+                <Button onClick={() => handleSave()} disabled={isSaving || !periodStart || !periodEnd} className="flex-1">
+                  {isSaving ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</>
+                  ) : (
+                    <>
+                      <FileText className="w-4 h-4 mr-2" />
+                      Add {entries.length} {entries.length === 1 ? 'entry' : 'entries'} to records
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </DialogContent>

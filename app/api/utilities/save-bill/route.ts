@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
 import { UTILITY_TYPES } from '@/lib/constants/utility-types'
+import { findSmartMeterOverlap, removeSmartMeterData } from '@/lib/energy/smart-meter-conflict'
 import type { ExtractedBillData } from '@/app/api/utilities/import-from-pdf/route'
 
 /**
@@ -50,6 +51,26 @@ export async function POST(request: NextRequest) {
     const valid = (bill.entries || []).filter((e) => e.utility_type && e.quantity > 0)
     if (valid.length === 0) {
       return NextResponse.json({ error: 'No valid utility entries to save' }, { status: 400 })
+    }
+
+    // Symmetric "enter consumption once" guard: warn if smart-meter data already
+    // covers these months for electricity/gas, so a bill can't double-count it.
+    const utilityTypes = valid.map((e) => e.utility_type as string)
+    const resolution = request.nextUrl.searchParams.get('resolution') // 'replace'
+    const smOverlap = await findSmartMeterOverlap(client as any, facilityId, utilityTypes, periodStart, periodEnd)
+    if (smOverlap.length > 0 && resolution !== 'replace') {
+      return NextResponse.json(
+        {
+          conflict: true,
+          kind: 'smart_meter',
+          span: { from: periodStart, to: periodEnd },
+          existing: smOverlap,
+        },
+        { status: 409 },
+      )
+    }
+    if (resolution === 'replace' && smOverlap.length > 0) {
+      await removeSmartMeterData(client as any, facilityId, utilityTypes, periodStart, periodEnd)
     }
 
     const trimmedName = (billName || '').trim()
