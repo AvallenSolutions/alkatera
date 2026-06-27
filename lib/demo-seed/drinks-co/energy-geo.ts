@@ -44,8 +44,8 @@ const HEAD_OFFICE_LNG = -2.5975;
 // Real English land-unit coordinates (Kent vineyard, Somerset cider orchard).
 const VINEYARD_LAT = 51.0705;
 const VINEYARD_LNG = 0.673;
-const ORCHARD_LAT = 51.149;
-const ORCHARD_LNG = -2.718;
+const ORCHARD_LAT = 51.21;
+const ORCHARD_LNG = -2.76;
 
 /** kWh in a single weekday/weekend half hour, by hour-of-day (0–23.5). */
 function elecKwh(hour: number, weekend: boolean): number {

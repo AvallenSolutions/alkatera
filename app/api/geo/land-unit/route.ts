@@ -15,6 +15,7 @@ import { createClient } from '@supabase/supabase-js';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 import { lookupPoint } from '@/lib/geo/point-lookup';
 import { validateFarmlandCover } from '@/lib/geo/sources/worldcover';
+import { runSoilBaseline, type LandUnitType } from '@/lib/geo/soil-baseline';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
   // Land unit (RLS-scoped to the user's org).
   const { data: unit, error: unitErr } = await supabase
     .from(table)
-    .select('id, name, hectares, address_lat, address_lng')
+    .select('id, name, hectares, address_lat, address_lng, organization_id')
     .eq('id', id)
     .maybeSingle();
   if (unitErr || !unit) {
@@ -58,16 +59,40 @@ export async function GET(request: NextRequest) {
   const hasCoords = lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0);
 
   // Latest soil-carbon stock sample (a measured one supersedes the baseline by date).
-  const { data: sample } = await supabase
-    .from('soil_carbon_samples')
-    .select('soc_stock_tc_ha, verification_status, sample_date, lab_name')
-    .eq('land_unit_type', type)
-    .eq('land_unit_id', id)
-    .eq('is_active', true)
-    .not('soc_stock_tc_ha', 'is', null)
-    .order('sample_date', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const readSample = async () =>
+    (
+      await supabase
+        .from('soil_carbon_samples')
+        .select('soc_stock_tc_ha, verification_status, sample_date, lab_name')
+        .eq('land_unit_type', type)
+        .eq('land_unit_id', id)
+        .eq('is_active', true)
+        .not('soc_stock_tc_ha', 'is', null)
+        .order('sample_date', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    ).data;
+
+  let sample = await readSample();
+
+  // Self-heal: if no sample yet but we have coordinates, fetch + persist the
+  // SoilGrids baseline inline (cache-first via geo_point_cache) rather than
+  // relying solely on the fire-and-forget Inngest job, which can miss. Mirrors
+  // the land-cover warm-on-miss below. Best-effort — never breaks the map.
+  if (!sample && hasCoords && unit.organization_id) {
+    try {
+      await runSoilBaseline(serviceClient(), {
+        organizationId: unit.organization_id as string,
+        landUnitType: type as LandUnitType,
+        landUnitId: id,
+        lat: lat!,
+        lng: lng!,
+      });
+      sample = await readSample();
+    } catch {
+      // SoilGrids slow/down or no-data point — leave soilCarbon null.
+    }
+  }
 
   const soilCarbon = sample
     ? {
