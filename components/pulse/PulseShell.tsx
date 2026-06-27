@@ -34,6 +34,7 @@ import { TopCostDriversExpandedSlot } from '@/components/pulse/widgets/top-cost-
 import { FacilityImpactExpandedSlot } from '@/components/pulse/widgets/facility-impact/expanded';
 import { AlertsInboxExpandedSlot } from '@/components/pulse/widgets/alerts-inbox/expanded';
 import { GridCarbonExpandedSlot } from '@/components/pulse/widgets/grid-carbon/expanded';
+import { EnergyTimingExpandedSlot } from '@/components/pulse/widgets/energy-timing/expanded';
 import { PeerBenchmarkExpandedSlot } from '@/components/pulse/widgets/peer-benchmark/expanded';
 import { CsrdGapsExpandedSlot } from '@/components/pulse/widgets/csrd-gaps/expanded';
 import { InsightCardExpandedSlot } from '@/components/pulse/widgets/insight-card/expanded';
@@ -158,6 +159,7 @@ function PulseShellBody() {
       <FacilityImpactExpandedSlot />
       <AlertsInboxExpandedSlot />
       <GridCarbonExpandedSlot />
+      <EnergyTimingExpandedSlot />
       <PeerBenchmarkExpandedSlot />
       <CsrdGapsExpandedSlot />
       <InsightCardExpandedSlot />

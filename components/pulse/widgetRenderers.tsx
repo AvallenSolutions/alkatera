@@ -25,6 +25,7 @@ import { TargetTrajectoryCard } from '@/components/pulse/widgets/target-trajecto
 import { FacilityImpactCard } from '@/components/pulse/widgets/facility-impact/FacilityImpactCard';
 import { AlertsInboxCard } from '@/components/pulse/widgets/alerts-inbox/AlertsInboxCard';
 import { GridCarbonCard } from '@/components/pulse/widgets/grid-carbon/GridCarbonCard';
+import { EnergyTimingCard } from '@/components/pulse/widgets/energy-timing/EnergyTimingCard';
 import { PeerBenchmarkCard } from '@/components/pulse/widgets/peer-benchmark/PeerBenchmarkCard';
 import { CsrdGapsCard } from '@/components/pulse/widgets/csrd-gaps/CsrdGapsCard';
 import { InsightCardCompact } from '@/components/pulse/widgets/insight-card/InsightCardCompact';
@@ -54,6 +55,7 @@ export const WIDGET_RENDERERS: Partial<Record<WidgetId, () => ReactNode>> = {
   'insight-card': () => <InsightCardCompact />,
   'alerts-inbox': () => <AlertsInboxCard />,
   'grid-carbon': () => <GridCarbonCard />,
+  'energy-timing': () => <EnergyTimingCard />,
   'peer-benchmark': () => <PeerBenchmarkCard />,
   'live-activity': () => <LiveActivityCard />,
   'csrd-gaps': () => <CsrdGapsCard />,

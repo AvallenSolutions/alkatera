@@ -24,6 +24,7 @@ export type WidgetId =
   | 'target-trajectory'
   | 'alerts-inbox'
   | 'grid-carbon'
+  | 'energy-timing'
   | 'peer-benchmark'
   | 'live-activity'
   | 'facility-impact'
@@ -188,6 +189,19 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetMeta> = {
       why: 'Running energy-heavy work in a greener window cuts your carbon for no extra cost.',
       todo: 'Shift flexible, energy-intensive tasks into the cleanest window shown.',
       source: 'Live national grid carbon-intensity data (UK today; EU coming next).',
+    },
+  }),
+  'energy-timing': withLayout({
+    id: 'energy-timing',
+    label: 'Cleanest energy window',
+    description: "Today's cleanest grid window + a load-shift saving.",
+    footprint: '2x1',
+    phase: 6,
+    explainer: {
+      what: "Today's cleanest and dirtiest 2-hour windows on your facility's regional grid, and what shifting load saves.",
+      why: 'Running flexible, energy-intensive work when the grid is greenest cuts carbon (and often cost) for free.',
+      todo: 'Move shiftable load (bottling, CIP, cold storage) into the cleanest window shown.',
+      source: 'UK Carbon Intensity API, regional to your facility postcode; weighted by your half-hourly data when present.',
     },
   }),
   'peer-benchmark': withLayout({
@@ -452,6 +466,7 @@ export const WIDGET_MIN_TIER: Record<WidgetId, TierName> = {
   'insight-card': 'seed',
   'live-metrics-strip': 'seed',
   'grid-carbon': 'seed',
+  'energy-timing': 'seed',
   'live-activity': 'seed',
   'ask-rosa': 'seed',
   // Blossom — operational analytics

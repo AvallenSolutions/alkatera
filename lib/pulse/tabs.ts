@@ -48,7 +48,7 @@ export const PULSE_TABS: Record<PulseTabId, PulseTabMeta> = {
     id: 'operations',
     label: 'Operations',
     blurb: 'Where the impact comes from: sites, suppliers and products.',
-    widgets: ['facility-impact', 'supplier-hotspots', 'product-env-cost', 'grid-carbon'],
+    widgets: ['facility-impact', 'supplier-hotspots', 'product-env-cost', 'grid-carbon', 'energy-timing'],
   },
   plan: {
     id: 'plan',
