@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 import { resolveFacilityRegionCode } from '@/lib/energy/region';
+import { regionalIntensityMap } from '@/lib/energy/intensity-history';
 import { fetchRegionalToday, CARBON_INTENSITY_REGIONS } from '@/lib/integrations/uk-carbon-intensity';
 import { buildTimingInsight, type IntensityPoint } from '@/lib/energy/timing';
 
@@ -77,12 +78,78 @@ export async function GET(request: NextRequest) {
   const nowIso = now.toISOString();
   const current = [...points].reverse().find((p) => p.recordedAt <= nowIso) ?? points[points.length - 1] ?? null;
 
-  // Has half-hourly consumption?
-  const { count: hhCount } = await admin
-    .from('smart_meter_readings')
-    .select('id', { count: 'exact', head: true })
-    .eq('facility_id', facilityId)
-    .eq('fuel', 'electricity');
+  // Uploaded half-hourly consumption: an average daily profile (mean kWh per
+  // half-hour-of-day) overlaid with the region's average intensity for the same
+  // time-of-day, so the user sees WHEN they use energy vs when the grid is clean.
+  // Paginate past PostgREST's 1000-row cap (a month is 1,488 rows; a year 17,520).
+  const hh: Array<{ recorded_at: string; consumption_kwh: number }> = [];
+  const PAGE = 1000;
+  for (let offset = 0; offset < 200_000; offset += PAGE) {
+    const { data: page } = await admin
+      .from('smart_meter_readings')
+      .select('recorded_at, consumption_kwh')
+      .eq('facility_id', facilityId)
+      .eq('fuel', 'electricity')
+      .order('recorded_at', { ascending: true })
+      .range(offset, offset + PAGE - 1);
+    if (!page || page.length === 0) break;
+    hh.push(...(page as Array<{ recorded_at: string; consumption_kwh: number }>));
+    if (page.length < PAGE) break;
+  }
+
+  let consumption: unknown = null;
+  if (hh.length > 0) {
+    const byHhmm = new Map<string, { sum: number; n: number }>();
+    let total = 0;
+    let weightedIntNum = 0; // Σ kWh*intensity
+    for (const r of hh) {
+      const hhmm = new Date(r.recorded_at as string).toISOString().slice(11, 16);
+      const b = byHhmm.get(hhmm) ?? { sum: 0, n: 0 };
+      b.sum += Number(r.consumption_kwh);
+      b.n += 1;
+      byHhmm.set(hhmm, b);
+      total += Number(r.consumption_kwh);
+    }
+
+    // Region's intensity over the readings' span, aggregated by half-hour-of-day.
+    const intByHhmm = new Map<string, { sum: number; n: number }>();
+    const first = hh[0].recorded_at as string;
+    const last = hh[hh.length - 1].recorded_at as string;
+    const map = await regionalIntensityMap(admin, region, first, new Date(new Date(last).getTime() + 30 * 60000).toISOString());
+    for (const [key, g] of Array.from(map)) {
+      const hhmm = key.slice(11, 16);
+      const b = intByHhmm.get(hhmm) ?? { sum: 0, n: 0 };
+      b.sum += g;
+      b.n += 1;
+      intByHhmm.set(hhmm, b);
+    }
+
+    const profile = Array.from(byHhmm.keys())
+      .sort()
+      .map((hhmm) => {
+        const c = byHhmm.get(hhmm)!;
+        const ib = intByHhmm.get(hhmm);
+        const avgIntensityG = ib ? ib.sum / ib.n : null;
+        if (avgIntensityG != null) weightedIntNum += (c.sum / c.n) * avgIntensityG;
+        return { hhmm, avgKwh: c.sum / c.n, avgIntensityG };
+      });
+
+    // Consumption-weighted vs flat-average intensity → "your timing" delta.
+    const flatAvgInt = profile.filter((p) => p.avgIntensityG != null).reduce((s, p) => s + (p.avgIntensityG as number), 0) /
+      Math.max(1, profile.filter((p) => p.avgIntensityG != null).length);
+    const totalProfileKwh = profile.reduce((s, p) => s + p.avgKwh, 0);
+    const weightedAvgInt = totalProfileKwh > 0 ? weightedIntNum / totalProfileKwh : null;
+
+    consumption = {
+      count: hh.length,
+      firstDate: first.slice(0, 10),
+      lastDate: last.slice(0, 10),
+      totalKwh: total,
+      profile,
+      flatAvgIntensityG: Number.isFinite(flatAvgInt) ? flatAvgInt : null,
+      weightedAvgIntensityG: weightedAvgInt,
+    };
+  }
 
   const timing = buildTimingInsight(points, { windowHours: 2 });
 
@@ -93,7 +160,8 @@ export async function GET(request: NextRequest) {
       currentG: current?.gPerKwh ?? null,
       points,
       timing,
-      hasHalfHourlyData: (hhCount ?? 0) > 0,
+      hasHalfHourlyData: hh.length > 0,
+      consumption,
     },
     { headers: { 'Cache-Control': 'no-store' } },
   );

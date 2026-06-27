@@ -9,7 +9,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts';
+import { ResponsiveContainer, AreaChart, Area, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ReferenceLine, Legend } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -34,6 +34,15 @@ interface Insight {
     recommendation: string | null;
   };
   hasHalfHourlyData?: boolean;
+  consumption?: {
+    count: number;
+    firstDate: string;
+    lastDate: string;
+    totalKwh: number;
+    profile: { hhmm: string; avgKwh: number; avgIntensityG: number | null }[];
+    flatAvgIntensityG: number | null;
+    weightedAvgIntensityG: number | null;
+  } | null;
   message?: string;
 }
 
@@ -162,6 +171,61 @@ export function FacilityEnergyTab({ facilityId }: { facilityId: string }) {
           <p className="mt-1 text-xs text-muted-foreground">Regional forecast from the National Energy System Operator (Carbon Intensity API). Dashed lines: clean (150) / dirty (300) g/kWh.</p>
         </CardContent>
       </Card>
+
+      {/* Uploaded consumption profile vs grid intensity */}
+      {data.consumption && data.consumption.count > 0 && (() => {
+        const c = data.consumption!;
+        const profile = c.profile.map((p) => ({
+          t: p.hhmm,
+          kwh: Number(p.avgKwh.toFixed(2)),
+          g: p.avgIntensityG != null ? Math.round(p.avgIntensityG) : null,
+        }));
+        const wt = c.weightedAvgIntensityG;
+        const flat = c.flatAvgIntensityG;
+        const pct = wt != null && flat != null && flat > 0 ? ((wt - flat) / flat) * 100 : null;
+        return (
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle className="text-base">Your half-hourly consumption</CardTitle>
+                <span className="text-xs text-muted-foreground">
+                  {c.firstDate} → {c.lastDate} · {Math.round(c.totalKwh).toLocaleString('en-GB')} kWh · {c.count.toLocaleString('en-GB')} readings
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div style={{ height: 260 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={profile} margin={{ top: 5, right: 4, bottom: 0, left: -10 }}>
+                    <XAxis dataKey="t" tick={{ fontSize: 11 }} interval={7} />
+                    <YAxis yAxisId="kwh" tick={{ fontSize: 11 }} width={42} />
+                    <YAxis yAxisId="g" orientation="right" tick={{ fontSize: 11 }} width={42} />
+                    <Tooltip />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Bar yAxisId="kwh" dataKey="kwh" name="Avg consumption (kWh)" fill="#ccff00" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                    <Line yAxisId="g" type="monotone" dataKey="g" name="Grid intensity (g/kWh)" stroke="#ef4444" strokeWidth={2} dot={false} isAnimationActive={false} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Average day across the uploaded period. Bars = your consumption; red line = grid carbon intensity for {data.regionName}.
+              </p>
+              {pct != null && Math.abs(pct) >= 1 && (
+                <p className="mt-2 text-sm">
+                  Your electricity falls in periods averaging{' '}
+                  <span className="font-medium">{Math.round(wt as number)} g/kWh</span> vs{' '}
+                  <span className="font-medium">{Math.round(flat as number)} g/kWh</span> if spread evenly —{' '}
+                  {pct > 0 ? (
+                    <span className="text-amber-600">about {Math.round(pct)}% higher-carbon-timed, so there&apos;s room to shift load.</span>
+                  ) : (
+                    <span className="text-green-600">about {Math.round(Math.abs(pct))}% lower-carbon-timed already.</span>
+                  )}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Recommendation */}
       {timing?.recommendation && (
