@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 import { parseHalfHourlyCsv } from '@/lib/energy/hh-csv-parser';
+import { deriveMonthlyEntries, readingsSpan, fuelToUtility, type Fuel } from '@/lib/energy/derive-utility';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,37 +66,111 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // De-dupe within the file (last wins) before upsert.
+  // De-dupe within the file (last wins).
   const byTime = new Map<string, number>();
   for (const r of parsed.readings) byTime.set(r.recordedAt, r.kwh);
-  const rows = Array.from(byTime.entries()).map(([recordedAt, kwh]) => ({
+  const dedup = Array.from(byTime.entries()).map(([recordedAt, kwh]) => ({ recordedAt, kwh }));
+
+  const { utilityType } = fuelToUtility(fuel as Fuel);
+  const span = readingsSpan(dedup);
+  if (!span) return NextResponse.json({ error: 'No dated readings found.' }, { status: 422 });
+
+  const admin = serviceClient();
+
+  // Detect overlap with existing bill / manual utility entries for this meter.
+  const { data: conflicts } = await admin
+    .from('utility_data_entries')
+    .select('id, reporting_period_start, reporting_period_end, quantity, unit')
+    .eq('facility_id', facilityId)
+    .eq('utility_type', utilityType)
+    .lte('reporting_period_start', span.to)
+    .gte('reporting_period_end', span.from)
+    .or('data_source.is.null,data_source.neq.smart_meter');
+
+  const resolution = request.nextUrl.searchParams.get('resolution'); // 'replace' | 'detail_only'
+
+  // "Warn and let the user choose": surface the conflict, write nothing yet.
+  if (conflicts && conflicts.length > 0 && resolution !== 'replace' && resolution !== 'detail_only') {
+    return NextResponse.json(
+      {
+        conflict: true,
+        fuel,
+        span,
+        summary: {
+          readings: dedup.length,
+          totalKwh: Math.round(dedup.reduce((s, r) => s + r.kwh, 0)),
+          months: deriveMonthlyEntries(dedup, fuel as Fuel).length,
+        },
+        existing: conflicts.map((c) => ({
+          from: c.reporting_period_start,
+          to: c.reporting_period_end,
+          quantity: Number(c.quantity),
+          unit: c.unit,
+        })),
+      },
+      { status: 409 },
+    );
+  }
+
+  // 1. Write the half-hourly detail.
+  const detail = dedup.map((r) => ({
     facility_id: facilityId,
     fuel,
-    recorded_at: recordedAt,
-    consumption_kwh: kwh,
+    recorded_at: r.recordedAt,
+    consumption_kwh: r.kwh,
     meter_id: meterId,
     source: 'csv_upload',
   }));
-
-  const admin = serviceClient();
-  // Upsert in chunks to stay well within statement limits.
   const CHUNK = 2000;
   let written = 0;
-  for (let i = 0; i < rows.length; i += CHUNK) {
+  for (let i = 0; i < detail.length; i += CHUNK) {
     const { error } = await admin
       .from('smart_meter_readings')
-      .upsert(rows.slice(i, i + CHUNK), { onConflict: 'facility_id,fuel,recorded_at' });
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      .upsert(detail.slice(i, i + CHUNK), { onConflict: 'facility_id,fuel,recorded_at' });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    written += Math.min(CHUNK, detail.length - i);
+  }
+
+  // 2. Always replace our OWN prior derived rows for the overlapping span.
+  await admin
+    .from('utility_data_entries')
+    .delete()
+    .eq('facility_id', facilityId)
+    .eq('utility_type', utilityType)
+    .eq('data_source', 'smart_meter')
+    .lte('reporting_period_start', span.to)
+    .gte('reporting_period_end', span.from);
+
+  // 3. On "replace", delete the conflicting bills too.
+  let replacedBills = 0;
+  if (resolution === 'replace' && conflicts && conflicts.length > 0) {
+    await admin.from('utility_data_entries').delete().in('id', conflicts.map((c) => c.id));
+    replacedBills = conflicts.length;
+  }
+
+  // 4. Derive the monthly totals (unless the user kept their bill: detail_only).
+  let derivedEntries = 0;
+  if (resolution !== 'detail_only') {
+    const derived = deriveMonthlyEntries(dedup, fuel as Fuel).map((d) => ({
+      ...d,
+      facility_id: facilityId,
+      mpan: fuel === 'electricity' ? meterId : null,
+      mprn: fuel === 'gas' ? meterId : null,
+    }));
+    if (derived.length > 0) {
+      const { error } = await admin.from('utility_data_entries').insert(derived);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      derivedEntries = derived.length;
     }
-    written += Math.min(CHUNK, rows.length - i);
   }
 
   return NextResponse.json({
     ok: true,
     format: parsed.format,
     readingsWritten: written,
-    rowsParsed: parsed.rowsParsed,
+    derivedEntries,
+    replacedBills,
+    mode: resolution ?? 'fresh',
     warnings: parsed.errors,
   });
 }

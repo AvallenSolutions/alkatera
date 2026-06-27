@@ -57,6 +57,14 @@ export function FacilityEnergyTab({ facilityId }: { facilityId: string }) {
   const [data, setData] = useState<Insight | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [fuel, setFuel] = useState<'electricity' | 'gas'>('electricity');
+  const [conflict, setConflict] = useState<{
+    fuel: string;
+    span: { from: string; to: string };
+    summary: { readings: number; totalKwh: number; months: number };
+    existing: { from: string; to: string; quantity: number; unit: string }[];
+  } | null>(null);
+  const pendingFile = useRef<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -75,17 +83,31 @@ export function FacilityEnergyTab({ facilityId }: { facilityId: string }) {
     load();
   }, [load]);
 
-  const onUpload = async (file: File) => {
+  const doUpload = async (file: File, resolution?: 'replace' | 'detail_only') => {
     setUploading(true);
     try {
       const fd = new FormData();
       fd.append('file', file);
       fd.append('facility_id', facilityId);
-      fd.append('fuel', 'electricity');
-      const res = await fetch('/api/energy/smart-meter/upload', { method: 'POST', body: fd });
+      fd.append('fuel', fuel);
+      const url = '/api/energy/smart-meter/upload' + (resolution ? `?resolution=${resolution}` : '');
+      const res = await fetch(url, { method: 'POST', body: fd });
       const body = await res.json();
+      if (res.status === 409 && body?.conflict) {
+        pendingFile.current = file;
+        setConflict(body);
+        return;
+      }
       if (!res.ok) throw new Error(body?.error || (body?.details ?? []).join('; ') || 'Upload failed');
-      toast({ title: 'Half-hourly data imported', description: `${body.readingsWritten?.toLocaleString('en-GB')} readings (${body.format}).` });
+      setConflict(null);
+      pendingFile.current = null;
+      toast({
+        title: 'Half-hourly data imported',
+        description:
+          `${body.readingsWritten?.toLocaleString('en-GB')} readings` +
+          (body.derivedEntries ? `, ${body.derivedEntries} monthly total(s) derived` : '') +
+          (body.replacedBills ? `, ${body.replacedBills} bill(s) replaced` : '') + '.',
+      });
       load();
     } catch (e) {
       toast({ title: 'Upload failed', description: e instanceof Error ? e.message : 'Please try again', variant: 'destructive' });
@@ -242,26 +264,67 @@ export function FacilityEnergyTab({ facilityId }: { facilityId: string }) {
 
       {/* HH upload */}
       <Card>
-        <CardContent className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="text-sm font-medium">Half-hourly meter data</div>
-            <p className="text-xs text-muted-foreground">
-              {data.hasHalfHourlyData
-                ? 'Half-hourly data is loaded for this facility — the carbon-aware figure is time-matched.'
-                : 'Upload your half-hourly export (supplier portal / data collector) for a precise, time-matched grid figure.'}
-            </p>
+        <CardContent className="space-y-3 p-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-sm font-medium">Half-hourly meter data</div>
+              <p className="text-xs text-muted-foreground">
+                {data.hasHalfHourlyData
+                  ? 'Half-hourly data is loaded — your monthly totals are derived from it, so no separate bill is needed for these months.'
+                  : 'Got a smart meter? Upload your half-hourly export instead of a bill — we work out your monthly totals from it.'}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="inline-flex rounded-md border p-0.5 text-xs">
+                {(['electricity', 'gas'] as const).map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => setFuel(f)}
+                    className={`rounded px-2 py-1 capitalize ${fuel === f ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && doUpload(e.target.files[0])}
+              />
+              <Button variant="outline" disabled={uploading} onClick={() => fileRef.current?.click()}>
+                <Upload className="mr-2 h-4 w-4" />
+                {uploading ? 'Uploading…' : 'Upload CSV'}
+              </Button>
+            </div>
           </div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".csv,.xlsx,.xls"
-            className="hidden"
-            onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])}
-          />
-          <Button variant="outline" disabled={uploading} onClick={() => fileRef.current?.click()}>
-            <Upload className="mr-2 h-4 w-4" />
-            {uploading ? 'Uploading…' : 'Upload half-hourly CSV'}
-          </Button>
+
+          {conflict && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
+              <div className="flex items-center gap-2 font-medium text-amber-800">
+                <AlertTriangle className="h-4 w-4" /> You already have {conflict.fuel} bill data for these months
+              </div>
+              <p className="mt-1 text-xs text-amber-800/90">
+                This upload covers {conflict.span.from} → {conflict.span.to} ({conflict.summary.months} month(s),{' '}
+                {conflict.summary.totalKwh.toLocaleString('en-GB')} kWh), which overlaps{' '}
+                {conflict.existing.length} existing entr{conflict.existing.length === 1 ? 'y' : 'ies'}. To avoid counting
+                the same energy twice, choose one:
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button size="sm" disabled={uploading} onClick={() => pendingFile.current && doUpload(pendingFile.current, 'replace')}>
+                  Replace the bill with smart-meter data
+                </Button>
+                <Button size="sm" variant="outline" disabled={uploading} onClick={() => pendingFile.current && doUpload(pendingFile.current, 'detail_only')}>
+                  Keep my bill (import detail only)
+                </Button>
+                <Button size="sm" variant="ghost" disabled={uploading} onClick={() => { setConflict(null); pendingFile.current = null; }}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
