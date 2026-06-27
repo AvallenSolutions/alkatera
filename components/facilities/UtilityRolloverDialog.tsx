@@ -10,6 +10,7 @@ import { toast } from 'sonner'
 import { supabase } from '@/lib/supabaseClient'
 import { useReportingPeriod } from '@/hooks/useReportingPeriod'
 import { UTILITY_TYPES } from '@/lib/constants/utility-types'
+import { checkSmartMeterConflict, resolveSmartMeterConflict } from '@/lib/energy/check-conflict-client'
 
 interface RolloverEntry {
   id: string
@@ -55,6 +56,7 @@ export function UtilityRolloverDialog({
   const [entries, setEntries] = useState<RolloverEntry[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [smConflict, setSmConflict] = useState<{ existing: { utilityType: string; from: string; to: string }[] } | null>(null)
 
   useEffect(() => {
     if (!open) return
@@ -135,12 +137,25 @@ export function UtilityRolloverDialog({
     setEntries(prev => prev.map(e => e.id === id ? { ...e, newQuantity: value } : e))
   }
 
-  const handleConfirm = async () => {
+  const handleConfirm = async (resolution?: 'replace') => {
     const valid = entries.filter(e => parseFloat(e.newQuantity) > 0)
     if (valid.length === 0) { toast.error('No entries to copy'); return }
 
     setIsSaving(true)
     try {
+      // "Enter consumption once": warn if smart-meter data covers the target months.
+      const shift = toYear - fromYear
+      const types = valid.map(e => e.utility_type)
+      const spanFrom = valid.map(e => shiftDateByYears(e.reporting_period_start, shift)).sort()[0]
+      const spanTo = valid.map(e => shiftDateByYears(e.reporting_period_end, shift)).sort().at(-1) as string
+      if (resolution === 'replace') {
+        await resolveSmartMeterConflict(facilityId, types, spanFrom, spanTo)
+      } else {
+        const c = await checkSmartMeterConflict(facilityId, types, spanFrom, spanTo)
+        if (c.conflict) { setSmConflict(c); setIsSaving(false); return }
+      }
+      setSmConflict(null)
+
       const { data: userData, error: userError } = await supabase.auth.getUser()
       if (userError || !userData.user) throw new Error('Not authenticated')
 
@@ -291,18 +306,32 @@ export function UtilityRolloverDialog({
         </div>
 
         {!isLoading && entries.length > 0 && (
-          <div className="flex gap-3 pt-2 border-t">
-            <Button variant="outline" onClick={onClose} disabled={isSaving}>
-              Cancel
-            </Button>
-            <Button onClick={handleConfirm} disabled={isSaving} className="flex-1">
-              {isSaving ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Copying...</>
-              ) : (
-                <><Copy className="w-4 h-4 mr-2" />Copy {entries.length} {entries.length === 1 ? 'entry' : 'entries'} to {toLabel}</>
-              )}
-            </Button>
-          </div>
+          smConflict ? (
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
+              <div className="font-medium text-amber-800">Smart-meter data already covers these months</div>
+              <p className="mt-1 text-xs text-amber-800/90">
+                Copying these entries would count the same energy twice. Replace the smart-meter data, or cancel and
+                keep it.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button size="sm" disabled={isSaving} onClick={() => handleConfirm('replace')}>Replace smart-meter data</Button>
+                <Button size="sm" variant="ghost" disabled={isSaving} onClick={() => setSmConflict(null)}>Cancel</Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-3 pt-2 border-t">
+              <Button variant="outline" onClick={onClose} disabled={isSaving}>
+                Cancel
+              </Button>
+              <Button onClick={() => handleConfirm()} disabled={isSaving} className="flex-1">
+                {isSaving ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Copying...</>
+                ) : (
+                  <><Copy className="w-4 h-4 mr-2" />Copy {entries.length} {entries.length === 1 ? 'entry' : 'entries'} to {toLabel}</>
+                )}
+              </Button>
+            </div>
+          )
         )}
       </DialogContent>
     </Dialog>

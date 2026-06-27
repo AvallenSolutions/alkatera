@@ -13,6 +13,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { isReadOnlyAdvisor } from '@/lib/auth/advisor-access';
+import { findSmartMeterOverlap } from '@/lib/energy/smart-meter-conflict';
 
 export interface ProposeInput {
   organizationId: string;
@@ -371,6 +372,21 @@ async function execApproveException(
     }
 
     if ((ex as any).kind === 'utility_bill') {
+      // "Enter consumption once": block if smart-meter data already covers these
+      // months for electricity/gas (resolve on the Energy & grid tab first).
+      const overlap = await findSmartMeterOverlap(
+        supabase,
+        facilityId,
+        entries.map((e: any) => e.utility_type),
+        periodStart,
+        periodEnd,
+      );
+      if (overlap.length > 0) {
+        throw new Error(
+          `Smart-meter data already covers ${periodStart} to ${periodEnd} for this facility, so saving this bill ` +
+            `would double-count it. Resolve it on the facility's Energy & grid tab, then approve.`,
+        );
+      }
       const rows = entries.map((entry: any) => ({
         organization_id: organizationId,
         facility_id: facilityId,

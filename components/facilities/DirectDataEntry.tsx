@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Plus, Trash2, Loader2, Zap, Droplets, Trash, Upload, Copy } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
+import { checkSmartMeterConflict, resolveSmartMeterConflict } from "@/lib/energy/check-conflict-client";
 import { useReportingPeriod } from "@/hooks/useReportingPeriod";
 import {
   UTILITY_TYPES,
@@ -85,6 +86,7 @@ export function DirectDataEntry({
   const [customStart, setCustomStart] = useState<string>("");
   const [activeTab, setActiveTab] = useState("utilities");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [smConflict, setSmConflict] = useState<{ existing: { utilityType: string; from: string; to: string }[] } | null>(null);
   const [showBillImport, setShowBillImport] = useState(false);
   const [showWaterImport, setShowWaterImport] = useState(false);
   const [showWasteImport, setShowWasteImport] = useState(false);
@@ -162,7 +164,7 @@ export function DirectDataEntry({
   // Submit
   // =========================================================================
 
-  const handleSaveUtilities = async () => {
+  const handleSaveUtilities = async (resolution?: "replace") => {
     if (!selectedPeriod) {
       toast.error("Please select a reporting period");
       return;
@@ -176,6 +178,20 @@ export function DirectDataEntry({
 
     setIsSubmitting(true);
     try {
+      // "Enter consumption once": warn if smart-meter data already covers these months.
+      const types = valid.map((v) => v.utility_type);
+      if (resolution === "replace") {
+        await resolveSmartMeterConflict(facilityId, types, selectedPeriod.start, selectedPeriod.end);
+      } else {
+        const c = await checkSmartMeterConflict(facilityId, types, selectedPeriod.start, selectedPeriod.end);
+        if (c.conflict) {
+          setSmConflict(c);
+          setIsSubmitting(false);
+          return;
+        }
+      }
+      setSmConflict(null);
+
       const { data: userData, error: userError } = await supabase.auth.getUser();
       if (userError || !userData.user) throw new Error("User not authenticated");
 
@@ -584,9 +600,27 @@ export function DirectDataEntry({
               </div>
             ))}
 
-            <Button onClick={handleSaveUtilities} disabled={isSubmitting} className="w-full">
-              {isSubmitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : "Save Utility Data"}
-            </Button>
+            {smConflict ? (
+              <Alert className="border-amber-300 bg-amber-50">
+                <AlertDescription className="text-amber-800">
+                  <span className="font-medium">Smart-meter data already covers these months.</span> Saving this entry
+                  too would count the same energy twice. Replace the smart-meter data with this entry, or cancel and
+                  keep the (more detailed) smart-meter data.
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button size="sm" disabled={isSubmitting} onClick={() => handleSaveUtilities("replace")}>
+                      Replace smart-meter data
+                    </Button>
+                    <Button size="sm" variant="ghost" disabled={isSubmitting} onClick={() => setSmConflict(null)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <Button onClick={() => handleSaveUtilities()} disabled={isSubmitting} className="w-full">
+                {isSubmitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : "Save Utility Data"}
+              </Button>
+            )}
           </TabsContent>
 
           {/* ============================================================= */}
