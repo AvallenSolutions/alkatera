@@ -22,7 +22,8 @@ import { DirectDataEntry } from "@/components/facilities/DirectDataEntry";
 import { ProductionVolumeManager } from "@/components/facilities/ProductionVolumeManager";
 import { DataQualityConfidenceCard } from "@/components/facilities/DataQualityConfidenceCard";
 import { ProductionRunDataEntry } from "@/components/facilities/ProductionRunDataEntry";
-import { Sparkles, ExternalLink, Settings2, HelpCircle } from "lucide-react";
+import { Sparkles, ExternalLink, Settings2, HelpCircle, Gauge } from "lucide-react";
+import { FacilityEnergyTab } from "@/components/energy/FacilityEnergyTab";
 import { FacilityDataSourcingDialog } from "@/components/facilities/FacilityDataSourcingDialog";
 import { FacilityDataDashboard } from "@/components/facilities/FacilityDataDashboard";
 import { UpgradeFacilityDataButton } from "@/components/facilities/UpgradeFacilityDataButton";
@@ -533,11 +534,19 @@ export default function FacilityDetailPage() {
             <History className="h-4 w-4 mr-2" />
             History
           </TabsTrigger>
+          <TabsTrigger value="energy">
+            <Gauge className="h-4 w-4 mr-2" />
+            Energy &amp; grid
+          </TabsTrigger>
           <TabsTrigger value="overview">
             <Building2 className="h-4 w-4 mr-2" />
             Overview
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="energy" className="space-y-6 mt-6">
+          <FacilityEnergyTab facilityId={facilityId} />
+        </TabsContent>
 
         {/* ============================================================= */}
         {/* DATA ENTRY TAB */}
