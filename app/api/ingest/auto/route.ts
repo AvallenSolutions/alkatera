@@ -174,6 +174,7 @@ export type IngestResultType =
   | 'soil_carbon_lab'
   | 'soil_carbon_evidence'
   | 'accounts_csv'
+  | 'smart_meter_csv'
   | 'historical_sustainability_report'
   | 'historical_lca_report'
   | 'unsupported'
@@ -181,6 +182,15 @@ export type IngestResultType =
 export interface IngestResponse {
   type: IngestResultType
   utilityBill?: ExtractedBillData
+  smartMeter?: {
+    format: 'long' | 'wide'
+    readings: number
+    totalKwh: number
+    firstDate: string | null
+    lastDate: string | null
+    months: number
+    stashId?: string
+  }
   waterBill?: ExtractedFacilityBillData<ExtractedWaterEntry>
   wasteBill?: ExtractedFacilityBillData<ExtractedWasteEntry>
   xlsx?: {

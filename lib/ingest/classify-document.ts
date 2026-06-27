@@ -7,6 +7,8 @@ import * as XLSX from 'xlsx';
 // "Queued…" forever.
 import { BILL_TOOL_INPUT_SCHEMA } from '../claude/bill-schemas';
 import { parseImportXLSX } from '../bulk-import/xlsx-parser';
+import { parseHalfHourlyCsv } from '../energy/hh-csv-parser';
+import { readingsSpan, deriveMonthlyEntries } from '../energy/derive-utility';
 
 /**
  * Shared Smart Upload classifier.
@@ -95,6 +97,7 @@ export type ClassifierResultType =
   | 'soil_carbon_lab'
   | 'soil_carbon_evidence'
   | 'accounts_csv'
+  | 'smart_meter_csv'
   | 'historical_sustainability_report'
   | 'historical_lca_report'
   | 'unsupported';
@@ -176,6 +179,8 @@ export function shapeIngestResult(
       };
     case 'accounts_csv':
       return { result_type: type, result_payload: { type, accountsCsv: payload } };
+    case 'smart_meter_csv':
+      return { result_type: type, result_payload: { type, smartMeter: { ...payload, stashId } } };
     case 'historical_sustainability_report':
       return {
         result_type: type,
@@ -208,6 +213,22 @@ export async function classifyDocument(input: ClassifierInput): Promise<Classifi
   const isImage = fileMime.startsWith('image/');
 
   if (isCsv) {
+    // Half-hourly smart-meter export? ("long" timestamp+kWh, or "wide" date+48 cols.)
+    const hh = parseHalfHourlyCsv(fileBytes);
+    if (hh.format !== 'unknown' && hh.readings.length >= 48) {
+      const span = readingsSpan(hh.readings);
+      return {
+        type: 'smart_meter_csv',
+        payload: {
+          format: hh.format,
+          readings: hh.readings.length,
+          totalKwh: Math.round(hh.readings.reduce((s, r) => s + r.kwh, 0)),
+          firstDate: span?.from ?? null,
+          lastDate: span?.to ?? null,
+          months: deriveMonthlyEntries(hh.readings, 'electricity').length,
+        },
+      };
+    }
     return {
       type: 'accounts_csv',
       payload: {

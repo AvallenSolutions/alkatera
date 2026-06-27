@@ -92,6 +92,8 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
   const [billName, setBillName] = useState('')
   const [periodStart, setPeriodStart] = useState('')
   const [periodEnd, setPeriodEnd] = useState('')
+  const [selectedFuel, setSelectedFuel] = useState<'electricity' | 'gas'>('electricity')
+  const [smConflict, setSmConflict] = useState<{ span: { from: string; to: string } } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const pollAbortRef = useRef<{ cancelled: boolean } | null>(null)
   const externalFileRef = useRef<File | null>(null)
@@ -105,6 +107,8 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
     setBillName('')
     setPeriodStart('')
     setPeriodEnd('')
+    setSelectedFuel('electricity')
+    setSmConflict(null)
     setQueue([])
     setQueueTotal(0)
     if (fileInputRef.current) fileInputRef.current.value = ''
@@ -275,16 +279,18 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
   const needsFacility =
     result?.type === 'utility_bill' ||
     result?.type === 'water_bill' ||
-    result?.type === 'waste_bill'
+    result?.type === 'waste_bill' ||
+    result?.type === 'smart_meter_csv'
 
   const canSave = () => {
     if (!result) return false
     if (needsFacility && !selectedFacilityId) return false
-    if (needsFacility && (!periodStart || !periodEnd)) return false
+    // Bills need a period; a smart-meter CSV brings its own dates.
+    if (needsFacility && result.type !== 'smart_meter_csv' && (!periodStart || !periodEnd)) return false
     return true
   }
 
-  const handleSave = async () => {
+  const handleSave = async (resolution?: 'replace' | 'detail_only') => {
     if (!result || !orgId) return
     const { data: userData } = await supabase.auth.getUser()
     if (!userData?.user) {
@@ -292,6 +298,35 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
       return
     }
     if (!needsFacility || !selectedFacilityId) return
+
+    // Half-hourly smart-meter CSV → the dedicated ingest (derives totals; warns on overlap).
+    if (result.type === 'smart_meter_csv' && result.smartMeter?.stashId) {
+      setStep('saving')
+      try {
+        const res = await fetch('/api/energy/smart-meter/ingest-stashed', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ stashId: result.smartMeter.stashId, facilityId: selectedFacilityId, fuel: selectedFuel, resolution }),
+        })
+        const body = await res.json().catch(() => ({}))
+        if (res.status === 409 && body?.conflict) {
+          setSmConflict(body)
+          setStep('review')
+          return
+        }
+        if (!res.ok) throw new Error(body?.error || 'Failed to import half-hourly data')
+        setSmConflict(null)
+        toast.success(
+          `Imported ${Number(body.readingsWritten).toLocaleString('en-GB')} readings` +
+            (body.replacedBills ? `, ${body.replacedBills} bill(s) replaced` : ''),
+        )
+        setStep('saved')
+      } catch (err: any) {
+        toast.error(err.message || 'Failed to import')
+        setStep('review')
+      }
+      return
+    }
 
     setStep('saving')
     try {
@@ -416,6 +451,10 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
             onSave={handleSave}
             canSave={canSave()}
             needsFacility={needsFacility}
+            selectedFuel={selectedFuel}
+            setSelectedFuel={setSelectedFuel}
+            smConflict={smConflict}
+            clearConflict={() => setSmConflict(null)}
             onClose={() => handleOpenChange(false)}
           />
         )}
@@ -481,9 +520,13 @@ interface ReviewPanelProps {
   setPeriodStart: (s: string) => void
   periodEnd: string
   setPeriodEnd: (s: string) => void
-  onSave: () => void
+  onSave: (resolution?: 'replace' | 'detail_only') => void
   canSave: boolean
   needsFacility: boolean
+  selectedFuel: 'electricity' | 'gas'
+  setSelectedFuel: (f: 'electricity' | 'gas') => void
+  smConflict: { span: { from: string; to: string } } | null
+  clearConflict: () => void
   /** Closes the Universal Dropzone dialog. Essential for hand-off paths where
    *  we navigate to another page — if we don't close, the dialog stays mounted
    *  in the persistent AppLayout and covers the target page. */
@@ -514,6 +557,77 @@ function ReviewPanel(props: ReviewPanelProps) {
           <ManualLink href="/vineyards" icon={<Leaf className="h-3.5 w-3.5" />} label="Spray diary" onClose={props.onClose} />
           <ManualLink href="/products" icon={<ScrollText className="h-3.5 w-3.5" />} label="Bill of materials" onClose={props.onClose} />
         </div>
+      </div>
+    )
+  }
+
+  if (result.type === 'smart_meter_csv' && result.smartMeter) {
+    const sm = result.smartMeter
+    return (
+      <div className="space-y-4">
+        <div className="rounded-lg border p-3 text-sm">
+          <p className="font-medium">Half-hourly smart-meter data detected</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {sm.readings.toLocaleString('en-GB')} readings · {sm.firstDate} → {sm.lastDate} ·{' '}
+            {sm.totalKwh.toLocaleString('en-GB')} kWh · {sm.months} month{sm.months === 1 ? '' : 's'} ({sm.format})
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            We&apos;ll derive your monthly totals from this — no separate bill needed for these months.
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="sm-facility">Facility</Label>
+          {props.facilities.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Add a facility first, then re-upload.</p>
+          ) : (
+            <Select value={props.selectedFacilityId} onValueChange={props.setSelectedFacilityId}>
+              <SelectTrigger id="sm-facility">
+                <SelectValue placeholder="Select facility" />
+              </SelectTrigger>
+              <SelectContent>
+                {props.facilities.map((f) => (
+                  <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Fuel</Label>
+          <div className="inline-flex rounded-md border p-0.5 text-sm">
+            {(['electricity', 'gas'] as const).map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => props.setSelectedFuel(f)}
+                className={`rounded px-3 py-1 capitalize ${props.selectedFuel === f ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {props.smConflict ? (
+          <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
+            <p className="font-medium text-amber-800">You already have bill data for these months</p>
+            <p className="mt-1 text-xs text-amber-800/90">
+              This covers {props.smConflict.span.from} → {props.smConflict.span.to} and overlaps existing entries.
+              Choose one so the same energy isn&apos;t counted twice:
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => props.onSave('replace')}>Replace the bill</Button>
+              <Button size="sm" variant="outline" onClick={() => props.onSave('detail_only')}>Keep bill (detail only)</Button>
+              <Button size="sm" variant="ghost" onClick={props.clearConflict}>Cancel</Button>
+            </div>
+          </div>
+        ) : (
+          <Button onClick={() => props.onSave()} disabled={!props.canSave} className="w-full">
+            Import half-hourly data
+          </Button>
+        )}
       </div>
     )
   }
@@ -798,7 +912,7 @@ function ReviewPanel(props: ReviewPanelProps) {
       )}
 
       <div className="flex items-center justify-end gap-2 pt-1">
-        <Button size="sm" onClick={props.onSave} disabled={!props.canSave}>
+        <Button size="sm" onClick={() => props.onSave()} disabled={!props.canSave}>
           <FileText className="h-3.5 w-3.5 mr-1.5" />
           Save to facility
         </Button>
