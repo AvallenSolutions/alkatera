@@ -2,9 +2,15 @@
  * UK Carbon Intensity API client.
  * Free, no API key required: https://carbonintensity.org.uk/
  *
- * We poll two endpoints:
- *   - /intensity         : current GB-NATIONAL intensity
- *   - /intensity/date    : 24h half-hourly forecast for the day
+ * We poll:
+ *   - /intensity                       : current GB-NATIONAL intensity (actual + forecast)
+ *   - /intensity/date                  : 24h half-hourly forecast for GB-NATIONAL
+ *   - /regional/intensity/{from}/{to}  : 24h half-hourly forecast for all 14 DNO regions
+ *                                        (+ England/Scotland/Wales) in a single call
+ *
+ * National readings carry a metered "actual"; regional readings are FORECAST only
+ * (the API does not publish regional actuals), so the regional granular figure is
+ * forecast-based — fine for an accuracy insight and for energy-timing.
  */
 
 const BASE = 'https://api.carbonintensity.org.uk';
@@ -15,6 +21,31 @@ export interface CarbonIntensityReading {
   intensity_g_per_kwh: number;
   forecast_g_per_kwh: number | null;
 }
+
+/**
+ * Carbon Intensity API regionids → human names. 1-14 are the GB DNO regions;
+ * 15-17 are the England/Scotland/Wales aggregates. (18 = "GB", which we skip in
+ * favour of the national endpoint that carries actuals.)
+ */
+export const CARBON_INTENSITY_REGIONS: Record<number, string> = {
+  1: 'North Scotland',
+  2: 'South Scotland',
+  3: 'North West England',
+  4: 'North East England',
+  5: 'Yorkshire',
+  6: 'North Wales & Merseyside',
+  7: 'South Wales',
+  8: 'West Midlands',
+  9: 'East Midlands',
+  10: 'East England',
+  11: 'South West England',
+  12: 'South England',
+  13: 'London',
+  14: 'South East England',
+  15: 'England',
+  16: 'Scotland',
+  17: 'Wales',
+};
 
 export async function fetchCurrentNationalIntensity(): Promise<CarbonIntensityReading | null> {
   try {
@@ -55,6 +86,47 @@ export async function fetchTodayForecast(): Promise<CarbonIntensityReading[]> {
     }));
   } catch (err) {
     console.error('[UK carbon-intensity] forecast fetch failed', err);
+    return [];
+  }
+}
+
+/**
+ * Today's half-hourly forecast for every region, in one call. Emits readings
+ * with region_code `GB-1`..`GB-17` (forecast-only). Region 18 ("GB") is skipped
+ * — the national endpoint already gives us GB-NATIONAL with actuals.
+ */
+export async function fetchRegionalToday(): Promise<CarbonIntensityReading[]> {
+  try {
+    const now = new Date();
+    const from = `${now.toISOString().slice(0, 10)}T00:00Z`;
+    const to = `${new Date(now.getTime() + 24 * 3600 * 1000).toISOString().slice(0, 10)}T00:00Z`;
+    const res = await fetch(`${BASE}/regional/intensity/${from}/${to}`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (!res.ok) return [];
+    const body = await res.json();
+    const periods: any[] = body?.data ?? [];
+    const readings: CarbonIntensityReading[] = [];
+    for (const p of periods) {
+      const recordedAt = p?.from;
+      if (!recordedAt || !Array.isArray(p?.regions)) continue;
+      for (const r of p.regions) {
+        const id = Number(r?.regionid);
+        // 1-17 only (skip 18 = GB national, covered by the national endpoint).
+        if (!Number.isInteger(id) || id < 1 || id > 17) continue;
+        const forecast = r?.intensity?.forecast;
+        if (typeof forecast !== 'number') continue;
+        readings.push({
+          region_code: `GB-${id}`,
+          recorded_at: recordedAt,
+          intensity_g_per_kwh: forecast,
+          forecast_g_per_kwh: forecast,
+        });
+      }
+    }
+    return readings;
+  } catch (err) {
+    console.error('[UK carbon-intensity] regional fetch failed', err);
     return [];
   }
 }

@@ -4,6 +4,7 @@ import { safeCompare } from '@/lib/utils/safe-compare';
 import {
   fetchCurrentNationalIntensity,
   fetchTodayForecast,
+  fetchRegionalToday,
 } from '@/lib/integrations/uk-carbon-intensity';
 
 /**
@@ -29,9 +30,10 @@ export async function POST(request: NextRequest) {
     { auth: { autoRefreshToken: false, persistSession: false } },
   );
 
-  const [current, forecast] = await Promise.all([
+  const [current, forecast, regional] = await Promise.all([
     fetchCurrentNationalIntensity(),
     fetchTodayForecast(),
+    fetchRegionalToday(),
   ]);
 
   // The "current" reading is the same half-hour slot as one of the forecast
@@ -49,9 +51,9 @@ export async function POST(request: NextRequest) {
     source: string;
   }>();
 
-  // Forecast first, then overwrite with the actual reading for the current
-  // slot if we have one.
-  for (const r of forecast) {
+  // Forecast first (national + all regions), then overwrite with the actual
+  // reading for the current national slot if we have one.
+  for (const r of [...forecast, ...regional]) {
     const key = `${r.region_code}|${r.recorded_at}|uk_carbon_intensity`;
     merged.set(key, {
       region_code: r.region_code,
