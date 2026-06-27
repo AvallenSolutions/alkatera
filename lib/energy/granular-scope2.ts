@@ -1,19 +1,22 @@
 /**
- * Programme 2 / Phase 1: carbon-aware *enhanced* Scope 2 (electricity).
+ * Programme 2 / Phase 1-2: carbon-aware *enhanced* Scope 2 (electricity).
  *
- * This is an ADDITIVE figure shown ALONGSIDE the standard annual-factor Scope 2
+ * ADDITIVE figure shown ALONGSIDE the standard annual-factor Scope 2
  * (`calculateScope2` in corporate-emissions.ts) — it never replaces the
- * compliance headline. For each GB electricity entry it weights consumption by
- * the facility's *regional* 30-min grid intensity, period-averaged over the
- * entry's reporting window (true half-hourly matching arrives in Phase 2 with
- * smart-meter data). It also returns the national-average equivalent so the UI
- * can show "your regional grid was X% cleaner/dirtier than the national average".
+ * compliance headline. Per GB facility it weights electricity by the region's
+ * actual grid intensity:
+ *   - if half-hourly smart-meter data exists, each half hour is weighted by the
+ *     region's intensity at that half hour (the real value of HH data — you
+ *     consume more when the grid is dirtier/cleaner);
+ *   - otherwise the monthly bill is weighted by the period-average intensity.
+ * It also returns the national-average equivalent for the "your regional grid
+ * was X% cleaner/dirtier than the national average" insight.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { overlapFraction, normaliseEnergyToKwh } from '@/lib/calculations/utility-factors'
 import { resolveFacilityRegionCode } from './region'
-import { periodAverageIntensity } from './intensity-history'
+import { periodAverageIntensity, regionalIntensityMap, halfHourKey } from './intensity-history'
 
 export interface GranularScope2Result {
   /** Region-weighted electricity emissions (kg CO2e) for the covered consumption. */
@@ -24,6 +27,8 @@ export interface GranularScope2Result {
   coveredKwh: number
   /** All electricity kWh in scope (covered + uncovered, e.g. non-GB). */
   totalElectricityKwh: number
+  /** True for facilities matched at half-hourly resolution. */
+  halfHourlyKwh: number
   byRegion: Record<string, { kwh: number; avgIntensityG: number }>
 }
 
@@ -44,11 +49,21 @@ export async function calculateScope2Granular(
   yearStart: string,
   yearEnd: string,
 ): Promise<GranularScope2Result> {
+  // Internally accumulate kgSum per region, convert to an average at the end.
+  const regionAcc: Record<string, { kwh: number; kgSum: number }> = {}
+  const add = (region: string, kwh: number, kg: number) => {
+    const a = regionAcc[region] ?? { kwh: 0, kgSum: 0 }
+    a.kwh += kwh
+    a.kgSum += kg
+    regionAcc[region] = a
+  }
+
   const result: GranularScope2Result = {
     granularKg: 0,
     nationalEquivalentKg: 0,
     coveredKwh: 0,
     totalElectricityKwh: 0,
+    halfHourlyKwh: 0,
     byRegion: {},
   }
 
@@ -56,10 +71,9 @@ export async function calculateScope2Granular(
     .from('facilities')
     .select('id, location_country_code, address_country, address_postcode, grid_region_code')
     .eq('organization_id', organizationId)
-
-  const facMap = new Map<string, any>((facilities ?? []).map((f: any) => [f.id, f]))
-  const facilityIds = Array.from(facMap.keys())
-  if (facilityIds.length === 0) return result
+  const facList = (facilities ?? []) as any[]
+  if (facList.length === 0) return result
+  const facilityIds = facList.map((f) => f.id)
 
   const { data: entries } = await supabase
     .from('utility_data_entries')
@@ -68,43 +82,79 @@ export async function calculateScope2Granular(
     .eq('utility_type', 'electricity_grid')
     .lte('reporting_period_start', yearEnd)
     .gte('reporting_period_end', yearStart)
-
-  const regionCache = new Map<string, string | null>()
-
+  const entriesByFac = new Map<string, any[]>()
   for (const e of entries ?? []) {
-    const facility = facMap.get((e as any).facility_id)
-    if (!facility) continue
-
-    const fraction = overlapFraction((e as any).reporting_period_start, (e as any).reporting_period_end, yearStart, yearEnd)
-    const kwh = normaliseEnergyToKwh(Number((e as any).quantity) || 0, (e as any).unit) * fraction
-    if (kwh <= 0) continue
-    result.totalElectricityKwh += kwh
-
-    let region = regionCache.get((e as any).facility_id)
-    if (region === undefined) {
-      region = await resolveFacilityRegionCode(supabase, facility)
-      regionCache.set((e as any).facility_id, region)
-    }
-    if (!region) continue // non-GB / unresolvable — stays on the headline factor
-
-    const periodFrom = startIso(maxStr((e as any).reporting_period_start, yearStart))
-    const periodTo = endExclusiveIso(minStr((e as any).reporting_period_end, yearEnd))
-
-    const [regAvg, natAvg] = await Promise.all([
-      periodAverageIntensity(supabase, region, periodFrom, periodTo),
-      periodAverageIntensity(supabase, 'GB-NATIONAL', periodFrom, periodTo),
-    ])
-    if (regAvg == null) continue
-
-    result.granularKg += kwh * (regAvg / 1000)
-    result.nationalEquivalentKg += kwh * ((natAvg ?? regAvg) / 1000)
-    result.coveredKwh += kwh
-
-    const b = result.byRegion[region] ?? { kwh: 0, avgIntensityG: 0 }
-    b.avgIntensityG = (b.avgIntensityG * b.kwh + regAvg * kwh) / (b.kwh + kwh)
-    b.kwh += kwh
-    result.byRegion[region] = b
+    const arr = entriesByFac.get((e as any).facility_id) ?? []
+    arr.push(e)
+    entriesByFac.set((e as any).facility_id, arr)
   }
 
+  const windowFrom = startIso(yearStart)
+  const windowTo = endExclusiveIso(yearEnd)
+
+  for (const facility of facList) {
+    const region = await resolveFacilityRegionCode(supabase, facility)
+
+    // 1. Half-hourly smart-meter data takes precedence.
+    const { data: hh } = await supabase
+      .from('smart_meter_readings')
+      .select('recorded_at, consumption_kwh')
+      .eq('facility_id', facility.id)
+      .eq('fuel', 'electricity')
+      .gte('recorded_at', windowFrom)
+      .lt('recorded_at', windowTo)
+    if (hh && hh.length > 0) {
+      const hhKwh = hh.reduce((s, r) => s + Number((r as any).consumption_kwh), 0)
+      result.totalElectricityKwh += hhKwh
+      if (!region) continue // non-GB: in totals but not granular
+      // Fetch intensity only for the actual span of the readings, not the whole year.
+      const times = hh.map((r) => new Date((r as any).recorded_at).getTime())
+      const hhFrom = new Date(Math.min(...times)).toISOString()
+      const hhTo = new Date(Math.max(...times) + 30 * 60 * 1000).toISOString()
+      const [regMap, natMap] = await Promise.all([
+        regionalIntensityMap(supabase, region, hhFrom, hhTo),
+        regionalIntensityMap(supabase, 'GB-NATIONAL', hhFrom, hhTo),
+      ])
+      for (const r of hh) {
+        const key = halfHourKey((r as any).recorded_at)
+        const ri = regMap.get(key)
+        if (ri == null) continue
+        const kwh = Number((r as any).consumption_kwh)
+        const kg = kwh * (ri / 1000)
+        result.granularKg += kg
+        result.nationalEquivalentKg += kwh * ((natMap.get(key) ?? ri) / 1000)
+        result.coveredKwh += kwh
+        result.halfHourlyKwh += kwh
+        add(region, kwh, kg)
+      }
+      continue // facility handled via HH — don't double-count its monthly bills
+    }
+
+    // 2. Fall back to monthly bills, period-averaged.
+    for (const e of entriesByFac.get(facility.id) ?? []) {
+      const fraction = overlapFraction((e as any).reporting_period_start, (e as any).reporting_period_end, yearStart, yearEnd)
+      const kwh = normaliseEnergyToKwh(Number((e as any).quantity) || 0, (e as any).unit) * fraction
+      if (kwh <= 0) continue
+      result.totalElectricityKwh += kwh
+      if (!region) continue
+
+      const periodFrom = startIso(maxStr((e as any).reporting_period_start, yearStart))
+      const periodTo = endExclusiveIso(minStr((e as any).reporting_period_end, yearEnd))
+      const [regAvg, natAvg] = await Promise.all([
+        periodAverageIntensity(supabase, region, periodFrom, periodTo),
+        periodAverageIntensity(supabase, 'GB-NATIONAL', periodFrom, periodTo),
+      ])
+      if (regAvg == null) continue
+      const kg = kwh * (regAvg / 1000)
+      result.granularKg += kg
+      result.nationalEquivalentKg += kwh * ((natAvg ?? regAvg) / 1000)
+      result.coveredKwh += kwh
+      add(region, kwh, kg)
+    }
+  }
+
+  for (const [region, a] of Object.entries(regionAcc)) {
+    result.byRegion[region] = { kwh: a.kwh, avgIntensityG: a.kwh > 0 ? (a.kgSum * 1000) / a.kwh : 0 }
+  }
   return result
 }
