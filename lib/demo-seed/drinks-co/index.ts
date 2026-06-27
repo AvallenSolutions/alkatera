@@ -5,6 +5,7 @@ import { seedCompletedLcas } from './lca';
 import { seedOperations } from './operations';
 import { seedProgramme } from './programme';
 import { seedSupplyChain } from './supply-chain';
+import { seedEnergyGeo } from './energy-geo';
 
 export interface SeedOutcome {
   ok: boolean;
@@ -25,6 +26,7 @@ export async function seedDrinksCoDemo(svc: SupabaseClient): Promise<SeedOutcome
   await seedEntities(ctx);
   await seedCompletedLcas(ctx);
   await seedOperations(ctx);
+  await seedEnergyGeo(ctx); // after operations: replaces the head office's latest bill with smart-meter data
   await seedProgramme(ctx);
   await seedSupplyChain(ctx);
 
@@ -35,6 +37,7 @@ export async function seedDrinksCoDemo(svc: SupabaseClient): Promise<SeedOutcome
     nextSteps: [
       'Completed LCAs are seeded directly (realistic estimates), so every product shows a footprint immediately — no recalc needed.',
       'Switch to the alkatera Drinks Co org and walk the Pulse overview, products + an LCA report, company footprint, water dashboard, targets + MACC, B Corp readiness, social sections and suppliers to confirm every area renders.',
+      'New: open the head office facility → "Energy & grid" tab to see the half-hourly electricity + gas charts, regional intensity and timing tip; the vineyard and orchard now have coordinates + a SoilGrids soil-carbon baseline (give the Inngest job a moment, then check the land-unit map).',
     ],
   };
 }
@@ -62,6 +65,8 @@ export async function resetDrinksCoDemo(svc: SupabaseClient): Promise<SeedOutcom
   if (facIds.length) {
     await svc.from('utility_data_entries').delete().in('facility_id', facIds);
     removed.push('utility_data_entries');
+    await svc.from('smart_meter_readings').delete().in('facility_id', facIds);
+    removed.push('smart_meter_readings');
   }
   await clear('facility_activity_entries', 'organization_id', orgId);
   await clear('production_logs', 'organization_id', orgId);
