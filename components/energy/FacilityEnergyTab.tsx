@@ -34,16 +34,19 @@ interface Insight {
     recommendation: string | null;
   };
   hasHalfHourlyData?: boolean;
-  consumption?: {
-    count: number;
-    firstDate: string;
-    lastDate: string;
-    totalKwh: number;
-    profile: { hhmm: string; avgKwh: number; avgIntensityG: number | null }[];
-    flatAvgIntensityG: number | null;
-    weightedAvgIntensityG: number | null;
-  } | null;
+  consumption?: ConsumptionData | null;
+  gasConsumption?: ConsumptionData | null;
   message?: string;
+}
+
+interface ConsumptionData {
+  count: number;
+  firstDate: string;
+  lastDate: string;
+  totalKwh: number;
+  profile: { hhmm: string; avgKwh: number; avgIntensityG: number | null }[];
+  flatAvgIntensityG: number | null;
+  weightedAvgIntensityG: number | null;
 }
 
 function statusOf(g: number) {
@@ -257,6 +260,40 @@ export function FacilityEnergyTab({ facilityId }: { facilityId: string }) {
                   )}
                 </p>
               )}
+            </CardContent>
+          </Card>
+        );
+      })()}
+
+      {/* Gas consumption (visibility only — gas carbon is time-flat) */}
+      {data.gasConsumption && data.gasConsumption.count > 0 && (() => {
+        const g = data.gasConsumption!;
+        const profile = g.profile.map((p) => ({ t: p.hhmm, kwh: Number(p.avgKwh.toFixed(2)) }));
+        return (
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle className="text-base">Your half-hourly gas use</CardTitle>
+                <span className="text-xs text-muted-foreground">
+                  {g.firstDate} → {g.lastDate} · {Math.round(g.totalKwh).toLocaleString('en-GB')} kWh · {g.count.toLocaleString('en-GB')} readings
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div style={{ height: 220 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={profile} margin={{ top: 5, right: 4, bottom: 0, left: -10 }}>
+                    <XAxis dataKey="t" tick={{ fontSize: 11 }} interval={7} />
+                    <YAxis tick={{ fontSize: 11 }} width={42} />
+                    <Tooltip {...TOOLTIP_PROPS} />
+                    <Bar dataKey="kwh" name="Avg gas (kWh)" fill="#60a5fa" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Average day across the uploaded period. Gas carbon is the same at any time of day, so there&apos;s no
+                timing benefit — this is for visibility.
+              </p>
             </CardContent>
           </Card>
         );
