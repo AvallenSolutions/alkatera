@@ -52,6 +52,19 @@ function statusOf(g: number) {
   return { label: 'Dirty', cls: 'bg-red-100 text-red-700 border-red-200', color: '#ef4444' };
 }
 
+// Dark, always-legible tooltip (the recharts default is white, on which the lime
+// consumption series is unreadable). Series colours stay readable on the dark bg.
+const TOOLTIP_PROPS = {
+  contentStyle: {
+    background: 'rgba(15, 23, 42, 0.96)',
+    border: '1px solid rgba(148, 163, 184, 0.3)',
+    borderRadius: 8,
+    fontSize: 12,
+    color: '#e5e7eb',
+  } as React.CSSProperties,
+  labelStyle: { color: '#cbd5e1', marginBottom: 2 } as React.CSSProperties,
+};
+
 export function FacilityEnergyTab({ facilityId }: { facilityId: string }) {
   const { toast } = useToast();
   const [data, setData] = useState<Insight | null>(null);
@@ -183,7 +196,7 @@ export function FacilityEnergyTab({ facilityId }: { facilityId: string }) {
                 </defs>
                 <XAxis dataKey="t" tick={{ fontSize: 11 }} interval={7} />
                 <YAxis tick={{ fontSize: 11 }} width={40} />
-                <Tooltip formatter={(v) => [`${v} g/kWh`, 'Intensity']} labelFormatter={(l) => `at ${l}`} />
+                <Tooltip {...TOOLTIP_PROPS} formatter={(v) => [`${v} g/kWh`, 'Intensity']} labelFormatter={(l) => `at ${l}`} />
                 <ReferenceLine y={150} stroke="#22c55e" strokeDasharray="3 3" />
                 <ReferenceLine y={300} stroke="#ef4444" strokeDasharray="3 3" />
                 <Area type="monotone" dataKey="g" stroke="#ccff00" strokeWidth={2} fill="url(#gridGrad)" isAnimationActive={false} />
@@ -222,7 +235,7 @@ export function FacilityEnergyTab({ facilityId }: { facilityId: string }) {
                     <XAxis dataKey="t" tick={{ fontSize: 11 }} interval={7} />
                     <YAxis yAxisId="kwh" tick={{ fontSize: 11 }} width={42} />
                     <YAxis yAxisId="g" orientation="right" tick={{ fontSize: 11 }} width={42} />
-                    <Tooltip />
+                    <Tooltip {...TOOLTIP_PROPS} />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
                     <Bar yAxisId="kwh" dataKey="kwh" name="Avg consumption (kWh)" fill="#ccff00" radius={[2, 2, 0, 0]} isAnimationActive={false} />
                     <Line yAxisId="g" type="monotone" dataKey="g" name="Grid intensity (g/kWh)" stroke="#ef4444" strokeWidth={2} dot={false} isAnimationActive={false} />
