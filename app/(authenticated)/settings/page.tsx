@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -19,15 +20,17 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
-import { ProfileSettings } from '@/components/settings/ProfileSettings'
-import { DataPrivacySettings } from '@/components/settings/DataPrivacySettings'
-import { TeamSettings } from '@/components/settings/TeamSettings'
-import { OrganisationSettings } from '@/components/settings/OrganisationSettings'
-import { SupportSettings } from '@/components/settings/SupportSettings'
-import { IntegrationsSettings } from '@/components/settings/IntegrationsSettings'
 import { FeatureGate } from '@/components/subscription/FeatureGate'
-import { VineyardSettings } from '@/components/settings/VineyardSettings'
-import { LcaTemplatesSettings } from '@/components/settings/LcaTemplatesSettings'
+// Round 5 (auto-research): only one settings tab is visible at a time, so the
+// other panels needn't be in /settings' First Load JS. Lazy-load all 8 panels.
+const ProfileSettings = dynamic(() => import('@/components/settings/ProfileSettings').then((m) => m.ProfileSettings), { ssr: false })
+const DataPrivacySettings = dynamic(() => import('@/components/settings/DataPrivacySettings').then((m) => m.DataPrivacySettings), { ssr: false })
+const TeamSettings = dynamic(() => import('@/components/settings/TeamSettings').then((m) => m.TeamSettings), { ssr: false })
+const OrganisationSettings = dynamic(() => import('@/components/settings/OrganisationSettings').then((m) => m.OrganisationSettings), { ssr: false })
+const SupportSettings = dynamic(() => import('@/components/settings/SupportSettings').then((m) => m.SupportSettings), { ssr: false })
+const IntegrationsSettings = dynamic(() => import('@/components/settings/IntegrationsSettings').then((m) => m.IntegrationsSettings), { ssr: false })
+const VineyardSettings = dynamic(() => import('@/components/settings/VineyardSettings').then((m) => m.VineyardSettings), { ssr: false })
+const LcaTemplatesSettings = dynamic(() => import('@/components/settings/LcaTemplatesSettings').then((m) => m.LcaTemplatesSettings), { ssr: false })
 import { useIsAlkateraAdmin } from '@/hooks/usePermissions'
 import { isViticultureEligible } from '@/lib/viticulture-utils'
 

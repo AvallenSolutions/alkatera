@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { FlagThresholdBanner } from '@/components/flag/FlagThresholdBanner';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -61,14 +62,17 @@ import type {
   NatureScoreBreakdown,
 } from '@/lib/vitality/environmental';
 import { PillarCard, PillarGrid, PerformanceSummary } from '@/components/vitality/PillarCard';
-import { CarbonDeepDive } from '@/components/vitality/CarbonDeepDive';
-import { WaterDeepDive } from '@/components/vitality/WaterDeepDive';
-import { WasteDeepDive } from '@/components/vitality/WasteDeepDive';
-import { NatureDeepDive } from '@/components/vitality/NatureDeepDive';
-import { CarbonBreakdownSheet } from '@/components/vitality/CarbonBreakdownSheet';
-import { WaterImpactSheet } from '@/components/vitality/WaterImpactSheet';
-import { CircularitySheet } from '@/components/vitality/CircularitySheet';
-import { NatureImpactSheet } from '@/components/vitality/NatureImpactSheet';
+// Round 3 (auto-research): these deep-dive / sheet panels render only inside an
+// expanded pillar or an opened sheet, so their recharts-heavy bundles shouldn't
+// sit in /performance's First Load JS. Lazy-load them.
+const CarbonDeepDive = dynamic(() => import('@/components/vitality/CarbonDeepDive').then((m) => m.CarbonDeepDive), { ssr: false });
+const WaterDeepDive = dynamic(() => import('@/components/vitality/WaterDeepDive').then((m) => m.WaterDeepDive), { ssr: false });
+const WasteDeepDive = dynamic(() => import('@/components/vitality/WasteDeepDive').then((m) => m.WasteDeepDive), { ssr: false });
+const NatureDeepDive = dynamic(() => import('@/components/vitality/NatureDeepDive').then((m) => m.NatureDeepDive), { ssr: false });
+const CarbonBreakdownSheet = dynamic(() => import('@/components/vitality/CarbonBreakdownSheet').then((m) => m.CarbonBreakdownSheet), { ssr: false });
+const WaterImpactSheet = dynamic(() => import('@/components/vitality/WaterImpactSheet').then((m) => m.WaterImpactSheet), { ssr: false });
+const CircularitySheet = dynamic(() => import('@/components/vitality/CircularitySheet').then((m) => m.CircularitySheet), { ssr: false });
+const NatureImpactSheet = dynamic(() => import('@/components/vitality/NatureImpactSheet').then((m) => m.NatureImpactSheet), { ssr: false });
 import {
   Collapsible,
   CollapsibleContent,
@@ -165,7 +169,7 @@ function transformFootprintToScope3Categories(
   // GHG Protocol Category Mapping:
   // - Cat 1: Purchased goods & services (includes products, purchased_services, marketing_materials)
   // - Cat 8: Upstream leased assets (only for actual leased asset emissions, NOT purchased services)
-  const cat1Value = (scope3Data.products || 0) + (scope3Data.purchased_services || 0) + (scope3Data.marketing_materials || scope3Data.marketing || 0);
+  const cat1Value = (scope3Data.products || 0) + (scope3Data.purchased_services || 0) + (scope3Data.marketing_materials || scope3Data.marketing || 0) + (scope3Data.hospitality || 0);
   const cat1HasData = cat1Value > 0;
 
   const categoryMapping: Record<number, { value: number; dataQuality: 'primary' | 'secondary' | 'estimated' | 'missing' }> = {
@@ -258,6 +262,18 @@ function transformFootprintToScope3Categories(
             source: 'Corporate Overheads',
             dataQuality: 'secondary',
             metadata: { type: 'marketing_materials' },
+          });
+        }
+        if (scope3Data.hospitality > 0) {
+          entries.push({
+            id: 'cat1-hospitality',
+            date: today,
+            description: 'Hospitality service (meals, drinks, rooms, waste)',
+            emissions: scope3Data.hospitality,
+            unit: 'kg CO₂e',
+            source: 'Hospitality module',
+            dataQuality: 'primary',
+            metadata: { type: 'hospitality' },
           });
         }
         break;

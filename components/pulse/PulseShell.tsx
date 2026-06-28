@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity,
@@ -13,7 +14,12 @@ import {
 } from 'lucide-react';
 import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider';
 import { Button } from '@/components/ui/button';
-import { PulseGrid } from '@/components/pulse/PulseGrid';
+// Round 2 (auto-research): lazy-load the react-grid-layout-backed grid so its
+// heavy drag/resize bundle leaves /pulse's First Load JS.
+const PulseGrid = dynamic(
+  () => import('@/components/pulse/PulseGrid').then((m) => m.PulseGrid),
+  { ssr: false }
+);
 import { PulseTabbedView } from '@/components/pulse/PulseTabbedView';
 import { PulseVerdictHero } from '@/components/pulse/PulseVerdictHero';
 import { DEFAULT_VIEW, type PulseView } from '@/lib/pulse/layout';
@@ -22,30 +28,33 @@ import {
   usePulseRealtimeContext,
 } from '@/lib/pulse/PulseRealtimeContext';
 import { MetricDrillProvider, useWidgetDrill } from '@/lib/pulse/MetricDrillContext';
-import { WidgetDrillOverlay } from '@/components/pulse/WidgetDrillOverlay';
-import { WaterfallSlotMount } from '@/components/pulse/drill-slots/WaterfallSlot';
-import { FinancialFootprintExpandedSlot } from '@/components/pulse/widgets/financial-footprint/expanded';
-import { ScenarioSensitivityExpandedSlot } from '@/components/pulse/widgets/scenario-sensitivity/expanded';
-import { MaccExpandedSlot } from '@/components/pulse/widgets/macc/expanded';
-import { CarbonBudgetsExpandedSlot } from '@/components/pulse/widgets/carbon-budgets/expanded';
-import { RegulatoryExposureExpandedSlot } from '@/components/pulse/widgets/regulatory-exposure/expanded';
-import { TargetTrajectoryExpandedSlot } from '@/components/pulse/widgets/target-trajectory/expanded';
-import { TopCostDriversExpandedSlot } from '@/components/pulse/widgets/top-cost-drivers/expanded';
-import { FacilityImpactExpandedSlot } from '@/components/pulse/widgets/facility-impact/expanded';
-import { AlertsInboxExpandedSlot } from '@/components/pulse/widgets/alerts-inbox/expanded';
-import { GridCarbonExpandedSlot } from '@/components/pulse/widgets/grid-carbon/expanded';
-import { EnergyTimingExpandedSlot } from '@/components/pulse/widgets/energy-timing/expanded';
-import { PeerBenchmarkExpandedSlot } from '@/components/pulse/widgets/peer-benchmark/expanded';
-import { CsrdGapsExpandedSlot } from '@/components/pulse/widgets/csrd-gaps/expanded';
-import { InsightCardExpandedSlot } from '@/components/pulse/widgets/insight-card/expanded';
-import { WhatIfExpandedSlot } from '@/components/pulse/widgets/what-if/expanded';
-import { HarvestSeasonsExpandedSlot } from '@/components/pulse/widgets/harvest-seasons/expanded';
-import { ProductEnvCostExpandedSlot } from '@/components/pulse/widgets/product-env-cost/expanded';
-import { SupplierHotspotsExpandedSlot } from '@/components/pulse/widgets/supplier-hotspots/expanded';
-import { LiveActivityExpandedSlot } from '@/components/pulse/widgets/live-activity/expanded';
-// Financial-only drill slots -- surfaced by the CFO persona view.
-import { CostIntensityExpandedSlot } from '@/components/pulse/widgets/cost-intensity/expanded';
-import { IssbDisclosureExpandedSlot } from '@/components/pulse/widgets/issb-disclosure/expanded';
+// Round 6 (auto-research): the drill overlay and every widget's ExpandedSlot only
+// render content when a widget is drilled into. Statically importing all ~24
+// recharts-heavy slots put them in /pulse's First Load JS; lazy-load them so they
+// move to post-hydration chunks instead.
+const WidgetDrillOverlay = dynamic(() => import('@/components/pulse/WidgetDrillOverlay').then((m) => m.WidgetDrillOverlay), { ssr: false });
+const WaterfallSlotMount = dynamic(() => import('@/components/pulse/drill-slots/WaterfallSlot').then((m) => m.WaterfallSlotMount), { ssr: false });
+const FinancialFootprintExpandedSlot = dynamic(() => import('@/components/pulse/widgets/financial-footprint/expanded').then((m) => m.FinancialFootprintExpandedSlot), { ssr: false });
+const ScenarioSensitivityExpandedSlot = dynamic(() => import('@/components/pulse/widgets/scenario-sensitivity/expanded').then((m) => m.ScenarioSensitivityExpandedSlot), { ssr: false });
+const MaccExpandedSlot = dynamic(() => import('@/components/pulse/widgets/macc/expanded').then((m) => m.MaccExpandedSlot), { ssr: false });
+const CarbonBudgetsExpandedSlot = dynamic(() => import('@/components/pulse/widgets/carbon-budgets/expanded').then((m) => m.CarbonBudgetsExpandedSlot), { ssr: false });
+const RegulatoryExposureExpandedSlot = dynamic(() => import('@/components/pulse/widgets/regulatory-exposure/expanded').then((m) => m.RegulatoryExposureExpandedSlot), { ssr: false });
+const TargetTrajectoryExpandedSlot = dynamic(() => import('@/components/pulse/widgets/target-trajectory/expanded').then((m) => m.TargetTrajectoryExpandedSlot), { ssr: false });
+const TopCostDriversExpandedSlot = dynamic(() => import('@/components/pulse/widgets/top-cost-drivers/expanded').then((m) => m.TopCostDriversExpandedSlot), { ssr: false });
+const FacilityImpactExpandedSlot = dynamic(() => import('@/components/pulse/widgets/facility-impact/expanded').then((m) => m.FacilityImpactExpandedSlot), { ssr: false });
+const AlertsInboxExpandedSlot = dynamic(() => import('@/components/pulse/widgets/alerts-inbox/expanded').then((m) => m.AlertsInboxExpandedSlot), { ssr: false });
+const GridCarbonExpandedSlot = dynamic(() => import('@/components/pulse/widgets/grid-carbon/expanded').then((m) => m.GridCarbonExpandedSlot), { ssr: false });
+const EnergyTimingExpandedSlot = dynamic(() => import('@/components/pulse/widgets/energy-timing/expanded').then((m) => m.EnergyTimingExpandedSlot), { ssr: false });
+const PeerBenchmarkExpandedSlot = dynamic(() => import('@/components/pulse/widgets/peer-benchmark/expanded').then((m) => m.PeerBenchmarkExpandedSlot), { ssr: false });
+const CsrdGapsExpandedSlot = dynamic(() => import('@/components/pulse/widgets/csrd-gaps/expanded').then((m) => m.CsrdGapsExpandedSlot), { ssr: false });
+const InsightCardExpandedSlot = dynamic(() => import('@/components/pulse/widgets/insight-card/expanded').then((m) => m.InsightCardExpandedSlot), { ssr: false });
+const WhatIfExpandedSlot = dynamic(() => import('@/components/pulse/widgets/what-if/expanded').then((m) => m.WhatIfExpandedSlot), { ssr: false });
+const HarvestSeasonsExpandedSlot = dynamic(() => import('@/components/pulse/widgets/harvest-seasons/expanded').then((m) => m.HarvestSeasonsExpandedSlot), { ssr: false });
+const ProductEnvCostExpandedSlot = dynamic(() => import('@/components/pulse/widgets/product-env-cost/expanded').then((m) => m.ProductEnvCostExpandedSlot), { ssr: false });
+const SupplierHotspotsExpandedSlot = dynamic(() => import('@/components/pulse/widgets/supplier-hotspots/expanded').then((m) => m.SupplierHotspotsExpandedSlot), { ssr: false });
+const LiveActivityExpandedSlot = dynamic(() => import('@/components/pulse/widgets/live-activity/expanded').then((m) => m.LiveActivityExpandedSlot), { ssr: false });
+const CostIntensityExpandedSlot = dynamic(() => import('@/components/pulse/widgets/cost-intensity/expanded').then((m) => m.CostIntensityExpandedSlot), { ssr: false });
+const IssbDisclosureExpandedSlot = dynamic(() => import('@/components/pulse/widgets/issb-disclosure/expanded').then((m) => m.IssbDisclosureExpandedSlot), { ssr: false });
 import { usePulseDrillUrl } from '@/hooks/usePulseDrillUrl';
 import { LiveMetricsStrip } from '@/components/pulse/widgets/LiveMetricsStrip';
 import { AskRosaWidget } from '@/components/pulse/widgets/AskRosaWidget';

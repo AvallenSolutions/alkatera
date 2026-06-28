@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { VitalityHero } from '@/components/vitality/VitalityHero'
 import { PriorityTiles } from './PriorityTiles'
 import { ProgressTracker } from './ProgressTracker'
@@ -12,8 +13,12 @@ import { NaturePositiveActions } from './NaturePositiveActions'
 import { QuickActions } from './QuickActions'
 import { QuickPrompts } from './QuickPrompts'
 import { ForwardTimeline } from './ForwardTimeline'
-import { HubSetupWizard } from './HubSetupWizard'
-import { OnboardingResumeBanner } from './OnboardingResumeBanner'
+// Round 2 (auto-research /rosa): the setup wizard only renders on first visit
+// (showWizardOnly early-return); returning users never see it, so defer it.
+const HubSetupWizard = dynamic(() => import('./HubSetupWizard').then((m) => m.HubSetupWizard), { ssr: false })
+// Round 4 (auto-research /rosa): banner self-gates to null once onboarding is
+// complete (most users), so defer it out of first load.
+const OnboardingResumeBanner = dynamic(() => import('./OnboardingResumeBanner').then((m) => m.OnboardingResumeBanner), { ssr: false })
 import { SustainableAINote } from './SustainableAINote'
 import { CertificationHealthWidget } from '@/components/certifications/CertificationHealthWidget'
 import { useHubLayout } from '@/lib/rosa/useHubLayout'

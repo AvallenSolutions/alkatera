@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { FeatureGate } from '@/components/subscription/FeatureGate';
 import { Button } from '@/components/ui/button';
@@ -21,8 +22,10 @@ import {
 import Link from 'next/link';
 
 import { GovernanceScoreHero } from '@/components/governance/GovernanceScoreHero';
-import { PolicyDashboard } from '@/components/governance/PolicyDashboard';
-import { BoardCompositionChart } from '@/components/governance/BoardCompositionChart';
+// Round 10 (auto-research): both live in non-default tabs (policies / board), so
+// defer them out of /governance's first load.
+const PolicyDashboard = dynamic(() => import('@/components/governance/PolicyDashboard').then((m) => m.PolicyDashboard), { ssr: false });
+const BoardCompositionChart = dynamic(() => import('@/components/governance/BoardCompositionChart').then((m) => m.BoardCompositionChart), { ssr: false });
 
 import { useGovernanceScore } from '@/hooks/data/useGovernanceScore';
 import { usePolicies } from '@/hooks/data/usePolicies';

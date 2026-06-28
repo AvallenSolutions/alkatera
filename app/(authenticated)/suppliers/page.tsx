@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { SmartUploadButton } from '@/components/layouts/SmartUploadButton';
@@ -66,12 +67,14 @@ import Image from 'next/image';
 import { supabase } from '@/lib/supabaseClient';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { useOrganization } from '@/lib/organizationContext';
-import { SuppliersByEmissions } from '@/components/suppliers/SuppliersByEmissions';
-import { SupplierTieringPanel } from '@/components/suppliers/SupplierTieringPanel';
+// Round 8 (auto-research): these panels render only when suppliers exist; defer them.
+const SuppliersByEmissions = dynamic(() => import('@/components/suppliers/SuppliersByEmissions').then((m) => m.SuppliersByEmissions), { ssr: false });
+const SupplierTieringPanel = dynamic(() => import('@/components/suppliers/SupplierTieringPanel').then((m) => m.SupplierTieringPanel), { ssr: false });
 import { useSupplierPermissions } from '@/hooks/useSupplierPermissions';
 import { useSupplierLimit } from '@/hooks/useSubscription';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { SendEsgSurveyDialog } from '@/components/suppliers/SendEsgSurveyDialog';
+// Round 8 (auto-research): open-gated modal; defer it out of first load.
+const SendEsgSurveyDialog = dynamic(() => import('@/components/suppliers/SendEsgSurveyDialog').then((m) => m.SendEsgSurveyDialog), { ssr: false });
 import { toast } from 'sonner';
 
 interface OrganizationSupplier {

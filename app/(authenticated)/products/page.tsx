@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import dynamic from 'next/dynamic';
 import { useRosaPageContext } from "@/lib/rosa/RosaContextProvider";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageLoader } from "@/components/ui/page-loader";
 import { Input } from "@/components/ui/input";
-import { WebsiteImportFlow } from "@/components/products/WebsiteImportFlow";
+// Round 4 (auto-research): import wizard is a modal (open-gated), so defer it.
+const WebsiteImportFlow = dynamic(() => import("@/components/products/WebsiteImportFlow").then((m) => m.WebsiteImportFlow), { ssr: false });
 import { Plus, Package, AlertCircle, Trash2, MoreVertical, Search, Leaf, ArrowRight, Globe, Copy, Sparkles, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { duplicateProduct } from "@/lib/products";
@@ -37,7 +39,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { DataQualityIndicator } from "@/components/ui/data-quality-indicator";
-import { ProductPortfolioMatrix } from "@/components/products/ProductPortfolioMatrix";
+// Round 4 (auto-research): recharts matrix only renders under the 'portfolio' view.
+const ProductPortfolioMatrix = dynamic(() => import("@/components/products/ProductPortfolioMatrix").then((m) => m.ProductPortfolioMatrix), { ssr: false });
 import { buildPortfolioPoints, sumFacilityVolume, type PortfolioResult } from "@/lib/products/portfolio";
 import { cn } from "@/lib/utils";
 

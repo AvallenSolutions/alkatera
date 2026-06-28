@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -21,7 +22,9 @@ import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
 import { useSubscription } from '@/hooks/useSubscription';
 import { PageLoader } from '@/components/ui/page-loader';
-import { AddFacilityWizard } from '@/components/facilities/AddFacilityWizard';
+// Round 7 (auto-research): the add-facility wizard is an open-gated modal that
+// pulls LocationPicker (Google Maps). Lazy-load it so maps leave first load.
+const AddFacilityWizard = dynamic(() => import('@/components/facilities/AddFacilityWizard').then((m) => m.AddFacilityWizard), { ssr: false });
 import Link from 'next/link';
 
 interface Facility {

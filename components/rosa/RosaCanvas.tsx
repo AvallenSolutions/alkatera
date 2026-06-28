@@ -1,12 +1,16 @@
 'use client'
 
 import { useCallback, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ForYouToday } from './ForYouToday'
-import { RosaQueue } from '@/components/agents/RosaQueue'
 import { useRosaContext } from '@/lib/rosa/RosaContextProvider'
+
+// Round 1 (auto-research /rosa): RosaQueue only renders on the non-default
+// `?view=queue` surface, so it needn't sit in /rosa's First Load JS.
+const RosaQueue = dynamic(() => import('@/components/agents/RosaQueue').then((m) => m.RosaQueue), { ssr: false })
 
 /**
  * Single-canvas Rosa.

@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { TrendingDown, TrendingUp, Activity } from 'lucide-react'
 import { useUserDisplayName } from '@/lib/rosa/useUserDisplayName'
 import { useOrganization } from '@/lib/organizationContext'
@@ -10,7 +11,9 @@ import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { HubLayoutSettings } from '@/components/rosa/HubLayoutSettings'
 import { VitalityRing } from './VitalityRing'
-import { VitalityBreakdownModal } from './VitalityBreakdownModal'
+// Round 3 (auto-research /rosa): breakdown modal is open-gated; defer it so it
+// leaves first load (benefits /rosa and every page that renders VitalityHero).
+const VitalityBreakdownModal = dynamic(() => import('./VitalityBreakdownModal').then((m) => m.VitalityBreakdownModal), { ssr: false })
 import type { VitalityComposite, ScoreBand } from '@/lib/vitality/composite'
 import type { TrendPoint } from '@/lib/vitality/snapshot'
 

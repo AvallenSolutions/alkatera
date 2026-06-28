@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,10 +20,12 @@ import {
 import Link from 'next/link';
 
 import { PeopleCultureScoreHero } from '@/components/people-culture/PeopleCultureScoreHero';
-import { FairWorkDashboard } from '@/components/people-culture/FairWorkDashboard';
-import { DiversityDashboard } from '@/components/people-culture/DiversityDashboard';
-import { TrainingDashboard } from '@/components/people-culture/TrainingDashboard';
-import { WellbeingDashboard } from '@/components/people-culture/WellbeingDashboard';
+// Round 9 (auto-research): each dashboard lives in its own (non-default) tab, so
+// only one is ever shown — defer all four out of /people-culture's first load.
+const FairWorkDashboard = dynamic(() => import('@/components/people-culture/FairWorkDashboard').then((m) => m.FairWorkDashboard), { ssr: false });
+const DiversityDashboard = dynamic(() => import('@/components/people-culture/DiversityDashboard').then((m) => m.DiversityDashboard), { ssr: false });
+const TrainingDashboard = dynamic(() => import('@/components/people-culture/TrainingDashboard').then((m) => m.TrainingDashboard), { ssr: false });
+const WellbeingDashboard = dynamic(() => import('@/components/people-culture/WellbeingDashboard').then((m) => m.WellbeingDashboard), { ssr: false });
 
 import { FeatureGate } from '@/components/subscription/FeatureGate';
 import { usePeopleCultureScore } from '@/hooks/data/usePeopleCultureScore';
