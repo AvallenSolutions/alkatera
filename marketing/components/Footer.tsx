@@ -2,6 +2,7 @@
 
 import { Logo } from './Logo';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Brand } from '@/components/shared/Brand';
 
 export const Footer = () => {
@@ -88,7 +89,31 @@ export const Footer = () => {
         </div>
       </div>
 
-      <div className="mt-16 pt-8 border-t border-white/10 flex flex-col sm:flex-row items-start justify-between gap-4">
+      <div className="mt-16 pt-10 pb-10 border-t border-b border-white/10 flex flex-col sm:flex-row items-center justify-between gap-8">
+        <div>
+          <p className="font-mono text-[#ccff00] text-xs uppercase tracking-widest mb-2">Memberships &amp; Certifications</p>
+          <p className="text-gray-400 text-sm max-w-xs">
+            alka<strong>tera</strong> is a proud member of the Porto Protocol, committed to a more sustainable drinks industry.
+          </p>
+        </div>
+        <a
+          href="https://www.portoprotocol.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="opacity-80 hover:opacity-100 transition-opacity flex-shrink-0"
+          aria-label="Porto Protocol member"
+        >
+          <Image
+            src="/images/partners/porto-protocol-logo.png"
+            alt="Porto Protocol"
+            width={200}
+            height={63}
+            className="h-14 w-auto"
+          />
+        </a>
+      </div>
+
+      <div className="mt-8 flex flex-col sm:flex-row items-start justify-between gap-4">
         <div className="text-gray-600 font-mono text-xs space-y-1">
           <p>Avallen Solutions Ltd T/A alkatera | Company No. 15905045</p>
           <p>Registered Office: Sterling House, Fulbourne Road, London, E17 4EE</p>
