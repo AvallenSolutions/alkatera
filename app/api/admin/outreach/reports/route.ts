@@ -12,21 +12,36 @@ function resolveBaseUrl(request: NextRequest): string {
   return new URL(request.url).origin;
 }
 
-/** GET — list recent reports for the admin tool. */
+/** GET — recent reports + the funnel summary for the admin tool. */
 export async function GET() {
   const auth = await requireAlkateraAdmin();
   if (!auth.ok) return auth.response;
 
   const { data, error } = await auth.service
     .from('brand_reports')
-    .select('id, token, brand_name, category, status, enrichment_status, created_at')
+    .select('id, token, brand_name, category, status, enrichment_status, first_viewed_at, claimed_at, created_at')
     .order('created_at', { ascending: false })
     .limit(50);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  return NextResponse.json({ reports: data ?? [] });
+
+  // Funnel counts across ALL reports (not just the 50 listed). head:true returns
+  // only the count, no rows.
+  const countWhere = async (apply: (q: any) => any): Promise<number> => {
+    const { count } = await apply(
+      auth.service.from('brand_reports').select('id', { count: 'exact', head: true }),
+    );
+    return count ?? 0;
+  };
+  const [generated, viewed, claimed] = await Promise.all([
+    countWhere((q) => q),
+    countWhere((q) => q.not('first_viewed_at', 'is', null)),
+    countWhere((q) => q.not('claimed_at', 'is', null)),
+  ]);
+
+  return NextResponse.json({ reports: data ?? [], stats: { generated, viewed, claimed } });
 }
 
 /** POST — generate one report and return its paste-ready link instantly. */

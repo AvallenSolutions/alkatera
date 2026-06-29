@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getBrandReportByToken } from '@/lib/outreach/brand-report';
 import BrandReportView from '@/components/outreach/BrandReportView';
+import ReportViewBeacon from '@/components/outreach/ReportViewBeacon';
 
 // Always fetch fresh — a report may be regenerated or claimed between views.
 export const dynamic = 'force-dynamic';
@@ -26,11 +27,14 @@ export default async function ReportPage({ params }: ReportPageProps) {
   if (!report) notFound();
 
   return (
-    <BrandReportView
-      token={report.token}
-      brandName={report.brand_name}
-      countryOfOrigin={report.country_of_origin}
-      estimate={report.estimate}
-    />
+    <>
+      <ReportViewBeacon token={report.token} />
+      <BrandReportView
+        token={report.token}
+        brandName={report.brand_name}
+        countryOfOrigin={report.country_of_origin}
+        estimate={report.estimate}
+      />
+    </>
   );
 }

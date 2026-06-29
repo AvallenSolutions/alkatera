@@ -26,6 +26,17 @@ interface ReportRow {
   created_at: string;
 }
 
+interface FunnelStats {
+  generated: number;
+  viewed: number;
+  claimed: number;
+}
+
+function pct(part: number, whole: number): string {
+  if (!whole) return '0%';
+  return `${Math.round((part / whole) * 100)}%`;
+}
+
 export function ReportGenerator() {
   const [brandName, setBrandName] = useState('');
   const [website, setWebsite] = useState('');
@@ -39,13 +50,15 @@ export function ReportGenerator() {
   const [copied, setCopied] = useState(false);
 
   const [reports, setReports] = useState<ReportRow[]>([]);
+  const [stats, setStats] = useState<FunnelStats | null>(null);
 
   const loadReports = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/outreach/reports');
       if (!res.ok) return;
-      const body = (await res.json()) as { reports: ReportRow[] };
+      const body = (await res.json()) as { reports: ReportRow[]; stats?: FunnelStats };
       setReports(body.reports ?? []);
+      setStats(body.stats ?? null);
     } catch {
       /* non-fatal */
     }
@@ -102,6 +115,25 @@ export function ReportGenerator() {
 
   return (
     <div className="space-y-6">
+      {stats && (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-2xl border border-border/60 bg-card/40 p-4 sm:p-5">
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Generated</div>
+            <div className="mt-1 text-3xl font-bold">{stats.generated}</div>
+          </div>
+          <div className="rounded-2xl border border-border/60 bg-card/40 p-4 sm:p-5">
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Opened</div>
+            <div className="mt-1 text-3xl font-bold">{stats.viewed}</div>
+            <div className="text-xs text-muted-foreground">{pct(stats.viewed, stats.generated)} open rate</div>
+          </div>
+          <div className="rounded-2xl border border-neon-lime/30 bg-neon-lime/5 p-4 sm:p-5">
+            <div className="text-[11px] uppercase tracking-wider text-neon-lime">Claimed</div>
+            <div className="mt-1 text-3xl font-bold">{stats.claimed}</div>
+            <div className="text-xs text-muted-foreground">{pct(stats.claimed, stats.generated)} of generated</div>
+          </div>
+        </div>
+      )}
+
       <div className="rounded-2xl border border-border/60 bg-card/40 p-5 sm:p-6 space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
