@@ -21,6 +21,7 @@ import { referenceDataLoadRun } from './reference-data';
 import { geoSoilBaselineRun } from './geo';
 import { trialReminderSweep } from './trial-reminders';
 import { pulseRefreshRun } from './pulse-refresh';
+import { outreachReportEnrich } from './outreach';
 
 export const allFunctions: InngestFunction.Any[] = [
   scrapingQueueTick,
@@ -39,4 +40,5 @@ export const allFunctions: InngestFunction.Any[] = [
   geoSoilBaselineRun,
   trialReminderSweep,
   pulseRefreshRun,
+  outreachReportEnrich,
 ];

@@ -276,6 +276,21 @@ export function isKnownCategory(category: string | null | undefined): boolean {
 }
 
 /**
+ * The benchmark group (e.g. "Spirits", "Wine") a specific category belongs to,
+ * or null when the category is unknown. Lets callers outside this module reason
+ * about the group without re-declaring the category→group map.
+ */
+export function getGroupForCategory(category: string | null | undefined): string | null {
+  if (!category) return null;
+  return CATEGORY_TO_GROUP[category] ?? null;
+}
+
+/** True when `value` is one of the top-level benchmark groups (a product type). */
+export function isProductGroup(value: string | null | undefined): boolean {
+  return !!value && Object.prototype.hasOwnProperty.call(GROUP_BENCHMARKS, value);
+}
+
+/**
  * Ordered keyword → category rules for deterministic category inference
  * from free text (a brand name + its SKU/product names). Drinks products
  * almost always name their type in plain text ("Arcane Rhum", "X Single

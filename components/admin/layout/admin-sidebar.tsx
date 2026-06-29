@@ -11,6 +11,7 @@ import {
   Database,
   ShieldCheck,
   Sparkles,
+  Send,
   LogOut,
   type LucideIcon,
 } from 'lucide-react';
@@ -41,6 +42,10 @@ const NAV_SECTIONS: NavSection[] = [
       { name: 'Brands', href: '/admin/directory/brands', icon: Building2 },
       { name: 'Products', href: '/admin/directory/products', icon: Package },
     ],
+  },
+  {
+    label: 'Outbound',
+    items: [{ name: 'Footprint reports', href: '/admin/outreach', icon: Send }],
   },
   {
     label: 'Insights',

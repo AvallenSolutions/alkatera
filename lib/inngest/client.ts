@@ -96,6 +96,11 @@ export interface AlkateraEvents {
   'pulse/refresh.requested': {
     data: { run_id: string; base_url: string };
   };
+
+  // ─────────── Outbound reply-hook: background brand-report enrich ───────────
+  'outreach/report.enrich': {
+    data: { report_id: string };
+  };
 }
 
 const eventKey = process.env.INNGEST_EVENT_KEY;
