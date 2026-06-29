@@ -1,18 +1,18 @@
 import 'server-only';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { inngest } from '../client';
-import { deepEnrichBrand } from '@/lib/admin/sourcing/deep-enrich';
-import { enrichmentToEstimatorInput } from '@/lib/outreach/enrichment-adapter';
-import { estimateBrandFootprint } from '@/lib/outreach/brand-footprint-estimate';
+import { enrichBrandForReport } from '@/lib/outreach/enrich-brand-for-report';
+import { estimateBrandFootprint, type BrandFootprintInput } from '@/lib/outreach/brand-footprint-estimate';
 
 /**
  * Background auto-enrich for an outbound brand report (Spec C).
  *
  * The generator returns the /r/[token] link instantly from typed inputs. This
- * job then runs deepEnrichBrand (Gemini grounded search, ~60-90s — which is why
- * it MUST live on Inngest, never a sync route), maps the result to the estimator
- * input, recomputes the footprint and upgrades the stored snapshot. The link and
- * token never change; the report just gets sharper.
+ * job then sharpens the estimate by reading the brand's own website with a
+ * fast, focused extraction (`enrichBrandForReport`) — NOT the heavy grounded
+ * `deepEnrichBrand`, which ran 60-90s+ and tripped serverless timeouts. The
+ * link and token never change; the report just gets the real category, country
+ * and SKU sizes.
  */
 
 function service(): SupabaseClient {
@@ -28,7 +28,6 @@ export const outreachReportEnrich = inngest.createFunction(
   {
     id: 'outreach-report-enrich',
     name: 'Auto-enrich an outbound brand report',
-    // Gemini grounded search has per-key concurrency limits; queue rather than 429.
     concurrency: { limit: 4 },
     retries: 2,
     triggers: [{ event: 'outreach/report.enrich' }],
@@ -70,20 +69,33 @@ export const outreachReportEnrich = inngest.createFunction(
 
     if (!report) return { skipped: 'report_not_found' };
 
-    const enriched = await step.run('gemini-grounded-search', async () => {
-      return deepEnrichBrand({
-        brandName: report.brand_name,
-        website: report.website,
-        country: report.country_of_origin,
-        category: null,
-        existingBrand: { description: null, founding_year: null, parent_company: null },
-        existingProducts: [],
-      });
+    const enrichment = await step.run('enrich-from-website', async () => {
+      return enrichBrandForReport(report.brand_name, report.website);
     });
 
-    await step.run('recompute-and-save', async () => {
-      const input = enrichmentToEstimatorInput(report.brand_name, enriched);
+    return step.run('recompute-and-save', async () => {
+      // Treat "no category and no products" as a failure, so the tool never
+      // presents a bland fallback as a finished report.
+      const hasData = !!enrichment.category || enrichment.products.length > 0;
+      if (!hasData) {
+        await supabase
+          .from('brand_reports')
+          .update({
+            enrichment_status: 'failed',
+            enrichment_error: (enrichment.error ?? 'no_brand_data_found').slice(0, 500),
+          })
+          .eq('id', report_id);
+        return { report_id, enriched: false, reason: enrichment.error ?? 'no_brand_data_found' };
+      }
+
+      const input: BrandFootprintInput = {
+        brandName: report.brand_name,
+        category: enrichment.category,
+        countryOfOrigin: enrichment.countryOfOrigin ?? report.country_of_origin,
+        skus: enrichment.products.map((p) => ({ name: p.name, containerSizeMl: p.containerSizeMl })),
+      };
       const estimate = estimateBrandFootprint(input);
+
       await supabase
         .from('brand_reports')
         .update({
@@ -96,9 +108,8 @@ export const outreachReportEnrich = inngest.createFunction(
           enriched_at: new Date().toISOString(),
         })
         .eq('id', report_id);
-      return { category: estimate.category, skus: estimate.skus.length };
-    });
 
-    return { report_id, enriched: true };
+      return { report_id, enriched: true, category: estimate.category, skus: estimate.skus.length };
+    });
   },
 );

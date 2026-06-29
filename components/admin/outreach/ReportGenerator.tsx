@@ -47,7 +47,10 @@ export function ReportGenerator() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<GenerateResult | null>(null);
+  const [resultBrand, setResultBrand] = useState('');
   const [copied, setCopied] = useState(false);
+  // Gate the "ready to send" state on enrichment actually finishing.
+  const [enrichState, setEnrichState] = useState<'researching' | 'ready' | 'failed'>('ready');
 
   const [reports, setReports] = useState<ReportRow[]>([]);
   const [stats, setStats] = useState<FunnelStats | null>(null);
@@ -94,7 +97,13 @@ export function ReportGenerator() {
         setError((body as { error?: string }).error ?? `Failed (${res.status})`);
         return;
       }
-      setResult(body as GenerateResult);
+      const r = body as GenerateResult;
+      setResult(r);
+      setResultBrand(brandName.trim());
+      // If enrichment was dispatched, the report isn't trustworthy until it
+      // finishes — gate the link behind a poll. Otherwise it's the typed-input
+      // estimate the user explicitly chose, so it's ready now.
+      setEnrichState(r.enrichmentDispatched ? 'researching' : 'ready');
       void loadReports();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Unexpected error');
@@ -102,6 +111,41 @@ export function ReportGenerator() {
       setBusy(false);
     }
   }
+
+  // Poll the report's enrichment status while it's being researched.
+  useEffect(() => {
+    if (!result || enrichState !== 'researching') return;
+    let cancelled = false;
+    let tries = 0;
+    const tick = async () => {
+      tries += 1;
+      try {
+        const res = await fetch('/api/admin/outreach/reports');
+        if (res.ok) {
+          const body = (await res.json()) as { reports: ReportRow[]; stats?: FunnelStats };
+          setReports(body.reports ?? []);
+          setStats(body.stats ?? null);
+          const row = (body.reports ?? []).find((x) => x.id === result.id);
+          if (row?.enrichment_status === 'done') {
+            if (!cancelled) setEnrichState('ready');
+            return;
+          }
+          if (row?.enrichment_status === 'failed') {
+            if (!cancelled) setEnrichState('failed');
+            return;
+          }
+        }
+      } catch {
+        /* keep polling */
+      }
+      if (!cancelled && tries < 40) setTimeout(tick, 3000);
+    };
+    const first = setTimeout(tick, 2000);
+    return () => {
+      cancelled = true;
+      clearTimeout(first);
+    };
+  }, [result, enrichState]);
 
   async function copyLink(url: string) {
     try {
@@ -204,7 +248,21 @@ export function ReportGenerator() {
           {error && <span className="text-sm text-destructive">{error}</span>}
         </div>
 
-        {result && (
+        {result && enrichState === 'researching' && (
+          <div className="rounded-xl border border-amber-400/30 bg-amber-400/5 p-4 space-y-2">
+            <div className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Researching {resultBrand || 'the brand'}…
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Reading the brand&apos;s website to find the real category and product sizes. This
+              usually takes under a minute. <strong>Hold off on sending</strong> until the link is
+              ready — the report isn&apos;t brand-specific yet.
+            </p>
+          </div>
+        )}
+
+        {result && enrichState === 'ready' && (
           <div className="rounded-xl border border-neon-lime/30 bg-neon-lime/5 p-4 space-y-3">
             <div className="text-sm font-semibold text-foreground">Link ready. Paste it into your email.</div>
             <div className="flex items-center gap-2">
@@ -220,13 +278,29 @@ export function ReportGenerator() {
                 </a>
               </Button>
             </div>
+          </div>
+        )}
+
+        {result && enrichState === 'failed' && (
+          <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 space-y-3">
+            <div className="text-sm font-semibold text-foreground">
+              Couldn&apos;t research {resultBrand || 'this brand'} automatically
+            </div>
             <p className="text-xs text-muted-foreground">
-              {result.enrichmentRequested
-                ? result.enrichmentDispatched
-                  ? 'Auto-enrich is running in the background; the report will sharpen within a minute or two. The link stays the same.'
-                  : 'Auto-enrich was requested but the background queue is not configured in this environment, so the report uses the typed inputs only.'
-                : 'Generated from the typed inputs (no auto-enrich requested).'}
+              The website couldn&apos;t be read, so this report is only a generic estimate, not
+              brand-specific. <strong>Best not to send it.</strong> Check the website URL is correct
+              and generate again, or fill in the category and country by hand.
             </p>
+            <div className="flex items-center gap-2">
+              <a
+                href={result.path}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-muted-foreground hover:underline inline-flex items-center gap-1"
+              >
+                Preview the generic report <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
           </div>
         )}
       </div>
