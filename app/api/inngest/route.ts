@@ -15,15 +15,19 @@ import { allFunctions } from '@/lib/inngest/functions';
  */
 
 export const runtime = 'nodejs';
-// Inngest steps stream — needs a generous time budget but typically
-// returns in seconds because each step is short. The function-level
-// retries + concurrency caps are configured per-function in
-// lib/inngest/functions/*.ts.
+// maxDuration is the TOTAL budget. The real risk for long steps (e.g. the
+// 60-90s Gemini grounded-search in deep-enrich / outreach enrich) is an
+// INACTIVITY timeout: the platform proxy kills a connection that sends no
+// bytes for too long, surfacing as a 504 "Inactivity Timeout" and a failed
+// Inngest run. `streaming: true` makes the SDK stream keepalive data back to
+// Inngest during a long step so the idle timer never fires — the documented
+// fix for serverless/edge timeouts, and it also hardens the existing enrich.
 export const maxDuration = 300;
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
   functions: allFunctions,
+  streaming: true,
   // The SDK auto-detects the URL from request headers in production;
   // setting it explicitly in dev avoids the dev server printing a
   // misleading prefix. Inngest dev server runs at localhost:8288 by
