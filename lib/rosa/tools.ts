@@ -46,6 +46,7 @@ export const ACTION_TOOL_NAMES = [
   'propose_create_lca_draft',
   'propose_dismiss_anomaly',
   'propose_set_progress_tracker',
+  'propose_save_bcorp_answer',
 ] as const;
 export type ActionToolName = typeof ACTION_TOOL_NAMES[number];
 
@@ -313,8 +314,43 @@ export const ROSA_TOOLS: ToolDefinition[] = [
   {
     name: 'get_bcorp_readiness',
     description:
-      "Returns the org's B Corp 2026 certification readiness: submit-readiness % (Year 0) and whole-programme %, whether they can submit, the blocking-requirement count, the prioritised next actions (each with what it needs and why), and — for recertifying orgs — the count of new / changed / carried-over requirements. Use for ANY B Corp question: 'are we ready to certify?', 'what's our biggest gap?', 'what do I need for requirement X / Fair Work / climate?', 'what's changed for recertification?'.",
+      "Returns the org's B Corp 2026 certification readiness: submit-readiness % (Year 0) and whole-programme %, whether they can submit, the blocking-requirement count, the prioritised next actions (each with what it needs and why), and — for recertifying orgs — the count of new / changed / carried-over requirements. Use for the OVERALL picture: 'are we ready to certify?', 'what's our biggest gap?', 'what's changed for recertification?'. For help ANSWERING ONE specific requirement, use get_bcorp_requirement instead.",
     input_schema: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'get_bcorp_requirement',
+    description:
+      "Deep-dives ONE B Corp requirement and drafts its answer from the org's own alkatera data. Returns the requirement code/name/section/status, plain-English guidance and pitfalls, the real data points already on the platform (emissions tonnes, wage figures, target dates, policies), the evidence on file, a confidence level, and the gap still to close. Use whenever the user wants to understand or ANSWER a specific requirement: 'help me answer IT5-Y0-001', 'draft my climate action answer', 'what do I write for Fair Work living wage?', 'how do I meet the mission requirement?'. Accepts a requirement code (e.g. 'IT5-Y0-001') or a topic/phrase (e.g. 'living wage', 'climate'). Ground your explanation and any draft in the returned data points; never invent figures.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        requirement: {
+          type: 'string',
+          description:
+            "A B Corp requirement code (e.g. 'IT5-Y0-001') or a topic/phrase to match (e.g. 'living wage', 'net zero', 'Fair Work').",
+        },
+      },
+      required: ['requirement'],
+    },
+  },
+  {
+    name: 'propose_save_bcorp_answer',
+    description:
+      "Saves a drafted answer onto a B Corp requirement as evidence (a note), so it is captured against that requirement in alkatera. It is saved UNVERIFIED (pending human review) and never marks the requirement as met on its own. Use after you have drafted an answer with get_bcorp_requirement and the user asks to save/keep/record it. Pass the exact requirement code returned by get_bcorp_requirement. This is a change, so it is confirmation-gated: propose it, tell the user what you will save, and wait for them to click Confirm.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        requirement_code: {
+          type: 'string',
+          description: "The exact B Corp requirement code, e.g. 'CA1.1' or 'PSG1.1'.",
+        },
+        answer: {
+          type: 'string',
+          description: 'The drafted answer text to save against the requirement.',
+        },
+      },
+      required: ['requirement_code', 'answer'],
+    },
   },
   // ───────────── Memory tools ─────────────
   {
@@ -655,6 +691,8 @@ export async function executeTool(
         return await toolSuggestDataGaps(ctx);
       case 'get_bcorp_readiness':
         return await toolGetBcorpReadiness(ctx);
+      case 'get_bcorp_requirement':
+        return await toolGetBcorpRequirement(ctx, input as { requirement?: string });
       case 'list_memories':
         return await toolListMemories(ctx);
       case 'save_memory':
@@ -669,6 +707,7 @@ export async function executeTool(
       case 'propose_create_lca_draft':
       case 'propose_dismiss_anomaly':
       case 'propose_set_progress_tracker':
+      case 'propose_save_bcorp_answer':
         return await toolProposeAction(ctx, name as ActionToolName, input as Record<string, unknown>);
       case 'extract_from_document':
         return await toolExtractFromDocument(ctx, input as { file_id: string; fields?: string[]; document_kind?: string });
@@ -829,6 +868,71 @@ async function toolGetBcorpReadiness(ctx: ToolContext): Promise<ToolResult> {
     is_error: false,
     content: JSON.stringify(summary),
     audit: { tool: 'get_bcorp_readiness', year0ReadinessPct: r.year0ReadinessPct, readyToSubmit: r.isReadyToSubmit },
+  };
+}
+
+async function toolGetBcorpRequirement(
+  ctx: ToolContext,
+  input: { requirement?: string },
+): Promise<ToolResult> {
+  const query = (input?.requirement ?? '').toString().trim();
+  if (!query) {
+    return {
+      is_error: true,
+      content:
+        'Tell me which requirement — a code like IT5-Y0-001, or a topic like "living wage" or "climate".',
+      audit: { tool: 'get_bcorp_requirement', error: 'no_query' },
+    };
+  }
+
+  const { buildRequirementAnswerForCode } = await import(
+    '@/lib/certifications/answer-key'
+  );
+  const detail = await buildRequirementAnswerForCode(
+    ctx.supabase,
+    ctx.organizationId,
+    query,
+  );
+
+  if (!detail) {
+    return {
+      is_error: false,
+      content: JSON.stringify({
+        found: false,
+        note: `No B Corp requirement matched "${query}". Either no certification has been started, or try a requirement code (e.g. IT5-Y0-001) or a broader topic. Call get_bcorp_readiness for the list of next actions with their codes.`,
+      }),
+      audit: { tool: 'get_bcorp_requirement', found: false, query },
+    };
+  }
+
+  const payload = {
+    found: true,
+    code: detail.code,
+    name: detail.name,
+    section: detail.section,
+    applicableFromYear: detail.applicableFromYear,
+    status: detail.status,
+    whatItNeeds: detail.guidance.summary,
+    evidenceThatWorks: detail.guidance.evidence,
+    pitfalls: detail.guidance.pitfalls ?? [],
+    starterTemplate: detail.guidance.template ?? null,
+    // The org's real data behind an answer — ground the draft in these.
+    yourDataPoints: detail.synthesis.dataPoints,
+    dataSource: detail.synthesis.dataSource,
+    confidence: detail.synthesis.confidence,
+    gapToClose: detail.synthesis.gap,
+    evidenceOnFile: detail.evidenceOnFile,
+    otherMatches: detail.otherMatches,
+  };
+
+  return {
+    is_error: false,
+    content: JSON.stringify(payload),
+    audit: {
+      tool: 'get_bcorp_requirement',
+      code: detail.code,
+      confidence: detail.synthesis.confidence,
+    },
   };
 }
 
@@ -1579,6 +1683,12 @@ function buildActionPreview(toolName: ActionToolName, p: Record<string, unknown>
       const reason = p.reason ? ` Reason: ${p.reason}` : '';
       return `Set the user's hub progress tracker to "${id}".${reason}`;
     }
+    case 'propose_save_bcorp_answer': {
+      const code = String(p.requirement_code);
+      const ans = String(p.answer ?? '');
+      const snippet = ans.length > 140 ? `${ans.slice(0, 140)}…` : ans;
+      return `Save this answer to B Corp requirement ${code} as a note (pending verification): "${snippet}"`;
+    }
     default:
       return `Perform action: ${toolName}`;
   }
@@ -1722,6 +1832,7 @@ function validateActionInput(toolName: ActionToolName, input: Record<string, unk
     propose_create_lca_draft: ['product_id'],
     propose_dismiss_anomaly: ['anomaly_id', 'reason'],
     propose_set_progress_tracker: ['tracker_id'],
+    propose_save_bcorp_answer: ['requirement_code', 'answer'],
   };
   const missing: string[] = [];
   for (const f of required[toolName]) {

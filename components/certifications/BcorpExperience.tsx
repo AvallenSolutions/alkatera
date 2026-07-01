@@ -52,6 +52,7 @@ import { EcgtBanner } from '@/components/certifications/EcgtBanner';
 import { JourneySelectionDialog } from '@/components/certifications/JourneySelectionDialog';
 import { RiskToolWizard } from '@/components/certifications/RiskToolWizard';
 import { PreAuditChecklist } from '@/components/certifications/PreAuditChecklist';
+import { AnswerKeyButton } from '@/components/certifications/AnswerKeyButton';
 import { AuditTimeline } from '@/components/certifications/AuditTimeline';
 import { ClarificationRequests } from '@/components/certifications/ClarificationRequests';
 import { BcorpOverview } from '@/components/certifications/BcorpOverview';
@@ -531,6 +532,25 @@ export function BcorpExperience() {
 
         {/* Audit Packages Tab */}
         <TabsContent value="audit" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <CardTitle className="text-base">
+                    B Corp answer key
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    Filling B Lab&apos;s questionnaire alongside alka
+                    <span className="font-bold">tera</span>? Download every
+                    applicable requirement with a paste-ready answer built from
+                    your platform data, so you can work straight down the sheet.
+                  </CardDescription>
+                </div>
+                <AnswerKeyButton />
+              </div>
+            </CardHeader>
+          </Card>
+
           {readiness?.isReadyToSubmit && (
             <PreAuditChecklist onReadyChange={setChecklistReady} />
           )}

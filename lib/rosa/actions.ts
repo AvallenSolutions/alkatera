@@ -167,6 +167,8 @@ async function dispatchMutation(
       return await execDismissAnomaly(supabase, row.organization_id, row.user_id, p);
     case 'propose_set_progress_tracker':
       return await execSetProgressTracker(supabase, row.organization_id, row.user_id, p);
+    case 'propose_save_bcorp_answer':
+      return await execSaveBcorpAnswer(supabase, row.organization_id, p);
     default:
       throw new Error(`Unsupported action tool: ${row.tool_name}`);
   }
@@ -234,6 +236,74 @@ async function execSetProgressTracker(
     .eq('organization_id', organizationId)
     .eq('user_id', userId);
   return { ok: true, tracker_id: trackerId, target_id: targetId };
+}
+
+/**
+ * Save a Rosa-drafted answer onto a B Corp requirement as an evidence note.
+ * Always UNVERIFIED (pending) — a draft never marks a requirement as met; a
+ * human still has to verify it. Mirrors the evidence-POST route's insert +
+ * readiness recalc.
+ */
+async function execSaveBcorpAnswer(
+  supabase: SupabaseClient,
+  organizationId: string,
+  p: any,
+): Promise<Record<string, unknown>> {
+  const code = String(p.requirement_code ?? '').trim();
+  const answer = String(p.answer ?? '').trim();
+  if (!code) throw new Error('requirement_code is required.');
+  if (!answer) throw new Error('answer is required.');
+
+  const { data: framework } = await supabase
+    .from('certification_frameworks')
+    .select('id')
+    .eq('framework_code', 'bcorp_2026')
+    .maybeSingle();
+  if (!framework) throw new Error('B Corp 2026 framework not found.');
+  const frameworkId = (framework as any).id;
+
+  const { data: req } = await supabase
+    .from('certification_framework_requirements')
+    .select('id, requirement_name')
+    .eq('framework_id', frameworkId)
+    .ilike('requirement_code', code)
+    .maybeSingle();
+  if (!req) throw new Error(`No B Corp requirement matching "${code}" was found.`);
+  const requirementId = (req as any).id;
+
+  const { data, error } = await supabase
+    .from('certification_evidence_links')
+    .insert({
+      organization_id: organizationId,
+      framework_id: frameworkId,
+      requirement_id: requirementId,
+      evidence_type: 'note',
+      source_module: 'rosa',
+      evidence_description: answer,
+      verification_status: 'pending',
+      notes: 'Drafted with Rosa',
+    })
+    .select('id')
+    .single();
+  if (error) throw new Error(error.message);
+
+  // Refresh readiness so the requirement flips to in-progress (pending review).
+  try {
+    const { recalculateAndNotify } = await import(
+      '@/lib/certifications/recalculate'
+    );
+    await recalculateAndNotify(supabase, organizationId);
+  } catch (e) {
+    console.error('recalc after Rosa evidence save failed:', e);
+  }
+
+  return {
+    evidence_id: (data as any).id,
+    requirement_code: code,
+    requirement_id: requirementId,
+    verification_status: 'pending',
+    table: 'certification_evidence_links',
+  };
 }
 
 async function execLogUtilityEntry(

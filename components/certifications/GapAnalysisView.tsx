@@ -35,6 +35,7 @@ import { EvidenceLinker } from '@/components/certifications/EvidenceLinker';
 import { AutoEvidencePanel } from '@/components/certifications/AutoEvidencePanel';
 import { getRequirementGuidance } from '@/lib/certifications/requirement-guidance';
 import { RequirementActionPlan, type RequirementAction } from '@/components/certifications/RequirementActionPlan';
+import { AskRosaButton } from '@/components/rosa/AskRosaButton';
 import { useOrganization } from '@/lib/organizationContext';
 import type {
   CertificationReadiness,
@@ -465,9 +466,30 @@ export function GapAnalysisView({
       >
         <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>
-              {activeRequirement?.code} — {activeRequirement?.name}
-            </DialogTitle>
+            <div className="flex items-start justify-between gap-3 pr-6">
+              <DialogTitle>
+                {activeRequirement?.code} — {activeRequirement?.name}
+              </DialogTitle>
+              {isBcorp && activeRequirement && (
+                <AskRosaButton
+                  variant="pill"
+                  label="Draft with Rosa"
+                  className="shrink-0"
+                  entity={{
+                    type: 'bcorp_requirement',
+                    id: activeRequirement.code,
+                    label: `B Corp requirement ${activeRequirement.code} — ${activeRequirement.name}`,
+                    data: {
+                      code: activeRequirement.code,
+                      name: activeRequirement.name,
+                      topic: activeRequirement.topicArea,
+                      status: activeRequirement.status,
+                    },
+                  }}
+                  prompt={`Help me answer the B Corp requirement ${activeRequirement.code} (${activeRequirement.name}). Explain what it needs and draft an answer from my data.`}
+                />
+              )}
+            </div>
           </DialogHeader>
           {activeRequirement && readiness.frameworkId && (
             <div className="grid gap-4 md:grid-cols-2 md:items-start">

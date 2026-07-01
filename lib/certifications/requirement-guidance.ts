@@ -169,13 +169,28 @@ export function getRequirementGuidance(
     return GENERIC;
   }
   // B Corp v2.1 requirements carry their own summary in the content module.
-  // Prefer it, then enrich with any hand-written per-code/topic guidance.
+  // The hand-written per-code guidance (evidence examples, pitfalls, templates)
+  // is keyed by the OLD codes, so resolve the requirement's `legacy` code and
+  // look guidance up under both — otherwise every v2.1 code (PSG1.1, CA1.1…)
+  // would fall through to generic evidence.
   const v21 = getBcorpV21Requirement(code);
-  const base =
-    (code && BY_CODE[code]) ||
-    (v21 && { summary: v21.summary, evidence: GENERIC.evidence }) ||
-    (topicArea && BY_TOPIC[topicArea]) ||
-    GENERIC;
-  const template = code ? TEMPLATES[code] : undefined;
+  const legacy = v21?.legacy ?? null;
+  const coded =
+    (code && BY_CODE[code]) || (legacy ? BY_CODE[legacy] : undefined) || null;
+
+  let base: RequirementGuidance;
+  if (v21) {
+    // Current canonical wording, enriched with the rich legacy examples/pitfalls.
+    base = {
+      summary: v21.summary,
+      evidence: coded?.evidence ?? GENERIC.evidence,
+      pitfalls: coded?.pitfalls,
+    };
+  } else {
+    base = coded || (topicArea && BY_TOPIC[topicArea]) || GENERIC;
+  }
+
+  const template =
+    (code && TEMPLATES[code]) || (legacy ? TEMPLATES[legacy] : undefined);
   return template ? { ...base, template } : base;
 }
