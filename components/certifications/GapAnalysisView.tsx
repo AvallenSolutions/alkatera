@@ -30,7 +30,9 @@ import {
   Lock,
   Upload,
   Loader2,
+  Download,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { EvidenceLinker } from '@/components/certifications/EvidenceLinker';
 import { AutoEvidencePanel } from '@/components/certifications/AutoEvidencePanel';
 import { getRequirementGuidance } from '@/lib/certifications/requirement-guidance';
@@ -140,6 +142,7 @@ export function GapAnalysisView({
   frameworkCode = 'bcorp_2026',
 }: GapAnalysisViewProps) {
   const isBcorp = frameworkCode === 'bcorp_2026';
+  const [sectionDownloadState, setSectionDownloadState] = useState<Record<string, 'idle' | 'loading'>>({});
   const [statusFilter, setStatusFilter] = useState<string>(
     initialBlockingOnly ? 'blocking' : 'all',
   );
@@ -264,6 +267,31 @@ export function GapAnalysisView({
     return true;
   };
 
+  const handleSectionDownload = async (topicArea: string) => {
+    setSectionDownloadState((prev) => ({ ...prev, [topicArea]: 'loading' }));
+    try {
+      const res = await fetch('/api/certifications/evidence/section-export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topics: [topicArea] }),
+      });
+      if (res.status === 404) {
+        toast.warning('No evidence files found for this section');
+        return;
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as any).error ?? 'Download failed');
+      }
+      const { url } = (await res.json()) as { url: string; fileCount: number };
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Download failed');
+    } finally {
+      setSectionDownloadState((prev) => ({ ...prev, [topicArea]: 'idle' }));
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -333,16 +361,33 @@ export function GapAnalysisView({
         return (
           <Card key={topic.topicArea}>
             <CardHeader>
-              <div className="flex flex-col gap-1">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  {topic.isFoundation && (
-                    <Badge variant="outline" className="text-xs">
-                      Foundation
-                    </Badge>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex flex-col gap-1">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    {topic.isFoundation && (
+                      <Badge variant="outline" className="text-xs">
+                        Foundation
+                      </Badge>
+                    )}
+                    {topicLabel(topic.topicArea)}
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">{aggregate}</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+                  title="Download evidence files for this section"
+                  disabled={sectionDownloadState[topic.topicArea] === 'loading'}
+                  onClick={() => handleSectionDownload(topic.topicArea)}
+                >
+                  {sectionDownloadState[topic.topicArea] === 'loading' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
                   )}
-                  {topicLabel(topic.topicArea)}
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">{aggregate}</p>
+                  <span className="sr-only">Download section evidence</span>
+                </Button>
               </div>
             </CardHeader>
             <CardContent>

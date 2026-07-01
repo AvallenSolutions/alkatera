@@ -46,6 +46,7 @@ import {
   Loader2,
   FileDown,
 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { GapAnalysisView } from '@/components/certifications/GapAnalysisView';
 import { ReadinessBanner } from '@/components/certifications/ReadinessBanner';
 import { EcgtBanner } from '@/components/certifications/EcgtBanner';
@@ -114,6 +115,8 @@ export function BcorpExperience() {
   const [riskToolOpen, setRiskToolOpen] = useState(false);
   const [checklistReady, setChecklistReady] = useState(false);
   const [includePending, setIncludePending] = useState(false);
+  const [selectedSections, setSelectedSections] = useState<string[]>([]);
+  const [sectionExportLoading, setSectionExportLoading] = useState(false);
   const [exportingPackageId, setExportingPackageId] = useState<string | null>(
     null,
   );
@@ -228,6 +231,33 @@ export function BcorpExperience() {
     }
   };
 
+  const handleSectionExport = async () => {
+    if (selectedSections.length === 0) return;
+    setSectionExportLoading(true);
+    try {
+      const res = await fetch('/api/certifications/evidence/section-export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topics: selectedSections, include_pending: includePending }),
+      });
+      if (res.status === 404) {
+        toast.warning('No evidence files found for the selected sections');
+        return;
+      }
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error((e as any).error ?? 'Download failed');
+      }
+      const { url, fileCount } = (await res.json()) as { url: string; fileCount: number };
+      window.open(url, '_blank', 'noopener,noreferrer');
+      toast.success(`${fileCount} file${fileCount === 1 ? '' : 's'} ready to download`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Download failed');
+    } finally {
+      setSectionExportLoading(false);
+    }
+  };
+
   const isCertified =
     certifications.find((c) => c.framework_id === bcorpFrameworkId)?.status ===
     'certified';
@@ -306,10 +336,20 @@ export function BcorpExperience() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Gap Analysis Tab */}
         {/* Overview Tab — at-a-glance: where we stand + what to do next */}
         <TabsContent value="overview">
-          {readiness && readiness.hasCertification ? (
+          {readinessLoading && !readiness ? (
+            <div className="space-y-4">
+              <Skeleton className="h-12 w-full rounded-lg" />
+              <div className="grid gap-4 md:grid-cols-3">
+                <Skeleton className="h-32 rounded-lg" />
+                <Skeleton className="h-32 rounded-lg" />
+                <Skeleton className="h-32 rounded-lg" />
+              </div>
+              <Skeleton className="h-48 rounded-lg" />
+              <Skeleton className="h-48 rounded-lg" />
+            </div>
+          ) : readiness?.hasCertification ? (
             <div className="space-y-6">
               <StandardsBanner onApplied={() => refetchReadiness()} />
               <RecertBanner active={!!readiness.recertPrepActive} />
@@ -350,7 +390,13 @@ export function BcorpExperience() {
 
         {/* Requirements Tab — the working list of every requirement */}
         <TabsContent value="requirements">
-          {readiness && readiness.hasCertification ? (
+          {readinessLoading && !readiness ? (
+            <div className="space-y-3">
+              <Skeleton className="h-10 w-full rounded-lg" />
+              <Skeleton className="h-64 rounded-lg" />
+              <Skeleton className="h-64 rounded-lg" />
+            </div>
+          ) : readiness?.hasCertification ? (
             <GapAnalysisView
               readiness={readiness}
               loading={readinessLoading}
@@ -550,6 +596,76 @@ export function BcorpExperience() {
               </div>
             </CardHeader>
           </Card>
+
+          {readiness && readiness.topicSummaries.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Download evidence by section</CardTitle>
+                <CardDescription className="mt-1">
+                  Download a ZIP of your Evidence Library files filtered to specific B Corp
+                  Impact Topics. Platform data (auto-evidence) is not stored as files and
+                  is not included here. Use the answer key above for that.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
+                  {readiness.topicSummaries.map((t) => {
+                    const label = t.isFoundation ? 'Foundation Requirements' : t.topicArea;
+                    const checked = selectedSections.includes(t.topicArea);
+                    return (
+                      <div key={t.topicArea} className="flex items-center gap-2">
+                        <Checkbox
+                          id={`section-${t.topicArea}`}
+                          checked={checked}
+                          onCheckedChange={(v) =>
+                            setSelectedSections((prev) =>
+                              v
+                                ? [...prev, t.topicArea]
+                                : prev.filter((s) => s !== t.topicArea),
+                            )
+                          }
+                        />
+                        <Label
+                          htmlFor={`section-${t.topicArea}`}
+                          className="cursor-pointer text-sm leading-tight"
+                        >
+                          {label}
+                        </Label>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center gap-3">
+                  <Button
+                    size="sm"
+                    disabled={selectedSections.length === 0 || sectionExportLoading}
+                    onClick={handleSectionExport}
+                  >
+                    {sectionExportLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Preparing download…
+                      </>
+                    ) : (
+                      <>
+                        <FileDown className="mr-2 h-4 w-4" />
+                        Download selected sections
+                      </>
+                    )}
+                  </Button>
+                  {selectedSections.length > 0 && (
+                    <button
+                      type="button"
+                      className="text-sm text-muted-foreground hover:text-foreground"
+                      onClick={() => setSelectedSections([])}
+                    >
+                      Clear selection
+                    </button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {readiness?.isReadyToSubmit && (
             <PreAuditChecklist onReadyChange={setChecklistReady} />

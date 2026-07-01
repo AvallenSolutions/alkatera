@@ -296,7 +296,7 @@ const PROBES: Record<ProbeId, ProbeDef> = {
     async query(supabase, orgId) {
       const { data } = await supabase
         .from('product_carbon_footprints')
-        .select('id, product_id, total_carbon_footprint')
+        .select('id, product_id, total_ghg_emissions')
         .eq('organization_id', orgId)
         .limit(50);
       const rows = data ?? [];
@@ -307,8 +307,8 @@ const PROBES: Record<ProbeId, ProbeDef> = {
           sourceRecordId: r.id,
           label: 'Product LCA',
           summary:
-            r.total_carbon_footprint != null
-              ? `${Number(r.total_carbon_footprint).toFixed(2)} kg CO2e per unit`
+            r.total_ghg_emissions != null && r.total_ghg_emissions > 0
+              ? `${Number(r.total_ghg_emissions).toFixed(2)} kg CO2e per unit`
               : 'LCA recorded',
         })),
       };
