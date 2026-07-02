@@ -100,7 +100,7 @@ describe('assessReductionPlan', () => {
   it('partial when the approved initiative lacks dates', () => {
     const r = assessReductionPlan([initiative({ start_date: null })], NOW);
     expect(r.completeness).toBe('partial');
-    expect(r.note).toContain('start and finish date');
+    expect(r.note).toContain('start date and a finish date');
   });
 
   it('partial when the approved initiative lacks an owner', () => {
@@ -116,7 +116,7 @@ describe('assessReductionPlan', () => {
     });
     const r = assessReductionPlan([stale], NOW);
     expect(r.completeness).toBe('partial');
-    expect(r.note).toContain('Update progress');
+    expect(r.note).toContain('update its progress');
   });
 
   it('a fresh approval keeps a not-yet-tracked initiative complete (no instant staleness)', () => {

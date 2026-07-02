@@ -122,25 +122,35 @@ export function assessReductionPlan(
 
   const missingTimebound = approved.filter((i) => !isTimeBound(i));
   if (missingTimebound.length === approved.length) {
+    const names = missingTimebound
+      .slice(0, 3)
+      .map((i) => `"${i.title}"`)
+      .join(', ');
+    const more = missingTimebound.length > 3 ? ` and ${missingTimebound.length - 3} more` : '';
     return {
       completeness: 'partial',
-      note: 'Your approved actions need a start and finish date to count as a time-bound plan. Add dates on the Targets page.',
+      note: `${missingTimebound.length === 1 ? 'Action' : 'Actions'} ${names}${more} need a start date and a finish date to count as a time-bound plan. Open each action on the Targets page to add the dates.`,
       qualifying: [],
     };
   }
 
   const missingOwner = approved.filter((i) => isTimeBound(i) && !hasOwner(i));
   if (missingOwner.length > 0 && approved.every((i) => !isTimeBound(i) || !hasOwner(i))) {
+    const names = missingOwner
+      .slice(0, 3)
+      .map((i) => `"${i.title}"`)
+      .join(', ');
+    const more = missingOwner.length > 3 ? ` and ${missingOwner.length - 3} more` : '';
     return {
       completeness: 'partial',
-      note: 'Your approved actions need a named owner. Add who is responsible on the Targets page.',
+      note: `${missingOwner.length === 1 ? 'Action' : 'Actions'} ${names}${more} need a named owner. Open each action on the Targets page to assign one.`,
       qualifying: [],
     };
   }
 
   return {
     completeness: 'partial',
-    note: `Progress has not been updated in over ${PROGRESS_FRESHNESS_DAYS} days. Update progress on an active action to show the plan is being tracked.`,
+    note: `Progress has not been updated in over ${PROGRESS_FRESHNESS_DAYS} days. Open an active action on the Targets page and update its progress to show the plan is being tracked.`,
     qualifying: [],
   };
 }
