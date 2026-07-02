@@ -39,7 +39,7 @@ import {
 interface EvidenceLink {
   id: string;
   requirement_id: string;
-  evidence_type: 'document' | 'data_link' | 'policy' | 'metric' | 'external_url';
+  evidence_type: 'document' | 'data_link' | 'policy' | 'metric' | 'external_url' | 'confirmation';
   source_module: string | null;
   source_table: string | null;
   evidence_description: string;
@@ -90,6 +90,7 @@ const evidenceTypeConfig = {
   policy: { label: 'Policy', icon: FileCheck, color: 'bg-emerald-100 text-emerald-700' },
   metric: { label: 'Metric', icon: Database, color: 'bg-amber-100 text-amber-700' },
   external_url: { label: 'External URL', icon: ExternalLink, color: 'bg-slate-100 text-slate-700' },
+  confirmation: { label: 'Confirmation', icon: CheckCircle2, color: 'bg-teal-100 text-teal-700' },
 };
 
 const verificationStatusConfig = {
@@ -213,9 +214,16 @@ export function EvidenceLinker({
                     <Label>Evidence Type</Label>
                     <Select
                       value={formData.evidence_type}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, evidence_type: value as EvidenceLink['evidence_type'] })
-                      }
+                      onValueChange={(value) => {
+                        const type = value as EvidenceLink['evidence_type'];
+                        setFormData({
+                          ...formData,
+                          evidence_type: type,
+                          ...(type === 'confirmation'
+                            ? { document_url: undefined, source_module: undefined }
+                            : {}),
+                        });
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -275,15 +283,28 @@ export function EvidenceLinker({
                   )}
 
                   <div className="space-y-2">
-                    <Label>Description</Label>
+                    <Label>
+                      {formData.evidence_type === 'confirmation'
+                        ? 'Confirmation statement'
+                        : 'Description'}
+                    </Label>
                     <Textarea
                       value={formData.evidence_description || ''}
                       onChange={(e) =>
                         setFormData({ ...formData, evidence_description: e.target.value })
                       }
-                      placeholder="Describe how this evidence supports the requirement..."
+                      placeholder={
+                        formData.evidence_type === 'confirmation'
+                          ? 'We confirm that we comply with this requirement...'
+                          : 'Describe how this evidence supports the requirement...'
+                      }
                       rows={3}
                     />
+                    {formData.evidence_type === 'confirmation' && (
+                      <p className="text-xs text-muted-foreground">
+                        Some B Corp requirements only need a self-confirmation rather than a document. Your statement will be saved as pending until an admin verifies it.
+                      </p>
+                    )}
                   </div>
                 </div>
                 <DialogFooter>
@@ -314,7 +335,7 @@ export function EvidenceLinker({
         ) : (
           <div className="space-y-3">
             {filteredEvidence.map((item) => {
-              const typeConfig = evidenceTypeConfig[item.evidence_type];
+              const typeConfig = evidenceTypeConfig[item.evidence_type] ?? evidenceTypeConfig.document;
               const statusConfig = verificationStatusConfig[item.verification_status];
               const TypeIcon = typeConfig.icon;
               const StatusIcon = statusConfig.icon;

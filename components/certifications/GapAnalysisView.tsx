@@ -49,7 +49,7 @@ import type {
 interface GapEvidence {
   id: string;
   requirement_id: string;
-  evidence_type: 'document' | 'data_link' | 'policy' | 'metric' | 'external_url';
+  evidence_type: 'document' | 'data_link' | 'policy' | 'metric' | 'external_url' | 'confirmation';
   source_module: string | null;
   source_table: string | null;
   evidence_description: string;
