@@ -90,6 +90,8 @@ export interface PlatformHealthEntry {
   status: 'complete' | 'partial' | 'missing';
   requirementCodes: string[];
   note: string | null;
+  /** Per-record deep links shown as chips under the note (e.g. individual actions). */
+  actionLinks?: { label: string; url: string }[];
 }
 
 export interface CertificationReadiness {

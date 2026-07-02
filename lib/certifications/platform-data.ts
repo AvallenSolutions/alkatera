@@ -27,6 +27,8 @@ export interface PlatformEvidenceItem {
   sourceRecordId: string;
   label: string;
   summary: string;
+  /** Optional deep-link into the source record (e.g. /pulse/targets?action=<id>). */
+  url?: string;
 }
 
 export interface PlatformEvidenceResult {
@@ -585,6 +587,8 @@ export interface PlatformHealthEntry {
   status: Completeness;
   requirementCodes: string[];
   note: string | null;
+  /** Per-record deep links shown as chips under the note (e.g. individual actions). */
+  actionLinks?: { label: string; url: string }[];
 }
 
 const SEVERITY: Record<Completeness, number> = {

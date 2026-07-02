@@ -72,6 +72,19 @@ export function PlatformHealthPanel({ entries }: PlatformHealthPanelProps) {
                   {e.note ??
                     `Affects ${e.requirementCodes.length} requirement(s): ${e.requirementCodes.join(', ')}`}
                 </p>
+                {e.actionLinks && e.actionLinks.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                    {e.actionLinks.map((link) => (
+                      <a
+                        key={link.url}
+                        href={link.url}
+                        className="text-xs text-blue-600 hover:underline"
+                      >
+                        {link.label} →
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
               <a
                 href={e.moduleLink}

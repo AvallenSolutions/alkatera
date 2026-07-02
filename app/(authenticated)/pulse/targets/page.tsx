@@ -91,6 +91,21 @@ function TargetsActionsHub() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, loading]);
 
+  // Deep link from Platform Health: /pulse/targets?action=<initiative_id>
+  useEffect(() => {
+    const actionId = searchParams.get('action');
+    if (actionId && !loading) {
+      const found = initiatives.find((i) => i.id === actionId);
+      if (found) {
+        setEditingInitiative(found);
+        setDialogTargetIds([]);
+        setDialogLeverId(null);
+        setDialogOpen(true);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, loading, initiatives]);
+
   function openNewInitiative(targetId?: string) {
     setEditingInitiative(null);
     setDialogTargetIds(targetId ? [targetId] : []);

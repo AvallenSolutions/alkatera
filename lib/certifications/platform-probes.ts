@@ -220,6 +220,7 @@ const PROBES: Record<ProbeId, ProbeDef> = {
           ...(plan.qualifying.length > 0 ? plan.qualifying : initiatives).slice(0, 5).map((i) => ({
             sourceRecordId: i.id,
             label: i.title,
+            url: `/pulse/targets?action=${i.id}`,
             summary: [
               i.status === 'completed' ? 'Completed' : i.status === 'active' ? 'Active' : 'Planned',
               i.owner_name || (i.owner_user_id ? 'owner assigned' : null),
@@ -586,6 +587,8 @@ export async function computeProbeHealth(
     }
     const result = cache.get(probe);
     if (!result) continue;
+    const linkedItems = result.items.filter((i) => i.url && i.sourceRecordId !== 'aggregate');
+    const actionLinks = linkedItems.map((i) => ({ label: i.label, url: i.url as string }));
     const existing = byModule.get(result.module);
     if (!existing) {
       byModule.set(result.module, {
@@ -595,12 +598,14 @@ export async function computeProbeHealth(
         status: result.completeness,
         requirementCodes: [code],
         note: result.completenessNote,
+        actionLinks: actionLinks.length > 0 ? actionLinks : undefined,
       });
     } else {
       existing.requirementCodes.push(code);
       if (SEVERITY[result.completeness] > SEVERITY[existing.status]) {
         existing.status = result.completeness;
         existing.note = result.completenessNote;
+        existing.actionLinks = actionLinks.length > 0 ? actionLinks : undefined;
       }
     }
   }
