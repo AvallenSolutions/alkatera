@@ -134,12 +134,17 @@ export async function buildReportData(reportId: string): Promise<{
   if (corpReport && pdfTotal > 0) {
     const scope3Pdf = typeof bjPdf?.scope3 === 'object' && bjPdf.scope3 !== null
       ? (bjPdf.scope3.total ?? 0) : (bjPdf?.scope3 ?? 0);
+    const s3obj = (typeof bjPdf?.scope3 === 'object' && bjPdf.scope3 !== null) ? bjPdf.scope3 : {};
     reportData.emissions = {
       scope1: bjPdf?.scope1 || 0,
       scope2: bjPdf?.scope2 || 0,
       scope3: scope3Pdf,
       total: pdfTotal,
       year,
+      hospitality: s3obj.hospitality ?? 0,
+      hospitalityFood: s3obj.hospitality_food ?? 0,
+      hospitalitySupplies: s3obj.hospitality_supplies ?? 0,
+      hospitalityWaste: s3obj.hospitality_waste ?? 0,
     };
     reportData.dataAvailability.hasEmissions = true;
   }

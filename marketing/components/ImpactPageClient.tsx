@@ -129,7 +129,7 @@ const measureCategories = [
   {
     icon: Wind,
     title: 'Carbon Emissions',
-    description: 'Full Scope 1, 2, and 3 greenhouse gas accounting across your entire value chain — from raw materials to end-of-life.',
+    description: 'Full Scope 1, 2, and 3 greenhouse gas accounting across your entire value chain, from raw materials to end-of-life.',
     color: 'hover:border-[#ccff00]/25',
     accent: 'via-[#ccff00]/40',
   },
@@ -185,7 +185,7 @@ const MeasureSection = () => (
           <span className="text-[#ccff00] italic">true impact</span>
         </h2>
         <p className="text-gray-400 max-w-2xl mx-auto">
-          Most platforms stop at carbon. <Brand /> measures the full spectrum of environmental, social, and governance impact — because sustainability is about more than emissions.
+          Most platforms stop at carbon. <Brand /> measures the full spectrum of environmental, social, and governance impact, because sustainability is about more than emissions.
         </p>
       </motion.div>
 
@@ -339,7 +339,7 @@ const BeyondCarbonSection = () => (
           <div className="absolute bottom-0 left-0 right-0 p-8">
             <h3 className="font-serif text-2xl mb-2">The Glass Box Guarantee</h3>
             <p className="text-gray-400 text-sm leading-relaxed">
-              Every metric is backed by verified industry datasets and global standards. When you show an impact number via alkatera, it&apos;s a defensible fact — not a guess.
+              Every metric is backed by verified industry datasets and global standards. When you show an impact number via alkatera, it&apos;s a defensible fact, not a guess.
             </p>
           </div>
         </motion.div>

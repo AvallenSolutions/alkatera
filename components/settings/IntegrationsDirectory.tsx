@@ -21,6 +21,7 @@ import {
 import { XeroConnectionCard } from './XeroConnectionCard'
 import { XeroSetupStepper } from './XeroSetupStepper'
 import { BrewwConnectionCard } from './BrewwConnectionCard'
+import { UnleashedConnectionCard } from './UnleashedConnectionCard'
 
 // Shape returned by /api/integrations/connections (generic, non-Xero providers).
 interface ConnectionRow {
@@ -146,6 +147,13 @@ function ProviderCard({
     return (
       <div className="sm:col-span-2 lg:col-span-3">
         <BrewwConnectionCard connection={connection} onChanged={onRefreshConnections} />
+      </div>
+    )
+  }
+  if (provider.slug === 'unleashed') {
+    return (
+      <div className="sm:col-span-2 lg:col-span-3">
+        <UnleashedConnectionCard connection={connection} onChanged={onRefreshConnections} />
       </div>
     )
   }

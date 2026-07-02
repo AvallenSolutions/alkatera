@@ -45,6 +45,7 @@ interface Dashboard {
   prev_total: number;
   weekly: { label: string; value: number }[];
   water_litres: number;
+  water_source?: 'metered' | 'embodied';
   land_m2a: number;
   waste: WasteSummary;
   score: { value: number; label: string; tone: string };
@@ -178,6 +179,7 @@ export function HospitalityOverview() {
   if (!data) return null;
 
   const { total, prev_total, weekly, water_litres, land_m2a, waste, score, pillar_scores } = data;
+  const waterMetered = data.water_source === 'metered';
   const band = bandFor(score.value);
   const togglePillar = (p: string) => setExpandedPillar(expandedPillar === p ? null : p);
 
@@ -251,7 +253,9 @@ export function HospitalityOverview() {
           onToggle={() => togglePillar('water')}
         >
           <p className="text-sm text-muted-foreground">
-            Embodied water in the food and drink you served, from each item&apos;s life-cycle assessment. {fmtNum(water_litres)} litres this year.
+            {waterMetered
+              ? `Metered from your hospitality water meter. ${fmtNum(water_litres)} litres this year.`
+              : `Estimated from recipes: embodied water in the food and drink you served, from each item's life-cycle assessment. ${fmtNum(water_litres)} litres this year. Add a hospitality water meter for a measured figure.`}
           </p>
         </PillarCard>
 

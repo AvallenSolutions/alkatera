@@ -40,6 +40,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
+import { HOSPITALITY_KINDS } from '@/lib/hospitality/constants';
 import {
   calculateFacilityWaterRisks,
   FacilityWaterRisk as SharedFacilityWaterRisk,
@@ -264,6 +265,16 @@ export function useCompanyMetrics(year?: number) {
 
       if (lcaError) throw lcaError;
 
+      // Hospitality products (meals/drinks/rooms) are counted via the hospitality
+      // throughput calculation, not the product-LCA rollup — exclude them here so
+      // the company impacts don't double-count them.
+      const { data: hospProducts } = await supabase
+        .from('products')
+        .select('id')
+        .eq('organization_id', currentOrganization.id)
+        .in('product_kind', HOSPITALITY_KINDS as unknown as string[]);
+      const hospitalityProductIds = new Set((hospProducts ?? []).map((p: any) => String(p.id)));
+
       // Deduplicate to get latest LCA per product_id
       const latestByProduct = new Map();
       allLcas?.forEach(lca => {
@@ -284,6 +295,7 @@ export function useCompanyMetrics(year?: number) {
       });
 
       const lcas = Array.from(lcaProductIds)
+        .filter(pid => !hospitalityProductIds.has(String(pid)))
         .map(pid => latestByProduct.get(Number(pid) || pid))
         .filter(Boolean);
 

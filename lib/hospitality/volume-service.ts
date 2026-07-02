@@ -4,6 +4,7 @@
  */
 
 import { parseCSV } from '@/lib/distributor/parsers/csv-parser'
+import { HOSPITALITY_KINDS, isHospitalityKind } from './constants'
 import type {
   HospitalityProductOption,
   PosSalesPreview,
@@ -19,8 +20,6 @@ type Db = any
 export type ServiceResult<T> = { ok: true; data: T } | { ok: false; status: number; error: string }
 const ok = <T>(data: T): ServiceResult<T> => ({ ok: true, data })
 const fail = (status: number, error: string): ServiceResult<never> => ({ ok: false, status, error })
-
-const HOSPITALITY_KINDS = ['hospitality_meal', 'hospitality_drink', 'hospitality_room_night']
 
 /** All hospitality products for the org (the things a volume row can point at). */
 export async function listHospitalityProducts(db: Db, organizationId: string): Promise<HospitalityProductOption[]> {
@@ -160,7 +159,7 @@ export async function createVolume(db: Db, organizationId: string, body: any): P
     .eq('id', product_id)
     .eq('organization_id', organizationId)
     .maybeSingle()
-  if (!product || !HOSPITALITY_KINDS.includes(product.product_kind)) {
+  if (!product || !isHospitalityKind(product.product_kind)) {
     return fail(400, 'product must be a hospitality meal, drink or room')
   }
 

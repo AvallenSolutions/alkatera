@@ -1,78 +1,95 @@
-# Advisor READ access to client-org dashboards
+# Outbound Reply-Hook — Project Goal & Spec
 
-## Goal
-An external advisor (row in `advisor_organization_access`, no `organization_members` row)
-switched into a client org should see the dashboard the same as a member, respecting their
-`read_only` / `read_write` level. Today many dashboard/read API routes 403 advisors because
-their org-resolution only accepts membership.
+_Resolved via goal-finding interview, 2026-06-28._
 
-## Mechanism (matches the codebase's already-migrated routes)
-- Resolve org with `resolveAccessibleOrg(client, user, requestedOrgId?)` (member OR active advisor)
-  instead of `resolveUserOrganization` / a local first-membership query.
-- On WRITE handlers that mutate org data, add `denyReadOnlyAdvisor(client, user, organizationId)`
-  immediately after resolving the org, so read_only advisors stay blocked from writes.
-- `resolveAccessibleOrg` reads `current_organization_id` from app_metadata/user_metadata, which
-  org-switching sets for advisors too — so the advisor's *selected* client org is used.
+## The real goal
+Grow paying customers by fixing the **top-of-funnel leak**. The channel is **outbound
+sales**, and the weakest link is **getting a reply** to Tim's cold email. The platform's
+job for the next ~90 days is to make outbound land and convert:
 
-## Scope: dashboard surface (agreed) + pre-existing security gaps (agreed)
+> Every prospect gets a **private, auto-generated report** estimating their brand's
+> carbon footprint, which **morphs into a real alkatera trial org** on one click.
 
-### Core / security-sensitive (do myself) — DONE
-- [x] rosa/priority-tiles (GET) — local resolveContext → resolveAccessibleOrg
-- [ ] rosa/progress-tracker (GET/POST/DELETE) — convert; POST/DELETE write rosa_memory (user pref, no guard)
-- [ ] rosa/memory (GET/POST/DELETE) — convert; rosa_memory (user/org pref, no guard)
-- [ ] rosa/briefing, rosa/mood, rosa/conversations/recent, rosa/exports (GET) — convert
-- [ ] rosa/telemetry (POST) — append-only, no guard
-- [ ] rosa/uploads (POST), uploads/extract (POST) — convert (no org-data write)
-- [ ] rosa/uploads/import (POST) — convert + GUARD (writes facility_activity_entries)
-- [ ] rosa/chat (POST) + rosa/actions/[id]/confirm|cancel — inspect; read_only can't execute org-data actions
-- [ ] vitality/composite (GET) — convert
-- [ ] vitality/weights (GET/POST) — convert; POST writes organizations.vitality_weights → GUARD
-- [ ] PRE-EXISTING: key-findings POST — add denyReadOnlyAdvisor
-- [ ] PRE-EXISTING: impact-valuation/calculate POST + narratives POST — add denyReadOnlyAdvisor
-- [ ] PRE-EXISTING: certifications/flag-resolve GET — add resolveAccessibleOrg access check
+All in-flight depth work (reporting rework, GHG revisions, VSME, tier-gating, SEO) is
+**parked** unless it directly serves this.
 
-### Mechanical module conversions (delegate to parallel subagents)
-- [ ] certifications/** reads (+ guard writes: audit-package PATCH, audit-package/export, auto-evidence/accept, risk-tool POST); evidence GET access check; leave benchmark (public) + already-migrated (flag-targets, audit-packages, gap-analysis, score)
-- [ ] hospitality/** — fix shared `auth()` in lib/hospitality/recipe-route-handlers.ts + per-route resolveUserOrganization; guard writes
-- [ ] byproducts/** + nature-actions/** + nature-dependencies — convert; guard writes
-- [ ] pulse/** reads (inline param membership check) + emissions/** + facility-production-volumes + advisor-messages + agents/exceptions + greenwash/assessments + supplier-responsibility — convert; guard writes
+## Verified decisions
+1. Scope = whole platform
+2. Win condition = revenue / paying customers
+3. Constraint = top of funnel (too few qualified producers land)
+4. Channel = outbound sales
+5. Weakest link = getting a reply
+6. Park all depth WIP for ~90 days
+7. Hook = personalised report added to Tim's existing personal emails
+8. Privacy = private unguessable token link, **full report visible**, "claim this profile" → real org
+9. MVP = A+B+C+D shipped as one unit
+10. Cold-brand data = **auto-enrich on the fly** (the one un-parked dependency)
 
-## Verify
-- [ ] typecheck passes
-- [ ] relevant vitest suites pass
-- [ ] review full git diff for consistency + no missed write guards
-- [ ] (manual) sign in as advisor, confirm dashboard populates
+## MVP specs (small, independently verifiable; build top→bottom)
+- [x] **A — Brand footprint estimator.** `lib/outreach/brand-footprint-estimate.ts`,
+      `estimateBrandFootprint(input)`. Pure/deterministic, no network. Uses the BIER 2023
+      **industry-benchmark** path (sourced per-litre + per-bottle carbon & water), NOT the
+      per-material LCA engine (which needs material rows a cold prospect lacks). Resolves
+      category via provided → product group → `inferCategoryFromText` → industry default,
+      with a confidence rating. Never invents annual volume. Added `getGroupForCategory` +
+      `isProductGroup` to `lib/industry-benchmarks.ts`.
+      _Verified: 7 vitest cases pass (Avallen 700ml spirit → 2.1 kg/bottle), tsc clean._
+      ⚠️ **Spec C wiring note:** `deepEnrichBrand` returns coarse lowercase categories
+      (`spirits|wine|beer|non_alc|other`) that do NOT match the estimator's group names
+      (`Spirits|Wine|...`). Don't pass them through raw — let inference run off brand+SKU
+      names, or add a small mapping adapter in the generator. Estimator left strict on purpose.
+- [x] **B — Private report page** `app/r/[token]/page.tsx` (server component) +
+      `components/outreach/BrandReportView.tsx` (pure, inline-styled, branded) +
+      `lib/outreach/brand-report.ts` (`getBrandReportByToken`, service-role, exact-token).
+      New table `brand_reports` (migration `20260628130000_brand_reports.sql`): RLS on, NO
+      anon policies — read only server-side by exact token (token is the capability; nothing
+      to enumerate). Stores an `estimate` jsonb snapshot so the page is benchmark-stable.
+      noindex via page metadata + `/r/` added to robots.ts DISALLOW.
+      _Verified in browser (local Supabase, seeded Avallen row): page 200 + renders 2.1
+      kg/bottle, robots meta = noindex,nofollow, bad token → 404, no page console errors.
+      13 vitest cases pass, tsc clean._ ⚠️ **Migration pending local persist + prod apply.**
+- [x] **C — Generate-report admin tool.** Admin page `app/admin/(panel)/outreach/page.tsx`
+      + `components/admin/outreach/ReportGenerator.tsx` (sidebar: Outbound → Footprint reports).
+      API `app/api/admin/outreach/reports/route.ts` (POST generate + GET list, `requireAlkateraAdmin`).
+      Instant link from typed inputs (estimator + `generateReportToken`); background auto-enrich
+      via Inngest `outreach/report.enrich` (`lib/inngest/functions/outreach.ts`) guarded by
+      `INNGEST_EVENT_KEY`. Adapter `lib/outreach/enrichment-adapter.ts` resolves the coarse-category
+      gotcha (feeds product NAMES as SKUs so the estimator infers the specific category, e.g.
+      Whisky 3.8, not the broad Spirits group). Migration `20260628140000_brand_reports_enrichment.sql`.
+      _Verified end-to-end in browser as a real admin: typed "Glenfiddich Example Single Malt" →
+      generated link → opened it → Whisky 3.8 kg/L, 2.66 kg/bottle, Scotland. 22 vitest pass, tsc
+      clean. Caught + fixed a 2nd em-dash in UI copy._
+      ⚠️ **Migration pending prod apply.** ⚠️ **Inngest enrich path NOT live-verified** (needs
+      INNGEST + GEMINI keys + Inngest dev server); function registered, adapter unit-tested.
+- [x] **D — Claim → real org.** `app/r/[token]/claim/page.tsx` (server) +
+      `components/outreach/ClaimFlow.tsx` (client) + `app/api/outreach/claim/route.ts`.
+      Signed-out prospect → auth gate → `/login?returnUrl=/r/[token]/claim` (login+signup tabs,
+      internal-redirect validated). Signed-in → auto-claim: creates org (status `trial`, tier
+      `seed`, **card-free** per decision) + owner membership + draft product carrying the brand
+      (product_category = specific cat, org product_type = mapped GROUP) + marks report claimed +
+      switches active org via app_metadata. Idempotent for the owner, 409 for others. No new
+      migration (reuses brand_reports.claimed_org_id/status/claimed_at).
+      _Verified end-to-end in browser: claimed Glenfiddich as a real user → trial org "Glenfiddich
+      Example Single Malt" (Spirits/Scotland) + draft product (Whisky) + owner membership + report
+      claimed → landed in the app. Re-claim → same org (no dup). Bad token 404. Logged-out gate
+      renders + Continue → /login?returnUrl. 22 vitest pass, tsc clean, no claim-page console errors._
 
-## Review
+**MVP A+B+C+D COMPLETE.** Remaining: live-verify the Inngest auto-enrich path (Spec C, needs
+keys) and ship Spec E (telemetry).
 
-Done. 102 API route/lib files converted so an active advisor for the org is granted
-READ access; read-only advisors stay blocked from writes via `denyReadOnlyAdvisor`.
+## Fast-follow (not MVP)
+- [x] **E — Outbound telemetry** (open / claim events) so the funnel fix is measurable.
+      NO migration (reuses brand_reports.first_viewed_at + claimed_at). View beacon
+      `components/outreach/ReportViewBeacon.tsx` on /r/[token] → POST `app/api/outreach/view`
+      stamps first_viewed_at + status 'viewed', but ONLY for logged-OUT viewers (skips admin
+      previews + claimer revisits → honest open rate). Funnel stats added to GET
+      `/api/admin/outreach/reports` (counts across ALL reports) → summary card in ReportGenerator
+      (Generated / Opened + open-rate / Claimed + claim-rate).
+      _Verified in browser: logged-out open stamps view; admin view counted:false (not stamped);
+      stats compute (gen 2 / viewed 0 / claimed 1) and render. 22 vitest pass, tsc clean._
+      ⚠️ Not yet committed/deployed.
 
-Pattern used everywhere: `resolveAccessibleOrg(client, user, requestedOrgId?)` for org
-resolution (member OR active advisor, honours the org switched into via metadata), plus
-`denyReadOnlyAdvisor` on org-data mutations. This mirrors the ~48 routes already on this
-pattern.
-
-Notable specifics:
-- Rosa hub: all read endpoints + chat converted. Action *execution* is the single
-  org-data write choke point — guarded inside `lib/rosa/actions.ts` `executeAction`
-  (covers the confirm route and any caller). Rosa memory/tracker/telemetry/upload-staging
-  are user-pref/append/staging, not org data, so unguarded; `uploads/import` (commits
-  facility data) IS guarded.
-- vitality/weights: write stays owner/admin-only (advisors carry no membership role), read opened.
-- Pre-existing gaps fixed (Tim approved): `key-findings` POST, `impact-valuation/calculate`
-  + `narratives` POST now guard read-only advisors; `certifications/flag-resolve` GET now
-  verifies org access (was a trusted-param read-IDOR).
-- Pulse: only routes with an explicit membership check were converted; pure RLS-cookie
-  routes already grant advisors via RLS and were left.
-
-Left deliberately member-only (writes, out of dashboard-read scope): advisor-messages POST,
-facility-production-volumes POST/DELETE, greenwash/assessments POST/DELETE,
-certifications/score POST (pre-existing advisor-accessible, unchanged).
-
-Verification: `tsc --noEmit` clean (0 errors); all 5 previously-403 routes now return 401
-unauth (load cleanly, no 500). Final advisor-session smoke test (sign in as an advisor,
-switch into a client org, load /rosa) left for manual confirmation.
-
-Follow-up flagged: `certifications/frameworks` GET reads an `organization_id` query param
-with no access check (same class as the flag-resolve fix) — spun off as a task.
+## Main risk
+Auto-enrich quality gates report quality. Cold brands with thin web presence → weak
+estimate → weak hook. **Fallback:** if enrichment is thin, drop to Tim-enters-a-few-fields
+rather than send a bad number.

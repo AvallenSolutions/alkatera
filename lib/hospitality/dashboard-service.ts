@@ -11,6 +11,7 @@
 
 import { listMenus } from './menu-service'
 import { summariseWaste, wasteCo2e, type WasteRangeSummary } from './waste-service'
+import { HOSPITALITY_KINDS, type HospitalityKind } from './constants'
 
 type Db = any
 
@@ -18,8 +19,7 @@ export type ServiceResult<T> = { ok: true; data: T } | { ok: false; status: numb
 const ok = <T>(data: T): ServiceResult<T> => ({ ok: true, data })
 const fail = (status: number, error: string): ServiceResult<never> => ({ ok: false, status, error })
 
-const HOSPITALITY_KINDS = ['hospitality_meal', 'hospitality_drink', 'hospitality_room_night'] as const
-type Kind = (typeof HOSPITALITY_KINDS)[number]
+type Kind = HospitalityKind
 
 export interface KindBreakdown {
   kind: Kind
@@ -73,8 +73,14 @@ export interface HospitalityDashboard {
   monthly: number[]
   /** Rolling 12-week trend of total footprint (carbon + waste), anchored to the latest activity. */
   weekly: WeeklyPoint[]
-  /** Supply-chain water embodied in food/drink served, litres. */
+  /** Water shown for the Water pillar, litres (metered when available, else embodied). */
   water_litres: number
+  /** 'metered' = from a hospitality water meter; 'embodied' = supply-chain LCA estimate. */
+  water_source: 'metered' | 'embodied'
+  /** Operational metered hospitality water for the year, litres (null when no meter). */
+  water_operational_litres: number | null
+  /** Supply-chain embodied water (kept for context / fallback), litres. */
+  water_embodied_litres: number
   /** Land use embodied in food/drink served (biodiversity proxy), m²a. */
   land_m2a: number
   waste: WasteRangeSummary
@@ -317,11 +323,33 @@ export async function getHospitalityDashboard(
     const priced = list.map((m) => m.avg_co2e).filter((n): n is number => typeof n === 'number')
     menusAvg = priced.length > 0 ? priced.reduce((s, n) => s + n, 0) / priced.length : null
   }
-  const { count: venuesCount } = await db
+  const { data: activeVenues } = await db
     .from('hospitality_venues')
-    .select('id', { count: 'exact', head: true })
+    .select('id, facility_id')
     .eq('organization_id', organizationId)
     .eq('status', 'active')
+  const venuesCount = (activeVenues ?? []).length
+  const venueFacilityIds = Array.from(
+    new Set((activeVenues ?? []).map((v: any) => v.facility_id).filter(Boolean)),
+  ) as string[]
+
+  // Operational metered hospitality water: facility water entries on a
+  // hospitality-purpose meter, for facilities linked to active venues. Preferred
+  // over the embodied (supply-chain) estimate when a meter exists.
+  let waterOperationalLitres: number | null = null
+  if (venueFacilityIds.length > 0) {
+    const { data: meterRows } = await db
+      .from('facility_activity_entries')
+      .select('quantity')
+      .in('facility_id', venueFacilityIds)
+      .eq('activity_category', 'water_intake')
+      .eq('meter_purpose', 'hospitality')
+      .lte('reporting_period_start', yearEnd)
+      .gte('reporting_period_end', yearStart)
+    if (meterRows && meterRows.length > 0) {
+      waterOperationalLitres = meterRows.reduce((s: number, r: any) => s + (Number(r.quantity) || 0) * 1000, 0)
+    }
+  }
 
   // Waste (this year + prior year so YoY is like-for-like with the total).
   const waste = await summariseWaste(db, organizationId, yearStart, yearEnd)
@@ -365,7 +393,10 @@ export async function getHospitalityDashboard(
     prev_total: prevTotalAll,
     monthly,
     weekly,
-    water_litres: waterLitres,
+    water_litres: waterOperationalLitres != null ? waterOperationalLitres : waterLitres,
+    water_source: waterOperationalLitres != null ? 'metered' : 'embodied',
+    water_operational_litres: waterOperationalLitres,
+    water_embodied_litres: waterLitres,
     land_m2a: landM2a,
     waste,
     score,

@@ -1,0 +1,77 @@
+{
+  "Pagination": {
+    "NumberOfItems": 1,
+    "PageSize": 200,
+    "PageNumber": 1,
+    "NumberOfPages": 1,
+    "TotalNumberOfRecords": 1
+  },
+  "Items": [
+    {
+      "Guid": "98008fab-96f3-4877-824e-ee841625859e",
+      "BillNumber": "BOM-00000001",
+      "Product": {
+        "Guid": "85fd2a2b-bd65-4ca6-962d-2ba81b60653b",
+        "ProductCode": "GIN-70-LONDON",
+        "ProductDescription": "London Dry Gin 70cl",
+        "IsAssembledProduct": true,
+        "ProductGroup": {
+          "Guid": "52250a78-68c4-47c9-953a-791258549fe8",
+          "GroupName": "Spirits"
+        }
+      },
+      "BillOfMaterialsLines": [
+        {
+          "Guid": "127a27ae-a471-48e9-a639-9b998117941d",
+          "LineNumber": 1,
+          "Product": {
+            "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "ProductCode": "GIN-BASE-SPIRIT",
+            "ProductDescription": "Neutral Grain Spirit 96%"
+          },
+          "Quantity": 0.35,
+          "WastageQuantity": 0.005,
+          "UnitOfMeasure": { "Name": "L" },
+          "UnitCost": 4.80,
+          "LineTotalCost": 1.68
+        },
+        {
+          "Guid": "3137035f-866b-4275-80bc-0fc933f06d59",
+          "LineNumber": 2,
+          "Product": {
+            "Guid": "cb3c9720-f81d-41da-8941-53d6bbf8551e",
+            "ProductCode": "BOT-70-FLINT",
+            "ProductDescription": "70cl Flint Glass Bottle"
+          },
+          "Quantity": 1,
+          "WastageQuantity": 0,
+          "UnitOfMeasure": { "Name": "EA" },
+          "UnitCost": 1.20,
+          "LineTotalCost": 1.20
+        },
+        {
+          "Guid": "78c2a7e6-61c9-4805-8801-f5a53d5388c3",
+          "LineNumber": 3,
+          "Product": {
+            "Guid": "cap-guid-0001",
+            "ProductCode": "CAP-CORK-T",
+            "ProductDescription": "T-Bar Cork Stopper"
+          },
+          "Quantity": 1,
+          "WastageQuantity": 0,
+          "UnitOfMeasure": { "Name": "EA" },
+          "UnitCost": 0.35,
+          "LineTotalCost": 0.35
+        }
+      ],
+      "TotalCost": 3.23,
+      "CanAutoAssemble": true,
+      "CanAutoDisassemble": false,
+      "Obsolete": false,
+      "CreatedOn": "/Date(1617064243856)/",
+      "CreatedBy": "admin",
+      "LastModifiedBy": "admin",
+      "LastModifiedOn": "/Date(1681699681399)/"
+    }
+  ]
+}

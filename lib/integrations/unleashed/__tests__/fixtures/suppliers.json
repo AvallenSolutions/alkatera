@@ -1,0 +1,60 @@
+{
+  "PageNumber": 1,
+  "PageSize": 200,
+  "Items": [
+    {
+      "Guid": "4d0f9c9e-73f0-4741-bc77-38a69cffeb1b",
+      "SupplierCode": "GLASS-CO",
+      "SupplierName": "Glassco Packaging Ltd",
+      "Email": "orders@glassco.co.uk",
+      "Taxable": true,
+      "Obsolete": false,
+      "Currency": {
+        "Guid": "gbp-currency-guid",
+        "CurrencyCode": "GBP",
+        "Description": "British Pound",
+        "DefaultBuyRate": 1.0,
+        "DefaultSellRate": 1.0,
+        "LastModifiedOn": "/Date(1459218740833)/"
+      },
+      "Addresses": [
+        {
+          "AddressType": "Postal",
+          "AddressName": "Head Office",
+          "StreetAddress": "14 Industrial Way",
+          "City": "Bristol",
+          "Country": "United Kingdom",
+          "PostalCode": "BS1 1AA"
+        }
+      ],
+      "LastModifiedOn": "/Date(1617064243856)/"
+    },
+    {
+      "Guid": "supplier-ngs-guid",
+      "SupplierCode": "NGS-01",
+      "SupplierName": "Grain Spirits UK Ltd",
+      "Email": "sales@grainspiritsuk.com",
+      "Taxable": true,
+      "Obsolete": false,
+      "Currency": {
+        "Guid": "gbp-currency-guid",
+        "CurrencyCode": "GBP",
+        "Description": "British Pound",
+        "DefaultBuyRate": 1.0,
+        "DefaultSellRate": 1.0,
+        "LastModifiedOn": "/Date(1459218740833)/"
+      },
+      "Addresses": [
+        {
+          "AddressType": "Postal",
+          "AddressName": "Main Site",
+          "StreetAddress": "1 Distillery Lane",
+          "City": "Glasgow",
+          "Country": "United Kingdom",
+          "PostalCode": "G1 2AB"
+        }
+      ],
+      "LastModifiedOn": "/Date(1617064243856)/"
+    }
+  ]
+}

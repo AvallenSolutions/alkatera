@@ -107,6 +107,31 @@ export interface CompanyWaterOverview {
   avg_recycling_rate: number;
 }
 
+/**
+ * Subtract hospitality-metered water (m³) from the company operational figures,
+ * scaling the scarcity-weighted value proportionally. Embedded (supply-chain)
+ * water is unaffected. Used only when an org excludes hospitality from its total.
+ */
+function excludeHospitalityWater(o: CompanyWaterOverview, hospM3: number): CompanyWaterOverview {
+  const intake = o.operational_intake_m3 || 0;
+  if (intake <= 0 || hospM3 <= 0) return o;
+  const newIntake = Math.max(0, intake - hospM3);
+  const scale = newIntake / intake;
+  const newNet = Math.max(0, (o.operational_net_m3 || 0) - hospM3);
+  const newScarcity = (o.operational_scarcity_weighted_m3 || 0) * scale;
+  return {
+    ...o,
+    operational_intake_m3: newIntake,
+    operational_net_m3: newNet,
+    operational_scarcity_weighted_m3: newScarcity,
+    total_water_footprint_m3: newNet + (o.embedded_water_m3 || 0),
+    total_scarcity_weighted_m3: newScarcity + (o.embedded_scarcity_weighted_m3 || 0),
+    total_consumption_m3: newIntake,
+    net_consumption_m3: newNet,
+    scarcity_weighted_consumption_m3: newScarcity,
+  };
+}
+
 export interface WaterSourceBreakdown {
   source: string;
   value: number;
@@ -129,6 +154,7 @@ export function useFacilityWaterData(year?: number) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [companyOverview, setCompanyOverview] = useState<CompanyWaterOverview | null>(null);
+  const [hospitalityWaterM3, setHospitalityWaterM3] = useState<number>(0);
   const [facilitySummaries, setFacilitySummaries] = useState<FacilityWaterSummary[]>([]);
   const [waterTimeSeries, setWaterTimeSeries] = useState<WaterTimeSeries[]>([]);
   const [sourceBreakdown, setSourceBreakdown] = useState<WaterSourceBreakdown[]>([]);
@@ -154,7 +180,7 @@ export function useFacilityWaterData(year?: number) {
 
     try {
       // Fetch time series from facility_activity_entries (where water data is actually stored)
-      const [overviewResult, summariesResult, timeSeriesResult, sessionsResult] = await Promise.all([
+      const [overviewResult, summariesResult, timeSeriesResult, sessionsResult, hospWaterResult, orgResult] = await Promise.all([
         supabase
           .from('company_water_overview')
           .select('*')
@@ -183,7 +209,24 @@ export function useFacilityWaterData(year?: number) {
           .from('facility_reporting_sessions')
           .select('facility_id, total_production_volume, volume_unit, reporting_period_start')
           .eq('organization_id', currentOrganization.id)
-          .order('reporting_period_start', { ascending: false })
+          .order('reporting_period_start', { ascending: false }),
+
+        // Hospitality-purpose water intake (for the include/exclude toggle and
+        // the "of which hospitality" figure).
+        supabase
+          .from('facility_activity_entries')
+          .select('quantity')
+          .eq('organization_id', currentOrganization.id)
+          .eq('activity_category', 'water_intake')
+          .eq('meter_purpose', 'hospitality')
+          .gte('reporting_period_start', yearStart)
+          .lte('reporting_period_start', yearEnd),
+
+        supabase
+          .from('organizations')
+          .select('report_defaults')
+          .eq('id', currentOrganization.id)
+          .maybeSingle(),
       ]);
 
       if (overviewResult.error) throw overviewResult.error;
@@ -194,13 +237,24 @@ export function useFacilityWaterData(year?: number) {
       // a historical sustainability report carries a water_m3 figure, overlay
       // the imported value and flag the source accordingly. Never overwrites
       // operational data.
+      // Hospitality water + the org's include/exclude flag. When hospitality is
+      // excluded from the company total, its metered water is reported separately
+      // and subtracted from the company operational figures here (the SQL view
+      // total is left summing everything, so this is a presentation concern).
+      const hospWaterM3 = ((hospWaterResult.data as any[]) ?? []).reduce(
+        (s, r) => s + (Number(r.quantity) || 0), 0,
+      );
+      const includeHospitality = ((orgResult.data as any)?.report_defaults?.include_hospitality) !== false;
+      setHospitalityWaterM3(hospWaterM3);
+
       const rawOverview = overviewResult.data as CompanyWaterOverview | null;
       const hasOperationalWater = !!rawOverview && (
         (rawOverview.total_water_footprint_m3 ?? 0) > 0 ||
         (rawOverview.operational_intake_m3 ?? 0) > 0
       );
+      let chosenOverview: CompanyWaterOverview | null;
       if (rawOverview && hasOperationalWater) {
-        setCompanyOverview({ ...rawOverview, source: 'operational' });
+        chosenOverview = { ...rawOverview, source: 'operational' };
       } else {
         const hist = await fetchHistoricalSustainabilityMetrics(
           supabase,
@@ -208,18 +262,22 @@ export function useFacilityWaterData(year?: number) {
           selectedYear,
         );
         if (hist?.water_m3 && hist.water_m3 > 0 && rawOverview) {
-          setCompanyOverview({
+          chosenOverview = {
             ...rawOverview,
             total_water_footprint_m3: hist.water_m3,
             total_scarcity_weighted_m3: hist.water_m3,
             total_consumption_m3: hist.water_m3,
             operational_intake_m3: hist.water_m3,
             source: 'imported',
-          });
+          };
         } else {
-          setCompanyOverview(rawOverview);
+          chosenOverview = rawOverview;
         }
       }
+      if (!includeHospitality && hospWaterM3 > 0 && chosenOverview) {
+        chosenOverview = excludeHospitalityWater(chosenOverview, hospWaterM3);
+      }
+      setCompanyOverview(chosenOverview);
       // Attach production volume + unit per facility (for litres-per-litre).
       // Sessions are sorted newest-first; the latest session sets the unit,
       // and volumes sharing that unit are summed.
@@ -442,6 +500,8 @@ export function useFacilityWaterData(year?: number) {
     loading,
     error,
     companyOverview,
+    /** Hospitality-metered water for the year, m³ (0 when no hospitality meter). */
+    hospitalityWaterM3,
     facilitySummaries,
     waterTimeSeries,
     sourceBreakdown,

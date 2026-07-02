@@ -390,7 +390,7 @@ function CanopyOnboardingContent() {
             <>
               <div className="text-center space-y-2">
                 <h2 className="font-serif text-xl text-white">Create Your Account</h2>
-                <p className="text-white/50 text-sm">Step 1 of 3 — Set up your login credentials</p>
+                <p className="text-white/50 text-sm">Step 1 of 3: Set up your login credentials</p>
               </div>
 
               <form onSubmit={handleCreateAccount} className="space-y-4">
@@ -500,7 +500,7 @@ function CanopyOnboardingContent() {
                   <Building2 className="w-7 h-7 text-[#ccff00]" />
                 </div>
                 <h2 className="font-serif text-xl text-white">Set Up Your Organisation</h2>
-                <p className="text-white/50 text-sm">Step 2 of 3 — Tell us about your company</p>
+                <p className="text-white/50 text-sm">Step 2 of 3: Tell us about your company</p>
               </div>
 
               <form onSubmit={handleCreateOrganization} className="space-y-5">
@@ -564,7 +564,7 @@ function CanopyOnboardingContent() {
             <>
               <div className="text-center space-y-2">
                 <h2 className="font-serif text-xl text-white">Complete Your Subscription</h2>
-                <p className="text-white/50 text-sm">Step 3 of 3 — Start your Canopy plan</p>
+                <p className="text-white/50 text-sm">Step 3 of 3: Start your Canopy plan</p>
               </div>
 
               {/* Canopy summary */}
@@ -632,7 +632,7 @@ function CanopyOnboardingContent() {
                   <span className="text-white/40 text-sm">/{billingInterval === 'monthly' ? 'mo' : 'yr'}</span>
                 </div>
                 {billingInterval === 'annual' && (
-                  <p className="text-xs text-[#ccff00]/70">Save £1,198/yr — that&apos;s 2 months free</p>
+                  <p className="text-xs text-[#ccff00]/70">Save £1,198/yr, that&apos;s 2 months free</p>
                 )}
               </div>
 
@@ -648,7 +648,7 @@ function CanopyOnboardingContent() {
                     Redirecting to checkout...
                   </span>
                 ) : (
-                  `Subscribe — £${billingInterval === 'monthly' ? '599/mo' : '5,990/yr'}`
+                  `Subscribe £${billingInterval === 'monthly' ? '599/mo' : '5,990/yr'}`
                 )}
               </button>
 

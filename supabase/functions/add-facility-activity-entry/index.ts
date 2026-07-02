@@ -51,6 +51,7 @@ interface RequestPayload {
   wastewater_discharge_destination?: string;
   water_recycling_rate_percent?: number;
   water_stress_area_flag?: boolean;
+  meter_purpose?: string;
   waste_category?: string;
   waste_treatment_method?: string;
   waste_recovery_percentage?: number;
@@ -235,6 +236,7 @@ Deno.serve(async (req: Request) => {
       wastewater_discharge_destination: payload.wastewater_discharge_destination,
       water_recycling_rate_percent: payload.water_recycling_rate_percent,
       water_stress_area_flag: payload.water_stress_area_flag,
+      meter_purpose: payload.meter_purpose === 'hospitality' ? 'hospitality' : 'production',
       waste_category: payload.waste_category,
       waste_treatment_method: payload.waste_treatment_method,
       waste_recovery_percentage: payload.waste_recovery_percentage,

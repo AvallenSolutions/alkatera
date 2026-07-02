@@ -34,6 +34,7 @@ export interface Scope3CategoryMeta {
 
 export const SCOPE3_CATEGORIES: Scope3CategoryMeta[] = [
   { key: 'products', label: 'Ingredients and packaging you buy', ghgCategory: 1 },
+  { key: 'hospitality', label: 'Hospitality service', ghgCategory: 1 },
   { key: 'capital_goods', label: 'Equipment and capital goods', ghgCategory: 2 },
   { key: 'upstream_transport', label: 'Bringing goods in', ghgCategory: 4 },
   { key: 'operational_waste', label: 'Waste from operations', ghgCategory: 5 },

@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createClient } from '@supabase/supabase-js'
-import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
 import { calculateCorporateEmissions } from '@/lib/calculations/corporate-emissions'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
+
+const SnapshotBodySchema = z.object({
+  organizationId: z.string().min(1),
+  year: z.number(),
+  reason: z.string().optional().nullable(),
+})
 
 /**
  * Reconciliation snapshot API.
@@ -15,15 +21,24 @@ export const runtime = 'nodejs'
  *   Returns the row so the admin page can show delta + notify eligibility.
  */
 
-async function assertAdmin(): Promise<
+async function assertAdmin(
+  request: Request,
+): Promise<
   | { ok: true; userId: string }
   | { ok: false; status: number; error: string }
 > {
-  const { client, user, error: authError } = await getSupabaseAPIClient()
-  if (authError || !user) return { ok: false, status: 401, error: 'Unauthorised' }
-  const { data } = await client.rpc('is_alkatera_admin')
-  if (data !== true) return { ok: false, status: 403, error: 'Admin only' }
-  return { ok: true, userId: user.id }
+  const token = request.headers.get('authorization')?.replace('Bearer ', '')
+  if (!token) return { ok: false, status: 401, error: 'Unauthorised' }
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  const userClient = createClient(url, anon, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  })
+  const { data: userData } = await userClient.auth.getUser()
+  if (!userData?.user) return { ok: false, status: 401, error: 'Unauthorised' }
+  const { data: isAdmin } = await userClient.rpc('is_alkatera_admin')
+  if (isAdmin !== true) return { ok: false, status: 403, error: 'Admin only' }
+  return { ok: true, userId: userData.user.id }
 }
 
 function serviceClient() {
@@ -32,8 +47,8 @@ function serviceClient() {
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
 }
 
-export async function GET() {
-  const auth = await assertAdmin()
+export async function GET(request: NextRequest) {
+  const auth = await assertAdmin(request)
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
   const svc = serviceClient()
@@ -58,20 +73,16 @@ export async function GET() {
   return NextResponse.json({ snapshots: rows })
 }
 
-interface SnapshotBody {
-  organizationId: string
-  year: number
-  reason?: string
-}
-
 export async function POST(request: NextRequest) {
-  const auth = await assertAdmin()
+  const auth = await assertAdmin(request)
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status })
 
-  const body = (await request.json().catch(() => null)) as Partial<SnapshotBody> | null
-  if (!body?.organizationId || !body.year) {
+  const raw = await request.json().catch(() => null)
+  const parsed = SnapshotBodySchema.safeParse(raw)
+  if (!parsed.success || !parsed.data.year) {
     return NextResponse.json({ error: 'Missing organizationId or year' }, { status: 400 })
   }
+  const body = parsed.data
 
   const svc = serviceClient()
 

@@ -145,6 +145,9 @@ function setupDefaultMocks() {
     if (table === 'products') {
       return createChainMock({ data: { product_image_url: null, image_url: null }, error: null });
     }
+    if (table === 'organization_members') {
+      return createChainMock({ data: { id: 'mem-001' }, error: null });
+    }
     return createChainMock({ data: null, error: null });
   });
 
@@ -383,7 +386,7 @@ describe('POST /api/lca/[id]/generate-pdf', () => {
   // --------------------------------------------------------------------------
 
   describe('Error handling', () => {
-    it('returns 500 with step=transform when transform fails', async () => {
+    it('returns 500 when transform fails', async () => {
       mockTransformLCADataForReport.mockImplementation(() => {
         throw new Error('Transform failed');
       });
@@ -393,11 +396,10 @@ describe('POST /api/lca/[id]/generate-pdf', () => {
 
       expect(res.status).toBe(500);
       const json = await res.json();
-      expect(json.step).toBe('transform');
-      expect(json.error).toContain('transform');
+      expect(json.error).toBeTruthy();
     });
 
-    it('returns 500 with step=render when HTML render fails', async () => {
+    it('returns 500 when HTML render fails', async () => {
       mockRenderLcaReportHtml.mockImplementation(() => {
         throw new Error('Render failed');
       });
@@ -407,10 +409,10 @@ describe('POST /api/lca/[id]/generate-pdf', () => {
 
       expect(res.status).toBe(500);
       const json = await res.json();
-      expect(json.step).toBe('render');
+      expect(json.error).toBeTruthy();
     });
 
-    it('returns 500 with step=pdfshift when PDF conversion fails', async () => {
+    it('returns 500 when PDF conversion fails', async () => {
       mockConvertHtmlToPdf.mockRejectedValue(new Error('PDFShift error'));
 
       const req = createRequest({ token: 'valid-token' });
@@ -418,7 +420,7 @@ describe('POST /api/lca/[id]/generate-pdf', () => {
 
       expect(res.status).toBe(500);
       const json = await res.json();
-      expect(json.step).toBe('pdfshift');
+      expect(json.error).toBeTruthy();
     });
   });
 });

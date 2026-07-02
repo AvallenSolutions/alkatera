@@ -14,6 +14,7 @@
 
 import { SupabaseClient } from '@supabase/supabase-js'
 import { summariseWaste } from '@/lib/hospitality/waste-service'
+import { isHospitalityKind } from '@/lib/hospitality/constants'
 
 export interface HospitalityEmissionsResult {
   /** Net-new Scope 3 from hospitality throughput + waste disposal, kg CO2e. */
@@ -27,8 +28,6 @@ export interface HospitalityEmissionsResult {
   /** Number of service-volume rows that contributed. */
   volume_rows: number
 }
-
-const HOSPITALITY_KINDS = ['hospitality_meal', 'hospitality_drink', 'hospitality_room_night']
 
 const EMPTY: HospitalityEmissionsResult = { total: 0, food: 0, supplies: 0, waste: 0, volume_rows: 0 }
 
@@ -87,7 +86,7 @@ export async function calculateHospitality(
   let counted = 0
   for (const v of vols) {
     const kind = kindById.get(v.product_id)
-    if (!kind || !HOSPITALITY_KINDS.includes(kind)) continue
+    if (!isHospitalityKind(kind)) continue
     const s3 = scope3ById.get(v.product_id)
     if (s3 == null) continue
     const covers = coversById.get(v.product_id) ?? 1

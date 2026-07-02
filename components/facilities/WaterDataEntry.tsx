@@ -109,6 +109,7 @@ export function WaterDataEntry({
     wastewater_discharge_destination: "",
     water_recycling_rate_percent: "",
     water_stress_area_flag: false,
+    meter_purpose: "production",
     data_provenance: isThirdParty ? "secondary_modelled_industry_average" : "primary_measured_onsite",
     allocation_basis: "none",
     brand_volume_reported: "",
@@ -199,6 +200,7 @@ export function WaterDataEntry({
             wastewater_discharge_destination: formData.wastewater_discharge_destination || undefined,
             water_recycling_rate_percent: formData.water_recycling_rate_percent ? parseFloat(formData.water_recycling_rate_percent) : undefined,
             water_stress_area_flag: formData.water_stress_area_flag,
+            meter_purpose: formData.meter_purpose,
             notes: formData.notes || undefined,
             reporting_session_id: sessionId,
           }),
@@ -224,6 +226,7 @@ export function WaterDataEntry({
         wastewater_discharge_destination: "",
         water_recycling_rate_percent: "",
         water_stress_area_flag: false,
+        meter_purpose: "production",
         data_provenance: isThirdParty ? "secondary_modelled_industry_average" : "primary_measured_onsite",
         allocation_basis: "none",
         brand_volume_reported: "",
@@ -275,6 +278,25 @@ export function WaterDataEntry({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="meter_purpose">Meter serves</Label>
+              <Select
+                value={formData.meter_purpose}
+                onValueChange={(value) => setFormData({ ...formData, meter_purpose: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="production">Production / main operations</SelectItem>
+                  <SelectItem value="hospitality">Hospitality (venue)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Use a separate hospitality meter to attribute venue water to your hospitality footprint.
+              </p>
             </div>
 
             <div className="space-y-2">

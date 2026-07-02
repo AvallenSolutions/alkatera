@@ -1,0 +1,109 @@
+{
+  "Pagination": {
+    "NumberOfItems": 3,
+    "PageSize": 200,
+    "PageNumber": 1,
+    "NumberOfPages": 1
+  },
+  "Items": [
+    {
+      "Guid": "85fd2a2b-bd65-4ca6-962d-2ba81b60653b",
+      "ProductCode": "GIN-70-LONDON",
+      "ProductDescription": "London Dry Gin 70cl",
+      "PackSize": 6.0,
+      "Weight": 1.35,
+      "DefaultPurchasePrice": 12.50,
+      "DefaultSellPrice": 28.99,
+      "IsAssembledProduct": true,
+      "IsComponent": false,
+      "Obsolete": false,
+      "UnitOfMeasure": {
+        "Guid": "2bb0942d-7cf3-400a-9fe4-b8b206a27a1f",
+        "Name": "EA",
+        "Obsolete": false
+      },
+      "ProductGroup": {
+        "Guid": "52250a78-68c4-47c9-953a-791258549fe8",
+        "GroupName": "Spirits",
+        "ParentGroupGuid": null,
+        "LastModifiedOn": "/Date(1617064243856)/"
+      },
+      "ProductBrand": {
+        "Guid": "abee8c0a-d1a4-4c95-dcbe-670477afe606",
+        "BrandName": "Avallen",
+        "LastModifiedOn": "/Date(1739918557456)/"
+      },
+      "Supplier": {
+        "Guid": "4d0f9c9e-73f0-4741-bc77-38a69cffeb1b",
+        "SupplierCode": "GLASS-CO",
+        "SupplierName": "Glassco Packaging Ltd"
+      },
+      "CreatedBy": "admin",
+      "CreatedOn": "/Date(1617064243856)/",
+      "LastModifiedBy": "admin",
+      "LastModifiedOn": "/Date(1681699681399)/"
+    },
+    {
+      "Guid": "cb3c9720-f81d-41da-8941-53d6bbf8551e",
+      "ProductCode": "BOT-70-FLINT",
+      "ProductDescription": "70cl Flint Glass Bottle",
+      "PackSize": null,
+      "Weight": 0.45,
+      "DefaultPurchasePrice": 1.20,
+      "DefaultSellPrice": null,
+      "IsAssembledProduct": false,
+      "IsComponent": true,
+      "Obsolete": false,
+      "UnitOfMeasure": {
+        "Guid": "2bb0942d-7cf3-400a-9fe4-b8b206a27a1f",
+        "Name": "EA",
+        "Obsolete": false
+      },
+      "ProductGroup": {
+        "Guid": "77b05cc5-4f7b-424c-89c7-63aabda06ef4",
+        "GroupName": "Packaging",
+        "ParentGroupGuid": null,
+        "LastModifiedOn": "/Date(1617064243856)/"
+      },
+      "ProductBrand": null,
+      "Supplier": null,
+      "CreatedBy": "admin",
+      "CreatedOn": "/Date(1617064243856)/",
+      "LastModifiedBy": "admin",
+      "LastModifiedOn": "/Date(1681699681399)/"
+    },
+    {
+      "Guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "ProductCode": "GIN-BASE-SPIRIT",
+      "ProductDescription": "Neutral Grain Spirit 96%",
+      "PackSize": null,
+      "Weight": null,
+      "DefaultPurchasePrice": 4.80,
+      "DefaultSellPrice": null,
+      "IsAssembledProduct": false,
+      "IsComponent": true,
+      "Obsolete": false,
+      "UnitOfMeasure": {
+        "Guid": "unit-litre-guid",
+        "Name": "L",
+        "Obsolete": false
+      },
+      "ProductGroup": {
+        "Guid": "ingredients-group-guid",
+        "GroupName": "Raw Materials",
+        "ParentGroupGuid": null,
+        "LastModifiedOn": "/Date(1617064243856)/"
+      },
+      "ProductBrand": null,
+      "Supplier": {
+        "Guid": "supplier-ngs-guid",
+        "SupplierCode": "NGS-01",
+        "SupplierName": "Grain Spirits UK Ltd"
+      },
+      "CreatedBy": "admin",
+      "CreatedOn": "/Date(1617064243856)/",
+      "LastModifiedBy": "admin",
+      "LastModifiedOn": "/Date(1681699681399)/"
+    }
+  ]
+}

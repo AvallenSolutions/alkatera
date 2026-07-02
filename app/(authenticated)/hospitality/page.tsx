@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { HospitalitySetup } from '@/components/hospitality/HospitalitySetup';
 import { HospitalityOverview } from '@/components/hospitality/dashboard/HospitalityOverview';
+import { HospitalityFootprintToggle } from '@/components/hospitality/HospitalityFootprintToggle';
 import { useHospitalitySettings } from '@/hooks/data/useHospitalitySettings';
 import { hospitalitySectionFromHref, isHospitalitySectionEnabled } from '@/lib/hospitality/settings';
 
@@ -87,6 +88,8 @@ export default function HospitalityDashboard() {
       {header}
 
       <HospitalityOverview />
+
+      <HospitalityFootprintToggle />
 
       <div>
         <h2 className="mb-3 text-sm font-semibold text-muted-foreground">Manage</h2>

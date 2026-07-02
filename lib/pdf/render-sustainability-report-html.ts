@@ -58,6 +58,12 @@ interface EmissionsData {
   scope3: number;
   total: number;
   year: number;
+  // Hospitality element (Scope 3 Cat 1), reported as its own line when counted
+  // in the total. All in kg CO2e. Optional so existing callers are unaffected.
+  hospitality?: number;
+  hospitalityFood?: number;
+  hospitalitySupplies?: number;
+  hospitalityWaste?: number;
 }
 
 interface YearlyEmissions {
@@ -1045,6 +1051,23 @@ function renderEmissionsPage(config: ReportConfig, data: ReportData, theme?: Rep
           </tr>
         </tbody>
       </table>
+
+      ${(emissions.hospitality && emissions.hospitality > 0) ? `
+      <div style="margin-top: 24px;">
+        <h3 style="font-size: 14px; font-weight: 700; margin: 0 0 8px;">Hospitality service (within Scope 3, Category 1)</h3>
+        <p style="font-size: 11px; color: #78716c; margin: 0 0 10px;">Meals, drinks and room-nights served, plus food and dry waste disposal.</p>
+        <table class="data-table">
+          <tbody>
+            <tr><td>Food &amp; drink served</td><td style="text-align: right;">${formatNumber(emissions.hospitalityFood || 0, 2)}</td></tr>
+            <tr><td>Room consumables</td><td style="text-align: right;">${formatNumber(emissions.hospitalitySupplies || 0, 2)}</td></tr>
+            <tr><td>Waste (food &amp; dry)</td><td style="text-align: right;">${formatNumber(emissions.hospitalityWaste || 0, 2)}</td></tr>
+            <tr style="border-top: 2px solid #e7e5e4; font-weight: 700;">
+              <td>Total hospitality (tCO&#8322;e)</td>
+              <td style="text-align: right;">${formatNumber(emissions.hospitality, 2)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>` : ''}
 
       ${renderPageFooter(config, 2, false, undefined, theme)}
     </div>`;

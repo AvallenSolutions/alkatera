@@ -44,7 +44,7 @@ export const LandingHero = ({ onOpenGuardian }: HeroProps) => {
               href="/getaccess"
               className="inline-flex items-center justify-center bg-[#ccff00] text-black px-8 py-4 rounded-full font-mono text-sm uppercase tracking-widest hover:scale-105 transition-transform duration-300"
             >
-              Get Access — from £99/mo
+              Get Access from £99/mo
             </a>
             <a
               href="/platform"

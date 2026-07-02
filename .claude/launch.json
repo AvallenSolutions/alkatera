@@ -21,6 +21,13 @@
       "runtimeArgs": ["-c", "cd /Users/timej/Documents/GitHub/alkatera/.claude/worktrees/nice-herschel-44a430 && export PATH=/usr/local/bin:$PATH && pnpm dev --port 8890"],
       "port": 8890,
       "autoPort": false
+    },
+    {
+      "name": "dev-main",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-c", "cd /Users/timej/Documents/GitHub/alkatera && export PATH=/usr/local/bin:$PATH && pnpm dev --port 8888"],
+      "port": 8888,
+      "autoPort": false
     }
   ]
 }

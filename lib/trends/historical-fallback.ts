@@ -1,4 +1,5 @@
-'use client'
+// Isomorphic data helper — used by both client trend widgets and server routes
+// (e.g. /api/emissions/corporate's empty-year fallback), so no 'use client'.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 

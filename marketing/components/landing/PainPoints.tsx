@@ -6,11 +6,11 @@ import { motion, useInView } from 'framer-motion';
 const painPoints = [
   {
     label: 'Carbon-only tools miss the point',
-    description: 'Carbon is one metric of many. Water stress, land use, biodiversity, waste — your retailers, certifiers, and regulators are already asking for all of it. Most platforms stop at carbon.',
+    description: 'Carbon is one metric of many. Water stress, land use, biodiversity, waste. Your retailers, certifiers, and regulators are already asking for all of it. Most platforms stop at carbon.',
   },
   {
     label: 'Generic calculators don\'t speak drinks',
-    description: 'A fermentation vessel is not a factory floor. Brewing, distilling, and winemaking have their own physics, water ratios, and waste profiles. Generic tools give you generic — and often wrong — answers.',
+    description: 'A fermentation vessel is not a factory floor. Brewing, distilling, and winemaking have their own physics, water ratios, and waste profiles. Generic tools give you generic, and often wrong, answers.',
   },
   {
     label: 'Spreadsheets that nobody trusts',
@@ -22,7 +22,7 @@ const painPoints = [
   },
   {
     label: 'Retailer data requests with no warning',
-    description: 'Tesco, Sainsbury\'s, Carrefour — they\'re all required to report their full supply chain emissions under CSRD. That means your environmental data becomes a condition of trade, not a nice-to-have.',
+    description: 'Tesco, Sainsbury\'s, Carrefour, they\'re all required to report their full supply chain emissions under CSRD. That means your environmental data becomes a condition of trade, not a nice-to-have.',
   },
   {
     label: 'Consultants who cost more than the problem',

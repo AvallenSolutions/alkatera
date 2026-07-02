@@ -1,0 +1,34 @@
+{
+  "Pagination": {
+    "NumberOfItems": 2,
+    "PageSize": 200,
+    "PageNumber": 1,
+    "NumberOfPages": 1
+  },
+  "Items": [
+    {
+      "Guid": "5797c041-4d5b-4860-8ac4-eb4714e7bae0",
+      "WarehouseCode": "DISTILLERY",
+      "WarehouseName": "Distillery & Production",
+      "IsDefault": true,
+      "City": "Bristol",
+      "Country": "United Kingdom",
+      "StreetNo": "1",
+      "AddressLine1": "Distillery Road",
+      "Obsolete": false,
+      "LastModifiedOn": "/Date(1459218740800)/"
+    },
+    {
+      "Guid": "c7c4a7ee-bb28-41bd-918b-a09240154141",
+      "WarehouseCode": "CELLAR-DOOR",
+      "WarehouseName": "Cellar Door Shop",
+      "IsDefault": false,
+      "City": "Bath",
+      "Country": "United Kingdom",
+      "StreetNo": "12",
+      "AddressLine1": "High Street",
+      "Obsolete": false,
+      "LastModifiedOn": "/Date(1459218740803)/"
+    }
+  ]
+}
