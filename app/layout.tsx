@@ -45,9 +45,12 @@ export const metadata: Metadata = {
   authors: [{ name: 'alkatera' }],
   creator: 'alkatera',
   publisher: 'alkatera',
-  alternates: {
-    canonical: '/',
-  },
+  // NB: no `alternates.canonical` here on purpose. A canonical set on the root
+  // layout is inherited by every page that doesn't override it, so it stamps a
+  // homepage canonical onto sub-pages (e.g. client-component pages that can't
+  // export their own metadata) and tells Google to index the homepage instead.
+  // Each page declares its own self-referencing canonical; the homepage's lives
+  // in app/page.tsx.
   openGraph: {
     type: 'website',
     locale: 'en_GB',

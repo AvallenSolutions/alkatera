@@ -33,6 +33,8 @@ const DISALLOW = [
   '/create-organization',
   '/complete-subscription',
   '/suspended',
+  '/debug-auth', // dev-only auth debug page, never for search
+  '/supplier-onboarding', // token-based supplier flow reached via email link
   '/team-invite/',
   '/advisor-invite/',
   '/lca-report/',
