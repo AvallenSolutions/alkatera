@@ -81,6 +81,9 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
   const [step, setStep] = useState<Step>('upload')
   const [dragOver, setDragOver] = useState(false)
   const [result, setResult] = useState<IngestResponse | null>(null)
+  // Ingest job behind the current result — lets the review panels report what
+  // the user actually saved back to /api/ingest/feedback (the learning loop).
+  const [jobId, setJobId] = useState<string | null>(null)
   const [phaseMessage, setPhaseMessage] = useState<string>('')
   // Bulk upload: when a user drops more than one file, we process them serially
   // through the existing review flow. `queue` is the remaining files after
@@ -103,6 +106,7 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
     setStep('upload')
     setDragOver(false)
     setResult(null)
+    setJobId(null)
     setPhaseMessage('')
     setBillName('')
     setPeriodStart('')
@@ -168,6 +172,7 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
         }
         const { jobId } = (await res.json()) as { jobId: string }
         if (!jobId) throw new Error('No job ID returned')
+        setJobId(jobId)
 
         // Poll until completed/failed. 3 min cap mirrors the import-from-url
         // flow — the background function can run 15 min, but if the classifier
@@ -245,6 +250,7 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
     // Reset review-step state but keep queueTotal so the "X of N" indicator
     // stays accurate across the batch.
     setResult(null)
+    setJobId(null)
     setPhaseMessage('')
     setBillName('')
     setPeriodStart('')
@@ -289,6 +295,26 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
     if (needsFacility && result.type !== 'smart_meter_csv' && (!periodStart || !periodEnd)) return false
     return true
   }
+
+  // Fire-and-forget learning hook: report what the user actually saved so the
+  // classifier gains experience of this org's documents. Must never block or
+  // break the save UX — all failures are swallowed.
+  const recordFeedback = useCallback(
+    (savedPayload: Record<string, unknown>, context?: Record<string, unknown>) => {
+      if (!jobId) return
+      try {
+        void fetch('/api/ingest/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          keepalive: true,
+          body: JSON.stringify({ jobId, savedPayload, context }),
+        }).catch(() => {})
+      } catch {
+        // never surface
+      }
+    },
+    [jobId],
+  )
 
   const handleSave = async (resolution?: 'replace' | 'detail_only') => {
     if (!result || !orgId) return
@@ -338,6 +364,14 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
         periodEnd,
         billName,
       }
+      const savedBill =
+        result.type === 'utility_bill'
+          ? result.utilityBill
+          : result.type === 'water_bill'
+            ? result.waterBill
+            : result.type === 'waste_bill'
+              ? result.wasteBill
+              : null
       if (result.type === 'utility_bill' && result.utilityBill) {
         await saveUtilityBill(
           { ...result.utilityBill, period_start: periodStart, period_end: periodEnd },
@@ -352,6 +386,15 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
         await saveWasteBill(
           { ...result.wasteBill, period_start: periodStart, period_end: periodEnd },
           common,
+        )
+      }
+      if (savedBill) {
+        recordFeedback(
+          { ...savedBill, period_start: periodStart, period_end: periodEnd },
+          {
+            facility_id: selectedFacilityId,
+            facility_name: facilities.find((f) => f.id === selectedFacilityId)?.name,
+          },
         )
       }
       toast.success('Saved')
@@ -456,6 +499,7 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
             smConflict={smConflict}
             clearConflict={() => setSmConflict(null)}
             onClose={() => handleOpenChange(false)}
+            onSaved={recordFeedback}
           />
         )}
 
@@ -531,6 +575,10 @@ interface ReviewPanelProps {
    *  we navigate to another page — if we don't close, the dialog stays mounted
    *  in the persistent AppLayout and covers the target page. */
   onClose: () => void
+  /** Learning hook: called once after a successful save with what the user
+   *  actually saved (plus bindings like facility/product the classifier
+   *  can't see). Fire-and-forget — panels must not await or gate on it. */
+  onSaved?: (savedPayload: Record<string, unknown>, context?: Record<string, unknown>) => void
 }
 
 function ReviewPanel(props: ReviewPanelProps) {
@@ -652,43 +700,43 @@ function ReviewPanel(props: ReviewPanelProps) {
 
   if (result.type === 'supplier_invoice') {
     return (
-      <SupplierInvoicePanel invoice={result.supplierInvoice} onClose={props.onClose} />
+      <SupplierInvoicePanel invoice={result.supplierInvoice} onClose={props.onClose} onSaved={props.onSaved} />
     )
   }
 
   if (result.type === 'freight_invoice') {
     return (
-      <FreightInvoicePanel freight={result.freightInvoice} onClose={props.onClose} />
+      <FreightInvoicePanel freight={result.freightInvoice} onClose={props.onClose} onSaved={props.onSaved} />
     )
   }
 
   if (result.type === 'refrigerant_service') {
     return (
-      <RefrigerantPanel service={result.refrigerantService} onClose={props.onClose} />
+      <RefrigerantPanel service={result.refrigerantService} onClose={props.onClose} onSaved={props.onSaved} />
     )
   }
 
   if (result.type === 'packaging_spec') {
     return (
-      <PackagingSpecPanel spec={result.packagingSpec} onClose={props.onClose} />
+      <PackagingSpecPanel spec={result.packagingSpec} onClose={props.onClose} onSaved={props.onSaved} />
     )
   }
 
   if (result.type === 'supplier_coa') {
     return (
-      <SupplierCoaPanel coa={result.supplierCoa} onClose={props.onClose} />
+      <SupplierCoaPanel coa={result.supplierCoa} onClose={props.onClose} onSaved={props.onSaved} />
     )
   }
 
   if (result.type === 'certification') {
     return (
-      <CertificationPanel cert={result.certification} onClose={props.onClose} />
+      <CertificationPanel cert={result.certification} onClose={props.onClose} onSaved={props.onSaved} />
     )
   }
 
   if (result.type === 'soil_carbon_lab') {
     return (
-      <SoilCarbonLabPanel lab={result.soilCarbonLab} onClose={props.onClose} />
+      <SoilCarbonLabPanel lab={result.soilCarbonLab} onClose={props.onClose} onSaved={props.onSaved} />
     )
   }
 
@@ -714,13 +762,13 @@ function ReviewPanel(props: ReviewPanelProps) {
 
   if (result.type === 'historical_sustainability_report') {
     return (
-      <HistoricalReportPanel result={result} onClose={props.onClose} />
+      <HistoricalReportPanel result={result} onClose={props.onClose} onSaved={props.onSaved} />
     )
   }
 
   if (result.type === 'historical_lca_report') {
     return (
-      <HistoricalLcaPanel result={result} onClose={props.onClose} />
+      <HistoricalLcaPanel result={result} onClose={props.onClose} onSaved={props.onSaved} />
     )
   }
 
@@ -933,7 +981,7 @@ function ReviewPanel(props: ReviewPanelProps) {
 // historical_imports.extracted_data as-is so schema evolves without migrations.
 // ───────────────────────────────────────────────────────────────────────────────
 
-function HistoricalReportPanel({ result, onClose }: { result: IngestResponse; onClose: () => void }) {
+function HistoricalReportPanel({ result, onClose, onSaved }: { result: IngestResponse; onClose: () => void; onSaved?: ReviewPanelProps['onSaved'] }) {
   const { currentOrganization } = useOrganization()
   const data = result.historicalSustainabilityReport || {}
   const [form, setForm] = useState({
@@ -985,6 +1033,7 @@ function HistoricalReportPanel({ result, onClose }: { result: IngestResponse; on
       }
       toast.success('Historical report saved')
       setSaved(true)
+      onSaved?.({ ...form })
     } catch (err: any) {
       toast.error(err.message || 'Failed to save')
     } finally {
@@ -1060,7 +1109,7 @@ function HistoricalReportPanel({ result, onClose }: { result: IngestResponse; on
 // HistoricalLcaPanel — review + save panel for prior LCA studies.
 // ───────────────────────────────────────────────────────────────────────────────
 
-function HistoricalLcaPanel({ result, onClose }: { result: IngestResponse; onClose: () => void }) {
+function HistoricalLcaPanel({ result, onClose, onSaved }: { result: IngestResponse; onClose: () => void; onSaved?: ReviewPanelProps['onSaved'] }) {
   const { currentOrganization } = useOrganization()
   const data = result.historicalLcaReport || {}
   const [form, setForm] = useState({
@@ -1113,6 +1162,7 @@ function HistoricalLcaPanel({ result, onClose }: { result: IngestResponse; onClo
       }
       toast.success('Historical LCA saved')
       setSaved(true)
+      onSaved?.({ ...form })
     } catch (err: any) {
       toast.error(err.message || 'Failed to save')
     } finally {
@@ -1886,9 +1936,11 @@ interface InvoiceLineDraft {
 function SupplierInvoicePanel({
   invoice,
   onClose,
+  onSaved,
 }: {
   invoice: NonNullable<IngestResponse['supplierInvoice']> | undefined
   onClose: () => void
+  onSaved?: ReviewPanelProps['onSaved']
 }) {
   const [supplierName] = useState(invoice?.supplier_name || '')
   const [invoiceDate, setInvoiceDate] = useState(invoice?.invoice_date || '')
@@ -1956,6 +2008,21 @@ function SupplierInvoicePanel({
       }
       setSaved({ count: json.saved ?? validRows.length, spend: json.total_spend ?? total, co2e: json.total_co2e_kg ?? 0 })
       toast.success(`Saved ${json.saved ?? validRows.length} spend line${(json.saved ?? validRows.length) === 1 ? '' : 's'}.`)
+      // Learning hook: report the confirmed values with quantity/unit kept as
+      // separate fields (unlike the POST, which folds them into description)
+      // so the diff against the classifier payload is meaningful.
+      onSaved?.({
+        supplier_name: supplierName,
+        invoice_date: invoiceDate || null,
+        currency,
+        category,
+        line_items: validRows.map((r) => ({
+          description: r.description,
+          amount: Number(r.amount),
+          ...(r.quantity ? { quantity: Number(r.quantity) } : {}),
+          ...(r.unit ? { unit: r.unit } : {}),
+        })),
+      })
     } finally {
       setSaving(false)
     }
@@ -2119,9 +2186,11 @@ interface PackagingDraft {
 function PackagingSpecPanel({
   spec,
   onClose,
+  onSaved,
 }: {
   spec: NonNullable<IngestResponse['packagingSpec']> | undefined
   onClose: () => void
+  onSaved?: ReviewPanelProps['onSaved']
 }) {
   const { currentOrganization } = useOrganization()
   const orgId = currentOrganization?.id
@@ -2172,6 +2241,22 @@ function PackagingSpecPanel({
       if (!res.ok) { toast.error(json.error || 'Could not save the packaging.'); return }
       setSaved({ count: json.saved ?? validRows.length })
       toast.success(`Saved ${json.saved ?? validRows.length} packaging component${(json.saved ?? validRows.length) === 1 ? '' : 's'}.`)
+      onSaved?.(
+        {
+          components: validRows.map((r) => ({
+            component_name: r.component_name,
+            material: r.material || null,
+            role: r.role,
+            weight_g: Number(r.weight_g),
+            recycled_content_pct: r.recycled_content_pct ? Number(r.recycled_content_pct) : null,
+            recyclability_pct: r.recyclability_pct ? Number(r.recyclability_pct) : null,
+          })),
+        },
+        {
+          product_id: productId,
+          product_name: products.find((p) => p.id === productId)?.name,
+        },
+      )
     } finally {
       setSaving(false)
     }
@@ -2314,9 +2399,11 @@ const COA_TYPES: { value: string; label: string }[] = [
 function SupplierCoaPanel({
   coa,
   onClose,
+  onSaved,
 }: {
   coa: NonNullable<IngestResponse['supplierCoa']> | undefined
   onClose: () => void
+  onSaved?: ReviewPanelProps['onSaved']
 }) {
   const [supplierProducts, setSupplierProducts] = useState<Array<{ id: string; name: string }>>([])
   const [loading, setLoading] = useState(true)
@@ -2371,6 +2458,19 @@ function SupplierCoaPanel({
       if (!res.ok) { toast.error(json.error || 'Could not file the document.'); return }
       setSaved({ attached: !!json.attached_file })
       toast.success('Document filed against the supplier product.')
+      onSaved?.(
+        {
+          document_name: docName || null,
+          document_type: docType,
+          document_date: docDate || null,
+          expiry_date: expiry || null,
+          reference_number: reference || null,
+        },
+        {
+          supplier_product_id: supplierProductId,
+          supplier_product_name: supplierProducts.find((s) => s.id === supplierProductId)?.name,
+        },
+      )
     } finally {
       setSaving(false)
     }
@@ -2495,9 +2595,11 @@ const CERT_HINT_TO_CODE: Record<string, string> = {
 function CertificationPanel({
   cert,
   onClose,
+  onSaved,
 }: {
   cert: NonNullable<IngestResponse['certification']> | undefined
   onClose: () => void
+  onSaved?: ReviewPanelProps['onSaved']
 }) {
   const [frameworks, setFrameworks] = useState<Array<{ id: string; name: string; code: string }>>([])
   const [loading, setLoading] = useState(true)
@@ -2548,6 +2650,17 @@ function CertificationPanel({
       if (!res.ok) { toast.error(json.error || json.details || 'Could not save the certification.'); return }
       setSaved(true)
       toast.success('Certification recorded.')
+      onSaved?.(
+        {
+          certification_number: number || null,
+          certification_date: issueDate || null,
+          expiry_date: expiry || null,
+        },
+        {
+          framework_id: frameworkId,
+          framework_code: frameworks.find((f) => f.id === frameworkId)?.code,
+        },
+      )
     } finally {
       setSaving(false)
     }
@@ -2655,9 +2768,11 @@ const FREIGHT_MODES: { value: string; label: string }[] = [
 function FreightInvoicePanel({
   freight,
   onClose,
+  onSaved,
 }: {
   freight: NonNullable<IngestResponse['freightInvoice']> | undefined
   onClose: () => void
+  onSaved?: ReviewPanelProps['onSaved']
 }) {
   const [carrier] = useState(freight?.carrier_name || '')
   const [date, setDate] = useState(freight?.shipment_date || '')
@@ -2706,6 +2821,15 @@ function FreightInvoicePanel({
       }
       setSaved({ method: json.method || 'spend', co2e: json.total_co2e_kg ?? 0 })
       toast.success('Freight saved to Scope 3.')
+      onSaved?.({
+        carrier_name: carrier,
+        shipment_date: date || null,
+        transport_mode: mode || null,
+        weight_kg: weight ? Number(weight) : null,
+        distance_km: distance ? Number(distance) : null,
+        amount: amount ? Number(amount) : null,
+        currency,
+      })
     } finally {
       setSaving(false)
     }
@@ -2829,9 +2953,11 @@ const REFRIGERANT_OPTIONS: { value: string; label: string }[] = [
 function RefrigerantPanel({
   service,
   onClose,
+  onSaved,
 }: {
   service: NonNullable<IngestResponse['refrigerantService']> | undefined
   onClose: () => void
+  onSaved?: ReviewPanelProps['onSaved']
 }) {
   const { currentOrganization } = useOrganization()
   const orgId = currentOrganization?.id
@@ -2885,6 +3011,17 @@ function RefrigerantPanel({
       if (!res.ok) { toast.error(json.error || 'Could not save the record.'); return }
       setSaved(true)
       toast.success('Refrigerant record saved to Scope 1.')
+      onSaved?.(
+        {
+          service_date: date || null,
+          refrigerant_type: refrigerant,
+          quantity_kg: Number(quantity),
+        },
+        {
+          facility_id: facilityId,
+          facility_name: facilities.find((f) => f.id === facilityId)?.name,
+        },
+      )
     } finally {
       setSaving(false)
     }
@@ -3006,9 +3143,11 @@ interface LabSampleDraft {
 function SoilCarbonLabPanel({
   lab,
   onClose,
+  onSaved,
 }: {
   lab: NonNullable<IngestResponse['soilCarbonLab']> | undefined
   onClose: () => void
+  onSaved?: ReviewPanelProps['onSaved']
 }) {
   const [assetKind, setAssetKind] = useState<AssetKind | null>(null)
   const [assets, setAssets] = useState<AssetOption[]>([])
@@ -3124,6 +3263,29 @@ function SoilCarbonLabPanel({
     if (savedCount > 0) {
       setSaved({ count: savedCount })
       toast.success(`Saved ${savedCount} soil carbon measurement${savedCount === 1 ? '' : 's'}.`)
+      onSaved?.(
+        {
+          lab_name: lab?.lab_name || null,
+          methodology: lab?.methodology || null,
+          samples: rows.slice(0, savedCount).map((r) => ({
+            location_label: r.location_label || null,
+            sample_date: r.sample_date,
+            depth_cm: Number(r.depth_cm),
+            soc_input_method: r.soc_input_method,
+            soc_stock_tc_ha: r.soc_input_method === 'stock' ? Number(r.soc_stock_tc_ha) : null,
+            soc_concentration_pct:
+              r.soc_input_method === 'concentration' ? Number(r.soc_concentration_pct) : null,
+            bulk_density_g_cm3:
+              r.soc_input_method === 'concentration' ? Number(r.bulk_density_g_cm3) : null,
+          })),
+        },
+        {
+          asset_kind: assetKind,
+          asset_id: assetId,
+          asset_name: assets.find((a) => a.id === assetId)?.name,
+          saved_count: savedCount,
+        },
+      )
     }
   }
 

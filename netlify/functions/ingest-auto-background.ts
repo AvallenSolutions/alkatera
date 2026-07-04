@@ -5,6 +5,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 // the function fail to cold-start, which is invisible to the caller because
 // the trigger is fire-and-forget; the symptom is jobs stuck at "Queued…".
 import { classifyDocument, shapeIngestResult } from '../../lib/ingest/classify-document';
+import { buildIngestOrgContext } from '../../lib/ingest/org-context';
 
 /**
  * Background runner for Smart Upload (the "Upload anything" dropzone and
@@ -85,7 +86,7 @@ export const handler = async (event: { body?: string | null; headers: Record<str
   try {
     const { data: job, error: jobErr } = await supabase
       .from('ingest_jobs')
-      .select('id, stash_path, file_name, file_mime')
+      .select('id, organization_id, stash_path, file_name, file_mime')
       .eq('id', jobId)
       .maybeSingle();
 
@@ -96,9 +97,13 @@ export const handler = async (event: { body?: string | null; headers: Record<str
 
     await updateJob({ status: 'extracting', phase_message: 'Reading the document…' });
 
-    const { data: download, error: dlErr } = await supabase.storage
-      .from('ingest-staging')
-      .download(job.stash_path);
+    // Org context (learned document profiles + org facts) fetches in parallel
+    // with the storage download; a failure or timeout degrades to null and
+    // the document classifies without hints.
+    const [{ data: download, error: dlErr }, orgContext] = await Promise.all([
+      supabase.storage.from('ingest-staging').download(job.stash_path),
+      buildIngestOrgContext(supabase, job.organization_id).catch(() => null),
+    ]);
     if (dlErr || !download) {
       await updateJob({
         status: 'failed',
@@ -115,6 +120,7 @@ export const handler = async (event: { body?: string | null; headers: Record<str
       fileBytes,
       fileName: job.file_name,
       fileMime: job.file_mime || '',
+      orgContext: orgContext ?? undefined,
     });
 
     const shaped = shapeIngestResult(result.type, result.payload, job.stash_path);

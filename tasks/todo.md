@@ -93,3 +93,36 @@ keys) and ship Spec E (telemetry).
 Auto-enrich quality gates report quality. Cold brands with thin web presence → weak
 estimate → weak hook. **Fallback:** if enrichment is thin, drop to Tim-enters-a-few-fields
 rather than send a bad number.
+
+---
+
+# Self-Learning Smart Upload (2026-07-03, SHIPPED locally 2026-07-04)
+
+_Full plan: `~/.claude/plans/dazzling-crafting-cookie.md`. Feedback capture (Layer 1) +
+per-org supplier/document memory injected into the classifier prompt (Layer 2)._
+
+- [x] 1. Migration `20260703180000_smart_upload_learning.sql` (ingest_feedback +
+      ingest_document_profiles) — applied + verified on local Supabase
+- [x] 2. Pure helpers + vitest: `lib/ingest/feedback-diff.ts`, `supplier-key.ts`,
+      `feedback-hints.ts`
+- [x] 3. `lib/ingest/org-context.ts` (fetcher + pure formatter) + vitest
+- [x] 4. `classify-document.ts`: `orgContext` param + `logClaudeUsage`
+- [x] 5. Call-site wiring: inline route + Netlify background fn
+- [x] 6. `POST /api/ingest/feedback` route (diff, feedback insert, profile upsert)
+- [x] 7. UniversalDropzone: lift jobId, `recordFeedback`, thread into 9 editing panels
+- [x] 8. Admin page `/admin/ingest-learning` + API + sidebar link
+- [x] 9. Verification: 37 vitest pass, tsc clean, `@/`-import grep clean, manual E2E
+
+## Review
+- E2E verified on local (real Opus classification): upload 1 → `[ingest-context] chars=324
+  profiles=0`, feedback with an edited period_start → diff `edited: 1`, profile learned
+  (british gas → utility_bill, hints: kWh / Bristol Distillery / electricity_grid).
+  Upload 2 → `[ingest-context] chars=521 profiles=1` (hints injected), confirm →
+  times_seen=2. Idempotent retry → `repeat: true`, no double-bump. Cross-org user → 404.
+  `[ai-usage] op=ingest_classify` telemetry live. Admin page renders all three tables.
+- Local env fixes made along the way: backfilled 14 unrecorded migrations into local
+  `schema_migrations` (history had drifted; schema itself was already current), created
+  the `ingest-staging` bucket locally from the archived migration.
+- ⚠️ Migration pending PROD apply (SQL posted in chat).
+- Deferred (Layer 3+): embedding-based exemplar retrieval, cross-org anonymised learning,
+  content-hash dedup of re-uploads, feedback on handoff types (bom/spray/evidence).

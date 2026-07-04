@@ -9,6 +9,7 @@ import { BILL_TOOL_INPUT_SCHEMA } from '../claude/bill-schemas';
 import { parseImportXLSX } from '../bulk-import/xlsx-parser';
 import { parseHalfHourlyCsv } from '../energy/hh-csv-parser';
 import { readingsSpan, deriveMonthlyEntries } from '../energy/derive-utility';
+import { logClaudeUsage } from '../ai/usage-log';
 
 /**
  * Shared Smart Upload classifier.
@@ -111,6 +112,12 @@ export interface ClassifierInput {
   fileBytes: Uint8Array;
   fileName: string;
   fileMime: string;
+  /**
+   * Optional pre-formatted org context block (see lib/ingest/org-context.ts):
+   * industry, facility/supplier/product names and learned document profiles.
+   * Appended to the prompt as reference hints; absent = classify as before.
+   */
+  orgContext?: string;
 }
 
 /**
@@ -201,7 +208,7 @@ export function shapeIngestResult(
 }
 
 export async function classifyDocument(input: ClassifierInput): Promise<ClassifierResult> {
-  const { fileBytes, fileName, fileMime } = input;
+  const { fileBytes, fileName, fileMime, orgContext } = input;
   const lowerName = fileName.toLowerCase();
   const isXlsx =
     lowerName.endsWith('.xlsx') ||
@@ -756,10 +763,13 @@ export async function classifyDocument(input: ClassifierInput): Promise<Classifi
             type: 'text',
             text: 'Identify what type of document this is and extract the relevant consumption data by calling exactly one of the available tools. Focus on quantities (consumption, volume, or mass), not on cost figures.',
           },
+          ...(orgContext ? [{ type: 'text' as const, text: orgContext }] : []),
         ],
       },
     ],
   });
+
+  logClaudeUsage('ingest_classify', 'claude-opus-4-6', response);
 
   const toolUse = response.content.find((c) => c.type === 'tool_use');
   if (!toolUse || toolUse.type !== 'tool_use') {

@@ -46,6 +46,7 @@ import {
   UserCheck,
   Scale,
   Eye,
+  Brain,
   Handshake,
   Gift,
   MapPin,
@@ -987,6 +988,7 @@ export function Sidebar({ className }: SidebarProps) {
                     { href: '/admin/beta-access/', icon: FlaskConical, label: 'Beta Access' },
                     { href: '/admin/emissions-trace/', icon: Eye, label: 'Emissions Trace' },
                     { href: '/admin/reconciliation/', icon: Scale, label: 'Reconciliation' },
+                    { href: '/admin/ingest-learning/', icon: Brain, label: 'Ingest Learning' },
                   ].map(({ href, icon: AdminIcon, label }) => (
                     isCollapsed ? (
                       <Tooltip key={href}>

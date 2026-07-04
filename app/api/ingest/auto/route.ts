@@ -3,6 +3,7 @@ import { createHmac } from 'crypto'
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
 import { createClient } from '@supabase/supabase-js'
 import { classifyDocument, shapeIngestResult } from '@/lib/ingest/classify-document'
+import { buildIngestOrgContext } from '@/lib/ingest/org-context'
 import type { ExtractedBillData } from '@/app/api/utilities/import-from-pdf/route'
 import type {
   ExtractedFacilityBillData,
@@ -93,6 +94,7 @@ async function runInlineClassifier(
   jobId: string,
   file: File,
   stashPath: string,
+  organizationId: string,
 ): Promise<void> {
   const updateJob = (patch: Record<string, any>) =>
     serviceClient
@@ -104,11 +106,18 @@ async function runInlineClassifier(
       status: 'extracting',
       phase_message: 'Reading the document (inline fallback)…',
     })
-    const fileBytes = new Uint8Array(await file.arrayBuffer())
+    // Org context (learned document profiles + org facts) fetches in parallel
+    // with reading the file; a failure or timeout degrades to null and the
+    // document classifies without hints.
+    const [fileBytes, orgContext] = await Promise.all([
+      file.arrayBuffer().then((b) => new Uint8Array(b)),
+      buildIngestOrgContext(serviceClient, organizationId).catch(() => null),
+    ])
     const result = await classifyDocument({
       fileBytes,
       fileName: file.name,
       fileMime: file.type || '',
+      orgContext: orgContext ?? undefined,
     })
     // Pass the real stash path so the file carry-through works on the inline
     // path too. Without it, historical-report source PDFs are never preserved
@@ -412,7 +421,7 @@ export async function POST(request: NextRequest) {
     // back to the background trigger for large PDFs that wouldn't finish
     // inside Netlify's 26s sync ceiling.
     if (file.size <= INLINE_FALLBACK_MAX_BYTES) {
-      await runInlineClassifier(serviceClient, job.id, file, stashPath)
+      await runInlineClassifier(serviceClient, job.id, file, stashPath, organizationId)
       return NextResponse.json({ jobId: job.id }, { status: 202 })
     }
 
