@@ -14,8 +14,8 @@ import { logClaudeUsage } from '../ai/usage-log';
 /**
  * Shared Smart Upload classifier.
  *
- * Called by the Netlify background function. Runs Claude Opus 4.6 with a
- * union of mutually-exclusive tool schemas; Claude picks one and fills it in.
+ * Called by the Netlify background function. Runs Claude (CLASSIFIER_MODEL)
+ * with a union of mutually-exclusive tool schemas; Claude picks one and fills it in.
  * Returns a discriminated union that mirrors the existing IngestResponse
  * shape, so the client dispatches exactly as it did before the move to an
  * async job pattern.
@@ -24,6 +24,10 @@ import { logClaudeUsage } from '../ai/usage-log';
  * CSV) that don't need Claude at all — we route everything through the job
  * so the client has one consistent shape to poll.
  */
+
+// Tool-forced classification with document/vision input; no thinking needed.
+// Sonnet-tier handles this well at ~40% the cost of Opus.
+const CLASSIFIER_MODEL = 'claude-sonnet-4-6';
 
 const WATER_CATEGORY_VALUES = ['water_intake', 'water_discharge', 'water_recycled'] as const;
 const WASTE_CATEGORY_VALUES = ['waste_general', 'waste_hazardous', 'waste_recycling'] as const;
@@ -303,7 +307,7 @@ export async function classifyDocument(input: ClassifierInput): Promise<Classifi
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
   const response = await anthropic.messages.create({
-    model: 'claude-opus-4-6',
+    model: CLASSIFIER_MODEL,
     // Soil lab reports can carry many sampling locations × depth layers, so the
     // tool-call payload (a samples array) is larger than the single-object bills.
     max_tokens: 4000,
@@ -769,7 +773,7 @@ export async function classifyDocument(input: ClassifierInput): Promise<Classifi
     ],
   });
 
-  logClaudeUsage('ingest_classify', 'claude-opus-4-6', response);
+  logClaudeUsage('ingest_classify', CLASSIFIER_MODEL, response);
 
   const toolUse = response.content.find((c) => c.type === 'tool_use');
   if (!toolUse || toolUse.type !== 'tool_use') {
