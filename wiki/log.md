@@ -20,6 +20,10 @@ Published pages now sync into `gaia_knowledge_base` (category `wiki`, entry type
 
 `/wiki` is now an interactive map (modelled on the "AI Stack, Connected" layout): five typed bands of pills, click a topic to draw its connection curves and open a detail drawer (summary, in-short text, connected topics, sources, link to the full page), search that dims non-matches, three audience tours, and a crawlable "browse as a list" section below for SEO. Map data comes from `getWikiMapData()` in `lib/wiki.ts`; per-page articles at `/wiki/[slug]` unchanged.
 
+## 2026-07-05: Rosa sync automated
+
+The wiki now syncs into Rosa's knowledge base automatically after every successful production deploy: `netlify/functions/deploy-succeeded.ts` (Netlify event-triggered function, production context only) posts to `/api/cron/sync-wiki-to-rosa` (CRON_SECRET protected), which runs the shared sync in `lib/wiki-sync.ts`. The `/admin/wiki` button remains as a manual fallback and uses the same shared code. No clicks needed after content deploys any more.
+
 ## 2026-07-05: Moved inside the app (subscribers only)
 
 The wiki is no longer on the public marketing site. Same `/wiki` URL, now inside the authenticated app shell: server-side session gate on both routes (redirect to `/login`), AppLayout handles tier/lifecycle (trial banner, cancelled read-only paywall, suspended redirect), available to all subscriber tiers including trial. Removed the /knowledge banner and sitemap entries, added robots disallow, added sidebar (Resources) and command palette entries. Rosa's `/wiki/<slug>` citation links unchanged and work for logged-in users.

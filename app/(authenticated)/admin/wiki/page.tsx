@@ -86,8 +86,9 @@ export default function AdminWikiPage() {
         <CardHeader>
           <CardTitle>Rosa knowledge base sync</CardTitle>
           <CardDescription>
-            Replaces all knowledge base entries in the &quot;wiki&quot; category with the pages in
-            this deploy. Run after every deploy that changes wiki content.
+            Runs automatically after every production deploy. This button is the manual fallback:
+            it replaces all knowledge base entries in the &quot;wiki&quot; category with the pages
+            in this deploy.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

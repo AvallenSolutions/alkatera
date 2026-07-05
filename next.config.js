@@ -60,6 +60,7 @@ const nextConfig = {
       '/wiki': ['./wiki/pages/**/*'],
       '/wiki/[slug]': ['./wiki/pages/**/*'],
       '/api/admin/wiki-sync': ['./wiki/pages/**/*'],
+      '/api/cron/sync-wiki-to-rosa': ['./wiki/pages/**/*'],
     },
     optimizePackageImports: [
       'lucide-react',
