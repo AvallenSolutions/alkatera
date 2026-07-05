@@ -167,6 +167,7 @@ export interface WikiMapNode {
   lastReviewed: string;
   sources: WikiSource[];
   links: string[];
+  html: string;
 }
 
 // The first body paragraph ("**In short:** ...") as plain text, for the map
@@ -203,6 +204,9 @@ export function getWikiMapData(): WikiMapNode[] {
       lastReviewed: page.lastReviewed,
       sources: page.sources,
       links: Array.from(links),
+      // Full rendered article for the map's in-place reader popout; internal
+      // links stay as /wiki/<slug> so the client can intercept them.
+      html: renderWikiHtml(page),
     };
   });
 }

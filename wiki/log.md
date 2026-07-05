@@ -19,3 +19,7 @@ Published pages now sync into `gaia_knowledge_base` (category `wiki`, entry type
 ## 2026-07-05: Connected-map front end
 
 `/wiki` is now an interactive map (modelled on the "AI Stack, Connected" layout): five typed bands of pills, click a topic to draw its connection curves and open a detail drawer (summary, in-short text, connected topics, sources, link to the full page), search that dims non-matches, three audience tours, and a crawlable "browse as a list" section below for SEO. Map data comes from `getWikiMapData()` in `lib/wiki.ts`; per-page articles at `/wiki/[slug]` unchanged.
+
+## 2026-07-05: In-place reader popout
+
+"Read the full page" now opens the article in a popout over the map instead of navigating away, and wikilinks inside the article swap the popout to the next article, so readers never leave `/wiki`. Each article ends with "Keep reading" chips (its connections). The standalone `/wiki/[slug]` pages remain for search engines and direct links (permalink icon in the reader header).

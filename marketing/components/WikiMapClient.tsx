@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
 import {
   Search,
   ArrowRight,
@@ -10,6 +9,7 @@ import {
   ExternalLink,
   CalendarCheck,
   MapPin,
+  Link2,
 } from 'lucide-react';
 
 // Serialisable shape produced by lib/wiki's getWikiMapData (declared locally so
@@ -24,6 +24,7 @@ export interface WikiMapNode {
   lastReviewed: string;
   sources: { title: string; url: string }[];
   links: string[];
+  html: string;
 }
 
 interface Band {
@@ -130,6 +131,8 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
   const [query, setQuery] = useState('');
   const [tour, setTour] = useState<{ id: string; step: number } | null>(null);
   const [edges, setEdges] = useState<Edge[]>([]);
+  // Slug currently open in the in-place reader popout (null = closed).
+  const [article, setArticle] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const pillRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -154,13 +157,59 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
     setEdges([]);
   }, []);
 
+  // Open a full article in the popout, keeping the map selection in step. A
+  // hop to a different topic behaves like a manual click (exits any tour).
+  const openArticle = useCallback(
+    (slug: string) => {
+      setArticle(slug);
+      setSelected((current) => {
+        if (current !== slug) {
+          setTour(null);
+          scrollPillIntoView(slug);
+        }
+        return slug;
+      });
+    },
+    [scrollPillIntoView],
+  );
+
+  const closeArticle = useCallback(() => setArticle(null), []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') reset();
+      if (e.key !== 'Escape') return;
+      if (article) closeArticle();
+      else reset();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [reset]);
+  }, [reset, article, closeArticle]);
+
+  // Lock background scroll while the reader popout is open.
+  useEffect(() => {
+    if (!article) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [article]);
+
+  // Wikilinks inside the rendered article point at /wiki/<slug>; catch them so
+  // reading chains from page to page without ever leaving the map.
+  const onArticleClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const anchor = (e.target as HTMLElement).closest('a');
+      if (!anchor) return;
+      const href = anchor.getAttribute('href') || '';
+      if (!href.startsWith('/wiki/')) return;
+      const slug = href.slice('/wiki/'.length);
+      if (!bySlug.has(slug)) return;
+      e.preventDefault();
+      openArticle(slug);
+    },
+    [bySlug, openArticle],
+  );
 
   // Connection curves are drawn between pill centres in container coordinates.
   const recomputeEdges = useCallback(() => {
@@ -429,13 +478,13 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
               <p className="mb-4 text-sm leading-relaxed text-gray-400">{selectedNode.inShort}</p>
             )}
 
-            <Link
-              href={`/wiki/${selectedNode.slug}`}
+            <button
+              onClick={() => openArticle(selectedNode.slug)}
               className="group mb-5 inline-flex items-center gap-2 rounded-md border border-[#ccff00]/40 bg-[#ccff00]/10 px-4 py-2 font-mono text-xs uppercase tracking-widest text-[#ccff00] transition-all duration-300 hover:bg-[#ccff00]/20"
             >
               Read the full page
               <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1" />
-            </Link>
+            </button>
 
             {(neighbours.get(selectedNode.slug)?.size ?? 0) > 0 && (
               <div className="mb-5">
@@ -500,6 +549,130 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
       <p className="mt-4 font-mono text-xs text-gray-600">
         {nodes.length} pages · {connectionCount} connections · Esc or click the background to reset
       </p>
+
+      {/* In-place reader popout: the full article without leaving the map. */}
+      {article &&
+        (() => {
+          const node = bySlug.get(article);
+          if (!node) return null;
+          const band = bandFor.get(node.type);
+          return (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm md:p-8"
+              onClick={closeArticle}
+              role="dialog"
+              aria-modal="true"
+              aria-label={node.title}
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="flex max-h-full w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0a0a0a] shadow-2xl"
+              >
+                <div className="flex items-center justify-between gap-3 border-b border-white/10 px-6 py-4 md:px-8">
+                  <div className="flex flex-wrap items-center gap-3">
+                    {band && (
+                      <span
+                        className="rounded-md border px-3 py-1 font-mono text-xs uppercase tracking-widest"
+                        style={{
+                          color: band.accent,
+                          borderColor: `${band.accent}55`,
+                          backgroundColor: `${band.accent}15`,
+                        }}
+                      >
+                        {band.label}
+                      </span>
+                    )}
+                    {node.lastReviewed && (
+                      <span className="hidden items-center gap-1.5 font-mono text-xs uppercase tracking-widest text-gray-600 sm:inline-flex">
+                        <CalendarCheck className="h-3.5 w-3.5" />
+                        Last reviewed {formatDate(node.lastReviewed)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <a
+                      href={`/wiki/${node.slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Open as its own page"
+                      className="rounded-md p-2 text-gray-500 transition-colors hover:text-white"
+                    >
+                      <Link2 className="h-4 w-4" />
+                    </a>
+                    <button
+                      onClick={closeArticle}
+                      className="rounded-md p-2 text-gray-500 transition-colors hover:text-white"
+                      aria-label="Close reader"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div key={node.slug} className="overflow-y-auto px-6 py-6 md:px-8 md:py-8">
+                  <h2 className="mb-6 font-serif text-3xl leading-tight text-white md:text-4xl">
+                    {node.title}
+                  </h2>
+                  <div
+                    className="wiki-prose"
+                    onClick={onArticleClick}
+                    dangerouslySetInnerHTML={{ __html: node.html }}
+                  />
+
+                  {node.sources.length > 0 && (
+                    <div className="mt-10 border-t border-white/10 pt-6">
+                      <p className="mb-3 font-mono text-xs uppercase tracking-widest text-gray-500">
+                        Sources
+                      </p>
+                      <ul className="space-y-1.5">
+                        {node.sources.map((s, i) => (
+                          <li key={i}>
+                            {s.url ? (
+                              <a
+                                href={s.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-start gap-1.5 text-sm text-gray-300 transition-colors hover:text-[#ccff00]"
+                              >
+                                <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                {s.title}
+                              </a>
+                            ) : (
+                              <span className="text-sm text-gray-300">{s.title}</span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {(neighbours.get(node.slug)?.size ?? 0) > 0 && (
+                    <div className="mt-8">
+                      <p className="mb-3 font-mono text-xs uppercase tracking-widest text-gray-500">
+                        Keep reading
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {Array.from(neighbours.get(node.slug) ?? [])
+                          .map((slug) => bySlug.get(slug))
+                          .filter((n): n is WikiMapNode => Boolean(n))
+                          .sort((a, b) => a.title.localeCompare(b.title))
+                          .map((n) => (
+                            <button
+                              key={n.slug}
+                              onClick={() => openArticle(n.slug)}
+                              className="rounded-full border border-white/15 px-3 py-1.5 text-xs text-gray-400 transition-colors hover:border-[#ccff00]/60 hover:text-white"
+                            >
+                              {n.title}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
     </div>
   );
 }
