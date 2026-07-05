@@ -245,6 +245,13 @@ export function KnowledgePageClient({ initialPosts = [] }: { initialPosts?: Know
             <p className="font-mono text-gray-400 text-sm md:text-base max-w-2xl leading-relaxed">
               Insights, guides, and perspectives on building a regenerative drinks brand. From carbon accounting to supply chain strategy, explore the science and stories behind sustainable growth.
             </p>
+            <Link
+              href="/wiki"
+              className="group inline-flex items-center gap-2 mt-8 px-5 py-3 bg-[#ccff00]/10 border border-[#ccff00]/30 text-[#ccff00] font-mono text-xs uppercase tracking-widest rounded-md hover:bg-[#ccff00]/20 transition-all duration-300"
+            >
+              Looking for a definition? Browse the sustainability wiki
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform duration-300" />
+            </Link>
           </motion.div>
         </div>
       </section>
