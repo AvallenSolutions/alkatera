@@ -17,6 +17,10 @@ const config: Config = {
         serif: ['var(--font-serif)', '"Playfair Display"', 'Georgia', 'serif'],
         sans: ['Inter', 'system-ui', 'sans-serif'],
         mono: ['var(--font-data)', 'Consolas', 'monospace'],
+        display: ['var(--font-display)', '"Space Grotesk"', 'sans-serif'],
+      },
+      transitionTimingFunction: {
+        studio: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
@@ -111,6 +115,31 @@ const config: Config = {
         'brand-primary': 'rgb(var(--brand-primary-rgb) / <alpha-value>)',
         'brand-strong': 'rgb(var(--brand-accent-rgb) / <alpha-value>)',
         'brand-on': 'rgb(var(--brand-on-primary-rgb) / <alpha-value>)',
+        /* The studio design language (app-wide on the redesign branch).
+           Namespaced tokens; see components/studio/theme.ts. */
+        studio: {
+          paper: '#ECEAE3',
+          cream: '#F2F1EA',
+          hairline: '#D9D6CB',
+          dim: '#6F6F68',
+          ink: '#1A1B1D',
+          forest: '#205E40',
+          cobalt: '#2B46C0',
+          ochre: '#DFA32B',
+          'ochre-ink': '#A97C14',
+          brick: '#BF4B2A',
+          good: '#047857',
+          attention: '#B45309',
+          stale: '#BE123C',
+          hold: '#6D28D9',
+        },
+        /* The current room's colours; set via --room-*-rgb by each room
+           layout. `room` is the saturated band/poster ink, `room-accent`
+           its text form on paper (ochre swaps to a darker ink), `room-on`
+           the text colour on the band. */
+        room: 'rgb(var(--room-rgb, 26 27 29) / <alpha-value>)',
+        'room-accent': 'rgb(var(--room-accent-rgb, 26 27 29) / <alpha-value>)',
+        'room-on': 'rgb(var(--room-on-rgb, 242 241 234) / <alpha-value>)',
       },
       keyframes: {
         'accordion-down': {

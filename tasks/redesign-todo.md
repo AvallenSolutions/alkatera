@@ -15,16 +15,22 @@ Rules of the road:
 - [x] `pnpm install`
 - [x] launch.json `redesign` config on :8891
 - [x] design language converted to `design/studio-design-language.md`
-- [ ] dev server verified on :8891, logged in, baseline screenshot
-- [ ] branch pushed to GitHub as backup
+- [x] dev server verified on :8891, logged in as dev@local.test, baseline screenshot (5 July)
+- [x] branch pushed to GitHub as backup (`origin/redesign`)
 
 ## Milestone 1 · the foundation
-- [ ] Tokens: paper/cream/hairline/dim/ink ground + room inks + working tones in globals.css & tailwind.config.ts, radius 6
-- [ ] Fonts: add Space Grotesk (statements, big numbers, tabular); Inter body; JetBrains Mono labels; retire Lora/Playfair defaults
-- [ ] Dark mode retired on this branch (confirm with Tim at review)
-- [ ] Kit of parts in `components/studio/`: pill actions, panel, accent panel, mono tabs, big number, fact row, state chips, stage bar, marks, breathing grid + studio ease + reduced-motion
-- [ ] Kit-of-parts gallery page for review on :8891
-- [ ] REVIEW CHECKPOINT with Tim
+- [x] Tokens: studio ground is now the DEFAULT `:root` theme in globals.css (paper/cream/hairline/dim/ink, room-ink charts, radius 6); studio.* + room tokens + studio ease in tailwind.config.ts
+- [x] Fonts: Space Grotesk added app-wide (`--font-display`, and `--font-heading` now points at it); Lora retired; Playfair kept only for passport exports
+- [x] Dark mode retired: next-themes forced light in app/layout.tsx, `.dark` block deleted (toggle UI still present but inert; confirm removal with Tim)
+- [x] Kit of parts: ported the distributor studio kit (uncommitted work found in the main checkout, built to this same design doc) to app-wide `components/studio/` (21 files: panel, pill-button, big-number, fact-row, state-chip, stage-bar, mark, mono-tabs, eyebrow, statement, poster-block, breathing-grid, room-band, ink-band, studio-shell, theme registry...)
+- [x] Kit-of-parts gallery at `/studio-kit` on :8891; legacy neon-* vars retinted to studio inks as a bridge until each room is converted
+- [ ] REVIEW CHECKPOINT with Tim ← WE ARE HERE
+
+Note: the ROOMS registry in components/studio/theme.ts is still distributor-flavoured;
+the platform room mapping is the M2 workshop. The distributor studio work remains
+uncommitted in the MAIN checkout (another stream); when it lands on main, the merge
+into this branch will conflict lightly in tailwind.config.ts (same token values, so
+resolution is trivial).
 
 ## Milestone 2 · the house of rooms
 - [ ] Room mapping proposal for the SaaS (workshop with Tim before building)

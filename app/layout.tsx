@@ -1,6 +1,7 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import { Inter, Lora, JetBrains_Mono, Playfair_Display } from 'next/font/google';
+import { Inter, JetBrains_Mono, Playfair_Display } from 'next/font/google';
+import { spaceGrotesk } from '@/components/studio/fonts';
 import { AuthProvider } from '@/components/providers/AuthProvider';
 import { QueryProvider } from '@/components/providers/QueryProvider';
 import { OrganizationProvider } from '@/lib/organizationContext';
@@ -14,12 +15,6 @@ import { PostHogProvider } from './providers';
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-body',
-  display: 'swap',
-});
-
-const lora = Lora({
-  subsets: ['latin'],
-  variable: '--font-heading',
   display: 'swap',
 });
 
@@ -168,12 +163,17 @@ export default function RootLayout({
         />
       </head>
       <GoogleAnalytics />
-      <body className={`${inter.variable} ${lora.variable} ${jetbrainsMono.variable} ${playfairDisplay.variable} font-body`}>
+      <body className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} ${playfairDisplay.variable} font-body`}>
         <PostHogProvider>
+          {/* The studio is a single paper theme: dark mode is retired on the
+              redesign branch, so the theme is forced light and the toggle is
+              inert. Confirm with Tim at the M1 review before deleting the
+              toggle UI itself. */}
           <ThemeProvider
             attribute="class"
-            defaultTheme="system"
-            enableSystem
+            defaultTheme="light"
+            forcedTheme="light"
+            enableSystem={false}
             disableTransitionOnChange={false}
           >
             <QueryProvider>
