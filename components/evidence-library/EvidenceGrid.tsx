@@ -6,10 +6,11 @@ import { toast } from 'sonner'
 import { useOrganization } from '@/lib/organizationContext'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Statement } from '@/components/studio/statement'
+import { StateChip } from '@/components/studio/state-chip'
 import {
   Dialog,
   DialogContent,
@@ -19,10 +20,7 @@ import {
 } from '@/components/ui/dialog'
 import {
   Upload,
-  Loader2,
   FileText,
-  Tag,
-  Link2,
   ArrowRight,
 } from 'lucide-react'
 
@@ -67,28 +65,26 @@ export function EvidenceGrid() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-heading font-bold tracking-tight">Evidence Library</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Upload a policy or evidence doc once — we&apos;ll suggest which B Corp, VSME, ESRS, CDP and SBTi requirements it satisfies.
-          </p>
-        </div>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <Statement eyebrow="THE EVIDENCE · LIBRARY" headline="The library." />
         <Button onClick={() => setUploadOpen(true)} className="gap-2">
           <Upload className="h-4 w-4" />
           Upload document
         </Button>
       </div>
+      <p className="text-sm text-studio-dim max-w-2xl">
+        Upload a policy or evidence doc once, and we&apos;ll suggest which B Corp, VSME, ESRS, CDP and SBTi requirements it satisfies.
+      </p>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground py-8">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading…
-        </div>
+        <p className="py-8 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+          Loading…
+        </p>
       ) : docs.length === 0 ? (
-        <Card>
+        <Card className="rounded-[6px] border-border">
           <CardContent className="py-12 text-center space-y-3">
-            <div className="h-12 w-12 mx-auto rounded-full bg-muted flex items-center justify-center">
-              <FileText className="h-5 w-5 text-muted-foreground" />
+            <div className="h-12 w-12 mx-auto rounded-full bg-secondary flex items-center justify-center">
+              <FileText className="h-5 w-5 text-studio-dim" />
             </div>
             <div>
               <p className="text-sm font-medium">Your evidence library is empty.</p>
@@ -106,11 +102,11 @@ export function EvidenceGrid() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {docs.map((d) => (
             <Link key={d.id} href={`/evidence-library/${d.id}`} className="group">
-              <Card className="h-full transition-shadow hover:shadow-md">
+              <Card className="h-full rounded-[6px] border-border transition-colors hover:border-studio-brick/60">
                 <CardContent className="p-4 flex flex-col gap-3 h-full">
                   <div className="flex items-start gap-3">
-                    <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                      <FileText className="h-4 w-4 text-muted-foreground" />
+                    <div className="h-9 w-9 rounded-[6px] bg-secondary flex items-center justify-center flex-shrink-0">
+                      <FileText className="h-4 w-4 text-studio-dim" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm truncate">{d.title}</p>
@@ -125,9 +121,9 @@ export function EvidenceGrid() {
                   )}
 
                   {d.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap gap-x-2.5 gap-y-1">
                       {d.tags.slice(0, 4).map((t) => (
-                        <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                        <span key={t} className="font-mono text-[10px] uppercase tracking-wide text-studio-dim">
                           {t}
                         </span>
                       ))}
@@ -135,18 +131,10 @@ export function EvidenceGrid() {
                   )}
 
                   <div className="mt-auto pt-2 flex items-center justify-between">
-                    <Badge
-                      variant="outline"
-                      className={
-                        d.linked_count > 0
-                          ? 'border-emerald-500/40 text-emerald-700 dark:text-emerald-300 text-[10px] gap-1'
-                          : 'text-[10px] gap-1'
-                      }
-                    >
-                      <Link2 className="h-2.5 w-2.5" />
+                    <StateChip tone={d.linked_count > 0 ? 'good' : 'quiet'}>
                       {d.linked_count === 0 ? 'Not linked yet' : `Linked to ${d.linked_count}`}
-                    </Badge>
-                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+                    </StateChip>
+                    <ArrowRight className="h-4 w-4 text-studio-dim group-hover:translate-x-0.5 transition-transform" />
                   </div>
                 </CardContent>
               </Card>
@@ -289,8 +277,8 @@ function UploadDialog({
               Cancel
             </Button>
             <Button size="sm" onClick={handleUpload} disabled={uploading || !file || !title.trim()}>
-              {uploading ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Upload className="h-3.5 w-3.5 mr-1.5" />}
-              Upload
+              <Upload className="h-3.5 w-3.5 mr-1.5" />
+              {uploading ? 'Uploading…' : 'Upload'}
             </Button>
           </div>
         </div>

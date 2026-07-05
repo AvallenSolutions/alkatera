@@ -13,13 +13,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import {
   ArrowLeft,
   ArrowRight,
   SkipForward,
-  Loader2,
   CheckCircle2,
   Layers,
   Zap,
@@ -215,8 +213,7 @@ export function BulkEditStep({ onComplete, onBack, onSkip }: BulkEditStepProps) 
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
-        <Loader2 className="w-8 h-8 text-neon-lime animate-spin" />
-        <p className="mt-3 text-sm text-muted-foreground">Loading packaging items...</p>
+        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">Loading packaging items</span>
       </div>
     )
   }
@@ -227,10 +224,10 @@ export function BulkEditStep({ onComplete, onBack, onSkip }: BulkEditStepProps) 
       <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 animate-in fade-in duration-300">
         <div className="w-full max-w-md space-y-6">
           <div className="text-center space-y-3">
-            <div className="mx-auto w-16 h-16 bg-emerald-400/20 backdrop-blur-md border border-emerald-400/30 rounded-2xl flex items-center justify-center">
-              <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+            <div className="mx-auto w-16 h-16 rounded-[6px] border border-border bg-card flex items-center justify-center">
+              <CheckCircle2 className="w-8 h-8 text-studio-good" />
             </div>
-            <h3 className="text-xl font-serif font-bold text-foreground">
+            <h3 className="text-xl font-display font-bold text-foreground">
               All items already have complete EPR data!
             </h3>
             <p className="text-sm text-muted-foreground">
@@ -249,7 +246,7 @@ export function BulkEditStep({ onComplete, onBack, onSkip }: BulkEditStepProps) 
             </Button>
             <Button
               onClick={onComplete}
-              className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full"
             >
               Continue
               <ArrowRight className="w-4 h-4 ml-2" />
@@ -265,10 +262,10 @@ export function BulkEditStep({ onComplete, onBack, onSkip }: BulkEditStepProps) 
       <div className="w-full max-w-2xl space-y-6">
         {/* Header */}
         <div className="text-center space-y-3">
-          <div className="mx-auto w-16 h-16 bg-neon-lime/20 backdrop-blur-md border border-neon-lime/30 rounded-2xl flex items-center justify-center">
-            <Layers className="w-8 h-8 text-neon-lime" />
+          <div className="mx-auto w-16 h-16 rounded-[6px] border border-border bg-card flex items-center justify-center">
+            <Layers className="w-8 h-8 text-studio-brick" />
           </div>
-          <h3 className="text-xl font-serif font-bold text-foreground">
+          <h3 className="text-xl font-display font-bold text-foreground">
             Bulk Edit Packaging Items
           </h3>
           <p className="text-sm text-muted-foreground">
@@ -277,19 +274,16 @@ export function BulkEditStep({ onComplete, onBack, onSkip }: BulkEditStepProps) 
         </div>
 
         {/* Batch Actions Bar */}
-        <div className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl p-4 space-y-4">
+        <div className="rounded-[6px] border border-border bg-card p-4 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-neon-lime" />
+              <Zap className="w-4 h-4 text-studio-brick" />
               <span className="text-sm font-medium text-muted-foreground">Batch Actions</span>
             </div>
             {selectedIds.size > 0 && (
-              <Badge
-                variant="outline"
-                className="border-neon-lime/30 text-neon-lime bg-neon-lime/10 text-xs"
-              >
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-brick">
                 {selectedIds.size} selected
-              </Badge>
+              </span>
             )}
           </div>
 
@@ -298,7 +292,7 @@ export function BulkEditStep({ onComplete, onBack, onSkip }: BulkEditStepProps) 
             <div className="space-y-1.5">
               <Label className="text-xs font-medium text-muted-foreground">Set Activity</Label>
               <Select value={batchActivity} onValueChange={setBatchActivity}>
-                <SelectTrigger className="bg-muted/50 border-border text-foreground text-sm placeholder:text-muted-foreground/50 focus:ring-neon-lime/50 h-9">
+                <SelectTrigger className="bg-background border-border text-foreground text-sm placeholder:text-muted-foreground/50 h-9">
                   <SelectValue placeholder="Activity..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -315,7 +309,7 @@ export function BulkEditStep({ onComplete, onBack, onSkip }: BulkEditStepProps) 
             <div className="space-y-1.5">
               <Label className="text-xs font-medium text-muted-foreground">Set UK Nation</Label>
               <Select value={batchNation} onValueChange={setBatchNation}>
-                <SelectTrigger className="bg-muted/50 border-border text-foreground text-sm placeholder:text-muted-foreground/50 focus:ring-neon-lime/50 h-9">
+                <SelectTrigger className="bg-background border-border text-foreground text-sm placeholder:text-muted-foreground/50 h-9">
                   <SelectValue placeholder="Nation..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -332,7 +326,7 @@ export function BulkEditStep({ onComplete, onBack, onSkip }: BulkEditStepProps) 
             <div className="space-y-1.5">
               <Label className="text-xs font-medium text-muted-foreground">Set Household</Label>
               <Select value={batchHousehold} onValueChange={setBatchHousehold}>
-                <SelectTrigger className="bg-muted/50 border-border text-foreground text-sm placeholder:text-muted-foreground/50 focus:ring-neon-lime/50 h-9">
+                <SelectTrigger className="bg-background border-border text-foreground text-sm placeholder:text-muted-foreground/50 h-9">
                   <SelectValue placeholder="Household..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -349,7 +343,7 @@ export function BulkEditStep({ onComplete, onBack, onSkip }: BulkEditStepProps) 
             <div className="space-y-1.5">
               <Label className="text-xs font-medium text-muted-foreground">Set Drinks Container</Label>
               <Select value={batchDrinksContainer} onValueChange={setBatchDrinksContainer}>
-                <SelectTrigger className="bg-muted/50 border-border text-foreground text-sm placeholder:text-muted-foreground/50 focus:ring-neon-lime/50 h-9">
+                <SelectTrigger className="bg-background border-border text-foreground text-sm placeholder:text-muted-foreground/50 h-9">
                   <SelectValue placeholder="Drinks container..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -366,11 +360,10 @@ export function BulkEditStep({ onComplete, onBack, onSkip }: BulkEditStepProps) 
           <Button
             onClick={handleApply}
             disabled={isApplying || selectedIds.size === 0 || !hasBatchValues}
-            className="w-full bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl"
+            className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full"
           >
             {isApplying ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Applying...
               </>
             ) : (
@@ -382,13 +375,13 @@ export function BulkEditStep({ onComplete, onBack, onSkip }: BulkEditStepProps) 
         </div>
 
         {/* Items Table */}
-        <div className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl overflow-hidden">
+        <div className="rounded-[6px] border border-border bg-card overflow-hidden">
           {/* Table Header */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-muted/20">
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-secondary/50">
             <Checkbox
               checked={isAllSelected}
               onCheckedChange={toggleSelectAll}
-              className="border-border data-[state=checked]:bg-neon-lime data-[state=checked]:text-black data-[state=checked]:border-neon-lime"
+              className="border-border data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground data-[state=checked]:border-primary"
             />
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Select All ({items.length} items)
@@ -396,7 +389,7 @@ export function BulkEditStep({ onComplete, onBack, onSkip }: BulkEditStepProps) 
           </div>
 
           {/* Table Body */}
-          <div className="max-h-[300px] overflow-y-auto divide-y divide-white/5 scrollbar-thin scrollbar-thumb-muted-foreground/20">
+          <div className="max-h-[300px] overflow-y-auto divide-y divide-border/40 scrollbar-thin scrollbar-thumb-muted-foreground/20">
             {items.map((item) => {
               const isSelected = selectedIds.has(item.id)
 
@@ -404,14 +397,14 @@ export function BulkEditStep({ onComplete, onBack, onSkip }: BulkEditStepProps) 
                 <div
                   key={item.id}
                   className={`flex items-center gap-3 px-4 py-3 transition-colors cursor-pointer ${
-                    isSelected ? 'bg-neon-lime/5' : 'hover:bg-muted/20'
+                    isSelected ? 'bg-secondary' : 'hover:bg-secondary/60'
                   }`}
                   onClick={() => toggleSelect(item.id)}
                 >
                   <Checkbox
                     checked={isSelected}
                     onCheckedChange={() => toggleSelect(item.id)}
-                    className="border-border data-[state=checked]:bg-neon-lime data-[state=checked]:text-black data-[state=checked]:border-neon-lime"
+                    className="border-border data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground data-[state=checked]:border-primary"
                   />
 
                   <div className="min-w-0 flex-1">
@@ -426,36 +419,24 @@ export function BulkEditStep({ onComplete, onBack, onSkip }: BulkEditStepProps) 
                   {/* Missing field indicators */}
                   <div className="flex flex-wrap gap-1 justify-end max-w-[200px]">
                     {!item.epr_packaging_activity && (
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] border-amber-400/30 text-amber-400 bg-amber-400/10 px-1.5 py-0"
-                      >
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-attention">
                         Activity
-                      </Badge>
+                      </span>
                     )}
                     {!item.epr_uk_nation && (
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] border-amber-400/30 text-amber-400 bg-amber-400/10 px-1.5 py-0"
-                      >
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-attention">
                         Nation
-                      </Badge>
+                      </span>
                     )}
                     {item.epr_is_household == null && (
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] border-amber-400/30 text-amber-400 bg-amber-400/10 px-1.5 py-0"
-                      >
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-attention">
                         Household
-                      </Badge>
+                      </span>
                     )}
                     {item.epr_is_drinks_container == null && (
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] border-amber-400/30 text-amber-400 bg-amber-400/10 px-1.5 py-0"
-                      >
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-attention">
                         DRS
-                      </Badge>
+                      </span>
                     )}
                   </div>
                 </div>
@@ -487,7 +468,7 @@ export function BulkEditStep({ onComplete, onBack, onSkip }: BulkEditStepProps) 
             )}
             <Button
               onClick={onComplete}
-              className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full"
             >
               Continue
               <ArrowRight className="w-4 h-4 ml-2" />

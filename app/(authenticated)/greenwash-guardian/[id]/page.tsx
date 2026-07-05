@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -23,13 +22,13 @@ import {
   Trash2,
   ChevronDown,
   ChevronUp,
-  ExternalLink,
-  Loader2,
   Scale,
   Lightbulb,
   FileText,
 } from "lucide-react";
-import { fetchAssessmentWithClaims, deleteAssessment, getRiskLevelColor, getJurisdictionLabel } from "@/lib/greenwash";
+import { StateChip } from "@/components/studio/state-chip";
+import { BigNumber } from "@/components/studio/big-number";
+import { fetchAssessmentWithClaims, deleteAssessment, getJurisdictionLabel } from "@/lib/greenwash";
 import type { GreenwashAssessmentWithClaims, GreenwashAssessmentClaim } from "@/lib/types/greenwash";
 import { toast } from "sonner";
 import { PageLoader } from "@/components/ui/page-loader";
@@ -176,37 +175,15 @@ export default function AssessmentReportPage() {
   const isProcessing = assessment.status === "processing" || assessment.status === "pending";
   const isFailed = assessment.status === "failed";
 
-  const RiskIndicator = ({ level }: { level: string }) => {
-    const color = getRiskLevelColor(level);
-    const Icon = level === "high" ? AlertTriangle :
-                 level === "medium" ? AlertCircle :
-                 CheckCircle2;
-
-    return (
-      <div className={`flex items-center gap-2 px-4 py-2 rounded-lg bg-${color}-500/20 border border-${color}-500/30`}>
-        <Icon className={`h-5 w-5 text-${color}-400`} />
-        <span className={`font-semibold text-${color}-400 uppercase`}>
-          {level} Risk
-        </span>
-      </div>
-    );
-  };
-
   return (
-    <div className="min-h-screen bg-[#09090b] relative overflow-hidden">
-      {/* Background */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-1/3 right-1/4 w-80 h-80 bg-cyan-500/20 rounded-full blur-3xl animate-pulse delay-1000" />
-      </div>
-
-      <div className="relative z-10 container mx-auto p-6 max-w-4xl space-y-6">
+    <div className="min-h-screen">
+      <div className="container mx-auto p-6 max-w-4xl space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <Button
             variant="ghost"
             onClick={() => router.push("/greenwash-guardian")}
-            className="text-slate-400 hover:text-white"
+            className="text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Greenwash Guardian
@@ -216,15 +193,14 @@ export default function AssessmentReportPage() {
               variant="outline"
               onClick={handleExportPDF}
               disabled={isProcessing || isFailed || isExporting}
-              className="bg-white/5 border-white/10 text-white hover:bg-white/10"
             >
-              {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+              <Download className="h-4 w-4 mr-2" />
               {isExporting ? 'Generating...' : 'Export PDF'}
             </Button>
             <Button
               variant="outline"
               onClick={handleDelete}
-              className="bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20"
+              className="text-studio-stale hover:text-studio-stale"
             >
               <Trash2 className="h-4 w-4" />
             </Button>
@@ -232,22 +208,22 @@ export default function AssessmentReportPage() {
         </div>
 
         {/* Disclaimer */}
-        <Alert className="bg-amber-500/10 border-amber-500/30">
-          <Info className="h-4 w-4 text-amber-400" />
-          <AlertDescription className="text-amber-200">
-            <strong>Disclaimer:</strong> This report provides guidance only and is not legal advice.
+        <Alert className="rounded-[6px] border-border bg-card">
+          <Info className="h-4 w-4 text-studio-attention" />
+          <AlertDescription className="text-muted-foreground">
+            <strong className="text-foreground">Disclaimer:</strong> This report provides guidance only and is not legal advice.
             Consult qualified legal counsel for compliance decisions.
           </AlertDescription>
         </Alert>
 
         {/* Processing State */}
         {isProcessing && (
-          <Card className="backdrop-blur-xl bg-white/5 border border-white/10">
+          <Card className="rounded-[6px]">
             <CardContent className="py-12 text-center">
-              <Loader2 className="h-12 w-12 animate-spin text-emerald-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-white mb-2">Analyzing Content</h3>
-              <p className="text-slate-400">
-                We're reviewing your content against UK and EU anti-greenwashing legislation...
+              <Shield className="h-12 w-12 text-studio-brick mx-auto mb-4" />
+              <h3 className="font-display text-xl font-semibold text-foreground mb-2">Analysing content.</h3>
+              <p className="text-muted-foreground">
+                We're reviewing your content against UK and EU anti-greenwashing legislation. Results appear here shortly.
               </p>
             </CardContent>
           </Card>
@@ -267,16 +243,16 @@ export default function AssessmentReportPage() {
         {assessment.status === "completed" && (
           <>
             {/* Title & Overview Card */}
-            <Card className="backdrop-blur-xl bg-white/5 border border-white/10">
+            <Card className="rounded-[6px]">
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div>
-                    <CardTitle className="text-white text-2xl flex items-center gap-3">
-                      <Shield className="h-6 w-6 text-emerald-400" />
+                    <CardTitle className="text-2xl flex items-center gap-3">
+                      <Shield className="h-6 w-6 text-studio-brick" />
                       {assessment.title}
                     </CardTitle>
-                    <CardDescription className="text-slate-400 mt-2">
-                      Analyzed on {new Date(assessment.created_at).toLocaleDateString()} •{" "}
+                    <CardDescription className="mt-2">
+                      Analysed on {new Date(assessment.created_at).toLocaleDateString()} ·{" "}
                       {assessment.input_type === "url" ? "Website" :
                        assessment.input_type === "document" ? "Document" :
                        assessment.input_type === "social_media" ? "Social Media" : "Text"} Analysis
@@ -287,52 +263,47 @@ export default function AssessmentReportPage() {
               <CardContent>
                 {/* Risk Overview */}
                 <div className="flex items-center gap-6 mb-6">
-                  <div className={`flex items-center gap-3 px-6 py-4 rounded-xl ${
-                    assessment.overall_risk_level === "high" ? "bg-red-500/20 border border-red-500/30" :
-                    assessment.overall_risk_level === "medium" ? "bg-amber-500/20 border border-amber-500/30" :
-                    "bg-green-500/20 border border-green-500/30"
-                  }`}>
-                    {assessment.overall_risk_level === "high" ? (
-                      <AlertTriangle className="h-8 w-8 text-red-400" />
-                    ) : assessment.overall_risk_level === "medium" ? (
-                      <AlertCircle className="h-8 w-8 text-amber-400" />
-                    ) : (
-                      <CheckCircle2 className="h-8 w-8 text-green-400" />
-                    )}
-                    <div>
-                      <p className={`text-2xl font-bold ${
-                        assessment.overall_risk_level === "high" ? "text-red-400" :
-                        assessment.overall_risk_level === "medium" ? "text-amber-400" :
-                        "text-green-400"
-                      }`}>
-                        {assessment.overall_risk_level?.toUpperCase()} RISK
-                      </p>
-                      <p className="text-slate-400 text-sm">
-                        Score: {assessment.overall_risk_score}/100
-                      </p>
-                    </div>
+                  <div className="flex items-end gap-6 rounded-[6px] border border-border bg-secondary px-6 py-4">
+                    <BigNumber
+                      value={`${assessment.overall_risk_score}`}
+                      label="RISK / 100"
+                      tone={
+                        assessment.overall_risk_level === "high" ? "stale" :
+                        assessment.overall_risk_level === "medium" ? "attention" :
+                        "good"
+                      }
+                    />
+                    <StateChip
+                      tone={
+                        assessment.overall_risk_level === "high" ? "stale" :
+                        assessment.overall_risk_level === "medium" ? "attention" :
+                        "good"
+                      }
+                      className="pb-1"
+                    >
+                      {assessment.overall_risk_level} risk
+                    </StateChip>
                   </div>
                   <div className="flex-1">
-                    <p className="text-slate-300">{assessment.summary}</p>
+                    <p className="text-foreground">{assessment.summary}</p>
                   </div>
                 </div>
 
                 {/* Legislation Applied */}
                 {assessment.legislation_applied && assessment.legislation_applied.length > 0 && (
                   <div className="mb-6">
-                    <h4 className="text-sm font-medium text-slate-400 mb-2 flex items-center gap-2">
+                    <h4 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
                       <Scale className="h-4 w-4" />
                       Legislation Applied
                     </h4>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
                       {assessment.legislation_applied.map((leg, idx) => (
-                        <Badge
+                        <span
                           key={idx}
-                          variant="outline"
-                          className="bg-white/5 border-white/20 text-slate-300"
+                          className="font-mono text-[10px] font-bold uppercase tracking-[0.15em] text-studio-dim"
                         >
-                          {getJurisdictionLabel(leg.jurisdiction)} • {leg.name}
-                        </Badge>
+                          {getJurisdictionLabel(leg.jurisdiction)} · {leg.name}
+                        </span>
                       ))}
                     </div>
                   </div>
@@ -342,13 +313,13 @@ export default function AssessmentReportPage() {
 
             {/* Claims Section */}
             {assessment.claims && assessment.claims.length > 0 && (
-              <Card className="backdrop-blur-xl bg-white/5 border border-white/10">
+              <Card className="rounded-[6px]">
                 <CardHeader>
-                  <CardTitle className="text-white flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-emerald-400" />
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-studio-brick" />
                     Identified Claims ({assessment.claims.length})
                   </CardTitle>
-                  <CardDescription className="text-slate-400">
+                  <CardDescription>
                     Environmental claims found in your content with risk assessments
                   </CardDescription>
                 </CardHeader>
@@ -367,19 +338,19 @@ export default function AssessmentReportPage() {
 
             {/* Recommendations */}
             {assessment.recommendations && assessment.recommendations.length > 0 && (
-              <Card className="backdrop-blur-xl bg-white/5 border border-white/10">
+              <Card className="rounded-[6px]">
                 <CardHeader>
-                  <CardTitle className="text-white flex items-center gap-2">
-                    <Lightbulb className="h-5 w-5 text-amber-400" />
+                  <CardTitle className="flex items-center gap-2">
+                    <Lightbulb className="h-5 w-5 text-studio-brick" />
                     Recommendations
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-3">
                     {assessment.recommendations.map((rec, idx) => (
-                      <li key={idx} className="flex items-start gap-3 text-slate-300">
-                        <span className="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-sm font-medium">
-                          {idx + 1}
+                      <li key={idx} className="flex items-start gap-3 text-foreground">
+                        <span className="flex-shrink-0 font-mono text-[11px] font-bold text-studio-brick tabular-nums pt-0.5">
+                          {String(idx + 1).padStart(2, "0")}
                         </span>
                         {rec}
                       </li>
@@ -391,11 +362,11 @@ export default function AssessmentReportPage() {
 
             {/* No Claims Found */}
             {(!assessment.claims || assessment.claims.length === 0) && (
-              <Card className="backdrop-blur-xl bg-green-500/10 border border-green-500/30">
+              <Card className="rounded-[6px]">
                 <CardContent className="py-8 text-center">
-                  <CheckCircle2 className="h-12 w-12 text-green-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-white mb-2">No Issues Found</h3>
-                  <p className="text-slate-400">
+                  <CheckCircle2 className="h-12 w-12 text-studio-good mx-auto mb-4" />
+                  <h3 className="font-display text-xl font-semibold text-foreground mb-2">No issues found.</h3>
+                  <p className="text-muted-foreground">
                     We didn&apos;t identify any significant greenwashing risks in your content.
                   </p>
                 </CardContent>
@@ -417,93 +388,84 @@ function ClaimCard({
   isExpanded: boolean;
   onToggle: () => void;
 }) {
-  const riskColor = claim.risk_level === "high" ? "red" :
-                    claim.risk_level === "medium" ? "amber" :
-                    "green";
+  const riskTone =
+    claim.risk_level === "high" ? "stale" :
+    claim.risk_level === "medium" ? "attention" :
+    "good";
+  const riskTextClass =
+    claim.risk_level === "high" ? "text-studio-stale" :
+    claim.risk_level === "medium" ? "text-studio-attention" :
+    "text-studio-good";
 
   return (
     <Collapsible open={isExpanded} onOpenChange={onToggle}>
-      <div className={`rounded-lg border ${
-        claim.risk_level === "high" ? "bg-red-500/10 border-red-500/30" :
-        claim.risk_level === "medium" ? "bg-amber-500/10 border-amber-500/30" :
-        "bg-green-500/10 border-green-500/30"
-      }`}>
+      <div className="rounded-[6px] border border-border bg-card">
         <CollapsibleTrigger asChild>
-          <button className="w-full p-4 flex items-start gap-4 text-left hover:bg-white/5 transition-colors rounded-lg">
-            <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-              claim.risk_level === "high" ? "bg-red-500/20" :
-              claim.risk_level === "medium" ? "bg-amber-500/20" :
-              "bg-green-500/20"
-            }`}>
+          <button className="w-full p-4 flex items-start gap-4 text-left hover:bg-secondary transition-colors rounded-[6px]">
+            <div className="flex-shrink-0 pt-0.5">
               {claim.risk_level === "high" ? (
-                <AlertTriangle className="h-4 w-4 text-red-400" />
+                <AlertTriangle className={`h-4 w-4 ${riskTextClass}`} />
               ) : claim.risk_level === "medium" ? (
-                <AlertCircle className="h-4 w-4 text-amber-400" />
+                <AlertCircle className={`h-4 w-4 ${riskTextClass}`} />
               ) : (
-                <CheckCircle2 className="h-4 w-4 text-green-400" />
+                <CheckCircle2 className={`h-4 w-4 ${riskTextClass}`} />
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-white font-medium">&quot;{claim.claim_text}&quot;</p>
-              <p className="text-slate-400 text-sm mt-1 truncate">
+              <p className="text-foreground font-medium">&quot;{claim.claim_text}&quot;</p>
+              <p className="text-muted-foreground text-sm mt-1 truncate">
                 {claim.issue_description}
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Badge className={`${
-                claim.risk_level === "high" ? "bg-red-500/20 text-red-400 border-red-500/30" :
-                claim.risk_level === "medium" ? "bg-amber-500/20 text-amber-400 border-amber-500/30" :
-                "bg-green-500/20 text-green-400 border-green-500/30"
-              }`}>
-                {claim.risk_level.toUpperCase()}
-              </Badge>
+              <StateChip tone={riskTone}>{claim.risk_level}</StateChip>
               {isExpanded ? (
-                <ChevronUp className="h-5 w-5 text-slate-400" />
+                <ChevronUp className="h-5 w-5 text-muted-foreground" />
               ) : (
-                <ChevronDown className="h-5 w-5 text-slate-400" />
+                <ChevronDown className="h-5 w-5 text-muted-foreground" />
               )}
             </div>
           </button>
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="px-4 pb-4 pt-0 space-y-4">
-            <Separator className="bg-white/10" />
+            <Separator />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <h5 className="text-sm font-medium text-slate-400 mb-1">Issue Type</h5>
-                <p className="text-white">{claim.issue_type?.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}</p>
+                <h5 className="text-sm font-medium text-muted-foreground mb-1">Issue Type</h5>
+                <p className="text-foreground">{claim.issue_type?.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}</p>
               </div>
               <div>
-                <h5 className="text-sm font-medium text-slate-400 mb-1">Risk Score</h5>
-                <p className="text-white">{claim.risk_score}/100</p>
+                <h5 className="text-sm font-medium text-muted-foreground mb-1">Risk Score</h5>
+                <p className="text-foreground tabular-nums">{claim.risk_score}/100</p>
               </div>
             </div>
 
             <div>
-              <h5 className="text-sm font-medium text-slate-400 mb-1">Issue Description</h5>
-              <p className="text-slate-300">{claim.issue_description}</p>
+              <h5 className="text-sm font-medium text-muted-foreground mb-1">Issue Description</h5>
+              <p className="text-foreground">{claim.issue_description}</p>
             </div>
 
             <div className="flex items-center gap-2">
-              <Scale className="h-4 w-4 text-slate-400" />
-              <span className="text-sm text-slate-400">Legislation:</span>
-              <Badge variant="outline" className="bg-white/5 border-white/20 text-slate-300">
-                {getJurisdictionLabel(claim.legislation_jurisdiction)} • {claim.legislation_name}
+              <Scale className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Legislation:</span>
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.15em] text-studio-dim">
+                {getJurisdictionLabel(claim.legislation_jurisdiction)} · {claim.legislation_name}
                 {claim.legislation_article && ` (${claim.legislation_article})`}
-              </Badge>
+              </span>
             </div>
 
-            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4">
-              <h5 className="text-sm font-medium text-emerald-400 mb-2 flex items-center gap-2">
+            <div className="bg-secondary border border-border rounded-[6px] p-4">
+              <h5 className="text-sm font-medium text-studio-good mb-2 flex items-center gap-2">
                 <Lightbulb className="h-4 w-4" />
                 Suggestion
               </h5>
-              <p className="text-slate-300">{claim.suggestion}</p>
+              <p className="text-foreground">{claim.suggestion}</p>
               {claim.suggested_revision && (
-                <div className="mt-3 p-3 bg-white/5 rounded-lg">
-                  <h6 className="text-xs font-medium text-slate-400 mb-1">Suggested Revision:</h6>
-                  <p className="text-white italic">&quot;{claim.suggested_revision}&quot;</p>
+                <div className="mt-3 p-3 bg-card border border-border rounded-[6px]">
+                  <h6 className="text-xs font-medium text-muted-foreground mb-1">Suggested Revision:</h6>
+                  <p className="text-foreground italic">&quot;{claim.suggested_revision}&quot;</p>
                 </div>
               )}
             </div>

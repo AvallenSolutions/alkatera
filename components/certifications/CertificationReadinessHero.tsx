@@ -1,9 +1,8 @@
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Progress } from '@/components/ui/progress';
+import { StateChip } from '@/components/studio/state-chip';
 import { Award, CheckCircle2, Clock, AlertCircle, TrendingUp } from 'lucide-react';
 
 interface ReadinessSummary {
@@ -23,7 +22,7 @@ interface CertificationReadinessHeroProps {
 export function CertificationReadinessHero({ summary, loading }: CertificationReadinessHeroProps) {
   if (loading) {
     return (
-      <Card className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-200 dark:border-amber-800">
+      <Card className="rounded-[6px] border-border bg-card">
         <CardHeader>
           <Skeleton className="h-6 w-48" />
           <Skeleton className="h-4 w-64" />
@@ -41,7 +40,7 @@ export function CertificationReadinessHero({ summary, loading }: CertificationRe
 
   if (!summary) {
     return (
-      <Card className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-200 dark:border-amber-800">
+      <Card className="rounded-[6px] border-border bg-card">
         <CardContent className="p-6">
           <div className="text-center text-muted-foreground">
             <Award className="h-12 w-12 mx-auto mb-2 opacity-50" />
@@ -58,19 +57,16 @@ export function CertificationReadinessHero({ summary, loading }: CertificationRe
     : 0;
 
   return (
-    <Card className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-200 dark:border-amber-800">
+    <Card className="rounded-[6px] border-border bg-card">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Award className="h-6 w-6 text-amber-600" />
-            <CardTitle>Certification Readiness</CardTitle>
+            <Award className="h-5 w-5 text-studio-brick" />
+            <CardTitle className="font-display">Certification Readiness</CardTitle>
           </div>
-          <Badge
-            variant={overallReadiness >= 80 ? 'default' : overallReadiness >= 50 ? 'secondary' : 'outline'}
-            className={overallReadiness >= 80 ? 'bg-emerald-500' : ''}
-          >
+          <StateChip tone={overallReadiness >= 80 ? 'good' : overallReadiness >= 50 ? 'attention' : 'quiet'}>
             {overallReadiness}% Ready
-          </Badge>
+          </StateChip>
         </div>
         <CardDescription>
           Track your progress across sustainability certification frameworks
@@ -78,48 +74,45 @@ export function CertificationReadinessHero({ summary, loading }: CertificationRe
       </CardHeader>
       <CardContent>
         <div className="mb-6">
-          <div className="flex justify-between text-sm mb-2">
-            <span className="text-muted-foreground">Overall Progress</span>
-            <span className="font-medium">{summary.averageScore}% Average Score</span>
+          <div className="flex items-baseline justify-between mb-2">
+            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
+              Overall Progress
+            </span>
+            <span className="text-sm font-medium tabular-nums">{summary.averageScore}% Average Score</span>
           </div>
-          <Progress value={summary.averageScore} className="h-3" />
+          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-studio-brick"
+              style={{ width: `${Math.max(0, Math.min(100, summary.averageScore))}%` }}
+            />
+          </div>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <StatusCard
-            icon={<Award className="h-5 w-5 text-emerald-600" />}
+            icon={<Award className="h-4 w-4 text-studio-good" />}
             label="Certified"
             value={summary.certified}
-            bgColor="bg-emerald-50 dark:bg-emerald-950/30"
-            borderColor="border-emerald-200 dark:border-emerald-800"
           />
           <StatusCard
-            icon={<CheckCircle2 className="h-5 w-5 text-blue-600" />}
+            icon={<CheckCircle2 className="h-4 w-4 text-studio-brick" />}
             label="Ready"
             value={summary.ready}
-            bgColor="bg-blue-50 dark:bg-blue-950/30"
-            borderColor="border-blue-200 dark:border-blue-800"
           />
           <StatusCard
-            icon={<TrendingUp className="h-5 w-5 text-amber-600" />}
+            icon={<TrendingUp className="h-4 w-4 text-studio-attention" />}
             label="In Progress"
             value={summary.inProgress}
-            bgColor="bg-amber-50 dark:bg-amber-950/30"
-            borderColor="border-amber-200 dark:border-amber-800"
           />
           <StatusCard
-            icon={<Clock className="h-5 w-5 text-slate-500" />}
+            icon={<Clock className="h-4 w-4 text-studio-dim" />}
             label="Not Started"
             value={summary.notStarted}
-            bgColor="bg-slate-50 dark:bg-slate-800"
-            borderColor="border-slate-200 dark:border-slate-700"
           />
           <StatusCard
-            icon={<AlertCircle className="h-5 w-5 text-purple-600" />}
+            icon={<AlertCircle className="h-4 w-4 text-foreground" />}
             label="Total"
             value={summary.totalFrameworks}
-            bgColor="bg-purple-50 dark:bg-purple-950/30"
-            borderColor="border-purple-200 dark:border-purple-800"
           />
         </div>
       </CardContent>
@@ -131,18 +124,18 @@ interface StatusCardProps {
   icon: React.ReactNode;
   label: string;
   value: number;
-  bgColor: string;
-  borderColor: string;
 }
 
-function StatusCard({ icon, label, value, bgColor, borderColor }: StatusCardProps) {
+function StatusCard({ icon, label, value }: StatusCardProps) {
   return (
-    <div className={`p-4 rounded-lg border ${bgColor} ${borderColor}`}>
-      <div className="flex items-center gap-2 mb-2">
+    <div className="p-4 rounded-[6px] border border-border bg-card">
+      <div className="flex items-center gap-2">
         {icon}
-        <span className="text-sm text-muted-foreground">{label}</span>
+        <span className="font-mono text-[9.5px] uppercase tracking-[0.2em] text-foreground opacity-70">
+          {label}
+        </span>
       </div>
-      <p className="text-2xl font-bold">{value}</p>
+      <p className="mt-2 font-display text-2xl font-bold leading-none tabular-nums">{value}</p>
     </div>
   );
 }

@@ -6,8 +6,8 @@ import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { ScrollText, Leaf, ArrowRight, Trash2, Loader2 } from 'lucide-react'
+import { Eyebrow, StateChip } from '@/components/studio'
+import { ScrollText, Leaf, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 // Simple listing surface for historical_imports. Purpose-built to make
@@ -70,17 +70,20 @@ export default function HistoricalImportsPage() {
 
   return (
     <div className="space-y-6 animate-fade-in-up">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-heading font-bold tracking-tight">Historical imports</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Data carried over from prior sustainability reports and LCA studies. Stored for reference — use the{' '}
+      <div className="space-y-2">
+        <Eyebrow>THE EVIDENCE · HISTORICAL IMPORTS</Eyebrow>
+        <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+          The historical imports.
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Data carried over from prior sustainability reports and LCA studies. Stored for reference: use the{' '}
           <span className="font-medium">Upload</span> button in the header to add more.
         </p>
       </div>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground py-8">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+        <div className="py-8 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+          Loading
         </div>
       ) : rows.length === 0 ? (
         <Card>
@@ -116,7 +119,7 @@ export default function HistoricalImportsPage() {
         <CardHeader className="pb-2">
           <CardTitle className="text-sm">Next step</CardTitle>
           <CardDescription className="text-xs">
-            Promoting an imported LCA to a full operational PCF — so it appears in your live LCA library with calculated methodology — is a follow-up we&apos;ll wire up next.
+            Promoting an imported LCA to a full operational PCF (so it appears in your live LCA library with calculated methodology) is a follow-up we&apos;ll wire up next.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -144,7 +147,7 @@ function HistoricalSection({
       <CardHeader className="pb-2">
         <CardTitle className="text-base flex items-center gap-2">
           {icon} {title}
-          <Badge variant="secondary" className="ml-auto h-5 px-1.5 text-xs">{rows.length}</Badge>
+          <StateChip className="ml-auto">{rows.length}</StateChip>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
@@ -159,17 +162,17 @@ function HistoricalSection({
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   {r.reporting_year ? (
-                    <Badge variant="outline" className="h-5 px-1.5 text-xs">{r.reporting_year}</Badge>
+                    <StateChip>{r.reporting_year}</StateChip>
                   ) : null}
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-6 w-6 text-muted-foreground hover:text-red-500"
+                    className="h-6 w-6 text-muted-foreground hover:text-studio-stale"
                     disabled={deletingId === r.id}
                     onClick={() => onDelete(r.id)}
                     title="Remove"
                   >
-                    {deletingId === r.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                    <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               </div>

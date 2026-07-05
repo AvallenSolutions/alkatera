@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import {
   ArrowRight,
-  Loader2,
   FileSpreadsheet,
   AlertTriangle,
   CheckCircle2,
@@ -14,7 +13,6 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import {
   Select,
   SelectContent,
@@ -119,7 +117,7 @@ export function GenerateStep({ onComplete, onBack }: GenerateStepProps) {
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Header */}
       <div className="text-center space-y-2">
-        <h2 className="text-2xl md:text-3xl font-serif font-bold text-foreground">
+        <h2 className="text-2xl md:text-3xl font-display font-bold text-foreground">
           Generate Submission
         </h2>
         <p className="text-muted-foreground text-sm max-w-md mx-auto">
@@ -129,7 +127,7 @@ export function GenerateStep({ onComplete, onBack }: GenerateStepProps) {
       </div>
 
       {/* Period & Fee Year Selectors */}
-      <Card className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl">
+      <Card className="rounded-[6px] border border-border bg-card">
         <CardContent className="p-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Submission Period */}
@@ -142,7 +140,7 @@ export function GenerateStep({ onComplete, onBack }: GenerateStepProps) {
                 onValueChange={setSubmissionPeriod}
                 disabled={generating}
               >
-                <SelectTrigger className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50">
+                <SelectTrigger className="bg-background border-border text-foreground placeholder:text-muted-foreground/50">
                   <SelectValue placeholder="Select period" />
                 </SelectTrigger>
                 <SelectContent>
@@ -165,7 +163,7 @@ export function GenerateStep({ onComplete, onBack }: GenerateStepProps) {
                 onValueChange={setFeeYear}
                 disabled={generating}
               >
-                <SelectTrigger className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50">
+                <SelectTrigger className="bg-background border-border text-foreground placeholder:text-muted-foreground/50">
                   <SelectValue placeholder="Select fee year" />
                 </SelectTrigger>
                 <SelectContent>
@@ -185,11 +183,10 @@ export function GenerateStep({ onComplete, onBack }: GenerateStepProps) {
               <Button
                 onClick={handleGenerate}
                 disabled={generating || !submissionPeriod || !feeYear}
-                className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl px-8 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full px-8 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {generating ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     Generating...
                   </>
                 ) : (
@@ -206,13 +203,13 @@ export function GenerateStep({ onComplete, onBack }: GenerateStepProps) {
 
       {/* Error */}
       {error && (
-        <div className="flex items-start gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/20">
-          <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 p-4 rounded-[6px] border border-border bg-card">
+          <AlertTriangle className="w-5 h-5 text-studio-stale flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-medium text-red-400">
+            <p className="text-sm font-medium text-studio-stale">
               Generation failed
             </p>
-            <p className="text-xs text-red-400/70 mt-1">{error}</p>
+            <p className="text-xs text-studio-stale/70 mt-1">{error}</p>
           </div>
         </div>
       )}
@@ -221,23 +218,23 @@ export function GenerateStep({ onComplete, onBack }: GenerateStepProps) {
       {generated && submission && (
         <>
           {/* Summary Stats */}
-          <Card className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl">
+          <Card className="rounded-[6px] border border-border bg-card">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-5">
                 <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <FileSpreadsheet className="w-4 h-4" />
                   Submission Summary
                 </h3>
-                <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/20 hover:bg-amber-500/15">
+                <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-attention">
                   Draft
-                </Badge>
+                </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {/* Total Weight */}
-                <div className="bg-muted/50 rounded-xl p-4 text-center">
-                  <Weight className="w-5 h-5 text-neon-lime mx-auto mb-2" />
-                  <p className="text-2xl font-bold text-foreground">
+                <div className="rounded-[6px] border border-border bg-secondary p-4 text-center">
+                  <Weight className="w-5 h-5 text-studio-brick mx-auto mb-2" />
+                  <p className="text-2xl font-bold text-foreground tabular-nums">
                     {totalWeightTonnes}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -246,18 +243,18 @@ export function GenerateStep({ onComplete, onBack }: GenerateStepProps) {
                 </div>
 
                 {/* Estimated Fee */}
-                <div className="bg-muted/50 rounded-xl p-4 text-center">
-                  <PoundSterling className="w-5 h-5 text-neon-lime mx-auto mb-2" />
-                  <p className="text-2xl font-bold text-foreground">
+                <div className="rounded-[6px] border border-border bg-secondary p-4 text-center">
+                  <PoundSterling className="w-5 h-5 text-studio-brick mx-auto mb-2" />
+                  <p className="text-2xl font-bold text-foreground tabular-nums">
                     {formatGBP(submission.total_estimated_fee_gbp)}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">Estimated Fee</p>
                 </div>
 
                 {/* Line Count */}
-                <div className="bg-muted/50 rounded-xl p-4 text-center">
-                  <Rows3 className="w-5 h-5 text-neon-lime mx-auto mb-2" />
-                  <p className="text-2xl font-bold text-foreground">
+                <div className="rounded-[6px] border border-border bg-secondary p-4 text-center">
+                  <Rows3 className="w-5 h-5 text-studio-brick mx-auto mb-2" />
+                  <p className="text-2xl font-bold text-foreground tabular-nums">
                     {submission.total_line_items}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -270,7 +267,7 @@ export function GenerateStep({ onComplete, onBack }: GenerateStepProps) {
 
           {/* Material Breakdown */}
           {Object.keys(materialSummary).length > 0 && (
-            <Card className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl">
+            <Card className="rounded-[6px] border border-border bg-card">
               <CardContent className="p-6">
                 <h3 className="text-sm font-medium text-muted-foreground mb-4">
                   Material Breakdown
@@ -335,9 +332,9 @@ export function GenerateStep({ onComplete, onBack }: GenerateStepProps) {
 
           {/* Warnings */}
           {warnings.length > 0 && (
-            <Card className="bg-amber-500/5 backdrop-blur-md border border-amber-500/15 rounded-2xl">
+            <Card className="rounded-[6px] border border-border bg-card">
               <CardContent className="p-6">
-                <h3 className="text-sm font-medium text-amber-400 flex items-center gap-2 mb-3">
+                <h3 className="text-sm font-medium text-studio-attention flex items-center gap-2 mb-3">
                   <AlertTriangle className="w-4 h-4" />
                   Warnings ({warnings.length})
                 </h3>
@@ -345,9 +342,9 @@ export function GenerateStep({ onComplete, onBack }: GenerateStepProps) {
                   {warnings.map((warning, i) => (
                     <li
                       key={i}
-                      className="text-xs text-amber-400/70 flex items-start gap-2"
+                      className="text-xs text-studio-attention/70 flex items-start gap-2"
                     >
-                      <span className="text-amber-400/40 mt-0.5">--</span>
+                      <span className="text-studio-attention/40 mt-0.5">·</span>
                       {warning}
                     </li>
                   ))}
@@ -371,7 +368,7 @@ export function GenerateStep({ onComplete, onBack }: GenerateStepProps) {
         {generated && (
           <Button
             onClick={onComplete}
-            className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full"
           >
             Continue
             <ArrowRight className="w-4 h-4 ml-2" />

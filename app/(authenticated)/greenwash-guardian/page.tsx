@@ -10,7 +10,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  Loader2,
   Globe,
   FileText,
   MessageSquare,
@@ -24,6 +23,7 @@ import {
   List,
   Lock,
 } from "lucide-react";
+import { Eyebrow } from "@/components/studio/eyebrow";
 import { useOrganization } from "@/lib/organizationContext";
 import { useSubscription } from "@/hooks/useSubscription";
 import { toast } from "sonner";
@@ -242,79 +242,70 @@ export default function GreenwashGuardianPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#09090b] relative overflow-hidden">
-      {/* Animated Background */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-1/3 right-1/4 w-80 h-80 bg-cyan-500/20 rounded-full blur-3xl animate-pulse delay-1000" />
-      </div>
-
-      <div className="relative z-10 container mx-auto p-6 max-w-4xl space-y-6">
+    <div className="min-h-screen">
+      <div className="container mx-auto p-6 max-w-4xl space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-              <Shield className="h-6 w-6 text-emerald-400" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-white">Greenwash Guardian</h1>
-              <p className="text-slate-400 mt-1">
-                AI-powered analysis against UK & EU anti-greenwashing legislation
-              </p>
-            </div>
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <Eyebrow className="mb-3">THE EVIDENCE · GUARDIAN</Eyebrow>
+            <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+              The guardian.
+            </h1>
+            <p className="text-muted-foreground mt-2 text-sm">
+              Analysis against UK and EU anti-greenwashing legislation.
+            </p>
           </div>
           <Link href="/greenwash-guardian/history">
-            <Button variant="outline" className="bg-white/5 border-white/10 text-white hover:bg-white/10">
+            <Button variant="outline">
               <History className="h-4 w-4 mr-2" />
               View History
             </Button>
           </Link>
-        </div>
+        </header>
 
         {/* Disclaimer */}
-        <Alert className="bg-amber-500/10 border-amber-500/30">
-          <Info className="h-4 w-4 text-amber-400" />
-          <AlertDescription className="text-amber-200">
-            <strong>Disclaimer:</strong> This tool provides guidance based on UK and EU anti-greenwashing
+        <Alert className="rounded-[6px] border-border bg-card">
+          <Info className="h-4 w-4 text-studio-attention" />
+          <AlertDescription className="text-muted-foreground">
+            <strong className="text-foreground">Disclaimer:</strong> This tool provides guidance based on UK and EU anti-greenwashing
             legislation. It is not legal advice. Always consult qualified legal counsel for compliance decisions.
           </AlertDescription>
         </Alert>
 
         {/* Main Card */}
-        <Card className="backdrop-blur-xl bg-white/5 border border-white/10">
+        <Card className="rounded-[6px]">
           <CardHeader>
-            <CardTitle className="text-white">New Assessment</CardTitle>
-            <CardDescription className="text-slate-400">
-              Analyze marketing content for potential greenwashing risks
+            <CardTitle>New Assessment</CardTitle>
+            <CardDescription>
+              Analyse marketing content for potential greenwashing risks
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Title Input */}
             <div className="space-y-2">
-              <Label htmlFor="title" className="text-slate-300">Assessment Title (optional)</Label>
+              <Label htmlFor="title">Assessment Title (optional)</Label>
               <Input
                 id="title"
                 placeholder="e.g., Website sustainability page review"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 disabled={isSubmitting}
-                className="bg-white/5 border-white/10 text-white placeholder:text-slate-500"
               />
             </div>
 
             {/* Input Tabs */}
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
-              <TabsList className="grid w-full grid-cols-5 bg-white/5 border border-white/10">
+              <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger
                   value="url"
-                  className="data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 text-slate-400"
+                  className="font-mono text-[10px] font-bold uppercase tracking-[0.15em]"
                 >
                   <Globe className="h-4 w-4 mr-2" />
                   URL
                 </TabsTrigger>
                 <TabsTrigger
                   value="bulk"
-                  className="data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 text-slate-400"
+                  className="font-mono text-[10px] font-bold uppercase tracking-[0.15em]"
                 >
                   <List className="h-4 w-4 mr-2" />
                   Bulk URLs
@@ -322,7 +313,7 @@ export default function GreenwashGuardianPage() {
                 <TabsTrigger
                   value="document"
                   disabled={!canAnalyzeDocuments}
-                  className="data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 text-slate-400 disabled:opacity-50"
+                  className="font-mono text-[10px] font-bold uppercase tracking-[0.15em] disabled:opacity-50"
                 >
                   {!canAnalyzeDocuments ? <Lock className="h-4 w-4 mr-2" /> : <FileText className="h-4 w-4 mr-2" />}
                   Document
@@ -330,7 +321,7 @@ export default function GreenwashGuardianPage() {
                 <TabsTrigger
                   value="text"
                   disabled={!canAnalyzeDocuments}
-                  className="data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 text-slate-400 disabled:opacity-50"
+                  className="font-mono text-[10px] font-bold uppercase tracking-[0.15em] disabled:opacity-50"
                 >
                   {!canAnalyzeDocuments ? <Lock className="h-4 w-4 mr-2" /> : <MessageSquare className="h-4 w-4 mr-2" />}
                   Text
@@ -338,7 +329,7 @@ export default function GreenwashGuardianPage() {
                 <TabsTrigger
                   value="social_media"
                   disabled={!canAnalyzeDocuments}
-                  className="data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 text-slate-400 disabled:opacity-50"
+                  className="font-mono text-[10px] font-bold uppercase tracking-[0.15em] disabled:opacity-50"
                 >
                   {!canAnalyzeDocuments ? <Lock className="h-4 w-4 mr-2" /> : <Share2 className="h-4 w-4 mr-2" />}
                   Social
@@ -346,21 +337,21 @@ export default function GreenwashGuardianPage() {
               </TabsList>
 
               {!canAnalyzeDocuments && (
-                <p className="text-xs text-amber-400/80 mt-2">
+                <p className="text-xs text-studio-attention mt-2">
                   Document, text and social media analysis requires a Blossom or Canopy plan.{" "}
                   <Link href="/dashboard/settings" className="underline">Upgrade</Link>
                 </p>
               )}
 
               {canAnalyzeDocuments && !isGreenwashUnlimited && (
-                <p className="text-xs text-slate-400 mt-2">
+                <p className="text-xs text-muted-foreground mt-2">
                   5 document analyses per month on your plan.
                 </p>
               )}
 
               <TabsContent value="url" className="space-y-4 mt-4">
                 <div className="space-y-2">
-                  <Label htmlFor="url" className="text-slate-300">Website URL</Label>
+                  <Label htmlFor="url">Website URL</Label>
                   <Input
                     id="url"
                     type="url"
@@ -368,17 +359,16 @@ export default function GreenwashGuardianPage() {
                     value={urlInput}
                     onChange={(e) => setUrlInput(e.target.value)}
                     disabled={isSubmitting}
-                    className="bg-white/5 border-white/10 text-white placeholder:text-slate-500"
                   />
-                  <p className="text-xs text-slate-500">
-                    We&apos;ll analyze the page and its subpages (up to 10 pages)
+                  <p className="text-xs text-muted-foreground">
+                    We&apos;ll analyse the page and its subpages (up to 10 pages)
                   </p>
                 </div>
               </TabsContent>
 
               <TabsContent value="bulk" className="space-y-4 mt-4">
                 <div className="space-y-2">
-                  <Label htmlFor="bulk-urls" className="text-slate-300">URLs (one per line)</Label>
+                  <Label htmlFor="bulk-urls">URLs (one per line)</Label>
                   <Textarea
                     id="bulk-urls"
                     placeholder={"https://example.com/sustainability\nhttps://competitor.com/green-claims\nhttps://supplier.com/environment"}
@@ -386,14 +376,14 @@ export default function GreenwashGuardianPage() {
                     onChange={(e) => setBulkUrls(e.target.value)}
                     disabled={isSubmitting}
                     rows={8}
-                    className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 font-mono text-sm"
+                    className="font-mono text-sm"
                   />
                   <div className="flex items-center justify-between">
-                    <p className="text-xs text-slate-500">
-                      Enter up to 50 URLs to scan in batch. Each URL will be analyzed separately.
+                    <p className="text-xs text-muted-foreground">
+                      Enter up to 50 URLs to scan in batch. Each URL will be analysed separately.
                     </p>
-                    <span className="text-xs text-slate-400">
-                      {bulkUrls.split("\n").filter(u => u.trim()).length} / 50 URLs
+                    <span className="text-xs font-mono text-muted-foreground">
+                      {bulkUrls.split("\n").filter(u => u.trim()).length} / 50 URLS
                     </span>
                   </div>
                 </div>
@@ -401,8 +391,8 @@ export default function GreenwashGuardianPage() {
 
               <TabsContent value="document" className="space-y-4 mt-4">
                 <div className="space-y-2">
-                  <Label className="text-slate-300">Upload Document</Label>
-                  <div className="border-2 border-dashed border-white/10 rounded-lg p-8 text-center hover:border-emerald-500/50 transition-colors">
+                  <Label>Upload Document</Label>
+                  <div className="border-2 border-dashed border-border rounded-[6px] p-8 text-center hover:border-studio-brick/50 transition-colors">
                     <input
                       type="file"
                       accept=".pdf,.docx,.txt"
@@ -414,9 +404,9 @@ export default function GreenwashGuardianPage() {
                     <label htmlFor="file-upload" className="cursor-pointer">
                       {documentFile ? (
                         <div className="space-y-2">
-                          <FileText className="h-10 w-10 text-emerald-400 mx-auto" />
-                          <p className="text-white font-medium">{documentFile.name}</p>
-                          <p className="text-slate-500 text-sm">
+                          <FileText className="h-10 w-10 text-studio-brick mx-auto" />
+                          <p className="text-foreground font-medium">{documentFile.name}</p>
+                          <p className="text-muted-foreground text-sm">
                             {(documentFile.size / 1024 / 1024).toFixed(2)} MB
                           </p>
                           <Button
@@ -433,11 +423,11 @@ export default function GreenwashGuardianPage() {
                         </div>
                       ) : (
                         <div className="space-y-2">
-                          <Upload className="h-10 w-10 text-slate-500 mx-auto" />
-                          <p className="text-slate-400">
+                          <Upload className="h-10 w-10 text-muted-foreground mx-auto" />
+                          <p className="text-muted-foreground">
                             Click to upload or drag and drop
                           </p>
-                          <p className="text-slate-500 text-sm">
+                          <p className="text-muted-foreground text-sm">
                             PDF, DOCX, or TXT (max 10MB)
                           </p>
                         </div>
@@ -449,7 +439,7 @@ export default function GreenwashGuardianPage() {
 
               <TabsContent value="text" className="space-y-4 mt-4">
                 <div className="space-y-2">
-                  <Label htmlFor="text" className="text-slate-300">Marketing Copy / Press Release</Label>
+                  <Label htmlFor="text">Marketing Copy / Press Release</Label>
                   <Textarea
                     id="text"
                     placeholder="Paste your marketing copy, press release, or any text content here..."
@@ -457,9 +447,8 @@ export default function GreenwashGuardianPage() {
                     onChange={(e) => setTextInput(e.target.value)}
                     disabled={isSubmitting}
                     rows={10}
-                    className="bg-white/5 border-white/10 text-white placeholder:text-slate-500"
                   />
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-muted-foreground">
                     {textInput.length} characters
                   </p>
                 </div>
@@ -468,7 +457,7 @@ export default function GreenwashGuardianPage() {
               <TabsContent value="social_media" className="space-y-4 mt-4">
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="social-url" className="text-slate-300">Social Media Post URL</Label>
+                    <Label htmlFor="social-url">Social Media Post URL</Label>
                     <Input
                       id="social-url"
                       type="url"
@@ -476,12 +465,11 @@ export default function GreenwashGuardianPage() {
                       value={socialMediaUrl}
                       onChange={(e) => setSocialMediaUrl(e.target.value)}
                       disabled={isSubmitting}
-                      className="bg-white/5 border-white/10 text-white placeholder:text-slate-500"
                     />
                   </div>
-                  <div className="text-center text-slate-500 text-sm">or</div>
+                  <div className="text-center text-muted-foreground text-sm">or</div>
                   <div className="space-y-2">
-                    <Label htmlFor="social-text" className="text-slate-300">Paste Post Content</Label>
+                    <Label htmlFor="social-text">Paste Post Content</Label>
                     <Textarea
                       id="social-text"
                       placeholder="Paste the social media post content here..."
@@ -489,7 +477,6 @@ export default function GreenwashGuardianPage() {
                       onChange={(e) => setSocialMediaText(e.target.value)}
                       disabled={isSubmitting}
                       rows={6}
-                      className="bg-white/5 border-white/10 text-white placeholder:text-slate-500"
                     />
                   </div>
                 </div>
@@ -508,17 +495,14 @@ export default function GreenwashGuardianPage() {
               onClick={handleSubmit}
               disabled={isSubmitting}
               size="lg"
-              className="w-full bg-emerald-500 hover:bg-emerald-600 text-black font-semibold"
+              className="w-full bg-primary text-primary-foreground font-semibold"
             >
               {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Analyzing...
-                </>
+                <>Analysing...</>
               ) : (
                 <>
                   <Shield className="mr-2 h-5 w-5" />
-                  Analyze for Greenwashing Risks
+                  Analyse for Greenwashing Risks
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </>
               )}
@@ -528,28 +512,28 @@ export default function GreenwashGuardianPage() {
 
         {/* Info Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card className="backdrop-blur-xl bg-white/5 border border-white/10">
+          <Card className="rounded-[6px]">
             <CardHeader className="pb-2">
-              <CardTitle className="text-white text-lg flex items-center gap-2">
+              <CardTitle className="text-lg flex items-center gap-2">
                 <span className="text-xl">🇬🇧</span> UK Legislation
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ul className="text-sm text-slate-400 space-y-1">
+              <ul className="text-sm text-muted-foreground space-y-1">
                 <li>• Green Claims Code (CMA)</li>
                 <li>• Digital Markets, Competition and Consumers Act 2024</li>
               </ul>
             </CardContent>
           </Card>
 
-          <Card className="backdrop-blur-xl bg-white/5 border border-white/10">
+          <Card className="rounded-[6px]">
             <CardHeader className="pb-2">
-              <CardTitle className="text-white text-lg flex items-center gap-2">
+              <CardTitle className="text-lg flex items-center gap-2">
                 <span className="text-xl">🇪🇺</span> EU Legislation
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ul className="text-sm text-slate-400 space-y-1">
+              <ul className="text-sm text-muted-foreground space-y-1">
                 <li>• Directive on Empowering Consumers for the Green Transition</li>
                 <li>• Green Claims Directive</li>
               </ul>

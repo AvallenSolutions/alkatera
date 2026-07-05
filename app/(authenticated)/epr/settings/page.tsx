@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Eyebrow } from '@/components/studio/eyebrow'
+import { StateChip } from '@/components/studio/state-chip'
 import { Switch } from '@/components/ui/switch'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
@@ -18,10 +19,8 @@ import {
   Scale,
   Globe,
   Recycle,
-  Loader2,
   Save,
   Sparkles,
-  Info,
   AlertCircle,
   MapPin,
   Users,
@@ -176,14 +175,14 @@ const EMPTY_CONTACT: HMRCContactFormState = { first_name: '', last_name: '', pho
 function getObligationBadge(size: ObligationSize) {
   switch (size) {
     case 'large':
-      return <Badge variant="info">Large Producer</Badge>
+      return <StateChip tone="stale">Large Producer</StateChip>
     case 'small':
-      return <Badge variant="warning">Small Producer</Badge>
+      return <StateChip tone="attention">Small Producer</StateChip>
     case 'below':
-      return <Badge variant="secondary">Below Threshold</Badge>
+      return <StateChip tone="good">Below Threshold</StateChip>
     case 'pending':
     default:
-      return <Badge variant="outline">Pending</Badge>
+      return <StateChip tone="quiet">Pending</StateChip>
   }
 }
 
@@ -671,11 +670,14 @@ export default function EprSettingsPage() {
   return (
     <div className="space-y-6">
       {/* Page header */}
-      <div className="space-y-1">
-        <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-          EPR Settings
+      <div className="min-w-0">
+        <Eyebrow tone="inherit" className="mb-3 text-studio-brick">
+          THE EVIDENCE · EPR · SETTINGS
+        </Eyebrow>
+        <h1 className="font-display text-[clamp(2rem,4vw,3.25rem)] font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+          EPR settings.
         </h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground mt-3">
           Configure your organisation&apos;s Extended Producer Responsibility parameters
         </p>
       </div>
@@ -766,7 +768,7 @@ export default function EprSettingsPage() {
               {isLoadingObligation ? (
                 <Skeleton className="h-10 w-full" />
               ) : (
-                <div className="flex h-10 items-center rounded-md border border-input bg-slate-50 px-3 text-sm dark:bg-slate-900">
+                <div className="flex h-10 items-center rounded-md border border-input bg-secondary px-3 text-sm">
                   {formatTonnage(obligation.packaging_tonnage_kg)}
                 </div>
               )}
@@ -864,13 +866,13 @@ export default function EprSettingsPage() {
         <CardContent className="space-y-4">
           {/* Method badge + auto-estimate button */}
           <div className="flex flex-wrap items-center gap-3">
-            <Badge
-              variant={
+            <StateChip
+              tone={
                 settings.nation_distribution_method === 'auto_estimated'
-                  ? 'info'
+                  ? 'hold'
                   : settings.nation_distribution_method === 'hybrid'
-                    ? 'warning'
-                    : 'secondary'
+                    ? 'attention'
+                    : 'quiet'
               }
             >
               {settings.nation_distribution_method === 'auto_estimated'
@@ -878,22 +880,20 @@ export default function EprSettingsPage() {
                 : settings.nation_distribution_method === 'hybrid'
                   ? 'Hybrid'
                   : 'Manual'}
-            </Badge>
+            </StateChip>
 
             {settings.nation_distribution_method === 'auto_estimated' &&
               autoEstimateConfidence != null && (
-                <Badge variant="outline" className="gap-1">
-                  <Sparkles className="h-3 w-3" />
+                <StateChip tone="quiet">
                   {(autoEstimateConfidence * 100).toFixed(0)}% confidence
-                </Badge>
+                </StateChip>
               )}
 
             {settings.nation_distribution_method === 'auto_estimated' &&
               autoEstimateSampleSize != null && (
-                <Badge variant="outline" className="gap-1">
-                  <Info className="h-3 w-3" />
+                <StateChip tone="quiet">
                   {autoEstimateSampleSize.toLocaleString()} samples
-                </Badge>
+                </StateChip>
               )}
 
             <Button
@@ -904,10 +904,7 @@ export default function EprSettingsPage() {
               className="ml-auto"
             >
               {isEstimating ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Estimating...
-                </>
+                'Estimating...'
               ) : (
                 <>
                   <Sparkles className="mr-2 h-4 w-4" />
@@ -945,16 +942,14 @@ export default function EprSettingsPage() {
           <div className="flex items-center gap-2 pt-2">
             <span className="text-sm font-medium text-muted-foreground">Total:</span>
             <span
-              className={`text-sm font-bold ${
-                nationTotalValid
-                  ? 'text-green-600 dark:text-green-400'
-                  : 'text-red-600 dark:text-red-400'
+              className={`text-sm font-bold tabular-nums ${
+                nationTotalValid ? 'text-studio-good' : 'text-studio-stale'
               }`}
             >
               {nationTotal.toFixed(2)}%
             </span>
             {!nationTotalValid && nationTotal > 0 && (
-              <span className="flex items-center gap-1 text-xs text-red-500">
+              <span className="flex items-center gap-1 text-xs text-studio-stale">
                 <AlertCircle className="h-3 w-3" />
                 Must equal 100%
               </span>
@@ -1004,8 +999,7 @@ export default function EprSettingsPage() {
         <Button onClick={handleSave} disabled={isSaving}>
           {isSaving ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Saving...
+Saving...
             </>
           ) : (
             <>
@@ -1020,7 +1014,7 @@ export default function EprSettingsPage() {
       {/* HMRC Registration Data */}
       {/* ================================================================ */}
       <div className="space-y-1 pt-4">
-        <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+        <h2 className="font-display text-2xl font-bold tracking-tight text-foreground">
           HMRC Registration Data
         </h2>
         <p className="text-sm text-muted-foreground">
@@ -1183,8 +1177,7 @@ export default function EprSettingsPage() {
                 <Button onClick={handleSaveOrgDetails} disabled={isSavingOrgDetails}>
                   {isSavingOrgDetails ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
+                Saving...
                     </>
                   ) : (
                     <>
@@ -1336,8 +1329,7 @@ export default function EprSettingsPage() {
                 <Button onClick={handleSaveAddresses} disabled={isSavingAddresses}>
                   {isSavingAddresses ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
+                Saving...
                     </>
                   ) : (
                     <>
@@ -1451,8 +1443,7 @@ export default function EprSettingsPage() {
                 <Button onClick={handleSaveContacts} disabled={isSavingContacts}>
                   {isSavingContacts ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
+                Saving...
                     </>
                   ) : (
                     <>
@@ -1527,7 +1518,7 @@ export default function EprSettingsPage() {
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="shrink-0 text-red-500 hover:text-red-700"
+                    className="shrink-0 text-studio-stale hover:text-studio-stale/80"
                     onClick={() => {
                       setHmrcBrands((prev) => prev.filter((_, i) => i !== index))
                     }}
@@ -1553,8 +1544,7 @@ export default function EprSettingsPage() {
                 <Button onClick={handleSaveBrands} disabled={isSavingBrands}>
                   {isSavingBrands ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
+                Saving...
                     </>
                   ) : (
                     <>
@@ -1649,7 +1639,7 @@ export default function EprSettingsPage() {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="shrink-0 text-red-500 hover:text-red-700"
+                      className="shrink-0 text-studio-stale hover:text-studio-stale/80"
                       onClick={() => {
                         setHmrcPartners((prev) => prev.filter((_, i) => i !== index))
                       }}
@@ -1678,8 +1668,7 @@ export default function EprSettingsPage() {
                   <Button onClick={handleSavePartners} disabled={isSavingPartners}>
                     {isSavingPartners ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Saving...
+                    Saving...
                       </>
                     ) : (
                       <>

@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { StateChip } from '@/components/studio/state-chip';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
@@ -42,7 +43,6 @@ import {
   Package,
   RefreshCw,
   Pencil,
-  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useOrganization } from '@/lib/organizationContext';
@@ -73,15 +73,15 @@ interface PRNResponse {
 function statusBadge(status: EPRPRNObligation['status']) {
   switch (status) {
     case 'not_started':
-      return <Badge variant="destructive">Not Started</Badge>;
+      return <StateChip tone="stale">Not Started</StateChip>;
     case 'partial':
-      return <Badge variant="warning">Partial</Badge>;
+      return <StateChip tone="attention">Partial</StateChip>;
     case 'fulfilled':
-      return <Badge variant="success">Fulfilled</Badge>;
+      return <StateChip tone="good">Fulfilled</StateChip>;
     case 'exceeded':
-      return <Badge variant="info">Exceeded</Badge>;
+      return <StateChip tone="good">Exceeded</StateChip>;
     default:
-      return <Badge variant="outline">{status}</Badge>;
+      return <StateChip tone="quiet">{status}</StateChip>;
   }
 }
 
@@ -199,7 +199,7 @@ function UpdatePRNDialog({
             {purchased && costPerTonne && (
               <div className="space-y-2">
                 <Label>Estimated Total Cost</Label>
-                <p className="text-sm font-mono text-neon-lime">
+                <p className="text-sm font-mono text-studio-brick">
                   {fmtGBP(parseFloat(purchased) * parseFloat(costPerTonne))}
                 </p>
               </div>
@@ -210,14 +210,7 @@ function UpdatePRNDialog({
               Cancel
             </Button>
             <Button onClick={handleSave} disabled={saving}>
-              {saving ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                'Save'
-              )}
+              {saving ? 'Saving...' : 'Save'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -241,10 +234,10 @@ function LockedView() {
         Track your Packaging Recovery Note obligations, record purchases, and monitor fulfilment
         across all material types. Available on the Canopy plan.
       </p>
-      <div className="rounded-lg border border-neon-lime/30 bg-neon-lime/5 p-6 w-full max-w-sm">
+      <div className="rounded-[6px] border border-border bg-card p-6 w-full max-w-sm">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-base font-semibold">Upgrade to Canopy</h3>
-          <Sparkles className="h-5 w-5 text-neon-lime" />
+          <Sparkles className="h-5 w-5 text-studio-dim" />
         </div>
         <p className="text-sm text-muted-foreground mb-4">
           Unlock PRN tracking, advanced compliance tools, and full EPR management capabilities.
@@ -382,13 +375,15 @@ export default function PRNTrackerPage() {
   return (
     <div className="space-y-6 animate-fade-in-up">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Recycle className="h-6 w-6 text-neon-lime" />
-            PRN Tracker
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <div className="min-w-0">
+          <Eyebrow tone="inherit" className="mb-3 text-studio-brick">
+            THE EVIDENCE · EPR · PRN
+          </Eyebrow>
+          <h1 className="font-display text-[clamp(2rem,4vw,3.25rem)] font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+            The PRN tracker.
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-muted-foreground mt-3 text-sm">
             Manage your Packaging Recovery Note obligations and track fulfilment across material types
           </p>
         </div>
@@ -411,7 +406,7 @@ export default function PRNTrackerPage() {
             }}
             disabled={loading}
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
         </div>
@@ -419,48 +414,54 @@ export default function PRNTrackerPage() {
 
       {/* Summary Banner */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
+        <Card className="rounded-[6px] border-border bg-card">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-neon-lime/10">
-                <PoundSterling className="h-5 w-5 text-neon-lime" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-[6px] border border-border bg-secondary">
+                <PoundSterling className="h-5 w-5 text-studio-brick" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">Total PRN Spend</p>
-                <p className="text-xl font-bold font-mono">{fmtGBP(totalPRNSpend)}</p>
+                <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">Total PRN Spend</p>
+                <p className="text-xl font-bold font-display tabular-nums">{fmtGBP(totalPRNSpend)}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="rounded-[6px] border-border bg-card">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
-                <TrendingUp className="h-5 w-5 text-blue-500" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-[6px] border border-border bg-secondary">
+                <TrendingUp className="h-5 w-5 text-studio-dim" />
               </div>
               <div className="flex-1">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">Overall Fulfilment</p>
-                <p className="text-xl font-bold font-mono">{fmtPct(fulfilmentPct)}</p>
+                <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">Overall Fulfilment</p>
+                <p className="text-xl font-bold font-display tabular-nums">{fmtPct(fulfilmentPct)}</p>
               </div>
             </div>
             <Progress
               value={Math.min(fulfilmentPct, 100)}
               className="mt-3 h-2"
-              indicatorColor={fulfilmentPct >= 100 ? 'lime' : fulfilmentPct >= 50 ? 'cyan' : 'purple'}
+              indicatorClassName={
+                fulfilmentPct >= 100
+                  ? 'bg-studio-good'
+                  : fulfilmentPct >= 50
+                  ? 'bg-studio-attention'
+                  : 'bg-studio-stale'
+              }
             />
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="rounded-[6px] border-border bg-card">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10">
-                <Package className="h-5 w-5 text-emerald-500" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-[6px] border border-border bg-secondary">
+                <Package className="h-5 w-5 text-studio-dim" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">Materials Tracked</p>
-                <p className="text-xl font-bold font-mono">
+                <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">Materials Tracked</p>
+                <p className="text-xl font-bold font-display tabular-nums">
                   {summary?.fulfilled_count ?? 0} / {summary?.materials_count ?? 0}
                   <span className="text-sm font-normal text-muted-foreground ml-1">fulfilled</span>
                 </p>
@@ -472,7 +473,7 @@ export default function PRNTrackerPage() {
 
       {/* Combined Cost View */}
       {hasFeeData && (
-        <Card className="bg-neon-lime/5 border-neon-lime/20">
+        <Card className="rounded-[6px] border-border bg-card">
           <CardContent className="p-4">
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
@@ -486,7 +487,7 @@ export default function PRNTrackerPage() {
                   <span className="font-mono">{fmtGBP(totalPRNSpend)}</span>
                   <span className="text-muted-foreground">PRN Costs</span>
                   <span className="text-muted-foreground">=</span>
-                  <span className="font-mono text-base font-bold text-neon-lime">
+                  <span className="font-mono text-base font-bold text-studio-brick">
                     {fmtGBP(totalComplianceCost)}
                   </span>
                   <span className="text-muted-foreground font-medium">Total</span>
@@ -562,9 +563,9 @@ export default function PRNTrackerPage() {
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
                           {remaining > 0 ? (
-                            <span className="text-orange-400">{fmtTonnes(remaining)}</span>
+                            <span className="text-studio-attention">{fmtTonnes(remaining)}</span>
                           ) : (
-                            <span className="text-green-400">0.000</span>
+                            <span className="text-studio-good">0.000</span>
                           )}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">

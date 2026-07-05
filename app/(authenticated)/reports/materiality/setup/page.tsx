@@ -18,7 +18,7 @@ import {
   getTopPriorityTopics,
 } from '@/lib/materiality/topic-library'
 import type { MaterialityTopic, TopicStatus, TopicCategory } from '@/lib/materiality/topic-library'
-import { ChevronLeft, ChevronRight, Check, Loader2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
 
@@ -198,15 +198,18 @@ export default function MaterialitySetupPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <Link href="/reports/materiality/" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 mb-1">
+          <Link href="/reports/materiality/" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 mb-3">
             <ChevronLeft className="w-3.5 h-3.5" /> Materiality
           </Link>
-          <h1 className="text-xl font-semibold">
-            {year} Materiality Assessment
+          <div className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-brick mb-2">
+            THE EVIDENCE · MATERIALITY
+          </div>
+          <h1 className="font-display text-3xl md:text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+            The {year} materiality assessment.
           </h1>
         </div>
         <Button variant="outline" size="sm" onClick={() => saveProgress(false)} disabled={isSaving}>
-          {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save Progress'}
+          {isSaving ? 'Saving...' : 'Save Progress'}
         </Button>
       </div>
 
@@ -221,7 +224,7 @@ export default function MaterialitySetupPage() {
               <div className="flex items-center gap-2 flex-1">
                 <div className={[
                   'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0',
-                  isDone ? 'bg-[#ccff00] text-stone-900' : isActive ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground',
+                  isDone ? 'bg-studio-brick text-studio-cream' : isActive ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground',
                 ].join(' ')}>
                   {isDone ? <Check className="w-4 h-4" /> : num}
                 </div>
@@ -233,7 +236,7 @@ export default function MaterialitySetupPage() {
                 </div>
               </div>
               {i < STEPS.length - 1 && (
-                <div className={['h-px flex-1 mx-3', isDone ? 'bg-[#ccff00]' : 'bg-border'].join(' ')} />
+                <div className={['h-px flex-1 mx-3', isDone ? 'bg-studio-brick' : 'bg-border'].join(' ')} />
               )}
             </div>
           )
@@ -269,15 +272,15 @@ export default function MaterialitySetupPage() {
                 onClick={() => setCategoryFilter(cat)}
                 className={[
                   'text-xs px-3 py-1.5 rounded-full border transition-colors flex items-center gap-1.5',
-                  categoryFilter === cat ? 'text-white border-transparent' : 'border-border text-muted-foreground hover:border-muted-foreground',
+                  categoryFilter === cat ? 'bg-foreground text-background border-foreground' : 'border-border text-muted-foreground hover:border-muted-foreground',
                 ].join(' ')}
-                style={categoryFilter === cat ? { background: CATEGORY_COLOURS[cat] } : {}}
               >
+                <span className="w-2 h-2 rounded-full" style={{ background: CATEGORY_COLOURS[cat] }} />
                 {CATEGORY_LABELS[cat]}
                 {categoryCounts[cat] > 0 && (
                   <span className={[
                     'text-xs rounded-full px-1.5',
-                    categoryFilter === cat ? 'bg-white/30' : 'bg-muted',
+                    categoryFilter === cat ? 'bg-background/30' : 'bg-muted',
                   ].join(' ')}>
                     {categoryCounts[cat]}
                   </span>
@@ -315,7 +318,7 @@ export default function MaterialitySetupPage() {
           </div>
 
           {materialTopics.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border p-10 text-center">
+            <div className="rounded-[6px] border border-dashed border-border p-10 text-center">
               <p className="text-sm text-muted-foreground">
                 No topics marked as Material yet.{' '}
                 <button onClick={() => setStep(1)} className="underline hover:text-foreground">
@@ -353,7 +356,7 @@ export default function MaterialitySetupPage() {
                           label="Financial risk or opportunity"
                           value={topic.financialScore || 3}
                           onChange={v => handleScoreChange(topic.id, 'financialScore', v)}
-                          colour="#8b5cf6"
+                          colour="#2B46C0"
                         />
                         <textarea
                           className="w-full text-xs bg-transparent border border-border rounded-md p-2 resize-none h-16 placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-border"
@@ -371,7 +374,7 @@ export default function MaterialitySetupPage() {
               {/* Live matrix */}
               <div className="sticky top-4 self-start">
                 <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-2">Live Matrix</p>
-                <div className="rounded-xl border border-border bg-card p-4">
+                <div className="rounded-[6px] border border-border bg-card p-4">
                   <MaterialityMatrix
                     topics={topics}
                     activeTopicId={activeTopicId || undefined}
@@ -415,7 +418,6 @@ export default function MaterialitySetupPage() {
 
         {step < 3 ? (
           <Button onClick={handleNext} disabled={isSaving}>
-            {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
             Next: {STEPS[step].label}
             <ChevronRight className="w-4 h-4 ml-1" />
           </Button>
@@ -423,9 +425,9 @@ export default function MaterialitySetupPage() {
           <Button
             onClick={handleFinish}
             disabled={isSaving || priorityOrder.length === 0}
-            className="bg-[#ccff00] text-stone-900 hover:bg-lime-300"
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
-            {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Check className="w-4 h-4 mr-1" />}
+            <Check className="w-4 h-4 mr-1" />
             Complete Assessment
           </Button>
         )}

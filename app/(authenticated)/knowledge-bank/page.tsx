@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Plus, Star, TrendingUp, Clock } from 'lucide-react'
+import { Eyebrow } from '@/components/studio/eyebrow'
+import { BigNumber } from '@/components/studio/big-number'
 import {
   useKnowledgeBankCategories,
   useKnowledgeBankItems,
@@ -77,10 +79,13 @@ export default function KnowledgeBankPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Knowledge Bank</h1>
-          <p className="text-muted-foreground mt-1">
+          <Eyebrow className="mb-3">THE EVIDENCE · KNOWLEDGE</Eyebrow>
+          <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+            The knowledge.
+          </h1>
+          <p className="text-muted-foreground mt-2 text-sm">
             Access training materials, templates, and documentation
           </p>
         </div>
@@ -90,27 +95,18 @@ export default function KnowledgeBankPage() {
             Add Resource
           </Link>
         </Button>
-      </div>
+      </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-1">
+        <Card className="lg:col-span-1 rounded-[6px]">
           <CardHeader>
             <CardTitle className="text-lg">Quick Stats</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Total Resources</span>
-                <span className="text-2xl font-bold">{items.length}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Categories</span>
-                <span className="text-2xl font-bold">{categories.length}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Favourites</span>
-                <span className="text-2xl font-bold">{favoriteItems.length}</span>
-              </div>
+            <div className="flex flex-wrap gap-8">
+              <BigNumber value={items.length} label="TOTAL RESOURCES" />
+              <BigNumber value={categories.length} label="CATEGORIES" />
+              <BigNumber value={favoriteItems.length} label="FAVOURITES" />
             </div>
           </CardContent>
         </Card>
@@ -135,14 +131,14 @@ export default function KnowledgeBankPage() {
       </div>
 
       <div>
-        <h2 className="text-2xl font-semibold mb-4">Browse by Category</h2>
+        <Eyebrow tone="dim" className="mb-4">BROWSE BY CATEGORY</Eyebrow>
         {categoriesLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[...Array(6)].map((_, i) => (
-              <Card key={i}>
+              <Card key={i} className="rounded-[6px]">
                 <CardContent className="p-6">
                   <div className="flex items-start gap-4">
-                    <Skeleton className="h-14 w-14 rounded-xl" />
+                    <Skeleton className="h-14 w-14 rounded-[6px]" />
                     <div className="flex-1 space-y-2">
                       <Skeleton className="h-5 w-full" />
                       <Skeleton className="h-4 w-3/4" />
@@ -159,7 +155,7 @@ export default function KnowledgeBankPage() {
       </div>
 
       <div>
-        <h2 className="text-2xl font-semibold mb-4">All Resources</h2>
+        <Eyebrow tone="dim" className="mb-4">ALL RESOURCES</Eyebrow>
         <div className="space-y-4">
           <SearchAndFilter
             categories={categories}
@@ -172,9 +168,9 @@ export default function KnowledgeBankPage() {
           {itemsLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {[...Array(6)].map((_, i) => (
-                <Card key={i}>
+                <Card key={i} className="rounded-[6px]">
                   <CardContent className="p-6 space-y-4">
-                    <Skeleton className="h-12 w-12 rounded-lg" />
+                    <Skeleton className="h-12 w-12 rounded-[6px]" />
                     <Skeleton className="h-5 w-full" />
                     <Skeleton className="h-4 w-3/4" />
                     <Skeleton className="h-4 w-1/2" />
@@ -183,7 +179,7 @@ export default function KnowledgeBankPage() {
               ))}
             </div>
           ) : filteredItems.length === 0 ? (
-            <Card>
+            <Card className="rounded-[6px]">
               <CardContent className="py-12 text-center">
                 <p className="text-muted-foreground">
                   {searchQuery || categoryFilter || contentTypeFilter

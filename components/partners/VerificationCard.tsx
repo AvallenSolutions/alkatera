@@ -1,8 +1,8 @@
 'use client'
 
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { StateChip } from '@/components/studio/state-chip'
 import { FileCheck, FileText, ArrowRight, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 import { useSubscription } from '@/hooks/useSubscription'
@@ -26,7 +26,7 @@ const VARIANT_CONFIG = {
   'report-creation': {
     icon: FileText,
     heading: 'Take your impact reporting further with Impact Focus',
-    description: 'alkatera creates the data foundations for professional, accurate sustainability reporting. Impact Focus can build on top of that — turning your metrics into rich impact narratives, designed reports, and stakeholder communications.',
+    description: 'alkatera creates the data foundations for professional, accurate sustainability reporting. Impact Focus can build on top of that, turning your metrics into rich impact narratives, designed reports, and stakeholder communications.',
   },
 }
 
@@ -38,19 +38,19 @@ export function VerificationCard({ variant }: VerificationCardProps) {
   const { icon: Icon, heading, description } = VARIANT_CONFIG[variant]
 
   return (
-    <Card className="border-emerald-200/50 dark:border-emerald-800/30 bg-gradient-to-r from-emerald-50/50 to-white dark:from-emerald-950/10 dark:to-slate-900">
+    <Card className="rounded-[6px] border-border bg-card">
       <CardContent className="pt-6">
         <div className="flex items-start gap-4">
-          <div className="h-10 w-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
-            <Icon className="h-5 w-5 text-emerald-600" />
+          <div className="h-10 w-10 rounded-[6px] bg-secondary flex items-center justify-center shrink-0">
+            <Icon className="h-5 w-5 text-studio-brick" />
           </div>
           <div className="flex-1 space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-semibold text-sm">{heading}</h3>
               {showCredit && (
-                <Badge variant="neon-lime" className="text-xs">
+                <StateChip tone="good">
                   {creditStatus === 'available' ? `£${creditAmount} credit` : 'Credit pending'}
-                </Badge>
+                </StateChip>
               )}
             </div>
             <p className="text-sm text-muted-foreground">{description}</p>

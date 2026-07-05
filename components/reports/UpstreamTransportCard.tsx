@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { ArrowUpFromLine, CheckCircle2, Info, Loader2, Package } from "lucide-react";
+import { StateChip } from "@/components/studio";
+import { ArrowUpFromLine, Info, Package } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 
@@ -158,36 +158,31 @@ export function UpstreamTransportCard({
   const hasData = materialCount > 0;
 
   return (
-    <Card className="relative overflow-hidden">
-      <div className="absolute top-0 right-0 w-32 h-32 bg-violet-50 dark:bg-violet-950 rounded-full -mr-16 -mt-16 opacity-50" />
-
+    <Card className="relative overflow-hidden rounded-[6px] border border-border bg-card">
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-violet-100 dark:bg-violet-900 flex items-center justify-center">
-              <ArrowUpFromLine className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+            <div className="h-10 w-10 rounded-[6px] bg-secondary flex items-center justify-center">
+              <ArrowUpFromLine className="h-5 w-5 text-studio-brick" />
             </div>
             <div>
               <CardTitle className="text-lg">Upstream Transport</CardTitle>
               <CardDescription>Category 4: Inbound logistics</CardDescription>
             </div>
           </div>
-          <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100 text-xs">
-            <CheckCircle2 className="h-3 w-3 mr-1" />
-            Auto-calculated
-          </Badge>
+          <StateChip tone="good">Auto-calculated</StateChip>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-4">
         {isLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <div className="py-8 text-center text-sm text-muted-foreground">
+            Loading transport data...
           </div>
         ) : hasData ? (
           <>
             <div className="text-center py-4 border-b">
-              <div className="text-3xl font-bold text-slate-900 dark:text-slate-100">
+              <div className="font-display text-3xl font-bold tabular-nums text-foreground">
                 {formatEmissions(totalEmissions)}
               </div>
               <div className="text-sm text-muted-foreground mt-1">
@@ -199,7 +194,7 @@ export function UpstreamTransportCard({
               {breakdown.slice(0, 5).map((item, index) => (
                 <div
                   key={index}
-                  className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-900"
+                  className="flex items-center justify-between p-3 rounded-[6px] border border-border bg-secondary"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm truncate">{item.materialName}</div>
@@ -219,9 +214,9 @@ export function UpstreamTransportCard({
               )}
             </div>
 
-            <Alert className="bg-violet-50 dark:bg-violet-950/30 border-violet-200 dark:border-violet-800">
-              <Package className="h-4 w-4 text-violet-600" />
-              <AlertDescription className="text-xs text-violet-800 dark:text-violet-200">
+            <Alert className="rounded-[6px] bg-card border-border">
+              <Package className="h-4 w-4 text-muted-foreground" />
+              <AlertDescription className="text-xs text-muted-foreground">
                 Calculated from material origins in your Product Environmental Impacts. To update, edit transport details on your products.
               </AlertDescription>
             </Alert>

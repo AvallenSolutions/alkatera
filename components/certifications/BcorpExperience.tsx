@@ -40,13 +40,12 @@ import {
   Package,
   Plus,
   CheckCircle2,
-  Clock,
-  XCircle,
   Trash2,
-  Loader2,
   FileDown,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Eyebrow, StateChip } from '@/components/studio';
+import type { WorkingTone } from '@/components/studio/theme';
 import { GapAnalysisView } from '@/components/certifications/GapAnalysisView';
 import { ReadinessBanner } from '@/components/certifications/ReadinessBanner';
 import { EcgtBanner } from '@/components/certifications/EcgtBanner';
@@ -263,22 +262,22 @@ export function BcorpExperience() {
     'certified';
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-end justify-between gap-6">
+        <div className="space-y-2">
           <Link
             href="/certifications/"
-            className="mb-1 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Certifications
           </Link>
-          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
-            <Award className="h-6 w-6 text-amber-600" />
-            B Corp Certification
+          <Eyebrow>THE EVIDENCE · B CORP</Eyebrow>
+          <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+            B Corp certification.
           </h1>
-          <p className="mt-1 text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             The 2026 B Corp Standards: Foundation Requirements and 7 Impact
             Topics, with Year 0, 3 and 5 progression.
           </p>
@@ -291,9 +290,7 @@ export function BcorpExperience() {
           }}
           disabled={readinessLoading}
         >
-          <RefreshCw
-            className={`mr-2 h-4 w-4 ${readinessLoading ? 'animate-spin' : ''}`}
-          />
+          <RefreshCw className="mr-2 h-4 w-4" />
           Refresh
         </Button>
       </div>
@@ -340,14 +337,14 @@ export function BcorpExperience() {
         <TabsContent value="overview">
           {readinessLoading && !readiness ? (
             <div className="space-y-4">
-              <Skeleton className="h-12 w-full rounded-lg" />
+              <Skeleton className="h-12 w-full rounded-[6px]" />
               <div className="grid gap-4 md:grid-cols-3">
-                <Skeleton className="h-32 rounded-lg" />
-                <Skeleton className="h-32 rounded-lg" />
-                <Skeleton className="h-32 rounded-lg" />
+                <Skeleton className="h-32 rounded-[6px]" />
+                <Skeleton className="h-32 rounded-[6px]" />
+                <Skeleton className="h-32 rounded-[6px]" />
               </div>
-              <Skeleton className="h-48 rounded-lg" />
-              <Skeleton className="h-48 rounded-lg" />
+              <Skeleton className="h-48 rounded-[6px]" />
+              <Skeleton className="h-48 rounded-[6px]" />
             </div>
           ) : readiness?.hasCertification ? (
             <div className="space-y-6">
@@ -363,7 +360,7 @@ export function BcorpExperience() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Award className="h-5 w-5 text-amber-600" />
+                  <Award className="h-5 w-5 text-studio-dim" />
                   Get started
                 </CardTitle>
                 <CardDescription>
@@ -392,9 +389,9 @@ export function BcorpExperience() {
         <TabsContent value="requirements">
           {readinessLoading && !readiness ? (
             <div className="space-y-3">
-              <Skeleton className="h-10 w-full rounded-lg" />
-              <Skeleton className="h-64 rounded-lg" />
-              <Skeleton className="h-64 rounded-lg" />
+              <Skeleton className="h-10 w-full rounded-[6px]" />
+              <Skeleton className="h-64 rounded-[6px]" />
+              <Skeleton className="h-64 rounded-[6px]" />
             </div>
           ) : readiness?.hasCertification ? (
             <GapAnalysisView
@@ -434,7 +431,7 @@ export function BcorpExperience() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-emerald-600" />
+                    <FileText className="h-5 w-5 text-studio-dim" />
                     Evidence Library
                   </CardTitle>
                   <CardDescription>
@@ -450,11 +447,7 @@ export function BcorpExperience() {
                     onClick={handleGenerateSupplierReport}
                     disabled={generatingReport}
                   >
-                    {generatingReport ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <FileDown className="mr-2 h-4 w-4" />
-                    )}
+                    {!generatingReport && <FileDown className="mr-2 h-4 w-4" />}
                     Supply-chain ESG report
                   </Button>
                   <Button
@@ -463,9 +456,7 @@ export function BcorpExperience() {
                     onClick={refetchEvidence}
                     disabled={evidenceLoading}
                   >
-                    <RefreshCw
-                      className={`mr-2 h-4 w-4 ${evidenceLoading ? 'animate-spin' : ''}`}
-                    />
+                    <RefreshCw className="mr-2 h-4 w-4" />
                     Refresh
                   </Button>
                 </div>
@@ -474,7 +465,9 @@ export function BcorpExperience() {
             <CardContent>
               {evidenceLoading ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-studio-dim">
+                    Loading
+                  </p>
                 </div>
               ) : evidence.length === 0 ? (
                 <div className="py-8 text-center text-muted-foreground">
@@ -487,24 +480,16 @@ export function BcorpExperience() {
               ) : (
                 <div className="space-y-3">
                   {evidence.map((item) => {
-                    const statusIcon =
-                      item.verification_status === 'verified' ? (
-                        <CheckCircle2 className="h-3 w-3" />
-                      ) : item.verification_status === 'rejected' ? (
-                        <XCircle className="h-3 w-3" />
-                      ) : (
-                        <Clock className="h-3 w-3" />
-                      );
-                    const statusColor =
+                    const statusTone: WorkingTone =
                       item.verification_status === 'verified'
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                        ? 'good'
                         : item.verification_status === 'rejected'
-                          ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                          : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400';
+                          ? 'stale'
+                          : 'attention';
                     return (
                       <div
                         key={item.id}
-                        className="flex items-start justify-between rounded-lg bg-slate-50 p-3 dark:bg-slate-800"
+                        className="flex items-start justify-between rounded-[6px] border border-border bg-card p-3"
                       >
                         <div className="flex-1">
                           <div className="flex flex-wrap items-center gap-2">
@@ -517,16 +502,13 @@ export function BcorpExperience() {
                             >
                               {item.evidence_type.replace('_', ' ')}
                             </Badge>
-                            <Badge className={`text-xs ${statusColor}`}>
-                              {statusIcon}
-                              <span className="ml-1 capitalize">
-                                {item.verification_status}
-                              </span>
-                            </Badge>
+                            <StateChip tone={statusTone} className="capitalize">
+                              {item.verification_status}
+                            </StateChip>
                           </div>
                           {item.requirement && (
                             <p className="mt-1 text-xs text-muted-foreground">
-                              {item.requirement.requirement_code} &mdash;{' '}
+                              {item.requirement.requirement_code} ·{' '}
                               {item.requirement.requirement_name}
                             </p>
                           )}
@@ -535,7 +517,7 @@ export function BcorpExperience() {
                               href={item.document_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="mt-1 inline-block text-xs text-blue-600 hover:underline"
+                              className="mt-1 inline-block text-xs text-studio-brick hover:underline"
                             >
                               View document
                             </a>
@@ -552,7 +534,7 @@ export function BcorpExperience() {
                                 )
                               }
                             >
-                              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                              <CheckCircle2 className="h-4 w-4 text-studio-good" />
                             </Button>
                           )}
                           <Button
@@ -564,7 +546,7 @@ export function BcorpExperience() {
                               )
                             }
                           >
-                            <Trash2 className="h-4 w-4 text-red-500" />
+                            <Trash2 className="h-4 w-4 text-studio-stale" />
                           </Button>
                         </div>
                       </div>
@@ -642,10 +624,7 @@ export function BcorpExperience() {
                     onClick={handleSectionExport}
                   >
                     {sectionExportLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Preparing download…
-                      </>
+                      <>Preparing download…</>
                     ) : (
                       <>
                         <FileDown className="mr-2 h-4 w-4" />
@@ -763,7 +742,7 @@ export function BcorpExperience() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2">
-                    <Package className="h-5 w-5 text-purple-600" />
+                    <Package className="h-5 w-5 text-studio-dim" />
                     Audit Packages
                   </CardTitle>
                   <CardDescription>
@@ -780,9 +759,7 @@ export function BcorpExperience() {
                     onClick={refetchPackages}
                     disabled={packagesLoading}
                   >
-                    <RefreshCw
-                      className={`mr-2 h-4 w-4 ${packagesLoading ? 'animate-spin' : ''}`}
-                    />
+                    <RefreshCw className="mr-2 h-4 w-4" />
                     Refresh
                   </Button>
                   <Button
@@ -798,7 +775,9 @@ export function BcorpExperience() {
             <CardContent>
               {packagesLoading ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-studio-dim">
+                    Loading
+                  </p>
                 </div>
               ) : auditPackages.length === 0 ? (
                 <div className="py-8 text-center text-muted-foreground">
@@ -812,31 +791,29 @@ export function BcorpExperience() {
               ) : (
                 <div className="space-y-3">
                   {auditPackages.map((pkg) => {
-                    const statusColor =
+                    const statusTone: WorkingTone =
                       pkg.status === 'approved'
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                        ? 'good'
                         : pkg.status === 'submitted'
-                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                          ? 'hold'
                           : pkg.status === 'in_review'
-                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                            ? 'attention'
                             : pkg.status === 'rejected'
-                              ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                              : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
+                              ? 'stale'
+                              : 'quiet';
                     return (
                       <div
                         key={pkg.id}
-                        className="flex items-start justify-between rounded-lg border p-4 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800"
+                        className="flex items-start justify-between rounded-[6px] border border-border bg-card p-4 transition-colors hover:bg-secondary"
                       >
                         <div className="flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="font-medium">
                               {pkg.package_name}
                             </span>
-                            <Badge
-                              className={`text-xs capitalize ${statusColor}`}
-                            >
+                            <StateChip tone={statusTone} className="capitalize">
                               {pkg.status.replace('_', ' ')}
-                            </Badge>
+                            </StateChip>
                           </div>
                           {pkg.description && (
                             <p className="mt-1 text-sm text-muted-foreground">
@@ -875,7 +852,7 @@ export function BcorpExperience() {
                               )
                             }
                           >
-                            <Trash2 className="h-4 w-4 text-red-500" />
+                            <Trash2 className="h-4 w-4 text-studio-stale" />
                           </Button>
                         )}
                       </div>

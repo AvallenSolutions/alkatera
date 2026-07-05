@@ -4,7 +4,6 @@ import { useState } from 'react'
 import {
   CheckCircle2,
   Download,
-  Loader2,
   ExternalLink,
   FileText,
   ShieldCheck,
@@ -17,7 +16,6 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { useOrganization } from '@/lib/organizationContext'
 import { toast } from 'sonner'
 
@@ -192,19 +190,10 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
       <div className="text-center space-y-4">
         {exported ? (
           <>
-            <div className="relative inline-block">
-              <div className="w-20 h-20 rounded-full bg-emerald-500/15 flex items-center justify-center mx-auto border border-emerald-500/20">
-                <CheckCircle2 className="w-10 h-10 text-emerald-400" />
-              </div>
-              {/* Confetti-style dots */}
-              <div className="absolute -top-2 -left-3 w-2 h-2 rounded-full bg-neon-lime animate-bounce" />
-              <div className="absolute -top-1 right-0 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce delay-100" />
-              <div className="absolute -bottom-1 -left-1 w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce delay-200" />
-              <div className="absolute top-0 -right-3 w-2 h-2 rounded-full bg-purple-400 animate-bounce delay-150" />
-              <div className="absolute -bottom-2 right-1 w-1 h-1 rounded-full bg-amber-400 animate-bounce delay-300" />
-              <div className="absolute top-4 -left-5 w-1 h-1 rounded-full bg-pink-400 animate-bounce delay-75" />
+            <div className="w-20 h-20 rounded-full border border-border bg-card flex items-center justify-center mx-auto">
+              <CheckCircle2 className="w-10 h-10 text-studio-good" />
             </div>
-            <h2 className="text-2xl md:text-3xl font-serif font-bold text-foreground">
+            <h2 className="text-2xl md:text-3xl font-display font-bold text-foreground">
               Your RPD CSV is Ready!
             </h2>
             <p className="text-muted-foreground text-sm max-w-md mx-auto">
@@ -214,10 +203,10 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
           </>
         ) : (
           <>
-            <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mx-auto border border-border">
-              <Download className="w-10 h-10 text-neon-lime" />
+            <div className="w-20 h-20 rounded-full border border-border bg-card flex items-center justify-center mx-auto">
+              <Download className="w-10 h-10 text-studio-brick" />
             </div>
-            <h2 className="text-2xl md:text-3xl font-serif font-bold text-foreground">
+            <h2 className="text-2xl md:text-3xl font-display font-bold text-foreground">
               Export &amp; Finish
             </h2>
             <p className="text-muted-foreground text-sm max-w-md mx-auto">
@@ -235,11 +224,10 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
             onClick={handleExport}
             disabled={exporting}
             size="lg"
-            className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl px-8"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full px-8"
           >
             {exporting ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Exporting...
               </>
             ) : (
@@ -254,17 +242,17 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
 
       {/* Error */}
       {error && (
-        <div className="flex items-start gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/20">
-          <PartyPopper className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 p-4 rounded-[6px] border border-border bg-card">
+          <PartyPopper className="w-5 h-5 text-studio-stale flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-medium text-red-400">Export failed</p>
-            <p className="text-xs text-red-400/70 mt-1">{error}</p>
+            <p className="text-sm font-medium text-studio-stale">Export failed</p>
+            <p className="text-xs text-studio-stale/70 mt-1">{error}</p>
             <Button
               variant="ghost"
               size="sm"
               onClick={handleExport}
               disabled={exporting}
-              className="text-red-400 hover:text-red-300 hover:bg-red-500/10 mt-2 px-0"
+              className="text-studio-stale hover:text-studio-stale/80 hover:bg-secondary mt-2 px-0"
             >
               Try Again
             </Button>
@@ -276,11 +264,11 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
       {exported && exportResult && (
         <>
           {/* Download Card */}
-          <Card className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl">
+          <Card className="rounded-[6px] border border-border bg-card">
             <CardContent className="p-6">
               <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0 border border-emerald-500/20">
-                  <FileText className="w-6 h-6 text-emerald-400" />
+                <div className="w-12 h-12 rounded-[6px] border border-border bg-secondary flex items-center justify-center flex-shrink-0">
+                  <FileText className="w-6 h-6 text-studio-good" />
                 </div>
                 <div className="flex-1 min-w-0 space-y-3">
                   <div>
@@ -288,12 +276,9 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
                       {exportResult.filename}
                     </p>
                     <div className="flex items-center gap-3 mt-1">
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] border-emerald-500/20 text-emerald-400"
-                      >
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-good">
                         Ready
-                      </Badge>
+                      </span>
                       {exportResult.line_count > 0 && (
                         <span className="text-xs text-muted-foreground">
                           {exportResult.line_count} lines
@@ -321,7 +306,7 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
                       href={exportResult.download_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-sm font-medium text-neon-lime hover:text-neon-lime/80 transition-colors"
+                      className="inline-flex items-center gap-2 text-sm font-medium text-studio-brick hover:text-studio-brick/80 transition-colors"
                     >
                       <Download className="w-4 h-4" />
                       Download CSV
@@ -354,7 +339,7 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
                 }
 
                 return (
-                  <Card key={template} className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl">
+                  <Card key={template} className="rounded-[6px] border border-border bg-card">
                     <CardContent className="p-4">
                       <p className="text-sm font-medium text-foreground">{labels[template]}</p>
                       <p className="text-xs text-muted-foreground mt-1">{descriptions[template]}</p>
@@ -369,7 +354,7 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
                               href={result.downloadUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 text-xs font-medium text-neon-lime hover:text-neon-lime/80 transition-colors"
+                              className="inline-flex items-center gap-1.5 text-xs font-medium text-studio-brick hover:text-studio-brick/80 transition-colors"
                             >
                               <Download className="w-3.5 h-3.5" />
                               Download
@@ -387,7 +372,6 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
                         >
                           {isExporting ? (
                             <>
-                              <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
                               Exporting...
                             </>
                           ) : (
@@ -406,12 +390,12 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
           </div>
 
           {/* Rosa Celebration */}
-          <div className="flex items-start gap-4 p-5 rounded-2xl bg-emerald-500/5 border border-emerald-500/15">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400/20 to-cyan-400/20 flex items-center justify-center flex-shrink-0 border border-emerald-400/30">
-              <Dog className="w-5 h-5 text-emerald-400" />
+          <div className="flex items-start gap-4 p-5 rounded-[6px] border border-border bg-card">
+            <div className="w-10 h-10 rounded-[6px] border border-border bg-secondary flex items-center justify-center flex-shrink-0">
+              <Dog className="w-5 h-5 text-studio-brick" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-emerald-400">Rosa</p>
+              <p className="text-sm font-semibold text-studio-brick">Rosa</p>
               <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
                 Brilliant! Your RPD CSV is ready to download. You can upload
                 this directly to the Defra portal. I&apos;ve also recorded
@@ -432,16 +416,16 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
                   <a
                     key={step.href}
                     href={step.href}
-                    className="group bg-muted/50 backdrop-blur-md border border-border rounded-2xl p-4 hover:bg-muted/80 hover:border-border transition-all"
+                    className="group rounded-[6px] border border-border bg-card p-4 hover:bg-muted/80 hover:border-border transition-all"
                   >
-                    <Icon className="w-5 h-5 text-neon-lime mb-3 group-hover:scale-110 transition-transform" />
+                    <Icon className="w-5 h-5 text-studio-brick mb-3 group-hover:scale-110 transition-transform" />
                     <p className="text-sm font-medium text-foreground">
                       {step.title}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
                       {step.description}
                     </p>
-                    <div className="flex items-center gap-1 mt-3 text-xs text-neon-lime/60 group-hover:text-neon-lime transition-colors">
+                    <div className="flex items-center gap-1 mt-3 text-xs text-studio-brick/60 group-hover:text-studio-brick transition-colors">
                       <span>Open</span>
                       <ArrowRight className="w-3 h-3" />
                     </div>
@@ -456,7 +440,7 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
             <Button
               onClick={onComplete}
               size="lg"
-              className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl px-10"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full px-10"
             >
               <PartyPopper className="w-5 h-5 mr-2" />
               Finish

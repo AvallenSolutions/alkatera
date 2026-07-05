@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useOrganization } from "@/lib/organizationContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -22,12 +21,15 @@ import {
   AlertTriangle,
   CheckCircle,
   AlertCircle,
-  Loader2,
   Trash2,
   TrendingUp,
   TrendingDown,
   Minus,
 } from "lucide-react";
+import { Eyebrow } from "@/components/studio/eyebrow";
+import { StateChip } from "@/components/studio/state-chip";
+import { BigNumber } from "@/components/studio/big-number";
+import type { WorkingTone } from "@/components/studio/theme";
 import { fetchAssessments, deleteAssessment, getRiskLevelColor, getRiskLevelLabel } from "@/lib/greenwash";
 import type { GreenwashAssessment } from "@/lib/types/greenwash";
 import { format } from "date-fns";
@@ -50,20 +52,27 @@ function RiskIndicator({ level }: { level: string | null }) {
   const colorName = getRiskLevelColor(level || "low");
   const Icon = level === "high" ? AlertTriangle : level === "medium" ? AlertCircle : CheckCircle;
 
-  // Map color names to Tailwind classes
-  const colorClasses: Record<string, { bg: string; text: string; border: string }> = {
-    red: { bg: "bg-red-500/20", text: "text-red-400", border: "border-red-500/30" },
-    amber: { bg: "bg-amber-500/20", text: "text-amber-400", border: "border-amber-500/30" },
-    green: { bg: "bg-green-500/20", text: "text-green-400", border: "border-green-500/30" },
-    gray: { bg: "bg-gray-500/20", text: "text-gray-400", border: "border-gray-500/30" },
+  // Map colour names to working tones
+  const tones: Record<string, WorkingTone> = {
+    red: "stale",
+    amber: "attention",
+    green: "good",
+    gray: "quiet",
+  };
+  const toneText: Record<WorkingTone, string> = {
+    good: "text-studio-good",
+    attention: "text-studio-attention",
+    stale: "text-studio-stale",
+    hold: "text-studio-hold",
+    quiet: "text-studio-dim",
   };
 
-  const color = colorClasses[colorName] || colorClasses.gray;
+  const tone = tones[colorName] || "quiet";
 
   return (
-    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${color.bg} ${color.text} border ${color.border}`}>
-      <Icon className="h-4 w-4" />
-      <span className="text-sm font-medium capitalize">{getRiskLevelLabel(level || "low")}</span>
+    <div className="flex items-center gap-2">
+      <Icon className={`h-4 w-4 ${toneText[tone]}`} />
+      <StateChip tone={tone}>{getRiskLevelLabel(level || "low")}</StateChip>
     </div>
   );
 }
@@ -76,7 +85,7 @@ function TrendVisualization({ assessments }: { assessments: GreenwashAssessment[
 
   if (sorted.length < 2) {
     return (
-      <p className="text-slate-400 text-sm">Need at least 2 completed assessments to show trends.</p>
+      <p className="text-muted-foreground text-sm">Need at least 2 completed assessments to show trends.</p>
     );
   }
 
@@ -102,10 +111,10 @@ function TrendVisualization({ assessments }: { assessments: GreenwashAssessment[
     <div className="space-y-6">
       {/* Trend Summary */}
       <div className="flex items-center gap-4">
-        <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-          trendDirection === "improving" ? "bg-green-500/20 text-green-400" :
-          trendDirection === "worsening" ? "bg-red-500/20 text-red-400" :
-          "bg-slate-500/20 text-slate-400"
+        <div className={`flex items-center gap-2 ${
+          trendDirection === "improving" ? "text-studio-good" :
+          trendDirection === "worsening" ? "text-studio-stale" :
+          "text-studio-dim"
         }`}>
           {trendDirection === "improving" ? (
             <TrendingDown className="h-5 w-5" />
@@ -114,29 +123,29 @@ function TrendVisualization({ assessments }: { assessments: GreenwashAssessment[
           ) : (
             <Minus className="h-5 w-5" />
           )}
-          <span className="font-medium">
+          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em]">
             {trendDirection === "improving" ? "Risk Improving" :
              trendDirection === "worsening" ? "Risk Increasing" : "Risk Stable"}
           </span>
           {trendDirection !== "stable" && (
-            <span className="text-sm">({trendPercent}%)</span>
+            <span className="font-mono text-[10px] tabular-nums">({trendPercent}%)</span>
           )}
         </div>
-        <div className="text-slate-400 text-sm">
-          Average Risk Score: <span className="text-white font-medium">{avgRiskScore.toFixed(0)}/100</span>
+        <div className="text-muted-foreground text-sm">
+          Average Risk Score: <span className="text-foreground font-medium tabular-nums">{avgRiskScore.toFixed(0)}/100</span>
         </div>
       </div>
 
       {/* Simple Visual Timeline */}
       <div className="space-y-2">
-        <p className="text-sm text-slate-400">Recent Assessment Risk Scores</p>
+        <p className="text-sm text-muted-foreground">Recent Assessment Risk Scores</p>
         <div className="flex items-end gap-1 h-32">
           {recentAssessments.map((assessment, idx) => {
             const score = assessment.overall_risk_score || 0;
             const height = (score / maxScore) * 100;
-            const color = assessment.overall_risk_level === "high" ? "bg-red-500" :
-                          assessment.overall_risk_level === "medium" ? "bg-amber-500" :
-                          "bg-green-500";
+            const color = assessment.overall_risk_level === "high" ? "bg-studio-stale" :
+                          assessment.overall_risk_level === "medium" ? "bg-studio-attention" :
+                          "bg-studio-good";
 
             return (
               <div key={assessment.id} className="flex-1 flex flex-col items-center gap-1">
@@ -145,7 +154,7 @@ function TrendVisualization({ assessments }: { assessments: GreenwashAssessment[
                   style={{ height: `${Math.max(height, 5)}%` }}
                   title={`${assessment.title}: ${score}/100`}
                 />
-                <span className="text-[10px] text-slate-500 truncate max-w-full">
+                <span className="text-[10px] font-mono text-muted-foreground truncate max-w-full">
                   {format(new Date(assessment.created_at), "MMM d")}
                 </span>
               </div>
@@ -233,47 +242,45 @@ export default function GreenwashHistoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+    <div className="min-h-screen">
       {/* Header */}
-      <div className="border-b border-white/10 backdrop-blur-xl bg-white/5">
+      <div className="border-b border-border">
         <div className="container mx-auto px-6 py-6">
           <div className="flex items-center gap-4 mb-4">
             <Link href="/greenwash-guardian">
-              <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white">
+              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back
               </Button>
             </Link>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
-              <Shield className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white">Assessment History</h1>
-              <p className="text-slate-400">View and manage past greenwash assessments</p>
-            </div>
+          <div>
+            <Eyebrow className="mb-3">THE EVIDENCE · GUARDIAN</Eyebrow>
+            <h1 className="font-display text-2xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+              Assessment history.
+            </h1>
+            <p className="text-muted-foreground mt-2 text-sm">View and manage past greenwash assessments</p>
           </div>
         </div>
       </div>
 
       {/* Filters */}
       <div className="container mx-auto px-6 py-6">
-        <Card className="backdrop-blur-xl bg-white/5 border border-white/10 mb-6">
+        <Card className="rounded-[6px] mb-6">
           <CardContent className="p-4">
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search assessments..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-slate-500"
+                  className="pl-10"
                 />
               </div>
               <Select value={riskFilter} onValueChange={setRiskFilter}>
-                <SelectTrigger className="w-full sm:w-48 bg-white/5 border-white/10 text-white">
-                  <Filter className="h-4 w-4 mr-2 text-slate-400" />
+                <SelectTrigger className="w-full sm:w-48">
+                  <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
                   <SelectValue placeholder="Risk Level" />
                 </SelectTrigger>
                 <SelectContent>
@@ -284,7 +291,7 @@ export default function GreenwashHistoryPage() {
                 </SelectContent>
               </Select>
               <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-full sm:w-48 bg-white/5 border-white/10 text-white">
+                <SelectTrigger className="w-full sm:w-48">
                   <SelectValue placeholder="Input Type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -302,20 +309,20 @@ export default function GreenwashHistoryPage() {
         {/* Results */}
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">Loading</p>
           </div>
         ) : filteredAssessments.length === 0 ? (
-          <Card className="backdrop-blur-xl bg-white/5 border border-white/10">
+          <Card className="rounded-[6px]">
             <CardContent className="py-12 text-center">
-              <Shield className="h-12 w-12 mx-auto mb-4 text-slate-500" />
-              <h3 className="text-lg font-medium text-white mb-2">No assessments found</h3>
-              <p className="text-slate-400 mb-6">
+              <Shield className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <h3 className="font-display text-lg font-medium text-foreground mb-2">No assessments found.</h3>
+              <p className="text-muted-foreground mb-6">
                 {assessments.length === 0
                   ? "You haven't created any assessments yet."
                   : "No assessments match your filters."}
               </p>
               <Link href="/greenwash-guardian">
-                <Button className="bg-emerald-600 hover:bg-emerald-700">
+                <Button className="bg-primary text-primary-foreground">
                   Create New Assessment
                 </Button>
               </Link>
@@ -330,45 +337,36 @@ export default function GreenwashHistoryPage() {
               return (
                 <Card
                   key={assessment.id}
-                  className="backdrop-blur-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+                  className="rounded-[6px] hover:bg-secondary transition-colors"
                 >
                   <CardContent className="p-6">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-start gap-4 flex-1 min-w-0">
-                        <div className="h-10 w-10 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
-                          <TypeIcon className="h-5 w-5 text-slate-400" />
-                        </div>
+                        <TypeIcon className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-1">
-                            <h3 className="font-medium text-white truncate">
+                            <h3 className="font-medium text-foreground truncate">
                               {assessment.title}
                             </h3>
-                            <Badge variant="outline" className="text-slate-400 border-slate-600">
-                              {inputTypeLabels[assessment.input_type]}
-                            </Badge>
+                            <StateChip>{inputTypeLabels[assessment.input_type]}</StateChip>
                             {assessment.status === "processing" && (
-                              <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
-                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                Processing
-                              </Badge>
+                              <StateChip tone="hold">Processing</StateChip>
                             )}
                             {assessment.status === "failed" && (
-                              <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
-                                Failed
-                              </Badge>
+                              <StateChip tone="stale">Failed</StateChip>
                             )}
                           </div>
                           {assessment.input_source && (
-                            <p className="text-sm text-slate-500 truncate mb-2">
+                            <p className="text-sm text-muted-foreground truncate mb-2">
                               {assessment.input_source}
                             </p>
                           )}
                           {assessment.summary && assessment.status === "completed" && (
-                            <p className="text-sm text-slate-400 line-clamp-2">
+                            <p className="text-sm text-muted-foreground line-clamp-2">
                               {assessment.summary}
                             </p>
                           )}
-                          <div className="flex items-center gap-4 mt-3 text-xs text-slate-500">
+                          <div className="flex items-center gap-4 mt-3 text-xs font-mono text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <Clock className="h-3 w-3" />
                               {format(new Date(assessment.created_at), "MMM d, yyyy 'at' h:mm a")}
@@ -384,7 +382,7 @@ export default function GreenwashHistoryPage() {
                         <div className="flex items-center gap-2">
                           {assessment.status === "completed" && (
                             <Link href={`/greenwash-guardian/${assessment.id}`}>
-                              <Button variant="outline" size="sm" className="border-white/10 hover:bg-white/10">
+                              <Button variant="outline" size="sm">
                                 <ExternalLink className="h-4 w-4 mr-2" />
                                 View Report
                               </Button>
@@ -395,13 +393,9 @@ export default function GreenwashHistoryPage() {
                             size="sm"
                             onClick={() => handleDelete(assessment.id)}
                             disabled={isDeleting}
-                            className="text-slate-400 hover:text-red-400 hover:bg-red-500/10"
+                            className="text-muted-foreground hover:text-studio-stale"
                           >
-                            {isDeleting ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
@@ -417,44 +411,49 @@ export default function GreenwashHistoryPage() {
         {assessments.length > 0 && (
           <>
             <div className="mt-8 grid grid-cols-1 sm:grid-cols-4 gap-4">
-              <Card className="backdrop-blur-xl bg-white/5 border border-white/10">
+              <Card className="rounded-[6px]">
                 <CardContent className="p-4 text-center">
-                  <div className="text-2xl font-bold text-white">{assessments.length}</div>
-                  <div className="text-sm text-slate-400">Total Assessments</div>
+                  <BigNumber value={assessments.length} label="TOTAL ASSESSMENTS" className="text-center" />
                 </CardContent>
               </Card>
-              <Card className="backdrop-blur-xl bg-red-500/10 border border-red-500/20">
+              <Card className="rounded-[6px]">
                 <CardContent className="p-4 text-center">
-                  <div className="text-2xl font-bold text-red-400">
-                    {assessments.filter((a) => a.overall_risk_level === "high").length}
-                  </div>
-                  <div className="text-sm text-slate-400">High Risk</div>
+                  <BigNumber
+                    value={assessments.filter((a) => a.overall_risk_level === "high").length}
+                    label="HIGH RISK"
+                    tone="stale"
+                    className="text-center"
+                  />
                 </CardContent>
               </Card>
-              <Card className="backdrop-blur-xl bg-amber-500/10 border border-amber-500/20">
+              <Card className="rounded-[6px]">
                 <CardContent className="p-4 text-center">
-                  <div className="text-2xl font-bold text-amber-400">
-                    {assessments.filter((a) => a.overall_risk_level === "medium").length}
-                  </div>
-                  <div className="text-sm text-slate-400">Medium Risk</div>
+                  <BigNumber
+                    value={assessments.filter((a) => a.overall_risk_level === "medium").length}
+                    label="MEDIUM RISK"
+                    tone="attention"
+                    className="text-center"
+                  />
                 </CardContent>
               </Card>
-              <Card className="backdrop-blur-xl bg-green-500/10 border border-green-500/20">
+              <Card className="rounded-[6px]">
                 <CardContent className="p-4 text-center">
-                  <div className="text-2xl font-bold text-green-400">
-                    {assessments.filter((a) => a.overall_risk_level === "low").length}
-                  </div>
-                  <div className="text-sm text-slate-400">Low Risk</div>
+                  <BigNumber
+                    value={assessments.filter((a) => a.overall_risk_level === "low").length}
+                    label="LOW RISK"
+                    tone="good"
+                    className="text-center"
+                  />
                 </CardContent>
               </Card>
             </div>
 
             {/* Risk Trend Analysis */}
             {assessments.length >= 2 && (
-              <Card className="mt-6 backdrop-blur-xl bg-white/5 border border-white/10">
+              <Card className="mt-6 rounded-[6px]">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-white text-lg">Risk Trend Analysis</CardTitle>
-                  <CardDescription className="text-slate-400">
+                  <CardTitle className="text-lg">Risk Trend Analysis</CardTitle>
+                  <CardDescription>
                     How your risk profile has changed over time
                   </CardDescription>
                 </CardHeader>

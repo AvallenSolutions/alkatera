@@ -5,7 +5,6 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
   Table,
@@ -25,11 +24,13 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  Loader2,
   AlertTriangle,
   Globe,
   RefreshCw,
 } from "lucide-react";
+import { StateChip } from "@/components/studio/state-chip";
+import { BigNumber } from "@/components/studio/big-number";
+import type { WorkingTone } from "@/components/studio/theme";
 import {
   getBulkJobWithUrls,
   startBulkJob,
@@ -144,48 +145,46 @@ export default function BulkJobPage() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "completed":
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
+        return <CheckCircle className="h-4 w-4 text-studio-good" />;
       case "failed":
-        return <XCircle className="h-4 w-4 text-red-500" />;
+        return <XCircle className="h-4 w-4 text-studio-stale" />;
       case "processing":
-        return <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />;
+        return <Clock className="h-4 w-4 text-studio-hold" />;
       case "skipped":
-        return <AlertTriangle className="h-4 w-4 text-amber-500" />;
+        return <AlertTriangle className="h-4 w-4 text-studio-attention" />;
       default:
-        return <Clock className="h-4 w-4 text-slate-500" />;
+        return <Clock className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, string> = {
-      pending: "bg-slate-500/20 text-slate-400 border-slate-500/30",
-      processing: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-      completed: "bg-green-500/20 text-green-400 border-green-500/30",
-      failed: "bg-red-500/20 text-red-400 border-red-500/30",
-      cancelled: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+    const tones: Record<string, WorkingTone> = {
+      pending: "quiet",
+      processing: "hold",
+      completed: "good",
+      failed: "stale",
+      cancelled: "attention",
     };
     return (
-      <Badge className={variants[status] || variants.pending}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
+      <StateChip tone={tones[status] || "quiet"}>{status}</StateChip>
     );
   };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">Loading</p>
       </div>
     );
   }
 
   if (!job) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-6">
-        <Card className="backdrop-blur-xl bg-white/5 border border-white/10">
+      <div className="min-h-screen p-6">
+        <Card className="rounded-[6px]">
           <CardContent className="py-12 text-center">
-            <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-amber-500" />
-            <h3 className="text-lg font-medium text-white mb-2">Bulk Job Not Found</h3>
+            <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-studio-attention" />
+            <h3 className="font-display text-lg font-medium text-foreground mb-2">Bulk job not found.</h3>
             <Link href="/greenwash-guardian">
               <Button>Back to Greenwash Guardian</Button>
             </Link>
@@ -200,13 +199,13 @@ export default function BulkJobPage() {
     : 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+    <div className="min-h-screen">
       {/* Header */}
-      <div className="border-b border-white/10 backdrop-blur-xl bg-white/5">
+      <div className="border-b border-border">
         <div className="container mx-auto px-6 py-6">
           <div className="flex items-center gap-4 mb-4">
             <Link href="/greenwash-guardian/history">
-              <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white">
+              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to History
               </Button>
@@ -214,12 +213,10 @@ export default function BulkJobPage() {
           </div>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
-                <Shield className="h-6 w-6 text-white" />
-              </div>
+              <Shield className="h-6 w-6 text-studio-brick" />
               <div>
-                <h1 className="text-2xl font-bold text-white">{job.title}</h1>
-                <p className="text-slate-400">
+                <h1 className="font-display text-2xl font-bold text-foreground">{job.title}</h1>
+                <p className="text-muted-foreground">
                   Created {format(new Date(job.created_at), "MMM d, yyyy 'at' h:mm a")}
                 </p>
               </div>
@@ -233,50 +230,43 @@ export default function BulkJobPage() {
 
       <div className="container mx-auto px-6 py-6 space-y-6">
         {/* Progress Card */}
-        <Card className="backdrop-blur-xl bg-white/5 border border-white/10">
+        <Card className="rounded-[6px]">
           <CardHeader className="pb-2">
-            <CardTitle className="text-white">Progress</CardTitle>
+            <CardTitle>Progress</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-400">
+              <span className="text-muted-foreground">
                 {job.completed_count + job.failed_count} of {job.total_urls} URLs processed
               </span>
-              <span className="text-white font-medium">{progress}%</span>
+              <span className="text-foreground font-medium tabular-nums">{progress}%</span>
             </div>
             <Progress value={progress} className="h-2" />
 
             {currentUrl && (
-              <div className="flex items-center gap-2 text-sm text-slate-400">
-                <Loader2 className="h-4 w-4 animate-spin text-emerald-500" />
-                <span>Processing: {currentUrl}</span>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <StateChip tone="hold">Processing</StateChip>
+                <span>{currentUrl}</span>
               </div>
             )}
 
             <div className="grid grid-cols-3 gap-4 pt-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-400">{job.completed_count}</div>
-                <div className="text-sm text-slate-400">Completed</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-red-400">{job.failed_count}</div>
-                <div className="text-sm text-slate-400">Failed</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-slate-400">
-                  {job.total_urls - job.completed_count - job.failed_count}
-                </div>
-                <div className="text-sm text-slate-400">Pending</div>
-              </div>
+              <BigNumber value={job.completed_count} label="COMPLETED" tone="good" className="text-center" />
+              <BigNumber value={job.failed_count} label="FAILED" tone="stale" className="text-center" />
+              <BigNumber
+                value={job.total_urls - job.completed_count - job.failed_count}
+                label="PENDING"
+                className="text-center"
+              />
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center gap-2 pt-4 border-t border-white/10">
+            <div className="flex items-center gap-2 pt-4 border-t border-border">
               {job.status === "pending" && (
                 <Button
                   onClick={handleStart}
                   disabled={isProcessing}
-                  className="bg-emerald-600 hover:bg-emerald-700"
+                  className="bg-primary text-primary-foreground"
                 >
                   <Play className="h-4 w-4 mr-2" />
                   Start Processing
@@ -286,7 +276,6 @@ export default function BulkJobPage() {
                 <Button
                   onClick={handleCancel}
                   variant="outline"
-                  className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
                 >
                   <Pause className="h-4 w-4 mr-2" />
                   Cancel
@@ -294,14 +283,14 @@ export default function BulkJobPage() {
               )}
               {(job.status === "completed" || job.status === "cancelled" || job.status === "failed") && (
                 <>
-                  <Button onClick={loadJob} variant="outline" className="border-white/10">
+                  <Button onClick={loadJob} variant="outline">
                     <RefreshCw className="h-4 w-4 mr-2" />
                     Refresh
                   </Button>
                   <Button
                     onClick={handleDelete}
                     variant="outline"
-                    className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                    className="text-studio-stale hover:text-studio-stale"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
                     Delete
@@ -313,44 +302,44 @@ export default function BulkJobPage() {
         </Card>
 
         {/* URLs Table */}
-        <Card className="backdrop-blur-xl bg-white/5 border border-white/10">
+        <Card className="rounded-[6px]">
           <CardHeader>
-            <CardTitle className="text-white">URLs ({job.urls.length})</CardTitle>
-            <CardDescription className="text-slate-400">
+            <CardTitle>URLs ({job.urls.length})</CardTitle>
+            <CardDescription>
               List of all URLs in this bulk scan
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
-                <TableRow className="border-white/10">
-                  <TableHead className="text-slate-400">Status</TableHead>
-                  <TableHead className="text-slate-400">URL</TableHead>
-                  <TableHead className="text-slate-400">Processed</TableHead>
-                  <TableHead className="text-slate-400 text-right">Actions</TableHead>
+                <TableRow>
+                  <TableHead>Status</TableHead>
+                  <TableHead>URL</TableHead>
+                  <TableHead>Processed</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {job.urls.map((url) => (
-                  <TableRow key={url.id} className="border-white/10">
+                  <TableRow key={url.id}>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         {getStatusIcon(url.status)}
-                        <span className="text-slate-300 capitalize">{url.status}</span>
+                        <span className="text-foreground capitalize">{url.status}</span>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2 max-w-md">
-                        <Globe className="h-4 w-4 text-slate-500 flex-shrink-0" />
-                        <span className="text-white truncate" title={url.url}>
+                        <Globe className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <span className="text-foreground truncate" title={url.url}>
                           {url.url}
                         </span>
                       </div>
                       {url.error_message && (
-                        <p className="text-xs text-red-400 mt-1">{url.error_message}</p>
+                        <p className="text-xs text-studio-stale mt-1">{url.error_message}</p>
                       )}
                     </TableCell>
-                    <TableCell className="text-slate-400">
+                    <TableCell className="text-muted-foreground font-mono text-xs">
                       {url.processed_at
                         ? format(new Date(url.processed_at), "MMM d, h:mm a")
                         : "-"}
@@ -358,7 +347,7 @@ export default function BulkJobPage() {
                     <TableCell className="text-right">
                       {url.assessment_id && (
                         <Link href={`/greenwash-guardian/${url.assessment_id}`}>
-                          <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white">
+                          <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
                             View Report
                             <ExternalLink className="h-3 w-3 ml-1" />
                           </Button>

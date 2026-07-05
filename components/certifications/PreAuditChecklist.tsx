@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { CheckCircle2, Circle, AlertTriangle, Loader2 } from 'lucide-react';
+import { CheckCircle2, Circle, AlertTriangle } from 'lucide-react';
 
 interface Derived {
   foundationComplete: boolean;
@@ -114,7 +114,9 @@ export function PreAuditChecklist({ onReadyChange }: PreAuditChecklistProps) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-10">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-studio-dim">
+            Loading
+          </p>
         </CardContent>
       </Card>
     );
@@ -123,7 +125,7 @@ export function PreAuditChecklist({ onReadyChange }: PreAuditChecklistProps) {
   const autoItem = (label: string, done: boolean) => (
     <div className="flex items-center gap-2 py-1.5 text-sm">
       {done ? (
-        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+        <CheckCircle2 className="h-4 w-4 text-studio-good" />
       ) : (
         <Circle className="h-4 w-4 text-muted-foreground" />
       )}
@@ -167,7 +169,7 @@ export function PreAuditChecklist({ onReadyChange }: PreAuditChecklistProps) {
             </SelectContent>
           </Select>
           {providerMismatch && (
-            <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+            <div className="flex items-start gap-2 rounded-[6px] border border-border bg-card p-2 text-xs text-studio-attention">
               <AlertTriangle className="h-4 w-4 shrink-0" />
               Your organisation has 50 or more workers. You should use SCS
               Global Services rather than To-Cert.
@@ -214,7 +216,7 @@ export function PreAuditChecklist({ onReadyChange }: PreAuditChecklistProps) {
 
         <div className="border-t pt-3 text-sm">
           {ready ? (
-            <span className="font-medium text-emerald-700 dark:text-emerald-400">
+            <span className="font-medium text-studio-good">
               Checklist complete. You can prepare your audit package.
             </span>
           ) : (

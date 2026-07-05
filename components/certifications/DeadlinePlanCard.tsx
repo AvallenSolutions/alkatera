@@ -34,20 +34,20 @@ export function DeadlinePlanCard({ readiness }: { readiness: CertificationReadin
   if (!plan) return null;
 
   return (
-    <Card className={cn('border-border/60', plan.overdue && 'border-red-500/40')}>
+    <Card className={cn('border-border/60', plan.overdue && 'border-studio-stale/40')}>
       <CardContent className="space-y-4 p-5">
         <div className="flex items-start gap-3">
-          <CalendarClock className="mt-0.5 h-5 w-5 shrink-0 text-[#ccff00]" />
+          <CalendarClock className="mt-0.5 h-5 w-5 shrink-0 text-studio-brick" />
           <div className="flex-1">
             <h3 className="text-sm font-semibold text-foreground">Recertification deadline</h3>
             <p className="mt-0.5 text-xs text-muted-foreground">
               Your 5-year cycle ends on{' '}
               <span className="font-medium text-foreground">{formatDate(plan.deadline)}</span>{' '}
-              <span className={cn(plan.overdue ? 'text-red-500' : 'text-muted-foreground')}>({countdown(plan.daysRemaining)})</span>.
+              <span className={cn(plan.overdue ? 'text-studio-stale' : 'text-muted-foreground')}>({countdown(plan.daysRemaining)})</span>.
             </p>
             {readiness.ecgtApplicable && (
-              <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-                You use B Corp status in EU marketing, so the ECGT (Empowering Consumers for the Green Transition) deadline also applies — keep your claims substantiated.
+              <p className="mt-1 text-xs text-studio-attention">
+                You use B Corp status in EU marketing, so the ECGT (Empowering Consumers for the Green Transition) deadline also applies: keep your claims substantiated.
               </p>
             )}
           </div>
@@ -58,7 +58,7 @@ export function DeadlinePlanCard({ readiness }: { readiness: CertificationReadin
             const Icon = m.done ? CheckCircle2 : Circle;
             return (
               <li key={m.label} className="flex items-center gap-3">
-                <Icon className={cn('h-4 w-4 shrink-0', m.done ? 'text-emerald-500' : 'text-muted-foreground/50')} />
+                <Icon className={cn('h-4 w-4 shrink-0', m.done ? 'text-studio-good' : 'text-muted-foreground/50')} />
                 <span className={cn('flex-1 text-sm', m.done ? 'text-muted-foreground line-through' : 'text-foreground')}>
                   {m.label}
                 </span>

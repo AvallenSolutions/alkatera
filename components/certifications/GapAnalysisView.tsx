@@ -23,15 +23,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  CheckCircle2,
-  Clock,
-  Circle,
-  CalendarClock,
   Lock,
   Upload,
-  Loader2,
   Download,
 } from 'lucide-react';
+import { StateChip } from '@/components/studio';
+import type { WorkingTone } from '@/components/studio/theme';
 import { toast } from 'sonner';
 import { EvidenceLinker } from '@/components/certifications/EvidenceLinker';
 import { AutoEvidencePanel } from '@/components/certifications/AutoEvidencePanel';
@@ -92,31 +89,23 @@ interface GapAnalysisViewProps {
 
 const STATUS_CONFIG: Record<
   RequirementStatusValue,
-  { label: string; icon: typeof CheckCircle2; className: string }
+  { label: string; tone: WorkingTone }
 > = {
   passed: {
     label: 'Passed',
-    icon: CheckCircle2,
-    className:
-      'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+    tone: 'good',
   },
   in_progress: {
     label: 'In Progress',
-    icon: Clock,
-    className:
-      'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+    tone: 'attention',
   },
   not_started: {
     label: 'Not Started',
-    icon: Circle,
-    className:
-      'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+    tone: 'quiet',
   },
   future: {
     label: 'Future',
-    icon: CalendarClock,
-    className:
-      'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+    tone: 'hold',
   },
 };
 
@@ -295,7 +284,9 @@ export function GapAnalysisView({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-studio-dim">
+          Loading
+        </p>
       </div>
     );
   }
@@ -333,7 +324,7 @@ export function GapAnalysisView({
           )}
           {notApplicableCount > 0 && (
             <p className="text-xs text-muted-foreground">
-              {notApplicableCount} requirement{notApplicableCount === 1 ? '' : 's'} hidden — they don&apos;t apply to your company size.
+              {notApplicableCount} requirement{notApplicableCount === 1 ? '' : 's'} hidden: they don&apos;t apply to your company size.
             </p>
           )}
         </CardContent>
@@ -381,11 +372,7 @@ export function GapAnalysisView({
                   disabled={sectionDownloadState[topic.topicArea] === 'loading'}
                   onClick={() => handleSectionDownload(topic.topicArea)}
                 >
-                  {sectionDownloadState[topic.topicArea] === 'loading' ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Download className="h-4 w-4" />
-                  )}
+                  <Download className="h-4 w-4" />
                   <span className="sr-only">Download section evidence</span>
                 </Button>
               </div>
@@ -394,8 +381,8 @@ export function GapAnalysisView({
               {topic.isFoundation &&
                 !readiness.riskToolComplete &&
                 onOpenRiskTool && (
-                  <div className="mb-3 flex flex-col gap-2 rounded-lg border border-blue-300 bg-blue-50 p-3 text-sm dark:border-blue-800 dark:bg-blue-950/30 sm:flex-row sm:items-center sm:justify-between">
-                    <span className="text-blue-900 dark:text-blue-200">
+                  <div className="mb-3 flex flex-col gap-2 rounded-[6px] border border-border bg-card p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                    <span className="text-foreground">
                       The Risk Tool has not been completed. It is a required
                       Foundation step.
                     </span>
@@ -418,14 +405,13 @@ export function GapAnalysisView({
                 <div className="space-y-2">
                   {visible.map((rs) => {
                     const cfg = STATUS_CONFIG[rs.status];
-                    const StatusIcon = cfg.icon;
                     const isBlocking = blockingIds.has(rs.requirementId);
                     return (
                       <div
                         key={rs.requirementId}
-                        className={`flex items-start justify-between gap-4 rounded-lg border p-3 ${
+                        className={`flex items-start justify-between gap-4 rounded-[6px] border p-3 ${
                           isBlocking
-                            ? 'border-amber-300 dark:border-amber-800'
+                            ? 'border-studio-attention/40'
                             : ''
                         }`}
                       >
@@ -437,10 +423,7 @@ export function GapAnalysisView({
                             <span className="font-medium text-sm">
                               {rs.name}
                             </span>
-                            <Badge className={`text-xs ${cfg.className}`}>
-                              <StatusIcon className="mr-1 h-3 w-3" />
-                              {cfg.label}
-                            </Badge>
+                            <StateChip tone={cfg.tone}>{cfg.label}</StateChip>
                             {rs.applicableFromYear > 0 && (
                               <Badge variant="outline" className="text-xs">
                                 Year {rs.applicableFromYear}
@@ -457,12 +440,14 @@ export function GapAnalysisView({
                             {readiness.staleRequirementCodes?.includes(
                               rs.code,
                             ) && (
-                              <Badge
-                                className="bg-amber-100 text-amber-700 text-xs dark:bg-amber-900/30 dark:text-amber-400"
-                                title="This evidence is over 18 months old. Consider updating it before your next recertification."
+                              <StateChip
+                                tone="stale"
+                                className="cursor-default"
                               >
-                                Evidence stale
-                              </Badge>
+                                <span title="This evidence is over 18 months old. Consider updating it before your next recertification.">
+                                  Evidence stale
+                                </span>
+                              </StateChip>
                             )}
                           </div>
                           {rs.description && (
@@ -476,7 +461,7 @@ export function GapAnalysisView({
                             {rs.verifiedCount} verified
                           </p>
                           {actionByReq[rs.requirementId] && (
-                            <p className="mt-1 text-xs text-[#7c3aed] dark:text-purple-400">
+                            <p className="mt-1 text-xs text-studio-hold">
                               {actionByReq[rs.requirementId].assigned_to
                                 ? `Owner: ${actionByReq[rs.requirementId].assigned_to}`
                                 : 'Action assigned'}
@@ -513,7 +498,7 @@ export function GapAnalysisView({
           <DialogHeader>
             <div className="flex items-start justify-between gap-3 pr-6">
               <DialogTitle>
-                {activeRequirement?.code} — {activeRequirement?.name}
+                {activeRequirement?.code} · {activeRequirement?.name}
               </DialogTitle>
               {isBcorp && activeRequirement && (
                 <AskRosaButton
@@ -523,7 +508,7 @@ export function GapAnalysisView({
                   entity={{
                     type: 'bcorp_requirement',
                     id: activeRequirement.code,
-                    label: `B Corp requirement ${activeRequirement.code} — ${activeRequirement.name}`,
+                    label: `B Corp requirement ${activeRequirement.code} · ${activeRequirement.name}`,
                     data: {
                       code: activeRequirement.code,
                       name: activeRequirement.name,
@@ -557,7 +542,7 @@ export function GapAnalysisView({
                     </div>
                     {g.pitfalls && g.pitfalls.length > 0 && (
                       <div>
-                        <p className="font-semibold text-amber-600 dark:text-amber-400">Watch out for</p>
+                        <p className="font-semibold text-studio-attention">Watch out for</p>
                         <ul className="mt-0.5 list-disc space-y-0.5 pl-4 text-muted-foreground">
                           {g.pitfalls.map((p) => (
                             <li key={p}>{p}</li>

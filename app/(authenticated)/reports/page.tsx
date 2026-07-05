@@ -7,6 +7,7 @@ import { FileText, Download } from 'lucide-react'
 import Link from 'next/link'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { VerificationCard } from '@/components/partners/VerificationCard'
+import { Eyebrow } from '@/components/studio'
 import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider'
 
 export default function ReportsPage() {
@@ -25,9 +26,10 @@ export default function ReportsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-            Reports
+        <div className="space-y-2">
+          <Eyebrow>THE EVIDENCE · REPORTS</Eyebrow>
+          <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+            The reports.
           </h1>
           <p className="text-sm text-muted-foreground">
             View and download sustainability and product reports

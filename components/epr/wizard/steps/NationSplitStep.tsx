@@ -8,12 +8,10 @@ import type { NationEstimationResult } from '@/lib/epr/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import {
   ArrowLeft,
   ArrowRight,
   SkipForward,
-  Loader2,
   MapPin,
   Sparkles,
   AlertCircle,
@@ -32,10 +30,10 @@ const DEFAULT_SPLITS = {
   ni: 2.8,
 }
 
-const CONFIDENCE_BADGE_STYLES: Record<string, string> = {
-  high: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-  medium: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-  low: 'bg-red-500/20 text-red-400 border-red-500/30',
+const CONFIDENCE_TONES: Record<string, string> = {
+  high: 'text-studio-good',
+  medium: 'text-studio-attention',
+  low: 'text-studio-stale',
 }
 
 interface NationField {
@@ -160,7 +158,7 @@ export function NationSplitStep({ onComplete, onBack, onSkip }: NationSplitStepP
   if (settingsLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 text-neon-lime animate-spin" />
+        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">Loading</span>
       </div>
     )
   }
@@ -170,10 +168,10 @@ export function NationSplitStep({ onComplete, onBack, onSkip }: NationSplitStepP
       <div className="w-full max-w-md space-y-6">
         {/* Header */}
         <div className="text-center space-y-3">
-          <div className="mx-auto w-16 h-16 bg-neon-lime/20 backdrop-blur-md border border-neon-lime/30 rounded-2xl flex items-center justify-center">
-            <MapPin className="w-8 h-8 text-neon-lime" />
+          <div className="mx-auto w-16 h-16 rounded-[6px] border border-border bg-card flex items-center justify-center">
+            <MapPin className="w-8 h-8 text-studio-brick" />
           </div>
-          <h3 className="text-xl font-serif font-bold text-foreground">
+          <h3 className="text-xl font-display font-bold text-foreground">
             Nation Sales Split
           </h3>
           <p className="text-sm text-muted-foreground">
@@ -186,16 +184,15 @@ export function NationSplitStep({ onComplete, onBack, onSkip }: NationSplitStepP
           variant="outline"
           onClick={handleAutoEstimate}
           disabled={estimating || isSaving}
-          className="w-full border-border bg-muted/50 text-foreground hover:bg-muted hover:text-foreground"
+          className="w-full border-border bg-card text-foreground hover:bg-secondary hover:text-foreground"
         >
           {estimating ? (
             <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               Estimating from your data...
             </>
           ) : (
             <>
-              <Sparkles className="w-4 h-4 mr-2 text-neon-lime" />
+              <Sparkles className="w-4 h-4 mr-2 text-studio-brick" />
               Auto-Estimate from Delivery Data
             </>
           )}
@@ -204,20 +201,17 @@ export function NationSplitStep({ onComplete, onBack, onSkip }: NationSplitStepP
         {/* Method + confidence indicators */}
         {method === 'auto_estimated' && confidence && (
           <div className="flex items-center justify-center gap-2 animate-in fade-in duration-200">
-            <Badge variant="outline" className="bg-neon-lime/10 text-neon-lime border-neon-lime/30 text-xs">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-brick">
               Auto-estimated
-            </Badge>
-            <Badge
-              variant="outline"
-              className={`text-xs ${CONFIDENCE_BADGE_STYLES[confidence] || ''}`}
-            >
+            </span>
+            <span className={`font-mono text-[10px] font-bold uppercase tracking-[0.18em] ${CONFIDENCE_TONES[confidence] || 'text-studio-dim'}`}>
               {confidence.charAt(0).toUpperCase() + confidence.slice(1)} confidence
-            </Badge>
+            </span>
           </div>
         )}
 
         {/* Nation split inputs */}
-        <div className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl p-6 space-y-4">
+        <div className="rounded-[6px] border border-border bg-card p-6 space-y-4">
           {NATIONS.map((nation) => (
             <div key={nation.key} className="flex items-center gap-3">
               <span className="text-lg w-8 text-center" role="img" aria-label={nation.label}>
@@ -239,7 +233,7 @@ export function NationSplitStep({ onComplete, onBack, onSkip }: NationSplitStepP
                   value={splits[nation.key]}
                   onChange={(e) => handleSplitChange(nation.key, e.target.value)}
                   disabled={isSaving}
-                  className="pr-8 bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50 text-right"
+                  className="pr-8 bg-background border-border text-foreground placeholder:text-muted-foreground/50 text-right"
                 />
                 <span className="absolute inset-y-0 right-3 flex items-center text-muted-foreground/70 text-sm pointer-events-none">
                   %
@@ -254,7 +248,7 @@ export function NationSplitStep({ onComplete, onBack, onSkip }: NationSplitStepP
               <span className="text-sm font-medium text-muted-foreground">Total</span>
               <span
                 className={`text-sm font-mono font-semibold ${
-                  isValid ? 'text-emerald-400' : 'text-red-400'
+                  isValid ? 'text-studio-good' : 'text-studio-stale'
                 }`}
               >
                 {total.toFixed(1)}%
@@ -262,8 +256,8 @@ export function NationSplitStep({ onComplete, onBack, onSkip }: NationSplitStepP
             </div>
             {!isValid && (
               <div className="flex items-center gap-2 mt-2 animate-in fade-in duration-200">
-                <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
-                <p className="text-xs text-red-400">
+                <AlertCircle className="w-4 h-4 text-studio-stale flex-shrink-0" />
+                <p className="text-xs text-studio-stale">
                   Percentages must add up to 100% (currently {total.toFixed(1)}%).
                 </p>
               </div>
@@ -297,11 +291,10 @@ export function NationSplitStep({ onComplete, onBack, onSkip }: NationSplitStepP
             <Button
               onClick={handleContinue}
               disabled={isSaving || !isValid}
-              className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full"
             >
               {isSaving ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Saving...
                 </>
               ) : (

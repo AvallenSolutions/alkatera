@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ArrowLeft, ArrowRight, SkipForward, Loader2, Building2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, SkipForward, Building2 } from 'lucide-react'
 import {
   HMRC_ORG_TYPE_NAMES,
   RPD_NATION_NAMES,
@@ -84,7 +84,7 @@ export function CompanyDetailsStep({ onComplete, onBack, onSkip }: CompanyDetail
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 text-neon-lime animate-spin" />
+        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">Loading</span>
       </div>
     )
   }
@@ -94,10 +94,10 @@ export function CompanyDetailsStep({ onComplete, onBack, onSkip }: CompanyDetail
       <div className="w-full max-w-md space-y-6">
         {/* Header */}
         <div className="text-center space-y-3">
-          <div className="mx-auto w-16 h-16 bg-neon-lime/20 backdrop-blur-md border border-neon-lime/30 rounded-2xl flex items-center justify-center">
-            <Building2 className="w-8 h-8 text-neon-lime" />
+          <div className="mx-auto w-16 h-16 rounded-[6px] border border-border bg-card flex items-center justify-center">
+            <Building2 className="w-8 h-8 text-studio-brick" />
           </div>
-          <h3 className="text-xl font-serif font-bold text-foreground">
+          <h3 className="text-xl font-display font-bold text-foreground">
             Company Details
           </h3>
           <p className="text-sm text-muted-foreground">
@@ -106,7 +106,7 @@ export function CompanyDetailsStep({ onComplete, onBack, onSkip }: CompanyDetail
         </div>
 
         {/* Form card */}
-        <div className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl p-6 space-y-5">
+        <div className="rounded-[6px] border border-border bg-card p-6 space-y-5">
           {/* Companies House Number */}
           <div className="space-y-2">
             <Label htmlFor="epr-ch-number" className="text-sm font-medium text-muted-foreground">
@@ -119,7 +119,7 @@ export function CompanyDetailsStep({ onComplete, onBack, onSkip }: CompanyDetail
               onChange={(e) => setCompaniesHouseNumber(e.target.value)}
               maxLength={8}
               disabled={isSaving}
-              className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50"
+              className="bg-background border-border text-foreground placeholder:text-muted-foreground/50"
             />
             <p className="text-xs text-muted-foreground/70">
               Your 8-character Companies House registration number.
@@ -138,7 +138,7 @@ export function CompanyDetailsStep({ onComplete, onBack, onSkip }: CompanyDetail
             >
               <SelectTrigger
                 id="epr-org-type"
-                className="bg-muted/50 border-border text-foreground focus:ring-neon-lime/50"
+                className="bg-background border-border text-foreground"
               >
                 <SelectValue placeholder="Select organisation type" />
               </SelectTrigger>
@@ -166,7 +166,7 @@ export function CompanyDetailsStep({ onComplete, onBack, onSkip }: CompanyDetail
               value={sicCode}
               onChange={(e) => setSicCode(e.target.value)}
               disabled={isSaving}
-              className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50"
+              className="bg-background border-border text-foreground placeholder:text-muted-foreground/50"
             />
             <div className="text-xs text-muted-foreground/70 space-y-1">
               <p>Common drinks industry SIC codes:</p>
@@ -177,7 +177,7 @@ export function CompanyDetailsStep({ onComplete, onBack, onSkip }: CompanyDetail
                       type="button"
                       onClick={() => setSicCode(sic.code)}
                       disabled={isSaving}
-                      className="text-left text-xs text-neon-lime/80 hover:text-neon-lime hover:underline transition-colors"
+                      className="text-left text-xs text-studio-brick hover:text-studio-brick/80 hover:underline transition-colors"
                     >
                       {sic.label}
                     </button>
@@ -199,7 +199,7 @@ export function CompanyDetailsStep({ onComplete, onBack, onSkip }: CompanyDetail
             >
               <SelectTrigger
                 id="epr-home-nation"
-                className="bg-muted/50 border-border text-foreground focus:ring-neon-lime/50"
+                className="bg-background border-border text-foreground"
               >
                 <SelectValue placeholder="Select home nation" />
               </SelectTrigger>
@@ -245,11 +245,10 @@ export function CompanyDetailsStep({ onComplete, onBack, onSkip }: CompanyDetail
             <Button
               onClick={handleContinue}
               disabled={isSaving}
-              className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full"
             >
               {isSaving ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Saving...
                 </>
               ) : (

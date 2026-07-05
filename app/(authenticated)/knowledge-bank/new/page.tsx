@@ -15,7 +15,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ChevronLeft, Upload, Loader2 } from 'lucide-react'
+import { ChevronLeft, Upload } from 'lucide-react'
+import { Eyebrow } from '@/components/studio/eyebrow'
 import { useKnowledgeBankCategories } from '@/hooks/data/useKnowledgeBank'
 import { useOrganization } from '@/lib/organizationContext'
 import { useIsAlkateraAdmin } from '@/hooks/usePermissions'
@@ -79,7 +80,7 @@ export default function NewResourcePage() {
 
         if (uploadError) throw uploadError
 
-        // Store the storage path (not a public URL) — the bucket is private,
+        // Store the storage path (not a public URL): the bucket is private,
         // so we generate signed URLs at download/view time instead.
         fileUrl = filePath
         fileName = file.name
@@ -185,14 +186,17 @@ export default function NewResourcePage() {
       </Button>
 
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Add New Resource</h1>
-        <p className="text-muted-foreground mt-1">
+        <Eyebrow className="mb-3">THE EVIDENCE · KNOWLEDGE</Eyebrow>
+        <h1 className="font-display text-3xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+          Add a resource.
+        </h1>
+        <p className="text-muted-foreground mt-2 text-sm">
           Upload documents, videos, or add links to external resources
         </p>
       </div>
 
       <form onSubmit={(e) => handleSubmit(e, 'published')}>
-        <Card>
+        <Card className="rounded-[6px]">
           <CardHeader>
             <CardTitle>Resource Details</CardTitle>
           </CardHeader>
@@ -327,24 +331,10 @@ export default function NewResourcePage() {
                 onClick={(e) => handleSubmit(e as any, 'draft')}
                 disabled={isUploading}
               >
-                {isUploading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  'Save as Draft'
-                )}
+                {isUploading ? 'Saving...' : 'Save as Draft'}
               </Button>
               <Button type="submit" disabled={isUploading}>
-                {isUploading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Publishing...
-                  </>
-                ) : (
-                  'Publish Resource'
-                )}
+                {isUploading ? 'Publishing...' : 'Publish Resource'}
               </Button>
             </div>
           </CardContent>

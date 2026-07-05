@@ -17,7 +17,6 @@ import {
   ArrowRight,
   SkipForward,
   Settings2,
-  Loader2,
   Info,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -81,8 +80,7 @@ export function DefaultsStep({ onComplete, onBack, onSkip }: DefaultsStepProps) 
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
-        <Loader2 className="w-8 h-8 text-neon-lime animate-spin" />
-        <p className="mt-3 text-sm text-muted-foreground">Loading settings...</p>
+        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">Loading settings</span>
       </div>
     )
   }
@@ -92,10 +90,10 @@ export function DefaultsStep({ onComplete, onBack, onSkip }: DefaultsStepProps) 
       <div className="w-full max-w-md space-y-6">
         {/* Header */}
         <div className="text-center space-y-3">
-          <div className="mx-auto w-16 h-16 bg-neon-lime/20 backdrop-blur-md border border-neon-lime/30 rounded-2xl flex items-center justify-center">
-            <Settings2 className="w-8 h-8 text-neon-lime" />
+          <div className="mx-auto w-16 h-16 rounded-[6px] border border-border bg-card flex items-center justify-center">
+            <Settings2 className="w-8 h-8 text-studio-brick" />
           </div>
-          <h3 className="text-xl font-serif font-bold text-foreground">
+          <h3 className="text-xl font-display font-bold text-foreground">
             Set your packaging defaults
           </h3>
           <p className="text-sm text-muted-foreground">
@@ -105,7 +103,7 @@ export function DefaultsStep({ onComplete, onBack, onSkip }: DefaultsStepProps) 
         </div>
 
         {/* Form Card */}
-        <div className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl p-6 space-y-5">
+        <div className="rounded-[6px] border border-border bg-card p-6 space-y-5">
           {/* Default Packaging Activity */}
           <div className="space-y-2">
             <Label htmlFor="epr-default-activity" className="text-sm font-medium text-muted-foreground">
@@ -114,7 +112,7 @@ export function DefaultsStep({ onComplete, onBack, onSkip }: DefaultsStepProps) 
             <Select value={defaultActivity} onValueChange={setDefaultActivity}>
               <SelectTrigger
                 id="epr-default-activity"
-                className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50"
+                className="bg-background border-border text-foreground placeholder:text-muted-foreground/50"
               >
                 <SelectValue placeholder="Select activity..." />
               </SelectTrigger>
@@ -139,7 +137,7 @@ export function DefaultsStep({ onComplete, onBack, onSkip }: DefaultsStepProps) 
             <Select value={defaultNation} onValueChange={setDefaultNation}>
               <SelectTrigger
                 id="epr-default-nation"
-                className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50"
+                className="bg-background border-border text-foreground placeholder:text-muted-foreground/50"
               >
                 <SelectValue placeholder="Select nation..." />
               </SelectTrigger>
@@ -208,11 +206,10 @@ export function DefaultsStep({ onComplete, onBack, onSkip }: DefaultsStepProps) 
             <Button
               onClick={handleSave}
               disabled={isSaving}
-              className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full"
             >
               {isSaving ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Saving...
                 </>
               ) : (

@@ -3,16 +3,12 @@
 import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { StateChip } from "@/components/studio";
 import {
   Upload,
   FileSpreadsheet,
   Sparkles,
-  CheckCircle,
-  XCircle,
-  Loader2,
-  AlertCircle,
   ChevronRight,
   Download,
   Trash2,
@@ -366,21 +362,21 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "uploading":
-        return <Badge variant="secondary"><Loader2 className="h-3 w-3 mr-1 animate-spin" />Uploading</Badge>;
+        return <StateChip tone="attention">Uploading</StateChip>;
       case "processing":
-        return <Badge variant="secondary"><Sparkles className="h-3 w-3 mr-1 animate-pulse" />AI Processing</Badge>;
+        return <StateChip tone="attention">AI Processing</StateChip>;
       case "partial":
-        return <Badge variant="secondary"><Sparkles className="h-3 w-3 mr-1 animate-pulse" />Processing...</Badge>;
+        return <StateChip tone="attention">Processing</StateChip>;
       case "ready_for_review":
-        return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100"><AlertCircle className="h-3 w-3 mr-1" />Ready for Review</Badge>;
+        return <StateChip tone="hold">Ready for Review</StateChip>;
       case "partially_imported":
-        return <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100"><AlertCircle className="h-3 w-3 mr-1" />Partially Imported</Badge>;
+        return <StateChip tone="attention">Partially Imported</StateChip>;
       case "completed":
-        return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"><CheckCircle className="h-3 w-3 mr-1" />Completed</Badge>;
+        return <StateChip tone="good">Completed</StateChip>;
       case "failed":
-        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Failed</Badge>;
+        return <StateChip tone="stale">Failed</StateChip>;
       default:
-        return <Badge variant="secondary">{status}</Badge>;
+        return <StateChip>{status}</StateChip>;
     }
   };
 
@@ -419,7 +415,7 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+            <Sparkles className="h-5 w-5 text-studio-brick" />
             <CardTitle>Accounts Import</CardTitle>
           </div>
           <Button variant="ghost" size="sm" onClick={downloadTemplate}>
@@ -436,10 +432,7 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
       </CardHeader>
       <CardContent className="space-y-4">
         {isUploading ? (
-          <div className="space-y-3">
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
-            </div>
+          <div className="space-y-3 py-6">
             <Progress value={uploadProgress} className="h-2" />
             <p className="text-sm text-center text-muted-foreground">
               {uploadProgress < 50 ? "Uploading file..." : uploadProgress < 90 ? "Processing data..." : "Finalising..."}
@@ -447,7 +440,7 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
           </div>
         ) : latestBatch && latestBatch.status !== "completed" ? (
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 rounded-lg border bg-card">
+            <div className="flex items-center justify-between p-4 rounded-[6px] border border-border bg-card">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
@@ -462,8 +455,8 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
 
             {latestBatch.status === "failed" && (
               <div className="space-y-3">
-                <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800">
-                  <p className="text-sm text-red-700 dark:text-red-300">
+                <div className="p-3 rounded-[6px] border border-border bg-card">
+                  <p className="text-sm text-studio-stale">
                     {latestBatch.error_message || "Upload failed. Please try again."}
                   </p>
                 </div>
@@ -473,11 +466,7 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
                   onClick={() => deleteBatch(latestBatch.id)}
                   disabled={isDeleting}
                 >
-                  {isDeleting ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-4 w-4 mr-2" />
-                  )}
+                  <Trash2 className="h-4 w-4 mr-2" />
                   Clear Failed Upload
                 </Button>
               </div>
@@ -485,8 +474,8 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
 
             {(latestBatch.status === "uploading" || latestBatch.status === "processing" || latestBatch.status === "partial") && isStuckBatch(latestBatch) && (
               <div className="space-y-3">
-                <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800">
-                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                <div className="p-3 rounded-[6px] border border-border bg-card">
+                  <p className="text-sm text-studio-attention">
                     This upload appears to be stuck. You can cancel it and try again.
                   </p>
                 </div>
@@ -497,11 +486,7 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
                     onClick={() => deleteBatch(latestBatch.id)}
                     disabled={isDeleting}
                   >
-                    {isDeleting ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4 mr-2" />
-                    )}
+                    <Trash2 className="h-4 w-4 mr-2" />
                     Cancel Upload
                   </Button>
                   <Button
@@ -509,7 +494,7 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
                     onClick={fetchBatches}
                     disabled={isLoading}
                   >
-                    <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                    <RefreshCw className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
@@ -527,7 +512,6 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
 
             {latestBatch.status === "uploading" && !isStuckBatch(latestBatch) && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
                 <span>Preparing data for AI categorisation...</span>
               </div>
             )}
@@ -535,23 +519,23 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
             {latestBatch.status === "ready_for_review" && (
               <div className="space-y-3">
                 <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="p-2 rounded-lg bg-green-50 dark:bg-green-950">
-                    <p className="text-lg font-bold text-green-700 dark:text-green-300">
+                  <div className="p-2 rounded-[6px] border border-border bg-card">
+                    <p className="font-display text-lg font-bold tabular-nums text-studio-good">
                       {latestBatch.approved_rows}
                     </p>
-                    <p className="text-xs text-green-600 dark:text-green-400">Approved</p>
+                    <p className="text-xs text-muted-foreground">Approved</p>
                   </div>
-                  <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950">
-                    <p className="text-lg font-bold text-amber-700 dark:text-amber-300">
+                  <div className="p-2 rounded-[6px] border border-border bg-card">
+                    <p className="font-display text-lg font-bold tabular-nums text-studio-attention">
                       {latestBatch.total_rows - latestBatch.approved_rows - latestBatch.rejected_rows}
                     </p>
-                    <p className="text-xs text-amber-600 dark:text-amber-400">Pending</p>
+                    <p className="text-xs text-muted-foreground">Pending</p>
                   </div>
-                  <div className="p-2 rounded-lg bg-red-50 dark:bg-red-950">
-                    <p className="text-lg font-bold text-red-700 dark:text-red-300">
+                  <div className="p-2 rounded-[6px] border border-border bg-card">
+                    <p className="font-display text-lg font-bold tabular-nums text-studio-stale">
                       {latestBatch.rejected_rows}
                     </p>
-                    <p className="text-xs text-red-600 dark:text-red-400">Rejected</p>
+                    <p className="text-xs text-muted-foreground">Rejected</p>
                   </div>
                 </div>
                 <Button className="w-full" onClick={() => window.location.href = `/data/spend-import/${latestBatch.id}`}>
@@ -563,7 +547,7 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="flex flex-col items-center justify-center py-8 text-center border-2 border-dashed rounded-lg">
+            <div className="flex flex-col items-center justify-center py-8 text-center border border-dashed border-border rounded-[6px]">
               <Upload className="h-10 w-10 text-muted-foreground mb-3" />
               <p className="text-sm font-medium mb-1">Upload Spend Data</p>
               <p className="text-xs text-muted-foreground mb-4">
@@ -588,7 +572,7 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
                 {batches.slice(0, 3).map((batch) => (
                   <div
                     key={batch.id}
-                    className="flex items-center justify-between p-2 rounded border text-sm"
+                    className="flex items-center justify-between p-2 rounded-[6px] border border-border text-sm"
                   >
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       <FileSpreadsheet className="h-3 w-3 text-muted-foreground flex-shrink-0" />
@@ -604,7 +588,7 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
 
         <div className="pt-3 border-t">
           <div className="flex items-start gap-2">
-            <Sparkles className="h-4 w-4 text-purple-600 dark:text-purple-400 mt-0.5 flex-shrink-0" />
+            <Sparkles className="h-4 w-4 text-studio-brick mt-0.5 flex-shrink-0" />
             <p className="text-xs text-muted-foreground">
               AI automatically categorises expenses into GHG Protocol categories with confidence scores. Review and approve before importing.
             </p>

@@ -6,7 +6,8 @@ import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { Eyebrow } from '@/components/studio/eyebrow'
+import { StateChip } from '@/components/studio/state-chip'
 import {
   Select,
   SelectContent,
@@ -29,7 +30,6 @@ import {
   Download,
   CheckCircle2,
   AlertTriangle,
-  Loader2,
   ArrowUpDown,
   RefreshCw,
   Package,
@@ -67,15 +67,15 @@ function deriveFeeYear(period: string): string {
 function statusBadge(status: EPRSubmission['status']) {
   switch (status) {
     case 'draft':
-      return <Badge variant="secondary" className="bg-zinc-700 text-zinc-200">Draft</Badge>
+      return <StateChip tone="quiet">Draft</StateChip>
     case 'ready':
-      return <Badge className="bg-blue-600/20 text-blue-400 border border-blue-600/40">Ready</Badge>
+      return <StateChip tone="hold">Ready</StateChip>
     case 'submitted':
-      return <Badge className="bg-green-600/20 text-green-400 border border-green-600/40">Submitted</Badge>
+      return <StateChip tone="good">Submitted</StateChip>
     case 'amended':
-      return <Badge className="bg-amber-600/20 text-amber-400 border border-amber-600/40">Amended</Badge>
+      return <StateChip tone="attention">Amended</StateChip>
     default:
-      return <Badge variant="secondary">{status}</Badge>
+      return <StateChip tone="quiet">{status}</StateChip>
   }
 }
 
@@ -417,7 +417,7 @@ export default function EPRSubmissionsPage() {
     <TableHead>
       <button
         type="button"
-        className="flex items-center gap-1 hover:text-[#ccff00] transition-colors text-left"
+        className="flex items-center gap-1 hover:text-studio-brick transition-colors text-left"
         onClick={() => toggleSort(field)}
       >
         {children}
@@ -447,9 +447,14 @@ export default function EPRSubmissionsPage() {
   return (
     <div className="container mx-auto py-8 px-4 max-w-7xl space-y-6">
       {/* Page Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">RPD Submissions</h1>
-        <p className="text-muted-foreground mt-1">
+      <div className="min-w-0">
+        <Eyebrow tone="inherit" className="mb-3 text-studio-brick">
+          THE EVIDENCE · EPR · SUBMISSIONS
+        </Eyebrow>
+        <h1 className="font-display text-[clamp(2rem,4vw,3.25rem)] font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+          RPD submissions.
+        </h1>
+        <p className="text-muted-foreground mt-3 text-sm">
           Generate, review and export packaging data submissions for the Defra RPD portal.
         </p>
       </div>
@@ -486,13 +491,10 @@ export default function EPRSubmissionsPage() {
             <Button
               onClick={handleGenerate}
               disabled={generating}
-              className="bg-[#ccff00] text-black hover:bg-[#b8e600] font-medium"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
             >
               {generating ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Generating...
-                </>
+                'Generating...'
               ) : (
                 <>
                   <FileText className="mr-2 h-4 w-4" />
@@ -506,10 +508,10 @@ export default function EPRSubmissionsPage() {
 
       {/* Warnings */}
       {warnings.length > 0 && (
-        <Alert className="border-amber-600/40 bg-amber-900/10">
-          <AlertTriangle className="h-4 w-4 text-amber-400" />
+        <Alert className="rounded-[6px] border-border bg-card">
+          <AlertTriangle className="h-4 w-4 text-studio-attention" />
           <AlertDescription>
-            <p className="font-medium text-amber-400 mb-2">
+            <p className="font-medium text-studio-attention mb-2">
               {warnings.length} warning{warnings.length !== 1 ? 's' : ''} during generation:
             </p>
             <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
@@ -526,7 +528,7 @@ export default function EPRSubmissionsPage() {
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold">Existing Submissions</h2>
           <Button variant="ghost" size="sm" onClick={fetchSubmissions} disabled={loadingSubmissions}>
-            <RefreshCw className={`h-4 w-4 mr-1 ${loadingSubmissions ? 'animate-spin' : ''}`} />
+            <RefreshCw className="h-4 w-4 mr-1" />
             Refresh
           </Button>
         </div>
@@ -559,8 +561,8 @@ export default function EPRSubmissionsPage() {
             {submissions.map(sub => (
               <Card
                 key={sub.id}
-                className={`cursor-pointer transition-all hover:border-[#ccff00]/50 ${
-                  activeSubmission?.id === sub.id ? 'border-[#ccff00] ring-1 ring-[#ccff00]/30' : ''
+                className={`rounded-[6px] border-border bg-card cursor-pointer transition-colors hover:border-studio-brick/50 ${
+                  activeSubmission?.id === sub.id ? 'border-studio-brick ring-1 ring-studio-brick/30' : ''
                 }`}
                 onClick={() => selectSubmission(sub)}
               >
@@ -626,10 +628,7 @@ export default function EPRSubmissionsPage() {
                     disabled={exporting || lines.length === 0}
                   >
                     {exporting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Exporting...
-                      </>
+                      'Exporting...'
                     ) : (
                       <>
                         <Download className="mr-2 h-4 w-4" />
@@ -641,13 +640,10 @@ export default function EPRSubmissionsPage() {
                     <Button
                       onClick={handleMarkSubmitted}
                       disabled={markingSubmitted}
-                      className="bg-green-700 hover:bg-green-600 text-white"
+                      className="bg-primary text-primary-foreground hover:bg-primary/90"
                     >
                       {markingSubmitted ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Updating...
-                        </>
+                        'Updating...'
                       ) : (
                         <>
                           <CheckCircle2 className="mr-2 h-4 w-4" />
@@ -715,7 +711,7 @@ export default function EPRSubmissionsPage() {
                   {summary.materials.map(mat => (
                     <div
                       key={mat.code}
-                      className="flex items-center justify-between p-3 rounded-lg bg-zinc-900 border border-zinc-800"
+                      className="flex items-center justify-between p-3 rounded-[6px] bg-card border border-border"
                     >
                       <div>
                         <p className="text-sm font-medium">{mat.name}</p>
@@ -805,9 +801,7 @@ export default function EPRSubmissionsPage() {
                             </TableCell>
                             <TableCell>
                               {line.is_drs_excluded ? (
-                                <Badge variant="outline" className="text-amber-400 border-amber-600/40 text-xs">
-                                  Excluded
-                                </Badge>
+                                <StateChip tone="attention">Excluded</StateChip>
                               ) : (
                                 <span className="text-xs text-muted-foreground">--</span>
                               )}

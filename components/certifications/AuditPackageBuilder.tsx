@@ -3,7 +3,6 @@
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,9 +15,9 @@ import {
   CheckCircle2,
   FileText,
   Send,
-  Loader2,
   AlertTriangle,
 } from 'lucide-react';
+import { StateChip } from '@/components/studio';
 import { useFlagThreshold } from '@/hooks/data/useFlagThreshold';
 
 interface Requirement {
@@ -159,7 +158,7 @@ export function AuditPackageBuilder({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Package className="h-5 w-5 text-purple-600" />
+          <Package className="h-5 w-5 text-studio-dim" />
           Build Audit Package
         </CardTitle>
         <CardDescription>
@@ -177,7 +176,7 @@ export function AuditPackageBuilder({
                   step.key === currentStep
                     ? 'bg-primary text-primary-foreground'
                     : index < currentStepIndex
-                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 cursor-pointer'
+                      ? 'bg-secondary text-studio-good cursor-pointer'
                       : 'bg-muted text-muted-foreground'
                 }`}
               >
@@ -280,16 +279,15 @@ export function AuditPackageBuilder({
                   />
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <Badge
-                        variant="outline"
-                        className={`text-xs ${
+                      <StateChip
+                        tone={
                           ev.verification_status === 'verified'
-                            ? 'border-emerald-500 text-emerald-600'
-                            : 'border-amber-500 text-amber-600'
-                        }`}
+                            ? 'good'
+                            : 'attention'
+                        }
                       >
                         {ev.verification_status}
-                      </Badge>
+                      </StateChip>
                       <span className="text-sm">{ev.evidence_description}</span>
                     </div>
                     <span className="text-xs text-muted-foreground capitalize">
@@ -356,40 +354,40 @@ export function AuditPackageBuilder({
         {currentStep === 'review' && (
           <div className="space-y-4">
             {flagBlocked && (
-              <Alert variant="destructive" className="border-amber-500/50 bg-amber-500/10">
-                <AlertTriangle className="h-4 w-4 text-amber-500" />
-                <AlertDescription className="text-amber-200">
-                  <strong>FLAG targets required.</strong> Your FLAG emissions exceed the 20% SBTi threshold but no FLAG targets have been set.
+              <Alert className="rounded-[6px] border-border bg-card">
+                <AlertTriangle className="h-4 w-4 text-studio-attention" />
+                <AlertDescription className="text-foreground">
+                  <strong className="text-studio-attention">FLAG targets required.</strong> Your FLAG emissions exceed the 20% SBTi threshold but no FLAG targets have been set.
                   SBTi requires separate FLAG science-based targets before submission. Please set targets in the FLAG Targets tab first.
                 </AlertDescription>
               </Alert>
             )}
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="p-4 bg-muted/50 rounded-lg">
+              <div className="p-4 bg-muted/50 rounded-[6px]">
                 <p className="text-sm font-medium">Package Name</p>
                 <p className="text-sm text-muted-foreground mt-1">{packageName}</p>
               </div>
-              <div className="p-4 bg-muted/50 rounded-lg">
+              <div className="p-4 bg-muted/50 rounded-[6px]">
                 <p className="text-sm font-medium">Framework</p>
                 <p className="text-sm text-muted-foreground mt-1">{frameworkName}</p>
               </div>
-              <div className="p-4 bg-muted/50 rounded-lg">
+              <div className="p-4 bg-muted/50 rounded-[6px]">
                 <p className="text-sm font-medium">Requirements Included</p>
-                <p className="text-2xl font-bold text-emerald-600 mt-1">{selectedRequirements.size}</p>
+                <p className="font-display text-2xl font-bold tabular-nums mt-1">{selectedRequirements.size}</p>
               </div>
-              <div className="p-4 bg-muted/50 rounded-lg">
+              <div className="p-4 bg-muted/50 rounded-[6px]">
                 <p className="text-sm font-medium">Evidence Items</p>
-                <p className="text-2xl font-bold text-blue-600 mt-1">{selectedEvidence.size}</p>
+                <p className="font-display text-2xl font-bold tabular-nums mt-1">{selectedEvidence.size}</p>
               </div>
             </div>
             {description && (
-              <div className="p-4 bg-muted/50 rounded-lg">
+              <div className="p-4 bg-muted/50 rounded-[6px]">
                 <p className="text-sm font-medium">Description</p>
                 <p className="text-sm text-muted-foreground mt-1">{description}</p>
               </div>
             )}
             {executiveSummary && (
-              <div className="p-4 bg-muted/50 rounded-lg">
+              <div className="p-4 bg-muted/50 rounded-[6px]">
                 <p className="text-sm font-medium">Executive Summary</p>
                 <p className="text-sm text-muted-foreground mt-1">{executiveSummary}</p>
               </div>
@@ -415,11 +413,7 @@ export function AuditPackageBuilder({
 
           {currentStep === 'review' ? (
             <Button onClick={handleSubmit} disabled={submitting || flagBlocked}>
-              {submitting ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4 mr-2" />
-              )}
+              {!submitting && <Send className="h-4 w-4 mr-2" />}
               {submitting ? 'Creating...' : 'Create Package'}
             </Button>
           ) : (

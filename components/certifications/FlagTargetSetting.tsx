@@ -28,10 +28,11 @@ import {
   Plus,
   Trash2,
   Target,
-  Loader2,
   ChevronDown,
   ChevronUp,
 } from 'lucide-react'
+import { StateChip } from '@/components/studio'
+import type { WorkingTone } from '@/components/studio/theme'
 import { toast } from 'sonner'
 import { useFlagTargets } from '@/hooks/data/useFlagTargets'
 import { useFlagThreshold } from '@/hooks/data/useFlagThreshold'
@@ -75,11 +76,11 @@ type NewTargetForm = {
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-const STATUS_STYLES: Record<FlagTarget['status'], string> = {
-  draft: 'bg-slate-500/15 text-slate-400 border-slate-500/20',
-  submitted: 'bg-amber-500/15 text-amber-400 border-amber-500/20',
-  validated: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20',
-  expired: 'bg-red-500/15 text-red-400 border-red-500/20',
+const STATUS_TONES: Record<FlagTarget['status'], WorkingTone> = {
+  draft: 'quiet',
+  submitted: 'attention',
+  validated: 'good',
+  expired: 'stale',
 }
 
 const STATUS_LABELS: Record<FlagTarget['status'], string> = {
@@ -215,9 +216,10 @@ export function FlagTargetSetting() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16 text-zinc-400">
-        <Loader2 className="h-5 w-5 animate-spin mr-2" />
-        Loading FLAG target data...
+      <div className="flex items-center justify-center py-16">
+        <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-studio-dim">
+          Loading FLAG target data
+        </p>
       </div>
     )
   }
@@ -239,10 +241,10 @@ export function FlagTargetSetting() {
       {hasTargets && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-white">Your FLAG Targets</h3>
+            <h3 className="text-lg font-semibold text-foreground">Your FLAG Targets</h3>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
-                <Button size="sm" className="bg-[#ccff00] text-black hover:bg-[#ccff00]/80">
+                <Button size="sm">
                   <Plus className="h-4 w-4 mr-1.5" />
                   Add Target
                 </Button>
@@ -272,15 +274,15 @@ export function FlagTargetSetting() {
 
       {/* ---- Empty state with add button ---- */}
       {!hasTargets && flagExceeded && (
-        <Card className="border-dashed border-zinc-700">
+        <Card className="border-dashed border-border">
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-            <Target className="h-10 w-10 text-zinc-500 mb-3" />
-            <p className="text-sm text-zinc-400 mb-4">
+            <Target className="h-10 w-10 text-studio-dim mb-3" />
+            <p className="text-sm text-muted-foreground mb-4">
               No FLAG targets have been set yet. Create your first target to begin compliance.
             </p>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
-                <Button className="bg-[#ccff00] text-black hover:bg-[#ccff00]/80">
+                <Button>
                   <Plus className="h-4 w-4 mr-1.5" />
                   Add FLAG Target
                 </Button>
@@ -300,36 +302,32 @@ export function FlagTargetSetting() {
       )}
 
       {/* ---- SBTi minimum stringency reference ---- */}
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/50">
+      <div className="rounded-[6px] border border-border bg-card">
         <button
           onClick={() => setReferenceOpen(!referenceOpen)}
           className="flex w-full items-center justify-between p-4 text-left"
         >
-          <span className="text-sm font-medium text-zinc-300">
+          <span className="text-sm font-medium text-foreground">
             SBTi Minimum Stringency Reference
           </span>
           {referenceOpen ? (
-            <ChevronUp className="h-4 w-4 text-zinc-500" />
+            <ChevronUp className="h-4 w-4 text-studio-dim" />
           ) : (
-            <ChevronDown className="h-4 w-4 text-zinc-500" />
+            <ChevronDown className="h-4 w-4 text-studio-dim" />
           )}
         </button>
         {referenceOpen && (
-          <div className="border-t border-zinc-800 px-4 pb-4 pt-3">
-            <div className="space-y-2 text-sm text-zinc-400">
+          <div className="border-t border-border px-4 pb-4 pt-3">
+            <div className="space-y-2 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-emerald-400 border-emerald-500/30 text-xs">
-                  Near-term
-                </Badge>
+                <StateChip tone="quiet">Near-term</StateChip>
                 <span>By 2030: &ge; 30% absolute reduction from base year</span>
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-emerald-400 border-emerald-500/30 text-xs">
-                  Long-term
-                </Badge>
+                <StateChip tone="quiet">Long-term</StateChip>
                 <span>By 2050: &ge; 72% absolute reduction from base year</span>
               </div>
-              <p className="text-xs text-zinc-500 mt-2">
+              <p className="text-xs text-muted-foreground mt-2">
                 Interim years are linearly interpolated. Intensity targets must demonstrate
                 equivalent ambition to absolute contraction benchmarks.
               </p>
@@ -358,11 +356,11 @@ function StatusHeader({
 }) {
   if (!flagExceeded) {
     return (
-      <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 flex items-start gap-3">
-        <CheckCircle2 className="h-5 w-5 text-emerald-400 mt-0.5 flex-shrink-0" />
+      <div className="rounded-[6px] border border-border bg-card p-4 flex items-start gap-3">
+        <CheckCircle2 className="h-5 w-5 text-studio-good mt-0.5 flex-shrink-0" />
         <div>
-          <p className="text-sm font-semibold text-white">FLAG Emissions Below Threshold</p>
-          <p className="text-sm text-zinc-400 mt-1">
+          <p className="text-sm font-semibold text-foreground">FLAG Emissions Below Threshold</p>
+          <p className="text-sm text-muted-foreground mt-1">
             Your FLAG emissions are below the 20% threshold of total Scope 1+2+3 emissions.
             No separate FLAG science-based targets are required at this time.
           </p>
@@ -373,11 +371,11 @@ function StatusHeader({
 
   if (hasTargets) {
     return (
-      <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 flex items-start gap-3">
-        <CheckCircle2 className="h-5 w-5 text-emerald-400 mt-0.5 flex-shrink-0" />
+      <div className="rounded-[6px] border border-border bg-card p-4 flex items-start gap-3">
+        <CheckCircle2 className="h-5 w-5 text-studio-good mt-0.5 flex-shrink-0" />
         <div>
-          <p className="text-sm font-semibold text-white">FLAG Targets Set</p>
-          <p className="text-sm text-zinc-400 mt-1">
+          <p className="text-sm font-semibold text-foreground">FLAG Targets Set</p>
+          <p className="text-sm text-muted-foreground mt-1">
             Your land-based emissions represent {maxFlagPct}% of total emissions.
             You have {validatedCount > 0 ? `${validatedCount} validated` : 'targets in progress'}.
           </p>
@@ -387,11 +385,11 @@ function StatusHeader({
   }
 
   return (
-    <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 flex items-start gap-3">
-      <AlertTriangle className="h-5 w-5 text-amber-400 mt-0.5 flex-shrink-0" />
+    <div className="rounded-[6px] border border-border bg-card p-4 flex items-start gap-3">
+      <AlertTriangle className="h-5 w-5 text-studio-attention mt-0.5 flex-shrink-0" />
       <div>
-        <p className="text-sm font-semibold text-white">FLAG Targets Required</p>
-        <p className="text-sm text-zinc-400 mt-1">
+        <p className="text-sm font-semibold text-foreground">FLAG Targets Required</p>
+        <p className="text-sm text-muted-foreground mt-1">
           Your land-based emissions represent {maxFlagPct}% of total Scope 1+2+3 emissions.
           Under SBTi FLAG Guidance v1.2, you must set separate FLAG science-based targets.
         </p>
@@ -412,7 +410,7 @@ function TargetCard({
   onSubmit: (id: string) => void
 }) {
   return (
-    <Card className="border-zinc-800">
+    <Card className="border-border">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
@@ -423,9 +421,9 @@ function TargetCard({
                   : 'Intensity-Based'}{' '}
                 Target
               </CardTitle>
-              <Badge className={STATUS_STYLES[target.status]}>
+              <StateChip tone={STATUS_TONES[target.status]}>
                 {STATUS_LABELS[target.status]}
-              </Badge>
+              </StateChip>
             </div>
             <CardDescription>{SCOPE_LABELS[target.scope]}</CardDescription>
           </div>
@@ -436,7 +434,6 @@ function TargetCard({
                 variant="outline"
                 size="sm"
                 onClick={() => onSubmit(target.id)}
-                className="text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10"
               >
                 Submit
               </Button>
@@ -444,7 +441,7 @@ function TargetCard({
                 variant="ghost"
                 size="icon"
                 onClick={() => onDelete(target.id)}
-                className="text-zinc-500 hover:text-red-400 h-8 w-8"
+                className="text-muted-foreground hover:text-studio-stale h-8 w-8"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -456,22 +453,22 @@ function TargetCard({
       <CardContent className="space-y-3">
         <div className="flex items-center gap-6 text-sm">
           <div>
-            <span className="text-zinc-500">Base year</span>{' '}
-            <span className="text-white font-medium">{target.base_year}</span>
+            <span className="text-muted-foreground">Base year</span>{' '}
+            <span className="text-foreground font-medium tabular-nums">{target.base_year}</span>
           </div>
-          <span className="text-zinc-600">&rarr;</span>
+          <span className="text-muted-foreground">&rarr;</span>
           <div>
-            <span className="text-zinc-500">Target year</span>{' '}
-            <span className="text-white font-medium">{target.target_year}</span>
+            <span className="text-muted-foreground">Target year</span>{' '}
+            <span className="text-foreground font-medium tabular-nums">{target.target_year}</span>
           </div>
           <div>
-            <span className="text-zinc-500">Reduction</span>{' '}
-            <span className="text-white font-medium">{target.reduction_percentage}%</span>
+            <span className="text-muted-foreground">Reduction</span>{' '}
+            <span className="text-foreground font-medium tabular-nums">{target.reduction_percentage}%</span>
           </div>
         </div>
 
         {target.base_year_emissions_co2e !== null && (
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-muted-foreground">
             Base year emissions: {target.base_year_emissions_co2e.toLocaleString()} tonnes CO2e
           </p>
         )}
@@ -479,13 +476,13 @@ function TargetCard({
         <div className="flex items-center gap-1.5 text-xs">
           {target.meets_sbti_minimum ? (
             <>
-              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-              <span className="text-emerald-400">Meets SBTi minimum stringency</span>
+              <CheckCircle2 className="h-3.5 w-3.5 text-studio-good" />
+              <span className="text-studio-good">Meets SBTi minimum stringency</span>
             </>
           ) : (
             <>
-              <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
-              <span className="text-amber-400">
+              <AlertTriangle className="h-3.5 w-3.5 text-studio-attention" />
+              <span className="text-studio-attention">
                 Below SBTi minimum ({getSbtiMinimumReduction(target.target_year)}% required by{' '}
                 {target.target_year})
               </span>
@@ -494,7 +491,7 @@ function TargetCard({
         </div>
 
         {target.sbti_pathway && (
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-muted-foreground">
             Pathway: {target.sbti_pathway === '1.5c' ? '1.5\u00B0C aligned' : 'Well below 2\u00B0C'}
           </p>
         )}
@@ -502,7 +499,7 @@ function TargetCard({
         {target.commodity_coverage && target.commodity_coverage.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {target.commodity_coverage.map((c) => (
-              <Badge key={c} variant="outline" className="text-xs text-zinc-400 border-zinc-700">
+              <Badge key={c} variant="outline" className="text-xs">
                 {c}
               </Badge>
             ))}
@@ -627,7 +624,7 @@ function AddTargetDialog({
             {form.reduction_percentage && (
               <p
                 className={`text-xs ${
-                  reductionMeetsSbti ? 'text-emerald-400' : 'text-amber-400'
+                  reductionMeetsSbti ? 'text-studio-good' : 'text-studio-attention'
                 }`}
               >
                 {reductionMeetsSbti
@@ -663,7 +660,7 @@ function AddTargetDialog({
             value={form.commodity_coverage}
             onChange={(e) => updateField('commodity_coverage', e.target.value)}
           />
-          <p className="text-xs text-zinc-500">Comma-separated list of commodities covered</p>
+          <p className="text-xs text-muted-foreground">Comma-separated list of commodities covered</p>
         </div>
 
         {/* Methodology notes */}
@@ -682,15 +679,9 @@ function AddTargetDialog({
         {/* Action buttons */}
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => onSave(false)} disabled={saving}>
-            {saving && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
             Save as Draft
           </Button>
-          <Button
-            onClick={() => onSave(true)}
-            disabled={saving}
-            className="bg-[#ccff00] text-black hover:bg-[#ccff00]/80"
-          >
-            {saving && <Loader2 className="h-4 w-4 animate-spin mr-1.5" />}
+          <Button onClick={() => onSave(true)} disabled={saving}>
             Submit
           </Button>
         </div>

@@ -18,7 +18,6 @@ import {
   Clock,
   AlertCircle,
   ExternalLink,
-  Loader2,
   RefreshCw,
   Package,
   Plus,
@@ -27,6 +26,8 @@ import {
   Leaf,
 } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
+import { StateChip } from '@/components/studio';
+import type { WorkingTone } from '@/components/studio/theme';
 import { GapAnalysisDashboard } from '@/components/certifications/GapAnalysisDashboard';
 import { FlagTargetSetting } from '@/components/certifications/FlagTargetSetting';
 import { EvidenceLinker } from '@/components/certifications/EvidenceLinker';
@@ -114,39 +115,35 @@ interface GapSummary {
   total_points_achieved: number;
 }
 
-const statusConfig = {
+const statusConfig: Record<
+  string,
+  { label: string; tone: WorkingTone; icon: typeof Clock }
+> = {
   not_started: {
     label: 'Not Started',
-    color: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+    tone: 'quiet',
     icon: Clock,
   },
   in_progress: {
     label: 'In Progress',
-    color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+    tone: 'attention',
     icon: Target,
   },
   ready: {
     label: 'Ready for Certification',
-    color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+    tone: 'good',
     icon: CheckCircle2,
   },
   certified: {
     label: 'Certified',
-    color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+    tone: 'good',
     icon: Award,
   },
   expired: {
     label: 'Expired',
-    color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+    tone: 'stale',
     icon: AlertCircle,
   },
-};
-
-const categoryColors: Record<string, string> = {
-  'B Corp': 'bg-emerald-500',
-  'Climate': 'bg-blue-500',
-  'ESG': 'bg-purple-500',
-  'Reporting': 'bg-amber-500',
 };
 
 // Maps framework codes to their required feature codes (Canopy-only frameworks)
@@ -515,7 +512,9 @@ function CertificationDetailsContent() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-studio-dim">
+          Loading
+        </p>
       </div>
     );
   }
@@ -534,7 +533,6 @@ function CertificationDetailsContent() {
 
   const status = certification?.status || 'not_started';
   const config = statusConfig[status];
-  const StatusIcon = config.icon;
   const isPassFail = framework.scoring_model === 'pass_fail';
 
   // Derive score from gap summary (which is computed from compliance_status) instead of
@@ -551,7 +549,7 @@ function CertificationDetailsContent() {
     : score >= framework.passing_score;
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-4">
@@ -561,17 +559,13 @@ function CertificationDetailsContent() {
             </Link>
           </Button>
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Badge className={categoryColors[framework.category] || 'bg-slate-500'}>
-                {framework.category}
-              </Badge>
-              <Badge variant="outline">{framework.version}</Badge>
-              <Badge className={config.color}>
-                <StatusIcon className="h-3 w-3 mr-1" />
-                {config.label}
-              </Badge>
+            <div className="flex items-center gap-3 mb-2">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
+                {framework.category} · {framework.version}
+              </span>
+              <StateChip tone={config.tone}>{config.label}</StateChip>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight">{framework.name}</h1>
+            <h1 className="font-display text-2xl font-bold tracking-[-0.02em]">{framework.name}</h1>
             <p className="text-muted-foreground mt-1 max-w-2xl">{framework.description}</p>
             {framework.governing_body && (
               <p className="text-sm text-muted-foreground mt-2">
@@ -581,7 +575,7 @@ function CertificationDetailsContent() {
                     href={framework.website_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 ml-2 text-blue-600 hover:underline"
+                    className="inline-flex items-center gap-1 ml-2 text-studio-brick hover:underline"
                   >
                     Learn more <ExternalLink className="h-3 w-3" />
                   </a>
@@ -591,7 +585,7 @@ function CertificationDetailsContent() {
           </div>
         </div>
         <Button variant="outline" onClick={handleRefresh} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
         </Button>
       </div>
@@ -613,7 +607,7 @@ function CertificationDetailsContent() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Target className="h-4 w-4 text-blue-600" />
+              <Target className="h-4 w-4 text-studio-dim" />
               {isPassFail ? 'Requirements Passed' : 'Current Score'}
             </CardTitle>
           </CardHeader>
@@ -621,7 +615,7 @@ function CertificationDetailsContent() {
             {isPassFail ? (
               <div className="space-y-2">
                 <div className="flex justify-between items-baseline">
-                  <span className={`text-3xl font-bold ${isPassingScore ? 'text-emerald-600' : ''}`}>
+                  <span className={`font-display text-3xl font-bold tabular-nums ${isPassingScore ? 'text-studio-good' : ''}`}>
                     {gapSummary?.compliant || 0}/{gapSummary?.total || 0}
                   </span>
                   <span className="text-sm text-muted-foreground">
@@ -630,7 +624,7 @@ function CertificationDetailsContent() {
                 </div>
                 <Progress
                   value={score}
-                  className={`h-2 ${isPassingScore ? '[&>div]:bg-emerald-500' : ''}`}
+                  className={`h-2 ${isPassingScore ? '[&>div]:bg-studio-good' : '[&>div]:bg-studio-brick'}`}
                 />
                 {!isPassingScore && gapSummary && gapSummary.total > 0 && (
                   <p className="text-xs text-muted-foreground">
@@ -641,7 +635,7 @@ function CertificationDetailsContent() {
             ) : (
               <div className="space-y-2">
                 <div className="flex justify-between items-baseline">
-                  <span className={`text-3xl font-bold ${isPassingScore ? 'text-emerald-600' : ''}`}>
+                  <span className={`font-display text-3xl font-bold tabular-nums ${isPassingScore ? 'text-studio-good' : ''}`}>
                     {score}%
                   </span>
                   <span className="text-sm text-muted-foreground">
@@ -650,7 +644,7 @@ function CertificationDetailsContent() {
                 </div>
                 <Progress
                   value={score}
-                  className={`h-2 ${isPassingScore ? '[&>div]:bg-emerald-500' : ''}`}
+                  className={`h-2 ${isPassingScore ? '[&>div]:bg-studio-good' : '[&>div]:bg-studio-brick'}`}
                 />
               </div>
             )}
@@ -661,18 +655,18 @@ function CertificationDetailsContent() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <FileText className="h-4 w-4 text-purple-600" />
+              <FileText className="h-4 w-4 text-studio-dim" />
               Requirements
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold">{framework.requirements?.length || 0}</span>
+              <span className="font-display text-3xl font-bold tabular-nums">{framework.requirements?.length || 0}</span>
               <span className="text-sm text-muted-foreground">total requirements</span>
             </div>
             {isPassFail ? (
               <p className="text-sm text-muted-foreground mt-1">
-                All mandatory &mdash; pass/fail model
+                All mandatory, pass/fail model
               </p>
             ) : (
               <p className="text-sm text-muted-foreground mt-1">
@@ -686,7 +680,7 @@ function CertificationDetailsContent() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-amber-600" />
+              <Calendar className="h-4 w-4 text-studio-dim" />
               Key Dates
             </CardTitle>
           </CardHeader>
@@ -702,7 +696,7 @@ function CertificationDetailsContent() {
             {certification?.certification_date && (
               <div className="text-sm">
                 <span className="text-muted-foreground">Certified: </span>
-                <span className="font-medium text-emerald-600">
+                <span className="font-medium text-studio-good">
                   {new Date(certification.certification_date).toLocaleDateString()}
                 </span>
               </div>
@@ -781,17 +775,19 @@ function CertificationDetailsContent() {
                 </p>
                 {flagLoading ? (
                   <div className="flex items-center justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-studio-dim">
+                      Loading
+                    </p>
                   </div>
                 ) : flagData?.requirements?.length ? (
                   <div className="space-y-4">
                     {flagData.requirements.map((req: any) => {
                       const resolution = flagData.resolved[req.id];
-                      const statusColors: Record<string, string> = {
-                        compliant: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-                        partial: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-                        non_compliant: 'bg-red-500/20 text-red-400 border-red-500/30',
-                        not_assessed: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
+                      const statusTones: Record<string, WorkingTone> = {
+                        compliant: 'good',
+                        partial: 'attention',
+                        non_compliant: 'stale',
+                        not_assessed: 'quiet',
                       };
                       const statusLabels: Record<string, string> = {
                         compliant: 'Compliant',
@@ -800,29 +796,29 @@ function CertificationDetailsContent() {
                         not_assessed: 'Not assessed',
                       };
                       return (
-                        <div key={req.id} className="border rounded-lg p-4 space-y-2">
+                        <div key={req.id} className="border rounded-[6px] p-4 space-y-2 bg-card">
                           <div className="flex items-start justify-between gap-4">
                             <div>
                               <div className="flex items-center gap-2">
                                 <span className="text-sm font-mono font-medium text-muted-foreground">{req.requirement_code}</span>
                                 {req.is_mandatory && (
-                                  <Badge variant="destructive" className="text-xs">Mandatory</Badge>
+                                  <StateChip tone="attention">Mandatory</StateChip>
                                 )}
                               </div>
                               <h4 className="text-sm font-semibold mt-1">{req.requirement_name}</h4>
                             </div>
-                            <Badge className={`text-xs border ${statusColors[resolution?.status || 'not_assessed']}`}>
+                            <StateChip tone={statusTones[resolution?.status || 'not_assessed']}>
                               {statusLabels[resolution?.status || 'not_assessed']}
-                            </Badge>
+                            </StateChip>
                           </div>
                           {resolution && (
                             <div className="text-xs text-muted-foreground space-y-1">
                               <p>{resolution.detail}</p>
                               <p className="text-[10px]">
                                 {resolution.source === 'platform_data' ? (
-                                  <span className="text-emerald-500">Resolved from platform data</span>
+                                  <span className="text-studio-good">Resolved from platform data</span>
                                 ) : (
-                                  <span className="text-amber-500">Requires manual input or document upload</span>
+                                  <span className="text-studio-attention">Requires manual input or document upload</span>
                                 )}
                               </p>
                             </div>
@@ -852,7 +848,9 @@ function CertificationDetailsContent() {
         <TabsContent value="gap-analysis">
           {gapLoading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-studio-dim">
+                Loading
+              </p>
             </div>
           ) : gapAnalyses.length > 0 ? (
             <GapAnalysisDashboard
@@ -915,7 +913,9 @@ function CertificationDetailsContent() {
         <TabsContent value="evidence">
           {evidenceLoading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-studio-dim">
+                Loading
+              </p>
             </div>
           ) : (
             <EvidenceLinker
@@ -946,7 +946,7 @@ function CertificationDetailsContent() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2">
-                    <Package className="h-5 w-5 text-purple-600" />
+                    <Package className="h-5 w-5 text-studio-dim" />
                     Audit Packages
                   </CardTitle>
                   <CardDescription>
@@ -975,7 +975,9 @@ function CertificationDetailsContent() {
             <CardContent>
               {packagesLoading ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-studio-dim">
+                    Loading
+                  </p>
                 </div>
               ) : auditPackages.length === 0 ? (
                 <div className="text-center text-muted-foreground py-8">
@@ -988,27 +990,27 @@ function CertificationDetailsContent() {
               ) : (
                 <div className="space-y-3">
                   {auditPackages.map((pkg) => {
-                    const statusColor =
+                    const statusTone: WorkingTone =
                       pkg.status === 'approved'
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                        ? 'good'
                         : pkg.status === 'submitted'
-                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                          ? 'hold'
                           : pkg.status === 'in_review'
-                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                            ? 'attention'
                             : pkg.status === 'rejected'
-                              ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                              : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
+                              ? 'stale'
+                              : 'quiet';
                     return (
                       <div
                         key={pkg.id}
-                        className="flex items-start justify-between p-4 border rounded-lg"
+                        className="flex items-start justify-between p-4 border rounded-[6px] bg-card"
                       >
                         <div className="flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium">{pkg.package_name}</span>
-                            <Badge className={`text-xs capitalize ${statusColor}`}>
+                            <StateChip tone={statusTone}>
                               {pkg.status.replace('_', ' ')}
-                            </Badge>
+                            </StateChip>
                           </div>
                           {pkg.description && (
                             <p className="text-sm text-muted-foreground mt-1">{pkg.description}</p>
@@ -1031,7 +1033,7 @@ function CertificationDetailsContent() {
                               deletePackage(pkg.id).then(() => toast.success('Package deleted'))
                             }
                           >
-                            <Trash2 className="h-4 w-4 text-red-500" />
+                            <Trash2 className="h-4 w-4 text-studio-stale" />
                           </Button>
                         )}
                       </div>
@@ -1058,22 +1060,20 @@ function CertificationDetailsContent() {
                   {framework.requirements.map((req) => (
                     <div
                       key={req.id}
-                      className="p-4 border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                      className="p-4 border rounded-[6px] bg-card hover:bg-secondary transition-colors"
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <code className="text-xs bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded">
+                            <code className="text-xs bg-secondary px-1.5 py-0.5 rounded">
                               {req.requirement_code}
                             </code>
                             {req.is_required && (
-                              <Badge variant="destructive" className="text-xs">
-                                Required
-                              </Badge>
+                              <StateChip tone="attention">Required</StateChip>
                             )}
-                            <Badge variant="outline" className="text-xs">
+                            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
                               {req.points_available} pts
-                            </Badge>
+                            </span>
                           </div>
                           <h4 className="font-medium">{req.requirement_name}</h4>
                           {req.description && (

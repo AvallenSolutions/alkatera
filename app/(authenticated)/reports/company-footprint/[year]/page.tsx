@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Accordion,
   AccordionContent,
@@ -18,17 +17,16 @@ import {
 } from "@/components/ui/tooltip";
 import {
   ArrowLeft,
-  CheckCircle2,
   Clock,
   Download,
   Factory,
   FileText,
   Leaf,
-  Loader2,
   Lock,
   Package,
   Sparkles,
 } from "lucide-react";
+import { Eyebrow, StateChip } from "@/components/studio";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { useOrganization } from "@/lib/organizationContext";
 import { useReportingPeriod } from "@/hooks/useReportingPeriod";
@@ -394,11 +392,12 @@ export default function FootprintBuilderPage() {
           <Button variant="ghost" size="icon" onClick={() => router.back()}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
-            <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-              {year} Company Footprint
+          <div className="space-y-2">
+            <Eyebrow>THE EVIDENCE · COMPANY FOOTPRINT</Eyebrow>
+            <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+              The {year} footprint.
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-sm text-muted-foreground">
               Build your annual greenhouse gas inventory
             </p>
           </div>
@@ -406,17 +405,8 @@ export default function FootprintBuilderPage() {
         <div className="flex items-center gap-3">
           {isFinalized ? (
             <Button variant="outline" onClick={handleGenerateReport} disabled={isGenerating}>
-              {isGenerating ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Exporting...
-                </>
-              ) : (
-                <>
-                  <Download className="h-4 w-4 mr-2" />
-                  Export Report
-                </>
-              )}
+              <Download className="h-4 w-4 mr-2" />
+              {isGenerating ? "Exporting..." : "Export Report"}
             </Button>
           ) : (
             <TooltipProvider>
@@ -427,17 +417,8 @@ export default function FootprintBuilderPage() {
                       onClick={handleGenerateReport}
                       disabled={isGenerating || completeness.score < 50}
                     >
-                      {isGenerating ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Finalising...
-                        </>
-                      ) : (
-                        <>
-                          <FileText className="h-4 w-4 mr-2" />
-                          Finalise Report
-                        </>
-                      )}
+                      <FileText className="h-4 w-4 mr-2" />
+                      {isGenerating ? "Finalising..." : "Finalise Report"}
                     </Button>
                   </span>
                 </TooltipTrigger>
@@ -509,23 +490,20 @@ export default function FootprintBuilderPage() {
         {/* ─────────────────────────────────────────────────────────────── */}
         {/* Scope 1 & 2: Direct & Energy Emissions                        */}
         {/* ─────────────────────────────────────────────────────────────── */}
-        <AccordionItem value="scope12" className="border rounded-xl overflow-hidden">
+        <AccordionItem value="scope12" className="border rounded-[6px] overflow-hidden">
           <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-muted/50 [&>svg]:ml-auto">
             <span className="flex items-center gap-3 flex-1">
-              <span className="flex items-center justify-center h-8 w-8 rounded-lg bg-gradient-to-br from-orange-500/20 to-blue-500/20">
-                <Factory className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+              <span className="flex items-center justify-center h-8 w-8 rounded-[6px] bg-secondary">
+                <Factory className="h-4 w-4 text-studio-dim" />
               </span>
               <span className="flex flex-col items-start">
-                <span className="font-semibold text-sm">Scope 1 & 2 — Direct & Energy Emissions</span>
+                <span className="font-semibold text-sm">Scope 1 & 2: Direct & Energy Emissions</span>
                 <span className="text-xs text-muted-foreground font-normal">
                   {formatEmissions(liveScope1Total + liveScope2Total)} CO₂e from operations & fleet
                 </span>
               </span>
               {(liveScope1Total + liveScope2Total) > 0 && (
-                <Badge variant="outline" className="ml-auto mr-2 bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-300 dark:border-orange-800 text-xs">
-                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                  2 sources
-                </Badge>
+                <StateChip tone="good" className="ml-auto mr-2">2 sources</StateChip>
               )}
             </span>
           </AccordionTrigger>
@@ -549,21 +527,21 @@ export default function FootprintBuilderPage() {
         {/* ─────────────────────────────────────────────────────────────── */}
         {/* Scope 3: Value Chain Emissions                                 */}
         {/* ─────────────────────────────────────────────────────────────── */}
-        <AccordionItem value="scope3" className="border rounded-xl overflow-hidden">
+        <AccordionItem value="scope3" className="border rounded-[6px] overflow-hidden">
           <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-muted/50 [&>svg]:ml-auto">
             <span className="flex items-center gap-3 flex-1">
-              <span className="flex items-center justify-center h-8 w-8 rounded-lg bg-emerald-500/20">
-                <Leaf className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              <span className="flex items-center justify-center h-8 w-8 rounded-[6px] bg-secondary">
+                <Leaf className="h-4 w-4 text-studio-dim" />
               </span>
               <span className="flex flex-col items-start">
-                <span className="font-semibold text-sm">Scope 3 — Value Chain Emissions</span>
+                <span className="font-semibold text-sm">Scope 3: Value Chain Emissions</span>
                 <span className="text-xs text-muted-foreground font-normal">
                   {formatEmissions(liveScope3Total)} CO₂e across {scope3Categories.length} categories
                 </span>
               </span>
-              <Badge variant="outline" className="ml-auto mr-2 bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800 text-xs">
+              <StateChip tone="good" className="ml-auto mr-2">
                 {scope3CompletedCount} of {scope3Categories.length} tracked
-              </Badge>
+              </StateChip>
             </span>
           </AccordionTrigger>
           <AccordionContent className="px-5 pb-5 space-y-6">
@@ -571,10 +549,10 @@ export default function FootprintBuilderPage() {
             {/* Sub-section: Data You Enter */}
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
                   Data you enter
                 </span>
-                <div className="flex-1 border-t border-slate-200 dark:border-slate-700" />
+                <div className="flex-1 border-t border-border" />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {report && (
@@ -662,14 +640,14 @@ export default function FootprintBuilderPage() {
             {/* Sub-section: Auto-Calculated from Products */}
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
                   Auto-calculated from products
                 </span>
-                <Sparkles className="h-3.5 w-3.5 text-emerald-500" />
-                <div className="flex-1 border-t border-slate-200 dark:border-slate-700" />
+                <Sparkles className="h-3.5 w-3.5 text-studio-dim" />
+                <div className="flex-1 border-t border-border" />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div id="footprint-card-products" className="border-l-4 border-emerald-500/20 pl-0 rounded-lg">
+                <div id="footprint-card-products">
                   <ProductsSupplyChainCard
                     totalCO2e={scope3TotalCO2e}
                     productsCO2e={scope3Emissions.products}
@@ -679,7 +657,7 @@ export default function FootprintBuilderPage() {
                   />
                 </div>
                 {report && currentOrganization && (
-                  <div id="footprint-card-upstream_transport" className="border-l-4 border-emerald-500/20 pl-0 rounded-lg">
+                  <div id="footprint-card-upstream_transport">
                     <UpstreamTransportCard
                       reportId={report.id}
                       organizationId={currentOrganization.id}
@@ -697,11 +675,11 @@ export default function FootprintBuilderPage() {
         {/* ─────────────────────────────────────────────────────────────── */}
         {/* Coming Soon                                                    */}
         {/* ─────────────────────────────────────────────────────────────── */}
-        <AccordionItem value="coming-soon" className="border rounded-xl overflow-hidden">
+        <AccordionItem value="coming-soon" className="border rounded-[6px] overflow-hidden">
           <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-muted/50 [&>svg]:ml-auto">
             <span className="flex items-center gap-3 flex-1">
-              <span className="flex items-center justify-center h-8 w-8 rounded-lg bg-slate-500/10">
-                <Clock className="h-4 w-4 text-slate-500" />
+              <span className="flex items-center justify-center h-8 w-8 rounded-[6px] bg-secondary">
+                <Clock className="h-4 w-4 text-studio-dim" />
               </span>
               <span className="flex flex-col items-start">
                 <span className="font-semibold text-sm text-muted-foreground">Coming Soon</span>
@@ -709,9 +687,7 @@ export default function FootprintBuilderPage() {
                   Cradle-to-grave categories
                 </span>
               </span>
-              <Badge variant="secondary" className="ml-auto mr-2 text-xs">
-                2 categories
-              </Badge>
+              <StateChip className="ml-auto mr-2">2 categories</StateChip>
             </span>
           </AccordionTrigger>
           <AccordionContent className="px-5 pb-5">

@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import { ChevronLeft, ChevronRight, Save, CheckCircle2, Sparkles } from 'lucide-react'
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client'
 import { useOrganization } from '@/lib/organizationContext'
@@ -217,19 +216,24 @@ function TransitionPlanSetupInner() {
   return (
     <div className="max-w-3xl space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-start gap-3">
         <button
           onClick={() => router.push('/reports/transition-plan')}
-          className="text-stone-400 hover:text-stone-600 transition-colors"
+          className="mt-1 text-muted-foreground hover:text-foreground transition-colors"
           aria-label="Back"
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
         <div>
-          <h1 className="text-xl font-semibold text-stone-900">
-            {planId ? 'Edit' : 'Create'} Transition Plan
+          <div className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-brick mb-2">
+            THE EVIDENCE · TRANSITION PLAN
+          </div>
+          <h1 className="font-display text-3xl md:text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+            The {planYear} transition plan.
           </h1>
-          <p className="text-sm text-stone-500">{planYear} plan year</p>
+          <p className="mt-2 font-mono text-[11px] text-studio-dim">
+            {planId ? 'EDITING' : 'NEW PLAN'} · {planYear} PLAN YEAR
+          </p>
         </div>
       </div>
 
@@ -242,7 +246,7 @@ function TransitionPlanSetupInner() {
               className={`flex items-center gap-2 text-sm ${i === step ? 'text-stone-900 font-medium' : i < step ? 'text-stone-500 cursor-pointer hover:text-stone-700' : 'text-stone-300 cursor-default'}`}
             >
               <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-mono border ${
-                i < step ? 'bg-[#ccff00] border-[#ccff00] text-stone-800' :
+                i < step ? 'bg-studio-brick border-studio-brick text-studio-cream' :
                 i === step ? 'bg-stone-900 border-stone-900 text-white' :
                 'border-stone-200 text-stone-400'
               }`}>
@@ -301,14 +305,14 @@ function TransitionPlanSetupInner() {
                   id="sbti"
                   checked={sbtiAligned}
                   onChange={e => setSbtiAligned(e.target.checked)}
-                  className="mt-0.5 accent-[#84cc16]"
+                  className="mt-0.5 accent-[#BF4B2A]"
                 />
                 <label htmlFor="sbti" className="cursor-pointer">
                   <span className="text-sm font-medium text-stone-700 flex items-center gap-2">
                     SBTi aligned
-                    <Badge variant="outline" className="text-xs border-[#ccff00] bg-[#ccff00]/10">
+                    <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-brick">
                       Science Based Targets
-                    </Badge>
+                    </span>
                   </span>
                   <span className="text-xs text-stone-500 block mt-0.5">
                     Targets meet the SBTi Corporate Standard (minimum 50% absolute reduction per scope by 2030 for 1.5C alignment)
@@ -335,7 +339,7 @@ function TransitionPlanSetupInner() {
           {step === 2 && (
             <>
               {risks.length === 0 && !isGeneratingRisks && (
-                <div className="rounded-lg bg-[#ccff00]/10 border border-[#ccff00]/30 p-4 flex items-start gap-3 mb-4">
+                <div className="rounded-[6px] border border-border bg-card p-4 flex items-start gap-3 mb-4">
                   <Sparkles className="w-4 h-4 text-stone-600 flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="text-sm font-medium text-stone-700">Generate your risk assessment</p>

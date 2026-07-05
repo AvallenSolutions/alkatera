@@ -117,7 +117,7 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
                   cy="50"
                   r="42"
                   fill="none"
-                  stroke="rgba(255,255,255,0.05)"
+                  stroke="#D9D6CB"
                   strokeWidth="8"
                 />
                 <circle
@@ -125,7 +125,7 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
                   cy="50"
                   r="42"
                   fill="none"
-                  stroke={isComplete ? '#22c55e' : '#ccff00'}
+                  stroke={isComplete ? '#047857' : '#BF4B2A'}
                   strokeWidth="8"
                   strokeLinecap="round"
                   strokeDasharray={`${pct * 2.639} ${263.9 - pct * 2.639}`}

@@ -10,17 +10,17 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import {
   ShieldCheck,
   Leaf,
   Send,
   ArrowRight,
-  Loader2,
   Users,
   FileDown,
 } from 'lucide-react';
+import { StateChip } from '@/components/studio';
+import type { WorkingTone } from '@/components/studio/theme';
 import { SendEsgSurveyDialog } from '@/components/suppliers/SendEsgSurveyDialog';
 
 // Local response shape (mirrors lib/certifications/supplier-esg-evidence; that file
@@ -63,11 +63,11 @@ interface CoverageResponse {
 
 const COMPLETENESS_STYLES: Record<
   EsgCoverage['completeness'],
-  { label: string; className: string }
+  { label: string; tone: WorkingTone }
 > = {
-  complete: { label: 'On track', className: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
-  partial: { label: 'In progress', className: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
-  missing: { label: 'Not started', className: 'bg-slate-500/20 text-slate-400 border-slate-500/30' },
+  complete: { label: 'On track', tone: 'good' },
+  partial: { label: 'In progress', tone: 'attention' },
+  missing: { label: 'Not started', tone: 'quiet' },
 };
 
 export function SupplyChainEsgCard() {
@@ -123,7 +123,7 @@ export function SupplyChainEsgCard() {
   const header = (
     <CardHeader>
       <CardTitle className="flex items-center gap-2">
-        <ShieldCheck className="h-5 w-5 text-emerald-500" />
+        <ShieldCheck className="h-5 w-5 text-studio-dim" />
         Supply chain ESG
       </CardTitle>
       <CardDescription>
@@ -138,9 +138,10 @@ export function SupplyChainEsgCard() {
       <Card>
         {header}
         <CardContent>
-          <div className="flex items-center gap-2 py-6 text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-sm">Loading supplier coverage…</span>
+          <div className="flex items-center gap-2 py-6">
+            <span className="font-mono text-[10px] uppercase tracking-[0.22em] text-studio-dim">
+              Loading supplier coverage
+            </span>
           </div>
         </CardContent>
       </Card>
@@ -211,7 +212,7 @@ export function SupplyChainEsgCard() {
         <div>
           <div className="flex items-end justify-between">
             <div>
-              <p className="text-3xl font-bold">
+              <p className="font-display text-3xl font-bold tabular-nums">
                 {esg.assessed}
                 <span className="text-lg font-normal text-muted-foreground"> / {esg.denominator}</span>
               </p>
@@ -220,29 +221,27 @@ export function SupplyChainEsgCard() {
                 {esg.verified > 0 ? ` · ${esg.verified} verified` : ''}
               </p>
             </div>
-            <Badge variant="outline" className={statusStyle.className}>
-              {statusStyle.label}
-            </Badge>
+            <StateChip tone={statusStyle.tone}>{statusStyle.label}</StateChip>
           </div>
-          <Progress value={coveragePct} className="mt-3 h-2" />
+          <Progress value={coveragePct} className="mt-3 h-2 [&>div]:bg-studio-brick" />
         </div>
 
         {/* Rating distribution + averages */}
-        <div className="flex flex-wrap items-center gap-2 text-xs">
+        <div className="flex flex-wrap items-center gap-3 text-xs">
           {esg.distribution.leader > 0 && (
-            <Badge className="bg-emerald-500/20 text-emerald-400">
+            <StateChip tone="good">
               {esg.distribution.leader} leader{esg.distribution.leader === 1 ? '' : 's'}
-            </Badge>
+            </StateChip>
           )}
           {esg.distribution.progressing > 0 && (
-            <Badge className="bg-amber-500/20 text-amber-400">
+            <StateChip tone="attention">
               {esg.distribution.progressing} progressing
-            </Badge>
+            </StateChip>
           )}
           {esg.distribution.needs_improvement > 0 && (
-            <Badge className="bg-red-500/20 text-red-400">
+            <StateChip tone="stale">
               {esg.distribution.needs_improvement} need improvement
-            </Badge>
+            </StateChip>
           )}
           {esg.avgLabour != null && (
             <span className="text-muted-foreground">Avg labour {esg.avgLabour}</span>
@@ -253,8 +252,8 @@ export function SupplyChainEsgCard() {
         </div>
 
         {/* Value-chain climate (IT5 Scope 3) */}
-        <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 p-3">
-          <Leaf className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-400" />
+        <div className="flex items-start gap-2 rounded-[6px] border border-border bg-card p-3">
+          <Leaf className="mt-0.5 h-4 w-4 flex-shrink-0 text-studio-dim" />
           <p className="text-xs text-muted-foreground">
             <span className="font-medium text-foreground">Value-chain climate (Scope 3):</span>{' '}
             {climate.engaged} of {climate.denominator} {tierWord} engage
@@ -289,11 +288,7 @@ export function SupplyChainEsgCard() {
           </Button>
           {esg.assessed > 0 && (
             <Button variant="outline" onClick={downloadReport} disabled={downloading}>
-              {downloading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <FileDown className="mr-2 h-4 w-4" />
-              )}
+              {!downloading && <FileDown className="mr-2 h-4 w-4" />}
               Download due-diligence report
             </Button>
           )}

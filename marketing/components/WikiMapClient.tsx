@@ -34,12 +34,14 @@ interface Band {
   accent: string;
 }
 
+// Band accents are drawn from the studio inks (see components/studio/theme.ts):
+// brick leads the room, the rest of the palette separates the bands.
 const BANDS: Band[] = [
-  { type: 'guide', label: 'Guides', blurb: 'start here: the big picture', accent: '#ccff00' },
-  { type: 'concept', label: 'Core concepts', blurb: 'the ideas behind measuring', accent: '#b388ff' },
-  { type: 'standard', label: 'Standards and methods', blurb: 'the rulebooks everyone follows', accent: '#00ccff' },
-  { type: 'legislation', label: 'Legislation and compliance', blurb: 'what applies, where and when', accent: '#ffb74d' },
-  { type: 'glossary', label: 'Glossary', blurb: 'the terms, decoded', accent: '#7ee787' },
+  { type: 'guide', label: 'Guides', blurb: 'start here: the big picture', accent: '#BF4B2A' },
+  { type: 'concept', label: 'Core concepts', blurb: 'the ideas behind measuring', accent: '#2B46C0' },
+  { type: 'standard', label: 'Standards and methods', blurb: 'the rulebooks everyone follows', accent: '#205E40' },
+  { type: 'legislation', label: 'Legislation and compliance', blurb: 'what applies, where and when', accent: '#A97C14' },
+  { type: 'glossary', label: 'Glossary', blurb: 'the terms, decoded', accent: '#6F6F68' },
 ];
 
 const TOURS: { id: string; label: string; stops: string[] }[] = [
@@ -293,7 +295,7 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
       {/* Search + tours */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div className="relative w-full max-w-xs">
-          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-studio-dim" />
           <input
             type="search"
             value={query}
@@ -305,11 +307,11 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
               }
             }}
             placeholder="Search, e.g. Scope 3, CSRD..."
-            className="w-full rounded-lg border border-white/10 bg-white/[0.03] py-2.5 pl-10 pr-4 text-sm text-white placeholder:text-gray-500 transition-colors duration-300 focus:border-[#ccff00]/50 focus:outline-none"
+            className="w-full rounded-[6px] border border-border bg-card py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-studio-dim transition-colors duration-200 focus:border-studio-brick focus:outline-none"
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-mono text-xs uppercase tracking-widest text-gray-500">Tours:</span>
+          <span className="font-mono text-xs uppercase tracking-widest text-studio-dim">Tours:</span>
           {TOURS.map((t) => (
             <button
               key={t.id}
@@ -317,10 +319,10 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
                 e.stopPropagation();
                 startTour(t.id);
               }}
-              className={`rounded-full border px-4 py-1.5 font-mono text-xs uppercase tracking-widest transition-all duration-300 ${
+              className={`rounded-full border px-4 py-1.5 font-mono text-xs uppercase tracking-widest transition-all duration-200 ${
                 tour?.id === t.id
-                  ? 'border-[#ccff00] bg-[#ccff00]/15 text-[#ccff00]'
-                  : 'border-white/15 text-gray-400 hover:border-[#ccff00]/60 hover:text-white'
+                  ? 'border-studio-brick bg-card text-studio-brick'
+                  : 'border-border text-studio-dim hover:border-studio-brick/60 hover:text-foreground'
               }`}
             >
               {t.label}
@@ -331,12 +333,12 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
 
       {/* Active tour bar */}
       {tour && activeTour && selectedNode && (
-        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-[#ccff00]/25 bg-[#ccff00]/[0.06] px-4 py-3">
-          <MapPin className="h-4 w-4 text-[#ccff00]" />
-          <span className="font-mono text-xs uppercase tracking-widest text-[#ccff00]">
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-[6px] border border-border bg-card px-4 py-3">
+          <MapPin className="h-4 w-4 text-studio-brick" />
+          <span className="font-mono text-xs uppercase tracking-widest text-studio-brick">
             {activeTour.label}: stop {tour.step + 1} of {activeTour.stops.length}
           </span>
-          <span className="text-sm text-gray-300">{selectedNode.title}</span>
+          <span className="text-sm text-foreground">{selectedNode.title}</span>
           <span className="ml-auto flex items-center gap-2">
             <button
               onClick={(e) => {
@@ -344,7 +346,7 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
                 stepTour(-1);
               }}
               disabled={tour.step === 0}
-              className="rounded-md border border-white/15 p-1.5 text-gray-300 transition-colors hover:border-[#ccff00]/60 hover:text-white disabled:opacity-30"
+              className="rounded-[6px] border border-border p-1.5 text-studio-dim transition-colors hover:border-studio-brick/60 hover:text-foreground disabled:opacity-30"
               aria-label="Previous stop"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -355,7 +357,7 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
                 stepTour(1);
               }}
               disabled={tour.step === activeTour.stops.length - 1}
-              className="rounded-md border border-white/15 p-1.5 text-gray-300 transition-colors hover:border-[#ccff00]/60 hover:text-white disabled:opacity-30"
+              className="rounded-[6px] border border-border p-1.5 text-studio-dim transition-colors hover:border-studio-brick/60 hover:text-foreground disabled:opacity-30"
               aria-label="Next stop"
             >
               <ArrowRight className="h-4 w-4" />
@@ -365,7 +367,7 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
                 e.stopPropagation();
                 reset();
               }}
-              className="rounded-md border border-white/15 p-1.5 text-gray-300 transition-colors hover:border-[#ccff00]/60 hover:text-white"
+              className="rounded-[6px] border border-border p-1.5 text-studio-dim transition-colors hover:border-studio-brick/60 hover:text-foreground"
               aria-label="Exit tour"
             >
               <X className="h-4 w-4" />
@@ -385,8 +387,8 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
                 key={i}
                 d={`M ${e.x1} ${e.y1} C ${e.x1} ${bowY}, ${e.x2} ${bowY}, ${e.x2} ${e.y2}`}
                 fill="none"
-                stroke="#ccff00"
-                strokeOpacity={0.35}
+                stroke="#BF4B2A"
+                strokeOpacity={0.4}
                 strokeWidth={1.2}
               />
             );
@@ -401,16 +403,16 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
           return (
             <div
               key={band.type}
-              className="mb-4 rounded-2xl border border-white/5 bg-white/[0.02] p-5"
+              className="mb-4 rounded-[6px] border border-border bg-card p-5"
             >
               <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <span
-                  className="font-mono text-xs uppercase tracking-widest"
+                  className="font-mono text-xs font-bold uppercase tracking-widest"
                   style={{ color: band.accent }}
                 >
                   {band.label}
                 </span>
-                <span className="text-xs text-gray-500">{band.blurb}</span>
+                <span className="text-xs text-studio-dim">{band.blurb}</span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {bandNodes.map((n) => {
@@ -429,10 +431,10 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
                       }}
                       style={{
                         borderColor: isSelected ? band.accent : `${band.accent}55`,
-                        backgroundColor: isSelected ? `${band.accent}22` : undefined,
+                        backgroundColor: isSelected ? band.accent : undefined,
                       }}
                       className={`rounded-full border px-3.5 py-1.5 text-sm transition-all duration-200 ${
-                        isSelected ? 'text-white' : 'text-gray-300 hover:text-white'
+                        isSelected ? 'text-studio-cream' : 'text-foreground/80 hover:text-foreground'
                       } ${dimmed ? 'opacity-20' : ''}`}
                     >
                       {n.title}
@@ -448,39 +450,35 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
         {selectedNode && selectedBand && (
           <aside
             onClick={(e) => e.stopPropagation()}
-            className="fixed inset-x-3 bottom-3 z-30 max-h-[65vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#0a0a0a]/95 p-6 shadow-2xl backdrop-blur lg:absolute lg:bottom-auto lg:left-auto lg:right-3 lg:top-3 lg:max-h-[calc(100%-1.5rem)] lg:w-[380px]"
+            className="fixed inset-x-3 bottom-3 z-30 max-h-[65vh] overflow-y-auto rounded-[6px] border border-border bg-card p-6 shadow-lg lg:absolute lg:bottom-auto lg:left-auto lg:right-3 lg:top-3 lg:max-h-[calc(100%-1.5rem)] lg:w-[380px]"
           >
             <div className="mb-4 flex items-start justify-between gap-3">
               <span
-                className="rounded-md border px-3 py-1 font-mono text-xs uppercase tracking-widest"
-                style={{
-                  color: selectedBand.accent,
-                  borderColor: `${selectedBand.accent}55`,
-                  backgroundColor: `${selectedBand.accent}15`,
-                }}
+                className="font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
+                style={{ color: selectedBand.accent }}
               >
                 {selectedBand.label}
               </span>
               <button
                 onClick={reset}
-                className="rounded-md p-1 text-gray-500 transition-colors hover:text-white"
+                className="rounded-[6px] p-1 text-studio-dim transition-colors hover:text-foreground"
                 aria-label="Close"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <h2 className="mb-2 font-serif text-2xl leading-tight text-white">{selectedNode.title}</h2>
-            <p className="mb-3 text-sm font-medium leading-relaxed text-gray-200">
+            <h2 className="mb-2 font-display text-2xl font-bold leading-tight tracking-tight text-foreground">{selectedNode.title}</h2>
+            <p className="mb-3 text-sm font-medium leading-relaxed text-foreground">
               {selectedNode.summary}
             </p>
             {selectedNode.inShort && selectedNode.inShort !== selectedNode.summary && (
-              <p className="mb-4 text-sm leading-relaxed text-gray-400">{selectedNode.inShort}</p>
+              <p className="mb-4 text-sm leading-relaxed text-studio-dim">{selectedNode.inShort}</p>
             )}
 
             <button
               onClick={() => openArticle(selectedNode.slug)}
-              className="group mb-5 inline-flex items-center gap-2 rounded-md border border-[#ccff00]/40 bg-[#ccff00]/10 px-4 py-2 font-mono text-xs uppercase tracking-widest text-[#ccff00] transition-all duration-300 hover:bg-[#ccff00]/20"
+              className="group mb-5 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 font-mono text-xs uppercase tracking-widest text-primary-foreground transition-opacity duration-200 hover:opacity-90"
             >
               Read the full page
               <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1" />
@@ -488,7 +486,7 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
 
             {(neighbours.get(selectedNode.slug)?.size ?? 0) > 0 && (
               <div className="mb-5">
-                <p className="mb-2 font-mono text-xs uppercase tracking-widest text-gray-500">
+                <p className="mb-2 font-mono text-xs uppercase tracking-widest text-studio-dim">
                   Connects to
                 </p>
                 <div className="flex flex-wrap gap-1.5">
@@ -500,7 +498,7 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
                       <button
                         key={n.slug}
                         onClick={() => selectNode(n.slug)}
-                        className="rounded-full border border-white/15 px-2.5 py-1 text-xs text-gray-400 transition-colors hover:border-[#ccff00]/60 hover:text-white"
+                        className="rounded-full border border-border px-2.5 py-1 text-xs text-studio-dim transition-colors hover:border-studio-brick/60 hover:text-foreground"
                       >
                         {n.title}
                       </button>
@@ -511,7 +509,7 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
 
             {selectedNode.sources.length > 0 && (
               <div className="mb-4">
-                <p className="mb-2 font-mono text-xs uppercase tracking-widest text-gray-500">
+                <p className="mb-2 font-mono text-xs uppercase tracking-widest text-studio-dim">
                   From these sources
                 </p>
                 <ul className="space-y-1.5">
@@ -522,13 +520,13 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
                           href={s.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-start gap-1.5 text-sm text-gray-300 transition-colors hover:text-[#ccff00]"
+                          className="inline-flex items-start gap-1.5 text-sm text-foreground/80 transition-colors hover:text-studio-brick"
                         >
                           <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                           {s.title}
                         </a>
                       ) : (
-                        <span className="text-sm text-gray-300">{s.title}</span>
+                        <span className="text-sm text-foreground/80">{s.title}</span>
                       )}
                     </li>
                   ))}
@@ -537,7 +535,7 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
             )}
 
             {selectedNode.lastReviewed && (
-              <p className="inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-widest text-gray-600">
+              <p className="inline-flex items-center gap-1.5 font-mono text-xs uppercase tracking-widest text-studio-dim">
                 <CalendarCheck className="h-3.5 w-3.5" />
                 Last reviewed {formatDate(selectedNode.lastReviewed)}
               </p>
@@ -546,7 +544,7 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
         )}
       </div>
 
-      <p className="mt-4 font-mono text-xs text-gray-600">
+      <p className="mt-4 font-mono text-xs text-studio-dim">
         {nodes.length} pages · {connectionCount} connections · Esc or click the background to reset
       </p>
 
@@ -558,7 +556,7 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
           const band = bandFor.get(node.type);
           return (
             <div
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm md:p-8"
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 md:p-8"
               onClick={closeArticle}
               role="dialog"
               aria-modal="true"
@@ -566,24 +564,20 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
             >
               <div
                 onClick={(e) => e.stopPropagation()}
-                className="flex max-h-full w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0a0a0a] shadow-2xl"
+                className="flex max-h-full w-full max-w-3xl flex-col overflow-hidden rounded-[6px] border border-border bg-card shadow-lg"
               >
-                <div className="flex items-center justify-between gap-3 border-b border-white/10 px-6 py-4 md:px-8">
+                <div className="flex items-center justify-between gap-3 border-b border-border px-6 py-4 md:px-8">
                   <div className="flex flex-wrap items-center gap-3">
                     {band && (
                       <span
-                        className="rounded-md border px-3 py-1 font-mono text-xs uppercase tracking-widest"
-                        style={{
-                          color: band.accent,
-                          borderColor: `${band.accent}55`,
-                          backgroundColor: `${band.accent}15`,
-                        }}
+                        className="font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
+                        style={{ color: band.accent }}
                       >
                         {band.label}
                       </span>
                     )}
                     {node.lastReviewed && (
-                      <span className="hidden items-center gap-1.5 font-mono text-xs uppercase tracking-widest text-gray-600 sm:inline-flex">
+                      <span className="hidden items-center gap-1.5 font-mono text-xs uppercase tracking-widest text-studio-dim sm:inline-flex">
                         <CalendarCheck className="h-3.5 w-3.5" />
                         Last reviewed {formatDate(node.lastReviewed)}
                       </span>
@@ -595,13 +589,13 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
                       target="_blank"
                       rel="noopener noreferrer"
                       title="Open as its own page"
-                      className="rounded-md p-2 text-gray-500 transition-colors hover:text-white"
+                      className="rounded-[6px] p-2 text-studio-dim transition-colors hover:text-foreground"
                     >
                       <Link2 className="h-4 w-4" />
                     </a>
                     <button
                       onClick={closeArticle}
-                      className="rounded-md p-2 text-gray-500 transition-colors hover:text-white"
+                      className="rounded-[6px] p-2 text-studio-dim transition-colors hover:text-foreground"
                       aria-label="Close reader"
                     >
                       <X className="h-5 w-5" />
@@ -610,7 +604,7 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
                 </div>
 
                 <div key={node.slug} className="overflow-y-auto px-6 py-6 md:px-8 md:py-8">
-                  <h2 className="mb-6 font-serif text-3xl leading-tight text-white md:text-4xl">
+                  <h2 className="mb-6 font-display text-3xl font-bold leading-tight tracking-tight text-foreground md:text-4xl">
                     {node.title}
                   </h2>
                   <div
@@ -620,8 +614,8 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
                   />
 
                   {node.sources.length > 0 && (
-                    <div className="mt-10 border-t border-white/10 pt-6">
-                      <p className="mb-3 font-mono text-xs uppercase tracking-widest text-gray-500">
+                    <div className="mt-10 border-t border-border pt-6">
+                      <p className="mb-3 font-mono text-xs uppercase tracking-widest text-studio-dim">
                         Sources
                       </p>
                       <ul className="space-y-1.5">
@@ -632,13 +626,13 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
                                 href={s.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-start gap-1.5 text-sm text-gray-300 transition-colors hover:text-[#ccff00]"
+                                className="inline-flex items-start gap-1.5 text-sm text-foreground/80 transition-colors hover:text-studio-brick"
                               >
                                 <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                                 {s.title}
                               </a>
                             ) : (
-                              <span className="text-sm text-gray-300">{s.title}</span>
+                              <span className="text-sm text-foreground/80">{s.title}</span>
                             )}
                           </li>
                         ))}
@@ -648,7 +642,7 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
 
                   {(neighbours.get(node.slug)?.size ?? 0) > 0 && (
                     <div className="mt-8">
-                      <p className="mb-3 font-mono text-xs uppercase tracking-widest text-gray-500">
+                      <p className="mb-3 font-mono text-xs uppercase tracking-widest text-studio-dim">
                         Keep reading
                       </p>
                       <div className="flex flex-wrap gap-1.5">
@@ -660,7 +654,7 @@ export function WikiMapClient({ nodes }: { nodes: WikiMapNode[] }) {
                             <button
                               key={n.slug}
                               onClick={() => openArticle(n.slug)}
-                              className="rounded-full border border-white/15 px-3 py-1.5 text-xs text-gray-400 transition-colors hover:border-[#ccff00]/60 hover:text-white"
+                              className="rounded-full border border-border px-3 py-1.5 text-xs text-studio-dim transition-colors hover:border-studio-brick/60 hover:text-foreground"
                             >
                               {n.title}
                             </button>

@@ -6,7 +6,6 @@ import { useOrganization } from '@/lib/organizationContext'
 import { useSubscription } from '@/hooks/useSubscription'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import {
   Table,
   TableBody,
@@ -26,19 +25,19 @@ import {
   Lock,
   Sparkles,
   ArrowRight,
-  PoundSterling,
   TrendingUp,
   TrendingDown,
   Minus,
   ChevronDown,
   ChevronUp,
   Package,
-  Loader2,
-  BarChart3,
   ArrowUpDown,
   Info,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { Eyebrow } from '@/components/studio/eyebrow'
+import { StateChip } from '@/components/studio/state-chip'
+import type { WorkingTone } from '@/components/studio/theme'
 
 // ---------------------------------------------------------------------------
 // Types mirroring the API response shapes
@@ -136,16 +135,16 @@ function pctChange(prev: number, curr: number): number | null {
   return ((curr - prev) / prev) * 100
 }
 
-function ramBadgeClasses(rating: string | null): string {
+function ramTone(rating: string | null): WorkingTone {
   switch (rating) {
     case 'green':
-      return 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+      return 'good'
     case 'amber':
-      return 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+      return 'attention'
     case 'red':
-      return 'bg-red-500/15 text-red-400 border-red-500/30'
+      return 'stale'
     default:
-      return 'bg-muted text-muted-foreground border-border'
+      return 'quiet'
   }
 }
 
@@ -157,7 +156,7 @@ export default function EPRCostEstimatorPage() {
   const { currentOrganization } = useOrganization()
   const { tierLevel, isLoading: tierLoading } = useSubscription()
 
-  // Data state — cache both years
+  // Data state: cache both years
   const [yearDataCache, setYearDataCache] = useState<Record<string, YearData>>({})
   const [feeRatesCache, setFeeRatesCache] = useState<Record<string, FeeRate[]>>({})
   const [activeYear, setActiveYear] = useState<string>('2025-26')
@@ -312,9 +311,14 @@ export default function EPRCostEstimatorPage() {
   return (
     <div className="space-y-6 p-6">
       {/* Page header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Cost Estimator</h1>
-        <p className="text-sm text-muted-foreground mt-1">
+      <div className="min-w-0">
+        <Eyebrow tone="inherit" className="mb-3 text-studio-brick">
+          THE EVIDENCE · EPR · COSTS
+        </Eyebrow>
+        <h1 className="font-display text-[clamp(2rem,4vw,3.25rem)] font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+          The cost estimator.
+        </h1>
+        <p className="text-sm text-muted-foreground mt-3">
           Estimate your EPR waste management fees
         </p>
       </div>
@@ -403,16 +407,13 @@ function TotalCostBanner({
 }) {
   if (loading || !data) {
     return (
-      <Card>
+      <Card className="rounded-[6px] border-border bg-card">
         <CardContent className="py-8">
           <div className="flex items-center justify-center gap-3">
             {loading ? (
-              <>
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">
-                  Calculating fees...
-                </span>
-              </>
+              <span className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                Calculating fees...
+              </span>
             ) : (
               <div className="space-y-2 w-full max-w-md">
                 <Skeleton className="h-10 w-48 mx-auto" />
@@ -428,11 +429,15 @@ function TotalCostBanner({
   const total = data.calculation.total_fee_gbp
 
   return (
-    <Card className="border-[#ccff00]/20">
+    <Card className="rounded-[6px] border-border bg-card">
       <CardContent className="py-8">
         <div className="text-center">
-          <p className="text-sm text-muted-foreground mb-1">{yearLabel}</p>
-          <p className="text-4xl font-bold tracking-tight">{formatGBP(total)}</p>
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim mb-2">
+            {yearLabel}
+          </p>
+          <p className="font-display text-4xl font-bold tracking-tight tabular-nums text-foreground">
+            {formatGBP(total)}
+          </p>
           <p className="text-sm text-muted-foreground mt-2">
             Total estimated EPR fee &middot;{' '}
             {formatWeight(data.calculation.total_weight_kg)} kg total packaging
@@ -440,18 +445,18 @@ function TotalCostBanner({
           {isModulated && yoyChange !== null && (
             <div className="mt-3 flex items-center justify-center gap-1.5">
               {yoyChange > 0 ? (
-                <TrendingUp className="h-4 w-4 text-red-400" />
+                <TrendingUp className="h-4 w-4 text-studio-attention" />
               ) : yoyChange < 0 ? (
-                <TrendingDown className="h-4 w-4 text-emerald-400" />
+                <TrendingDown className="h-4 w-4 text-studio-good" />
               ) : (
                 <Minus className="h-4 w-4 text-muted-foreground" />
               )}
               <span
                 className={`text-sm font-medium ${
                   yoyChange > 0
-                    ? 'text-red-400'
+                    ? 'text-studio-attention'
                     : yoyChange < 0
-                    ? 'text-emerald-400'
+                    ? 'text-studio-good'
                     : 'text-muted-foreground'
                 }`}
               >
@@ -560,12 +565,9 @@ function ProductBreakdownTable({
                   </TableCell>
                   <TableCell className="text-center">
                     {item.ram_rating ? (
-                      <Badge
-                        variant="outline"
-                        className={`capitalize ${ramBadgeClasses(item.ram_rating)}`}
-                      >
+                      <StateChip tone={ramTone(item.ram_rating)}>
                         {item.ram_rating}
-                      </Badge>
+                      </StateChip>
                     ) : (
                       <span className="text-xs text-muted-foreground">N/A</span>
                     )}
@@ -578,9 +580,7 @@ function ProductBreakdownTable({
                   </TableCell>
                   <TableCell className="text-center">
                     {item.is_drs_excluded ? (
-                      <Badge variant="outline" className="bg-blue-500/15 text-blue-400 border-blue-500/30">
-                        Yes
-                      </Badge>
+                      <StateChip tone="hold">Yes</StateChip>
                     ) : (
                       <span className="text-xs text-muted-foreground">No</span>
                     )}
@@ -660,7 +660,7 @@ function MaterialCostSummary({
                     className="h-full rounded-full transition-all duration-500"
                     style={{
                       width: `${barWidth}%`,
-                      backgroundColor: '#ccff00',
+                      backgroundColor: '#BF4B2A',
                     }}
                   />
                 </div>
@@ -741,18 +741,18 @@ function ScenarioComparison({
             {totalChange !== null ? (
               <div className="flex items-center gap-1.5">
                 {totalChange > 0 ? (
-                  <TrendingUp className="h-4 w-4 text-red-400" />
+                  <TrendingUp className="h-4 w-4 text-studio-attention" />
                 ) : totalChange < 0 ? (
-                  <TrendingDown className="h-4 w-4 text-emerald-400" />
+                  <TrendingDown className="h-4 w-4 text-studio-good" />
                 ) : (
                   <Minus className="h-4 w-4 text-muted-foreground" />
                 )}
                 <span
                   className={`text-xl font-bold ${
                     totalChange > 0
-                      ? 'text-red-400'
+                      ? 'text-studio-attention'
                       : totalChange < 0
-                      ? 'text-emerald-400'
+                      ? 'text-studio-good'
                       : 'text-muted-foreground'
                   }`}
                 >
@@ -792,9 +792,9 @@ function ScenarioComparison({
                       <span
                         className={`text-sm font-medium ${
                           mc.change > 0
-                            ? 'text-red-400'
+                            ? 'text-studio-attention'
                             : mc.change < 0
-                            ? 'text-emerald-400'
+                            ? 'text-studio-good'
                             : 'text-muted-foreground'
                         }`}
                       >

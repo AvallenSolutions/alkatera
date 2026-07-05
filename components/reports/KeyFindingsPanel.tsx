@@ -4,11 +4,11 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StateChip } from "@/components/studio";
 import {
   Sparkles,
   TrendingDown,
   TrendingUp,
-  Loader2,
   Lock,
   AlertCircle,
 } from "lucide-react";
@@ -29,12 +29,6 @@ interface KeyFindingsPanelProps {
 // Constants
 // ============================================================================
 
-const SCOPE_COLOURS: Record<string, string> = {
-  scope1: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100",
-  scope2: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100",
-  scope3: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100",
-};
-
 const SCOPE_LABELS: Record<string, string> = {
   scope1: "Scope 1",
   scope2: "Scope 2",
@@ -42,9 +36,9 @@ const SCOPE_LABELS: Record<string, string> = {
 };
 
 const CONFIDENCE_DOTS: Record<string, { colour: string; label: string }> = {
-  high: { colour: "bg-emerald-500", label: "Matched to logged event" },
-  medium: { colour: "bg-amber-500", label: "Pattern detected in data" },
-  low: { colour: "bg-slate-400", label: "Inferred from emission delta" },
+  high: { colour: "bg-studio-good", label: "Matched to logged event" },
+  medium: { colour: "bg-studio-attention", label: "Pattern detected in data" },
+  low: { colour: "bg-studio-dim", label: "Inferred from emission delta" },
 };
 
 // ============================================================================
@@ -110,14 +104,12 @@ export function KeyFindingsPanel({
   }
 
   return (
-    <Card className="relative overflow-hidden border-dashed border-[#ccff00]/30">
-      <div className="absolute top-0 right-0 w-40 h-40 bg-[#ccff00]/5 rounded-full -mr-20 -mt-20" />
-
+    <Card className="relative overflow-hidden rounded-[6px] border border-border bg-card">
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-[#ccff00]/10 flex items-center justify-center">
-              <Sparkles className="h-5 w-5 text-[#ccff00]" />
+            <div className="h-10 w-10 rounded-[6px] bg-secondary flex items-center justify-center">
+              <Sparkles className="h-5 w-5 text-studio-brick" />
             </div>
             <div>
               <CardTitle className="text-lg">Key Findings</CardTitle>
@@ -129,17 +121,10 @@ export function KeyFindingsPanel({
           </div>
 
           {meta && (
-            <Badge
-              variant="outline"
-              className={
-                meta.totalChangePct <= 0
-                  ? "border-emerald-500 text-emerald-600"
-                  : "border-red-500 text-red-600"
-              }
-            >
+            <StateChip tone={meta.totalChangePct <= 0 ? "good" : "stale"}>
               {meta.totalChangePct <= 0 ? "↓" : "↑"}{" "}
               {Math.abs(meta.totalChangePct).toFixed(1)}% YoY
-            </Badge>
+            </StateChip>
           )}
         </div>
       </CardHeader>
@@ -147,7 +132,7 @@ export function KeyFindingsPanel({
       <CardContent className="space-y-4">
         {/* Subscription gate */}
         {isGated && (
-          <div className="flex items-center gap-3 p-4 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+          <div className="flex items-center gap-3 p-4 rounded-[6px] border border-border bg-secondary">
             <Lock className="h-5 w-5 text-muted-foreground shrink-0" />
             <div>
               <div className="font-medium text-sm">
@@ -163,7 +148,7 @@ export function KeyFindingsPanel({
 
         {/* Error state */}
         {error && (
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-950 text-sm text-red-600 dark:text-red-400">
+          <div className="flex items-center gap-2 p-3 rounded-[6px] border border-border bg-card text-sm text-studio-stale">
             <AlertCircle className="h-4 w-4 shrink-0" />
             {error}
           </div>
@@ -177,14 +162,14 @@ export function KeyFindingsPanel({
                 finding.direction === "decrease" ? TrendingDown : TrendingUp;
               const dirColour =
                 finding.direction === "decrease"
-                  ? "text-emerald-600 dark:text-emerald-400"
-                  : "text-red-600 dark:text-red-400";
+                  ? "text-studio-good"
+                  : "text-studio-stale";
               const conf = CONFIDENCE_DOTS[finding.confidence] || CONFIDENCE_DOTS.low;
 
               return (
                 <div
                   key={i}
-                  className="flex gap-3 p-4 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200/50 dark:border-slate-800/50"
+                  className="flex gap-3 p-4 rounded-[6px] border border-border bg-secondary"
                 >
                   <DirIcon
                     className={`h-5 w-5 mt-0.5 shrink-0 ${dirColour}`}
@@ -197,11 +182,9 @@ export function KeyFindingsPanel({
                       {finding.narrative}
                     </div>
                     <div className="flex items-center gap-2 mt-2 flex-wrap">
-                      <Badge
-                        className={`text-xs ${SCOPE_COLOURS[finding.scope] || ""}`}
-                      >
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
                         {SCOPE_LABELS[finding.scope] || finding.scope}
-                      </Badge>
+                      </span>
                       <Badge variant="outline" className="text-xs">
                         {finding.magnitude_pct >= 0 ? "+" : ""}
                         {finding.magnitude_pct.toFixed(0)}%
@@ -240,10 +223,7 @@ export function KeyFindingsPanel({
             size="sm"
           >
             {isGenerating ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Analysing changes...
-              </>
+              <>Analysing changes...</>
             ) : findings ? (
               <>
                 <Sparkles className="h-4 w-4 mr-2" />

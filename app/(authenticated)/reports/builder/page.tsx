@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Zap, ArrowLeft, ArrowRight, FileText, Loader2 } from 'lucide-react';
+import { Zap, ArrowLeft, ArrowRight, FileText } from 'lucide-react';
+import { Eyebrow } from '@/components/studio';
 import { WizardStepIndicator } from '@/components/report-builder/WizardStepIndicator';
 import { FramingStep, getAudienceDefaults } from '@/components/report-builder/FramingStep';
 import { ReportPreviewPanel } from '@/components/report-builder/ReportPreviewPanel';
@@ -194,8 +195,11 @@ export default function ReportBuilderPage() {
   if (generatingReportId) {
     return (
       <div className="container mx-auto py-8 px-4 max-w-6xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Generate Sustainability Report</h1>
+        <div className="mb-8 space-y-2">
+          <Eyebrow>THE EVIDENCE · REPORT BUILDER</Eyebrow>
+          <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+            The report builder.
+          </h1>
         </div>
         <GenerationProgress
           status={progress.status}
@@ -213,16 +217,19 @@ export default function ReportBuilderPage() {
     <div className="container mx-auto py-8 px-4 max-w-6xl">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold mb-1">Generate Sustainability Report</h1>
-          <p className="text-muted-foreground">
+        <div className="space-y-2">
+          <Eyebrow>THE EVIDENCE · REPORT BUILDER</Eyebrow>
+          <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+            The report builder.
+          </h1>
+          <p className="text-sm text-muted-foreground">
             Create a data-driven sustainability report with AI-powered document generation
           </p>
         </div>
         <Button
           variant="default"
           size="lg"
-          className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white shadow-lg"
+          className="bg-primary text-primary-foreground"
           onClick={() => setQuickGenerateOpen(true)}
         >
           <Zap className="mr-2 h-5 w-5" />
@@ -281,10 +288,7 @@ export default function ReportBuilderPage() {
             {step < 4 ? (
               <Button onClick={handleNext} disabled={applyingDefaults}>
                 {applyingDefaults ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Applying...
-                  </>
+                  <>Applying...</>
                 ) : (
                   <>
                     Next
@@ -295,10 +299,7 @@ export default function ReportBuilderPage() {
             ) : (
               <Button onClick={() => handleGenerate()} disabled={generating} size="lg">
                 {generating ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Starting...
-                  </>
+                  <>Starting...</>
                 ) : (
                   <>
                     <FileText className="mr-2 h-4 w-4" />

@@ -24,12 +24,12 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { StateChip } from '@/components/studio';
 import { GapAnalysisView } from '@/components/certifications/GapAnalysisView';
 import { EvidenceLinker } from '@/components/certifications/EvidenceLinker';
 import { PlatformHealthPanel } from '@/components/certifications/PlatformHealthPanel';
 import { useCertificationReadiness } from '@/hooks/data/useCertificationReadiness';
 import { useCertificationEvidence } from '@/hooks/data/useCertificationEvidence';
-import { Loader2 } from 'lucide-react';
 
 interface CertificationExperienceProps {
   /** Framework code, e.g. 'iso14001' | 'iso50001' | 'ecovadis'. */
@@ -108,7 +108,9 @@ export function CertificationExperience({
   if (loading || !readiness) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-studio-dim">
+          Loading
+        </p>
       </div>
     );
   }
@@ -123,7 +125,7 @@ export function CertificationExperience({
   const pct = readiness.programmeReadinessPct;
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-4">
@@ -133,16 +135,15 @@ export function CertificationExperience({
             </Link>
           </Button>
           <div>
-            <div className="mb-2 flex items-center gap-2">
-              <Badge className="bg-blue-500">Standard</Badge>
+            <div className="mb-2 flex items-center gap-3">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
+                Standard
+              </span>
               {readiness.isReadyToSubmit && (
-                <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                  <CheckCircle2 className="mr-1 h-3 w-3" />
-                  All requirements met
-                </Badge>
+                <StateChip tone="good">All requirements met</StateChip>
               )}
             </div>
-            <h1 className="text-2xl font-bold tracking-tight">{label}</h1>
+            <h1 className="font-display text-2xl font-bold tracking-[-0.02em]">{label}</h1>
             {description && (
               <p className="mt-1 max-w-2xl text-muted-foreground">{description}</p>
             )}
@@ -154,9 +155,7 @@ export function CertificationExperience({
           </div>
         </div>
         <Button variant="outline" onClick={refreshAll} disabled={loading}>
-          <RefreshCw
-            className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`}
-          />
+          <RefreshCw className="mr-2 h-4 w-4" />
           Refresh
         </Button>
       </div>
@@ -188,13 +187,13 @@ export function CertificationExperience({
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                  <Target className="h-4 w-4 text-blue-600" />
+                  <Target className="h-4 w-4 text-studio-dim" />
                   Readiness
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="flex items-baseline justify-between">
-                  <span className="text-3xl font-bold">{pct}%</span>
+                  <span className="font-display text-3xl font-bold tabular-nums">{pct}%</span>
                   <span className="text-sm text-muted-foreground">
                     {passed}/{total} verified
                   </span>
@@ -209,26 +208,26 @@ export function CertificationExperience({
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                  <ListChecks className="h-4 w-4 text-purple-600" />
+                  <ListChecks className="h-4 w-4 text-studio-dim" />
                   Status
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-1.5 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-2 text-muted-foreground">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600" /> Passed
+                    <CheckCircle2 className="h-4 w-4 text-studio-good" /> Passed
                   </span>
                   <span className="font-medium">{passed}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-2 text-muted-foreground">
-                    <Clock className="h-4 w-4 text-amber-600" /> In progress
+                    <Clock className="h-4 w-4 text-studio-attention" /> In progress
                   </span>
                   <span className="font-medium">{inProgress}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-2 text-muted-foreground">
-                    <Circle className="h-4 w-4 text-slate-400" /> Not started
+                    <Circle className="h-4 w-4 text-studio-dim" /> Not started
                   </span>
                   <span className="font-medium">{notStarted}</span>
                 </div>
@@ -238,7 +237,7 @@ export function CertificationExperience({
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                  <ArrowRight className="h-4 w-4 text-amber-600" />
+                  <ArrowRight className="h-4 w-4 text-studio-dim" />
                   Next steps
                 </CardTitle>
               </CardHeader>
@@ -306,7 +305,9 @@ export function CertificationExperience({
         <TabsContent value="evidence">
           {evidenceLoading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-studio-dim">
+                Loading
+              </p>
             </div>
           ) : frameworkId ? (
             <EvidenceLinker

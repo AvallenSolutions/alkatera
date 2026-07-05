@@ -9,11 +9,11 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
+import { StateChip } from '@/components/studio';
 import { toast } from 'sonner';
 
 interface ClarificationRequest {
@@ -107,7 +107,9 @@ export function ClarificationRequests({
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-studio-dim">
+            Loading
+          </p>
         </CardContent>
       </Card>
     );
@@ -121,9 +123,7 @@ export function ClarificationRequests({
         <CardTitle className="flex items-center gap-2 text-lg">
           Clarification Requests
           {open.length > 0 && (
-            <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-              {open.length} open
-            </Badge>
+            <StateChip tone="attention">{open.length} open</StateChip>
           )}
         </CardTitle>
         <CardDescription>
@@ -163,17 +163,17 @@ export function ClarificationRequests({
                   {r.raised_by ? `${r.raised_by}: ` : ''}
                   {r.description}
                 </span>
-                <Badge
-                  className={
+                <StateChip
+                  tone={
                     r.status === 'resolved'
-                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                      ? 'good'
                       : r.status === 'responded'
-                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                        : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                        ? 'hold'
+                        : 'attention'
                   }
                 >
                   {r.status}
-                </Badge>
+                </StateChip>
               </div>
               {r.response && (
                 <p className="text-xs text-muted-foreground">

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { CheckCircle2, Loader2, Building2, Package, TrendingUp, Users, Plane, Briefcase } from "lucide-react";
+import { CheckCircle2, Circle, Building2, Package, TrendingUp, Users, Plane, Briefcase } from "lucide-react";
 import { toast } from "sonner";
 
 interface GapFillWizardModalProps {
@@ -44,7 +44,7 @@ export function GapFillWizardModal({
       completed: false,
     },
     {
-      label: "Analyzing Production Volumes",
+      label: "Analysing Production Volumes",
       icon: <Package className="h-4 w-4" />,
       completed: false,
     },
@@ -137,7 +137,7 @@ export function GapFillWizardModal({
             <DialogHeader>
               <DialogTitle>Generating {year} Carbon Footprint Report</DialogTitle>
               <DialogDescription>
-                Analyzing your existing data to calculate your corporate emissions
+                Analysing your existing data to calculate your corporate emissions
               </DialogDescription>
             </DialogHeader>
 
@@ -146,23 +146,23 @@ export function GapFillWizardModal({
                 {calculationSteps.map((calcStep, idx) => (
                   <div key={idx} className="flex items-center gap-3">
                     <div
-                      className={`flex items-center justify-center h-8 w-8 rounded-full ${
+                      className={`flex items-center justify-center h-8 w-8 rounded-full bg-secondary ${
                         calcStep.completed
-                          ? "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-400"
-                          : "bg-slate-100 text-slate-400 dark:bg-slate-800"
+                          ? "text-studio-good"
+                          : "text-muted-foreground"
                       }`}
                     >
                       {calcStep.completed ? (
                         <CheckCircle2 className="h-4 w-4" />
                       ) : (
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Circle className="h-4 w-4" />
                       )}
                     </div>
                     <span
                       className={`text-sm ${
                         calcStep.completed
-                          ? "text-slate-900 dark:text-slate-100 font-medium"
-                          : "text-slate-500"
+                          ? "text-foreground font-medium"
+                          : "text-muted-foreground"
                       }`}
                     >
                       {calcStep.label}
@@ -189,7 +189,7 @@ export function GapFillWizardModal({
               {/* Business Travel */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <Plane className="h-4 w-4 text-slate-500" />
+                  <Plane className="h-4 w-4 text-muted-foreground" />
                   <Label htmlFor="business-travel">Business Travel Spend (£)</Label>
                 </div>
                 <Input
@@ -209,7 +209,7 @@ export function GapFillWizardModal({
               {/* Purchased Services */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <Briefcase className="h-4 w-4 text-slate-500" />
+                  <Briefcase className="h-4 w-4 text-muted-foreground" />
                   <Label htmlFor="purchased-services">
                     External Services Spend (£)
                   </Label>
@@ -231,7 +231,7 @@ export function GapFillWizardModal({
               {/* Employee Commuting */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-slate-500" />
+                  <Users className="h-4 w-4 text-muted-foreground" />
                   <Label htmlFor="employee-ftes">Number of Full-Time Employees</Label>
                 </div>
                 <Input
@@ -259,14 +259,7 @@ export function GapFillWizardModal({
                 Cancel
               </Button>
               <Button onClick={handleFinalize} disabled={isSaving}>
-                {isSaving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Generating Report...
-                  </>
-                ) : (
-                  "Finalize Report"
-                )}
+                {isSaving ? "Generating Report..." : "Finalise Report"}
               </Button>
             </div>
           </>

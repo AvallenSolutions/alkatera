@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
-  ArrowLeft, ArrowRight, SkipForward, Loader2, Users, ChevronDown, ChevronRight,
+  ArrowLeft, ArrowRight, SkipForward, Users, ChevronDown, ChevronRight,
 } from 'lucide-react'
 import {
   HMRC_CONTACT_TYPE_NAMES,
@@ -152,7 +152,7 @@ export function ContactsStep({ onComplete, onBack, onSkip }: ContactsStepProps) 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 text-neon-lime animate-spin" />
+        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">Loading</span>
       </div>
     )
   }
@@ -173,11 +173,11 @@ export function ContactsStep({ onComplete, onBack, onSkip }: ContactsStepProps) 
               {HMRC_CONTACT_TYPE_NAMES[type]}
             </h4>
             {isRequired ? (
-              <span className="text-[10px] font-medium bg-neon-lime/20 text-neon-lime border border-neon-lime/30 rounded-full px-2 py-0.5">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-brick">
                 Required
               </span>
             ) : (
-              <span className="text-[10px] font-medium bg-muted text-muted-foreground border border-border rounded-full px-2 py-0.5">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
                 Optional
               </span>
             )}
@@ -206,12 +206,12 @@ export function ContactsStep({ onComplete, onBack, onSkip }: ContactsStepProps) 
                 value={contacts[type].first_name}
                 onChange={(e) => updateContact(type, 'first_name', e.target.value)}
                 disabled={isSaving}
-                className={`bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50 ${
-                  validationErrors[`${type}.first_name`] ? 'border-red-500' : ''
+                className={`bg-background border-border text-foreground placeholder:text-muted-foreground/50 ${
+                  validationErrors[`${type}.first_name`] ? 'border-studio-stale' : ''
                 }`}
               />
               {validationErrors[`${type}.first_name`] && (
-                <p className="text-[10px] text-red-400">{validationErrors[`${type}.first_name`]}</p>
+                <p className="text-[10px] text-studio-stale">{validationErrors[`${type}.first_name`]}</p>
               )}
             </div>
 
@@ -226,12 +226,12 @@ export function ContactsStep({ onComplete, onBack, onSkip }: ContactsStepProps) 
                 value={contacts[type].last_name}
                 onChange={(e) => updateContact(type, 'last_name', e.target.value)}
                 disabled={isSaving}
-                className={`bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50 ${
-                  validationErrors[`${type}.last_name`] ? 'border-red-500' : ''
+                className={`bg-background border-border text-foreground placeholder:text-muted-foreground/50 ${
+                  validationErrors[`${type}.last_name`] ? 'border-studio-stale' : ''
                 }`}
               />
               {validationErrors[`${type}.last_name`] && (
-                <p className="text-[10px] text-red-400">{validationErrors[`${type}.last_name`]}</p>
+                <p className="text-[10px] text-studio-stale">{validationErrors[`${type}.last_name`]}</p>
               )}
             </div>
 
@@ -246,7 +246,7 @@ export function ContactsStep({ onComplete, onBack, onSkip }: ContactsStepProps) 
                 value={contacts[type].phone}
                 onChange={(e) => updateContact(type, 'phone', e.target.value)}
                 disabled={isSaving}
-                className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50"
+                className="bg-background border-border text-foreground placeholder:text-muted-foreground/50"
               />
             </div>
 
@@ -262,7 +262,7 @@ export function ContactsStep({ onComplete, onBack, onSkip }: ContactsStepProps) 
                 value={contacts[type].email}
                 onChange={(e) => updateContact(type, 'email', e.target.value)}
                 disabled={isSaving}
-                className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50"
+                className="bg-background border-border text-foreground placeholder:text-muted-foreground/50"
               />
             </div>
 
@@ -277,7 +277,7 @@ export function ContactsStep({ onComplete, onBack, onSkip }: ContactsStepProps) 
                 value={contacts[type].job_title}
                 onChange={(e) => updateContact(type, 'job_title', e.target.value)}
                 disabled={isSaving}
-                className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50"
+                className="bg-background border-border text-foreground placeholder:text-muted-foreground/50"
               />
             </div>
           </div>
@@ -291,10 +291,10 @@ export function ContactsStep({ onComplete, onBack, onSkip }: ContactsStepProps) 
       <div className="w-full max-w-lg space-y-6">
         {/* Header */}
         <div className="text-center space-y-3">
-          <div className="mx-auto w-16 h-16 bg-neon-lime/20 backdrop-blur-md border border-neon-lime/30 rounded-2xl flex items-center justify-center">
-            <Users className="w-8 h-8 text-neon-lime" />
+          <div className="mx-auto w-16 h-16 rounded-[6px] border border-border bg-card flex items-center justify-center">
+            <Users className="w-8 h-8 text-studio-brick" />
           </div>
-          <h3 className="text-xl font-serif font-bold text-foreground">
+          <h3 className="text-xl font-display font-bold text-foreground">
             HMRC Contacts
           </h3>
           <p className="text-sm text-muted-foreground">
@@ -303,7 +303,7 @@ export function ContactsStep({ onComplete, onBack, onSkip }: ContactsStepProps) 
         </div>
 
         {/* Form card */}
-        <div className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl p-6 space-y-6">
+        <div className="rounded-[6px] border border-border bg-card p-6 space-y-6">
           {/* Required contacts */}
           {REQUIRED_TYPES.map(type => renderContactSection(type, true))}
 
@@ -340,11 +340,10 @@ export function ContactsStep({ onComplete, onBack, onSkip }: ContactsStepProps) 
             <Button
               onClick={handleContinue}
               disabled={isSaving}
-              className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full"
             >
               {isSaving ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Saving...
                 </>
               ) : (

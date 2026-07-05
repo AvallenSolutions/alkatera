@@ -16,9 +16,9 @@ export function EligibilityEstimateCard({ readiness }: { readiness: Certificatio
   if (e.readyToSubmit) return null;
 
   return (
-    <Card className="border-[#ccff00]/30">
+    <Card className="border-border">
       <CardContent className="flex items-start gap-3 p-5">
-        <Rocket className="mt-0.5 h-5 w-5 shrink-0 text-[#ccff00]" />
+        <Rocket className="mt-0.5 h-5 w-5 shrink-0 text-studio-brick" />
         <div className="flex-1">
           <h3 className="text-sm font-semibold text-foreground">Your route to certification</h3>
           <p className="mt-1 text-sm text-muted-foreground">{e.summary}</p>

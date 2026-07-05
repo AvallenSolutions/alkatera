@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Award, Search, Filter, RefreshCw } from 'lucide-react';
+import { Eyebrow } from '@/components/studio';
 import { CertificationReadinessHero } from '@/components/certifications/CertificationReadinessHero';
 import { FrameworkCard } from '@/components/certifications/FrameworkCard';
 import { useCertificationFrameworks } from '@/hooks/data/useCertificationFrameworks';
@@ -123,15 +124,15 @@ function CertificationsHub() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
-            <Award className="h-6 w-6 text-amber-600" />
-            Certifications Hub
+    <div className="space-y-6">
+      {/* Statement header */}
+      <div className="flex items-end justify-between gap-6">
+        <div className="space-y-2">
+          <Eyebrow>THE EVIDENCE · CERTIFICATIONS</Eyebrow>
+          <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+            The certifications.
           </h1>
-          <p className="mt-1 text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Track your certification progress and choose a framework to work on
           </p>
         </div>
@@ -143,9 +144,7 @@ function CertificationsHub() {
           }}
           disabled={loading || scoreLoading}
         >
-          <RefreshCw
-            className={`mr-2 h-4 w-4 ${loading || scoreLoading ? 'animate-spin' : ''}`}
-          />
+          <RefreshCw className="mr-2 h-4 w-4" />
           Refresh
         </Button>
       </div>
@@ -228,13 +227,13 @@ function CertificationsHub() {
           {loading ? (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {[...Array(6)].map((_, i) => (
-                <Card key={i} className="animate-pulse">
+                <Card key={i}>
                   <CardHeader>
-                    <div className="h-6 w-24 rounded bg-slate-200 dark:bg-slate-700" />
-                    <div className="mt-2 h-4 w-3/4 rounded bg-slate-200 dark:bg-slate-700" />
+                    <div className="h-6 w-24 rounded bg-secondary" />
+                    <div className="mt-2 h-4 w-3/4 rounded bg-secondary" />
                   </CardHeader>
                   <CardContent>
-                    <div className="h-20 rounded bg-slate-200 dark:bg-slate-700" />
+                    <div className="h-20 rounded bg-secondary" />
                   </CardContent>
                 </Card>
               ))}

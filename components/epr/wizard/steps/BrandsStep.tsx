@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ArrowLeft, ArrowRight, SkipForward, Loader2, Tag, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, SkipForward, Tag, Plus, Trash2 } from 'lucide-react'
 import { HMRC_BRAND_TYPE_NAMES } from '@/lib/epr/constants'
 import type { HMRCBrandTypeCode } from '@/lib/epr/types'
 
@@ -118,7 +118,7 @@ export function BrandsStep({ onComplete, onBack, onSkip }: BrandsStepProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 text-neon-lime animate-spin" />
+        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">Loading</span>
       </div>
     )
   }
@@ -128,10 +128,10 @@ export function BrandsStep({ onComplete, onBack, onSkip }: BrandsStepProps) {
       <div className="w-full max-w-lg space-y-6">
         {/* Header */}
         <div className="text-center space-y-3">
-          <div className="mx-auto w-16 h-16 bg-neon-lime/20 backdrop-blur-md border border-neon-lime/30 rounded-2xl flex items-center justify-center">
-            <Tag className="w-8 h-8 text-neon-lime" />
+          <div className="mx-auto w-16 h-16 rounded-[6px] border border-border bg-card flex items-center justify-center">
+            <Tag className="w-8 h-8 text-studio-brick" />
           </div>
-          <h3 className="text-xl font-serif font-bold text-foreground">
+          <h3 className="text-xl font-display font-bold text-foreground">
             Brand Details
           </h3>
           <p className="text-sm text-muted-foreground">
@@ -140,7 +140,7 @@ export function BrandsStep({ onComplete, onBack, onSkip }: BrandsStepProps) {
         </div>
 
         {/* Form card */}
-        <div className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl p-6 space-y-4">
+        <div className="rounded-[6px] border border-border bg-card p-6 space-y-4">
           {/* Column headers */}
           <div className="grid grid-cols-[1fr_120px_36px] gap-3 items-end">
             <Label className="text-xs font-medium text-muted-foreground">Brand name</Label>
@@ -156,14 +156,14 @@ export function BrandsStep({ onComplete, onBack, onSkip }: BrandsStepProps) {
                 value={brand.brand_name}
                 onChange={(e) => updateBrand(index, 'brand_name', e.target.value)}
                 disabled={isSaving}
-                className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50"
+                className="bg-background border-border text-foreground placeholder:text-muted-foreground/50"
               />
               <Select
                 value={brand.brand_type_code}
                 onValueChange={(value) => updateBrand(index, 'brand_type_code', value)}
                 disabled={isSaving}
               >
-                <SelectTrigger className="bg-muted/50 border-border text-foreground focus:ring-neon-lime/50">
+                <SelectTrigger className="bg-background border-border text-foreground">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -181,7 +181,7 @@ export function BrandsStep({ onComplete, onBack, onSkip }: BrandsStepProps) {
                 size="icon"
                 onClick={() => removeBrand(index)}
                 disabled={isSaving || brands.length <= 1}
-                className="text-muted-foreground hover:text-red-400 hover:bg-red-400/10 h-9 w-9"
+                className="text-muted-foreground hover:text-studio-stale hover:bg-secondary h-9 w-9"
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -190,7 +190,7 @@ export function BrandsStep({ onComplete, onBack, onSkip }: BrandsStepProps) {
 
           {/* Validation error */}
           {validationError && (
-            <p className="text-xs text-red-400">{validationError}</p>
+            <p className="text-xs text-studio-stale">{validationError}</p>
           )}
 
           {/* Add brand button */}
@@ -198,7 +198,7 @@ export function BrandsStep({ onComplete, onBack, onSkip }: BrandsStepProps) {
             variant="ghost"
             onClick={addBrand}
             disabled={isSaving}
-            className="w-full border border-dashed border-border text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:border-neon-lime/30"
+            className="w-full border border-dashed border-border text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:border-studio-brick/40"
           >
             <Plus className="w-4 h-4 mr-2" />
             Add Brand
@@ -237,11 +237,10 @@ export function BrandsStep({ onComplete, onBack, onSkip }: BrandsStepProps) {
             <Button
               onClick={handleContinue}
               disabled={isSaving}
-              className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full"
             >
               {isSaving ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Saving...
                 </>
               ) : (

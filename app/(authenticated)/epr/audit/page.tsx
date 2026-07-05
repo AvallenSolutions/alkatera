@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { StateChip } from '@/components/studio/state-chip';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -20,7 +21,6 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
-  History,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -135,23 +135,23 @@ function formatRelativeTime(iso: string): string {
 function actionBadge(action: string) {
   switch (action) {
     case 'create':
-      return <Badge variant="success">Create</Badge>;
+      return <StateChip tone="good">Create</StateChip>;
     case 'update':
-      return <Badge variant="info">Update</Badge>;
+      return <StateChip tone="quiet">Update</StateChip>;
     case 'delete':
-      return <Badge variant="destructive">Delete</Badge>;
+      return <StateChip tone="stale">Delete</StateChip>;
     case 'generate_csv':
-      return <Badge className="bg-purple-500/10 text-purple-500 border-transparent">Generate CSV</Badge>;
+      return <StateChip tone="hold">Generate CSV</StateChip>;
     case 'submit':
-      return <Badge className="bg-emerald-500/10 text-emerald-500 border-transparent">Submit</Badge>;
+      return <StateChip tone="good">Submit</StateChip>;
     case 'approve':
-      return <Badge className="bg-green-600/10 text-green-600 border-transparent">Approve</Badge>;
+      return <StateChip tone="good">Approve</StateChip>;
     case 'amend':
-      return <Badge variant="warning">Amend</Badge>;
+      return <StateChip tone="attention">Amend</StateChip>;
     case 'estimate_nations':
-      return <Badge className="bg-cyan-500/10 text-cyan-500 border-transparent">Estimate Nations</Badge>;
+      return <StateChip tone="hold">Estimate Nations</StateChip>;
     default:
-      return <Badge variant="outline">{action}</Badge>;
+      return <StateChip tone="quiet">{action}</StateChip>;
   }
 }
 
@@ -217,7 +217,7 @@ function AuditEntryCard({ entry }: { entry: AuditEntry }) {
 
   return (
     <Collapsible open={expanded} onOpenChange={setExpanded}>
-      <div className="border border-border rounded-lg p-4 hover:bg-muted/30 transition-colors">
+      <div className="border border-border bg-card rounded-[6px] p-4 hover:bg-muted/30 transition-colors">
         <div className="flex items-start justify-between gap-4">
           {/* Left: timestamp + user + action */}
           <div className="flex-1 min-w-0">
@@ -247,11 +247,11 @@ function AuditEntryCard({ entry }: { entry: AuditEntry }) {
                 {fieldChanges.map(([field, change]) => (
                   <div key={field} className="flex items-center gap-2 text-xs">
                     <span className="font-mono text-muted-foreground">{field}:</span>
-                    <span className="font-mono text-red-400 line-through">
+                    <span className="font-mono text-studio-stale line-through">
                       {formatFieldValue(change.old)}
                     </span>
                     <span className="text-muted-foreground">&rarr;</span>
-                    <span className="font-mono text-green-400">
+                    <span className="font-mono text-studio-good">
                       {formatFieldValue(change.new)}
                     </span>
                   </div>
@@ -413,14 +413,16 @@ export default function AuditTrailPage() {
   return (
     <div className="space-y-6 animate-fade-in-up">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <History className="h-6 w-6 text-neon-lime" />
-            Audit Trail
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <div className="min-w-0">
+          <Eyebrow tone="inherit" className="mb-3 text-studio-brick">
+            THE EVIDENCE · EPR · AUDIT
+          </Eyebrow>
+          <h1 className="font-display text-[clamp(2rem,4vw,3.25rem)] font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+            The audit trail.
           </h1>
-          <p className="text-muted-foreground mt-1">
-            Immutable audit log for all EPR compliance activity &mdash; submissions, fee calculations, PRN updates, and configuration changes
+          <p className="text-muted-foreground mt-3 text-sm">
+            Immutable audit log for all EPR compliance activity: submissions, fee calculations, PRN updates, and configuration changes
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -430,7 +432,7 @@ export default function AuditTrailPage() {
             onClick={() => fetchAuditLog(pagination.page)}
             disabled={loading}
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
           <Button variant="outline" size="sm" onClick={handleExport} disabled={entries.length === 0}>

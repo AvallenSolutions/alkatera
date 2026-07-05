@@ -7,13 +7,11 @@ import { toast } from 'sonner'
 import { useOrganization } from '@/lib/organizationContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { StateChip } from '@/components/studio/state-chip'
 import {
-  Loader2,
   Sparkles,
   Link2,
   Link2Off,
-  FileText,
   Trash2,
   ArrowLeft,
   Check,
@@ -268,9 +266,9 @@ export function EvidenceDetailPanel({ docId }: Props) {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground py-8">
-        <Loader2 className="h-4 w-4 animate-spin" /> Loading…
-      </div>
+      <p className="py-8 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+        Loading…
+      </p>
     )
   }
   if (!detail) {
@@ -294,9 +292,9 @@ export function EvidenceDetailPanel({ docId }: Props) {
             <p className="text-sm mt-3 max-w-2xl">{detail.description}</p>
           )}
           {detail.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-3">
+            <div className="flex flex-wrap gap-x-2.5 gap-y-1 mt-3">
               {detail.tags.map((t) => (
-                <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                <span key={t} className="font-mono text-[10px] uppercase tracking-wide text-studio-dim">
                   {t}
                 </span>
               ))}
@@ -317,20 +315,20 @@ export function EvidenceDetailPanel({ docId }: Props) {
             size="sm"
             onClick={handleDelete}
             disabled={deleting}
-            className="text-muted-foreground hover:text-red-500 gap-1.5"
+            className="text-muted-foreground hover:text-studio-stale gap-1.5"
           >
-            {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-            Delete
+            <Trash2 className="h-3.5 w-3.5" />
+            {deleting ? 'Deleting…' : 'Delete'}
           </Button>
         </div>
       </div>
 
       {/* Pending suggestions panel */}
-      <Card className="border-[#ccff00]/30 bg-[#ccff00]/5">
+      <Card className="rounded-[6px] border-border bg-card">
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center justify-between gap-2">
             <span className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-[#8da300] dark:text-[#ccff00]" />
+              <Sparkles className="h-4 w-4 text-studio-brick" />
               Suggested framework links
             </span>
             <div className="flex items-center gap-2">
@@ -342,13 +340,17 @@ export function EvidenceDetailPanel({ docId }: Props) {
                   disabled={bulkAccepting}
                   className="gap-1.5"
                 >
-                  {bulkAccepting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                  Accept {highCount} high-confidence
+                  <Check className="h-3.5 w-3.5" />
+                  {bulkAccepting ? 'Accepting…' : `Accept ${highCount} high-confidence`}
                 </Button>
               )}
               <Button size="sm" onClick={handleSuggest} disabled={suggesting} className="gap-1.5">
-                {suggesting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                {pendingSuggestions.length > 0 ? 'Refresh suggestions' : 'Get suggestions'}
+                <Sparkles className="h-3.5 w-3.5" />
+                {suggesting
+                  ? 'Working…'
+                  : pendingSuggestions.length > 0
+                    ? 'Refresh suggestions'
+                    : 'Get suggestions'}
               </Button>
             </div>
           </CardTitle>
@@ -385,7 +387,7 @@ export function EvidenceDetailPanel({ docId }: Props) {
       </Card>
 
       {/* Current links */}
-      <Card>
+      <Card className="rounded-[6px] border-border">
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
             <Link2 className="h-4 w-4" />
@@ -408,7 +410,7 @@ export function EvidenceDetailPanel({ docId }: Props) {
                     {group.rows.map((l) => (
                       <div
                         key={l.id}
-                        className="flex items-center justify-between gap-3 rounded-md border border-border p-2.5"
+                        className="flex items-center justify-between gap-3 rounded-[6px] border border-border p-2.5"
                       >
                         <div className="flex-1 min-w-0">
                           <p className="text-sm truncate">
@@ -422,7 +424,7 @@ export function EvidenceDetailPanel({ docId }: Props) {
                           size="sm"
                           variant="ghost"
                           onClick={() => handleUnlink(l)}
-                          className="text-muted-foreground hover:text-red-500 gap-1.5 flex-shrink-0"
+                          className="text-muted-foreground hover:text-studio-stale gap-1.5 flex-shrink-0"
                         >
                           <Link2Off className="h-3.5 w-3.5" />
                           Unlink
@@ -451,12 +453,7 @@ function SuggestionRow({
 }) {
   const [busy, setBusy] = useState(false)
   const conf = suggestion.confidence
-  const level = conf >= 0.8 ? 'high' : conf >= 0.6 ? 'good' : conf >= 0.3 ? 'review' : 'weak'
-  const badge = level === 'high'
-    ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
-    : level === 'good'
-      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20'
-      : 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30'
+  const tone: 'good' | 'attention' = conf >= 0.6 ? 'good' : 'attention'
 
   const wrapped = async (fn: () => Promise<void> | void) => {
     setBusy(true)
@@ -464,7 +461,7 @@ function SuggestionRow({
   }
 
   return (
-    <div className="rounded-md border border-border bg-background p-3 space-y-2">
+    <div className="rounded-[6px] border border-border bg-background p-3 space-y-2">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <p className="text-sm">
@@ -477,12 +474,12 @@ function SuggestionRow({
             <p className="text-xs text-muted-foreground mt-1">{suggestion.reasoning}</p>
           )}
         </div>
-        <Badge className={`text-[10px] uppercase tracking-wider font-semibold ${badge}`} variant="outline">
+        <StateChip tone={tone} className="flex-shrink-0">
           {Math.round(conf * 100)}%
-        </Badge>
+        </StateChip>
       </div>
       <div className="flex items-center justify-end gap-2">
-        <Button size="sm" variant="ghost" onClick={() => wrapped(onReject)} disabled={busy} className="text-muted-foreground hover:text-red-500 gap-1.5">
+        <Button size="sm" variant="ghost" onClick={() => wrapped(onReject)} disabled={busy} className="text-muted-foreground hover:text-studio-stale gap-1.5">
           <X className="h-3.5 w-3.5" />
           Reject
         </Button>

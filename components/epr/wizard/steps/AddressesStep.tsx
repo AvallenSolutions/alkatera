@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, ArrowRight, SkipForward, Loader2, MapPin, ChevronDown, ChevronUp } from 'lucide-react'
+import { ArrowLeft, ArrowRight, SkipForward, MapPin, ChevronDown, ChevronUp } from 'lucide-react'
 import { HMRC_ADDRESS_TYPE_NAMES } from '@/lib/epr/constants'
 import type { HMRCAddressType, HMRCAddress } from '@/lib/epr/types'
 
@@ -211,7 +211,9 @@ export function AddressesStep({ onComplete, onBack, onSkip }: AddressesStepProps
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 text-neon-lime animate-spin" />
+        <span className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
+          Loading...
+        </span>
       </div>
     )
   }
@@ -232,7 +234,7 @@ export function AddressesStep({ onComplete, onBack, onSkip }: AddressesStepProps
             value={addr.line_1}
             onChange={(e) => updateAddress(type, 'line_1', e.target.value)}
             disabled={disabled || isReadOnly}
-            className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50 text-sm"
+            className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 text-sm"
           />
         </div>
 
@@ -247,7 +249,7 @@ export function AddressesStep({ onComplete, onBack, onSkip }: AddressesStepProps
             value={addr.line_2}
             onChange={(e) => updateAddress(type, 'line_2', e.target.value)}
             disabled={disabled || isReadOnly}
-            className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50 text-sm"
+            className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 text-sm"
           />
         </div>
 
@@ -260,7 +262,7 @@ export function AddressesStep({ onComplete, onBack, onSkip }: AddressesStepProps
               value={addr.city}
               onChange={(e) => updateAddress(type, 'city', e.target.value)}
               disabled={disabled || isReadOnly}
-              className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50 text-sm"
+              className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 text-sm"
             />
           </div>
           <div className="space-y-1.5">
@@ -273,7 +275,7 @@ export function AddressesStep({ onComplete, onBack, onSkip }: AddressesStepProps
               value={addr.county}
               onChange={(e) => updateAddress(type, 'county', e.target.value)}
               disabled={disabled || isReadOnly}
-              className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50 text-sm"
+              className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 text-sm"
             />
           </div>
         </div>
@@ -287,7 +289,7 @@ export function AddressesStep({ onComplete, onBack, onSkip }: AddressesStepProps
               value={addr.postcode}
               onChange={(e) => updateAddress(type, 'postcode', e.target.value)}
               disabled={disabled || isReadOnly}
-              className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50 text-sm"
+              className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 text-sm"
             />
           </div>
           <div className="space-y-1.5">
@@ -296,7 +298,7 @@ export function AddressesStep({ onComplete, onBack, onSkip }: AddressesStepProps
               value={addr.country}
               onChange={(e) => updateAddress(type, 'country', e.target.value)}
               disabled={disabled || isReadOnly}
-              className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50 text-sm"
+              className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 text-sm"
             />
           </div>
         </div>
@@ -313,7 +315,7 @@ export function AddressesStep({ onComplete, onBack, onSkip }: AddressesStepProps
               value={addresses[type].phone}
               onChange={(e) => updateAddress(type, 'phone', e.target.value)}
               disabled={disabled}
-              className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50 text-sm"
+              className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 text-sm"
             />
           </div>
         )}
@@ -326,10 +328,10 @@ export function AddressesStep({ onComplete, onBack, onSkip }: AddressesStepProps
       <div className="w-full max-w-lg space-y-6">
         {/* Header */}
         <div className="text-center space-y-3">
-          <div className="mx-auto w-16 h-16 bg-neon-lime/20 backdrop-blur-md border border-neon-lime/30 rounded-2xl flex items-center justify-center">
-            <MapPin className="w-8 h-8 text-neon-lime" />
+          <div className="mx-auto w-16 h-16 bg-card border border-border rounded-[6px] flex items-center justify-center">
+            <MapPin className="w-8 h-8 text-studio-brick" />
           </div>
-          <h3 className="text-xl font-serif font-bold text-foreground">
+          <h3 className="text-xl font-display font-bold text-foreground">
             Organisation Addresses
           </h3>
           <p className="text-sm text-muted-foreground">
@@ -348,7 +350,7 @@ export function AddressesStep({ onComplete, onBack, onSkip }: AddressesStepProps
             return (
               <div
                 key={type}
-                className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl overflow-hidden"
+                className="bg-card border border-border rounded-[6px] overflow-hidden"
               >
                 {/* Section header */}
                 <button
@@ -362,8 +364,8 @@ export function AddressesStep({ onComplete, onBack, onSkip }: AddressesStepProps
                 >
                   <div className="flex items-center gap-3">
                     <div className={`
-                      w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold
-                      ${isRegistered ? 'bg-neon-lime/20 text-neon-lime' : 'bg-muted/50 text-muted-foreground'}
+                      w-8 h-8 rounded-[6px] flex items-center justify-center text-xs font-bold font-mono
+                      ${isRegistered ? 'bg-secondary text-studio-brick' : 'bg-secondary text-muted-foreground'}
                     `}>
                       {type === 'registered' ? 'R' : type === 'audit' ? 'A' : type === 'service_of_notice' ? 'S' : 'P'}
                     </div>
@@ -399,7 +401,7 @@ export function AddressesStep({ onComplete, onBack, onSkip }: AddressesStepProps
                             )
                           }
                           disabled={isSaving}
-                          className="w-4 h-4 rounded border-border text-neon-lime focus:ring-neon-lime/50 bg-muted/50"
+                          className="w-4 h-4 rounded border-border text-primary bg-muted/50"
                         />
                         <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
                           Same as registered address
@@ -442,13 +444,10 @@ export function AddressesStep({ onComplete, onBack, onSkip }: AddressesStepProps
             <Button
               onClick={handleContinue}
               disabled={isSaving}
-              className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-[6px]"
             >
               {isSaving ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
-                </>
+                'Saving...'
               ) : (
                 <>
                   Continue

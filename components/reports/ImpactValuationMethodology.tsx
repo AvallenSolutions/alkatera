@@ -2,7 +2,6 @@
 
 import { useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -25,6 +24,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { BookOpen, ChevronDown, Download, Minus, Plus } from 'lucide-react';
+import { StateChip } from '@/components/studio';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -56,7 +56,7 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 
 function FormulaBox({ children }: { children: React.ReactNode }) {
   return (
-    <div className="my-3 rounded-md border-l-4 border-[#ccff00] bg-[#ccff00]/5 dark:bg-[#ccff00]/10 px-4 py-3">
+    <div className="my-3 rounded-[6px] border border-border border-l-4 border-l-studio-brick bg-card px-4 py-3">
       <p className="text-sm font-mono font-semibold text-foreground">{children}</p>
     </div>
   );
@@ -111,7 +111,7 @@ function generateMethodologyStatement(
     if (capitalItems.length === 0) continue;
     text += `${capitalGroupLabels[capital]}\n`;
     for (const item of capitalItems) {
-      text += `- ${item.label}: £${Number(item.proxy_value).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} ${item.unit} — ${item.source}\n`;
+      text += `- ${item.label}: £${Number(item.proxy_value).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} ${item.unit} · ${item.source}\n`;
     }
     text += '\n';
   }
@@ -197,7 +197,7 @@ export function ImpactValuationMethodology({
               Impact Valuation translates your organisation&apos;s environmental and social
               performance into monetary values using independently-sourced proxy prices
               (shadow prices). This makes it possible to understand the true cost or
-              benefit of your operations in financial terms — the kind of language
+              benefit of your operations in financial terms: the kind of language
               boards, investors, and retail buyers understand.
             </p>
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -207,7 +207,7 @@ export function ImpactValuationMethodology({
             <p className="text-sm text-muted-foreground leading-relaxed">
               Every number traces back to either a raw input value from your
               organisation&apos;s data or a published proxy value. No AI or machine learning
-              is used in the calculations — they are purely deterministic. AI is used only
+              is used in the calculations: they are purely deterministic. AI is used only
               to generate optional narrative summaries.
             </p>
 
@@ -220,20 +220,20 @@ export function ImpactValuationMethodology({
             </p>
             <FormulaBox>Net Impact = Benefits − Costs</FormulaBox>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 my-3">
-              <div className="rounded-md border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20 p-3">
+              <div className="rounded-[6px] border border-border bg-card p-3">
                 <div className="flex items-center gap-2 mb-1">
-                  <Plus className="h-3.5 w-3.5 text-emerald-600" />
-                  <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Benefits</span>
+                  <Plus className="h-3.5 w-3.5 text-studio-good" />
+                  <span className="text-xs font-semibold text-studio-good">Benefits</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Employee training, wellbeing, volunteering, charitable giving, local
                   supply chain spend, governance quality
                 </p>
               </div>
-              <div className="rounded-md border border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20 p-3">
+              <div className="rounded-[6px] border border-border bg-card p-3">
                 <div className="flex items-center gap-2 mb-1">
-                  <Minus className="h-3.5 w-3.5 text-red-600" />
-                  <span className="text-xs font-semibold text-red-700 dark:text-red-400">Costs</span>
+                  <Minus className="h-3.5 w-3.5 text-studio-stale" />
+                  <span className="text-xs font-semibold text-studio-stale">Costs</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Carbon emissions, water consumption, land use, waste to landfill,
@@ -244,7 +244,7 @@ export function ImpactValuationMethodology({
             <p className="text-sm text-muted-foreground leading-relaxed">
               A positive Net Impact means your organisation creates more social value than
               environmental cost. A negative Net Impact means environmental costs outweigh
-              the social benefits measured so far — this is common when data coverage is
+              the social benefits measured so far. This is common when data coverage is
               still building.
             </p>
 
@@ -302,8 +302,8 @@ export function ImpactValuationMethodology({
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     Raw water volume alone is misleading. The <strong>AWARE methodology</strong> (Available
                     Water Remaining), developed by the UNEP-SETAC Life Cycle Initiative and compliant
-                    with ISO 14046, answers: &ldquo;what is the potential to deprive another user —
-                    human or ecosystem — when consuming water in this area?&rdquo;
+                    with ISO 14046, answers: &ldquo;what is the potential to deprive another user
+                    (human or ecosystem) when consuming water in this area?&rdquo;
                   </p>
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     AWARE factors range from 0.1 (very water-abundant) to 100 (extremely
@@ -330,7 +330,7 @@ export function ImpactValuationMethodology({
                   />
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     Land use impact is captured at the material/ingredient level within each
-                    product&apos;s LCA (m²a — square metres per year). This covers both ingredients
+                    product&apos;s LCA (m²a, square metres per year). This covers both ingredients
                     and packaging, accounting for the full supply chain. Per-unit land footprint
                     is multiplied by production volume and converted to hectares (÷ 10,000).
                   </p>
@@ -354,7 +354,7 @@ export function ImpactValuationMethodology({
                     Based directly on the UK Landfill Tax, introduced in 1996 to incentivise
                     diversion from landfill. The standard rate has risen from £7/tonne in 1996
                     to £103.70 in 2024-25, reaching £130.75 from April 2026. Only waste with
-                    treatment method &lsquo;landfill&rsquo; is included — recycled, composted, or
+                    treatment method &lsquo;landfill&rsquo; is included. Recycled, composted, or
                     energy-recovered waste is excluded.
                   </p>
                   <p className="text-xs text-muted-foreground leading-relaxed italic">
@@ -370,7 +370,7 @@ export function ImpactValuationMethodology({
                 </AccordionTrigger>
                 <AccordionContent className="space-y-4">
                   <h4 className="text-xs font-semibold text-foreground uppercase tracking-wide mt-2">
-                    Living Wage Gap <Badge variant="outline" className="ml-2 text-[10px] text-red-600 border-red-200">Cost</Badge>
+                    Living Wage Gap <StateChip tone="stale" className="ml-2">Cost</StateChip>
                   </h4>
                   <MetricDetailTable
                     rows={[
@@ -381,13 +381,13 @@ export function ImpactValuationMethodology({
                     ]}
                   />
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    This metric represents a cost — the shortfall between what your organisation
+                    This metric represents a cost: the shortfall between what your organisation
                     pays and the real living wage. A larger gap means a greater negative social
                     impact. Closing the gap directly reduces this cost.
                   </p>
 
                   <h4 className="text-xs font-semibold text-foreground uppercase tracking-wide mt-4">
-                    Employee Training <Badge variant="outline" className="ml-2 text-[10px] text-emerald-600 border-emerald-200">Benefit</Badge>
+                    Employee Training <StateChip tone="good" className="ml-2">Benefit</StateChip>
                   </h4>
                   <MetricDetailTable
                     rows={[
@@ -398,7 +398,7 @@ export function ImpactValuationMethodology({
                   />
 
                   <h4 className="text-xs font-semibold text-foreground uppercase tracking-wide mt-4">
-                    Employee Wellbeing <Badge variant="outline" className="ml-2 text-[10px] text-emerald-600 border-emerald-200">Benefit</Badge>
+                    Employee Wellbeing <StateChip tone="good" className="ml-2">Benefit</StateChip>
                   </h4>
                   <MetricDetailTable
                     rows={[
@@ -492,21 +492,21 @@ export function ImpactValuationMethodology({
                   </p>
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 text-[10px]">High</Badge>
+                      <StateChip tone="good">High</StateChip>
                       <span className="text-xs text-muted-foreground">≥80% of metrics (9+ of 11)</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 text-[10px]">Medium</Badge>
+                      <StateChip tone="attention">Medium</StateChip>
                       <span className="text-xs text-muted-foreground">50–79% (5–8 of 11)</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 text-[10px]">Low</Badge>
+                      <StateChip>Low</StateChip>
                       <span className="text-xs text-muted-foreground">&lt;50% (fewer than 5 of 11)</span>
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed mt-2">
                     <strong>Zero vs &ldquo;No data&rdquo;:</strong> If a metric has data entered and the
-                    value is zero, it shows as £0 (e.g. no waste to landfill — a positive outcome).
+                    value is zero, it shows as £0 (e.g. no waste to landfill, a positive outcome).
                     If no data has been entered, it shows as &ldquo;No data&rdquo; and is excluded
                     from the calculation. This prevents organisations appearing to have zero impact
                     simply because data hasn&apos;t been entered yet.
@@ -523,7 +523,7 @@ export function ImpactValuationMethodology({
                   <div className="space-y-2">
                     {[
                       { title: 'Transparency', desc: 'Every proxy value is cited with its authoritative source and version number.' },
-                      { title: 'Determinism', desc: 'No AI or machine learning in the calculations — pure multiplication of raw data × proxy values.' },
+                      { title: 'Determinism', desc: 'No AI or machine learning in the calculations: pure multiplication of raw data × proxy values.' },
                       { title: 'Auditability', desc: 'Every calculation stores a complete input snapshot for independent verification.' },
                       { title: 'Conservatism', desc: 'Where sources provide a range, the central (not high) estimate is used.' },
                       { title: 'Geographic sensitivity', desc: 'Water consumption is adjusted for local water stress using AWARE factors.' },
@@ -547,11 +547,11 @@ export function ImpactValuationMethodology({
                   {[
                     {
                       q: 'Why is my net impact negative?',
-                      a: 'A negative Net Impact means your environmental costs (Natural Capital) currently outweigh the social benefits measured. This is common when data coverage is still building — as you add Human, Social, and Governance data, the benefits side will grow. It can also genuinely reflect that environmental impact reduction should be a priority.',
+                      a: 'A negative Net Impact means your environmental costs (Natural Capital) currently outweigh the social benefits measured. This is common when data coverage is still building: as you add Human, Social, and Governance data, the benefits side will grow. It can also genuinely reflect that environmental impact reduction should be a priority.',
                     },
                     {
                       q: 'Why does carbon dominate my Natural Capital cost?',
-                      a: 'The shadow carbon price (£259/tCO₂e) reflects the full societal cost of emissions as estimated by UK Government economists — including climate adaptation, health impacts, and economic disruption. Even modest emission volumes produce significant monetary values. This is intentional.',
+                      a: 'The shadow carbon price (£259/tCO₂e) reflects the full societal cost of emissions as estimated by UK Government economists, including climate adaptation, health impacts, and economic disruption. Even modest emission volumes produce significant monetary values. This is intentional.',
                     },
                     {
                       q: 'What is a shadow price?',

@@ -2,8 +2,8 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import { StateChip } from '@/components/studio/state-chip';
+import type { WorkingTone } from '@/components/studio/theme';
 import {
   Award,
   ChevronRight,
@@ -45,39 +45,35 @@ interface FrameworkCardProps {
   onStart?: (frameworkId: string) => void;
 }
 
-const statusConfig = {
+const statusConfig: Record<
+  Certification['status'],
+  { label: string; tone: WorkingTone; icon: typeof Clock }
+> = {
   not_started: {
     label: 'Not Started',
-    color: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+    tone: 'quiet',
     icon: Clock,
   },
   in_progress: {
     label: 'In Progress',
-    color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+    tone: 'attention',
     icon: Target,
   },
   ready: {
     label: 'Ready',
-    color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+    tone: 'good',
     icon: CheckCircle2,
   },
   certified: {
     label: 'Certified',
-    color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+    tone: 'good',
     icon: Award,
   },
   expired: {
     label: 'Expired',
-    color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+    tone: 'stale',
     icon: AlertCircle,
   },
-};
-
-const categoryColors: Record<string, string> = {
-  'B Corp': 'bg-emerald-500',
-  'Climate': 'bg-blue-500',
-  'ESG': 'bg-purple-500',
-  'Reporting': 'bg-amber-500',
 };
 
 // Maps framework codes to their required feature codes
@@ -101,43 +97,51 @@ export function FrameworkCard({ framework, certification, onStart }: FrameworkCa
   const isPassingScore = score >= framework.passing_score;
 
   return (
-    <Card className={`hover:shadow-md transition-shadow ${isLocked ? 'opacity-75' : ''}`}>
+    <Card
+      className={`rounded-[6px] border-border bg-card transition-colors duration-200 ease-studio hover:border-foreground/30 ${isLocked ? 'opacity-75' : ''}`}
+    >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2">
-            <Badge className={categoryColors[framework.category] || 'bg-slate-500'}>
+          <div className="flex items-baseline gap-3">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-brick">
               {framework.category}
-            </Badge>
-            <Badge variant="outline">{framework.version}</Badge>
+            </span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
+              {framework.version}
+            </span>
           </div>
           {isLocked ? (
-            <Badge variant="outline" className="border-amber-500 text-amber-600">
-              <Lock className="h-3 w-3 mr-1" />
+            <StateChip tone="attention" className="inline-flex items-center gap-1">
+              <Lock className="h-3 w-3" />
               Canopy
-            </Badge>
+            </StateChip>
           ) : (
-            <Badge className={config.color}>
-              <StatusIcon className="h-3 w-3 mr-1" />
+            <StateChip tone={config.tone} className="inline-flex items-center gap-1">
+              <StatusIcon className="h-3 w-3" />
               {config.label}
-            </Badge>
+            </StateChip>
           )}
         </div>
-        <CardTitle className="text-lg mt-2">{framework.name}</CardTitle>
+        <CardTitle className="font-display text-lg mt-2">{framework.name}</CardTitle>
         <CardDescription className="line-clamp-2">{framework.description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Score Progress */}
         <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Current Score</span>
-            <span className={`font-medium ${isPassingScore ? 'text-emerald-600' : ''}`}>
+          <div className="flex items-baseline justify-between">
+            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
+              Current Score
+            </span>
+            <span className={`text-sm font-medium tabular-nums ${isPassingScore ? 'text-studio-good' : ''}`}>
               {score}% / {framework.passing_score}% required
             </span>
           </div>
-          <Progress
-            value={score}
-            className={`h-2 ${isPassingScore ? '[&>div]:bg-emerald-500' : ''}`}
-          />
+          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+            <div
+              className={`h-full rounded-full ${isPassingScore ? 'bg-studio-good' : 'bg-studio-brick'}`}
+              style={{ width: `${Math.max(0, Math.min(100, score))}%` }}
+            />
+          </div>
         </div>
 
         {/* Dates */}
@@ -151,7 +155,7 @@ export function FrameworkCard({ framework, certification, onStart }: FrameworkCa
             )}
             {certification.certification_date && (
               <div className="flex items-center gap-1">
-                <Award className="h-4 w-4 text-emerald-500" />
+                <Award className="h-4 w-4 text-studio-good" />
                 <span>Certified: {new Date(certification.certification_date).toLocaleDateString()}</span>
               </div>
             )}
@@ -162,7 +166,7 @@ export function FrameworkCard({ framework, certification, onStart }: FrameworkCa
         <div className="flex items-center gap-2 pt-2">
           {isLocked ? (
             <Link href="/dashboard/settings" className="w-full">
-              <Button variant="outline" className="w-full text-amber-600 border-amber-300 hover:bg-amber-50">
+              <Button variant="outline" className="w-full">
                 <Lock className="h-4 w-4 mr-2" />
                 Upgrade to Canopy
               </Button>

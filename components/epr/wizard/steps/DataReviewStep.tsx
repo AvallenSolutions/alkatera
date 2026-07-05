@@ -2,7 +2,6 @@
 
 import { useEPRDataCompleteness } from '@/hooks/data/useEPRDataCompleteness'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -13,7 +12,6 @@ import {
   AlertTriangle,
   ExternalLink,
   Package,
-  Loader2,
 } from 'lucide-react'
 import type { EPRDataGap } from '@/lib/epr/types'
 
@@ -31,25 +29,25 @@ function getCompletenessColor(pct: number): {
 } {
   if (pct >= 80) {
     return {
-      text: 'text-emerald-400',
-      indicator: 'bg-emerald-400',
+      text: 'text-studio-good',
+      indicator: 'bg-studio-good',
       indicatorColor: 'emerald',
-      bg: 'bg-emerald-400/10',
+      bg: 'bg-secondary',
     }
   }
   if (pct >= 50) {
     return {
-      text: 'text-amber-400',
-      indicator: 'bg-amber-400',
+      text: 'text-studio-attention',
+      indicator: 'bg-studio-attention',
       indicatorColor: 'default',
-      bg: 'bg-amber-400/10',
+      bg: 'bg-secondary',
     }
   }
   return {
-    text: 'text-red-400',
-    indicator: 'bg-red-400',
+    text: 'text-studio-stale',
+    indicator: 'bg-studio-stale',
     indicatorColor: 'default',
-    bg: 'bg-red-400/10',
+    bg: 'bg-secondary',
   }
 }
 
@@ -59,7 +57,7 @@ function GapRow({ gap }: { gap: EPRDataGap }) {
       href={`/products?highlight=${gap.product_id}`}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-start justify-between gap-3 p-3 rounded-xl bg-muted/30 hover:bg-muted/50 border border-border/50 hover:border-border transition-colors group"
+      className="flex items-start justify-between gap-3 p-3 rounded-[6px] border border-border bg-card hover:bg-secondary transition-colors group"
     >
       <div className="min-w-0 flex-1 space-y-1.5">
         <div className="flex items-center gap-2">
@@ -71,13 +69,9 @@ function GapRow({ gap }: { gap: EPRDataGap }) {
         <p className="text-xs text-muted-foreground truncate">{gap.material_name}</p>
         <div className="flex flex-wrap gap-1.5">
           {gap.missing_fields.map((field) => (
-            <Badge
-              key={field}
-              variant="outline"
-              className="text-[10px] border-amber-400/30 text-amber-400 bg-amber-400/10 px-1.5 py-0"
-            >
+            <span key={field} className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-attention">
               {field}
-            </Badge>
+            </span>
           ))}
         </div>
       </div>
@@ -90,24 +84,24 @@ function LoadingSkeleton() {
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
       <div className="w-full max-w-lg space-y-6">
         <div className="text-center space-y-3">
-          <Skeleton className="mx-auto w-16 h-16 rounded-2xl bg-muted" />
+          <Skeleton className="mx-auto w-16 h-16 rounded-[6px] bg-muted" />
           <Skeleton className="mx-auto h-6 w-48 bg-muted rounded-lg" />
           <Skeleton className="mx-auto h-4 w-64 bg-muted rounded-lg" />
         </div>
-        <div className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl p-6 space-y-4">
+        <div className="rounded-[6px] border border-border bg-card p-6 space-y-4">
           <div className="flex justify-center">
             <Skeleton className="h-16 w-20 bg-muted rounded-lg" />
           </div>
           <Skeleton className="h-3 w-full bg-muted rounded-full" />
           <div className="grid grid-cols-3 gap-3">
-            <Skeleton className="h-16 bg-muted rounded-xl" />
-            <Skeleton className="h-16 bg-muted rounded-xl" />
-            <Skeleton className="h-16 bg-muted rounded-xl" />
+            <Skeleton className="h-16 bg-muted rounded-[6px]" />
+            <Skeleton className="h-16 bg-muted rounded-[6px]" />
+            <Skeleton className="h-16 bg-muted rounded-[6px]" />
           </div>
         </div>
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-20 w-full bg-muted rounded-xl" />
+            <Skeleton key={i} className="h-20 w-full bg-muted rounded-[6px]" />
           ))}
         </div>
       </div>
@@ -136,10 +130,10 @@ export function DataReviewStep({ onComplete, onBack }: DataReviewStepProps) {
       <div className="w-full max-w-lg space-y-6">
         {/* Header */}
         <div className="text-center space-y-3">
-          <div className="mx-auto w-16 h-16 bg-neon-lime/20 backdrop-blur-md border border-neon-lime/30 rounded-2xl flex items-center justify-center">
-            <Package className="w-8 h-8 text-neon-lime" />
+          <div className="mx-auto w-16 h-16 rounded-[6px] border border-border bg-card flex items-center justify-center">
+            <Package className="w-8 h-8 text-studio-brick" />
           </div>
-          <h3 className="text-xl font-serif font-bold text-foreground">
+          <h3 className="text-xl font-display font-bold text-foreground">
             Packaging Data Review
           </h3>
           <p className="text-sm text-muted-foreground">
@@ -148,7 +142,7 @@ export function DataReviewStep({ onComplete, onBack }: DataReviewStepProps) {
         </div>
 
         {/* Completeness Card */}
-        <div className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl p-6 space-y-5">
+        <div className="rounded-[6px] border border-border bg-card p-6 space-y-5">
           {/* Large Percentage */}
           <div className="text-center">
             <span className={`text-5xl font-bold tabular-nums ${colors.text}`}>
@@ -166,16 +160,16 @@ export function DataReviewStep({ onComplete, onBack }: DataReviewStepProps) {
 
           {/* Stats Strip */}
           <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="bg-muted/30 border border-border/50 rounded-xl py-3 px-2">
+            <div className="rounded-[6px] border border-border bg-card py-3 px-2">
               <p className="text-lg font-semibold text-foreground tabular-nums">{total}</p>
               <p className="text-[11px] text-muted-foreground">Total items</p>
             </div>
-            <div className="bg-emerald-400/5 border border-emerald-400/10 rounded-xl py-3 px-2">
-              <p className="text-lg font-semibold text-emerald-400 tabular-nums">{complete}</p>
+            <div className="rounded-[6px] border border-border bg-card py-3 px-2">
+              <p className="text-lg font-semibold text-studio-good tabular-nums">{complete}</p>
               <p className="text-[11px] text-muted-foreground">Complete</p>
             </div>
-            <div className="bg-amber-400/5 border border-amber-400/10 rounded-xl py-3 px-2">
-              <p className="text-lg font-semibold text-amber-400 tabular-nums">{incomplete}</p>
+            <div className="rounded-[6px] border border-border bg-card py-3 px-2">
+              <p className="text-lg font-semibold text-studio-attention tabular-nums">{incomplete}</p>
               <p className="text-[11px] text-muted-foreground">Incomplete</p>
             </div>
           </div>
@@ -183,10 +177,10 @@ export function DataReviewStep({ onComplete, onBack }: DataReviewStepProps) {
 
         {/* Success State */}
         {isAllComplete && (
-          <div className="bg-emerald-400/10 border border-emerald-400/20 rounded-2xl p-5 flex items-start gap-3">
-            <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+          <div className="rounded-[6px] border border-border bg-card p-5 flex items-start gap-3">
+            <CheckCircle2 className="w-5 h-5 text-studio-good flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-medium text-emerald-400">
+              <p className="text-sm font-medium text-studio-good">
                 All packaging data is complete!
               </p>
               <p className="text-xs text-muted-foreground mt-1">
@@ -201,7 +195,7 @@ export function DataReviewStep({ onComplete, onBack }: DataReviewStepProps) {
           <div className="space-y-3">
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-400" />
+                <AlertTriangle className="w-4 h-4 text-studio-attention" />
                 <h4 className="text-sm font-medium text-muted-foreground">
                   Items needing attention
                 </h4>
@@ -236,16 +230,12 @@ export function DataReviewStep({ onComplete, onBack }: DataReviewStepProps) {
               disabled={isRefreshing}
               className="text-muted-foreground hover:text-foreground hover:bg-muted text-sm"
             >
-              {isRefreshing ? (
-                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-              ) : (
-                <RefreshCw className="w-4 h-4 mr-1" />
-              )}
+              <RefreshCw className="w-4 h-4 mr-1" />
               Refresh
             </Button>
             <Button
               onClick={onComplete}
-              className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full"
             >
               Continue
               <ArrowRight className="w-4 h-4 ml-2" />

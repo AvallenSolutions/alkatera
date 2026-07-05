@@ -8,11 +8,9 @@ import type { ObligationResult } from '@/lib/epr/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import {
   ArrowLeft,
   ArrowRight,
-  Loader2,
   Scale,
   CalendarRange,
   PoundSterling,
@@ -24,10 +22,10 @@ interface ObligationStepProps {
   onSkip?: () => void
 }
 
-const OBLIGATION_BADGE_STYLES: Record<string, string> = {
-  large: 'bg-red-500/20 text-red-400 border-red-500/30',
-  small: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-  below_threshold: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+const OBLIGATION_TONES: Record<string, string> = {
+  large: 'text-studio-stale',
+  small: 'text-studio-attention',
+  below_threshold: 'text-studio-good',
 }
 
 const OBLIGATION_LABELS: Record<string, string> = {
@@ -112,7 +110,7 @@ export function ObligationStep({ onComplete, onBack }: ObligationStepProps) {
   if (settingsLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 text-neon-lime animate-spin" />
+        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">Loading</span>
       </div>
     )
   }
@@ -122,10 +120,10 @@ export function ObligationStep({ onComplete, onBack }: ObligationStepProps) {
       <div className="w-full max-w-md space-y-6">
         {/* Header */}
         <div className="text-center space-y-3">
-          <div className="mx-auto w-16 h-16 bg-neon-lime/20 backdrop-blur-md border border-neon-lime/30 rounded-2xl flex items-center justify-center">
-            <Scale className="w-8 h-8 text-neon-lime" />
+          <div className="mx-auto w-16 h-16 rounded-[6px] border border-border bg-card flex items-center justify-center">
+            <Scale className="w-8 h-8 text-studio-brick" />
           </div>
-          <h3 className="text-xl font-serif font-bold text-foreground">
+          <h3 className="text-xl font-display font-bold text-foreground">
             Your EPR Obligation
           </h3>
           <p className="text-sm text-muted-foreground">
@@ -134,7 +132,7 @@ export function ObligationStep({ onComplete, onBack }: ObligationStepProps) {
         </div>
 
         {/* Turnover input card */}
-        <div className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl p-6 space-y-5">
+        <div className="rounded-[6px] border border-border bg-card p-6 space-y-5">
           <div className="space-y-2">
             <Label htmlFor="epr-turnover" className="text-sm font-medium text-muted-foreground">
               Annual Turnover (GBP)
@@ -152,7 +150,7 @@ export function ObligationStep({ onComplete, onBack }: ObligationStepProps) {
                 value={turnover}
                 onChange={(e) => setTurnover(e.target.value)}
                 disabled={isSaving}
-                className="pl-9 bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50"
+                className="pl-9 bg-background border-border text-foreground placeholder:text-muted-foreground/50"
               />
             </div>
             <p className="text-xs text-muted-foreground/70">
@@ -167,11 +165,11 @@ export function ObligationStep({ onComplete, onBack }: ObligationStepProps) {
                 Estimated Packaging Tonnage
               </Label>
               <div className="flex items-center gap-3">
-                <div className="bg-muted/50 border border-border rounded-xl px-4 py-2.5 text-foreground text-sm font-mono flex-1">
+                <div className="bg-muted/50 border border-border rounded-[6px] px-4 py-2.5 text-foreground text-sm font-mono flex-1">
                   {obligation.total_packaging_tonnes.toFixed(2)} tonnes
                 </div>
                 {fetchingObligation && (
-                  <Loader2 className="w-4 h-4 text-muted-foreground animate-spin flex-shrink-0" />
+                  <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim flex-shrink-0">Updating</span>
                 )}
               </div>
               <p className="text-xs text-muted-foreground/70">
@@ -183,15 +181,12 @@ export function ObligationStep({ onComplete, onBack }: ObligationStepProps) {
 
         {/* Obligation result */}
         {obligation && (
-          <div className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl p-6 space-y-4 animate-in fade-in duration-300">
+          <div className="rounded-[6px] border border-border bg-card p-6 space-y-4 animate-in fade-in duration-300">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-muted-foreground">Obligation Size</span>
-              <Badge
-                variant="outline"
-                className={OBLIGATION_BADGE_STYLES[obligation.size] || 'bg-muted text-muted-foreground'}
-              >
+              <span className={`font-mono text-[10px] font-bold uppercase tracking-[0.18em] ${OBLIGATION_TONES[obligation.size] || 'text-studio-dim'}`}>
                 {OBLIGATION_LABELS[obligation.size] || obligation.size}
-              </Badge>
+              </span>
             </div>
 
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -229,11 +224,10 @@ export function ObligationStep({ onComplete, onBack }: ObligationStepProps) {
           <Button
             onClick={handleContinue}
             disabled={isSaving || !turnover}
-            className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full"
           >
             {isSaving ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Saving...
               </>
             ) : (

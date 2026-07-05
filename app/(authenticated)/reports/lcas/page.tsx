@@ -6,11 +6,13 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Award, Eye, Download, Search, Filter, Package, Calendar, Shield, Loader2 } from 'lucide-react';
+import { Award, Eye, Download, Search, Filter, Package, Calendar, Shield } from 'lucide-react';
 import Link from 'next/link';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { useOrganization } from '@/lib/organizationContext';
 import { VerificationCard } from '@/components/partners/VerificationCard';
+import { Eyebrow, StateChip } from '@/components/studio';
+import type { WorkingTone } from '@/components/studio';
 
 interface LCAReport {
   id: string;
@@ -178,29 +180,32 @@ export default function LcasPage() {
     report.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const getStatusBadge = (status: string) => {
-    const config = {
-      completed: { className: 'bg-green-600', label: 'Completed' },
-      published: { className: 'bg-green-600', label: 'Published' },
-      verified: { className: 'bg-blue-600', label: 'Verified' },
-      draft: { className: 'bg-gray-500', label: 'Draft' },
-      in_progress: { className: 'bg-amber-600', label: 'In Progress' },
+  const getStatusBadge = (status: string): { tone: WorkingTone; label: string } => {
+    const config: Record<string, { tone: WorkingTone; label: string }> = {
+      completed: { tone: 'good', label: 'Completed' },
+      published: { tone: 'good', label: 'Published' },
+      verified: { tone: 'good', label: 'Verified' },
+      draft: { tone: 'quiet', label: 'Draft' },
+      in_progress: { tone: 'attention', label: 'In Progress' },
     };
-    return config[status as keyof typeof config] || config.draft;
+    return config[status] || config.draft;
   };
 
-  const getDQIBadge = (score: number) => {
-    if (score >= 80) return { className: 'bg-green-600', label: 'High Confidence' };
-    if (score >= 50) return { className: 'bg-amber-600', label: 'Medium Confidence' };
-    return { className: 'bg-red-600', label: 'Modelled' };
+  const getDQIBadge = (score: number): { tone: WorkingTone; label: string } => {
+    if (score >= 80) return { tone: 'good', label: 'High Confidence' };
+    if (score >= 50) return { tone: 'attention', label: 'Medium Confidence' };
+    return { tone: 'stale', label: 'Modelled' };
   };
 
   return (
     <div className="container mx-auto py-8 space-y-8">
       <div className="flex items-start justify-between">
         <div className="space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight">Life Cycle Assessments</h1>
-          <p className="text-lg text-muted-foreground">
+          <Eyebrow>THE EVIDENCE · LIFE CYCLE ASSESSMENTS</Eyebrow>
+          <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+            The life cycle assessments.
+          </h1>
+          <p className="text-sm text-muted-foreground">
             ISO 14044 compliant Life Cycle Assessment reports for your products
           </p>
         </div>
@@ -237,7 +242,9 @@ export default function LcasPage() {
       {loading ? (
         <Card>
           <CardContent className="p-12 flex items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+              Loading
+            </span>
           </CardContent>
         </Card>
       ) : (
@@ -314,15 +321,13 @@ export default function LcasPage() {
             const dqiBadge = getDQIBadge(report.dqi_score);
 
             return (
-              <Card key={report.id} className="hover:shadow-lg transition-shadow">
+              <Card key={report.id}>
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="space-y-2 flex-1">
                       <div className="flex items-center gap-3">
                         <CardTitle className="text-lg">{report.product_name}</CardTitle>
-                        <Badge variant="default" className={statusBadge.className}>
-                          {statusBadge.label}
-                        </Badge>
+                        <StateChip tone={statusBadge.tone}>{statusBadge.label}</StateChip>
                         <Badge variant="outline">v{report.version}</Badge>
                       </div>
                       <CardDescription>{report.title}</CardDescription>
@@ -348,9 +353,7 @@ export default function LcasPage() {
                       <div className="flex items-center gap-2">
                         <Shield className="h-4 w-4 text-muted-foreground" />
                         <span className="text-sm font-semibold">{report.dqi_score}/100</span>
-                        <Badge variant="default" className={`${dqiBadge.className} text-xs`}>
-                          {dqiBadge.label}
-                        </Badge>
+                        <StateChip tone={dqiBadge.tone}>{dqiBadge.label}</StateChip>
                       </div>
                     </div>
                   </div>
@@ -386,12 +389,8 @@ export default function LcasPage() {
                             disabled={loadingPdf === report.id}
                             onClick={() => handleViewReport(report.id)}
                           >
-                            {loadingPdf === report.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Eye className="h-4 w-4" />
-                            )}
-                            View Report
+                            <Eye className="h-4 w-4" />
+                            {loadingPdf === report.id ? 'Preparing...' : 'View Report'}
                           </Button>
                           <Button
                             variant="outline"
@@ -400,12 +399,8 @@ export default function LcasPage() {
                             disabled={downloadingPdf === report.id}
                             onClick={() => handleDownloadReport(report.id, report.product_name)}
                           >
-                            {downloadingPdf === report.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Download className="h-4 w-4" />
-                            )}
-                            Download
+                            <Download className="h-4 w-4" />
+                            {downloadingPdf === report.id ? 'Preparing...' : 'Download'}
                           </Button>
                         </>
                       ) : (
@@ -429,20 +424,20 @@ export default function LcasPage() {
       <VerificationCard variant="lca" />
 
       {/* Info Card */}
-      <Card className="bg-blue-50 border-blue-200">
+      <Card className="rounded-[6px] border border-border bg-card">
         <CardContent className="p-6">
           <div className="flex items-start gap-4">
-            <div className="p-2 rounded-lg bg-blue-100">
-              <Award className="h-6 w-6 text-blue-600" />
+            <div className="p-2 rounded-[6px] bg-secondary">
+              <Award className="h-6 w-6 text-studio-dim" />
             </div>
             <div className="space-y-2">
-              <h3 className="font-semibold text-blue-900">About LCA Reports</h3>
-              <p className="text-sm text-blue-800">
+              <h3 className="font-semibold text-foreground">About LCA Reports</h3>
+              <p className="text-sm text-muted-foreground">
                 Life Cycle Assessments (LCAs) provide a comprehensive environmental profile of your products following ISO 14044:2006 standards.
                 Each report includes cradle-to-gate impacts across multiple environmental categories including climate change, water use,
                 land use, and resource depletion.
               </p>
-              <p className="text-sm text-blue-800">
+              <p className="text-sm text-muted-foreground">
                 Reports with a DQI score above 80 are suitable for external disclosure under CSRD and GHG Protocol Product Standard.
               </p>
             </div>
