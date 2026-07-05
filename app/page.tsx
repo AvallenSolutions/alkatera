@@ -14,9 +14,9 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 export default async function Home() {
-  // Authenticated users go straight to Rosa; unauthenticated visitors see
-  // the marketing site. The check is server-side so first paint already
-  // reflects the user's status.
+  // Authenticated users go straight to the desk (the hall of the house);
+  // unauthenticated visitors see the marketing site. The check is
+  // server-side so first paint already reflects the user's status.
   let user = null;
   try {
     const supabase = getSupabaseServerClient();
@@ -27,9 +27,9 @@ export default async function Home() {
   }
 
   // redirect() throws NEXT_REDIRECT, so it must live OUTSIDE the try/catch above
-  // or the bare catch swallows it and authenticated users never reach Rosa.
+  // or the bare catch swallows it and authenticated users never reach the desk.
   if (user) {
-    redirect('/rosa/');
+    redirect('/desk/');
   }
 
   return <HomePageClient />;

@@ -20,7 +20,13 @@ export function RoomLayout({ room: key, action, children }: RoomLayoutProps) {
     <StudioShell
       room={room}
       mark={room.mark}
-      band={<RoomBand room={room} brand={<PortalBandBrand roomName={room.name} />} />}
+      band={
+        <RoomBand
+          room={room}
+          deskHref="/distributor/dashboard"
+          brand={<PortalBandBrand roomName={room.name} />}
+        />
+      }
       inkBand={<InkBand action={action} tabs={room.tabs} />}
     >
       <UpgradeBanner />

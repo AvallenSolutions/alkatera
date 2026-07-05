@@ -1,15 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { useOrganization } from '@/lib/organizationContext'
 import { useSubscription } from '@/hooks/useSubscription'
-import { Sidebar } from './Sidebar'
-import { Header } from './Header'
+import { RoomBand } from '@/components/studio/room-band'
+import { AskRosaBand } from '@/components/studio/ask-rosa-band'
+import { BandControls } from '@/components/studio/band-controls'
+import { roomForPath } from '@/components/studio/platform-rooms'
 import { SupplierLayout } from './SupplierLayout'
 import { Skeleton } from '@/components/ui/skeleton'
-import { cn } from '@/lib/utils'
 import { PaymentWarningBanner } from '@/components/subscription/PaymentWarningBanner'
 import { TrialBanner } from '@/components/subscription/TrialBanner'
 import { ReadOnlyPaywallBanner } from '@/components/subscription/ReadOnlyPaywallBanner'
@@ -46,49 +47,41 @@ export function AppLayout({ children, requireOrganization = true }: AppLayoutPro
   )
 }
 
-// Full app-shell skeleton shown while auth/org resolve. A skeleton that mirrors
-// the real layout (sidebar + header + content) reads as "the app is loading"
-// far better than a blank full-screen spinner, which is the single biggest
-// perceived-latency complaint on cold loads (Rosa is the landing page).
+// Full app-shell skeleton shown while auth/org resolve. Mirrors the studio
+// shell (room band + paper + ink band) so cold loads read as "the app is
+// loading" rather than a blank spinner.
 function AppShellSkeleton() {
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      {/* Sidebar (hidden on mobile, where it's off-canvas) */}
-      <aside className="hidden lg:flex w-64 flex-col gap-2 border-r border-border bg-sidebar px-3 py-4">
-        <div className="mb-6 px-2">
-          <Skeleton className="h-10 w-32" />
-          <Skeleton className="mt-2 h-3 w-28" />
-        </div>
-        <div className="space-y-1.5">
-          {Array.from({ length: 11 }).map((_, i) => (
-            <Skeleton key={i} className="h-9 w-full rounded-md" />
+    <div className="flex h-screen flex-col overflow-hidden bg-background">
+      {/* The room band */}
+      <div className="flex h-[52px] shrink-0 items-center gap-6 bg-studio-ink px-4 md:px-6">
+        <Skeleton className="h-4 w-4 rounded-sm bg-studio-cream/20" />
+        <Skeleton className="h-4 w-28 bg-studio-cream/20" />
+        <div className="flex flex-1 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-3 w-16 bg-studio-cream/15" />
           ))}
         </div>
-      </aside>
+        <Skeleton className="h-6 w-6 rounded-full bg-studio-cream/20" />
+      </div>
 
-      {/* Main column */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex h-16 shrink-0 items-center justify-between border-b border-border px-4 sm:px-6 lg:px-8">
-          <Skeleton className="h-8 w-44" />
-          <div className="flex items-center gap-3">
-            <Skeleton className="h-9 w-9 rounded-full" />
-            <Skeleton className="h-9 w-9 rounded-full" />
+      {/* The paper */}
+      <div className="flex-1 overflow-y-auto bg-background">
+        <div className="container mx-auto space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+          <Skeleton className="h-9 w-64" />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-32 w-full rounded-[6px]" />
+            ))}
           </div>
+          <Skeleton className="h-64 w-full rounded-[6px]" />
         </div>
+      </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto bg-background">
-          <div className="container mx-auto space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-            <Skeleton className="h-9 w-64" />
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} className="h-32 w-full rounded-xl" />
-              ))}
-            </div>
-            <Skeleton className="h-64 w-full rounded-xl" />
-          </div>
-        </div>
+      {/* The ink band */}
+      <div className="flex h-12 shrink-0 items-center gap-4 bg-studio-ink px-4 md:px-6">
+        <Skeleton className="h-3.5 w-3.5 rounded-full bg-studio-cream/20" />
+        <Skeleton className="h-5 w-40 rounded-full bg-studio-cream/15" />
       </div>
     </div>
   )
@@ -100,18 +93,6 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
   const { currentOrganization, isLoading: isOrganizationLoading, userRole } = useOrganization()
   const { subscriptionStatus, isLoading: subscriptionLoading } = useSubscription()
   const pathname = usePathname()
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth >= 1024) {
-        setIsMobileMenuOpen(false)
-      }
-    }
-
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
 
   const isSupplier = userRole === 'supplier' || user?.user_metadata?.is_supplier === true
   const isSupplierRoute = pathname?.startsWith('/supplier-portal')
@@ -211,29 +192,23 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
     return null
   }
 
+  // The house of rooms: which room's colours does this surface wear?
+  // The --room-* variables drive bg-room / text-room-on / text-room-accent
+  // everywhere below (band, tabs, eyebrows, links).
+  const room = roomForPath(pathname)
+  const roomVars = {
+    '--room-rgb': room.rgb,
+    '--room-accent-rgb': room.accentRgb,
+    '--room-on-rgb': room.onRgb,
+  } as React.CSSProperties
+
   return (
     <>
       <OnboardingWizard />
-      <div className="flex h-screen overflow-hidden bg-background">
-        {isMobileMenuOpen && (
-          <div
-            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
-            onClick={() => setIsMobileMenuOpen(false)}
-          />
-        )}
-
-        <Sidebar
-          className={cn(
-            'fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0',
-            isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-          )}
-        />
-
-        <div className="flex flex-1 flex-col overflow-hidden">
-          <Header
-            onMenuClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            isMobileMenuOpen={isMobileMenuOpen}
-          />
+      <div className="flex h-screen overflow-hidden bg-background" style={roomVars}>
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          {/* Band, statement, paper, band: the room band above... */}
+          <RoomBand room={room} endSlot={<BandControls />} className="shrink-0" />
 
           <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background">
             <IntegrationHealthBanner />
@@ -251,6 +226,9 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
               {children}
             </div>
           </main>
+
+          {/* ...and the ink band below: Rosa's permanent home. */}
+          <AskRosaBand tabs={room.tabs} />
         </div>
 
         {/*

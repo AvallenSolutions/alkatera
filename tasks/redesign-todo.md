@@ -33,12 +33,18 @@ into this branch will conflict lightly in tailwind.config.ts (same token values,
 resolution is trivial).
 
 ## Milestone 2 · the house of rooms
-- [ ] Room mapping proposal for the SaaS (workshop with Tim before building)
-- [ ] The desk (home grid of breathing poster blocks)
-- [ ] The room band (52px sticky, colour per room, mono tabs, live note)
-- [ ] The ink band (Rosa as "Ask the studio": ring, prompt pill, cmd-K, quick capture)
-- [ ] Replaces sidebar AppLayout on this branch
-- [ ] REVIEW CHECKPOINT with Tim
+- [x] Room mapping approved by Tim: Today (forest) / The measures (cobalt) / The evidence (brick) / The post (ochre) / The wiring (ink); registry + path resolution in `components/studio/platform-rooms.ts`
+- [x] The desk at `/desk`: greeting statement + four breathing poster blocks + the wiring in ink; login now lands here (app/page.tsx)
+- [x] The room band: 52px, room colour, desk link, mono tabs, bell + org/account cluster (`band-controls.tsx`); ochre takes ink text
+- [x] The ink band: Rosa's permanent home (`ask-rosa-band.tsx`) — ring, Ask Rosa prompt pill (opens the drawer), ⌘/ note, room tabs for the thumb; the lime header button is retired
+- [x] Sidebar + Header replaced in AppLayout; ALL gates kept (auth, org, subscription, onboarding wizard, banners, RosaDrawer); skeleton restyled to the shell
+- [ ] REVIEW CHECKPOINT with Tim ← WE ARE HERE
+
+Open questions for the M2 review:
+- Knowledge Bank + Wiki + Guardian currently live in The evidence; happy?
+- The band does not yet hide tier/milestone-gated tabs (pages still gate themselves)
+- Mobile: tabs scroll horizontally in the band; a thumb-first pass comes with M3
+- Old Sidebar.tsx/Header.tsx still exist (admin/dev nav lives there); delete after M3 confirms nothing is lost
 
 ## Milestone 3+ · room by room (review each before the next)
 - [ ] Dashboard / pulse

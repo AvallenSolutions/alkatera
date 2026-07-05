@@ -42,7 +42,9 @@ export interface RoomTab {
 }
 
 export interface RoomConfig {
-  key: RoomKey;
+  /** Registry key. A string so both the distributor registry (RoomKey)
+      and the platform registry (PlatformRoomKey) can share the shape. */
+  key: string;
   /** Plain words with a little pride: "The portfolio." */
   name: string;
   /** Saturated room ink (band + poster block fill). */
