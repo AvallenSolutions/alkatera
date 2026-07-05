@@ -1,6 +1,5 @@
 import type { MetadataRoute } from 'next';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
-import { getPublishedWikiPages } from '@/lib/wiki';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://alkatera.com';
@@ -39,12 +38,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
     {
       url: `${baseUrl}/knowledge`,
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 0.7,
-    },
-    {
-      url: `${baseUrl}/wiki`,
       lastModified: new Date(),
       changeFrequency: 'weekly',
       priority: 0.7,
@@ -98,19 +91,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.error('Error fetching blog posts for sitemap:', error);
   }
 
-  // Wiki pages come from wiki/pages/*.md on disk (traced into this function's
-  // bundle via outputFileTracingIncludes in next.config.js).
-  let wikiPages: MetadataRoute.Sitemap = [];
-  try {
-    wikiPages = getPublishedWikiPages().map((page) => ({
-      url: `${baseUrl}/wiki/${page.slug}`,
-      lastModified: page.lastReviewed ? new Date(page.lastReviewed) : new Date(),
-      changeFrequency: 'monthly' as const,
-      priority: 0.6,
-    }));
-  } catch (error) {
-    console.error('Error listing wiki pages for sitemap:', error);
-  }
-
-  return [...staticPages, ...blogPages, ...wikiPages];
+  return [...staticPages, ...blogPages];
 }

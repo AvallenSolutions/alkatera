@@ -25,6 +25,7 @@ import {
   ClipboardList,
   Sparkles,
   GraduationCap,
+  BookOpen,
   Search,
 } from 'lucide-react';
 
@@ -92,6 +93,14 @@ const commands: CommandItem[] = [
     icon: <GraduationCap className="h-4 w-4" />,
     href: '/knowledge-bank',
     keywords: ['documents', 'resources', 'library'],
+    group: 'Navigation',
+  },
+  {
+    id: 'wiki',
+    label: 'Sustainability Wiki',
+    icon: <BookOpen className="h-4 w-4" />,
+    href: '/wiki',
+    keywords: ['glossary', 'scope', 'legislation', 'definitions', 'learn'],
     group: 'Navigation',
   },
   {

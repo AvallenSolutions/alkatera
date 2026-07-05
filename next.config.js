@@ -53,11 +53,12 @@ const nextConfig = {
     ];
   },
   experimental: {
-    // app/sitemap.ts reads wiki/pages/*.md from disk at request time; include
-    // the folder in its function trace so Netlify bundles the files. The /wiki
-    // routes themselves are force-static so they only read at build time.
+    // The wiki routes (dynamic, inside the authenticated group) and the Rosa
+    // sync route read wiki/pages/*.md from disk at request time; include the
+    // folder in their function traces so Netlify bundles the files.
     outputFileTracingIncludes: {
-      '/sitemap.xml': ['./wiki/pages/**/*'],
+      '/wiki': ['./wiki/pages/**/*'],
+      '/wiki/[slug]': ['./wiki/pages/**/*'],
       '/api/admin/wiki-sync': ['./wiki/pages/**/*'],
     },
     optimizePackageImports: [

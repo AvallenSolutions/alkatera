@@ -290,6 +290,7 @@ const navigationStructure: NavItem[] = [
     icon: Library,
     minTier: 1,
     children: [
+      { name: 'Sustainability Wiki', href: '/wiki/',              icon: BookOpen,      minTier: 1 },
       { name: 'Knowledge Bank',     href: '/knowledge-bank/',     icon: GraduationCap, minTier: 1 },
       { name: 'Greenwash Guardian', href: '/greenwash-guardian/', icon: Leaf,          minTier: 2 },
       { name: 'Expert Partners',    href: '/expert-partners/',    icon: Handshake,     minTier: 1 },

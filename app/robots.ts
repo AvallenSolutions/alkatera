@@ -17,6 +17,7 @@ const DISALLOW = [
   '/governance/',
   '/greenwash-guardian/',
   '/knowledge-bank/',
+  '/wiki', // subscriber-only sustainability wiki (covers /wiki and /wiki/*)
   '/people-culture/',
   '/community-impact/',
   '/rosa/',
