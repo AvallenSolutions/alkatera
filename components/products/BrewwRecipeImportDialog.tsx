@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { Loader2, Beer, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { Beer, AlertTriangle, CheckCircle2 } from 'lucide-react'
 
 interface PreviewRow {
   ingredient_name: string
@@ -124,7 +124,7 @@ export function BrewwRecipeImportDialog({
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Beer className="h-5 w-5 text-[#8da300] dark:text-[#ccff00]" />
+            <Beer className="h-5 w-5 text-studio-cobalt" />
             Import recipe from Breww
           </DialogTitle>
           <DialogDescription>
@@ -134,7 +134,6 @@ export function BrewwRecipeImportDialog({
 
         {loading && (
           <div className="flex items-center justify-center py-12 text-muted-foreground text-sm gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" />
             Computing preview…
           </div>
         )}
@@ -152,7 +151,7 @@ export function BrewwRecipeImportDialog({
         {!loading && !errorMsg && meta && preview && (
           <>
             <div className="rounded-lg border bg-muted/30 p-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <InfoTile label="Parent drink" value={meta.drink_name ?? '—'} />
+              <InfoTile label="Parent drink" value={meta.drink_name ?? '–'} />
               <InfoTile label="Unit size" value={`${meta.sku_volume_ml.toFixed(0)} ml`} />
               <InfoTile label="Basis" value={`${meta.total_hl_12m.toFixed(1)} hL`} />
               <InfoTile
@@ -201,7 +200,7 @@ export function BrewwRecipeImportDialog({
             )}
 
             <p className="text-[11px] text-muted-foreground flex items-start gap-1.5">
-              <CheckCircle2 className="h-3 w-3 mt-0.5 text-emerald-500 flex-shrink-0" />
+              <CheckCircle2 className="h-3 w-3 mt-0.5 text-studio-good flex-shrink-0" />
               Quantities are 12-month averages (total ingredient usage ÷ total production hL), scaled to the SKU&apos;s unit size. Emission factors need to be assigned to each row on the recipe page.
             </p>
           </>
@@ -212,8 +211,9 @@ export function BrewwRecipeImportDialog({
             Cancel
           </Button>
           <Button size="sm" onClick={handleCommit} disabled={!canCommit}>
-            {committing && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
-            Import {preview?.length ? `${preview.length} ingredient${preview.length === 1 ? '' : 's'}` : ''}
+            {committing
+              ? 'Importing…'
+              : `Import ${preview?.length ? `${preview.length} ingredient${preview.length === 1 ? '' : 's'}` : ''}`}
           </Button>
         </DialogFooter>
       </DialogContent>

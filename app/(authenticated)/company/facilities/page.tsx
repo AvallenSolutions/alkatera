@@ -18,6 +18,8 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Building2, Plus, AlertCircle, MapPin, Leaf } from 'lucide-react';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { BigNumber } from '@/components/studio/big-number';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -93,25 +95,30 @@ export default function FacilitiesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Manage Facilities</h1>
-          <p className="text-muted-foreground mt-2">
+      <header className="flex flex-wrap items-end justify-between gap-x-12 gap-y-6">
+        <div className="min-w-0">
+          <Eyebrow className="mb-3">THE MEASURES · FACILITIES</Eyebrow>
+          <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+            The facilities.
+          </h1>
+          <p className="mt-3 max-w-xl text-sm text-muted-foreground">
             Track emissions from your operational facilities
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <SmartUploadButton />
-          <Button
-            onClick={() => (isReadOnly ? router.push('/complete-subscription') : setWizardOpen(true))}
-            size="lg"
-            className="gap-2"
-          >
-            <Plus className="h-5 w-5" />
-            {isReadOnly ? 'Subscribe to add' : 'Add Facility'}
-          </Button>
+        <div className="flex shrink-0 items-end gap-8 pb-1">
+          <BigNumber size="display" value={facilities.length} label="Facilities" />
+          <div className="flex items-center gap-2">
+            <SmartUploadButton />
+            <Button
+              onClick={() => (isReadOnly ? router.push('/complete-subscription') : setWizardOpen(true))}
+              className="gap-2 bg-primary text-primary-foreground"
+            >
+              <Plus className="h-4 w-4" />
+              {isReadOnly ? 'Subscribe to add' : 'Add facility'}
+            </Button>
+          </div>
         </div>
-      </div>
+      </header>
 
       {facilities.length === 0 ? (
         <Card className="border-2 border-dashed">

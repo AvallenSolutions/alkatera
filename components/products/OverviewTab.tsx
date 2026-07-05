@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { StateChip } from "@/components/studio/state-chip";
 import { Button } from "@/components/ui/button";
 import { Package, Droplets, Zap, Wind, MapPin, AlertTriangle, FileText, CheckCircle2, ArrowRight, Map, Factory, Layers } from "lucide-react";
 import type { Product, ProductIngredient, ProductPackaging, ProductLCA } from "@/hooks/data/useProductData";
@@ -163,7 +164,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
                 </svg>
               </div>
               <div className="text-center space-y-4 max-w-md">
-                <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto" />
+                <AlertTriangle className="h-12 w-12 text-studio-attention mx-auto" />
                 <div>
                   <h3 className="text-lg font-semibold text-foreground mb-2">No LCA Data Available</h3>
                   <p className="text-sm text-muted-foreground">
@@ -171,7 +172,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
                   </p>
                 </div>
                 <Link href={`/products/${product.id}/compliance-wizard`}>
-                  <Button className="bg-lime-500 hover:bg-lime-600 text-slate-900">
+                  <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
                     Run LCA
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
@@ -184,21 +185,21 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
         <Card className="border">
           <CardHeader>
             <CardTitle className="text-foreground flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-lime-400" />
+              <CheckCircle2 className="h-5 w-5 text-studio-good" />
               Data Completeness
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
               <div className="flex items-center gap-2">
-                <div className={`h-2 w-2 rounded-full ${ingredients.length > 0 ? 'bg-green-500' : 'bg-muted-foreground/40'}`} />
+                <div className={`h-2 w-2 rounded-full ${ingredients.length > 0 ? 'bg-studio-good' : 'bg-muted-foreground/40'}`} />
                 <span className="text-sm text-muted-foreground">Ingredients</span>
               </div>
               <span className="text-sm font-medium text-foreground">{ingredients.length} added ({ingredientWeight.toFixed(2)} kg)</span>
             </div>
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
               <div className="flex items-center gap-2">
-                <div className={`h-2 w-2 rounded-full ${packaging.length > 0 ? 'bg-green-500' : 'bg-muted-foreground/40'}`} />
+                <div className={`h-2 w-2 rounded-full ${packaging.length > 0 ? 'bg-studio-good' : 'bg-muted-foreground/40'}`} />
                 <span className="text-sm text-muted-foreground">Packaging</span>
               </div>
               <span className="text-sm font-medium text-foreground">{packaging.length} added ({packagingWeight.toFixed(1)} g)</span>
@@ -247,7 +248,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
       />
 
       {/* Quick Impact Summary Bar */}
-      <div className="border rounded-xl p-4">
+      <div className="rounded-[6px] border border-border bg-card p-4">
         <QuickImpactBar
           impacts={quickImpacts}
           compact={false}
@@ -284,13 +285,13 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
             showPercentages
           />
           {breakdown.soilCarbonRemovals > 0 && (
-            <div className="mt-3 p-3 rounded-lg border border-[#ccff00]/20 bg-[#ccff00]/5">
+            <div className="mt-3 p-3 rounded-[6px] border border-border bg-card">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="h-2.5 w-2.5 rounded-full bg-[#ccff00]" />
+                  <div className="h-2.5 w-2.5 rounded-full bg-studio-good" />
                   <span className="text-sm text-muted-foreground">Soil Carbon Removals (FLAG)</span>
                 </div>
-                <span className="text-sm font-medium text-[#ccff00]">
+                <span className="text-sm font-medium text-studio-good">
                   -{breakdown.soilCarbonRemovals.toFixed(4)} kg CO₂e
                 </span>
               </div>
@@ -310,12 +311,12 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           unit="m³ world eq"
         >
           <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
+            <div className="p-4 rounded-[6px] bg-secondary border border-border">
               <p className="text-xs text-muted-foreground uppercase mb-1">Consumption</p>
               <p className="text-2xl font-bold text-foreground">{waterConsumption.toFixed(3)}</p>
               <p className="text-sm text-muted-foreground">m³</p>
             </div>
-            <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
+            <div className="p-4 rounded-[6px] bg-secondary border border-border">
               <p className="text-xs text-muted-foreground uppercase mb-1">Scarcity Impact</p>
               <p className="text-2xl font-bold text-foreground">{waterScarcity.toFixed(3)}</p>
               <p className="text-sm text-muted-foreground">m³ world eq</p>
@@ -323,14 +324,14 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           </div>
           {latestLCA.aggregated_impacts?.water_risk_level && (
             <div className="mt-4">
-              <Badge className={`${
-                latestLCA.aggregated_impacts.water_risk_level === 'low' ? 'bg-green-500/20 text-green-400' :
-                latestLCA.aggregated_impacts.water_risk_level === 'medium' ? 'bg-amber-500/20 text-amber-400' :
-                'bg-red-500/20 text-red-400'
-              }`}>
+              <StateChip tone={
+                latestLCA.aggregated_impacts.water_risk_level === 'low' ? 'good' :
+                latestLCA.aggregated_impacts.water_risk_level === 'medium' ? 'attention' :
+                'stale'
+              }>
                 {latestLCA.aggregated_impacts.water_risk_level === 'low' ? 'Low Risk' :
                  latestLCA.aggregated_impacts.water_risk_level === 'medium' ? 'Medium Risk' : 'High Risk'}
-              </Badge>
+              </StateChip>
             </div>
           )}
         </ImpactAccordion>
@@ -348,7 +349,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
               <div className="flex-1">
                 <div className="h-4 bg-muted rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-amber-500 to-lime-500 transition-all"
+                    className="h-full bg-studio-cobalt transition-all"
                     style={{ width: `${circularityRate}%` }}
                   />
                 </div>
@@ -356,20 +357,25 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
               <span className="text-2xl font-bold text-foreground">{circularityRate}%</span>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <div className="p-3 rounded-[6px] bg-secondary border border-border">
                 <p className="text-xs text-muted-foreground uppercase mb-1">Fossil Resources</p>
                 <p className="text-xl font-bold text-foreground">
                   {latestLCA.aggregated_impacts?.fossil_resource_scarcity?.toFixed(3) || '0'}
                 </p>
                 <p className="text-sm text-muted-foreground">kg oil eq</p>
               </div>
-              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <div className="p-3 rounded-[6px] bg-secondary border border-border">
                 <p className="text-xs text-muted-foreground uppercase mb-1">Rating</p>
-                <Badge className="mt-1 bg-amber-500/20 text-amber-400 border-amber-500/30">
-                  {circularityRate >= 75 ? 'EXCELLENT' :
-                   circularityRate >= 50 ? 'GOOD' :
-                   circularityRate >= 25 ? 'FAIR' : 'POOR'}
-                </Badge>
+                <div className="mt-1">
+                  <StateChip tone={
+                    circularityRate >= 50 ? 'good' :
+                    circularityRate >= 25 ? 'attention' : 'stale'
+                  }>
+                    {circularityRate >= 75 ? 'EXCELLENT' :
+                     circularityRate >= 50 ? 'GOOD' :
+                     circularityRate >= 25 ? 'FAIR' : 'POOR'}
+                  </StateChip>
+                </div>
               </div>
             </div>
           </div>
@@ -384,12 +390,12 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           unit="m²a"
         >
           <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+            <div className="p-4 rounded-[6px] bg-secondary border border-border">
               <p className="text-xs text-muted-foreground uppercase mb-1">Land Use</p>
               <p className="text-2xl font-bold text-foreground">{landUse.toFixed(3)}</p>
               <p className="text-sm text-muted-foreground">m²a crop eq</p>
             </div>
-            <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+            <div className="p-4 rounded-[6px] bg-secondary border border-border">
               <p className="text-xs text-muted-foreground uppercase mb-1">Ecotoxicity</p>
               <p className="text-2xl font-bold text-foreground">
                 {latestLCA.aggregated_impacts?.terrestrial_ecotoxicity?.toFixed(3) || '0.000'}
@@ -397,9 +403,9 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
               <p className="text-sm text-muted-foreground">kg DCB eq</p>
             </div>
           </div>
-          <div className="flex gap-2 mt-4">
-            <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-xs">ReCiPe 2016</Badge>
-            <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-xs">Multi-capital</Badge>
+          <div className="flex gap-3 mt-4">
+            <StateChip>ReCiPe 2016</StateChip>
+            <StateChip>Multi-capital</StateChip>
           </div>
         </ImpactAccordion>
       </ImpactAccordionGroup>
@@ -410,8 +416,8 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           <CollapsibleTrigger asChild>
             <button className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-cyan-500/20 flex items-center justify-center">
-                  <Map className="h-5 w-5 text-cyan-400" />
+                <div className="h-10 w-10 rounded-[6px] bg-secondary flex items-center justify-center">
+                  <Map className="h-5 w-5 text-studio-cobalt" />
                 </div>
                 <div className="text-left">
                   <h3 className="font-semibold text-foreground">Supply Chain Network</h3>
@@ -420,9 +426,9 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
                   </p>
                 </div>
               </div>
-              <Badge className="bg-cyan-500/20 text-cyan-400 border-cyan-500/30">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-cobalt">
                 {showSupplyChain ? 'Hide' : 'Show'} Map
-              </Badge>
+              </span>
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent>
@@ -446,8 +452,8 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-cyan-500/20 flex items-center justify-center">
-                  <FileText className="h-5 w-5 text-cyan-400" />
+                <div className="h-10 w-10 rounded-[6px] bg-secondary flex items-center justify-center">
+                  <FileText className="h-5 w-5 text-studio-cobalt" />
                 </div>
                 <div>
                   <CardTitle className="text-foreground">LCA Reports</CardTitle>
@@ -456,7 +462,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
               </div>
               {lcaReports.length > 0 && (
                 <Link href="/reports/lcas">
-                  <Button variant="ghost" size="sm" className="text-cyan-400 hover:text-cyan-300">
+                  <Button variant="ghost" size="sm" className="text-studio-cobalt hover:text-studio-cobalt/80">
                     View All
                   </Button>
                 </Link>
@@ -468,9 +474,9 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
               <Link key={lca.id} href={`/products/${product.id}/compliance-wizard`}>
                 <div className="p-3 rounded-lg bg-muted/50 border hover:bg-accent transition-all cursor-pointer">
                   <div className="flex items-center justify-between mb-2">
-                    <Badge className={`${lca.status === 'completed' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                    <StateChip tone={lca.status === 'completed' ? 'good' : 'attention'}>
                       {lca.status}
-                    </Badge>
+                    </StateChip>
                     <span className="text-xs text-muted-foreground">
                       {formatDistanceToNow(new Date(lca.created_at), { addSuffix: true })}
                     </span>
@@ -496,8 +502,8 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           <CollapsibleTrigger asChild>
             <button className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-lime-500/20 flex items-center justify-center">
-                  <CheckCircle2 className="h-5 w-5 text-lime-400" />
+                <div className="h-10 w-10 rounded-[6px] bg-secondary flex items-center justify-center">
+                  <CheckCircle2 className="h-5 w-5 text-studio-good" />
                 </div>
                 <div className="text-left">
                   <h3 className="font-semibold text-foreground">Data Completeness</h3>
@@ -509,7 +515,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
               <div className="flex items-center gap-3">
                 <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-lime-500 to-green-500 transition-all duration-500"
+                    className="h-full bg-studio-good transition-all duration-500"
                     style={{ width: `${isHealthy ? 100 : ingredients.length > 0 || packaging.length > 0 ? 66 : 33}%` }}
                   />
                 </div>
@@ -523,21 +529,21 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
             <CardContent className="pt-0 space-y-3">
               <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                 <div className="flex items-center gap-2">
-                  <div className={`h-2 w-2 rounded-full ${ingredients.length > 0 ? 'bg-green-500' : 'bg-muted-foreground/40'}`} />
+                  <div className={`h-2 w-2 rounded-full ${ingredients.length > 0 ? 'bg-studio-good' : 'bg-muted-foreground/40'}`} />
                   <span className="text-sm text-muted-foreground">Ingredients</span>
                 </div>
                 <span className="text-sm font-medium text-foreground">{ingredients.length} ({ingredientWeight.toFixed(2)} kg)</span>
               </div>
               <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                 <div className="flex items-center gap-2">
-                  <div className={`h-2 w-2 rounded-full ${packaging.length > 0 ? 'bg-green-500' : 'bg-muted-foreground/40'}`} />
+                  <div className={`h-2 w-2 rounded-full ${packaging.length > 0 ? 'bg-studio-good' : 'bg-muted-foreground/40'}`} />
                   <span className="text-sm text-muted-foreground">Packaging</span>
                 </div>
                 <span className="text-sm font-medium text-foreground">{packaging.length} ({packagingWeight.toFixed(1)} g)</span>
               </div>
               <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                 <div className="flex items-center gap-2">
-                  <div className={`h-2 w-2 rounded-full ${lcaReports.length > 0 ? 'bg-green-500' : 'bg-muted-foreground/40'}`} />
+                  <div className={`h-2 w-2 rounded-full ${lcaReports.length > 0 ? 'bg-studio-good' : 'bg-muted-foreground/40'}`} />
                   <span className="text-sm text-muted-foreground">Carbon Footprint Reports</span>
                 </div>
                 <span className="text-sm font-medium text-foreground">{lcaReports.length}</span>

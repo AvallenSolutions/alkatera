@@ -11,6 +11,7 @@ import { ArrowLeft, Trash2, Building2, Zap, Pencil, History, Package, Loader2, F
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Eyebrow } from "@/components/studio/eyebrow";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -365,27 +366,31 @@ export default function FacilityDetailPage() {
         </Button>
       </div>
 
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <Building2 className="h-8 w-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold">{facility.name}</h1>
-            <p className="text-muted-foreground">
-              {facility.address_city}, {facility.address_country}
-            </p>
-          </div>
-        </div>
+      <header className="mb-6">
+        <Eyebrow className="mb-3">THE MEASURES · FACILITY</Eyebrow>
+        <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+          {facility.name}.
+        </h1>
+        <p className="mt-3 text-sm text-muted-foreground">
+          {facility.address_city}, {facility.address_country}
+        </p>
 
-        <div className="flex flex-wrap gap-2 mt-4 items-center">
+        <div className="flex flex-wrap gap-x-4 gap-y-2 mt-4 items-center">
           {facility.functions.map((func: string) => (
-            <Badge key={func} variant="secondary">{func}</Badge>
+            <span key={func} className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
+              {func}
+            </span>
           ))}
-          <Badge className={facility.operational_control === 'owned' ? 'bg-green-600' : 'bg-blue-600'}>
+          <span
+            className={`font-mono text-[10px] font-bold uppercase tracking-[0.22em] ${
+              facility.operational_control === 'owned' ? 'text-studio-good' : 'text-studio-dim'
+            }`}
+          >
             {facility.operational_control === 'owned' ? 'Owned' : 'Third-Party'}
-          </Badge>
+          </span>
           <FacilityBrewwLinkBadge facilityId={facility.id} />
         </div>
-      </div>
+      </header>
 
       {facility.operational_control === 'third_party' &&
         (!facility.default_data_collection_mode || facility.default_data_collection_mode === 'primary') && (

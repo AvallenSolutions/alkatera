@@ -58,15 +58,15 @@ interface ProductHeroImpactProps {
   className?: string;
 }
 
-const LAYER_COLORS: Record<string, { fill: string; glow: string; label: string }> = {
-  rawMaterials: { fill: '#84cc16', glow: 'rgba(132, 204, 22, 0.4)', label: 'Raw Materials' },
-  viticulture: { fill: '#ccff00', glow: 'rgba(204, 255, 0, 0.4)', label: 'Viticulture' },
-  purchasedIngredients: { fill: '#84cc16', glow: 'rgba(132, 204, 22, 0.4)', label: 'Purchased Ingredients' },
-  processing: { fill: '#a855f7', glow: 'rgba(168, 85, 247, 0.4)', label: 'Processing' },
-  packaging: { fill: '#f97316', glow: 'rgba(249, 115, 22, 0.4)', label: 'Packaging' },
-  transport: { fill: '#06b6d4', glow: 'rgba(6, 182, 212, 0.4)', label: 'Transport' },
-  endOfLife: { fill: '#3b82f6', glow: 'rgba(59, 130, 246, 0.4)', label: 'End of Life' },
-  usePhase: { fill: '#ec4899', glow: 'rgba(236, 72, 153, 0.4)', label: 'Use Phase' },
+const LAYER_COLORS: Record<string, { fill: string; label: string }> = {
+  rawMaterials: { fill: '#2B46C0', label: 'Raw Materials' },
+  viticulture: { fill: '#047857', label: 'Viticulture' },
+  purchasedIngredients: { fill: '#205E40', label: 'Purchased Ingredients' },
+  processing: { fill: '#6D28D9', label: 'Processing' },
+  packaging: { fill: '#A97C14', label: 'Packaging' },
+  transport: { fill: '#6F6F68', label: 'Transport' },
+  endOfLife: { fill: '#BE123C', label: 'End of Life' },
+  usePhase: { fill: '#BF4B2A', label: 'Use Phase' },
 };
 
 function BottleVisualization({
@@ -138,30 +138,17 @@ function BottleVisualization({
 
   return (
     <div className={cn('relative w-[100px] h-[200px]', className)}>
-      <svg viewBox="0 0 100 200" className="w-full h-full drop-shadow-2xl">
+      <svg viewBox="0 0 100 200" className="w-full h-full">
         <defs>
-          <linearGradient id="glassOverlay" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="rgba(255,255,255,0.15)" />
-            <stop offset="50%" stopColor="rgba(255,255,255,0.05)" />
-            <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-          </linearGradient>
           <mask id="bottleMask">
             <path d={bottleOutline} fill="white" />
           </mask>
-          <filter id="bottleGlow">
-            <feGaussianBlur stdDeviation="2" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
         </defs>
 
         <g mask="url(#bottleMask)">
           {layerRects.map(layer => (
             <rect key={layer.key} x="0" y={layer.y} width="100" height={layer.height} fill={layer.fill} />
           ))}
-          <rect x="0" y={bottleFillTop} width="100" height={fillHeight} fill="url(#glassOverlay)" />
         </g>
 
         <path
@@ -170,7 +157,6 @@ function BottleVisualization({
           stroke="currentColor"
           strokeWidth="1.5"
           className="opacity-80 text-foreground"
-          filter="url(#bottleGlow)"
         />
 
         <rect x="38" y="2" width="24" height="6" rx="1" fill="none" stroke="currentColor" strokeWidth="1.5" className="opacity-80 text-foreground" />
@@ -248,30 +234,17 @@ function CanVisualization({
 
   return (
     <div className={cn('relative w-[100px] h-[200px]', className)}>
-      <svg viewBox="0 0 100 200" className="w-full h-full drop-shadow-2xl">
+      <svg viewBox="0 0 100 200" className="w-full h-full">
         <defs>
-          <linearGradient id="canGlassOverlay" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="rgba(255,255,255,0.15)" />
-            <stop offset="50%" stopColor="rgba(255,255,255,0.05)" />
-            <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-          </linearGradient>
           <mask id="canMask">
             <path d={canOutline} fill="white" />
           </mask>
-          <filter id="canGlow">
-            <feGaussianBlur stdDeviation="2" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
         </defs>
 
         <g mask="url(#canMask)">
           {layerRects.map(layer => (
             <rect key={layer.key} x="0" y={layer.y} width="100" height={layer.height} fill={layer.fill} />
           ))}
-          <rect x="0" y={canFillTop} width="100" height={fillHeight} fill="url(#canGlassOverlay)" />
         </g>
 
         <path
@@ -280,7 +253,6 @@ function CanVisualization({
           stroke="currentColor"
           strokeWidth="1.5"
           className="opacity-80 text-foreground"
-          filter="url(#canGlow)"
         />
 
         <path d="M28,36 L72,36" fill="none" stroke="currentColor" strokeWidth="1.5" className="opacity-80 text-foreground" />
@@ -359,30 +331,17 @@ function KegVisualization({
 
   return (
     <div className={cn('relative w-[100px] h-[200px]', className)}>
-      <svg viewBox="0 0 100 200" className="w-full h-full drop-shadow-2xl">
+      <svg viewBox="0 0 100 200" className="w-full h-full">
         <defs>
-          <linearGradient id="kegGlassOverlay" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="rgba(255,255,255,0.15)" />
-            <stop offset="50%" stopColor="rgba(255,255,255,0.05)" />
-            <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-          </linearGradient>
           <mask id="kegMask">
             <path d={kegOutline} fill="white" />
           </mask>
-          <filter id="kegGlow">
-            <feGaussianBlur stdDeviation="2" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
         </defs>
 
         <g mask="url(#kegMask)">
           {layerRects.map(layer => (
             <rect key={layer.key} x="0" y={layer.y} width="100" height={layer.height} fill={layer.fill} />
           ))}
-          <rect x="0" y={kegFillTop} width="100" height={kegFillHeight} fill="url(#kegGlassOverlay)" />
         </g>
 
         <path
@@ -391,7 +350,6 @@ function KegVisualization({
           stroke="currentColor"
           strokeWidth="1.5"
           className="opacity-80 text-foreground"
-          filter="url(#kegGlow)"
         />
 
         <path d="M15,40 L15,25 C15,20 85,20 85,25 L85,40" fill="none" stroke="currentColor" strokeWidth="1.5" className="opacity-80 text-foreground" />
@@ -446,15 +404,9 @@ export function ProductHeroImpact({
 
   return (
     <div className={cn(
-      'relative overflow-hidden rounded-2xl border bg-card',
+      'relative overflow-hidden rounded-[6px] border border-border bg-card',
       className
     )}>
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-32 -right-32 w-64 h-64 bg-lime-400/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-32 -left-32 w-64 h-64 bg-cyan-400/10 rounded-full blur-3xl" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-300/5 rounded-full blur-3xl" />
-      </div>
-
       <div className="relative z-10 p-6 lg:p-8">
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="flex flex-col items-center lg:items-start gap-4">
@@ -462,10 +414,10 @@ export function ProductHeroImpact({
               <img
                 src={productImage}
                 alt={productName}
-                className="w-32 h-32 object-cover rounded-xl border border-border"
+                className="w-32 h-32 object-cover rounded-[6px] border border-border"
               />
             ) : (
-              <div className="w-32 h-32 rounded-xl bg-muted/50 border border-border flex items-center justify-center">
+              <div className="w-32 h-32 rounded-[6px] bg-muted/50 border border-border flex items-center justify-center">
                 <span className="text-4xl opacity-50">📦</span>
               </div>
             )}
@@ -492,7 +444,7 @@ export function ProductHeroImpact({
                   type="single"
                   value={containerType}
                   onValueChange={handleContainerChange}
-                  className="flex flex-row gap-1 bg-muted p-1.5 rounded-lg"
+                  className="flex flex-row gap-1 bg-muted p-1.5 rounded-[6px]"
                 >
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -547,10 +499,10 @@ export function ProductHeroImpact({
                 <div className="flex flex-wrap items-center gap-3 justify-center lg:justify-start mb-6">
                   {benchmarkDiff !== null && (
                     <div className={cn(
-                      'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium',
+                      'flex items-center gap-1.5 text-sm font-medium',
                       isBetterThanBenchmark
-                        ? 'bg-green-500/20 text-green-400'
-                        : 'bg-red-500/20 text-red-400'
+                        ? 'text-studio-good'
+                        : 'text-studio-stale'
                     )}>
                       {isBetterThanBenchmark ? (
                         <>
@@ -568,10 +520,10 @@ export function ProductHeroImpact({
 
                   {trend !== undefined && trendDirection && (
                     <div className={cn(
-                      'flex items-center gap-1 px-3 py-1.5 rounded-full text-sm',
-                      trendDirection === 'down' ? 'bg-green-500/20 text-green-400' :
-                      trendDirection === 'up' ? 'bg-red-500/20 text-red-400' :
-                      'bg-gray-500/20 text-gray-400'
+                      'flex items-center gap-1 text-sm',
+                      trendDirection === 'down' ? 'text-studio-good' :
+                      trendDirection === 'up' ? 'text-studio-stale' :
+                      'text-studio-dim'
                     )}>
                       <TrendIcon className="h-4 w-4" />
                       <span>{trend > 0 ? '+' : ''}{trend}% vs last version</span>

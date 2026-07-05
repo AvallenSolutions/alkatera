@@ -68,15 +68,15 @@ export function ProductProductionSparkline({
   const secondAvg = secondHalf.reduce((s, m) => s + m.volume_hl, 0) / Math.max(secondHalf.length, 1)
   const trendPct = firstAvg > 0 ? ((secondAvg - firstAvg) / firstAvg) * 100 : 0
   const TrendIcon = trendPct > 5 ? TrendingUp : trendPct < -5 ? TrendingDown : Minus
-  const trendColor = trendPct > 5 ? 'text-emerald-500' : trendPct < -5 ? 'text-amber-500' : 'text-muted-foreground'
+  const trendColor = trendPct > 5 ? 'text-studio-good' : trendPct < -5 ? 'text-studio-attention' : 'text-muted-foreground'
 
   return (
     <Card className="border">
       <CardContent className="p-4">
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-[#ccff00]/20 flex items-center justify-center">
-              <Beer className="h-4 w-4 text-[#8da300] dark:text-[#ccff00]" />
+            <div className="h-8 w-8 rounded-[6px] bg-secondary flex items-center justify-center">
+              <Beer className="h-4 w-4 text-studio-cobalt" />
             </div>
             <div>
               <h3 className="text-sm font-semibold text-foreground">Brewery Production</h3>
@@ -104,7 +104,7 @@ export function ProductProductionSparkline({
             return (
               <div key={m.period_start} className="flex-1 flex flex-col items-center gap-1 group relative">
                 <div
-                  className="w-full rounded-sm bg-[#ccff00]/30 hover:bg-[#ccff00]/60 transition-colors cursor-help"
+                  className="w-full rounded-sm bg-studio-cobalt/30 hover:bg-studio-cobalt/60 transition-colors cursor-help"
                   style={{ height: `${h}%` }}
                 />
                 <div className="absolute bottom-full mb-1 px-2 py-1 rounded bg-popover border text-[10px] whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-10 shadow-md">

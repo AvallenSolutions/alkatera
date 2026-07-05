@@ -37,15 +37,14 @@ import {
   Zap,
   BarChart3,
   Globe,
-  Calendar,
   FileText,
-  Lock,
   CheckCircle2,
   Building2,
   ExternalLink,
   TrendingUp,
   TrendingDown,
 } from 'lucide-react';
+import { Eyebrow } from '@/components/studio/eyebrow';
 import { supabase } from '@/lib/supabaseClient';
 import { cn } from '@/lib/utils';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
@@ -1237,44 +1236,43 @@ export default function CompanyEmissionsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Company Emissions
+      <header className="flex flex-wrap items-end justify-between gap-x-12 gap-y-6">
+        <div className="min-w-0">
+          <Eyebrow className="mb-3">THE MEASURES · EMISSIONS</Eyebrow>
+          <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+            The emissions.
           </h1>
-          <p className="text-muted-foreground mt-2">
+          <p className="mt-3 max-w-xl text-sm text-muted-foreground">
             Build and track your organisation&apos;s annual carbon footprint
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <Select
-              value={selectedYear.toString()}
-              onValueChange={(value) => setSelectedYear(parseInt(value))}
-            >
-              <SelectTrigger className="w-[120px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {selectableYears.map((y) => (
-                  <SelectItem key={y.year} value={y.year.toString()}>
-                    {y.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="flex shrink-0 items-center gap-4 pb-1">
+          <Select
+            value={selectedYear.toString()}
+            onValueChange={(value) => setSelectedYear(parseInt(value))}
+          >
+            <SelectTrigger className="w-[120px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {selectableYears.map((y) => (
+                <SelectItem key={y.year} value={y.year.toString()}>
+                  {y.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {report?.status === 'Finalized' ? (
-            <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 border-green-200">
-              <Lock className="h-3 w-3 mr-1" />
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-good">
               Complete
-            </Badge>
+            </span>
           ) : (
-            <Badge variant="secondary">Draft</Badge>
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
+              Draft
+            </span>
           )}
         </div>
-      </div>
+      </header>
 
       {facilities.length === 0 && !isLoadingFacilities && (
         <Alert>

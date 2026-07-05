@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Trash2, Building2, Database, Sprout, Info, MapPin, Calculator, Award, Layers, Package, ChevronDown, ChevronUp, Plus, Loader2, Leaf, Shield, CheckCircle2, Droplets, TreePine, HelpCircle } from "lucide-react";
+import { Trash2, Building2, Database, Sprout, Info, MapPin, Calculator, Award, Layers, Package, ChevronDown, ChevronUp, Plus, Leaf, Shield, CheckCircle2, Droplets, TreePine, HelpCircle } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { InlineIngredientSearch } from "@/components/lca/InlineIngredientSearch";
 import { MatchStatusBadge } from "@/components/products/MatchStatusBadge";
@@ -488,7 +488,7 @@ export function IngredientFormCard({
       ingredientLitres = unit.startsWith('ml') ? qty / 1000 : qty;
     } else if (MASS_UNITS.includes(unit)) {
       ingredientLitres = unit === 'g' ? qty / 1000 : qty; // density ≈ 1 kg/L
-      warning = 'Using 1 kg ≈ 1 L — consider switching to litres for spirits';
+      warning = 'Using 1 kg ≈ 1 L, consider switching to litres for spirits';
     } else {
       return null; // unit type (e.g. "unit") — can't calculate
     }
@@ -648,8 +648,8 @@ export function IngredientFormCard({
         return (
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                <Award className="h-3 w-3 mr-1.5" />
+              <Badge variant="outline">
+                <Award className="h-3 w-3 mr-1.5 text-studio-good" />
                 Supplier Verified (High Quality)
               </Badge>
               <span className="text-xs text-muted-foreground">95% confidence</span>
@@ -665,8 +665,8 @@ export function IngredientFormCard({
       case 'staging':
         return (
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-              <Layers className="h-3 w-3 mr-1.5" />
+            <Badge variant="outline">
+              <Layers className="h-3 w-3 mr-1.5 text-studio-hold" />
               Hybrid Source (DEFRA + Ecoinvent)
             </Badge>
             <span className="text-xs text-muted-foreground">80% confidence</span>
@@ -676,8 +676,8 @@ export function IngredientFormCard({
       case 'openlca':
         return (
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="bg-teal-50 text-teal-700 border-teal-200">
-              <Database className="h-3 w-3 mr-1.5" />
+            <Badge variant="outline">
+              <Database className="h-3 w-3 mr-1.5 text-studio-dim" />
               Ecoinvent Database (Medium Quality)
             </Badge>
             <span className="text-xs text-muted-foreground">70% confidence</span>
@@ -686,8 +686,8 @@ export function IngredientFormCard({
       case 'primary':
         return (
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-              <Sprout className="h-3 w-3 mr-1.5" />
+            <Badge variant="outline">
+              <Sprout className="h-3 w-3 mr-1.5 text-studio-good" />
               Custom Primary Data
             </Badge>
             <span className="text-xs text-muted-foreground">90% confidence</span>
@@ -860,18 +860,18 @@ export function IngredientFormCard({
   // input's focus). Render conditionally with stable element types instead.
   const renderWrapper = (children: React.ReactNode) =>
     showAll ? (
-      <Card className="border-l-4 border-l-orange-500 bg-amber-50/50 dark:bg-amber-950/20">
+      <Card className="rounded-[6px] border border-border bg-card">
         <div className="p-6 space-y-4">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded bg-orange-500 flex items-center justify-center text-white font-medium text-sm">
+              <div className="h-8 w-8 rounded bg-primary flex items-center justify-center text-primary-foreground font-medium text-sm">
                 {index + 1}
               </div>
               <div>
-                <h3 className="font-semibold text-orange-800 dark:text-orange-300">
+                <h3 className="font-semibold text-foreground">
                   Ingredient {index + 1}
                 </h3>
-                <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">
+                <p className="text-xs text-muted-foreground mt-0.5">
                   Use smart search to find ingredients with environmental data
                 </p>
               </div>
@@ -900,10 +900,10 @@ export function IngredientFormCard({
           {showBasics && <>
           {/* Supplier product suggestions - shown above name when available */}
           {ingredientSupplierProducts.length > 0 && !ingredient.supplier_product_id && (
-            <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20 p-3">
+            <div className="rounded-[6px] border border-border bg-card p-3">
               <div className="flex items-center gap-2 mb-2">
-                <Building2 className="h-3.5 w-3.5 text-emerald-600" />
-                <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                <Building2 className="h-3.5 w-3.5 text-studio-good" />
+                <span className="text-xs font-medium text-foreground">
                   From your suppliers
                 </span>
               </div>
@@ -915,9 +915,9 @@ export function IngredientFormCard({
                       key={product.id}
                       type="button"
                       onClick={() => handleSupplierProductSelect(product)}
-                      className="flex items-center gap-2 px-3 py-2 rounded-md border border-emerald-200 dark:border-emerald-700 bg-white dark:bg-slate-900 hover:border-emerald-400 dark:hover:border-emerald-500 hover:shadow-sm transition-all text-left"
+                      className="flex items-center gap-2 px-3 py-2 rounded-[6px] border border-border bg-card hover:border-studio-cobalt transition-all text-left"
                     >
-                      <Shield className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                      <Shield className="h-3.5 w-3.5 text-studio-good shrink-0" />
                       <div className="min-w-0">
                         <div className="text-sm font-medium truncate">{product.name}</div>
                         <div className="flex items-center gap-2 mt-0.5">
@@ -938,9 +938,9 @@ export function IngredientFormCard({
 
           {/* Show primary data indicator when supplier product is selected */}
           {ingredient.supplier_product_id && ingredient.data_source === 'supplier' && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
-              <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-              <span className="text-xs text-emerald-700 dark:text-emerald-400">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-[6px] border border-border bg-card">
+              <CheckCircle2 className="h-4 w-4 text-studio-good shrink-0" />
+              <span className="text-xs text-foreground">
                 Using primary data from <span className="font-medium">{ingredient.supplier_name || 'supplier'}</span>
               </span>
               <button
@@ -1078,11 +1078,11 @@ export function IngredientFormCard({
               />
               <p className="text-xs text-muted-foreground mt-1">
                 {isBatchMode
-                  ? `Total used per batch — divided by ${bottlesPerBatch.toFixed(0)} bottles`
+                  ? `Total used per batch, divided by ${bottlesPerBatch.toFixed(0)} bottles`
                   : 'Quantity used per product unit'}
               </p>
               {isBatchMode && Number(ingredient.amount) > 0 && (
-                <p className="text-xs text-green-700 dark:text-green-400 mt-1">
+                <p className="text-xs text-studio-good mt-1">
                   ≈ {formatPerBottle(Number(ingredient.amount), ingredient.unit, bottlesPerBatch)} per bottle
                 </p>
               )}
@@ -1172,7 +1172,7 @@ export function IngredientFormCard({
                   <SelectValue placeholder="Pick a stage" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__unassigned">— Unassigned —</SelectItem>
+                  <SelectItem value="__unassigned">Unassigned</SelectItem>
                   {productionStages.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
                       {s.ordinal + 1}. {s.name}
@@ -1269,7 +1269,7 @@ export function IngredientFormCard({
                 htmlFor={`self-grown-vineyard-${ingredient.tempId}`}
                 className="text-sm font-normal cursor-pointer flex items-center gap-1.5"
               >
-                <Leaf className="h-3.5 w-3.5 text-[#ccff00]" />
+                <Leaf className="h-3.5 w-3.5 text-studio-good" />
                 Grown on our own vineyard
               </Label>
             </div>
@@ -1306,7 +1306,7 @@ export function IngredientFormCard({
                 htmlFor={`self-grown-arable-${ingredient.tempId}`}
                 className="text-sm font-normal cursor-pointer flex items-center gap-1.5"
               >
-                <Leaf className="h-3.5 w-3.5 text-[#ccff00]" />
+                <Leaf className="h-3.5 w-3.5 text-studio-good" />
                 Grown on our own arable field
               </Label>
             </div>
@@ -1343,7 +1343,7 @@ export function IngredientFormCard({
                 htmlFor={`self-grown-orchard-${ingredient.tempId}`}
                 className="text-sm font-normal cursor-pointer flex items-center gap-1.5"
               >
-                <Leaf className="h-3.5 w-3.5 text-[#ccff00]" />
+                <Leaf className="h-3.5 w-3.5 text-studio-good" />
                 Grown in our own orchard
               </Label>
             </div>
@@ -1352,7 +1352,7 @@ export function IngredientFormCard({
 
           {/* Vineyard selector + profile status */}
           {ingredient.is_self_grown && ingredient.data_source === 'viticulture_primary' && (
-            <div className="rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5 p-4 space-y-3">
+            <div className="rounded-[6px] border border-border bg-card p-4 space-y-3">
               <VineyardSelector
                 organizationId={organizationId}
                 value={ingredient.vineyard_id || ''}
@@ -1366,15 +1366,14 @@ export function IngredientFormCard({
                 <>
                   {loadingProfile && (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       Checking growing profile...
                     </div>
                   )}
 
                   {!loadingProfile && growingProfile && (
-                    <div className="rounded-md bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 px-3 py-2 space-y-1">
-                      <Badge variant="outline" className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700">
-                        <Sprout className="h-3 w-3 mr-1.5" />
+                    <div className="rounded-[6px] border border-border bg-card px-3 py-2 space-y-1">
+                      <Badge variant="outline">
+                        <Sprout className="h-3 w-3 mr-1.5 text-studio-good" />
                         Growing profile complete
                       </Badge>
                       <p className="text-xs text-muted-foreground">
@@ -1409,7 +1408,7 @@ export function IngredientFormCard({
 
           {/* Arable field selector + profile status */}
           {ingredient.is_self_grown && ingredient.data_source === 'arable_primary' && (
-            <div className="rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5 p-4 space-y-3">
+            <div className="rounded-[6px] border border-border bg-card p-4 space-y-3">
               <ArableFieldSelector
                 organizationId={organizationId}
                 value={ingredient.arable_field_id || ''}
@@ -1423,15 +1422,14 @@ export function IngredientFormCard({
                 <>
                   {loadingArableProfile && (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       Checking growing profile...
                     </div>
                   )}
 
                   {!loadingArableProfile && arableProfile && (
-                    <div className="rounded-md bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 px-3 py-2 space-y-1">
-                      <Badge variant="outline" className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700">
-                        <Sprout className="h-3 w-3 mr-1.5" />
+                    <div className="rounded-[6px] border border-border bg-card px-3 py-2 space-y-1">
+                      <Badge variant="outline">
+                        <Sprout className="h-3 w-3 mr-1.5 text-studio-good" />
                         Growing profile complete
                       </Badge>
                       <p className="text-xs text-muted-foreground">
@@ -1466,7 +1464,7 @@ export function IngredientFormCard({
 
           {/* Orchard selector + profile status */}
           {ingredient.is_self_grown && ingredient.data_source === 'orchard_primary' && (
-            <div className="rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5 p-4 space-y-3">
+            <div className="rounded-[6px] border border-border bg-card p-4 space-y-3">
               <OrchardSelector
                 organizationId={organizationId}
                 value={ingredient.orchard_id || ''}
@@ -1480,15 +1478,14 @@ export function IngredientFormCard({
                 <>
                   {loadingOrchardProfile && (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       Checking growing profile...
                     </div>
                   )}
 
                   {!loadingOrchardProfile && orchardProfile && (
-                    <div className="rounded-md bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 px-3 py-2 space-y-1">
-                      <Badge variant="outline" className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700">
-                        <Sprout className="h-3 w-3 mr-1.5" />
+                    <div className="rounded-[6px] border border-border bg-card px-3 py-2 space-y-1">
+                      <Badge variant="outline">
+                        <Sprout className="h-3 w-3 mr-1.5 text-studio-good" />
                         Growing profile complete
                       </Badge>
                       <p className="text-xs text-muted-foreground">
@@ -1724,7 +1721,7 @@ export function IngredientFormCard({
                           <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 text-xs">
                             <Calculator className="h-3 w-3 text-green-600 dark:text-green-400 shrink-0" />
                             <span className="font-mono font-semibold text-green-800 dark:text-green-200">
-                              {leg.distanceKm > 0 ? leg.distanceKm.toLocaleString() : '—'} km
+                              {leg.distanceKm > 0 ? leg.distanceKm.toLocaleString() : '–'} km
                             </span>
                             <span className="text-green-700 dark:text-green-300 text-[10px] ml-1">
                               auto-calculated
@@ -1822,7 +1819,6 @@ export function IngredientFormCard({
                   <div>
                     {transportPreviewLoading && (
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
                         Calculating transport emissions…
                       </div>
                     )}
@@ -1920,7 +1916,7 @@ export function IngredientFormCard({
                   </SelectTrigger>
                   <SelectContent>
                     {/* Radix UI v2 requires non-empty strings — use sentinel '__none__' */}
-                    <SelectItem value="__none__">— None —</SelectItem>
+                    <SelectItem value="__none__">None</SelectItem>
                     {CONTAINER_PRESETS.map((p) => (
                       <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>
                     ))}
@@ -1980,7 +1976,7 @@ export function IngredientFormCard({
                             />
                             {preset && !isOverridden && (
                               <p className="text-xs text-muted-foreground mt-1">
-                                Industry default — edit if your actual container differs.
+                                Industry default. Edit if your actual container differs.
                               </p>
                             )}
                           </>
@@ -2067,7 +2063,7 @@ export function IngredientFormCard({
                             <SelectValue placeholder="Select material…" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="__none__">— Select material —</SelectItem>
+                            <SelectItem value="__none__">Select material</SelectItem>
                             {CONTAINER_MATERIAL_OPTIONS.map((m) => (
                               <SelectItem key={m.value} value={m.value}>
                                 {m.label}
@@ -2097,7 +2093,7 @@ export function IngredientFormCard({
                             min={0}
                             step="any"
                             placeholder={`Leave blank to use material default (${
-                              CONTAINER_MATERIAL_OPTIONS.find(m => m.value === ingredient.inbound_container_material)?.ef ?? '—'
+                              CONTAINER_MATERIAL_OPTIONS.find(m => m.value === ingredient.inbound_container_material)?.ef ?? '–'
                             } kg CO₂e/kg)`}
                             value={ingredient.inbound_container_ef ?? ''}
                             onChange={(e) =>
@@ -2149,8 +2145,8 @@ export function IngredientFormCard({
               <div className="flex-1">
                 {ingredient.is_self_grown ? (
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="bg-[#ccff00]/10 text-[#ccff00] border-[#ccff00]/30">
-                      <Leaf className="h-3 w-3 mr-1.5" />
+                    <Badge variant="outline">
+                      <Leaf className="h-3 w-3 mr-1.5 text-studio-good" />
                       Self-Grown (Viticulture)
                     </Badge>
                     <span className="text-xs text-muted-foreground">Calculated from growing profile</span>

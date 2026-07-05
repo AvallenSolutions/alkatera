@@ -51,8 +51,8 @@ export function SupplierActionItems({
       label: 'Complete your company profile',
       description: 'Add your contact details, address, and phone number so customers can reach you.',
       href: '/supplier-portal/profile',
-      colour: 'text-emerald-400',
-      bgColour: 'bg-emerald-500/10',
+      colour: 'text-studio-good',
+      bgColour: 'bg-secondary',
     });
   }
 
@@ -64,8 +64,8 @@ export function SupplierActionItems({
       label: 'Add your first product',
       description: 'List your products with environmental data so brands can include them in their assessments.',
       href: '/supplier-portal/products',
-      colour: 'text-purple-400',
-      bgColour: 'bg-purple-500/10',
+      colour: 'text-studio-hold',
+      bgColour: 'bg-secondary',
     });
   }
 
@@ -77,8 +77,8 @@ export function SupplierActionItems({
       label: 'Add impact data to your products',
       description: 'Provide climate, water, waste, and land impact figures to strengthen your sustainability credentials.',
       href: '/supplier-portal/products',
-      colour: 'text-blue-400',
-      bgColour: 'bg-blue-500/10',
+      colour: 'text-studio-cobalt',
+      bgColour: 'bg-secondary',
     });
   }
 
@@ -90,8 +90,8 @@ export function SupplierActionItems({
       label: 'Start your ESG self-assessment',
       description: 'Complete a voluntary ESG questionnaire to demonstrate your sustainability practices to buyers.',
       href: '/supplier-portal/esg-assessment',
-      colour: 'text-amber-400',
-      bgColour: 'bg-amber-500/10',
+      colour: 'text-studio-attention',
+      bgColour: 'bg-secondary',
     });
   }
 
@@ -103,8 +103,8 @@ export function SupplierActionItems({
       label: 'Respond to pending data requests',
       description: `You have ${pendingRequestsCount} data request${pendingRequestsCount === 1 ? '' : 's'} awaiting your response.`,
       href: '/supplier-portal/requests',
-      colour: 'text-red-400',
-      bgColour: 'bg-red-500/10',
+      colour: 'text-studio-stale',
+      bgColour: 'bg-secondary',
     });
   }
 
@@ -120,10 +120,10 @@ export function SupplierActionItems({
             <Link
               key={item.id}
               href={item.href}
-              className="group flex items-center justify-between p-4 rounded-xl border border-border bg-card hover:border-[#ccff00]/30 hover:bg-[#ccff00]/5 transition-all"
+              className="group flex items-center justify-between p-4 rounded-[6px] border border-border bg-card hover:border-studio-cobalt/40 hover:bg-secondary transition-all"
             >
               <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${item.bgColour}`}>
+                <div className={`p-2 rounded-[6px] border border-border ${item.bgColour}`}>
                   <Icon className={`h-4 w-4 ${item.colour}`} />
                 </div>
                 <div>
@@ -131,7 +131,7 @@ export function SupplierActionItems({
                   <p className="text-xs text-muted-foreground">{item.description}</p>
                 </div>
               </div>
-              <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-[#ccff00] transition-colors flex-shrink-0 ml-3" />
+              <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-studio-cobalt transition-colors flex-shrink-0 ml-3" />
             </Link>
           );
         })}

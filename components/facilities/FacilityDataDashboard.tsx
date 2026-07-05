@@ -13,7 +13,6 @@
 
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -328,7 +327,7 @@ export function FacilityDataDashboard({
 
   const groups: SeriesData['group'][] = ['Energy & Fuel', 'Water', 'Waste'];
   const TrendIcon = stats?.trend.direction === 'up' ? TrendingUp : stats?.trend.direction === 'down' ? TrendingDown : Minus;
-  const trendColour = stats?.trend.direction === 'down' ? 'text-green-500' : stats?.trend.direction === 'up' ? 'text-amber-500' : 'text-muted-foreground';
+  const trendColour = stats?.trend.direction === 'down' ? 'text-studio-good' : stats?.trend.direction === 'up' ? 'text-studio-attention' : 'text-muted-foreground';
 
   return (
     <div className="space-y-6">
@@ -391,13 +390,13 @@ export function FacilityDataDashboard({
 
                             if (c.covered && c.value !== null) {
                               cellClass = c.estimated
-                                ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30'
-                                : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25';
+                                ? 'bg-studio-attention/10 text-studio-attention border border-studio-attention/30'
+                                : 'bg-studio-good/10 text-studio-good border border-studio-good/25';
                               cellContent = formatValue(c.value);
                               title = `${m.label}: ${c.value.toLocaleString('en-GB', { maximumFractionDigits: 1 })} ${s.unit}${c.estimated ? ' (estimated)' : ''}`;
                             } else if (c.covered) {
                               // Covered but value excluded due to incompatible units
-                              cellClass = 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25';
+                              cellClass = 'bg-studio-good/10 text-studio-good border border-studio-good/25';
                               cellContent = '✓';
                               title = `${m.label}: data recorded (mixed units)`;
                             } else if (m.isCurrent && c.tracked) {
@@ -405,7 +404,7 @@ export function FacilityDataDashboard({
                               cellContent = '…';
                               title = `${m.label}: current month, bill may not have arrived yet`;
                             } else if (c.tracked) {
-                              cellClass = 'bg-amber-500/10 border border-dashed border-amber-500/50 text-amber-600 dark:text-amber-500';
+                              cellClass = 'bg-studio-attention/5 border border-dashed border-studio-attention/50 text-studio-attention';
                               cellContent = '–';
                               title = `${m.label}: no data recorded (gap)`;
                             } else {
@@ -417,7 +416,7 @@ export function FacilityDataDashboard({
                             return (
                               <td key={m.key} className="px-0.5 py-1">
                                 <div
-                                  className={`rounded h-7 flex items-center justify-center font-medium tabular-nums text-[11px] ${cellClass}`}
+                                  className={`rounded-[6px] h-7 flex items-center justify-center font-medium tabular-nums text-[11px] ${cellClass}`}
                                   title={title}
                                 >
                                   {cellContent}
@@ -426,18 +425,13 @@ export function FacilityDataDashboard({
                             );
                           })}
                           <td className="pl-3 py-1.5 text-right">
-                            <Badge
-                              variant="outline"
-                              className={`text-[10px] tabular-nums ${
-                                coveragePct === 100
-                                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30'
-                                  : coveragePct >= 75
-                                    ? 'bg-lime-500/10 text-lime-700 dark:text-lime-400 border-lime-500/30'
-                                    : 'bg-amber-500/10 text-amber-600 dark:text-amber-500 border-amber-500/30'
+                            <span
+                              className={`font-mono text-[10px] font-bold tabular-nums tracking-[0.08em] ${
+                                coveragePct >= 75 ? 'text-studio-good' : 'text-studio-attention'
                               }`}
                             >
                               {s.coveredCount}/{s.trackedCount || 12}
-                            </Badge>
+                            </span>
                           </td>
                         </tr>
                       );
@@ -450,19 +444,19 @@ export function FacilityDataDashboard({
 
           <div className="flex flex-wrap gap-4 mt-4 text-xs text-muted-foreground">
             <div className="flex items-center gap-1.5">
-              <div className="w-4 h-4 rounded bg-emerald-500/15 border border-emerald-500/25" />
+              <div className="w-4 h-4 rounded-[3px] bg-studio-good/10 border border-studio-good/25" />
               <span>Data recorded</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-4 h-4 rounded bg-amber-500/20 border border-amber-500/30" />
+              <div className="w-4 h-4 rounded-[3px] bg-studio-attention/10 border border-studio-attention/30" />
               <span>Estimated data</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-4 h-4 rounded bg-amber-500/10 border border-dashed border-amber-500/50" />
+              <div className="w-4 h-4 rounded-[3px] bg-studio-attention/5 border border-dashed border-studio-attention/50" />
               <span>Gap (no data)</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-4 h-4 rounded border border-dashed border-border" />
+              <div className="w-4 h-4 rounded-[3px] border border-dashed border-border" />
               <span>Current month (pending)</span>
             </div>
             <div className="flex items-center gap-1.5">
@@ -564,14 +558,14 @@ export function FacilityDataDashboard({
                 {stats.average > 0 && (
                   <ReferenceLine
                     y={stats.average}
-                    stroke="#94a3b8"
+                    stroke="#6F6F68"
                     strokeDasharray="5 5"
-                    label={{ value: 'Avg', position: 'right', fontSize: 10, fill: '#94a3b8' }}
+                    label={{ value: 'Avg', position: 'right', fontSize: 10, fill: '#6F6F68' }}
                   />
                 )}
                 <Bar dataKey="value" radius={[3, 3, 0, 0]} maxBarSize={40}>
                   {chartData.map((d, i) => (
-                    <Cell key={i} fill={d.estimated ? '#f59e0b' : '#ccff00'} fillOpacity={0.85} />
+                    <Cell key={i} fill={d.estimated ? '#B45309' : '#2B46C0'} fillOpacity={0.85} />
                   ))}
                 </Bar>
               </BarChart>
@@ -579,11 +573,11 @@ export function FacilityDataDashboard({
 
             {stats.gapMonths.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5 mt-3 text-xs">
-                <span className="text-amber-600 dark:text-amber-500 font-medium">Missing months:</span>
+                <span className="text-studio-attention font-medium">Missing months:</span>
                 {stats.gapMonths.map(m => (
-                  <Badge key={m.key} variant="outline" className="text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-500 border-amber-500/30">
+                  <span key={m.key} className="font-mono text-[10px] font-bold uppercase tracking-[0.08em] text-studio-attention">
                     {m.label}
-                  </Badge>
+                  </span>
                 ))}
               </div>
             )}

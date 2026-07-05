@@ -32,6 +32,7 @@ import {
   Loader2,
   Send,
 } from 'lucide-react';
+import { Eyebrow } from '@/components/studio/eyebrow';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
 import { createTicket } from '@/lib/feedback';
@@ -321,9 +322,14 @@ export default function DataSourcesPage() {
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
-      <div className="space-y-3">
-        <h1 className="text-3xl font-bold tracking-tight">Data Sources</h1>
-        <p className="text-muted-foreground">
+      <header className="space-y-3">
+        <div>
+          <Eyebrow className="mb-3">THE MEASURES · SOURCES</Eyebrow>
+          <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+            The sources.
+          </h1>
+        </div>
+        <p className="max-w-2xl text-sm text-muted-foreground">
           This is the reference library that powers your carbon footprint calculations. It contains the
           conversion numbers (called &ldquo;emission factors&rdquo;) that tell us how much CO&#8322; is released
           for every kilogram of malt, litre of fuel, or unit of packaging your business uses.
@@ -333,11 +339,11 @@ export default function DataSourcesPage() {
           <AlertDescription className="text-blue-800 dark:text-blue-200">
             <strong>Why does this matter?</strong> When you log ingredients, packaging, or energy use elsewhere in alkatera, we
             multiply your quantities by these numbers to calculate your carbon footprint. Better data here means more
-            accurate results for your business. You don&apos;t need to edit anything — this page is here so you can see
+            accurate results for your business. You don&apos;t need to edit anything: this page is here so you can see
             exactly where our numbers come from.
           </AlertDescription>
         </Alert>
-      </div>
+      </header>
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

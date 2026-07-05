@@ -47,6 +47,7 @@ import type {
 import { supabase } from '@/lib/supabaseClient';
 import { calculateVitalityScores } from '@/components/vitality/VitalityScoreHero';
 import { EsgVitalityScoreHero } from '@/components/vitality/EsgVitalityScoreHero';
+import { Eyebrow } from '@/components/studio/eyebrow';
 import type { VitalityComposite } from '@/lib/vitality/composite';
 import {
   listMissingSubScores,
@@ -906,6 +907,13 @@ export default function PerformancePage() {
 
   return (
     <div className="space-y-6 animate-fade-in-up">
+      <header>
+        <Eyebrow className="mb-3">THE MEASURES · VITALITY</Eyebrow>
+        <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+          The vitality.
+        </h1>
+      </header>
+
       {/* ESG composite hero — composes E + S + G with configurable weights.
           Replaces the legacy environmental-only VitalityScoreHero. The
           deep environmental pillar deep-dives still live further down the

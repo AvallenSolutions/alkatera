@@ -115,12 +115,12 @@ export function BrewwLinkBadge({ productId, onChanged, onOpenRecipeImport }: Bre
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="inline-flex items-center gap-1.5 rounded-full border border-[#ccff00]/40 bg-[#ccff00]/10 px-2.5 py-1 text-xs font-medium text-[#8da300] dark:text-[#ccff00] hover:bg-[#ccff00]/20 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-[6px] border border-border bg-card px-2.5 py-1 text-xs font-medium text-studio-cobalt hover:bg-secondary transition-colors"
             title="Linked to Breww"
           >
             <Link2 className="h-3 w-3" />
             Breww
-            <span className="text-[10px] text-[#8da300]/70 dark:text-[#ccff00]/70 font-normal truncate max-w-[140px]">
+            <span className="text-[10px] text-studio-dim font-normal truncate max-w-[140px]">
               {info.skuName}
             </span>
           </button>
@@ -128,7 +128,7 @@ export function BrewwLinkBadge({ productId, onChanged, onOpenRecipeImport }: Bre
         <PopoverContent className="w-80 p-0" align="start">
           <div className="p-4 border-b space-y-1">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+              <CheckCircle2 className="h-3 w-3 text-studio-good" />
               Linked to Breww SKU
             </div>
             <div className="font-medium text-sm">{info.skuName}</div>
@@ -160,7 +160,7 @@ export function BrewwLinkBadge({ productId, onChanged, onOpenRecipeImport }: Bre
             <button
               type="button"
               onClick={() => setConfirmUnlink(true)}
-              className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted text-left text-red-600"
+              className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-muted text-left text-studio-stale"
             >
               <Link2Off className="h-3.5 w-3.5" />
               Unlink from Breww
@@ -181,7 +181,7 @@ export function BrewwLinkBadge({ productId, onChanged, onOpenRecipeImport }: Bre
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => { e.preventDefault(); handleUnlink() }}
-              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               Unlink
             </AlertDialogAction>

@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   Package,
   CheckCircle2,
@@ -54,36 +53,36 @@ const PILLAR_CONFIG = [
     key: 'climate' as const,
     label: 'Climate',
     icon: Cloud,
-    color: 'text-blue-400',
-    bg: 'bg-blue-500/10',
-    border: 'border-blue-500/20',
+    color: 'text-studio-cobalt',
+    bg: 'bg-card',
+    border: 'border-border',
     unit: 'kg CO₂e',
   },
   {
     key: 'water' as const,
     label: 'Water',
     icon: Droplets,
-    color: 'text-cyan-400',
-    bg: 'bg-cyan-500/10',
-    border: 'border-cyan-500/20',
+    color: 'text-studio-cobalt',
+    bg: 'bg-card',
+    border: 'border-border',
     unit: 'L',
   },
   {
     key: 'circularity' as const,
     label: 'Circularity',
     icon: Recycle,
-    color: 'text-amber-400',
-    bg: 'bg-amber-500/10',
-    border: 'border-amber-500/20',
+    color: 'text-studio-attention',
+    bg: 'bg-card',
+    border: 'border-border',
     unit: '',
   },
   {
     key: 'nature' as const,
     label: 'Nature',
     icon: Leaf,
-    color: 'text-green-400',
-    bg: 'bg-green-500/10',
-    border: 'border-green-500/20',
+    color: 'text-studio-good',
+    bg: 'bg-card',
+    border: 'border-border',
     unit: 'pt',
   },
 ];
@@ -116,7 +115,7 @@ export default function ProductPreviewPanel({ product }: ProductPreviewPanelProp
       {/* Product image and header */}
       <div className="flex items-start gap-4">
         {product.product_image_url ? (
-          <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border border-border flex items-center justify-center bg-slate-100 dark:bg-slate-800">
+          <div className="w-20 h-20 rounded-[6px] overflow-hidden flex-shrink-0 border border-border flex items-center justify-center bg-secondary">
             <img
               src={product.product_image_url}
               alt={product.name}
@@ -124,32 +123,32 @@ export default function ProductPreviewPanel({ product }: ProductPreviewPanelProp
             />
           </div>
         ) : (
-          <div className="w-20 h-20 rounded-lg flex-shrink-0 flex items-center justify-center bg-purple-500/10 border border-purple-500/20">
-            <Package className="h-8 w-8 text-purple-400" />
+          <div className="w-20 h-20 rounded-[6px] flex-shrink-0 flex items-center justify-center bg-secondary border border-border">
+            <Package className="h-8 w-8 text-muted-foreground" />
           </div>
         )}
         <div className="min-w-0 flex-1">
           <h3 className="text-lg font-semibold text-foreground truncate">{product.name}</h3>
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
             {product.product_type === 'packaging' ? (
-              <Badge variant="secondary" className="text-xs bg-purple-500/10 text-purple-400 border-purple-500/20">
+              <span className="inline-flex items-center font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
                 <Box className="h-3 w-3 mr-1" />
                 Packaging
-              </Badge>
+              </span>
             ) : (
-              <Badge variant="secondary" className="text-xs bg-amber-500/10 text-amber-400 border-amber-500/20">
+              <span className="inline-flex items-center font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
                 <Wheat className="h-3 w-3 mr-1" />
                 Ingredient
-              </Badge>
+              </span>
             )}
             {product.is_verified && (
-              <Badge variant="default" className="text-xs bg-green-500/20 text-green-400 border-green-500/30">
+              <span className="inline-flex items-center font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-good">
                 <CheckCircle2 className="h-3 w-3 mr-1" />
                 Verified
-              </Badge>
+              </span>
             )}
             {!product.is_active && (
-              <Badge variant="secondary" className="text-xs">Inactive</Badge>
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">Inactive</span>
             )}
           </div>
         </div>
@@ -226,10 +225,10 @@ export default function ProductPreviewPanel({ product }: ProductPreviewPanelProp
             return (
               <div
                 key={pillar.key}
-                className={`rounded-lg border p-3 ${
+                className={`rounded-[6px] border p-3 ${
                   value !== null
                     ? `${pillar.bg} ${pillar.border}`
-                    : 'bg-muted/30 border-border'
+                    : 'bg-secondary border-border'
                 }`}
               >
                 <div className="flex items-center gap-1.5 mb-1">
@@ -260,14 +259,13 @@ export default function ProductPreviewPanel({ product }: ProductPreviewPanelProp
           <h4 className="text-sm font-medium text-foreground">Certifications</h4>
           <div className="flex flex-wrap gap-2">
             {product.certifications.map((cert) => (
-              <Badge
+              <span
                 key={cert}
-                variant="secondary"
-                className="text-xs bg-[#ccff00]/10 text-[#ccff00] border-[#ccff00]/20"
+                className="inline-flex items-center font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-cobalt"
               >
                 <Award className="h-3 w-3 mr-1" />
                 {cert}
-              </Badge>
+              </span>
             ))}
           </div>
         </div>

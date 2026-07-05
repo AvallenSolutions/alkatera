@@ -20,7 +20,7 @@ export function SmartUploadButton({
     <UniversalDropzone
       trigger={
         <Button variant="outline" size={size} className={className}>
-          <Sparkles className="mr-2 h-4 w-4 text-[#8da300] dark:text-[#ccff00]" />
+          <Sparkles className="mr-2 h-4 w-4 text-room-accent" />
           Smart upload
         </Button>
       }

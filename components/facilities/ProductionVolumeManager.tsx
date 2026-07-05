@@ -7,8 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Loader2, Package, Plus, Trash2, Download } from "lucide-react";
+import { Package, Plus, Trash2, Download } from "lucide-react";
 import { BrewwImportDialog } from "@/components/facilities/BrewwImportDialog";
 import { toast } from "sonner";
 import { useReportingPeriod } from "@/hooks/useReportingPeriod";
@@ -174,8 +173,8 @@ export function ProductionVolumeManager({
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-              <Package className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <div className="h-10 w-10 rounded-[6px] border border-border bg-secondary flex items-center justify-center">
+              <Package className="h-5 w-5 text-studio-cobalt" />
             </div>
             <div>
               <CardTitle className="text-lg">Production Volume</CardTitle>
@@ -199,8 +198,8 @@ export function ProductionVolumeManager({
       <CardContent className="space-y-4">
         {/* Prominent Breww import CTA when this facility is linked */}
         {brewwAvailable && !showForm && volumes.length === 0 && (
-          <div className="rounded-lg border border-[#ccff00]/40 bg-[#ccff00]/10 p-3 flex items-center gap-3">
-            <Download className="h-4 w-4 text-[#8da300] dark:text-[#ccff00] flex-shrink-0" />
+          <div className="rounded-[6px] border border-border bg-card p-3 flex items-center gap-3">
+            <Download className="h-4 w-4 text-studio-cobalt flex-shrink-0" />
             <div className="flex-1 min-w-0 text-sm">
               <div className="font-medium">Breww has production data for this site</div>
               <div className="text-xs text-muted-foreground">
@@ -215,7 +214,7 @@ export function ProductionVolumeManager({
 
         {/* Add Form */}
         {showForm && (
-          <div className="p-4 border rounded-lg bg-muted/30 space-y-4">
+          <div className="p-4 border border-border rounded-[6px] bg-card space-y-4">
             <div className="flex flex-wrap gap-4 items-end">
               <div className="space-y-1.5">
                 <Label className="text-xs">Cadence</Label>
@@ -280,7 +279,7 @@ export function ProductionVolumeManager({
                 Cancel
               </Button>
               <Button size="sm" onClick={handleSave} disabled={isSaving}>
-                {isSaving ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Saving...</> : "Save"}
+                {isSaving ? "Saving..." : "Save"}
               </Button>
             </div>
           </div>
@@ -288,15 +287,15 @@ export function ProductionVolumeManager({
 
         {/* Volume History */}
         {isLoading ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <div className="py-8 text-center text-sm text-muted-foreground">
+            Loading production volumes...
           </div>
         ) : volumes.length === 0 ? (
           <div className="py-8 text-center text-sm text-muted-foreground">
             No production volumes recorded yet. Add one to enable intensity metrics.
           </div>
         ) : (
-          <div className="border rounded-lg overflow-hidden">
+          <div className="border border-border rounded-[6px] overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -311,16 +310,20 @@ export function ProductionVolumeManager({
                 {volumes.map((v) => (
                   <TableRow key={v.id}>
                     <TableCell className="text-sm">
-                      {v.reporting_period_start} — {v.reporting_period_end}
+                      {v.reporting_period_start} to {v.reporting_period_end}
                     </TableCell>
                     <TableCell className="text-right font-medium">
                       {Number(v.production_volume).toLocaleString()}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{v.volume_unit}</TableCell>
                     <TableCell>
-                      <Badge variant={v.data_source_type === "Primary" ? "default" : "secondary"} className="text-xs">
+                      <span
+                        className={`font-mono text-[10px] font-bold uppercase tracking-[0.18em] ${
+                          v.data_source_type === "Primary" ? "text-studio-good" : "text-studio-attention"
+                        }`}
+                      >
                         {v.data_source_type === "Primary" ? "Primary" : "Estimated"}
-                      </Badge>
+                      </span>
                     </TableCell>
                     <TableCell>
                       <Button variant="ghost" size="icon" onClick={() => handleDelete(v.id)}>

@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { BigNumber } from '@/components/studio/big-number';
 import { PeopleCultureScoreHero } from '@/components/people-culture/PeopleCultureScoreHero';
 // Round 9 (auto-research): each dashboard lives in its own (non-default) tab, so
 // only one is ever shown — defer all four out of /people-culture's first load.
@@ -126,23 +128,28 @@ function PeopleCulturePageContent() {
   return (
     <div className="space-y-6 animate-fade-in-up">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Users className="h-6 w-6" />
-            People & Culture
+      <header className="flex flex-wrap items-end justify-between gap-x-12 gap-y-6">
+        <div className="min-w-0">
+          <Eyebrow className="mb-3">THE MEASURES · PEOPLE &amp; CULTURE</Eyebrow>
+          <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+            People &amp; culture.
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="mt-3 max-w-xl text-sm text-muted-foreground">
             Workforce wellbeing, diversity, fair work, and development metrics
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleRecalculate} disabled={isRecalculating}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRecalculating ? 'animate-spin' : ''}`} />
-            {isRecalculating ? 'Calculating...' : 'Refresh Data'}
-          </Button>
+        <div className="flex shrink-0 items-end gap-8 pb-1">
+          {typeof summary?.total_employees === 'number' && (
+            <BigNumber size="display" value={summary.total_employees} label="Employees" />
+          )}
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleRecalculate} disabled={isRecalculating}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRecalculating ? 'animate-spin' : ''}`} />
+              {isRecalculating ? 'Calculating...' : 'Refresh Data'}
+            </Button>
+          </div>
         </div>
-      </div>
+      </header>
 
       {/* Score Hero */}
       <PeopleCultureScoreHero

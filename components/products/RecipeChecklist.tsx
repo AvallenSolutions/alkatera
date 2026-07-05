@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { StateChip } from "@/components/studio/state-chip";
 import {
   Collapsible,
   CollapsibleContent,
@@ -109,20 +109,13 @@ export function RecipeChecklist({
         <CollapsibleTrigger asChild>
           <button className="flex items-center justify-between w-full px-4 py-3 text-left hover:bg-muted/50 transition-colors rounded-lg">
             <div className="flex items-center gap-2">
-              <Lightbulb className="h-4 w-4 text-[#ccff00]" />
+              <Lightbulb className="h-4 w-4 text-studio-cobalt" />
               <span className="text-sm font-medium">
                 Typical {categoryLabel} Recipe
               </span>
-              <Badge
-                variant={allFilled ? "default" : "secondary"}
-                className={
-                  allFilled
-                    ? "bg-green-600 text-white"
-                    : ""
-                }
-              >
+              <StateChip tone={allFilled ? "good" : "quiet"}>
                 {filledCount} / {totalCount}
-              </Badge>
+              </StateChip>
             </div>
             {isOpen ? (
               <ChevronUp className="h-4 w-4 text-muted-foreground" />
@@ -151,7 +144,7 @@ export function RecipeChecklist({
                 >
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     {filled ? (
-                      <Check className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />
+                      <Check className="h-3.5 w-3.5 text-studio-good flex-shrink-0" />
                     ) : (
                       <div className="h-3.5 w-3.5 rounded-sm border border-muted-foreground/40 flex-shrink-0" />
                     )}
@@ -159,9 +152,7 @@ export function RecipeChecklist({
                       {item.label}
                     </span>
                     {item.required && !filled && (
-                      <Badge variant="outline" className="text-[10px] h-4 px-1 border-amber-500/50 text-amber-500">
-                        expected
-                      </Badge>
+                      <StateChip tone="attention">expected</StateChip>
                     )}
                   </div>
                   {!filled && (
@@ -169,7 +160,7 @@ export function RecipeChecklist({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-6 px-2 text-xs text-[#ccff00] hover:text-[#ccff00] hover:bg-[#ccff00]/10"
+                      className="h-6 px-2 text-xs text-studio-cobalt hover:text-studio-cobalt hover:bg-secondary"
                       onClick={(e) => {
                         e.stopPropagation();
                         onQuickAdd(

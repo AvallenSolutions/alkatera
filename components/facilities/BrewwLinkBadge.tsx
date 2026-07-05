@@ -75,12 +75,12 @@ export function BrewwLinkBadge({ facilityId }: BrewwLinkBadgeProps) {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="inline-flex items-center gap-1.5 rounded-full border border-[#ccff00]/40 bg-[#ccff00]/10 px-2.5 py-1 text-xs font-medium text-[#8da300] dark:text-[#ccff00] hover:bg-[#ccff00]/20 transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-[6px] border border-border bg-card px-2.5 py-1 text-xs font-medium text-studio-cobalt hover:bg-secondary transition-colors"
           title="Linked to Breww site"
         >
           <Link2 className="h-3 w-3" />
           Breww
-          <span className="text-[10px] text-[#8da300]/70 dark:text-[#ccff00]/70 font-normal truncate max-w-[140px]">
+          <span className="text-[10px] text-muted-foreground font-normal truncate max-w-[140px]">
             {info.siteName}
           </span>
         </button>
@@ -88,7 +88,7 @@ export function BrewwLinkBadge({ facilityId }: BrewwLinkBadgeProps) {
       <PopoverContent className="w-72 p-4" align="start">
         <div className="space-y-1">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+            <CheckCircle2 className="h-3 w-3 text-studio-good" />
             Linked to Breww site
           </div>
           <div className="font-medium text-sm">{info.siteName}</div>
@@ -100,7 +100,7 @@ export function BrewwLinkBadge({ facilityId }: BrewwLinkBadgeProps) {
           <button
             type="button"
             onClick={() => router.push('/settings/integrations/breww?tab=sites')}
-            className="mt-2 inline-flex items-center gap-1 text-[11px] text-[#8da300] dark:text-[#ccff00] hover:underline"
+            className="mt-2 inline-flex items-center gap-1 text-[11px] text-studio-cobalt hover:underline"
           >
             <ExternalLink className="h-2.5 w-2.5" />
             Manage in integrations

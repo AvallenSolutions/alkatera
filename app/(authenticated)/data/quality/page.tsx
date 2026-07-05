@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Eyebrow } from '@/components/studio/eyebrow';
 import { useDataQualityMetrics } from '@/hooks/data/useDataQualityMetrics';
 import { useOrganization } from '@/lib/organizationContext';
 import {
@@ -112,13 +113,16 @@ export default function DataQualityDashboard() {
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Page Header */}
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight">Data Quality</h1>
-        <p className="text-muted-foreground">
+      <header>
+        <Eyebrow className="mb-3">THE MEASURES · DATA QUALITY</Eyebrow>
+        <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+          Data quality.
+        </h1>
+        <p className="mt-3 max-w-xl text-sm text-muted-foreground">
           See how accurate your carbon footprint data is across your products, and find out where you
           can improve it by getting better numbers from your suppliers.
         </p>
-      </div>
+      </header>
 
       {/* Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">

@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Loader2, Layers } from 'lucide-react';
+import { Layers } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -93,11 +93,11 @@ export function SupplierTieringPanel({ organizationId }: { organizationId: strin
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Layers className="h-4 w-4 text-[#ccff00]" />
+          <Layers className="h-4 w-4 text-studio-cobalt" />
           Supplier tiers
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          We suggest your direct, material suppliers (Tier 1) from spend{summary ? ` — ${summary.count} suppliers making up ${Math.round(summary.spendSharePct)}% of spend` : ''}.
+          We suggest your direct, material suppliers (Tier 1) from spend{summary ? `: ${summary.count} suppliers making up ${Math.round(summary.spendSharePct)}% of spend` : ''}.
           These become the set B Corp measures your survey coverage against. Adjust any below.
         </p>
       </CardHeader>
@@ -107,7 +107,7 @@ export function SupplierTieringPanel({ organizationId }: { organizationId: strin
             const current = tierFor(s);
             const isSuggested = (s.suggestedTier ?? 'none') === current && overrides[s.id] === undefined;
             return (
-              <div key={s.id} className="flex items-center gap-3 rounded-md border border-border/60 px-3 py-2">
+              <div key={s.id} className="flex items-center gap-3 rounded-[6px] border border-border px-3 py-2">
                 <span className="min-w-0 flex-1 truncate text-sm font-medium">{s.name}</span>
                 <span className="text-xs tabular-nums text-muted-foreground">{gbp(s.spend)}</span>
                 <Select value={current} onValueChange={(v) => setOverrides((o) => ({ ...o, [s.id]: v as Tier }))}>
@@ -122,7 +122,7 @@ export function SupplierTieringPanel({ organizationId }: { organizationId: strin
                   </SelectContent>
                 </Select>
                 {isSuggested && s.suggestedTier === 'tier_1' && (
-                  <span className="w-16 text-[10px] uppercase tracking-wide text-[#9bbf00] dark:text-[#ccff00]">Suggested</span>
+                  <span className="w-16 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-cobalt">Suggested</span>
                 )}
                 {!isSuggested || s.suggestedTier !== 'tier_1' ? <span className="w-16" /> : null}
               </div>
@@ -131,8 +131,7 @@ export function SupplierTieringPanel({ organizationId }: { organizationId: strin
         </div>
         <div className="flex justify-end">
           <Button onClick={apply} disabled={saving || !anyChange}>
-            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Apply tiers
+            {saving ? 'Applying...' : 'Apply tiers'}
           </Button>
         </div>
       </CardContent>

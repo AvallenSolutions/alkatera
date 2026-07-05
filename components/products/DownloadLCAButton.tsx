@@ -125,9 +125,9 @@ export function DownloadLCAButton({
                   variant={variant}
                   size={size}
                   onClick={() => setShowUpgradeModal(true)}
-                  className="border-[#ccff00]/50"
+                  className="border-studio-cobalt/50"
                 >
-                  <Lock className="h-4 w-4 mr-2 text-[#ccff00]" />
+                  <Lock className="h-4 w-4 mr-2 text-studio-cobalt" />
                   {exportReason === "read_only" ? "Subscribe to download" : "Download (trial)"}
                 </Button>
               </span>
@@ -153,7 +153,7 @@ export function DownloadLCAButton({
                 disabled
                 className="opacity-50 cursor-not-allowed"
               >
-                <ShieldAlert className="h-4 w-4 mr-2 text-amber-400" />
+                <ShieldAlert className="h-4 w-4 mr-2 text-studio-attention" />
                 Blocked
               </Button>
             </span>
@@ -186,9 +186,9 @@ export function DownloadLCAButton({
                   variant={variant}
                   size={size}
                   onClick={() => setShowUpgradeModal(true)}
-                  className="border-amber-500/50"
+                  className="border-studio-attention/50"
                 >
-                  <Lock className="h-4 w-4 mr-2 text-amber-500" />
+                  <Lock className="h-4 w-4 mr-2 text-studio-attention" />
                   Upgrade
                 </Button>
               </span>

@@ -6,6 +6,8 @@ import { useRosaPageContext } from "@/lib/rosa/RosaContextProvider";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { SmartUploadButton } from "@/components/layouts/SmartUploadButton";
+import { Eyebrow } from "@/components/studio/eyebrow";
+import { BigNumber } from "@/components/studio/big-number";
 import { FlagThresholdBanner } from '@/components/flag/FlagThresholdBanner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -303,12 +305,14 @@ export default function ProductsPage() {
     const label = getBoundaryLabel(normalised);
     const isFullLifecycle = normalised === "cradle-to-consumer" || normalised === "cradle-to-grave";
     return (
-      <Badge
-        variant={isFullLifecycle ? "default" : "secondary"}
-        className={isFullLifecycle ? "bg-green-600" : "bg-amber-600 text-white"}
+      <span
+        className={cn(
+          'font-mono text-[10px] font-bold uppercase tracking-[0.18em]',
+          isFullLifecycle ? 'text-studio-good' : 'text-studio-attention',
+        )}
       >
         {label}
-      </Badge>
+      </span>
     );
   };
 
@@ -380,58 +384,62 @@ export default function ProductsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Products</h1>
-          <p className="text-muted-foreground mt-2">
+      <header className="flex flex-wrap items-end justify-between gap-x-12 gap-y-6">
+        <div className="min-w-0">
+          <Eyebrow className="mb-3">THE MEASURES · PRODUCTS</Eyebrow>
+          <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+            The products.
+          </h1>
+          <p className="mt-3 max-w-xl text-sm text-muted-foreground">
             Create and manage your products here
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <SmartUploadButton />
-          {products.length > 0 && (
+        <div className="flex shrink-0 items-end gap-8 pb-1">
+          <BigNumber size="display" value={products.length} label="Products" />
+          <div className="flex items-center gap-2">
+            <SmartUploadButton />
+            {products.length > 0 && (
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={findSupplierMatches}
+                disabled={findingMatches}
+              >
+                {findingMatches ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                Find supplier matches
+              </Button>
+            )}
             <Button
-              size="lg"
               variant="outline"
               className="gap-2"
-              onClick={findSupplierMatches}
-              disabled={findingMatches}
+              onClick={() => setImportDialogOpen(true)}
             >
-              {findingMatches ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              Find supplier matches
+              <Globe className="h-4 w-4" />
+              Import from Website
             </Button>
-          )}
-          <Button
-            size="lg"
-            variant="outline"
-            className="gap-2"
-            onClick={() => setImportDialogOpen(true)}
-          >
-            <Globe className="h-4 w-4" />
-            Import from Website
-          </Button>
-          {isReadOnly ? (
-            <Button size="lg" className="gap-2" onClick={() => router.push('/complete-subscription')}>
-              <Plus className="h-5 w-5" />
-              Subscribe to add
-            </Button>
-          ) : (
-            <Link href="/products/new">
-              <Button size="lg" className="gap-2">
-                <Plus className="h-5 w-5" />
-                Add New Product
+            {isReadOnly ? (
+              <Button className="gap-2 bg-primary text-primary-foreground" onClick={() => router.push('/complete-subscription')}>
+                <Plus className="h-4 w-4" />
+                Subscribe to add
               </Button>
-            </Link>
-          )}
+            ) : (
+              <Link href="/products/new">
+                <Button className="gap-2 bg-primary text-primary-foreground">
+                  <Plus className="h-4 w-4" />
+                  Add New Product
+                </Button>
+              </Link>
+            )}
+          </div>
         </div>
-      </div>
+      </header>
 
       {matchCount > 0 && (
         <Link
           href="/products/supplier-matches"
-          className="flex items-center gap-2 rounded-lg border border-[#ccff00]/40 bg-[#ccff00]/[0.06] px-4 py-2.5 text-sm transition-colors hover:bg-[#ccff00]/10"
+          className="flex items-center gap-2 rounded-[6px] border border-border bg-card px-4 py-2.5 text-sm transition-colors duration-150 ease-studio hover:border-studio-cobalt"
         >
-          <Sparkles className="h-4 w-4 shrink-0 text-[#ccff00]" />
+          <Sparkles className="h-4 w-4 shrink-0 text-studio-cobalt" />
           <span className="flex-1">
             {matchCount} supplier {matchCount === 1 ? 'match' : 'matches'} to review. Linking adds real
             supplier data to your footprints.
@@ -458,7 +466,7 @@ export default function ProductsPage() {
               onClick={() => setView('list')}
               className={cn(
                 'rounded px-3 py-1.5 text-xs font-medium transition-colors',
-                view === 'list' ? 'bg-[#ccff00]/20 text-foreground' : 'text-muted-foreground',
+                view === 'list' ? 'bg-secondary text-foreground' : 'text-muted-foreground',
               )}
             >
               List
@@ -468,7 +476,7 @@ export default function ProductsPage() {
               onClick={() => setView('portfolio')}
               className={cn(
                 'rounded px-3 py-1.5 text-xs font-medium transition-colors',
-                view === 'portfolio' ? 'bg-[#ccff00]/20 text-foreground' : 'text-muted-foreground',
+                view === 'portfolio' ? 'bg-secondary text-foreground' : 'text-muted-foreground',
               )}
             >
               Portfolio
@@ -486,17 +494,17 @@ export default function ProductsPage() {
       {products.length === 0 ? (
         <Card className="border-2 border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <div className="h-14 w-14 rounded-full bg-emerald-500/20 flex items-center justify-center mb-4">
-              <Leaf className="h-7 w-7 text-emerald-400" />
+            <div className="h-14 w-14 rounded-full bg-secondary flex items-center justify-center mb-4">
+              <Leaf className="h-7 w-7 text-studio-cobalt" />
             </div>
-            <h3 className="text-xl font-semibold mb-2">Build Your Product Portfolio</h3>
+            <h3 className="font-display text-xl font-semibold mb-2">Build your product portfolio.</h3>
             <p className="text-muted-foreground text-center max-w-md mb-6">
               Products are at the heart of your sustainability story. Import from your website or create one manually.
             </p>
             <div className="flex flex-col sm:flex-row items-center gap-3">
               <Button
                 size="lg"
-                className="gap-2 bg-neon-lime text-black hover:bg-neon-lime/90"
+                className="gap-2"
                 onClick={() => setImportDialogOpen(true)}
               >
                 <Globe className="h-4 w-4" />

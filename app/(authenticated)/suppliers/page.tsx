@@ -5,6 +5,8 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { SmartUploadButton } from '@/components/layouts/SmartUploadButton';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { BigNumber } from '@/components/studio/big-number';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -824,49 +826,55 @@ export default function SuppliersPage() {
   return (
     <div className="space-y-6 animate-fade-in-up">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Your Suppliers</h1>
-          <p className="text-muted-foreground mt-2">
+      <header className="flex flex-wrap items-end justify-between gap-x-12 gap-y-6">
+        <div className="min-w-0">
+          <Eyebrow className="mb-3">THE MEASURES · SUPPLIERS</Eyebrow>
+          <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+            The suppliers.
+          </h1>
+          <p className="mt-3 max-w-xl text-sm text-muted-foreground">
             {hasSuppliers
               ? 'Manage your supply chain and track supplier relationships'
               : 'Find and add suppliers from our verified directory'}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <SmartUploadButton />
-          {hasSuppliers && (
-            <>
-            {(canCreateSuppliers || canInviteSuppliers) && (
-              <Button size="lg" variant="outline" onClick={() => setEsgSurveyOpen(true)}>
-                <ClipboardCheck className="h-5 w-5 mr-2" />
-                Send ESG Survey
-              </Button>
+        <div className="flex shrink-0 items-end gap-8 pb-1">
+          {hasSuppliers && <BigNumber size="display" value={suppliers.length} label="Suppliers" />}
+          <div className="flex items-center gap-2">
+            <SmartUploadButton />
+            {hasSuppliers && (
+              <>
+              {(canCreateSuppliers || canInviteSuppliers) && (
+                <Button variant="outline" onClick={() => setEsgSurveyOpen(true)}>
+                  <ClipboardCheck className="h-4 w-4 mr-2" />
+                  Send ESG Survey
+                </Button>
+              )}
+              {(canCreateSuppliers || canInviteSuppliers) ? (
+                <Button className="bg-primary text-primary-foreground" onClick={handleOpenSheet}>
+                  <Search className="h-4 w-4 mr-2" />
+                  Find or Invite Supplier
+                </Button>
+              ) : (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button disabled>
+                        <Lock className="h-4 w-4 mr-2" />
+                        Find Supplier
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Only administrators can add suppliers</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              </>
             )}
-            {(canCreateSuppliers || canInviteSuppliers) ? (
-              <Button size="lg" onClick={handleOpenSheet}>
-                <Search className="h-5 w-5 mr-2" />
-                Find or Invite Supplier
-              </Button>
-            ) : (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button size="lg" disabled>
-                      <Lock className="h-5 w-5 mr-2" />
-                      Find Supplier
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Only administrators can add suppliers</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-            </>
-          )}
+          </div>
         </div>
-      </div>
+      </header>
 
       {/* Spend-driven supplier insight: who carries the most impact, and which
           are your direct/material suppliers for B Corp. */}

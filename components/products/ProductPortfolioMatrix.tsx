@@ -107,16 +107,16 @@ export function ProductPortfolioMatrix({ data }: { data: PortfolioResult }) {
                         <p className="text-muted-foreground">{d.perUnitKgCo2e.toFixed(2)} kg CO2e per unit</p>
                         <p className="text-muted-foreground">{Number(d.annualVolume).toLocaleString('en-GB')} units</p>
                         <p className="text-muted-foreground">{fmtKg(d.totalKgCo2e)} CO2e total</p>
-                        <p className="mt-1 text-[#9bbf00] dark:text-[#ccff00]">{QUADRANT_LABELS[d.quadrant as keyof typeof QUADRANT_LABELS]}</p>
+                        <p className="mt-1 text-studio-cobalt">{QUADRANT_LABELS[d.quadrant as keyof typeof QUADRANT_LABELS]}</p>
                       </div>
                     );
                   }}
                 />
                 <Scatter
                   data={points}
-                  fill="#ccff00"
+                  fill="#2B46C0"
                   fillOpacity={0.55}
-                  stroke="#9bbf00"
+                  stroke="#2B46C0"
                   onClick={(p: any) => p?.id != null && router.push(`/products/${p.id}`)}
                   className="cursor-pointer"
                 />
@@ -157,7 +157,7 @@ export function ProductPortfolioMatrix({ data }: { data: PortfolioResult }) {
                   key={p.id}
                   type="button"
                   onClick={() => router.push(`/products/${p.id}`)}
-                  className="rounded-full border border-border/60 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-[#ccff00]/50 hover:text-foreground"
+                  className="rounded-[6px] border border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-studio-cobalt hover:text-foreground"
                 >
                   {p.name}
                 </button>
