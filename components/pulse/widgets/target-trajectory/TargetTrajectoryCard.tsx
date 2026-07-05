@@ -138,7 +138,7 @@ export function TargetTrajectoryCard() {
             <Line
               type="monotone"
               dataKey="historical"
-              stroke="#ccff00"
+              stroke="#205E40"
               strokeWidth={2}
               dot={false}
               connectNulls
@@ -147,7 +147,7 @@ export function TargetTrajectoryCard() {
             <Line
               type="monotone"
               dataKey="forecast"
-              stroke="#ccff00"
+              stroke="#205E40"
               strokeDasharray="4 3"
               strokeWidth={1.5}
               dot={false}
@@ -156,7 +156,7 @@ export function TargetTrajectoryCard() {
             />
             <ReferenceLine
               y={target.target_value}
-              stroke="#94a3b8"
+              stroke="#A97C14"
               strokeDasharray="2 2"
             />
           </LineChart>

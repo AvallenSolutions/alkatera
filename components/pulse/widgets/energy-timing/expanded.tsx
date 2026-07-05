@@ -70,13 +70,13 @@ function EnergyTimingExpanded() {
       </p>
 
       <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5 p-3">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Cleanest window</p>
+        <div className="rounded-[6px] border border-border bg-card p-3">
+          <p className="text-[10px] uppercase tracking-wider text-studio-good">Cleanest window</p>
           <p className="mt-1 text-xl font-bold tabular-nums">{cleanest.label}</p>
           <p className="text-xs text-muted-foreground">≈{Math.round(cleanest.avgG)} g CO₂/kWh</p>
         </div>
-        <div className="rounded-lg border border-red-400/30 bg-red-500/5 p-3">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Dirtiest window</p>
+        <div className="rounded-[6px] border border-border bg-card p-3">
+          <p className="text-[10px] uppercase tracking-wider text-studio-stale">Dirtiest window</p>
           <p className="mt-1 text-xl font-bold tabular-nums">{dirtiest.label}</p>
           <p className="text-xs text-muted-foreground">≈{Math.round(dirtiest.avgG)} g CO₂/kWh</p>
         </div>
@@ -84,7 +84,7 @@ function EnergyTimingExpanded() {
 
       {recommendation && (
         <div className="flex items-start gap-2 rounded-lg border bg-muted/30 p-3 text-sm">
-          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-[#8da300] dark:text-[#ccff00]" />
+          <Clock className="mt-0.5 h-4 w-4 shrink-0 text-studio-forest" />
           <p>{recommendation}</p>
         </div>
       )}
@@ -99,7 +99,7 @@ function EnergyTimingExpanded() {
       {data.facilityId && (
         <Link
           href={`/company/facilities/${data.facilityId}`}
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-[#8da300] hover:underline dark:text-[#ccff00]"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-studio-forest hover:underline"
         >
           Open the facility Energy &amp; grid tab
           <ArrowRight className="h-3.5 w-3.5" />

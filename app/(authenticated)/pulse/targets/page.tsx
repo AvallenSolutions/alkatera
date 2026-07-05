@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, Plus, Target as TargetIcon } from 'lucide-react';
+import { Eyebrow } from '@/components/studio/eyebrow';
 import { useOrganization } from '@/lib/organizationContext';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider';
@@ -166,19 +167,19 @@ function TargetsActionsHub() {
 
   return (
     <div className="space-y-6">
-      <header className="space-y-2">
+      <header>
         <Link
           href="/pulse"
-          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors duration-200 ease-studio hover:text-foreground"
         >
           <ArrowLeft className="h-3 w-3" />
           Back to Pulse
         </Link>
-        <div className="flex items-center gap-2">
-          <TargetIcon className="h-6 w-6 text-[#ccff00]" />
-          <h1 className="text-3xl font-semibold tracking-tight">Targets &amp; Actions</h1>
-        </div>
-        <p className="max-w-xl text-sm text-muted-foreground">
+        <Eyebrow className="mb-3 mt-3">PULSE · TARGETS</Eyebrow>
+        <h1 className="font-display text-[clamp(2rem,4vw,3rem)] font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+          Targets &amp; actions.
+        </h1>
+        <p className="mt-2 max-w-xl text-sm text-muted-foreground">
           Set sustainability commitments and build the plan behind them. Pulse projects your
           trajectory at the current pace; approved actions count towards your B Corp evidence.
         </p>

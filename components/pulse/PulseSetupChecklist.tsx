@@ -80,7 +80,7 @@ export function PulseSetupChecklist() {
   if (incomplete.length < 2) return null;
 
   return (
-    <Card className="border-dashed border-[#ccff00]/30 bg-[#ccff00]/[0.03]">
+    <Card className="rounded-[6px] border-dashed border-border bg-card">
       <CardContent className="space-y-3 p-5">
         <div>
           <h3 className="text-sm font-semibold">Get more from Pulse</h3>
@@ -95,11 +95,11 @@ export function PulseSetupChecklist() {
                 href={item.href}
                 className={cn(
                   'group flex items-center gap-2 rounded-md border border-border/40 px-3 py-2 text-sm transition-colors',
-                  item.done ? 'text-muted-foreground' : 'hover:border-[#ccff00]/50',
+                  item.done ? 'text-muted-foreground' : 'hover:border-studio-forest/50',
                 )}
               >
                 {item.done ? (
-                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-studio-good" />
                 ) : (
                   <Circle className="h-4 w-4 shrink-0 text-muted-foreground/50" />
                 )}

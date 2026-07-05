@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Card, CardContent } from '@/components/ui/card';
 import { ShieldCheck, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
 interface HealthScoreResponse {
@@ -32,26 +31,26 @@ export function CertificationHealthWidget() {
 
   const trendIcon =
     data.trend === 'up' ? (
-      <TrendingUp className="h-4 w-4 text-emerald-600" />
+      <TrendingUp className="h-4 w-4 text-studio-good" />
     ) : data.trend === 'down' ? (
-      <TrendingDown className="h-4 w-4 text-red-600" />
+      <TrendingDown className="h-4 w-4 text-studio-stale" />
     ) : (
       <Minus className="h-4 w-4 text-muted-foreground" />
     );
 
   const tone =
     data.score >= 80
-      ? 'text-emerald-600'
+      ? 'text-studio-good'
       : data.score >= 70
-        ? 'text-amber-600'
-        : 'text-red-600';
+        ? 'text-studio-attention'
+        : 'text-studio-stale';
 
   return (
     <Link href="/certifications" className="block">
-      <Card className="transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50">
-        <CardContent className="flex items-center justify-between p-4">
+      <div className="rounded-[6px] border border-border bg-card transition-colors duration-200 ease-studio hover:border-foreground/30">
+        <div className="flex items-center justify-between p-4">
           <div className="flex items-center gap-3">
-            <ShieldCheck className="h-6 w-6 text-amber-600" />
+            <ShieldCheck className="h-5 w-5 text-studio-dim" />
             <div>
               <p className="text-sm font-medium">B Corp certification health</p>
               <p className="text-xs text-muted-foreground">
@@ -61,11 +60,17 @@ export function CertificationHealthWidget() {
           </div>
           <div className="flex items-center gap-2">
             {trendIcon}
-            <span className={`text-2xl font-bold ${tone}`}>{data.score}</span>
-            <span className="text-sm text-muted-foreground">/ 100</span>
+            <span className="flex items-baseline gap-1.5">
+              <span className={`font-display text-2xl font-bold leading-none tabular-nums ${tone}`}>
+                {data.score}
+              </span>
+              <span className="font-mono text-[9.5px] uppercase tracking-[0.2em] text-foreground opacity-70">
+                / 100
+              </span>
+            </span>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </Link>
   );
 }

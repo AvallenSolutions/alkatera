@@ -268,15 +268,15 @@ function WidgetCell({
         className={cn(
           'absolute right-2 top-2 z-20 flex h-6 w-6 items-center justify-center rounded-md border transition',
           pinned
-            ? 'border-[#ccff00]/60 bg-[#ccff00]/15 text-[#ccff00] opacity-100'
-            : 'border-border/60 bg-background/80 text-muted-foreground opacity-0 backdrop-blur-sm hover:text-foreground group-hover:opacity-90 group-focus-within:opacity-90',
+            ? 'border-studio-forest/60 bg-card text-studio-forest opacity-100'
+            : 'border-border/60 bg-background text-muted-foreground opacity-0 hover:text-foreground group-hover:opacity-90 group-focus-within:opacity-90',
         )}
       >
         {pinned ? <Pin className="h-3 w-3 fill-current" /> : <PinOff className="h-3 w-3" />}
       </button>
 
       {editMode && (
-        <div className="pulse-drag-handle absolute inset-x-0 top-0 z-30 flex cursor-move items-center justify-between rounded-t-xl border-b border-[#ccff00]/30 bg-[#ccff00]/10 px-2 py-1 text-[10px] font-medium text-muted-foreground">
+        <div className="pulse-drag-handle absolute inset-x-0 top-0 z-30 flex cursor-move items-center justify-between rounded-t-[6px] border-b border-border bg-secondary px-2 py-1 text-[10px] font-medium text-muted-foreground">
           <div className="flex items-center gap-1.5">
             <GripVertical className="h-3 w-3" />
             {meta.label}
@@ -288,7 +288,7 @@ function WidgetCell({
               e.stopPropagation();
               onRemove();
             }}
-            className="h-5 w-5 p-0 text-muted-foreground hover:text-red-500"
+            className="h-5 w-5 p-0 text-muted-foreground hover:text-studio-stale"
             title="Remove from layout"
           >
             <X className="h-3 w-3" />

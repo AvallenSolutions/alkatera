@@ -55,12 +55,12 @@ export function AskRosaButton({
         className={cn(
           'inline-flex items-center gap-1.5 rounded-full border border-border bg-background/40',
           'px-2.5 py-1 text-xs font-medium text-muted-foreground',
-          'hover:border-[#ccff00]/40 hover:bg-[#ccff00]/[0.06] hover:text-foreground transition-colors',
+          'hover:border-studio-forest/40 hover:bg-secondary hover:text-foreground transition-colors',
           className,
         )}
         title="Ask Rosa about this"
       >
-        <Dog className="h-3 w-3 text-[#ccff00]" />
+        <Dog className="h-3 w-3 text-studio-forest" />
         {label || 'Ask Rosa'}
       </button>
     )
@@ -73,7 +73,7 @@ export function AskRosaButton({
       onClick={handleClick}
       className={cn(
         'inline-flex h-7 w-7 items-center justify-center rounded-md',
-        'text-muted-foreground hover:bg-[#ccff00]/15 hover:text-[#ccff00]',
+        'text-muted-foreground hover:bg-secondary hover:text-studio-forest',
         'transition-colors',
         className,
       )}

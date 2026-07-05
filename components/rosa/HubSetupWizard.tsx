@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Dog,
-  Loader2,
   ShieldCheck,
   TrendingDown,
   Calculator,
@@ -200,16 +199,7 @@ export function HubSetupWizard({ compact = false, onDone }: Props) {
   }
 
   return (
-    <div
-      className={cn(
-        'relative overflow-hidden rounded-3xl border border-[#ccff00]/30 bg-gradient-to-br',
-        'from-[#0c1410] via-card to-card p-6 sm:p-8',
-      )}
-    >
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-[#ccff00]/15 blur-3xl"
-      />
+    <div className="relative overflow-hidden rounded-[6px] border border-border bg-card p-6 sm:p-8">
       {compact ? null : (
         <button
           onClick={handleSkip}
@@ -222,12 +212,12 @@ export function HubSetupWizard({ compact = false, onDone }: Props) {
 
       <div className="relative">
         <div className="flex items-start gap-4">
-          <div className="flex-shrink-0 rounded-xl bg-[#ccff00]/15 p-2.5">
-            <Dog className="h-6 w-6 text-[#ccff00]" />
+          <div className="flex-shrink-0 rounded-[6px] border border-border bg-background p-2.5">
+            <Dog className="h-6 w-6 text-studio-forest" />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-xl sm:text-2xl font-semibold leading-tight">
-              Let me set this up for you
+            <h2 className="font-display text-xl sm:text-2xl font-semibold leading-tight">
+              Let me set this up for you.
             </h2>
             <p className="mt-2 text-sm text-muted-foreground max-w-2xl leading-relaxed">
               Pick what matters most to your role at alka<strong>tera</strong>. I&apos;ll
@@ -247,20 +237,20 @@ export function HubSetupWizard({ compact = false, onDone }: Props) {
                 onClick={() => togglePick(id)}
                 disabled={saving}
                 className={cn(
-                  'group flex items-start gap-3 rounded-xl border p-3 text-left transition',
+                  'group flex items-start gap-3 rounded-[6px] border p-3 text-left transition-colors duration-200 ease-studio',
                   isPicked
-                    ? 'border-[#ccff00]/60 bg-[#ccff00]/[0.07]'
-                    : 'border-border bg-background/40 hover:border-[#ccff00]/40 hover:bg-[#ccff00]/5',
+                    ? 'border-studio-forest bg-background'
+                    : 'border-border bg-background hover:border-foreground/30',
                   'disabled:opacity-50',
                 )}
                 aria-pressed={isPicked}
               >
                 <span
                   className={cn(
-                    'flex-shrink-0 rounded-lg p-2',
+                    'flex-shrink-0 p-2 transition-colors duration-200 ease-studio',
                     isPicked
-                      ? 'bg-[#ccff00]/20 text-[#ccff00]'
-                      : 'bg-muted/40 text-foreground group-hover:bg-[#ccff00]/15 group-hover:text-[#ccff00]',
+                      ? 'text-studio-forest'
+                      : 'text-muted-foreground group-hover:text-studio-forest',
                   )}
                 >
                   <Icon className="h-4 w-4" />
@@ -284,25 +274,20 @@ export function HubSetupWizard({ compact = false, onDone }: Props) {
             disabled={saving}
             className="gap-1.5"
           >
-            {saving && picked.size === 0 ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Sparkles className="h-3.5 w-3.5" />
-            )}
-            Show me everything
+            <Sparkles className="h-3.5 w-3.5" />
+            {saving && picked.size === 0 ? 'Saving…' : 'Show me everything'}
           </Button>
           <Button
             size="sm"
             onClick={handleSavePicks}
             disabled={saving || picked.size === 0}
-            className="bg-[#ccff00] text-black hover:bg-[#b8e600] disabled:opacity-50"
+            className="rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50"
           >
-            {saving && picked.size > 0 ? (
-              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-            ) : null}
-            {picked.size === 0
-              ? 'Pick at least one'
-              : `Build my view (${picked.size})`}
+            {saving && picked.size > 0
+              ? 'Building…'
+              : picked.size === 0
+                ? 'Pick at least one'
+                : `Build my view (${picked.size})`}
           </Button>
         </div>
       </div>

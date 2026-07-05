@@ -38,11 +38,9 @@ export function SustainableAINote() {
     <div
       role="region"
       aria-label="About Rosa's AI"
-      className="rounded-2xl border border-emerald-500/30 bg-gradient-to-r from-emerald-500/10 to-emerald-500/5 px-4 py-3 sm:px-5 sm:py-4 mb-4 flex items-start gap-3"
+      className="rounded-[6px] border border-border bg-card px-4 py-3 sm:px-5 sm:py-4 mb-4 flex items-start gap-3"
     >
-      <div className="h-9 w-9 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0">
-        <Leaf className="w-4 h-4 text-emerald-400" />
-      </div>
+      <Leaf className="w-4 h-4 text-studio-forest shrink-0 mt-0.5" />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground">
           Rosa now runs on more sustainable AI.
@@ -59,7 +57,7 @@ export function SustainableAINote() {
         type="button"
         onClick={handleDismiss}
         aria-label="Dismiss"
-        className="shrink-0 -mr-1 rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted/30 transition"
+        className="shrink-0 -mr-1 rounded-md p-1 text-muted-foreground hover:text-foreground transition-colors duration-200 ease-studio"
       >
         <X className="w-4 h-4" />
       </button>

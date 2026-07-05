@@ -58,7 +58,7 @@ export function PeerBenchmarkWidget() {
       <CardContent className="flex flex-col p-0">
         <header className="flex items-center justify-between border-b border-border/60 px-5 py-3">
           <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-[#ccff00]" />
+            <Users className="h-4 w-4 text-studio-forest" />
             <h3 className="text-sm font-semibold text-foreground">Peer benchmarks</h3>
           </div>
           <span className="font-data text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -106,13 +106,13 @@ function BenchmarkRow({ row }: { row: BenchmarkRow }) {
             You: {row.org_value.toLocaleString('en-GB', { maximumFractionDigits: 1 })} {row.unit} · peer median {row.peer.p50.toLocaleString('en-GB', { maximumFractionDigits: 1 })} · n={row.peer.sample_size}
           </p>
         </div>
-        <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider', percentileChip(friendlyPercentile))}>
+        <span className={cn('font-mono text-[10px] font-bold uppercase tracking-[0.18em]', percentileChip(friendlyPercentile))}>
           {friendlyLabel}
         </span>
       </div>
 
       {/* Distribution strip with org marker */}
-      <div className="relative h-2 rounded-full bg-gradient-to-r from-emerald-500/15 via-amber-500/15 to-red-500/15">
+      <div className="relative h-2 rounded-full bg-secondary">
         <div
           className="absolute top-1/2 h-3.5 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground"
           style={{ left: `${orgPos * 100}%` }}
@@ -139,8 +139,8 @@ function describePercentile(p: number): string {
 }
 
 function percentileChip(p: number): string {
-  if (p >= 75) return 'bg-emerald-500/15 text-emerald-500';
-  if (p >= 50) return 'bg-[#ccff00]/15 text-[#ccff00]';
-  if (p >= 25) return 'bg-amber-500/15 text-amber-500';
-  return 'bg-red-500/15 text-red-500';
+  if (p >= 75) return 'text-studio-good';
+  if (p >= 50) return 'text-studio-forest';
+  if (p >= 25) return 'text-studio-attention';
+  return 'text-studio-stale';
 }

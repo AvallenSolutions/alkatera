@@ -4,14 +4,12 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   Sparkles,
   AlertTriangle,
   CalendarClock,
   TrendingUp,
   ArrowRight,
-  Loader2,
   X,
 } from 'lucide-react';
 
@@ -80,7 +78,6 @@ export function RosaBriefing() {
   if (loading) {
     return (
       <div className="border-b bg-background/95 px-4 py-2 flex items-center gap-2 text-xs text-muted-foreground">
-        <Loader2 className="h-3 w-3 animate-spin" />
         Loading your briefing...
       </div>
     );
@@ -89,9 +86,9 @@ export function RosaBriefing() {
   if (!data) return null;
 
   const severityColor = (s: 'low' | 'medium' | 'high' | null) =>
-    s === 'high' ? 'bg-red-500/10 text-red-600 border-red-500/30'
-    : s === 'medium' ? 'bg-amber-500/10 text-amber-600 border-amber-500/30'
-    : 'bg-muted text-muted-foreground border-border';
+    s === 'high' ? 'text-studio-stale'
+    : s === 'medium' ? 'text-studio-attention'
+    : 'text-studio-dim';
 
   const deadlineUrgent = data.next_deadline && data.next_deadline.days_away <= 30;
 
@@ -113,10 +110,10 @@ export function RosaBriefing() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
           {/* Insight */}
-          <Card className="border-[#ccff00]/30">
+          <Card className="border-studio-forest/30">
             <CardContent className="p-3 space-y-1.5">
               <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                <Sparkles className="h-3.5 w-3.5 text-[#ccff00]" />
+                <Sparkles className="h-3.5 w-3.5 text-studio-forest" />
                 Latest insight
               </div>
               <p className="text-xs line-clamp-2">
@@ -136,18 +133,18 @@ export function RosaBriefing() {
           </Card>
 
           {/* Anomalies */}
-          <Card className={data.anomalies.open_count > 0 ? 'border-amber-500/30' : ''}>
+          <Card className={data.anomalies.open_count > 0 ? 'border-studio-attention/30' : ''}>
             <CardContent className="p-3 space-y-1.5">
               <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                <AlertTriangle className="h-3.5 w-3.5 text-studio-attention" />
                 Anomalies open
               </div>
               <div className="flex items-baseline gap-2">
                 <span className="text-lg font-semibold">{data.anomalies.open_count}</span>
                 {data.anomalies.top_severity && (
-                  <Badge variant="outline" className={`text-[10px] ${severityColor(data.anomalies.top_severity)}`}>
+                  <span className={`font-mono text-[10px] font-bold uppercase tracking-[0.18em] ${severityColor(data.anomalies.top_severity)}`}>
                     {data.anomalies.top_severity} severity
-                  </Badge>
+                  </span>
                 )}
               </div>
               {data.anomalies.open_count > 0 ? (
@@ -166,10 +163,10 @@ export function RosaBriefing() {
           </Card>
 
           {/* Next deadline */}
-          <Card className={deadlineUrgent ? 'border-red-500/30' : ''}>
+          <Card className={deadlineUrgent ? 'border-studio-stale/30' : ''}>
             <CardContent className="p-3 space-y-1.5">
               <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                <CalendarClock className={`h-3.5 w-3.5 ${deadlineUrgent ? 'text-red-500' : 'text-muted-foreground'}`} />
+                <CalendarClock className={`h-3.5 w-3.5 ${deadlineUrgent ? 'text-studio-stale' : 'text-muted-foreground'}`} />
                 Next deadline
               </div>
               {data.next_deadline ? (
@@ -199,7 +196,7 @@ export function RosaBriefing() {
           <Card>
             <CardContent className="p-3 space-y-1.5">
               <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+                <TrendingUp className="h-3.5 w-3.5 text-studio-good" />
                 Next best step
               </div>
               {data.next_gap ? (

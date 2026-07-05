@@ -17,7 +17,6 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
-  Loader2,
   Plus,
   Target,
   Trash2,
@@ -107,7 +106,7 @@ export function CarbonBudgetWidget() {
         <header className="flex items-start justify-between gap-3">
           <div>
             <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              <Target className="h-3 w-3 text-[#ccff00]" />
+              <Target className="h-3 w-3 text-studio-forest" />
               Carbon budgets
             </p>
             <h3 className="mt-0.5 text-sm font-semibold text-foreground">
@@ -140,12 +139,12 @@ export function CarbonBudgetWidget() {
 
         {loading && (
           <div className="flex h-24 items-center justify-center">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Loading</span>
           </div>
         )}
 
         {!loading && data && data.budgets.length === 0 && !adding && (
-          <p className="rounded-lg border border-dashed border-border/60 bg-muted/20 p-3 text-xs text-muted-foreground">
+          <p className="rounded-[6px] border border-dashed border-border/60 bg-muted/20 p-3 text-xs text-muted-foreground">
             No budgets set yet.{' '}
             {canEdit
               ? "Click 'Add budget' to set a monthly, quarterly or annual cap."
@@ -181,16 +180,16 @@ function BudgetRowEl({
 }) {
   const tone =
     budget.status === 'on_track'
-      ? 'text-emerald-500'
+      ? 'text-studio-good'
       : budget.status === 'at_risk'
-        ? 'text-amber-500'
-        : 'text-red-500';
+        ? 'text-studio-attention'
+        : 'text-studio-stale';
   const bar =
     budget.status === 'on_track'
-      ? 'bg-emerald-500'
+      ? 'bg-studio-good'
       : budget.status === 'at_risk'
-        ? 'bg-amber-500'
-        : 'bg-red-500';
+        ? 'bg-studio-attention'
+        : 'bg-studio-stale';
   const actualPct =
     budget.budget_tco2e > 0
       ? Math.min(150, (budget.actual_tco2e / budget.budget_tco2e) * 100)
@@ -235,7 +234,7 @@ function BudgetRowEl({
         />
         {actualPct > 100 && (
           <div
-            className="absolute top-0 h-full bg-red-500/80"
+            className="absolute top-0 h-full bg-studio-stale/80"
             style={{
               left: '100%',
               width: `${actualPct - 100}%`,
@@ -302,7 +301,7 @@ function AddBudgetForm({
   return (
     <form
       onSubmit={submit}
-      className="space-y-3 rounded-md border border-[#ccff00]/40 bg-[#ccff00]/5 p-3"
+      className="space-y-3 rounded-[6px] border border-border bg-card p-3"
     >
       <div className="grid gap-2 sm:grid-cols-3">
         <label className="text-[11px]">
@@ -362,10 +361,9 @@ function AddBudgetForm({
           type="submit"
           size="sm"
           disabled={submitting}
-          className="bg-[#ccff00] text-black hover:bg-[#b8e600]"
+          className="bg-primary text-primary-foreground hover:bg-primary/90"
         >
-          {submitting ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
-          Save budget
+          {submitting ? 'Saving' : 'Save budget'}
         </Button>
       </div>
     </form>

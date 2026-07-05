@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Check, ChevronDown, ChevronUp, Loader2, Sparkles, X } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, ChevronUp, Sparkles, X } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { StateChip } from '@/components/studio/state-chip';
 import { cn } from '@/lib/utils';
 import { METRIC_DEFINITIONS, type MetricKey } from '@/lib/pulse/metric-keys';
 import { safeDateTime, safeFixed, safePct } from '@/lib/pulse/format';
@@ -121,7 +121,7 @@ export function AlertsInbox() {
       <CardContent className="flex flex-col p-0">
         <header className="flex items-center justify-between border-b border-border/60 px-5 py-3">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <AlertTriangle className="h-4 w-4 text-studio-attention" />
             <h3 className="text-sm font-semibold text-foreground">Alerts</h3>
           </div>
           <span className="font-data text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -156,9 +156,9 @@ export function AlertsInbox() {
                         <p className="text-sm font-medium text-foreground">
                           {def?.label ?? a.metric_key}
                         </p>
-                        <span className={cn('rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider', severityChip(a.severity))}>
+                        <StateChip tone={severityTone(a.severity)}>
                           {a.severity}
-                        </span>
+                        </StateChip>
                       </div>
                       <p className="mt-0.5 text-xs text-muted-foreground">
                         {direction} {safePct(Math.abs(deltaPct), 1)} vs baseline · z = {safeFixed(a.z_score, 1)} · {safeDateTime(a.detected_at)}
@@ -174,11 +174,11 @@ export function AlertsInbox() {
                         className="text-xs"
                       >
                         {isExplaining ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          <span>Investigating</span>
                         ) : hasExplanation ? (
                           isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />
                         ) : (
-                          <Sparkles className="mr-1 h-3.5 w-3.5 text-[#ccff00]" />
+                          <Sparkles className="mr-1 h-3.5 w-3.5 text-studio-forest" />
                         )}
                         {!hasExplanation && !isExplaining && <span>Why?</span>}
                       </Button>
@@ -202,15 +202,15 @@ export function AlertsInbox() {
                   </div>
 
                   {explainErrors[a.id] && (
-                    <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400">
+                    <p className="mt-2 text-[11px] text-studio-attention">
                       {explainErrors[a.id]}
                     </p>
                   )}
 
                   {isExpanded && a.explanation && (
-                    <div className="mt-3 rounded-md border border-[#ccff00]/30 bg-[#ccff00]/5 p-3">
+                    <div className="mt-3 rounded-[6px] border border-border bg-card p-3">
                       <div className="mb-2 flex items-center gap-2">
-                        <Sparkles className="h-3 w-3 text-[#ccff00]" />
+                        <Sparkles className="h-3 w-3 text-studio-forest" />
                         <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
                           Rosa's hypothesis
                         </span>
@@ -228,7 +228,7 @@ export function AlertsInbox() {
                         <ul className="mt-2 space-y-1">
                           {a.explanation.bullets.map((b, i) => (
                             <li key={i} className="flex gap-2 text-xs text-muted-foreground">
-                              <span className="text-[#ccff00]">•</span>
+                              <span className="text-studio-forest">•</span>
                               <span>{b}</span>
                             </li>
                           ))}
@@ -237,16 +237,9 @@ export function AlertsInbox() {
                       {a.explanation.tools_called && a.explanation.tools_called.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1">
                           {a.explanation.tools_called.map((t, i) => (
-                            <Badge
-                              key={i}
-                              variant="outline"
-                              className={cn(
-                                'text-[9px] uppercase tracking-wider',
-                                t.is_error && 'border-amber-500/40 text-amber-600',
-                              )}
-                            >
+                            <StateChip key={i} tone={t.is_error ? 'attention' : 'quiet'}>
                               {t.name}
-                            </Badge>
+                            </StateChip>
                           ))}
                         </div>
                       )}
@@ -263,13 +256,9 @@ export function AlertsInbox() {
 }
 
 function severityDot(severity: Anomaly['severity']): string {
-  return severity === 'high' ? 'bg-red-500' : severity === 'medium' ? 'bg-amber-500' : 'bg-yellow-500';
+  return severity === 'high' ? 'bg-studio-stale' : severity === 'medium' ? 'bg-studio-attention' : 'bg-studio-dim';
 }
 
-function severityChip(severity: Anomaly['severity']): string {
-  return severity === 'high'
-    ? 'bg-red-500/15 text-red-500'
-    : severity === 'medium'
-      ? 'bg-amber-500/15 text-amber-500'
-      : 'bg-yellow-500/15 text-yellow-600';
+function severityTone(severity: Anomaly['severity']): 'stale' | 'attention' | 'quiet' {
+  return severity === 'high' ? 'stale' : severity === 'medium' ? 'attention' : 'quiet';
 }

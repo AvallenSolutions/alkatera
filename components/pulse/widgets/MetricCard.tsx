@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUpRight, Minus, TrendingDown, TrendingUp } from 'lucide-react';
 import { Line, LineChart, ResponsiveContainer, YAxis } from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
+import { STUDIO } from '@/components/studio/theme';
 import { cn } from '@/lib/utils';
 import { useMetricSnapshots } from '@/hooks/data/useMetricSnapshots';
 import { useAnimatedNumber } from '@/hooks/useAnimatedNumber';
@@ -87,8 +88,8 @@ export function MetricCard({ metricKey, days = 365, compareDays = 30 }: MetricCa
     trendDirection === 'stable' || trendDirection === null
       ? 'text-slate-500'
       : isGoodTrend
-        ? 'text-emerald-600 dark:text-emerald-400'
-        : 'text-red-600 dark:text-red-400';
+        ? 'text-studio-good'
+        : 'text-studio-stale';
 
   const TrendIcon =
     trendDirection === 'up'
@@ -99,27 +100,27 @@ export function MetricCard({ metricKey, days = 365, compareDays = 30 }: MetricCa
 
   // Sparkline colour shifts with overall trend health.
   const sparkColour = isBadTrend
-    ? '#ef4444'
+    ? STUDIO.brick
     : isGoodTrend
-      ? '#10b981'
-      : '#ccff00';
+      ? STUDIO.good
+      : STUDIO.forest;
 
   return (
     <button
       type="button"
       onClick={() => openDrill(metricKey)}
       className={cn(
-        'group relative flex w-full flex-col overflow-hidden rounded-xl border bg-card p-4 text-left transition-all hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ccff00]/60',
+        'group relative flex w-full flex-col overflow-hidden rounded-[6px] border bg-card p-4 text-left transition-all hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-studio-forest/60',
         flashing
-          ? 'border-[#ccff00] shadow-[0_0_24px_rgba(204,255,0,0.35)]'
-          : 'border-border/60 hover:border-[#ccff00]/40',
+          ? 'border-studio-forest'
+          : 'border-border/60 hover:border-studio-forest/40',
       )}
     >
       {/* Live event flash bar */}
       {flashing && (
         <span
           aria-hidden="true"
-          className="absolute inset-x-0 top-0 h-0.5 animate-pulse bg-[#ccff00]"
+          className="absolute inset-x-0 top-0 h-0.5 bg-studio-forest"
         />
       )}
 
@@ -226,7 +227,7 @@ function Sparkline({
 
 function MetricCardSkeleton() {
   return (
-    <div className="flex flex-col rounded-xl border border-border/60 bg-card p-4">
+    <div className="flex flex-col rounded-[6px] border border-border/60 bg-card p-4">
       <Skeleton className="mb-2 h-3 w-24" />
       <Skeleton className="h-7 w-28" />
       <Skeleton className="mt-2 h-3 w-32" />
@@ -239,7 +240,7 @@ function MetricCardEmpty({ def }: { def: (typeof METRIC_DEFINITIONS)[MetricKey] 
   return (
     <Link
       href={def.href}
-      className="group flex flex-col overflow-hidden rounded-xl border border-dashed border-border/60 bg-card/40 p-4 transition-colors hover:border-[#ccff00]/40"
+      className="group flex flex-col overflow-hidden rounded-[6px] border border-dashed border-border/60 bg-card/40 p-4 transition-colors hover:border-studio-forest/40"
     >
       <div className="mb-2 flex items-center justify-between">
         <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -259,7 +260,7 @@ function MetricCardEmpty({ def }: { def: (typeof METRIC_DEFINITIONS)[MetricKey] 
 
 /** Compact value formatter — 1,234 → "1.2k", 1,234,567 → "1.2M". */
 function formatValue(value: number, compact?: boolean): string {
-  if (!Number.isFinite(value)) return '—';
+  if (!Number.isFinite(value)) return 'n/a';
   if (!compact) {
     return value.toLocaleString('en-GB', { maximumFractionDigits: 1 });
   }

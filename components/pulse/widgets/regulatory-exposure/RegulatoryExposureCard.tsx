@@ -27,10 +27,10 @@ interface ApiPayload {
 }
 
 const LINE_COLOURS: Record<string, string> = {
-  uk_ets: '#ccff00',
-  cbam: '#38bdf8',
-  plastic_tax: '#f59e0b',
-  epr: '#c084fc',
+  uk_ets: '#205E40',
+  cbam: '#2B46C0',
+  plastic_tax: '#A97C14',
+  epr: '#6D28D9',
 };
 
 export function RegulatoryExposureCard() {
@@ -108,7 +108,7 @@ export function RegulatoryExposureCard() {
                   key={l.id}
                   style={{
                     width: `${(l.annual_cost_gbp / data.total_annual_gbp) * 100}%`,
-                    backgroundColor: LINE_COLOURS[l.id] ?? '#94a3b8',
+                    backgroundColor: LINE_COLOURS[l.id] ?? '#6F6F68',
                   }}
                   title={`${l.label}: ${formatGbp(l.annual_cost_gbp)}`}
                 />
@@ -121,7 +121,7 @@ export function RegulatoryExposureCard() {
                 <span key={l.id} className="flex items-center gap-1">
                   <span
                     className="h-1.5 w-1.5 rounded-sm"
-                    style={{ backgroundColor: LINE_COLOURS[l.id] ?? '#94a3b8' }}
+                    style={{ backgroundColor: LINE_COLOURS[l.id] ?? '#6F6F68' }}
                   />
                   <span className="text-foreground">{l.label}</span>
                 </span>

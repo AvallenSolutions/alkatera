@@ -121,10 +121,10 @@ function ScenarioPips({ scenarios }: { scenarios: Scenario[] }) {
               className={cn(
                 'h-3 w-3 rounded-full border-2 border-background',
                 s.is_current
-                  ? 'bg-[#ccff00]'
+                  ? 'bg-studio-forest'
                   : s.id === 'stress'
-                    ? 'bg-red-500'
-                    : 'bg-slate-400',
+                    ? 'bg-studio-brick'
+                    : 'bg-studio-dim',
               )}
             />
             <span

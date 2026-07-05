@@ -63,7 +63,7 @@ export function GridCarbonWidget() {
       <Card className="border-dashed border-border/60 bg-card/40">
         <CardContent className="space-y-2 p-5">
           <div className="flex items-center gap-2">
-            <Zap className="h-4 w-4 text-[#ccff00]" />
+            <Zap className="h-4 w-4 text-studio-forest" />
             <h3 className="text-sm font-semibold text-foreground">UK grid carbon</h3>
           </div>
           <p className="text-sm text-muted-foreground">
@@ -85,7 +85,7 @@ export function GridCarbonWidget() {
         <header className="flex items-start justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <Zap className="h-4 w-4 text-[#ccff00]" />
+              <Zap className="h-4 w-4 text-studio-forest" />
               <h3 className="text-sm font-semibold text-foreground">UK grid carbon</h3>
             </div>
             <p className="mt-0.5 text-xs text-muted-foreground">
@@ -114,13 +114,13 @@ export function GridCarbonWidget() {
               />
               <YAxis hide />
               <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
-              <Bar dataKey="intensity" fill="#ccff00" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+              <Bar dataKey="intensity" fill="#205E40" radius={[2, 2, 0, 0]} isAnimationActive={false} />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
         {cleanestWindow && (
-          <div className="rounded-md border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-600 dark:text-emerald-400">
+          <div className="rounded-[6px] border border-border bg-card px-3 py-2 text-xs text-studio-good">
             <Leaf className="mr-1 inline h-3 w-3" />
             Cleanest window: {cleanestWindow.startTime}–{cleanestWindow.endTime} (~
             {Math.round(cleanestWindow.avg)} g/kWh, {Math.round(cleanestWindow.savingsPct)}% lower than peak)

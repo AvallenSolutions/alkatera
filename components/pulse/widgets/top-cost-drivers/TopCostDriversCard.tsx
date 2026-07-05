@@ -85,7 +85,7 @@ export function TopCostDriversCard() {
                 </p>
                 <div className="mt-0.5 h-1 w-full overflow-hidden rounded-full bg-muted">
                   <div
-                    className="h-full bg-[#ccff00]"
+                    className="h-full bg-studio-forest"
                     style={{ width: `${clampPctWidth((item.gbp / maxGbp) * 100)}%` }}
                   />
                 </div>

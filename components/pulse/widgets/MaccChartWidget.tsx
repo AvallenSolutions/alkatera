@@ -16,9 +16,10 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Loader2, TrendingUp } from 'lucide-react';
+import { ArrowRight, TrendingUp } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { Card, CardContent } from '@/components/ui/card';
+import { STUDIO } from '@/components/studio/theme';
 import { cn } from '@/lib/utils';
 
 interface Lever {
@@ -79,7 +80,7 @@ export function MaccChartWidget() {
         <header className="flex items-start justify-between gap-3">
           <div>
             <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              <TrendingUp className="h-3 w-3 text-[#ccff00]" />
+              <TrendingUp className="h-3 w-3 text-studio-forest" />
               Marginal abatement cost curve
             </p>
             <h3 className="mt-0.5 text-sm font-semibold text-foreground">
@@ -90,12 +91,12 @@ export function MaccChartWidget() {
 
         {loading && (
           <div className="flex h-40 items-center justify-center">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Loading</span>
           </div>
         )}
 
         {!loading && data && data.levers.length === 0 && (
-          <p className="rounded-lg border border-dashed border-border/60 bg-muted/20 p-3 text-xs text-muted-foreground">
+          <p className="rounded-[6px] border border-dashed border-border/60 bg-muted/20 p-3 text-xs text-muted-foreground">
             MACC populates once you have activity in electricity, gas, fuel or
             waste. Log your facility activity and come back.
           </p>
@@ -261,11 +262,11 @@ function MaccChart({
           const fill =
             cost < 0
               ? isSelected
-                ? '#10b981'
-                : '#10b98188'
+                ? STUDIO.good
+                : `${STUDIO.good}88`
               : isSelected
-                ? '#ccff00'
-                : '#ccff0088';
+                ? STUDIO.forest
+                : `${STUDIO.forest}88`;
           return (
             <g
               key={l.id}
@@ -278,7 +279,7 @@ function MaccChart({
                 width={Math.max(1, w - 2)}
                 height={barHeight}
                 fill={fill}
-                stroke={isSelected ? '#fff' : 'transparent'}
+                stroke={isSelected ? STUDIO.ink : 'transparent'}
                 strokeWidth={isSelected ? 1 : 0}
               >
                 <title>
@@ -296,7 +297,7 @@ function MaccChart({
 
 function SelectedLeverDetail({ lever }: { lever: Lever }) {
   const cost = lever.levelised_cost_gbp_per_tonne;
-  const tone = cost < 0 ? 'text-emerald-500' : 'text-foreground';
+  const tone = cost < 0 ? 'text-studio-good' : 'text-foreground';
   return (
     <div className="rounded-md border border-border/60 bg-card/40 p-3">
       <p className="text-sm font-semibold text-foreground">{lever.label}</p>
@@ -310,7 +311,7 @@ function SelectedLeverDetail({ lever }: { lever: Lever }) {
         />
         <Metric
           label="Capex"
-          value={lever.capex_gbp > 0 ? formatGbp(lever.capex_gbp) : '—'}
+          value={lever.capex_gbp > 0 ? formatGbp(lever.capex_gbp) : 'None'}
         />
         <Metric
           label="Simple payback"
@@ -325,13 +326,13 @@ function SelectedLeverDetail({ lever }: { lever: Lever }) {
       </dl>
       <p className="mt-2 text-[11px] text-muted-foreground">
         NPV over {lever.lifetime_years} yrs:{' '}
-        <span className={cn('font-medium', lever.npv_gbp >= 0 ? 'text-emerald-500' : 'text-red-500')}>
+        <span className={cn('font-medium', lever.npv_gbp >= 0 ? 'text-studio-good' : 'text-studio-stale')}>
           {formatGbp(lever.npv_gbp)}
         </span>
       </p>
       <Link
         href={`/pulse/targets?lever=${encodeURIComponent(lever.id)}#actions`}
-        className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-[#ccff00]/40 bg-[#ccff00]/10 px-2.5 py-1 text-xs font-medium text-[#9bbf00] hover:bg-[#ccff00]/20 dark:text-[#ccff00]"
+        className="mt-3 inline-flex items-center gap-1.5 rounded-[6px] bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90"
       >
         Plan this action
         <ArrowRight className="h-3 w-3" />

@@ -97,7 +97,7 @@ export function HarvestSeasonsCard() {
                   key={m}
                   className={cn(
                     'h-4 flex items-center justify-center rounded-sm text-[8px] font-medium',
-                    isPeak ? 'bg-[#ccff00] text-black' : isWindow ? 'bg-[#ccff00]/25 text-foreground' : 'bg-muted text-muted-foreground/60',
+                    isPeak ? 'bg-studio-forest text-studio-cream' : isWindow ? 'bg-studio-forest/25 text-foreground' : 'bg-muted text-muted-foreground/60',
                     isCurrent && 'ring-1 ring-foreground',
                   )}
                 >

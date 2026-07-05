@@ -148,7 +148,7 @@ export function ForwardTimeline() {
 
   if (stalledLcas === null && oldQueueCount === null) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+      <div className="rounded-[6px] border border-border bg-card p-5 sm:p-6">
         <Skeleton className="h-4 w-40 mb-4" />
         <Skeleton className="h-16 w-full mb-2" />
         <Skeleton className="h-16 w-full" />
@@ -158,9 +158,9 @@ export function ForwardTimeline() {
 
   if (events.length === 0) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+      <div className="rounded-[6px] border border-border bg-card p-5 sm:p-6">
         <h2 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-          <CalendarClock className="h-4 w-4 text-[#ccff00]" />
+          <CalendarClock className="h-4 w-4 text-studio-forest" />
           The next 14 days
         </h2>
         <p className="text-sm text-muted-foreground">
@@ -171,9 +171,9 @@ export function ForwardTimeline() {
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+    <div className="rounded-[6px] border border-border bg-card p-5 sm:p-6">
       <h2 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2">
-        <CalendarClock className="h-4 w-4 text-[#ccff00]" />
+        <CalendarClock className="h-4 w-4 text-studio-forest" />
         The next 14 days
       </h2>
       <ol className="relative border-l border-border/60 ml-2 space-y-4">
@@ -242,7 +242,7 @@ function StatusPill({ status }: { status: EventStatus }) {
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium border',
+        'font-mono text-[10px] font-bold uppercase tracking-[0.18em]',
         tone.pill,
       )}
     >
@@ -264,23 +264,23 @@ const STATUS_TONE: Record<
   { dot: string; icon: string; pill: string }
 > = {
   on_track: {
-    dot: 'border-emerald-500/60 bg-emerald-500/10',
-    icon: 'text-emerald-300',
-    pill: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+    dot: 'border-studio-good/60',
+    icon: 'text-studio-good',
+    pill: 'text-studio-good',
   },
   at_risk: {
-    dot: 'border-amber-500/60 bg-amber-500/10',
-    icon: 'text-amber-300',
-    pill: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
+    dot: 'border-studio-attention/60',
+    icon: 'text-studio-attention',
+    pill: 'text-studio-attention',
   },
   overdue: {
-    dot: 'border-red-500/60 bg-red-500/10',
-    icon: 'text-red-300',
-    pill: 'border-red-500/30 bg-red-500/10 text-red-300',
+    dot: 'border-studio-stale/60',
+    icon: 'text-studio-stale',
+    pill: 'text-studio-stale',
   },
   blocked: {
-    dot: 'border-muted bg-muted/30',
-    icon: 'text-muted-foreground',
-    pill: 'border-border bg-muted/30 text-muted-foreground',
+    dot: 'border-studio-hold/60',
+    icon: 'text-studio-hold',
+    pill: 'text-studio-hold',
   },
 }

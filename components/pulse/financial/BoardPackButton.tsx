@@ -9,7 +9,7 @@
  */
 
 import { useState } from 'react';
-import { Download, Loader2 } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -56,13 +56,9 @@ export function BoardPackButton() {
       variant="default"
       onClick={download}
       disabled={busy}
-      className="bg-[#ccff00] text-black hover:bg-[#b8e600]"
+      className="bg-primary text-primary-foreground hover:bg-primary/90"
     >
-      {busy ? (
-        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-      ) : (
-        <Download className="mr-1.5 h-3.5 w-3.5" />
-      )}
+      <Download className="mr-1.5 h-3.5 w-3.5" />
       {busy ? 'Generating…' : 'Board pack'}
     </Button>
   );

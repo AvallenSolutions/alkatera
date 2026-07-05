@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Loader2, Send, Sparkles } from 'lucide-react';
+import { ArrowRight, Send, Sparkles } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
@@ -185,18 +185,18 @@ export function AskRosaWidget({ collapsed = false }: { collapsed?: boolean } = {
       <Card className="border-border/60">
         <CardContent className="space-y-2.5 p-4">
           <form onSubmit={onSubmit} className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 shrink-0 text-[#ccff00]" aria-hidden="true" />
+            <Sparkles className="h-4 w-4 shrink-0 text-studio-forest" aria-hidden="true" />
             <input
               value={input}
               onChange={e => setInput(e.target.value)}
               placeholder="Ask Rosa about anything on this page…"
-              className="flex-1 rounded-md border border-border/60 bg-background/60 px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 focus:border-[#ccff00]/60"
+              className="flex-1 rounded-md border border-border/60 bg-background/60 px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 focus:border-studio-forest/60"
             />
             <Button
               type="submit"
               size="sm"
               disabled={!input.trim()}
-              className="bg-[#ccff00] text-black hover:bg-[#b8e600]"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               <Send className="h-3.5 w-3.5" />
             </Button>
@@ -207,7 +207,7 @@ export function AskRosaWidget({ collapsed = false }: { collapsed?: boolean } = {
                 key={s}
                 type="button"
                 onClick={() => void send(s)}
-                className="rounded-full border border-border/60 bg-card/40 px-3 py-1 text-[11px] text-muted-foreground transition hover:border-[#ccff00]/50 hover:text-foreground"
+                className="rounded-full border border-border/60 bg-card/40 px-3 py-1 text-[11px] text-muted-foreground transition hover:border-studio-forest/50 hover:text-foreground"
               >
                 {s}
               </button>
@@ -223,7 +223,7 @@ export function AskRosaWidget({ collapsed = false }: { collapsed?: boolean } = {
       <CardContent className="space-y-3 p-5">
         <header className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-[#ccff00]" />
+            <Sparkles className="h-4 w-4 text-studio-forest" />
             <h3 className="text-sm font-semibold text-foreground">Ask Rosa</h3>
           </div>
           <Link
@@ -245,7 +245,7 @@ export function AskRosaWidget({ collapsed = false }: { collapsed?: boolean } = {
           )}
           {streaming && (
             <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              <Loader2 className="h-3 w-3 animate-spin" /> Thinking…
+              Thinking…
             </div>
           )}
         </div>
@@ -256,13 +256,13 @@ export function AskRosaWidget({ collapsed = false }: { collapsed?: boolean } = {
             onChange={e => setInput(e.target.value)}
             placeholder="Ask about anything you can see on this page…"
             disabled={streaming}
-            className="flex-1 rounded-md border border-border/60 bg-background/60 px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 focus:border-[#ccff00]/60 disabled:opacity-50"
+            className="flex-1 rounded-md border border-border/60 bg-background/60 px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 focus:border-studio-forest/60 disabled:opacity-50"
           />
           <Button
             type="submit"
             size="sm"
             disabled={streaming || !input.trim()}
-            className="bg-[#ccff00] text-black hover:bg-[#b8e600]"
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
             <Send className="h-3.5 w-3.5" />
           </Button>
@@ -283,7 +283,7 @@ function EmptyState({ onPick }: { onPick: (q: string) => void }) {
           <button
             key={s}
             onClick={() => onPick(s)}
-            className="rounded-full border border-border/60 bg-card/40 px-3 py-1 text-[11px] text-foreground transition hover:border-[#ccff00]/50 hover:bg-[#ccff00]/5"
+            className="rounded-full border border-border/60 bg-card/40 px-3 py-1 text-[11px] text-foreground transition hover:border-studio-forest/50 hover:bg-secondary"
           >
             {s}
           </button>
@@ -297,7 +297,7 @@ function TurnBubble({ turn }: { turn: Turn }) {
   if (turn.role === 'user') {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-[#ccff00]/15 px-3 py-2 text-sm text-foreground">
+        <div className="max-w-[85%] rounded-[6px] rounded-tr-sm bg-secondary px-3 py-2 text-sm text-foreground">
           {turn.text}
         </div>
       </div>
@@ -307,7 +307,7 @@ function TurnBubble({ turn }: { turn: Turn }) {
   // to users — the "spanner" chips were noise on the dashboard.
   return (
     <div className="space-y-1.5">
-      <div className="rounded-2xl rounded-tl-sm bg-card/60 px-3 py-2 text-sm text-foreground whitespace-pre-wrap">
+      <div className="rounded-[6px] rounded-tl-sm border border-border bg-card px-3 py-2 text-sm text-foreground whitespace-pre-wrap">
         {turn.text || (
           <span className="text-muted-foreground">…</span>
         )}

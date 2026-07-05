@@ -95,8 +95,8 @@ export function EnergyTimingCard() {
     >
       {hasWindow && dirtiest ? (
         <div className="flex h-full flex-col justify-center gap-1.5 px-0.5">
-          <Bar label="Cleanest" pct={cleanPct} value={Math.round(cleanest!.avgG)} colour="#ccff00" />
-          <Bar label="Dirtiest" pct={dirtyPct} value={Math.round(dirtiest.avgG)} colour="#f87171" />
+          <Bar label="Cleanest" pct={cleanPct} value={Math.round(cleanest!.avgG)} colour="#205E40" />
+          <Bar label="Dirtiest" pct={dirtyPct} value={Math.round(dirtiest.avgG)} colour="#BF4B2A" />
         </div>
       ) : (
         <div className="flex h-full items-center justify-center text-[9px] uppercase tracking-wider text-muted-foreground/50">

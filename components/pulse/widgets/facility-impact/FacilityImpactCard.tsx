@@ -96,23 +96,23 @@ export function FacilityImpactCard() {
           <AreaChart data={data.months} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
             <defs>
               <linearGradient id="fic-elec" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#ccff00" stopOpacity={0.5} />
-                <stop offset="100%" stopColor="#ccff00" stopOpacity={0} />
+                <stop offset="0%" stopColor="#205E40" stopOpacity={0.5} />
+                <stop offset="100%" stopColor="#205E40" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="fic-gas" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#38bdf8" stopOpacity={0.5} />
-                <stop offset="100%" stopColor="#38bdf8" stopOpacity={0} />
+                <stop offset="0%" stopColor="#2B46C0" stopOpacity={0.5} />
+                <stop offset="100%" stopColor="#2B46C0" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="fic-other" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.5} />
-                <stop offset="100%" stopColor="#f59e0b" stopOpacity={0} />
+                <stop offset="0%" stopColor="#A97C14" stopOpacity={0.5} />
+                <stop offset="100%" stopColor="#A97C14" stopOpacity={0} />
               </linearGradient>
             </defs>
             <Area
               type="monotone"
               dataKey="electricity_tco2e_tariff"
               stackId="1"
-              stroke="#ccff00"
+              stroke="#205E40"
               fill="url(#fic-elec)"
               strokeWidth={1.5}
               isAnimationActive={false}
@@ -121,7 +121,7 @@ export function FacilityImpactCard() {
               type="monotone"
               dataKey="gas_tco2e"
               stackId="1"
-              stroke="#38bdf8"
+              stroke="#2B46C0"
               fill="url(#fic-gas)"
               strokeWidth={1.5}
               isAnimationActive={false}
@@ -130,7 +130,7 @@ export function FacilityImpactCard() {
               type="monotone"
               dataKey="other_scope12_tco2e"
               stackId="1"
-              stroke="#f59e0b"
+              stroke="#A97C14"
               fill="url(#fic-other)"
               strokeWidth={1.5}
               isAnimationActive={false}

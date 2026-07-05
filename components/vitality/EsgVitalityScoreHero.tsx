@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { ArrowUpRight, RefreshCw, Loader2, Settings2, Sparkles, TrendingDown, TrendingUp } from 'lucide-react'
+import { ArrowUpRight, RefreshCw, Settings2, Sparkles, TrendingDown, TrendingUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useOrganization } from '@/lib/organizationContext'
@@ -30,11 +30,11 @@ interface CompositeResponse {
 }
 
 const BAND_TONE: Record<ScoreBand, string> = {
-  EXCELLENT: 'border-[#ccff00]/40 bg-gradient-to-br from-[#0c1410] via-card to-card',
-  HEALTHY: 'border-emerald-500/30 bg-gradient-to-br from-emerald-950/20 via-card to-card',
+  EXCELLENT: 'border-border bg-card',
+  HEALTHY: 'border-border bg-card',
   DEVELOPING: 'border-border bg-card',
-  EMERGING: 'border-amber-500/30 bg-gradient-to-br from-amber-950/20 via-card to-card',
-  'NEEDS ATTENTION': 'border-red-500/30 bg-gradient-to-br from-red-950/20 via-card to-card',
+  EMERGING: 'border-border bg-card',
+  'NEEDS ATTENTION': 'border-border bg-card',
   'AWAITING DATA': 'border-border bg-card',
 }
 
@@ -156,7 +156,7 @@ export function EsgVitalityScoreHero() {
 
   if (loading && !data) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-6 sm:p-8">
+      <div className="rounded-[6px] border border-border bg-card p-6 sm:p-8">
         <Skeleton className="h-8 w-64 mb-3" />
         <Skeleton className="h-40 w-full mb-3" />
         <Skeleton className="h-24 w-full" />
@@ -166,7 +166,7 @@ export function EsgVitalityScoreHero() {
 
   if (!data) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-6 text-sm text-muted-foreground">
+      <div className="rounded-[6px] border border-border bg-card p-6 text-sm text-muted-foreground">
         Couldn&apos;t load your composite vitality. Try refreshing.
       </div>
     )
@@ -192,7 +192,7 @@ export function EsgVitalityScoreHero() {
   }
 
   return (
-    <div className={cn('rounded-2xl border p-6 sm:p-8', BAND_TONE[composite.band])}>
+    <div className={cn('rounded-[6px] border p-6 sm:p-8', BAND_TONE[composite.band])}>
       <div className="flex items-start justify-between gap-3 mb-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -229,11 +229,7 @@ export function EsgVitalityScoreHero() {
             title="Refresh score"
             className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
           >
-            {refreshing ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <RefreshCw className="h-3.5 w-3.5" />
-            )}
+            <RefreshCw className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
@@ -254,17 +250,13 @@ export function EsgVitalityScoreHero() {
             <CompositeChart trend={trend} />
           ) : (
             <p className="text-xs text-muted-foreground italic">
-              Trend builds up across visits — one snapshot per day.
+              Trend builds up across visits, one snapshot per day.
             </p>
           )}
           {read ? (
             <div className="rounded-lg border border-border/50 bg-card/40 p-4">
               <p className="text-xs uppercase tracking-wider text-muted-foreground inline-flex items-center gap-1.5">
-                {readUpgrading ? (
-                  <Loader2 className="h-3 w-3 text-[#ccff00] animate-spin" />
-                ) : (
-                  <Sparkles className="h-3 w-3 text-[#ccff00]" />
-                )}
+                <Sparkles className="h-3 w-3 text-studio-forest" />
                 Rosa&apos;s read
                 {readUpgrading ? (
                   <span className="text-[10px] text-muted-foreground/70">· deepening</span>
@@ -377,7 +369,7 @@ function CompositeChart({ trend }: { trend: TrendPoint[] }) {
                 )}
                 style={{
                   height: `${heightPct}%`,
-                  backgroundColor: '#ccff00',
+                  backgroundColor: '#205E40',
                 }}
               />
             </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Package, ArrowRight, CheckCircle2, Clock, FileText, Sparkles } from 'lucide-react'
+import { Package, ArrowRight } from 'lucide-react'
 import { useProductSpotlight } from '@/hooks/data/useProductSpotlight'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
@@ -22,7 +22,7 @@ export function ProductSpotlight() {
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 h-full">
+      <div className="rounded-[6px] border border-border bg-card p-5 sm:p-6 h-full">
         <Skeleton className="h-4 w-32 mb-4" />
         <div className="grid grid-cols-2 gap-3">
           <Skeleton className="h-32" />
@@ -39,10 +39,10 @@ export function ProductSpotlight() {
   const display = products.slice(0, 4)
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 h-full">
+    <div className="rounded-[6px] border border-border bg-card p-5 sm:p-6 h-full">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-          <Package className="h-4 w-4 text-[#ccff00]" />
+          <Package className="h-4 w-4 text-studio-forest" />
           Product spotlight
         </h2>
         <Link
@@ -58,7 +58,7 @@ export function ProductSpotlight() {
           <Link
             key={p.id}
             href={hrefForProduct(p.id, p.lca_status)}
-            className="group rounded-xl border border-border overflow-hidden bg-background/40 hover:border-[#ccff00]/40 hover:bg-card transition-all"
+            className="group rounded-[6px] border border-border overflow-hidden bg-background/40 hover:border-studio-forest/40 hover:bg-card transition-all"
           >
             <div className="relative aspect-[16/9] bg-muted/40 flex items-center justify-center overflow-hidden">
               {p.image_url ? (
@@ -109,22 +109,23 @@ function hrefForProduct(id: string, status: 'completed' | 'in_progress' | 'estim
 }
 
 function StatusPill({ status }: { status: 'completed' | 'in_progress' | 'estimate' | 'draft' }) {
+  // Typographic state chip: small bold mono in a working tone, on a cream
+  // backing so it stays legible over product imagery.
   const map = {
-    completed: { label: 'LCA done', icon: CheckCircle2, cls: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' },
-    in_progress: { label: 'In progress', icon: Clock, cls: 'bg-amber-500/20 text-amber-300 border-amber-500/30' },
-    estimate: { label: 'Estimate', icon: Sparkles, cls: 'bg-[#ccff00]/20 text-[#ccff00] border-[#ccff00]/30' },
-    draft: { label: 'No LCA', icon: FileText, cls: 'bg-slate-500/20 text-slate-300 border-slate-500/30' },
+    completed: { label: 'LCA done', cls: 'text-studio-good' },
+    in_progress: { label: 'In progress', cls: 'text-studio-attention' },
+    estimate: { label: 'Estimate', cls: 'text-studio-forest' },
+    draft: { label: 'No LCA', cls: 'text-studio-dim' },
   } as const
   const m = map[status]
-  const Icon = m.icon
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium',
+        'inline-flex items-center rounded-[4px] bg-card/90 px-1.5 py-0.5',
+        'font-mono text-[10px] font-bold uppercase tracking-[0.18em]',
         m.cls,
       )}
     >
-      <Icon className="h-2.5 w-2.5" />
       {m.label}
     </span>
   )

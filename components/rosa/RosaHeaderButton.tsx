@@ -26,9 +26,8 @@ export function RosaHeaderButton() {
       onClick={open}
       className={cn(
         'group relative inline-flex items-center gap-2 rounded-full',
-        'bg-[#ccff00] px-3 py-1.5 text-black',
-        'hover:bg-[#b8e600] active:scale-95 transition-all',
-        'border border-[#ccff00]/60 ring-1 ring-black/5',
+        'bg-primary px-3 py-1.5 text-primary-foreground',
+        'hover:bg-primary/90 active:scale-95 transition-all',
       )}
       aria-label={count > 0 ? `Open Rosa (${count} new)` : 'Open Rosa'}
       title={count > 0 ? `Ask Rosa  (${count} new · ⌘/)` : 'Ask Rosa  (⌘/)'}
@@ -39,7 +38,7 @@ export function RosaHeaderButton() {
           <span
             className={cn(
               'absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1',
-              'rounded-full bg-red-500 text-white border-2 border-[#ccff00]',
+              'rounded-full bg-studio-stale text-white border-2 border-primary',
               'flex items-center justify-center text-[9px] font-bold leading-none',
             )}
             aria-hidden="true"

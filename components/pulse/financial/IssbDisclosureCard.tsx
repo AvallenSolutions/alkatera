@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Download, FileText, Loader2 } from 'lucide-react';
+import { Download, FileText } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
@@ -106,7 +106,7 @@ export function IssbDisclosureCard() {
         <header className="flex items-start justify-between gap-3">
           <div>
             <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              <FileText className="h-3 w-3 text-[#ccff00]" />
+              <FileText className="h-3 w-3 text-studio-forest" />
               ISSB / IFRS S2 disclosure
             </p>
             <h3 className="mt-0.5 text-sm font-semibold text-foreground">
@@ -123,7 +123,7 @@ export function IssbDisclosureCard() {
             <Button size="sm" variant="outline" onClick={copyCsv} disabled={!disclosure}>
               Copy CSV
             </Button>
-            <Button size="sm" variant="default" onClick={downloadCsv} disabled={!disclosure} className="bg-[#ccff00] text-black hover:bg-[#b8e600]">
+            <Button size="sm" variant="default" onClick={downloadCsv} disabled={!disclosure} className="bg-primary text-primary-foreground hover:bg-primary/90">
               <Download className="mr-1 h-3 w-3" />
               CSV
             </Button>
@@ -132,7 +132,7 @@ export function IssbDisclosureCard() {
 
         {loading && (
           <div className="flex h-24 items-center justify-center">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            <p className="text-xs text-muted-foreground">Loading…</p>
           </div>
         )}
 
@@ -154,7 +154,7 @@ export function IssbDisclosureCard() {
                   label="Intensity / £m rev"
                   value={
                     disclosure.metricsAndTargets.carbonIntensity_tco2e_per_m_gbp_revenue === null
-                      ? '—'
+                      ? 'n/a'
                       : `${disclosure.metricsAndTargets.carbonIntensity_tco2e_per_m_gbp_revenue.toFixed(2)} tCO₂e`
                   }
                   sub="per £m revenue"
@@ -188,10 +188,10 @@ export function IssbDisclosureCard() {
                       <span className="truncate text-foreground">{t.label}</span>
                       <span
                         className={cn(
-                          'rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider',
-                          t.status === 'on_track' && 'bg-emerald-500/15 text-emerald-500',
-                          t.status === 'at_risk' && 'bg-amber-500/15 text-amber-500',
-                          t.status === 'off_track' && 'bg-red-500/15 text-red-500',
+                          'font-mono text-[9px] font-bold uppercase tracking-[0.18em]',
+                          t.status === 'on_track' && 'text-studio-good',
+                          t.status === 'at_risk' && 'text-studio-attention',
+                          t.status === 'off_track' && 'text-studio-stale',
                         )}
                       >
                         {t.status.replace('_', ' ')}

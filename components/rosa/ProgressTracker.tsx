@@ -2,18 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import {
-  Activity,
-  ArrowUpRight,
-  Loader2,
-  RefreshCw,
-  Settings2,
-  Sparkles,
-  TrendingDown,
-  TrendingUp,
-} from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { ArrowUpRight, RefreshCw, Settings2 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
+import { BigNumber } from '@/components/studio/big-number'
+import { Eyebrow } from '@/components/studio/eyebrow'
+import { StateChip } from '@/components/studio/state-chip'
+import { STUDIO } from '@/components/studio/theme'
 import { useOrganization } from '@/lib/organizationContext'
 import { useRealtimeRefresh } from '@/lib/rosa/useRealtimeRefresh'
 import { ProgressTrackerSetup } from './ProgressTrackerSetup'
@@ -174,7 +168,7 @@ export function ProgressTracker() {
 
   if (loading && !data) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 h-full">
+      <div className="rounded-[6px] border border-border bg-card p-5 sm:p-6 h-full">
         <Skeleton className="h-4 w-32 mb-4" />
         <Skeleton className="h-32 w-full" />
       </div>
@@ -201,7 +195,7 @@ export function ProgressTracker() {
 
   if (!data || !data.tracker || !data.series || !data.read) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 h-full">
+      <div className="rounded-[6px] border border-border bg-card p-5 sm:p-6 h-full">
         <p className="text-sm text-muted-foreground">Couldn&apos;t load your tracker. Try again.</p>
       </div>
     )
@@ -235,27 +229,18 @@ function ProgressTrackerCard({
   const deltaPct = series.delta.pct_change
   const deltaIsGood =
     direction === 'improving' ? true : direction === 'worsening' ? false : null
-  const deltaIcon =
-    direction === 'improving' ? TrendingDown : direction === 'worsening' ? TrendingUp : Activity
-  // Direction colours: improving = brand lime, worsening = amber, flat = muted.
-  const deltaColor =
-    deltaIsGood === true
-      ? 'text-[#ccff00]'
-      : deltaIsGood === false
-        ? 'text-amber-300'
-        : 'text-muted-foreground'
-
-  const DeltaIcon = deltaIcon
+  // Direction is a typographic state: good if improving, attention if not.
+  const deltaTone =
+    deltaIsGood === true ? 'good' : deltaIsGood === false ? 'attention' : 'quiet'
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 h-full">
+    <div className="rounded-[6px] border border-border bg-card p-5 sm:p-6 h-full">
       <div className="flex items-start justify-between gap-3 mb-4">
         <div className="min-w-0">
-          <h2 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-            <Activity className="h-4 w-4 text-[#ccff00]" />
+          <Eyebrow tone="inherit" className="text-studio-forest">
             Progress tracker
-          </h2>
-          <p className="text-base font-semibold mt-0.5 truncate" title={tracker.label}>
+          </Eyebrow>
+          <p className="font-display text-base font-semibold mt-1 truncate" title={tracker.label}>
             {tracker.label}
             {tracker.resolved_id && tracker.resolved_id !== tracker.id ? (
               <span className="ml-2 text-xs font-normal text-muted-foreground">
@@ -271,20 +256,16 @@ function ProgressTrackerCard({
             disabled={refreshing}
             aria-label="Ask Rosa to re-read"
             title="Ask Rosa to re-read"
-            className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors duration-200 ease-studio disabled:opacity-50"
           >
-            {refreshing ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <RefreshCw className="h-3.5 w-3.5" />
-            )}
+            <RefreshCw className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
             onClick={onChangeTracker}
             aria-label="Change what you track"
             title="Change what you track"
-            className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors duration-200 ease-studio"
           >
             <Settings2 className="h-3.5 w-3.5" />
           </button>
@@ -294,34 +275,26 @@ function ProgressTrackerCard({
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5 items-stretch">
         {/* Left ~60%: chart + delta */}
         <div className="lg:col-span-3 flex flex-col">
-          <div className="flex items-baseline justify-between mb-2">
-            <div>
-              {series.delta.last_value !== null ? (
-                <span className="text-3xl font-semibold tabular-nums leading-none">
-                  {formatNumber(series.delta.last_value)}
-                  <span className="ml-1.5 text-sm font-normal text-muted-foreground">
-                    {tracker.unit}
-                  </span>
-                </span>
-              ) : (
-                <span className="text-3xl font-semibold tabular-nums leading-none text-muted-foreground">
-                  —
-                </span>
-              )}
-            </div>
+          <div className="flex items-start justify-between mb-2">
+            {series.delta.last_value !== null ? (
+              <BigNumber
+                value={formatNumber(series.delta.last_value)}
+                label={tracker.unit || 'latest'}
+              />
+            ) : (
+              <span className="text-sm text-muted-foreground">No data yet.</span>
+            )}
             {deltaPct !== null ? (
-              <span className={cn('inline-flex items-center gap-1 text-xs font-medium', deltaColor)}>
-                <DeltaIcon className="h-3.5 w-3.5" />
+              <StateChip tone={deltaTone} className="mt-1">
                 {deltaPct > 0 ? '+' : ''}
-                {deltaPct.toFixed(1)}%
-                <span className="text-muted-foreground font-normal">over 12w</span>
-              </span>
+                {deltaPct.toFixed(1)}% · 12w
+              </StateChip>
             ) : null}
           </div>
           <div className="flex-1 min-h-[140px]">
             <TrendChart series={series} higherIsBetter={tracker.higher_is_better} />
           </div>
-          <p className="text-[10px] text-muted-foreground mt-2 text-right">
+          <p className="font-mono text-[10px] text-studio-dim mt-2 text-right">
             Last 12 weeks · {series.data_quality.coverage_weeks}/12 weeks with data
           </p>
         </div>
@@ -329,15 +302,12 @@ function ProgressTrackerCard({
         {/* Right ~40%: Rosa-voiced read */}
         <div className="lg:col-span-2 flex flex-col gap-3 border-t lg:border-t-0 lg:border-l lg:pl-5 border-border pt-4 lg:pt-0">
           <div>
-            <p className="text-xs uppercase tracking-wider text-muted-foreground inline-flex items-center gap-1.5">
-              <Sparkles className="h-3 w-3 text-[#ccff00]" />
+            <Eyebrow tone="dim">
               Rosa&apos;s read
               {read.confidence === 'low' ? (
-                <span className="ml-1 text-[10px] text-muted-foreground/70">
-                  · low confidence
-                </span>
+                <span className="ml-1 font-normal opacity-70">· low confidence</span>
               ) : null}
-            </p>
+            </Eyebrow>
             <p className="mt-2 text-sm font-medium leading-snug">
               <RichText>{read.headline}</RichText>
             </p>
@@ -346,14 +316,14 @@ function ProgressTrackerCard({
             </p>
           </div>
           {read.next_move ? (
-            <div className="mt-auto pt-3 border-t border-border/50">
-              <p className="text-xs italic text-muted-foreground leading-snug mb-2">
+            <div className="mt-auto pt-3 border-t border-border">
+              <p className="font-mono text-[9.5px] uppercase tracking-[0.2em] text-studio-dim mb-2">
                 Best next move
               </p>
               {read.next_move_href ? (
                 <Link
                   href={read.next_move_href}
-                  className="inline-flex items-start gap-1.5 text-xs text-foreground hover:text-[#ccff00] transition-colors group"
+                  className="inline-flex items-start gap-1.5 text-xs text-foreground hover:text-studio-forest transition-colors duration-200 ease-studio group"
                 >
                   <span className="leading-snug">
                     <RichText>{read.next_move}</RichText>
@@ -386,7 +356,8 @@ function formatNumber(value: number): string {
 /**
  * Tiny inline SVG line chart for 12 weekly points + optional target overlay.
  * Deliberately minimal so it fits the col-span-3 slot without dependencies.
- * Nulls render as gaps; a target overlay renders as a dashed amber line.
+ * Nulls render as gaps; overlays render as dashed dim lines; the series
+ * itself is drawn in forest.
  */
 function TrendChart({
   series,
@@ -488,7 +459,8 @@ function TrendChart({
           y1={baselineY}
           x2={width - padX}
           y2={baselineY}
-          stroke="rgb(115 115 115 / 0.3)"
+          stroke={STUDIO.dim}
+          strokeOpacity="0.35"
           strokeDasharray="2 3"
           strokeWidth="1"
         />
@@ -496,7 +468,8 @@ function TrendChart({
       {targetPath ? (
         <path
           d={targetPath}
-          stroke="rgb(252 211 77 / 0.6)"
+          stroke={STUDIO.dim}
+          strokeOpacity="0.7"
           strokeWidth="1.5"
           strokeDasharray="3 3"
           fill="none"
@@ -505,7 +478,7 @@ function TrendChart({
       {linePath ? (
         <path
           d={linePath}
-          stroke="#ccff00"
+          stroke={STUDIO.forest}
           strokeWidth="2"
           fill="none"
           strokeLinecap="round"
@@ -513,7 +486,7 @@ function TrendChart({
         />
       ) : null}
       {lastDot ? (
-        <circle cx={lastDot.x} cy={lastDot.y} r="3" fill="#ccff00" />
+        <circle cx={lastDot.x} cy={lastDot.y} r="3" fill={STUDIO.forest} />
       ) : null}
     </svg>
   )

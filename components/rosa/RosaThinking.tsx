@@ -98,7 +98,7 @@ function DogSpinner({ px }: { px: number }) {
       `}</style>
 
       {/* Body — chunky bean. */}
-      <g className="body" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none" color="#ccff00">
+      <g className="body" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none" color="#205E40">
         {/* Torso */}
         <path d="M9 14 Q9 9 14 9 L19 9 Q22 9 22 12 L22 18 Q22 21 19 21 L12 21 Q9 21 9 18 Z" />
         {/* Front leg */}
@@ -108,7 +108,7 @@ function DogSpinner({ px }: { px: number }) {
       </g>
 
       {/* Head — slight tilt animation. */}
-      <g className="head" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none" color="#ccff00">
+      <g className="head" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none" color="#205E40">
         <circle cx="8" cy="11" r="3.5" />
         {/* Ear flopping forward */}
         <path d="M5.5 9 L4 7" />
@@ -117,7 +117,7 @@ function DogSpinner({ px }: { px: number }) {
       </g>
 
       {/* Tail — fast wag. */}
-      <g className="tail" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none" color="#ccff00">
+      <g className="tail" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none" color="#205E40">
         <path d="M22 12 Q26 10 27 6" />
       </g>
     </svg>

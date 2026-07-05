@@ -38,7 +38,7 @@ export function LiveActivityCard() {
         <ul className="flex h-full flex-col gap-1.5 text-[11px]">
           {top3.map(e => (
             <li key={e.id} className="flex items-center gap-2 rounded-md border border-border/40 bg-card/30 px-2 py-1">
-              <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#ccff00]" />
+              <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-studio-forest" />
               <span className="min-w-0 flex-1 truncate text-foreground">{e.description}</span>
               <span className="whitespace-nowrap text-muted-foreground">{timeAgo(e.occurredAt)}</span>
             </li>

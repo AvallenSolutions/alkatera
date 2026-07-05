@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { TrendingDown, TrendingUp, Activity } from 'lucide-react'
 import { useUserDisplayName } from '@/lib/rosa/useUserDisplayName'
 import { useOrganization } from '@/lib/organizationContext'
 import { useRealtimeRefresh } from '@/lib/rosa/useRealtimeRefresh'
@@ -10,7 +9,8 @@ import { trackRosa } from '@/lib/rosa/track'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { HubLayoutSettings } from '@/components/rosa/HubLayoutSettings'
-import { VitalityRing } from './VitalityRing'
+import { StateChip } from '@/components/studio/state-chip'
+import { STUDIO, WORKING_TONE_HEX, type WorkingTone } from '@/components/studio/theme'
 // Round 3 (auto-research /rosa): breakdown modal is open-gated; defer it so it
 // leaves first load (benefits /rosa and every page that renders VitalityHero).
 const VitalityBreakdownModal = dynamic(() => import('./VitalityBreakdownModal').then((m) => m.VitalityBreakdownModal), { ssr: false })
@@ -33,62 +33,21 @@ interface CompositeResponse {
   stale?: boolean
 }
 
-const BAND_VISUALS: Record<ScoreBand, {
-  background: string
-  glow: string
-  eyebrow: string
-  chipBg: string
-  chipFg: string
-  spark: string
-}> = {
-  EXCELLENT: {
-    background: 'border-[#ccff00]/40 from-[#0c1410] via-card to-card',
-    glow: 'bg-[#ccff00]/20',
-    eyebrow: 'text-[#ccff00]/85',
-    chipBg: 'bg-[#ccff00]/15',
-    chipFg: 'text-[#ccff00]',
-    spark: '#ccff00',
-  },
-  HEALTHY: {
-    background: 'border-emerald-500/30 from-emerald-950/30 via-card to-card',
-    glow: 'bg-emerald-500/15',
-    eyebrow: 'text-emerald-300',
-    chipBg: 'bg-emerald-500/15',
-    chipFg: 'text-emerald-300',
-    spark: '#34d399',
-  },
-  DEVELOPING: {
-    background: 'border-border from-card via-card to-card',
-    glow: 'bg-blue-500/10',
-    eyebrow: 'text-muted-foreground',
-    chipBg: 'bg-muted',
-    chipFg: 'text-foreground',
-    spark: '#93c5fd',
-  },
-  EMERGING: {
-    background: 'border-amber-500/30 from-amber-950/30 via-card to-card',
-    glow: 'bg-amber-500/15',
-    eyebrow: 'text-amber-300',
-    chipBg: 'bg-amber-500/15',
-    chipFg: 'text-amber-300',
-    spark: '#fbbf24',
-  },
-  'NEEDS ATTENTION': {
-    background: 'border-red-500/30 from-red-950/30 via-card to-card',
-    glow: 'bg-red-500/15',
-    eyebrow: 'text-red-300',
-    chipBg: 'bg-red-500/15',
-    chipFg: 'text-red-300',
-    spark: '#f87171',
-  },
-  'AWAITING DATA': {
-    background: 'border-border from-card via-card to-card',
-    glow: 'bg-muted-foreground/10',
-    eyebrow: 'text-muted-foreground',
-    chipBg: 'bg-muted',
-    chipFg: 'text-muted-foreground',
-    spark: '#94a3b8',
-  },
+/**
+ * Band → working tone. States are typographic (StateChip) and the same
+ * tone strokes the composite ring. Working tones only; never decoration.
+ */
+const BAND_TONE: Record<ScoreBand, WorkingTone> = {
+  EXCELLENT: 'good',
+  HEALTHY: 'good',
+  DEVELOPING: 'attention',
+  EMERGING: 'attention',
+  'NEEDS ATTENTION': 'stale',
+  'AWAITING DATA': 'quiet',
+}
+
+function toneHex(tone: WorkingTone): string {
+  return tone === 'quiet' ? STUDIO.dim : WORKING_TONE_HEX[tone]
 }
 
 /**
@@ -232,22 +191,9 @@ export function VitalityHero() {
     },
   )
 
-  const greeting = (() => {
-    const hour = new Date().getHours()
-    if (hour < 12) return 'Good morning'
-    if (hour < 18) return 'Good afternoon'
-    return 'Good evening'
-  })()
-
-  const today = new Date().toLocaleDateString('en-GB', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  })
-
   if (loading && !data) {
     return (
-      <div className="rounded-3xl border border-border bg-card p-6 sm:p-8">
+      <div className="rounded-[6px] border border-border bg-card p-6 sm:p-8">
         <Skeleton className="h-8 w-64 mb-3" />
         <Skeleton className="h-32 w-full" />
       </div>
@@ -256,9 +202,11 @@ export function VitalityHero() {
 
   const composite = data?.composite ?? null
   const band = composite?.band ?? 'AWAITING DATA'
-  const visuals = BAND_VISUALS[band]
+  const tone = BAND_TONE[band]
   const delta = data?.trend_delta?.delta_points ?? null
   const trendValues = data?.trend.map(t => t.composite) ?? []
+  const deltaSuffix =
+    delta !== null && delta !== 0 ? ` · ${delta > 0 ? '+' : ''}${delta} pts` : ''
 
   return (
     <>
@@ -273,65 +221,45 @@ export function VitalityHero() {
           }
         }}
         className={cn(
-          'relative overflow-hidden rounded-3xl border w-full text-left p-6 sm:p-8 cursor-pointer',
-          'bg-gradient-to-br',
-          visuals.background,
-          'transition-shadow hover:shadow-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ccff00]/50',
+          'relative w-full cursor-pointer rounded-[6px] border border-border bg-card p-6 text-left sm:p-8',
+          'transition-colors duration-200 ease-studio hover:border-foreground/30',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         )}
         aria-label="Open vitality breakdown"
       >
-        <div
-          aria-hidden="true"
-          className={cn(
-            'pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full blur-3xl',
-            visuals.glow,
-          )}
-        />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute bottom-0 left-1/3 h-32 w-32 rounded-full bg-emerald-500/10 blur-3xl"
-        />
-
         <div className="absolute top-3 right-3 z-10" onClick={e => e.stopPropagation()}>
           <HubLayoutSettings />
         </div>
 
-        <div className="relative grid grid-cols-1 sm:grid-cols-5 gap-6 items-center">
-          <div className="sm:col-span-3 min-w-0">
-            <div className="flex items-center gap-3 flex-wrap">
-              <p className={cn('text-xs uppercase tracking-[0.2em]', visuals.eyebrow)}>
-                {today}
+        <div className="grid grid-cols-1 items-center gap-6 sm:grid-cols-5">
+          <div className="min-w-0 sm:col-span-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
+                THE VITALITY
               </p>
               {composite ? (
-                <BandChip band={band} delta={delta} visuals={visuals} />
+                <StateChip tone={tone}>
+                  {band}
+                  {deltaSuffix}
+                </StateChip>
               ) : null}
             </div>
-            <h1 className="mt-2 text-3xl sm:text-4xl font-semibold leading-tight">
-              {greeting}{firstName ? `, ${firstName}` : ''}.
-            </h1>
-            <p className="mt-3 text-sm sm:text-base text-muted-foreground max-w-2xl leading-relaxed">
-              {data?.read?.headline ?? data?.band_description ?? 'Loading your vitality picture…'}
-            </p>
+            {/* The panel's one sentence: Rosa's read of the vitality picture.
+                The page statement above owns the greeting. */}
+            <h2 className="mt-2 font-display text-2xl font-semibold leading-tight sm:text-3xl">
+              {data?.read?.headline ?? data?.band_description ?? 'Reading your vitality picture…'}
+            </h2>
 
-            <TrendStrip
-              values={trendValues}
-              colour={visuals.spark}
-              delta={delta}
-            />
-            <p className="mt-1 text-[10px] text-muted-foreground/70">
-              Click for the full breakdown
+            <TrendStrip values={trendValues} delta={delta} />
+            <p className="mt-1 font-mono text-[10px] text-muted-foreground/70">
+              Click for the full breakdown.
             </p>
           </div>
 
-          <div className="sm:col-span-2 flex flex-col items-center gap-3">
-            <VitalityRing
-              score={composite?.composite ?? null}
-              size="lg"
-              animated
-              showLabel={false}
-            />
+          <div className="flex flex-col items-center gap-4 sm:col-span-2">
+            <CompositeRing score={composite?.composite ?? null} colour={toneHex(tone)} />
             {composite ? (
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <div className="flex items-start gap-6">
                 <PillarMini label="E" score={composite.e.score} />
                 <PillarMini label="S" score={composite.s.score} />
                 <PillarMini label="G" score={composite.g.score} />
@@ -354,59 +282,77 @@ export function VitalityHero() {
   )
 }
 
-function BandChip({
-  band,
-  delta,
-  visuals,
-}: {
-  band: ScoreBand
-  delta: number | null
-  visuals: { chipBg: string; chipFg: string }
-}) {
-  const Icon =
-    delta === null
-      ? Activity
-      : delta > 0
-        ? TrendingUp
-        : delta < 0
-          ? TrendingDown
-          : Activity
+/**
+ * The composite ring: a hairline track with the score's arc stroked in
+ * the band's working tone. The number sits inside, display-bold over its
+ * mono label. No gradients, no glow.
+ */
+function CompositeRing({ score, colour }: { score: number | null; colour: string }) {
+  const size = 160
+  const strokeWidth = 10
+  const radius = (size - strokeWidth) / 2
+  const circumference = 2 * Math.PI * radius
+  const hasScore = score !== null && Number.isFinite(score)
+  const value = hasScore ? Math.min(Math.max(score as number, 0), 100) : 0
+  const dashOffset = circumference - (value / 100) * circumference
+
   return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium',
-        visuals.chipBg,
-        visuals.chipFg,
-      )}
-    >
-      <Icon className="h-3 w-3" />
-      {band}
-      {delta !== null && delta !== 0 ? (
-        <span className="opacity-70">
-          ({delta > 0 ? '+' : ''}
-          {delta} pts)
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={STUDIO.hairline}
+          strokeWidth={strokeWidth}
+        />
+        {hasScore ? (
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke={colour}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={dashOffset}
+            style={{ transition: 'stroke-dashoffset 700ms cubic-bezier(0.2, 0.8, 0.2, 1)' }}
+          />
+        ) : null}
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="font-display text-4xl font-bold leading-none tabular-nums text-foreground">
+          {hasScore ? Math.round(value) : '–'}
         </span>
-      ) : null}
-    </span>
+        <span className="mt-1.5 font-mono text-[9.5px] uppercase tracking-[0.2em] text-foreground opacity-70">
+          composite
+        </span>
+      </div>
+    </div>
   )
 }
 
+/** A pillar score: a small display number over its mono label. */
 function PillarMini({ label, score }: { label: string; score: number | null }) {
   return (
-    <span className="inline-flex items-center gap-1.5">
-      <span className="font-semibold tabular-nums text-sm text-foreground">
-        {score === null ? '—' : score}
-      </span>
-      <span className="opacity-70">{label}</span>
-    </span>
+    <div className="text-center">
+      <div className="font-display text-lg font-bold leading-none tabular-nums text-foreground">
+        {score === null ? '–' : score}
+      </div>
+      <div className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.2em] text-foreground opacity-70">
+        {label}
+      </div>
+    </div>
   )
 }
 
 /**
- * 12-week trend visual rendered as a row of weekly bars. Each bar
- * encodes that week's composite score (taller = higher). Missing weeks
- * show as low-opacity placeholders so the data density is visible at a
- * glance. The latest bar uses full opacity so the eye lands on "now".
+ * 12-week trend visual rendered as a row of weekly bars in forest. Each
+ * bar encodes that week's composite score (taller = higher). Missing
+ * weeks show as low-opacity placeholders so the data density is visible
+ * at a glance. The latest bar uses full opacity so the eye lands on "now".
  *
  * Bars chosen over a line chart because:
  *   - Sparse data (1-2 snapshots) doesn't look like a cliff or a mystery
@@ -422,18 +368,16 @@ function PillarMini({ label, score }: { label: string; score: number | null }) {
  */
 function TrendStrip({
   values,
-  colour,
   delta,
 }: {
   values: Array<number | null>
-  colour: string
   delta: number | null
 }) {
   const nonNullCount = values.filter(v => v !== null && Number.isFinite(v)).length
 
   if (nonNullCount < 1) {
     return (
-      <div className="mt-4 text-xs text-muted-foreground/80 italic max-w-md">
+      <div className="mt-4 max-w-md text-xs text-muted-foreground/80">
         12-week trend is still building. One snapshot lands per day; come back tomorrow to start seeing movement.
       </div>
     )
@@ -449,10 +393,10 @@ function TrendStrip({
           : 'Flat'
   const deltaTone =
     delta === null || delta === 0
-      ? 'text-muted-foreground'
+      ? 'text-studio-dim'
       : delta > 0
-        ? 'text-emerald-300'
-        : 'text-amber-300'
+        ? 'text-studio-good'
+        : 'text-studio-attention'
 
   // Find the latest non-null bucket so we can highlight it without
   // depending on array order semantics elsewhere.
@@ -466,10 +410,10 @@ function TrendStrip({
 
   return (
     <div className="mt-4 max-w-md" aria-label="12-week composite trend">
-      <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
+      <div className="mb-1.5 flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
         <span>12-week trend</span>
         {deltaLabel ? (
-          <span className={cn('tabular-nums font-medium', deltaTone)}>{deltaLabel}</span>
+          <span className={cn('font-bold tabular-nums', deltaTone)}>{deltaLabel}</span>
         ) : null}
       </div>
       <div className="flex items-end gap-1 h-10">
@@ -487,16 +431,16 @@ function TrendStrip({
             >
               <div
                 className={cn(
-                  'w-full rounded-sm transition-colors',
+                  'w-full rounded-sm transition-colors duration-200 ease-studio',
                   filled
                     ? isLast
                       ? 'opacity-100'
-                      : 'opacity-70'
+                      : 'opacity-60'
                     : 'opacity-15',
                 )}
                 style={{
                   height: `${heightPct}%`,
-                  backgroundColor: colour,
+                  backgroundColor: STUDIO.forest,
                 }}
               />
             </div>
@@ -506,4 +450,3 @@ function TrendStrip({
     </div>
   )
 }
-

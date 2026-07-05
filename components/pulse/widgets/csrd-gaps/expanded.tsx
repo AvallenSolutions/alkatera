@@ -18,7 +18,6 @@ import {
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
-  Loader2,
 } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import {
@@ -95,7 +94,9 @@ function CsrdGapsExpanded() {
   if (loading) {
     return (
       <div className="flex h-48 items-center justify-center">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          Loading
+        </span>
       </div>
     );
   }
@@ -121,8 +122,8 @@ function QuickFixLauncher({ data }: { data: ApiPayload }) {
   // "All clear" state
   if (critical.length === 0 && warning.length === 0) {
     return (
-      <section className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4">
-        <p className="flex items-center gap-2 text-sm font-semibold text-emerald-500">
+      <section className="rounded-[6px] border border-border bg-card p-4">
+        <p className="flex items-center gap-2 text-sm font-semibold text-studio-good">
           <CheckCircle2 className="h-4 w-4" />
           All ESRS disclosure points are covered by your current data.
         </p>
@@ -141,7 +142,7 @@ function QuickFixLauncher({ data }: { data: ApiPayload }) {
     <section className="space-y-3">
       <header>
         <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-          <AlertCircle className="h-4 w-4 text-amber-500" />
+          <AlertCircle className="h-4 w-4 text-studio-attention" />
           Quick-fix launcher
         </h3>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -174,23 +175,20 @@ function QuickFixTile({ gap }: { gap: GapResult }) {
     <Link
       href={gap.fix_href}
       className={cn(
-        'group flex flex-col gap-2 rounded-xl border p-4 transition hover:-translate-y-0.5',
-        isCritical
-          ? 'border-red-500/40 bg-red-500/5 hover:border-red-500/60 hover:bg-red-500/10'
-          : 'border-amber-500/40 bg-amber-500/5 hover:border-amber-500/60 hover:bg-amber-500/10',
+        'group flex flex-col gap-2 rounded-[6px] border border-border bg-card p-4 transition hover:-translate-y-0.5 hover:border-foreground/30',
       )}
     >
       <div className="flex items-center gap-2">
         <Icon
           className={cn(
             'h-4 w-4',
-            isCritical ? 'text-red-500' : 'text-amber-500',
+            isCritical ? 'text-studio-stale' : 'text-studio-attention',
           )}
         />
         <span
           className={cn(
             'text-[10px] font-semibold uppercase tracking-wider',
-            isCritical ? 'text-red-500' : 'text-amber-500',
+            isCritical ? 'text-studio-stale' : 'text-studio-attention',
           )}
         >
           {isCritical ? 'Critical' : 'Warning'}
@@ -204,7 +202,7 @@ function QuickFixTile({ gap }: { gap: GapResult }) {
       </div>
       <p className="text-sm font-medium text-foreground">{gap.title}</p>
       <p className="text-[11px] text-muted-foreground">{gap.evidence}</p>
-      <p className="mt-auto inline-flex items-center gap-1 text-[11px] font-medium text-[#ccff00] group-hover:underline">
+      <p className="mt-auto inline-flex items-center gap-1 text-[11px] font-medium text-studio-forest group-hover:underline">
         {gap.fix_label ?? 'Open fixer'}
         <ArrowRight className="h-3 w-3" />
       </p>

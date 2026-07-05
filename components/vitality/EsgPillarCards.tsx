@@ -71,7 +71,7 @@ export function EsgPillarCards({ e, s, g, sparklines, compact = false }: Props) 
       <PillarCardCell
         title="Environmental"
         Icon={Leaf}
-        toneClass="text-emerald-300 bg-emerald-500/10 border-emerald-500/30"
+        toneClass="text-studio-forest bg-card border-border"
         ringTone="emerald"
         pillar={e}
         subLabels={ENV_SUB_LABELS}
@@ -83,7 +83,7 @@ export function EsgPillarCards({ e, s, g, sparklines, compact = false }: Props) 
       <PillarCardCell
         title="Social"
         Icon={Users}
-        toneClass="text-sky-300 bg-sky-500/10 border-sky-500/30"
+        toneClass="text-studio-cobalt bg-card border-border"
         ringTone="sky"
         pillar={s}
         subLabels={SOCIAL_SUB_LABELS}
@@ -95,7 +95,7 @@ export function EsgPillarCards({ e, s, g, sparklines, compact = false }: Props) 
       <PillarCardCell
         title="Governance"
         Icon={Scale}
-        toneClass="text-purple-300 bg-purple-500/10 border-purple-500/30"
+        toneClass="text-studio-hold bg-card border-border"
         ringTone="purple"
         pillar={g}
         subLabels={GOV_SUB_LABELS}
@@ -134,7 +134,7 @@ function PillarCardCell<T extends object>({
 }: CellProps<T>) {
   const subEntries = Object.entries(pillar.sub) as Array<[keyof T, number | null]>
   return (
-    <div className={cn('rounded-xl border border-border bg-card p-4', compact && 'p-3')}>
+    <div className={cn('rounded-[6px] border border-border bg-card p-4', compact && 'p-3')}>
       <div className="flex items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-2 min-w-0">
           <span className={cn('rounded-md p-1.5 border', toneClass)}>
@@ -166,7 +166,7 @@ function PillarCardCell<T extends object>({
           <li key={String(key)} className="flex items-baseline justify-between gap-2 text-xs">
             <span className="text-muted-foreground truncate">{subLabels[key]}</span>
             <span className="font-medium tabular-nums text-foreground">
-              {val === null ? <span className="text-muted-foreground/60">—</span> : Math.round(val)}
+              {val === null ? <span className="text-muted-foreground/60">·</span> : Math.round(val)}
             </span>
           </li>
         ))}
@@ -211,7 +211,7 @@ function MiniTrendBars({
                 'w-full rounded-sm transition-colors',
                 filled ? (isLast ? 'opacity-100' : 'opacity-65') : 'opacity-15',
               )}
-              style={{ height: `${heightPct}%`, backgroundColor: '#ccff00' }}
+              style={{ height: `${heightPct}%`, backgroundColor: '#205E40' }}
             />
           </div>
         )

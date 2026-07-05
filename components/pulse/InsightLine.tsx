@@ -43,9 +43,9 @@ export function InsightLine() {
     <button
       type="button"
       onClick={() => openDrill({ kind: 'widget', id: 'insight-card' })}
-      className="group flex w-full items-center gap-2.5 rounded-lg border border-border/60 bg-card/60 px-4 py-2.5 text-left transition-colors hover:border-[#ccff00]/50"
+      className="group flex w-full items-center gap-2.5 rounded-[6px] border border-border bg-card px-4 py-2.5 text-left transition-colors hover:border-studio-forest/50"
     >
-      <Sparkles className="h-4 w-4 shrink-0 text-[#ccff00]" aria-hidden="true" />
+      <Sparkles className="h-4 w-4 shrink-0 text-studio-forest" aria-hidden="true" />
       <span className="min-w-0 flex-1 truncate text-sm text-foreground">{headline}</span>
       <span className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground group-hover:text-foreground">
         Read more

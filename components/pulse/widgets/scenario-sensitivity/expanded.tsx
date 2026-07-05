@@ -87,10 +87,10 @@ function EtsHistoryChart() {
   return (
     <section className="space-y-3">
       <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-        <History className="h-4 w-4 text-[#ccff00]" />
+        <History className="h-4 w-4 text-studio-forest" />
         UK ETS price history
       </h3>
-      <div className="h-64 rounded-xl border border-border/60 bg-card/40 p-3">
+      <div className="h-64 rounded-[6px] border border-border/60 bg-card/40 p-3">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart
             data={UK_ETS_HISTORY}
@@ -98,8 +98,8 @@ function EtsHistoryChart() {
           >
             <defs>
               <linearGradient id="ets-hist-grad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#ccff00" stopOpacity={0.45} />
-                <stop offset="100%" stopColor="#ccff00" stopOpacity={0} />
+                <stop offset="0%" stopColor="#205E40" stopOpacity={0.45} />
+                <stop offset="100%" stopColor="#205E40" stopOpacity={0} />
               </linearGradient>
             </defs>
             <XAxis
@@ -124,14 +124,14 @@ function EtsHistoryChart() {
             <Area
               type="monotone"
               dataKey="gbp_per_tonne"
-              stroke="#ccff00"
+              stroke="#205E40"
               strokeWidth={2}
               fill="url(#ets-hist-grad)"
               isAnimationActive={false}
             />
             <ReferenceLine
               y={85}
-              stroke="#94a3b8"
+              stroke="#A97C14"
               strokeDasharray="2 2"
               label={{
                 value: 'Today £85',
@@ -161,7 +161,7 @@ function EtsHistoryChart() {
 
 function ForwardCommentary() {
   return (
-    <section className="space-y-2 rounded-xl border border-border/60 bg-card/40 p-4">
+    <section className="space-y-2 rounded-[6px] border border-border/60 bg-card/40 p-4">
       <h3 className="text-sm font-semibold text-foreground">Forward-curve view</h3>
       <p className="text-xs leading-relaxed text-muted-foreground">
         UK ETS forward markets price carbon in the mid-£80s through 2026-27.

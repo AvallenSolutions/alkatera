@@ -22,7 +22,8 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { ArrowDown, ArrowUp, Loader2, PoundSterling, TrendingUp } from 'lucide-react';
+import { ArrowDown, ArrowUp, PoundSterling, TrendingUp } from 'lucide-react';
+import { STUDIO } from '@/components/studio/theme';
 import { useOrganization } from '@/lib/organizationContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { METRIC_DEFINITIONS, type MetricKey } from '@/lib/pulse/metric-keys';
@@ -57,9 +58,9 @@ interface ApiPayload {
 }
 
 const METRIC_COLOURS: Record<string, string> = {
-  total_co2e: '#ccff00',
-  water_consumption: '#38bdf8',
-  waste_total: '#f59e0b',
+  total_co2e: STUDIO.forest,
+  water_consumption: STUDIO.cobalt,
+  waste_total: STUDIO.ochreInk,
 };
 
 export function FinancialFootprintWidget() {
@@ -106,18 +107,18 @@ export function FinancialFootprintWidget() {
         pct: total > 0 ? (gbp / total) * 100 : 0,
         label: METRIC_DEFINITIONS[metric as MetricKey]?.label ?? metric,
         provenance: data.price_provenance[metric],
-        colour: METRIC_COLOURS[metric] ?? '#94a3b8',
+        colour: METRIC_COLOURS[metric] ?? STUDIO.dim,
       }))
       .sort((a, b) => b.gbp - a.gbp);
   }, [data]);
 
   return (
-    <Card className="border-border/60 bg-gradient-to-br from-card via-card to-card/60">
+    <Card className="rounded-[6px] border-border bg-card">
       <CardContent className="space-y-5 p-6">
         <header className="flex items-start justify-between gap-3">
           <div>
             <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              <PoundSterling className="h-3 w-3 text-[#ccff00]" />
+              <PoundSterling className="h-3 w-3 text-studio-forest" />
               Annual environmental liability
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground/80">
@@ -130,12 +131,12 @@ export function FinancialFootprintWidget() {
 
         {loading && (
           <div className="flex h-32 items-center justify-center">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Loading</span>
           </div>
         )}
 
         {!loading && error && (
-          <p className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-xs text-red-500">
+          <p className="rounded-[6px] border border-border bg-card p-3 text-xs text-studio-stale">
             {error}
           </p>
         )}
@@ -157,7 +158,7 @@ export function FinancialFootprintWidget() {
                 Set one on the{' '}
                 <a
                   href="/pulse/settings/shadow-prices/"
-                  className="text-[#ccff00] underline-offset-2 hover:underline"
+                  className="text-studio-forest underline-offset-2 hover:underline"
                 >
                   Prices page
                 </a>
@@ -181,10 +182,10 @@ function Headline({
   const formatted = formatGbp(total);
   const tone =
     yoy.direction === 'improving'
-      ? 'text-emerald-500 bg-emerald-500/10 border-emerald-500/30'
+      ? 'text-studio-good'
       : yoy.direction === 'worsening'
-        ? 'text-red-500 bg-red-500/10 border-red-500/30'
-        : 'text-muted-foreground bg-muted/30 border-border/60';
+        ? 'text-studio-stale'
+        : 'text-muted-foreground';
   const Arrow = yoy.delta_gbp < 0 ? ArrowDown : yoy.delta_gbp > 0 ? ArrowUp : TrendingUp;
 
   return (
@@ -197,7 +198,7 @@ function Headline({
       </div>
       <div
         className={cn(
-          'flex flex-col items-end gap-0.5 rounded-lg border px-3 py-2',
+          'flex flex-col items-end gap-0.5 rounded-[6px] border border-border bg-card px-3 py-2',
           tone,
         )}
       >
@@ -230,23 +231,21 @@ function TrendChart({ monthly }: { monthly: MonthlyBucket[] }) {
         <AreaChart data={monthly} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
           <defs>
             <linearGradient id="financialFootprintFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#ccff00" stopOpacity={0.45} />
-              <stop offset="100%" stopColor="#ccff00" stopOpacity={0} />
+              <stop offset="0%" stopColor={STUDIO.forest} stopOpacity={0.25} />
+              <stop offset="100%" stopColor={STUDIO.forest} stopOpacity={0} />
             </linearGradient>
           </defs>
           <XAxis
             dataKey="month"
             tickFormatter={m => m.slice(5)}
-            tick={{ fontSize: 10, fill: 'currentColor' }}
-            stroke="currentColor"
-            strokeOpacity={0.2}
+            tick={{ fontSize: 10, fill: STUDIO.dim }}
+            stroke={STUDIO.hairline}
             interval="preserveStartEnd"
           />
           <YAxis
             tickFormatter={v => formatGbpShort(Number(v))}
-            tick={{ fontSize: 10, fill: 'currentColor' }}
-            stroke="currentColor"
-            strokeOpacity={0.2}
+            tick={{ fontSize: 10, fill: STUDIO.dim }}
+            stroke={STUDIO.hairline}
             width={42}
           />
           <ChartTooltip
@@ -257,7 +256,7 @@ function TrendChart({ monthly }: { monthly: MonthlyBucket[] }) {
           <Area
             type="monotone"
             dataKey="total_gbp"
-            stroke="#ccff00"
+            stroke={STUDIO.forest}
             strokeWidth={2}
             fill="url(#financialFootprintFill)"
             isAnimationActive={false}

@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Waves } from 'lucide-react';
+import { Waves } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import {
   useRegisterDrillSlot,
@@ -118,7 +118,9 @@ function TornadoChart() {
   if (loading) {
     return (
       <div className="flex h-48 items-center justify-center">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          Loading
+        </span>
       </div>
     );
   }
@@ -127,7 +129,7 @@ function TornadoChart() {
     return (
       <section className="space-y-3">
         <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-          <Waves className="h-4 w-4 text-[#ccff00]" />
+          <Waves className="h-4 w-4 text-studio-forest" />
           Individual lever sensitivity
         </h3>
         <p className="rounded-lg border border-dashed border-border/60 bg-muted/30 p-4 text-xs text-muted-foreground">
@@ -141,7 +143,7 @@ function TornadoChart() {
   return (
     <section className="space-y-3">
       <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-        <Waves className="h-4 w-4 text-[#ccff00]" />
+        <Waves className="h-4 w-4 text-studio-forest" />
         Individual lever sensitivity
       </h3>
       <p className="text-xs text-muted-foreground">
@@ -150,7 +152,7 @@ function TornadoChart() {
         absolute opportunities.
       </p>
 
-      <div className="overflow-hidden rounded-xl border border-border/60">
+      <div className="overflow-hidden rounded-[6px] border border-border/60">
         <table className="w-full text-sm">
           <thead className="bg-muted/40">
             <tr className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -179,7 +181,7 @@ function TornadoChart() {
                   <td className="px-3 py-2">
                     <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                       <div
-                        className="h-full bg-[#ccff00]"
+                        className="h-full bg-studio-forest"
                         style={{ width: `${pct}%` }}
                       />
                     </div>

@@ -22,12 +22,13 @@ import {
   Leaf,
   PoundSterling,
   RefreshCw,
-  Loader2,
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useOrganization } from '@/lib/organizationContext'
 import { Skeleton } from '@/components/ui/skeleton'
+import { StateChip } from '@/components/studio/state-chip'
+import type { WorkingTone } from '@/components/studio/theme'
 import { useRealtimeRefresh } from '@/lib/rosa/useRealtimeRefresh'
 import { trackRosa } from '@/lib/rosa/track'
 import { RichText } from '@/components/shared/Brand'
@@ -250,7 +251,7 @@ export function PriorityTiles({ onOpenQueue }: Props) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[0, 1, 2].map(i => (
-          <Skeleton key={i} className="h-36 rounded-2xl" />
+          <Skeleton key={i} className="h-36 rounded-[6px]" />
         ))}
       </div>
     )
@@ -258,7 +259,7 @@ export function PriorityTiles({ onOpenQueue }: Props) {
 
   if (tiles.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-border bg-card/50 p-6 text-center">
+      <div className="rounded-[6px] border border-dashed border-border bg-card p-6 text-center">
         <p className="text-sm font-medium">You&apos;re all caught up.</p>
         <p className="mt-1 text-xs text-muted-foreground">
           Drop a document or ask Rosa anything below to get started.
@@ -277,23 +278,20 @@ export function PriorityTiles({ onOpenQueue }: Props) {
           type="button"
           onClick={handleRefresh}
           disabled={refreshing}
-          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 hover:bg-muted hover:text-foreground transition-colors duration-200 ease-studio disabled:opacity-50"
           aria-label="Ask Rosa to re-pick"
           title="Ask Rosa to re-pick these"
         >
-          {refreshing ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <RefreshCw className="h-3.5 w-3.5" />
-          )}
-          <span className="hidden sm:inline">Re-pick</span>
+          <RefreshCw className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">{refreshing ? 'Re-picking' : 'Re-pick'}</span>
         </button>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {tiles.map(t => (
+        {tiles.map((t, i) => (
           <PriorityTile
             key={t.id}
             tile={t}
+            poster={i === 0}
             onSnooze={handleSnooze}
             onOpenQueue={t.kind === 'queue' ? onOpenQueue : undefined}
           />
@@ -304,76 +302,121 @@ export function PriorityTiles({ onOpenQueue }: Props) {
   )
 }
 
+/**
+ * Tone → typographic state chip. States are words in a working tone,
+ * never coloured backgrounds. Info tiles carry no chip: quiet is quiet.
+ */
+const TONE_CHIP: Record<CuratedTile['tone'], { label: string; tone: WorkingTone } | null> = {
+  urgent: { label: 'Urgent', tone: 'attention' },
+  warn: { label: 'Review', tone: 'attention' },
+  good: { label: 'On track', tone: 'good' },
+  info: null,
+}
+
 function PriorityTile({
   tile,
+  poster,
   onSnooze,
   onOpenQueue,
 }: {
   tile: CuratedTile
+  poster?: boolean
   onSnooze: (kind: string) => void
   onOpenQueue?: () => void
 }) {
   const Icon: LucideIcon = ICON_MAP[tile.icon] ?? Sparkles
-  const toneStyles = TONE_STYLES[tile.tone]
+  const chip = TONE_CHIP[tile.tone]
 
-  const inner = (
-    <div
+  const snoozeButton = (
+    <button
+      type="button"
+      onClick={e => {
+        e.preventDefault()
+        e.stopPropagation()
+        onSnooze(tile.kind)
+      }}
+      aria-label="Snooze for 24 hours"
+      title="Snooze for 24 hours"
       className={cn(
-        'group relative h-full rounded-2xl border p-5 sm:p-6 overflow-hidden transition-all',
-        'hover:shadow-lg hover:-translate-y-0.5',
-        toneStyles.card,
+        'opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-studio rounded-md p-1',
+        poster
+          ? 'text-studio-cream/70 hover:text-studio-cream'
+          : 'text-muted-foreground hover:bg-muted hover:text-foreground',
       )}
     >
-      <div
-        aria-hidden="true"
-        className={cn('absolute -top-12 -right-12 h-32 w-32 rounded-full blur-2xl pointer-events-none', toneStyles.glow)}
-      />
-      <div className="relative flex items-start justify-between mb-4">
-        <span className={cn('rounded-lg p-2', toneStyles.iconBg)}>
-          <Icon className={cn('h-5 w-5', toneStyles.iconColor)} />
+      <X className="h-3.5 w-3.5" />
+    </button>
+  )
+
+  const inner = poster ? (
+    // The surface's one saturated block: forest, cream text, the number first.
+    <div className="group relative h-full overflow-hidden rounded-[6px] bg-studio-forest p-5 sm:p-6 text-studio-cream transition-all duration-200 ease-studio hover:-translate-y-0.5 hover:opacity-[0.96]">
+      <div className="flex items-start justify-between mb-4">
+        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] opacity-80">
+          Top priority
         </span>
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={e => {
-              e.preventDefault()
-              e.stopPropagation()
-              onSnooze(tile.kind)
-            }}
-            aria-label="Snooze for 24 hours"
-            title="Snooze for 24 hours"
-            className="opacity-0 group-hover:opacity-100 transition-opacity rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
+          {snoozeButton}
           {(tile.href || onOpenQueue) && (
-            <ArrowUpRight className={cn('h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity', toneStyles.iconColor)} />
+            <ArrowUpRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-studio" />
           )}
         </div>
       </div>
-      <div className="relative">
+      <div>
         <div className="flex items-baseline gap-2">
-          <span className={cn('text-4xl font-semibold tabular-nums leading-none', toneStyles.value)}>
+          <span className="font-display text-[2.5rem] font-bold tabular-nums leading-none">
             {tile.value}
           </span>
           {tile.unit && (
-            <span className="text-sm text-muted-foreground">{tile.unit}</span>
+            <span className="font-mono text-xs opacity-80">{tile.unit}</span>
           )}
         </div>
-        <p className="mt-2 text-sm font-medium leading-snug">
+        <p className="mt-2 font-mono text-[9.5px] uppercase tracking-[0.2em] opacity-70">
           <RichText>{tile.title}</RichText>
         </p>
-        <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
+        <p className="mt-2 text-xs leading-snug opacity-80 line-clamp-2">
           <RichText>{tile.hint}</RichText>
         </p>
         {tile.recommendation && (
-          <p
-            className={cn(
-              'mt-3 pt-3 border-t border-border/50 text-xs italic leading-snug',
-              toneStyles.recommendation,
-            )}
-          >
-            <Sparkles className="inline h-3 w-3 mr-1 -mt-0.5" />
+          <p className="mt-3 pt-3 border-t border-studio-cream/25 text-xs italic leading-snug opacity-90">
+            Rosa: <RichText>{tile.recommendation}</RichText>
+          </p>
+        )}
+      </div>
+    </div>
+  ) : (
+    // Cream panel: hairline, radius 6, the number in ink. Urgency is a word.
+    <div className="group relative h-full rounded-[6px] border border-border bg-card p-5 sm:p-6 transition-all duration-200 ease-studio hover:-translate-y-0.5">
+      <div className="flex items-start justify-between mb-4">
+        {chip ? (
+          <StateChip tone={chip.tone}>{chip.label}</StateChip>
+        ) : (
+          <Icon className="h-4 w-4 text-studio-dim" />
+        )}
+        <div className="flex items-center gap-1">
+          {snoozeButton}
+          {(tile.href || onOpenQueue) && (
+            <ArrowUpRight className="h-4 w-4 text-studio-forest opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-studio" />
+          )}
+        </div>
+      </div>
+      <div>
+        <div className="flex items-baseline gap-2">
+          <span className="font-display text-[2rem] font-bold tabular-nums leading-none text-foreground">
+            {tile.value}
+          </span>
+          {tile.unit && (
+            <span className="font-mono text-xs text-muted-foreground">{tile.unit}</span>
+          )}
+        </div>
+        <p className="mt-2 font-mono text-[9.5px] uppercase tracking-[0.2em] text-studio-dim">
+          <RichText>{tile.title}</RichText>
+        </p>
+        <p className="mt-2 text-xs text-muted-foreground leading-snug line-clamp-2">
+          <RichText>{tile.hint}</RichText>
+        </p>
+        {tile.recommendation && (
+          <p className="mt-3 pt-3 border-t border-border text-xs italic leading-snug text-muted-foreground">
             Rosa: <RichText>{tile.recommendation}</RichText>
           </p>
         )}
@@ -397,7 +440,7 @@ function PriorityTile({
           handleClick()
           onOpenQueue()
         }}
-        className="block w-full text-left"
+        className="block h-full w-full text-left"
       >
         {inner}
       </button>
@@ -405,54 +448,12 @@ function PriorityTile({
   }
   if (tile.href) {
     return (
-      <Link href={tile.href} onClick={handleClick}>
+      <Link href={tile.href} onClick={handleClick} className="block h-full">
         {inner}
       </Link>
     )
   }
   return inner
-}
-
-const TONE_STYLES: Record<CuratedTile['tone'], {
-  card: string
-  glow: string
-  iconBg: string
-  iconColor: string
-  value: string
-  recommendation: string
-}> = {
-  urgent: {
-    card: 'border-[#ccff00]/40 bg-[#ccff00]/[0.04]',
-    glow: 'bg-[#ccff00]/15',
-    iconBg: 'bg-[#ccff00]/15',
-    iconColor: 'text-[#ccff00]',
-    value: 'text-[#ccff00]',
-    recommendation: 'text-[#ccff00]/85',
-  },
-  warn: {
-    card: 'border-amber-500/40 bg-amber-500/[0.04]',
-    glow: 'bg-amber-500/15',
-    iconBg: 'bg-amber-500/15',
-    iconColor: 'text-amber-300',
-    value: 'text-amber-200',
-    recommendation: 'text-amber-200/85',
-  },
-  info: {
-    card: 'border-border bg-card',
-    glow: 'bg-blue-500/10',
-    iconBg: 'bg-muted',
-    iconColor: 'text-foreground',
-    value: 'text-foreground',
-    recommendation: 'text-muted-foreground',
-  },
-  good: {
-    card: 'border-emerald-500/40 bg-emerald-500/[0.04]',
-    glow: 'bg-emerald-500/15',
-    iconBg: 'bg-emerald-500/15',
-    iconColor: 'text-emerald-300',
-    value: 'text-emerald-200',
-    recommendation: 'text-emerald-200/85',
-  },
 }
 
 function ReadinessBadge({ readiness }: { readiness: ReadinessSummary }) {
@@ -469,13 +470,13 @@ function ReadinessBadge({ readiness }: { readiness: ReadinessSummary }) {
 
   const { title, body, cta, href } = foundationBroken
     ? {
-        title: 'Get your facility data flowing',
+        title: 'Get your facility data flowing.',
         body: 'No facility has had a utility, water, or waste entry in the last 60 days. Adding even one recent entry unlocks the LCA pipeline.',
         cta: 'Open facilities',
         href: '/company/facilities/',
       }
     : {
-        title: 'Finish matching product ingredients',
+        title: 'Finish matching product ingredients.',
         body: 'Some ingredients still need an emission factor. Until they\'re matched the LCAs stay in draft.',
         cta: 'Open products',
         href: '/products',
@@ -484,17 +485,17 @@ function ReadinessBadge({ readiness }: { readiness: ReadinessSummary }) {
   return (
     <Link
       href={href}
-      className="group block rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-500/[0.08] via-card to-card px-4 py-3 hover:border-amber-500/50 hover:from-amber-500/[0.12] transition-colors"
+      className="group block rounded-[6px] border border-border bg-card px-4 py-3 transition-colors duration-200 ease-studio hover:border-studio-dim/60"
     >
       <div className="flex items-start gap-3">
-        <span className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-amber-500/15 text-amber-300">
-          <Sparkles className="h-3.5 w-3.5" />
-        </span>
+        <StateChip tone="attention" className="mt-1 shrink-0">
+          Attention
+        </StateChip>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-amber-100 leading-snug">{title}</p>
+          <p className="text-sm font-medium leading-snug">{title}</p>
           <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">{body}</p>
         </div>
-        <span className="self-center shrink-0 inline-flex items-center gap-1 text-xs font-medium text-amber-200 group-hover:text-amber-100">
+        <span className="self-center shrink-0 inline-flex items-center gap-1 text-xs font-medium text-studio-forest">
           {cta}
           <ArrowUpRight className="h-3.5 w-3.5" />
         </span>

@@ -12,6 +12,8 @@ import {
   YAxis,
 } from 'recharts';
 import { Target } from 'lucide-react';
+import { StateChip } from '@/components/studio/state-chip';
+import { STUDIO } from '@/components/studio/theme';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
 import { Card, CardContent } from '@/components/ui/card';
@@ -102,12 +104,12 @@ export function TargetTrajectoryWidget() {
       <Card className="border-dashed border-border/60 bg-card/40">
         <CardContent className="space-y-2 p-6">
           <div className="flex items-center gap-2">
-            <Target className="h-4 w-4 text-[#ccff00]" />
+            <Target className="h-4 w-4 text-studio-forest" />
             <h3 className="text-sm font-semibold text-foreground">Targets</h3>
           </div>
           <p className="text-sm text-muted-foreground">
             No targets yet. Set one (e.g. -50% emissions by 2030) on the{' '}
-            <a href="/pulse/targets" className="text-[#ccff00] underline-offset-2 hover:underline">
+            <a href="/pulse/targets" className="text-studio-forest underline-offset-2 hover:underline">
               targets page
             </a>{' '}
             to see your trajectory here.
@@ -183,15 +185,13 @@ function SingleTargetChart({
               <XAxis
                 dataKey="date"
                 tickFormatter={d => d.slice(0, 7)}
-                tick={{ fontSize: 10, fill: 'currentColor' }}
-                stroke="currentColor"
-                strokeOpacity={0.2}
+                tick={{ fontSize: 10, fill: STUDIO.dim }}
+                stroke={STUDIO.hairline}
                 interval="preserveStartEnd"
               />
               <YAxis
-                tick={{ fontSize: 10, fill: 'currentColor' }}
-                stroke="currentColor"
-                strokeOpacity={0.2}
+                tick={{ fontSize: 10, fill: STUDIO.dim }}
+                stroke={STUDIO.hairline}
                 width={40}
               />
               <Tooltip
@@ -202,7 +202,7 @@ function SingleTargetChart({
               <Area
                 dataKey="band95"
                 stroke="none"
-                fill="#ccff00"
+                fill={STUDIO.forest}
                 fillOpacity={0.07}
                 connectNulls
                 isAnimationActive={false}
@@ -210,7 +210,7 @@ function SingleTargetChart({
               <Area
                 dataKey="band80"
                 stroke="none"
-                fill="#ccff00"
+                fill={STUDIO.forest}
                 fillOpacity={0.12}
                 connectNulls
                 isAnimationActive={false}
@@ -218,14 +218,14 @@ function SingleTargetChart({
               <Area
                 dataKey="band50"
                 stroke="none"
-                fill="#ccff00"
+                fill={STUDIO.forest}
                 fillOpacity={0.22}
                 connectNulls
                 isAnimationActive={false}
               />
               <Line
                 dataKey="historical"
-                stroke="#ccff00"
+                stroke={STUDIO.forest}
                 strokeWidth={2}
                 dot={false}
                 connectNulls
@@ -233,7 +233,7 @@ function SingleTargetChart({
               />
               <Line
                 dataKey="forecast"
-                stroke="#ccff00"
+                stroke={STUDIO.forest}
                 strokeWidth={1.5}
                 strokeDasharray="4 3"
                 dot={false}
@@ -242,7 +242,7 @@ function SingleTargetChart({
               />
               <ReferenceLine
                 y={target.target_value}
-                stroke="#94a3b8"
+                stroke={STUDIO.ochreInk}
                 strokeDasharray="2 2"
                 label={{
                   value: 'Target',
@@ -266,7 +266,7 @@ function SingleTargetChart({
               {targetStatus.gap !== null && (
                 <>
                   {' · gap '}
-                  <span className={cn(targetStatus.gap >= 0 ? 'text-emerald-500' : 'text-red-500')}>
+                  <span className={cn(targetStatus.gap >= 0 ? 'text-studio-good' : 'text-studio-stale')}>
                     {targetStatus.gap.toLocaleString('en-GB', { maximumFractionDigits: 1 })}
                   </span>
                 </>
@@ -291,10 +291,10 @@ function SingleTargetChart({
 function ProbabilityBar({ percent }: { percent: number }) {
   const colour =
     percent >= 70
-      ? 'bg-emerald-500'
+      ? 'bg-studio-good'
       : percent >= 40
-        ? 'bg-amber-500'
-        : 'bg-red-500';
+        ? 'bg-studio-attention'
+        : 'bg-studio-stale';
   const label =
     percent >= 70
       ? 'Likely to hit target'
@@ -321,26 +321,17 @@ function LegendDot({ opacity }: { opacity: number }) {
   return (
     <span
       className="inline-block h-2 w-2 rounded-sm"
-      style={{ backgroundColor: '#ccff00', opacity }}
+      style={{ backgroundColor: STUDIO.forest, opacity }}
     />
   );
 }
 
 function StatusPill({ status }: { status: 'on_track' | 'at_risk' | 'off_track' | 'unknown' }) {
   const config = {
-    on_track: { label: 'On track', cls: 'bg-emerald-500/15 text-emerald-500' },
-    at_risk: { label: 'At risk', cls: 'bg-amber-500/15 text-amber-500' },
-    off_track: { label: 'Off track', cls: 'bg-red-500/15 text-red-500' },
-    unknown: { label: 'Building data', cls: 'bg-slate-500/15 text-slate-400' },
+    on_track: { label: 'On track', tone: 'good' as const },
+    at_risk: { label: 'At risk', tone: 'attention' as const },
+    off_track: { label: 'Off track', tone: 'stale' as const },
+    unknown: { label: 'Building data', tone: 'quiet' as const },
   }[status];
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider',
-        config.cls,
-      )}
-    >
-      {config.label}
-    </span>
-  );
+  return <StateChip tone={config.tone}>{config.label}</StateChip>;
 }

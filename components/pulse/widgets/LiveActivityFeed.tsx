@@ -46,11 +46,11 @@ export function LiveActivityFeed({ limit = 12 }: { limit?: number }) {
   const visible = events.slice(0, limit);
 
   return (
-    <Card className="overflow-hidden border-border/60 bg-card/60">
+    <Card className="overflow-hidden rounded-[6px] border-border bg-card">
       <CardContent className="flex flex-col p-0">
         <header className="flex items-center justify-between border-b border-border/60 px-5 py-3">
           <div className="flex items-center gap-2">
-            <Activity className="h-4 w-4 text-[#ccff00]" />
+            <Activity className="h-4 w-4 text-studio-forest" />
             <h3 className="text-sm font-semibold text-foreground">Live activity</h3>
           </div>
           <span className="font-data text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -67,11 +67,11 @@ export function LiveActivityFeed({ limit = 12 }: { limit?: number }) {
                 <motion.li
                   key={event.id}
                   layout
-                  initial={{ opacity: 0, y: -8, backgroundColor: 'rgba(204,255,0,0.12)' }}
+                  initial={{ opacity: 0, y: -8, backgroundColor: 'rgba(32,94,64,0.08)' }}
                   animate={{
                     opacity: 1,
                     y: 0,
-                    backgroundColor: 'rgba(204,255,0,0)',
+                    backgroundColor: 'rgba(32,94,64,0)',
                   }}
                   exit={{ opacity: 0 }}
                   transition={{
@@ -133,15 +133,15 @@ function EmptyState() {
 function kindBadgeClass(kind: PulseEventKind): string {
   switch (kind) {
     case 'emissions_entry':
-      return 'bg-orange-500/10 text-orange-500';
+      return 'bg-secondary text-studio-brick';
     case 'lca_progress':
-      return 'bg-emerald-500/10 text-emerald-500';
+      return 'bg-secondary text-studio-forest';
     case 'supplier_update':
-      return 'bg-sky-500/10 text-sky-500';
+      return 'bg-secondary text-studio-cobalt';
     case 'production_log':
-      return 'bg-amber-500/10 text-amber-500';
+      return 'bg-secondary text-studio-ochre-ink';
     case 'metric_snapshot':
-      return 'bg-[#ccff00]/15 text-[#ccff00]';
+      return 'bg-secondary text-studio-dim';
   }
 }
 

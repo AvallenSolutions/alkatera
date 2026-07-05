@@ -53,7 +53,7 @@ export function RecentConversations() {
 
   if (conversations === null) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 h-full">
+      <div className="rounded-[6px] border border-border bg-card p-5 sm:p-6 h-full">
         <h2 className="text-sm font-medium text-muted-foreground mb-4">
           Recent conversations
         </h2>
@@ -66,7 +66,7 @@ export function RecentConversations() {
 
   if (conversations.length === 0) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 h-full">
+      <div className="rounded-[6px] border border-border bg-card p-5 sm:p-6 h-full">
         <h2 className="text-sm font-medium text-muted-foreground mb-2">
           Recent conversations
         </h2>
@@ -79,9 +79,9 @@ export function RecentConversations() {
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 h-full">
+    <div className="rounded-[6px] border border-border bg-card p-5 sm:p-6 h-full">
       <h2 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2">
-        <MessageSquare className="h-4 w-4 text-[#ccff00]" />
+        <MessageSquare className="h-4 w-4 text-studio-forest" />
         Recent conversations
       </h2>
       <ul className="space-y-1">
@@ -100,7 +100,7 @@ export function RecentConversations() {
                   {c.last_message_at && ` · ${fmtRelative(c.last_message_at)}`}
                 </p>
               </div>
-              <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-[#ccff00] transition-colors flex-shrink-0" />
+              <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-studio-forest transition-colors flex-shrink-0" />
             </button>
           </li>
         ))}

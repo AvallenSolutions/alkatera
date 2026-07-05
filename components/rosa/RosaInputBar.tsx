@@ -103,7 +103,7 @@ export function RosaInputBar({ onSubmit, placeholder, defaultValue }: Props) {
       />
       <div className="relative">
         {showSlash && (
-          <div className="absolute bottom-full left-0 right-0 mb-2 rounded-xl border border-border bg-popover shadow-lg overflow-hidden">
+          <div className="absolute bottom-full left-0 right-0 mb-2 rounded-[6px] border border-border bg-popover overflow-hidden">
             <ul className="py-1 max-h-64 overflow-y-auto">
               {SLASH_COMMANDS.filter(c => c.command.startsWith(value.toLowerCase())).map(c => (
                 <li key={c.command}>
@@ -115,7 +115,7 @@ export function RosaInputBar({ onSubmit, placeholder, defaultValue }: Props) {
                       setTimeout(() => submit(), 0)
                     }}
                   >
-                    <code className="font-mono text-[#ccff00]">{c.command}</code>
+                    <code className="font-mono text-studio-forest">{c.command}</code>
                     <span className="text-muted-foreground text-xs">{c.hint}</span>
                   </button>
                 </li>
@@ -125,8 +125,8 @@ export function RosaInputBar({ onSubmit, placeholder, defaultValue }: Props) {
         )}
         <div
           className={cn(
-            'flex items-end gap-2 rounded-2xl border border-border bg-card',
-            'p-2 shadow-sm transition-shadow focus-within:shadow-md focus-within:border-[#ccff00]/40',
+            'flex items-end gap-2 rounded-[6px] border border-border bg-card',
+            'p-2 transition-colors focus-within:border-studio-forest/40',
           )}
         >
           <input
@@ -167,7 +167,7 @@ export function RosaInputBar({ onSubmit, placeholder, defaultValue }: Props) {
           <Button
             type="button"
             size="icon"
-            className="h-9 w-9 flex-shrink-0 bg-[#ccff00] text-black hover:bg-[#b8e600] disabled:opacity-50"
+            className="h-9 w-9 flex-shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             onClick={submit}
             disabled={!value.trim()}
             aria-label="Send"

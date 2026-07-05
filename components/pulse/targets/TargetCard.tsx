@@ -11,11 +11,12 @@ import { forecastTrajectory } from '@/lib/pulse/forecast';
 import { INITIATIVE_STATUSES } from '@/lib/pulse/initiative-status';
 import type { Initiative, Target } from './types';
 
+// Typographic state chips: working tones from components/studio/theme.ts.
 const PILL_STYLES: Record<string, string> = {
-  on_track: 'bg-green-500/15 text-green-500',
-  at_risk: 'bg-amber-500/15 text-amber-500',
-  off_track: 'bg-red-500/15 text-red-500',
-  unknown: 'bg-muted text-muted-foreground',
+  on_track: 'text-studio-good',
+  at_risk: 'text-studio-attention',
+  off_track: 'text-studio-stale',
+  unknown: 'text-studio-dim',
 };
 
 const PILL_LABELS: Record<string, string> = {
@@ -60,7 +61,7 @@ export function TargetCard({ target, history, initiatives, onDelete, onAddInitia
                 {def?.label ?? target.metric_key} → {target.target_value.toLocaleString('en-GB')}{' '}
                 {def?.unit ?? ''} by {target.target_date}
               </p>
-              <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide', PILL_STYLES[status])}>
+              <span className={cn('font-mono text-[10px] font-bold uppercase tracking-[0.18em]', PILL_STYLES[status])}>
                 {PILL_LABELS[status]}
               </span>
             </div>
@@ -75,7 +76,7 @@ export function TargetCard({ target, history, initiatives, onDelete, onAddInitia
             size="sm"
             variant="ghost"
             onClick={() => onDelete(target.id)}
-            className="text-muted-foreground hover:text-red-500"
+            className="text-muted-foreground hover:text-studio-stale"
           >
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -92,11 +93,11 @@ export function TargetCard({ target, history, initiatives, onDelete, onAddInitia
                   <span
                     className={cn(
                       'h-1.5 w-1.5 rounded-full',
-                      meta?.colour === 'lime' && 'bg-[#ccff00]',
-                      meta?.colour === 'green' && 'bg-green-500',
-                      meta?.colour === 'amber' && 'bg-amber-500',
-                      meta?.colour === 'red' && 'bg-red-500',
-                      meta?.colour === 'slate' && 'bg-slate-400',
+                      meta?.colour === 'lime' && 'bg-studio-forest',
+                      meta?.colour === 'green' && 'bg-studio-good',
+                      meta?.colour === 'amber' && 'bg-studio-attention',
+                      meta?.colour === 'red' && 'bg-studio-stale',
+                      meta?.colour === 'slate' && 'bg-studio-dim',
                     )}
                   />
                   {i.title}
@@ -107,7 +108,7 @@ export function TargetCard({ target, history, initiatives, onDelete, onAddInitia
           <Button
             size="sm"
             variant="ghost"
-            className="h-6 px-2 text-xs text-[#9bbf00] hover:text-[#ccff00]"
+            className="h-6 px-2 text-xs text-studio-forest hover:text-studio-forest/80"
             onClick={() => onAddInitiative(target.id)}
           >
             + Add action

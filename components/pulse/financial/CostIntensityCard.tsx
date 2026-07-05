@@ -14,7 +14,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { Card, CardContent } from '@/components/ui/card';
 
@@ -80,7 +80,7 @@ export function CostIntensityCard() {
 
         {loading && (
           <div className="flex h-24 items-center justify-center">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            <p className="text-xs text-muted-foreground">Loading…</p>
           </div>
         )}
 
@@ -106,7 +106,7 @@ function Ratio({ label, ratio }: { label: string; ratio: RatioResult }) {
         <p className="mt-1 text-xs text-muted-foreground">{ratio.missing_reason}</p>
         <Link
           href={ratio.fix_href}
-          className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-[#ccff00] hover:underline"
+          className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-studio-forest hover:underline"
         >
           Add data <ArrowRight className="h-3 w-3" />
         </Link>

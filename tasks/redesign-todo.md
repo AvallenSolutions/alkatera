@@ -46,8 +46,13 @@ Open questions for the M2 review:
 - Mobile: tabs scroll horizontally in the band; a thumb-first pass comes with M3
 - Old Sidebar.tsx/Header.tsx still exist (admin/dev nav lives there); delete after M3 confirms nothing is lost
 
-## Milestone 3+ · room by room (review each before the next)
-- [ ] Dashboard / pulse
+## Milestone 3+ · room by room
+- [x] TODAY (5 July): the brief opens with a statement (greeting + date eyebrow); vitality hero
+  is a cream panel with working-tone ring + Rosa's read; priority tiles carry the one forest
+  block; Pulse/Financial/Targets have statement headers; the entire pulse widget catalogue
+  (~60 files), rosa surfaces incl. the drawer, vitality modals, targets and financial cards are
+  de-limed to studio (forest accents, working-tone typographic chips, no spinners/gradients/
+  glows). grep for ccff00/#0c1410 in components/{rosa,vitality,pulse} returns nothing.
 - [ ] Products + LCA
 - [ ] Reports / certifications / passports
 - [ ] Settings (the wiring)

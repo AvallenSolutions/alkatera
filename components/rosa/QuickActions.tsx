@@ -46,9 +46,9 @@ export function QuickActions({ onOpenQueue }: Props) {
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 sm:p-6 h-full">
+    <div className="rounded-[6px] border border-border bg-card p-5 sm:p-6 h-full">
       <h2 className="text-sm font-medium text-muted-foreground mb-4 flex items-center gap-2">
-        <Upload className="h-4 w-4 text-[#ccff00]" />
+        <Upload className="h-4 w-4 text-studio-forest" />
         Send Rosa your data
       </h2>
       <div className="space-y-3">
@@ -96,14 +96,14 @@ function ActionRow({
       className={cn(
         'group w-full text-left flex items-start gap-3 rounded-lg p-3 transition-colors',
         'border border-transparent hover:border-border hover:bg-muted/50',
-        highlight && 'border-[#ccff00]/30 bg-[#ccff00]/[0.04]',
+        highlight && 'border-studio-forest/30 bg-secondary',
       )}
     >
       <span
         className={cn(
           'flex-shrink-0 rounded-md p-1.5 transition-colors',
-          'bg-muted text-muted-foreground group-hover:bg-[#ccff00]/15 group-hover:text-[#ccff00]',
-          highlight && 'bg-[#ccff00]/15 text-[#ccff00]',
+          'bg-muted text-muted-foreground group-hover:text-studio-forest',
+          highlight && 'text-studio-forest',
         )}
       >
         {icon}

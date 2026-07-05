@@ -97,14 +97,14 @@ export function FinancialFootprintCard() {
           >
             <defs>
               <linearGradient id="ffcard-grad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#ccff00" stopOpacity={0.5} />
-                <stop offset="100%" stopColor="#ccff00" stopOpacity={0} />
+                <stop offset="0%" stopColor="#205E40" stopOpacity={0.5} />
+                <stop offset="100%" stopColor="#205E40" stopOpacity={0} />
               </linearGradient>
             </defs>
             <Area
               type="monotone"
               dataKey="total_gbp"
-              stroke="#ccff00"
+              stroke="#205E40"
               strokeWidth={2}
               fill="url(#ffcard-grad)"
               isAnimationActive={false}

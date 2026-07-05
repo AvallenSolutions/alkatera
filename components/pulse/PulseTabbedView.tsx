@@ -27,13 +27,13 @@ import { useState } from 'react';
 function HubLinkCard({ title, sub, href }: { title: string; sub: string; href: string }) {
   return (
     <Link href={href}>
-      <Card className="h-full border-[#ccff00]/30 bg-[#ccff00]/[0.04] transition-colors hover:border-[#ccff00]/60">
+      <Card className="h-full rounded-[6px] border-border bg-card transition-colors hover:border-studio-forest/60">
         <CardContent className="flex h-full items-center justify-between gap-3 p-5">
           <div>
             <p className="text-sm font-semibold text-foreground">{title}</p>
             <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>
           </div>
-          <ArrowRight className="h-4 w-4 shrink-0 text-[#ccff00]" />
+          <ArrowRight className="h-4 w-4 shrink-0 text-studio-forest" />
         </CardContent>
       </Card>
     </Link>

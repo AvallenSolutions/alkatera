@@ -54,7 +54,7 @@ export function PulseEditToolbar({
           className={cn(
             'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider transition',
             adaptiveEnabled
-              ? 'border-[#ccff00]/40 bg-[#ccff00]/10 text-[#ccff00]'
+              ? 'border-studio-forest/40 bg-card text-studio-forest'
               : 'border-border/60 bg-muted/40 text-muted-foreground hover:text-foreground',
           )}
         >
@@ -69,7 +69,7 @@ export function PulseEditToolbar({
             <Plus className="mr-1.5 h-3.5 w-3.5" />
             Add widget
             {hiddenWidgets.length > 0 && (
-              <span className="ml-1.5 rounded-full bg-[#ccff00]/15 px-1.5 text-[10px] font-semibold text-[#ccff00]">
+              <span className="ml-1.5 rounded-full bg-secondary px-1.5 text-[10px] font-semibold text-studio-forest">
                 {hiddenWidgets.length}
               </span>
             )}
@@ -116,7 +116,7 @@ export function PulseEditToolbar({
         size="sm"
         variant={editMode ? 'default' : 'outline'}
         onClick={onToggleEdit}
-        className={cn('text-xs', editMode && 'bg-[#ccff00] text-black hover:bg-[#ccff00]/90')}
+        className={cn('text-xs', editMode && 'bg-primary text-primary-foreground hover:bg-primary/90')}
       >
         <Pencil className="mr-1.5 h-3.5 w-3.5" />
         {editMode ? 'Done editing' : 'Edit layout'}

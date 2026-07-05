@@ -260,7 +260,7 @@ export function TargetForm({ organizationId, onCreated, onMetricKeyChange }: Tar
                     onClick={() => setTargetMode('absolute')}
                     className={cn(
                       'rounded px-2 py-0.5 text-[10px] font-medium transition-colors',
-                      targetMode === 'absolute' ? 'bg-[#ccff00]/20 text-foreground' : 'text-muted-foreground',
+                      targetMode === 'absolute' ? 'bg-secondary text-foreground' : 'text-muted-foreground',
                     )}
                   >
                     Value
@@ -270,7 +270,7 @@ export function TargetForm({ organizationId, onCreated, onMetricKeyChange }: Tar
                     onClick={() => setTargetMode('percent')}
                     className={cn(
                       'rounded px-2 py-0.5 text-[10px] font-medium transition-colors',
-                      targetMode === 'percent' ? 'bg-[#ccff00]/20 text-foreground' : 'text-muted-foreground',
+                      targetMode === 'percent' ? 'bg-secondary text-foreground' : 'text-muted-foreground',
                     )}
                   >
                     % reduction
@@ -309,7 +309,7 @@ export function TargetForm({ organizationId, onCreated, onMetricKeyChange }: Tar
                       className={cn(
                         'rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors',
                         reductionPct === String(pct)
-                          ? 'border-[#ccff00]/60 bg-[#ccff00]/15 text-foreground'
+                          ? 'border-studio-forest bg-secondary text-foreground'
                           : 'border-border/60 text-muted-foreground hover:text-foreground',
                       )}
                     >
@@ -362,7 +362,7 @@ export function TargetForm({ organizationId, onCreated, onMetricKeyChange }: Tar
         </div>
 
         {error && (
-          <p className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-600 dark:text-amber-300">
+          <p className="rounded-md border border-border bg-card px-3 py-2 text-xs text-studio-attention">
             {error}
           </p>
         )}

@@ -81,7 +81,7 @@ export function SupplierHotspotsCard() {
             <li key={i} className="flex items-center gap-2">
               <span className="w-24 truncate text-muted-foreground">{s.supplier_name}</span>
               <div className="flex-1 h-1 overflow-hidden rounded-full bg-muted">
-                <div className="h-full bg-[#ccff00]" style={{ width: `${Math.min(100, s.pct_of_attributed)}%` }} />
+                <div className="h-full bg-studio-forest" style={{ width: `${Math.min(100, s.pct_of_attributed)}%` }} />
               </div>
               <span className="w-8 text-right tabular-nums text-foreground">{Math.round(s.pct_of_attributed)}%</span>
             </li>

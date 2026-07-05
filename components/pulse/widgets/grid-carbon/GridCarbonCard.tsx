@@ -78,7 +78,7 @@ export function GridCarbonCard() {
             <Line
               type="monotone"
               dataKey="intensity"
-              stroke="#ccff00"
+              stroke="#205E40"
               strokeWidth={2}
               dot={false}
               isAnimationActive={false}

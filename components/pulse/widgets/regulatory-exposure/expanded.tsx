@@ -58,12 +58,12 @@ function RegulatoryExpanded() {
 }
 
 const REGIME_COLOURS: Record<DeadlineRegime, string> = {
-  uk_ets: 'bg-[#ccff00]/15 text-[#ccff00] border-[#ccff00]/40',
-  cbam: 'bg-sky-500/15 text-sky-500 border-sky-500/40',
-  plastic_tax: 'bg-amber-500/15 text-amber-500 border-amber-500/40',
-  epr: 'bg-purple-500/15 text-purple-500 border-purple-500/40',
-  csrd: 'bg-emerald-500/15 text-emerald-500 border-emerald-500/40',
-  streamlined: 'bg-rose-500/15 text-rose-500 border-rose-500/40',
+  uk_ets: 'text-studio-forest',
+  cbam: 'text-studio-cobalt',
+  plastic_tax: 'text-studio-ochre-ink',
+  epr: 'text-studio-hold',
+  csrd: 'text-studio-good',
+  streamlined: 'text-studio-brick',
 };
 
 function ComplianceCalendar() {
@@ -75,7 +75,7 @@ function ComplianceCalendar() {
   return (
     <section className="space-y-3">
       <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-        <CalendarDays className="h-4 w-4 text-[#ccff00]" />
+        <CalendarDays className="h-4 w-4 text-studio-forest" />
         Compliance calendar (next 12 months)
       </h3>
       <p className="text-xs text-muted-foreground">
@@ -121,11 +121,11 @@ function DeadlineGroup({
   if (items.length === 0) return null;
   const toneClass =
     tone === 'bad'
-      ? 'text-red-500'
+      ? 'text-studio-stale'
       : tone === 'warn'
-        ? 'text-amber-500'
+        ? 'text-studio-attention'
         : tone === 'good'
-          ? 'text-emerald-500'
+          ? 'text-studio-good'
           : 'text-muted-foreground';
   return (
     <div className="space-y-1.5">
@@ -148,7 +148,7 @@ function DeadlineGroup({
               <div className="flex flex-wrap items-center gap-2">
                 <span
                   className={cn(
-                    'rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider',
+                    'font-mono text-[9px] font-bold uppercase tracking-[0.18em]',
                     REGIME_COLOURS[d.regime],
                   )}
                 >
@@ -169,9 +169,9 @@ function DeadlineGroup({
                 className={cn(
                   'text-[10px] font-medium tabular-nums',
                   d.days_away < 0
-                    ? 'text-red-500'
+                    ? 'text-studio-stale'
                     : d.days_away <= 30
-                      ? 'text-amber-500'
+                      ? 'text-studio-attention'
                       : 'text-muted-foreground',
                 )}
               >
@@ -183,7 +183,7 @@ function DeadlineGroup({
               </span>
               <Link
                 href={d.action_href}
-                className="inline-flex items-center gap-0.5 text-[10px] font-medium text-[#ccff00] hover:underline"
+                className="inline-flex items-center gap-0.5 text-[10px] font-medium text-studio-forest hover:underline"
               >
                 Act <ArrowRight className="h-2.5 w-2.5" />
               </Link>
@@ -309,7 +309,7 @@ function WhatIfMitigations() {
   return (
     <section className="space-y-3">
       <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-        <Wrench className="h-4 w-4 text-[#ccff00]" />
+        <Wrench className="h-4 w-4 text-studio-forest" />
         What-if mitigations
       </h3>
       <p className="text-xs text-muted-foreground">
@@ -318,7 +318,7 @@ function WhatIfMitigations() {
         affects and compound across regimes.
       </p>
 
-      <div className="grid gap-3 rounded-xl border border-border/60 bg-card/40 p-4 sm:grid-cols-3">
+      <div className="grid gap-3 rounded-[6px] border border-border/60 bg-card/40 p-4 sm:grid-cols-3">
         <div>
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
             Baseline
@@ -335,7 +335,7 @@ function WhatIfMitigations() {
             {formatGbp(totalRemaining)}
           </p>
         </div>
-        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-emerald-500">
+        <div className="rounded-[6px] border border-border bg-card px-3 py-2 text-studio-good">
           <p className="text-[10px] uppercase tracking-wider opacity-80">
             Avoided
           </p>
@@ -354,7 +354,7 @@ function WhatIfMitigations() {
               className={cn(
                 'cursor-pointer rounded-md border p-3 transition',
                 on
-                  ? 'border-[#ccff00]/50 bg-[#ccff00]/5'
+                  ? 'border-studio-forest bg-card'
                   : 'border-border/40 bg-card/30 hover:border-border',
               )}
               onClick={() => toggle(m.id)}
@@ -364,7 +364,7 @@ function WhatIfMitigations() {
                   className={cn(
                     'mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border',
                     on
-                      ? 'border-[#ccff00] bg-[#ccff00] text-black'
+                      ? 'border-studio-forest bg-studio-forest text-studio-cream'
                       : 'border-border/60',
                   )}
                 >

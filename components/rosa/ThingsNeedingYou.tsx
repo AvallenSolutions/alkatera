@@ -140,7 +140,7 @@ export function ThingsNeedingYou({ onOpenQueue }: { onOpenQueue?: () => void }) 
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+      <div className="rounded-[6px] border border-border bg-card p-5 sm:p-6">
         <h2 className="text-sm font-medium text-muted-foreground mb-4">
           What needs you today
         </h2>
@@ -155,7 +155,7 @@ export function ThingsNeedingYou({ onOpenQueue }: { onOpenQueue?: () => void }) 
 
   if (things.length === 0) {
     return (
-      <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+      <div className="rounded-[6px] border border-border bg-card p-5 sm:p-6">
         <h2 className="text-sm font-medium text-muted-foreground mb-2">
           What needs you today
         </h2>
@@ -167,7 +167,7 @@ export function ThingsNeedingYou({ onOpenQueue }: { onOpenQueue?: () => void }) 
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+    <div className="rounded-[6px] border border-border bg-card p-5 sm:p-6">
       <h2 className="text-sm font-medium text-muted-foreground mb-4">
         What needs you today
       </h2>
@@ -199,7 +199,7 @@ function ThingRow({
       <span
         className={cn(
           'flex-shrink-0 rounded-md p-1.5 transition-colors',
-          'bg-muted text-muted-foreground group-hover:bg-[#ccff00]/15 group-hover:text-[#ccff00]',
+          'bg-muted text-muted-foreground group-hover:text-studio-forest',
         )}
       >
         <Icon className="h-4 w-4" />

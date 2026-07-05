@@ -9,9 +9,10 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, Wheat } from 'lucide-react';
+import { Wheat } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { Card, CardContent } from '@/components/ui/card';
+import { StateChip } from '@/components/studio/state-chip';
 import { cn } from '@/lib/utils';
 import type { CropSeason } from '@/lib/pulse/harvest-seasons';
 
@@ -55,24 +56,22 @@ export function HarvestSeasonsWidget() {
       <CardContent className="space-y-4 p-5">
         <header className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Wheat className="h-4 w-4 text-[#ccff00]" />
+            <Wheat className="h-4 w-4 text-studio-forest" />
             <h3 className="text-sm font-semibold text-foreground">Harvest calendar</h3>
           </div>
           {data?.detected_from_corpus && (
-            <span className="rounded-full bg-[#ccff00]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#ccff00]">
-              Detected from your data
-            </span>
+            <StateChip tone="good">Detected from your data</StateChip>
           )}
         </header>
 
         {loading && (
           <div className="flex h-24 items-center justify-center">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Loading</span>
           </div>
         )}
 
         {!loading && data && data.crops.length === 0 && (
-          <p className="rounded-lg border border-dashed border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground">
+          <p className="rounded-[6px] border border-dashed border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground">
             No matching crops yet. Add product or BOM data so we can detect the
             seasonality of your ingredients.
           </p>
@@ -118,7 +117,7 @@ function CropRow({ crop, currentMonth }: { crop: CropSeason; currentMonth: numbe
           {inPeak
             ? 'Peak now'
             : weeksUntilPeak === null
-              ? '—'
+              ? 'N/A'
               : `Next peak in ~${weeksUntilPeak} wk${weeksUntilPeak === 1 ? '' : 's'}`}
         </p>
       </div>
@@ -134,9 +133,9 @@ function CropRow({ crop, currentMonth }: { crop: CropSeason; currentMonth: numbe
               className={cn(
                 'relative flex h-5 items-center justify-center text-[9px] font-medium',
                 isPeak
-                  ? 'bg-[#ccff00] text-black'
+                  ? 'bg-studio-forest text-studio-cream'
                   : isWindow
-                    ? 'bg-[#ccff00]/30 text-foreground'
+                    ? 'bg-studio-forest/30 text-foreground'
                     : 'bg-muted text-muted-foreground/60',
               )}
               title={`${MONTH_LABELS[m - 1]}${isPeak ? ' · peak' : isWindow ? ' · in window' : ''}`}
@@ -152,7 +151,7 @@ function CropRow({ crop, currentMonth }: { crop: CropSeason; currentMonth: numbe
 
       <p className="mt-1.5 text-[11px] text-muted-foreground">{crop.notes}</p>
       {inWindow && !inPeak && (
-        <p className="mt-1 text-[11px] text-amber-500">
+        <p className="mt-1 text-[11px] text-studio-attention">
           In harvest window: expect inbound emissions and material variability now.
         </p>
       )}

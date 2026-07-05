@@ -15,8 +15,8 @@
  */
 
 import Link from 'next/link';
-import { ArrowLeft, PoundSterling } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { ArrowLeft } from 'lucide-react';
+import { Eyebrow } from '@/components/studio/eyebrow';
 
 import { MetricDrillProvider, useWidgetDrill } from '@/lib/pulse/MetricDrillContext';
 import { WidgetDrillOverlay } from '@/components/pulse/WidgetDrillOverlay';
@@ -113,30 +113,27 @@ function PulseFinancialShellBody() {
 
 function FinancialHeader() {
   return (
-    <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div>
+    <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="min-w-0">
         <Link
           href="/pulse"
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors duration-200 ease-studio hover:text-foreground"
         >
           <ArrowLeft className="h-3 w-3" />
           Back to Pulse
         </Link>
-        <div className="mt-1 flex items-center gap-2">
-          <PoundSterling className="h-6 w-6 text-[#ccff00]" aria-hidden="true" />
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground">
-            Financial
+        <Eyebrow className="mb-3 mt-3">PULSE · FINANCIAL</Eyebrow>
+        <div className="flex items-baseline gap-3">
+          <h1 className="font-display text-[clamp(2rem,4vw,3rem)] font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+            Financial.
           </h1>
-          <Badge
-            variant="outline"
-            className="border-[#ccff00]/40 bg-[#ccff00]/10 text-[10px] font-semibold uppercase tracking-wider text-[#ccff00]"
-          >
+          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-ochre-ink">
             Beta
-          </Badge>
+          </span>
         </div>
-        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
           Every figure here is your live operational data multiplied by your
-          shadow prices. Click any card for the deep view -- month-by-month
+          shadow prices. Click any card for the deep view: month-by-month
           tables, scenario analysis, compliance calendars and audit-ready
           exports.
         </p>
@@ -145,7 +142,7 @@ function FinancialHeader() {
         <BoardPackButton />
         <Link
           href="/pulse/settings/shadow-prices/"
-          className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-card/40 px-3 py-1.5 text-xs text-muted-foreground hover:border-[#ccff00]/40 hover:text-foreground"
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground transition-colors duration-200 ease-studio hover:text-foreground"
         >
           Manage prices
         </Link>

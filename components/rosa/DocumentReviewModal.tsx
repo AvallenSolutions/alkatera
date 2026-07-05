@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { AlertCircle, CheckCircle2, FileText, Loader2, Zap } from 'lucide-react';
+import { AlertCircle, CheckCircle2, FileText, Zap } from 'lucide-react';
 
 export interface ExtractResult {
   ok: boolean;
@@ -184,7 +184,7 @@ export function DocumentReviewModal({
         onOpenChange(false);
       }, 1200);
     } catch {
-      setImportError('Network error — please try again.');
+      setImportError('Network error, please try again.');
     } finally {
       setImporting(false);
     }
@@ -194,13 +194,13 @@ export function DocumentReviewModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto bg-zinc-900 border-zinc-700 text-white">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto rounded-[6px] border-border bg-card">
         <DialogHeader>
           <div className="flex items-center gap-2 mb-1">
-            <FileText className="w-4 h-4 text-zinc-400 shrink-0" />
-            <span className="text-xs text-zinc-400 truncate">{filename}</span>
+            <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+            <span className="text-xs text-muted-foreground truncate">{filename}</span>
           </div>
-          <DialogTitle className="text-base text-white">
+          <DialogTitle className="text-base">
             {extracting
               ? 'Reading document...'
               : extractResult?.ok
@@ -212,16 +212,16 @@ export function DocumentReviewModal({
         {/* Extracting state */}
         {extracting && (
           <div className="flex flex-col items-center gap-3 py-8 text-center">
-            <Loader2 className="w-8 h-8 animate-spin text-[#ccff00]" />
-            <p className="text-sm text-zinc-400">Extracting data from your document...</p>
+            <FileText className="w-8 h-8 text-studio-forest" />
+            <p className="text-sm text-muted-foreground">Extracting data from your document...</p>
           </div>
         )}
 
         {/* Extraction failed or unsupported type */}
         {!extracting && (extractError || (extractResult && !extractResult.ok)) && (
           <div className="space-y-4">
-            <div className="flex items-start gap-3 rounded-lg bg-zinc-800 p-3 text-sm text-zinc-300">
-              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-amber-400" />
+            <div className="flex items-start gap-3 rounded-lg bg-secondary p-3 text-sm text-muted-foreground">
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-studio-attention" />
               <p>
                 {extractError ?? extractResult?.error ?? 'Could not extract data from this document.'}
                 {' '}You can still send it to Rosa and ask her to read it.
@@ -233,11 +233,11 @@ export function DocumentReviewModal({
         {/* Non-utility document — offer to send to Rosa */}
         {!extracting && extractResult?.ok && !isUtilityBill && (
           <div className="space-y-4">
-            <div className="flex items-start gap-3 rounded-lg bg-zinc-800 p-3 text-sm text-zinc-300">
-              <Zap className="w-4 h-4 mt-0.5 shrink-0 text-[#ccff00]" />
+            <div className="flex items-start gap-3 rounded-lg bg-secondary p-3 text-sm text-muted-foreground">
+              <Zap className="w-4 h-4 mt-0.5 shrink-0 text-studio-forest" />
               <p>
-                This looks like a <strong className="text-white">{documentTypeLabel(extractResult.document_type)}</strong>.
-                {' '}Rosa can read and discuss it in the chat — send it across and ask her anything about it.
+                This looks like a <strong className="text-foreground">{documentTypeLabel(extractResult.document_type)}</strong>.
+                {' '}Rosa can read and discuss it in the chat. Send it across and ask her anything about it.
               </p>
             </div>
           </div>
@@ -246,8 +246,8 @@ export function DocumentReviewModal({
         {/* Import success */}
         {importSuccess && (
           <div className="flex flex-col items-center gap-3 py-6 text-center">
-            <CheckCircle2 className="w-8 h-8 text-[#ccff00]" />
-            <p className="text-sm text-white font-medium">Imported successfully</p>
+            <CheckCircle2 className="w-8 h-8 text-studio-good" />
+            <p className="text-sm font-medium">Imported successfully</p>
           </div>
         )}
 
@@ -255,7 +255,7 @@ export function DocumentReviewModal({
         {!extracting && extractResult?.ok && isUtilityBill && !importSuccess && (
           <div className="space-y-4">
             {extractResult.supplier_name && (
-              <div className="rounded-lg bg-zinc-800 px-3 py-2 text-xs text-zinc-400">
+              <div className="rounded-lg bg-secondary px-3 py-2 text-xs text-muted-foreground">
                 {extractResult.supplier_name}
                 {extractResult.account_number ? ` · Account ${extractResult.account_number}` : ''}
                 {extractResult.total_cost != null
@@ -265,14 +265,14 @@ export function DocumentReviewModal({
             )}
 
             <div className="space-y-1">
-              <Label className="text-xs text-zinc-400">Facility *</Label>
+              <Label className="text-xs text-muted-foreground">Facility *</Label>
               <Select value={facilityId} onValueChange={setFacilityId}>
-                <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white text-sm">
+                <SelectTrigger className="text-sm">
                   <SelectValue placeholder="Select a facility..." />
                 </SelectTrigger>
-                <SelectContent className="bg-zinc-800 border-zinc-700">
+                <SelectContent>
                   {extractResult.facilities.map(f => (
-                    <SelectItem key={f.id} value={f.id} className="text-white focus:bg-zinc-700">
+                    <SelectItem key={f.id} value={f.id}>
                       {f.name}
                       {f.address_country ? ` (${f.address_country})` : ''}
                     </SelectItem>
@@ -282,14 +282,14 @@ export function DocumentReviewModal({
             </div>
 
             <div className="space-y-1">
-              <Label className="text-xs text-zinc-400">Utility type *</Label>
+              <Label className="text-xs text-muted-foreground">Utility type *</Label>
               <Select value={utilityType} onValueChange={setUtilityType}>
-                <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white text-sm">
+                <SelectTrigger className="text-sm">
                   <SelectValue placeholder="Select type..." />
                 </SelectTrigger>
-                <SelectContent className="bg-zinc-800 border-zinc-700">
+                <SelectContent>
                   {UTILITY_TYPES.map(t => (
-                    <SelectItem key={t.value} value={t.value} className="text-white focus:bg-zinc-700">
+                    <SelectItem key={t.value} value={t.value}>
                       {t.label}
                     </SelectItem>
                   ))}
@@ -299,60 +299,60 @@ export function DocumentReviewModal({
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs text-zinc-400">Period start *</Label>
+                <Label className="text-xs text-muted-foreground">Period start *</Label>
                 <Input
                   type="date"
                   value={periodStart}
                   onChange={e => setPeriodStart(e.target.value)}
-                  className="bg-zinc-800 border-zinc-700 text-white text-sm [color-scheme:dark]"
+                  className="text-sm"
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-zinc-400">Period end *</Label>
+                <Label className="text-xs text-muted-foreground">Period end *</Label>
                 <Input
                   type="date"
                   value={periodEnd}
                   onChange={e => setPeriodEnd(e.target.value)}
-                  className="bg-zinc-800 border-zinc-700 text-white text-sm [color-scheme:dark]"
+                  className="text-sm"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs text-zinc-400">Quantity *</Label>
+                <Label className="text-xs text-muted-foreground">Quantity *</Label>
                 <Input
                   type="number"
                   value={quantity}
                   onChange={e => setQuantity(e.target.value)}
                   placeholder="0"
-                  className="bg-zinc-800 border-zinc-700 text-white text-sm"
+                  className="text-sm"
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-zinc-400">Unit *</Label>
+                <Label className="text-xs text-muted-foreground">Unit *</Label>
                 <Input
                   value={unit}
                   onChange={e => setUnit(e.target.value)}
                   placeholder="kWh, m³, litres..."
-                  className="bg-zinc-800 border-zinc-700 text-white text-sm"
+                  className="text-sm"
                 />
               </div>
             </div>
 
             <div className="space-y-1">
-              <Label className="text-xs text-zinc-400">Notes</Label>
+              <Label className="text-xs text-muted-foreground">Notes</Label>
               <Textarea
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
                 placeholder="Optional notes..."
                 rows={2}
-                className="bg-zinc-800 border-zinc-700 text-white text-sm resize-none"
+                className="text-sm resize-none"
               />
             </div>
 
             {importError && (
-              <div className="flex items-center gap-2 rounded-lg bg-red-950 border border-red-800 px-3 py-2 text-xs text-red-300">
+              <div className="flex items-center gap-2 rounded-lg border border-studio-stale/30 bg-card px-3 py-2 text-xs text-studio-stale">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                 {importError}
               </div>
@@ -368,20 +368,16 @@ export function DocumentReviewModal({
                   <button
                     type="button"
                     onClick={onSendToRosa}
-                    className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors underline-offset-2 hover:underline"
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors underline-offset-2 hover:underline"
                   >
                     Send to Rosa instead
                   </button>
                   <Button
                     onClick={handleImport}
                     disabled={!canImport || importing}
-                    className="bg-[#ccff00] text-black hover:bg-[#b8e600] font-medium text-sm disabled:opacity-40"
+                    className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium text-sm disabled:opacity-40"
                   >
-                    {importing ? (
-                      <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Importing...</>
-                    ) : (
-                      'Import to system'
-                    )}
+                    {importing ? 'Importing...' : 'Import to system'}
                   </Button>
                 </>
               ) : (
@@ -390,13 +386,13 @@ export function DocumentReviewModal({
                     <Button
                       variant="ghost"
                       onClick={() => onOpenChange(false)}
-                      className="text-zinc-400 hover:text-white text-sm"
+                      className="text-muted-foreground hover:text-foreground text-sm"
                     >
                       Dismiss
                     </Button>
                     <Button
                       onClick={onSendToRosa}
-                      className="bg-[#ccff00] text-black hover:bg-[#b8e600] font-medium text-sm"
+                      className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium text-sm"
                     >
                       Send to Rosa
                     </Button>

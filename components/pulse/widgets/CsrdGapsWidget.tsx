@@ -10,10 +10,11 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, ArrowRight, CheckCircle2, ClipboardList, Loader2 } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle2, ClipboardList } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { StateChip } from '@/components/studio/state-chip';
 import { useOrganization } from '@/lib/organizationContext';
 import { cn } from '@/lib/utils';
 import type { GapResult, GapSeverity } from '@/lib/pulse/csrd-gaps';
@@ -75,10 +76,10 @@ export function CsrdGapsWidget() {
   return (
     <Card className="overflow-hidden border-border/60">
       <CardContent className="flex flex-col p-0">
-        <header className="flex items-start justify-between gap-3 border-b border-border/60 bg-gradient-to-br from-slate-50 to-white px-5 py-4 dark:from-slate-900/60 dark:to-slate-900">
+        <header className="flex items-start justify-between gap-3 border-b border-border/60 bg-card px-5 py-4">
           <div className="flex items-start gap-3">
-            <div className="rounded-md bg-[#ccff00]/15 p-2">
-              <ClipboardList className="h-4 w-4 text-[#ccff00]" />
+            <div className="rounded-md bg-secondary p-2">
+              <ClipboardList className="h-4 w-4 text-studio-forest" />
             </div>
             <div>
               <h3 className="text-sm font-semibold uppercase tracking-wider text-foreground">
@@ -101,7 +102,7 @@ export function CsrdGapsWidget() {
 
         {loading ? (
           <div className="flex h-32 items-center justify-center">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Loading</p>
           </div>
         ) : !data || total === 0 ? (
           <p className="px-5 py-6 text-sm text-muted-foreground">
@@ -139,24 +140,13 @@ export function CsrdGapsWidget() {
 }
 
 function SeverityChip({ count, severity }: { count: number; severity: GapSeverity }) {
-  const styles =
-    severity === 'critical'
-      ? 'border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300'
-      : severity === 'warning'
-        ? 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300'
-        : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300';
+  const tone = severity === 'critical' ? 'stale' : severity === 'warning' ? 'attention' : 'good';
   const label =
     severity === 'critical' ? 'Critical' : severity === 'warning' ? 'Warning' : 'Covered';
   return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-medium',
-        styles,
-      )}
-    >
-      <span className="tabular-nums">{count}</span>
-      {label}
-    </span>
+    <StateChip tone={tone}>
+      <span className="tabular-nums">{count}</span> {label}
+    </StateChip>
   );
 }
 
@@ -169,10 +159,10 @@ function GapRow({ gap }: { gap: GapResult }) {
         : AlertTriangle;
   const iconColour =
     gap.severity === 'ok'
-      ? 'text-emerald-500'
+      ? 'text-studio-good'
       : gap.severity === 'warning'
-        ? 'text-amber-500'
-        : 'text-red-500';
+        ? 'text-studio-attention'
+        : 'text-studio-stale';
 
   return (
     <li className="flex items-start gap-3 px-5 py-3">

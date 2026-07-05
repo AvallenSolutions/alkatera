@@ -63,7 +63,7 @@ export function WidgetDrillOverlay() {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-stretch justify-stretch bg-black/70 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-stretch justify-stretch bg-studio-ink/30"
       role="dialog"
       aria-modal="true"
       aria-label={`${title} details`}
@@ -74,7 +74,7 @@ export function WidgetDrillOverlay() {
     >
       <div className="flex h-full w-full flex-col bg-background">
         {/* Sticky header -- collapses to a compact layout on mobile */}
-        <header className="sticky top-0 z-10 flex items-center gap-2 border-b border-border/60 bg-background/95 px-4 py-3 backdrop-blur sm:gap-3 sm:px-6 sm:py-4">
+        <header className="sticky top-0 z-10 flex items-center gap-2 border-b border-border bg-background px-4 py-3 sm:gap-3 sm:px-6 sm:py-4">
           <button
             type="button"
             onClick={closeDrill}
@@ -93,7 +93,7 @@ export function WidgetDrillOverlay() {
           {fullPageHref && (
             <Link
               href={fullPageHref}
-              className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1.5 text-[11px] text-muted-foreground transition hover:border-[#ccff00]/40 hover:text-foreground sm:gap-1.5 sm:px-3 sm:text-xs"
+              className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1.5 text-[11px] text-muted-foreground transition hover:border-studio-forest/40 hover:text-foreground sm:gap-1.5 sm:px-3 sm:text-xs"
             >
               <span className="hidden sm:inline">Full page</span>
               <ExternalLink className="h-3 w-3" />
@@ -214,7 +214,7 @@ function TrendSlot({ metricKey }: { metricKey: MetricKey }) {
         )}
       </div>
 
-      <div className="h-64 rounded-lg border border-border/60 bg-card/40 p-2">
+      <div className="h-64 rounded-[6px] border border-border bg-card p-2">
         {chartData.length < 2 ? (
           <div className="flex h-full items-center justify-center text-xs uppercase tracking-wider text-muted-foreground/50">
             Trend builds with data
@@ -224,8 +224,8 @@ function TrendSlot({ metricKey }: { metricKey: MetricKey }) {
             <AreaChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
               <defs>
                 <linearGradient id={`overlay-grad-${metricKey}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#ccff00" stopOpacity={0.45} />
-                  <stop offset="100%" stopColor="#ccff00" stopOpacity={0} />
+                  <stop offset="0%" stopColor="#205E40" stopOpacity={0.25} />
+                  <stop offset="100%" stopColor="#205E40" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <XAxis
@@ -238,12 +238,12 @@ function TrendSlot({ metricKey }: { metricKey: MetricKey }) {
               <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} width={48} />
               <Tooltip
                 contentStyle={{
-                  background: 'rgba(15,23,42,0.92)',
-                  border: '1px solid rgba(255,255,255,0.1)',
+                  background: '#F2F1EA',
+                  border: '1px solid #D9D6CB',
                   borderRadius: 6,
                   fontSize: 12,
                 }}
-                labelStyle={{ color: '#e2e8f0' }}
+                labelStyle={{ color: '#1A1B1D' }}
                 formatter={(v: number) => [
                   `${v.toLocaleString('en-GB', { maximumFractionDigits: 1 })} ${def.unit}`,
                   def.label,
@@ -252,7 +252,7 @@ function TrendSlot({ metricKey }: { metricKey: MetricKey }) {
               <Area
                 type="monotone"
                 dataKey="value"
-                stroke="#ccff00"
+                stroke="#205E40"
                 strokeWidth={2}
                 fill={`url(#overlay-grad-${metricKey})`}
                 isAnimationActive={false}

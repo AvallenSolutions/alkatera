@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowDown, Loader2, RotateCcw, Sparkles } from 'lucide-react';
+import { ArrowDown, RotateCcw, Sparkles } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -169,7 +169,7 @@ export function WhatIfWidget() {
               What if?
             </p>
             <h3 className="mt-0.5 text-sm font-semibold text-foreground flex items-center gap-2">
-              <Sparkles className="h-3.5 w-3.5 text-[#ccff00]" />
+              <Sparkles className="h-3.5 w-3.5 text-studio-forest" />
               Decarbonisation playground
             </h3>
           </div>
@@ -181,7 +181,7 @@ export function WhatIfWidget() {
 
         {loading && (
           <div className="flex h-32 items-center justify-center">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Loading</span>
           </div>
         )}
 
@@ -240,10 +240,10 @@ function Headline({
   } = computed;
   const tone =
     reductionPct >= 50
-      ? 'text-emerald-500'
+      ? 'text-studio-good'
       : reductionPct >= 25
-        ? 'text-[#ccff00]'
-        : 'text-amber-500';
+        ? 'text-studio-forest'
+        : 'text-studio-attention';
   void shadowPrice;
   // Blended annual saving includes the shadow £/tCO2e AND the utility bill impact.
   const blendedAnnualSaving = moneySavedGbp + totalUtilitySaving;
@@ -276,7 +276,7 @@ function Headline({
       <div className="grid gap-3 border-t border-border/40 pt-3 sm:grid-cols-3">
         <Stat
           label="Capex"
-          value={totalCapex > 0 ? `£${totalCapex.toLocaleString('en-GB', { maximumFractionDigits: 0 })}` : '—'}
+          value={totalCapex > 0 ? `£${totalCapex.toLocaleString('en-GB', { maximumFractionDigits: 0 })}` : 'None'}
           sub={totalCapex > 0 ? 'one-off' : 'no capital lever active'}
         />
         <Stat
@@ -350,7 +350,7 @@ function LeverRow({
         </div>
         <div className="text-right">
           <p className="text-sm font-medium tabular-nums text-foreground">{pct}%</p>
-          <p className="text-[10px] tabular-nums text-emerald-500">
+          <p className="text-[10px] tabular-nums text-studio-good">
             -{saving_t.toLocaleString('en-GB', { maximumFractionDigits: 1 })} t
           </p>
         </div>
@@ -362,7 +362,7 @@ function LeverRow({
         step={5}
         value={pct}
         onChange={e => onChange(Number(e.target.value))}
-        className="mt-2 w-full accent-[#ccff00]"
+        className="mt-2 w-full accent-studio-forest"
         aria-label={`${lever.label} adoption percentage`}
       />
       {pct > 0 && (capex > 0 || npv !== 0) && (
@@ -380,7 +380,7 @@ function LeverRow({
           </span>
           <span>
             {lever.lifetimeYears}yr NPV{' '}
-            <span className={cn('font-medium tabular-nums', npv >= 0 ? 'text-emerald-500' : 'text-red-500')}>
+            <span className={cn('font-medium tabular-nums', npv >= 0 ? 'text-studio-good' : 'text-studio-stale')}>
               £{npv.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
             </span>
           </span>

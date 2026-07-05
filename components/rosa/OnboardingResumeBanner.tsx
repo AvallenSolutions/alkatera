@@ -39,15 +39,13 @@ export function OnboardingResumeBanner() {
     <div
       role="region"
       aria-label="Resume onboarding"
-      className="rounded-2xl border border-[#ccff00]/30 bg-gradient-to-r from-[#ccff00]/10 to-[#ccff00]/5 px-4 py-3 sm:px-5 sm:py-4 mb-4 flex items-center justify-between gap-3"
+      className="rounded-[6px] border border-border border-l-2 border-l-studio-forest bg-card px-4 py-3 sm:px-5 sm:py-4 mb-4 flex items-center justify-between gap-3"
     >
       <div className="flex items-start sm:items-center gap-3 min-w-0">
-        <div className="h-9 w-9 rounded-xl bg-[#ccff00]/20 flex items-center justify-center shrink-0">
-          <Sparkles className="w-4 h-4 text-[#ccff00]" />
-        </div>
+        <Sparkles className="w-4 h-4 text-studio-forest shrink-0 mt-0.5 sm:mt-0" />
         <div className="min-w-0">
           <p className="text-sm font-medium text-foreground">
-            Finish setting up &mdash; step {stepNumber} of {total}
+            Finish setting up: step {stepNumber} of {total}.
           </p>
           <p className="text-xs text-muted-foreground truncate">
             Rosa has more for you once your starter data is in.
@@ -57,7 +55,7 @@ export function OnboardingResumeBanner() {
       <div className="flex items-center gap-1 shrink-0">
         <button
           onClick={resumeOnboarding}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-[#ccff00] px-3 py-1.5 text-xs font-medium text-black hover:bg-[#ccff00]/90 transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-3.5 py-1.5 text-xs font-medium text-background hover:bg-foreground/90 transition-colors duration-200 ease-studio"
         >
           Resume
           <ArrowRight className="w-3.5 h-3.5" />

@@ -14,7 +14,6 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -106,7 +105,7 @@ export function TopCostDriversCard() {
                 className={cn(
                   'rounded px-2.5 py-1 transition',
                   view === t.id
-                    ? 'bg-[#ccff00] text-black'
+                    ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:text-foreground',
                 )}
               >
@@ -118,7 +117,7 @@ export function TopCostDriversCard() {
 
         {loading && (
           <div className="flex h-32 items-center justify-center">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            <p className="text-xs text-muted-foreground">Loading…</p>
           </div>
         )}
 
@@ -209,7 +208,7 @@ function RankList({
             </span>
             <div className="flex h-1 w-16 overflow-hidden rounded-full bg-muted">
               <div
-                className="bg-[#ccff00]"
+                className="bg-studio-forest"
                 style={{ width: `${Math.min(100, r.pct)}%` }}
               />
             </div>

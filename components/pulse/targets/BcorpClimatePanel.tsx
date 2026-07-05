@@ -20,11 +20,12 @@ interface PlatformHealthModule {
 
 const CLIMATE_CODES = ['IT5-Y0-002', 'IT5-Y3-002', 'IT5-Y5-001'];
 
+// Typographic state chips: working tones from components/studio/theme.ts.
 const STATUS_STYLES: Record<string, string> = {
-  passed: 'bg-green-500/15 text-green-500',
-  in_progress: 'bg-amber-500/15 text-amber-500',
-  not_started: 'bg-muted text-muted-foreground',
-  future: 'bg-muted text-muted-foreground',
+  passed: 'text-studio-good',
+  in_progress: 'text-studio-attention',
+  not_started: 'text-studio-dim',
+  future: 'text-studio-dim',
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -71,7 +72,7 @@ export function BcorpClimatePanel() {
       <CardContent className="space-y-3 p-4">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Award className="h-4 w-4 text-[#ccff00]" />
+            <Award className="h-4 w-4 text-studio-forest" />
             <h3 className="text-sm font-semibold">Your action plan counts towards B Corp</h3>
           </div>
           <Link
@@ -87,7 +88,7 @@ export function BcorpClimatePanel() {
           {pills.map((p) => (
             <div key={p.code} className="flex items-center gap-1.5 rounded-md border border-border/60 px-2 py-1">
               <span className="text-xs">{p.name}</span>
-              <span className={cn('rounded-full px-1.5 py-0.5 text-[10px] font-medium', STATUS_STYLES[p.status] ?? STATUS_STYLES.not_started)}>
+              <span className={cn('font-mono text-[10px] font-bold uppercase tracking-[0.18em]', STATUS_STYLES[p.status] ?? STATUS_STYLES.not_started)}>
                 {STATUS_LABELS[p.status] ?? p.status}
               </span>
             </div>

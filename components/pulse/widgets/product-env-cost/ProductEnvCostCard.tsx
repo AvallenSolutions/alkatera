@@ -81,7 +81,7 @@ function Distribution({ products }: { products: ProductRow[] }) {
         return (
           <div
             key={i}
-            className="flex-1 rounded-t-sm bg-[#ccff00]/80"
+            className="flex-1 rounded-t-sm bg-studio-forest/80"
             style={{ height: `${h}%` }}
             title={`${p.product_name}: ${formatGbp(p.gbp_per_unit)}/${p.functional_unit}`}
           />

@@ -23,10 +23,10 @@ import {
   Zap,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { StateChip } from '@/components/studio/state-chip';
+import { STUDIO } from '@/components/studio/theme';
 import { useOrganization } from '@/lib/organizationContext';
-import { cn } from '@/lib/utils';
 
 interface MonthBucket {
   month: string;
@@ -127,8 +127,8 @@ export function FacilityImpactWidget() {
 
   if (error || !data) {
     return (
-      <Card className="border-amber-500/30 bg-amber-500/5">
-        <CardContent className="p-5 text-sm text-amber-700 dark:text-amber-300">
+      <Card className="border-border bg-card">
+        <CardContent className="p-5 text-sm text-studio-attention">
           {error ?? 'Could not load facility impact.'}
         </CardContent>
       </Card>
@@ -158,7 +158,7 @@ function FacilityImpactView({ data }: { data: FacilityImpactResponse }) {
         <header className="flex items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-[#ccff00]" />
+              <Building2 className="h-4 w-4 text-studio-forest" />
               <h3 className="text-sm font-semibold text-foreground">Facility impact</h3>
               <ConfidenceBadge confidence={data.summary.confidence} />
             </div>
@@ -269,13 +269,13 @@ function ElectricityTab({ data }: { data: FacilityImpactResponse }) {
             label: 'Live grid impact',
             value: data.summary.annual_tco2e_live.toFixed(1),
             unit: 'tCO₂e',
-            accent: '#ccff00',
+            accent: STUDIO.forest,
           },
           {
             label: 'Bill estimate',
             value: data.summary.annual_tco2e_tariff.toFixed(1),
             unit: 'tCO₂e',
-            accent: '#94a3b8',
+            accent: STUDIO.dim,
           },
           {
             label: 'Annual grid avg',
@@ -292,8 +292,8 @@ function ElectricityTab({ data }: { data: FacilityImpactResponse }) {
             Monthly emissions · bill estimate vs live grid
           </p>
           <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-            <LegendDot color="#94a3b8" label="Bill estimate" />
-            <LegendDot color="#ccff00" label="Live grid" />
+            <LegendDot color={STUDIO.dim} label="Bill estimate" />
+            <LegendDot color={STUDIO.forest} label="Live grid" />
           </div>
         </div>
         <div className="h-56 -mx-1">
@@ -314,19 +314,19 @@ function ElectricityTab({ data }: { data: FacilityImpactResponse }) {
               />
               <Tooltip
                 content={<ElectricityTooltip />}
-                cursor={{ fill: 'rgba(204,255,0,0.06)' }}
+                cursor={{ fill: 'rgba(32,94,64,0.06)' }}
               />
               <Bar
                 dataKey="tariff"
                 name="Bill estimate"
-                fill="#94a3b8"
+                fill={STUDIO.dim}
                 radius={[2, 2, 0, 0]}
                 isAnimationActive={false}
               />
               <Bar
                 dataKey="live"
                 name="Live grid"
-                fill="#ccff00"
+                fill={STUDIO.forest}
                 radius={[2, 2, 0, 0]}
                 isAnimationActive={false}
               />
@@ -366,16 +366,16 @@ function ElectricityTab({ data }: { data: FacilityImpactResponse }) {
                 domain={['auto', 'auto']}
               />
               <Tooltip
-                cursor={{ stroke: 'rgba(204,255,0,0.3)' }}
+                cursor={{ stroke: 'rgba(32,94,64,0.3)' }}
                 contentStyle={{ fontSize: 11, borderRadius: 6, border: '1px solid rgba(120,120,120,0.3)' }}
                 formatter={(value: number) => [`${Math.round(value)} g/kWh`, 'Grid avg']}
               />
               <Line
                 type="monotone"
                 dataKey="intensity"
-                stroke="#ccff00"
+                stroke={STUDIO.forest}
                 strokeWidth={2}
-                dot={{ r: 3, fill: '#ccff00', strokeWidth: 0 }}
+                dot={{ r: 3, fill: STUDIO.forest, strokeWidth: 0 }}
                 isAnimationActive={false}
               />
             </ComposedChart>
@@ -394,7 +394,7 @@ function ElectricityTab({ data }: { data: FacilityImpactResponse }) {
 
       {/* Fallback nudge */}
       {data.summary.confidence === 'fallback' && (
-        <div className="rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+        <div className="rounded-md border border-border bg-card px-3 py-2 text-xs text-studio-attention">
           <Sparkles className="mr-1 inline h-3 w-3" />
           No live grid feed for your facilities yet. The line is flat because we&apos;re using a
           static IEA country average. Connect ElectricityMaps to expose summer/winter swings for
@@ -439,11 +439,11 @@ function GasTab({ months }: { months: MonthBucket[] }) {
       <KpiStrip
         items={[
           { label: 'Total', value: formatNumber(total), unit: 'kWh' },
-          { label: 'Emissions', value: totalTco2e.toFixed(1), unit: 'tCO₂e', accent: '#a78bfa' },
+          { label: 'Emissions', value: totalTco2e.toFixed(1), unit: 'tCO₂e', accent: STUDIO.cobalt },
           { label: 'Avg / month', value: formatNumber(avgMonth), unit: 'kWh' },
           {
             label: 'Peak month',
-            value: peakMonth?.month_label ?? '—',
+            value: peakMonth?.month_label ?? 'n/a',
             unit: peakMonth ? `${formatNumber(peakMonth.gas_kwh)} kWh` : '',
           },
         ]}
@@ -476,13 +476,13 @@ function GasTab({ months }: { months: MonthBucket[] }) {
               <YAxis
                 yAxisId="co2"
                 orientation="right"
-                tick={{ fontSize: 10, fill: '#a78bfa' }}
-                stroke="#a78bfa"
+                tick={{ fontSize: 10, fill: STUDIO.cobalt }}
+                stroke={STUDIO.cobalt}
                 strokeOpacity={0.4}
                 width={36}
               />
               <Tooltip
-                cursor={{ fill: 'rgba(249,115,22,0.06)' }}
+                cursor={{ fill: 'rgba(223,163,43,0.08)' }}
                 contentStyle={{ fontSize: 11, borderRadius: 6, border: '1px solid rgba(120,120,120,0.3)' }}
                 formatter={(value: number, name: string) =>
                   name === 'kwh'
@@ -493,7 +493,7 @@ function GasTab({ months }: { months: MonthBucket[] }) {
               <Bar
                 yAxisId="kwh"
                 dataKey="kwh"
-                fill="#f97316"
+                fill={STUDIO.ochre}
                 radius={[2, 2, 0, 0]}
                 isAnimationActive={false}
               />
@@ -501,7 +501,7 @@ function GasTab({ months }: { months: MonthBucket[] }) {
                 yAxisId="co2"
                 type="monotone"
                 dataKey="tco2e"
-                stroke="#a78bfa"
+                stroke={STUDIO.cobalt}
                 strokeWidth={1.5}
                 strokeDasharray="3 3"
                 dot={false}
@@ -513,7 +513,7 @@ function GasTab({ months }: { months: MonthBucket[] }) {
       </div>
 
       {Math.abs(heatingDelta) > 20 && winterAvg > 0 && summerAvg > 0 && (
-        <div className="rounded-md border border-orange-500/20 bg-orange-500/5 px-3 py-2 text-xs text-orange-700 dark:text-orange-300">
+        <div className="rounded-md border border-border bg-card px-3 py-2 text-xs text-studio-attention">
           <Flame className="mr-1 inline h-3 w-3" />
           Winter gas use averaged{' '}
           <span className="font-medium tabular-nums">{Math.round(heatingDelta)}%</span> higher than
@@ -551,12 +551,12 @@ function WaterTab({ months }: { months: MonthBucket[] }) {
     <div className="space-y-4">
       <KpiStrip
         items={[
-          { label: 'Total intake', value: formatNumber(total), unit: 'm³', accent: '#3b82f6' },
+          { label: 'Total intake', value: formatNumber(total), unit: 'm³', accent: STUDIO.cobalt },
           { label: 'Avg / month', value: formatNumber(avgMonth), unit: 'm³' },
           { label: 'Avg / day', value: formatNumber(dailyAvg), unit: 'm³' },
           {
             label: 'Peak month',
-            value: peakMonth?.month_label ?? '—',
+            value: peakMonth?.month_label ?? 'n/a',
             unit: peakMonth ? `${formatNumber(peakMonth.water_m3)} m³` : '',
           },
         ]}
@@ -586,20 +586,20 @@ function WaterTab({ months }: { months: MonthBucket[] }) {
                 width={42}
               />
               <Tooltip
-                cursor={{ fill: 'rgba(59,130,246,0.06)' }}
+                cursor={{ fill: 'rgba(43,70,192,0.06)' }}
                 contentStyle={{ fontSize: 11, borderRadius: 6, border: '1px solid rgba(120,120,120,0.3)' }}
                 formatter={(value: number) => [
                   `${value.toLocaleString('en-GB', { maximumFractionDigits: 1 })} m³`,
                   'Intake',
                 ]}
               />
-              <Bar dataKey="m3" fill="#3b82f6" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+              <Bar dataKey="m3" fill={STUDIO.cobalt} radius={[2, 2, 0, 0]} isAnimationActive={false} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      <div className="rounded-md border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs text-blue-700 dark:text-blue-300">
+      <div className="rounded-md border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
         <Droplets className="mr-1 inline h-3 w-3" />
         Water intake shown in native units. AWARE-weighted scarcity impact is calculated per
         facility location and surfaces in your product LCAs and sustainability reports.
@@ -655,19 +655,19 @@ function WasteTab({ months }: { months: MonthBucket[] }) {
             label: 'Recycled',
             value: `${recoveryRate.toFixed(0)}%`,
             unit: `${formatNumber(totalRecycling)} kg`,
-            accent: '#10b981',
+            accent: STUDIO.good,
           },
           {
             label: 'General',
             value: formatNumber(totalGeneral),
             unit: 'kg',
-            accent: '#94a3b8',
+            accent: STUDIO.dim,
           },
           {
             label: 'Hazardous',
             value: `${hazardousPct.toFixed(1)}%`,
             unit: `${formatNumber(totalHazardous)} kg`,
-            accent: '#ef4444',
+            accent: STUDIO.brick,
           },
         ]}
       />
@@ -678,9 +678,9 @@ function WasteTab({ months }: { months: MonthBucket[] }) {
             Monthly waste · stream breakdown
           </p>
           <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-            <LegendDot color="#10b981" label="Recycled" />
-            <LegendDot color="#94a3b8" label="General" />
-            <LegendDot color="#ef4444" label="Hazardous" />
+            <LegendDot color={STUDIO.good} label="Recycled" />
+            <LegendDot color={STUDIO.dim} label="General" />
+            <LegendDot color={STUDIO.brick} label="Hazardous" />
           </div>
         </div>
         <div className="h-64 -mx-1">
@@ -700,16 +700,16 @@ function WasteTab({ months }: { months: MonthBucket[] }) {
                 width={42}
               />
               <Tooltip
-                cursor={{ fill: 'rgba(239,68,68,0.06)' }}
+                cursor={{ fill: 'rgba(191,75,42,0.06)' }}
                 contentStyle={{ fontSize: 11, borderRadius: 6, border: '1px solid rgba(120,120,120,0.3)' }}
                 formatter={(value: number, name: string) => [
                   `${value.toLocaleString('en-GB', { maximumFractionDigits: 0 })} kg`,
                   name === 'recycling' ? 'Recycled' : name === 'general' ? 'General' : 'Hazardous',
                 ]}
               />
-              <Bar dataKey="recycling" stackId="waste" fill="#10b981" isAnimationActive={false} />
-              <Bar dataKey="general" stackId="waste" fill="#94a3b8" isAnimationActive={false} />
-              <Bar dataKey="hazardous" stackId="waste" fill="#ef4444" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+              <Bar dataKey="recycling" stackId="waste" fill={STUDIO.good} isAnimationActive={false} />
+              <Bar dataKey="general" stackId="waste" fill={STUDIO.dim} isAnimationActive={false} />
+              <Bar dataKey="hazardous" stackId="waste" fill={STUDIO.brick} radius={[2, 2, 0, 0]} isAnimationActive={false} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -746,16 +746,16 @@ function WasteTab({ months }: { months: MonthBucket[] }) {
                 tickFormatter={v => `${v}%`}
               />
               <Tooltip
-                cursor={{ stroke: 'rgba(16,185,129,0.3)' }}
+                cursor={{ stroke: 'rgba(4,120,87,0.3)' }}
                 contentStyle={{ fontSize: 11, borderRadius: 6, border: '1px solid rgba(120,120,120,0.3)' }}
                 formatter={(value: number) => [`${value.toFixed(1)}%`, 'Recovery']}
               />
               <Line
                 type="monotone"
                 dataKey="recovery"
-                stroke="#10b981"
+                stroke={STUDIO.good}
                 strokeWidth={2}
-                dot={{ r: 3, fill: '#10b981', strokeWidth: 0 }}
+                dot={{ r: 3, fill: STUDIO.good, strokeWidth: 0 }}
                 isAnimationActive={false}
               />
             </ComposedChart>
@@ -764,7 +764,7 @@ function WasteTab({ months }: { months: MonthBucket[] }) {
       </div>
 
       {recoveryTrendPp >= 5 && (
-        <div className="rounded-md border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
+        <div className="rounded-md border border-border bg-card px-3 py-2 text-xs text-studio-good">
           <Recycle className="mr-1 inline h-3 w-3" />
           Recovery rate has improved by{' '}
           <span className="font-medium tabular-nums">{recoveryTrendPp.toFixed(1)} pp</span> over
@@ -773,7 +773,7 @@ function WasteTab({ months }: { months: MonthBucket[] }) {
         </div>
       )}
       {recoveryTrendPp <= -5 && (
-        <div className="rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+        <div className="rounded-md border border-border bg-card px-3 py-2 text-xs text-studio-attention">
           <Recycle className="mr-1 inline h-3 w-3" />
           Recovery rate has dropped by{' '}
           <span className="font-medium tabular-nums">
@@ -847,7 +847,7 @@ function SeasonalityCallout({
   const fmt = (key: string) =>
     new Date(`${key}-01T00:00:00Z`).toLocaleString('en-GB', { month: 'long' });
   return (
-    <div className="rounded-md border border-emerald-500/20 bg-emerald-500/5 px-3 py-3 text-xs text-emerald-700 dark:text-emerald-300">
+    <div className="rounded-md border border-border bg-card px-3 py-3 text-xs text-studio-good">
       <div className="flex items-start gap-2">
         <Leaf className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
         <div>
@@ -858,7 +858,7 @@ function SeasonalityCallout({
             </span>{' '}
             more CO₂ than the same kWh would have in {fmt(cleanest.month)}.
           </p>
-          <p className="mt-1 leading-relaxed text-emerald-600/90 dark:text-emerald-400/80">
+          <p className="mt-1 leading-relaxed text-muted-foreground">
             Grid carbon was{' '}
             <span className="font-medium tabular-nums">
               {Math.round(dirtiest.grid_intensity_avg_g_per_kwh)} g/kWh
@@ -910,26 +910,14 @@ function ElectricityTooltip({ active, payload, label }: { active?: boolean; payl
 }
 
 function ConfidenceBadge({ confidence }: { confidence: 'live' | 'mixed' | 'fallback' }) {
-  const styles =
-    confidence === 'live'
-      ? 'border-[#ccff00]/40 bg-[#ccff00]/10 text-[#ccff00]'
-      : confidence === 'mixed'
-        ? 'border-amber-500/40 bg-amber-500/10 text-amber-500'
-        : 'border-slate-500/40 bg-slate-500/10 text-slate-400';
+  const tone = confidence === 'live' ? 'good' : confidence === 'mixed' ? 'attention' : 'quiet';
   const label =
     confidence === 'live'
       ? 'Live grid'
       : confidence === 'mixed'
         ? 'Mixed sources'
         : 'Country avg';
-  return (
-    <Badge
-      variant="outline"
-      className={cn('text-[10px] font-semibold uppercase tracking-wider', styles)}
-    >
-      {label}
-    </Badge>
-  );
+  return <StateChip tone={tone}>{label}</StateChip>;
 }
 
 function LegendDot({ color, label }: { color: string; label: string }) {
@@ -952,13 +940,13 @@ function EmptyState({
     <Card className="border-dashed border-border/60 bg-card/40">
       <CardContent className="space-y-2 p-5">
         <div className="flex items-center gap-2">
-          <Building2 className="h-4 w-4 text-[#ccff00]" />
+          <Building2 className="h-4 w-4 text-studio-forest" />
           <h3 className="text-sm font-semibold text-foreground">Facility impact</h3>
         </div>
         {reason === 'no_facilities' ? (
           <p className="text-sm text-muted-foreground">
             Add a facility under{' '}
-            <a href="/facilities/" className="text-[#ccff00] underline-offset-2 hover:underline">
+            <a href="/facilities/" className="text-studio-forest underline-offset-2 hover:underline">
               Facilities
             </a>{' '}
             and upload a utility bill to see your monthly Scope 1 &amp; 2 impact, with live UK grid

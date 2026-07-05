@@ -51,7 +51,7 @@ export function RosaConversation({ turns, isStreaming, error, onReset }: Props) 
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <Dog className="h-6 w-6 text-[#ccff00]" />
+          <Dog className="h-6 w-6 text-studio-forest" />
           Conversation with Rosa
         </h1>
         {turns.length > 0 && (
@@ -72,7 +72,7 @@ export function RosaConversation({ turns, isStreaming, error, onReset }: Props) 
           <Turn key={turn.id} turn={turn} />
         ))}
         {error && (
-          <div className="rounded-lg border border-red-500/30 bg-red-500/[0.06] p-3 flex items-start gap-2 text-sm text-red-200">
+          <div className="rounded-lg border border-studio-stale/30 bg-card p-3 flex items-start gap-2 text-sm text-studio-stale">
             <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <p>{error}</p>
           </div>
@@ -87,7 +87,7 @@ function Turn({ turn }: { turn: RosaTurn }) {
   if (turn.role === 'user') {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[80%] rounded-2xl rounded-br-md bg-[#ccff00]/10 border border-[#ccff00]/20 px-4 py-2.5">
+        <div className="max-w-[80%] rounded-[6px] bg-secondary border border-border px-4 py-2.5">
           <p className="text-sm leading-relaxed whitespace-pre-wrap">{turn.content}</p>
         </div>
       </div>
@@ -97,14 +97,14 @@ function Turn({ turn }: { turn: RosaTurn }) {
   // Assistant turn
   return (
     <div className="flex gap-3 items-start">
-      <div className="flex-shrink-0 rounded-xl bg-[#ccff00]/15 p-2 mt-0.5">
-        <Dog className="h-5 w-5 text-[#ccff00]" />
+      <div className="flex-shrink-0 rounded-[6px] bg-secondary p-2 mt-0.5">
+        <Dog className="h-5 w-5 text-studio-forest" />
       </div>
       <div className="flex-1 min-w-0 space-y-2">
         <div
           className={cn(
-            'rounded-2xl rounded-tl-md border bg-card px-4 py-3',
-            turn.errored ? 'border-red-500/40' : 'border-border',
+            'rounded-[6px] border bg-card px-4 py-3',
+            turn.errored ? 'border-studio-stale/40' : 'border-border',
           )}
         >
           {turn.content ? (
@@ -116,7 +116,7 @@ function Turn({ turn }: { turn: RosaTurn }) {
 
         {/* Inline chart attached to this turn (Phase B). */}
         {turn.chart && (
-          <div className="rounded-xl border border-border bg-card/60 p-3">
+          <div className="rounded-[6px] border border-border bg-card/60 p-3">
             <RosaChartRenderer chartData={turn.chart} />
           </div>
         )}
@@ -169,9 +169,9 @@ function AttachmentChip({
       target="_blank"
       rel="noopener noreferrer"
       download={attachment.filename}
-      className="group inline-flex items-center gap-2 rounded-lg border border-border bg-background/60 px-3 py-2 hover:border-[#ccff00]/40 hover:bg-card transition-colors"
+      className="group inline-flex items-center gap-2 rounded-lg border border-border bg-background/60 px-3 py-2 hover:border-studio-forest/40 hover:bg-card transition-colors"
     >
-      <Download className="h-4 w-4 text-[#ccff00]" />
+      <Download className="h-4 w-4 text-studio-forest" />
       <div className="text-left">
         <p className="text-xs font-medium leading-tight">{attachment.label}</p>
         {expiresLabel && (
@@ -389,7 +389,7 @@ function RosaImage({ src, alt }: { src: string; alt: string }) {
           if (parent && !parent.querySelector('.rosa-img-fallback')) {
             const link = document.createElement('span')
             link.textContent = src
-            link.className = 'rosa-img-fallback text-blue-400 underline break-all'
+            link.className = 'rosa-img-fallback text-studio-cobalt underline break-all'
             parent.appendChild(link)
           }
         }}
@@ -404,7 +404,7 @@ function RosaLink({ href, children }: { href: string; children: React.ReactNode 
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-[#ccff00] hover:underline break-all"
+      className="text-studio-forest hover:underline break-all"
     >
       {children}
     </a>

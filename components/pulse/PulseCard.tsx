@@ -61,12 +61,12 @@ export interface PulseCardProps {
   className?: string;
 }
 
-/** Tailwind classes for each status tone. */
+/** Tailwind classes for each status tone. Typographic state chips: no pills. */
 const STATUS_CLASSES: Record<PulseCardStatusTone, string> = {
-  good: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30',
-  warn: 'bg-amber-500/10 text-amber-500 border-amber-500/30',
-  bad: 'bg-red-500/10 text-red-500 border-red-500/30',
-  neutral: 'bg-muted text-muted-foreground border-border/60',
+  good: 'text-studio-good',
+  warn: 'text-studio-attention',
+  bad: 'text-studio-stale',
+  neutral: 'text-studio-dim',
 };
 
 /**
@@ -103,12 +103,12 @@ export function PulseCard({
   return (
     <div
       className={cn(
-        'group relative flex h-full w-full flex-col overflow-hidden rounded-xl border transition',
+        'group relative flex h-full w-full flex-col overflow-hidden rounded-[6px] border transition',
         error
-          ? 'border-red-500/40 bg-red-500/5'
-          : 'border-border/60 bg-card/40',
+          ? 'border-studio-stale/40 bg-card'
+          : 'border-border bg-card',
         onExpand && !error
-          ? 'cursor-pointer hover:border-[#ccff00]/50 hover:bg-card/60 focus-within:border-[#ccff00]'
+          ? 'cursor-pointer hover:border-studio-forest/50 focus-within:border-studio-forest'
           : '',
         className,
       )}
@@ -121,14 +121,14 @@ export function PulseCard({
           type="button"
           onClick={onExpand}
           aria-label={`Open ${label} details`}
-          className="absolute inset-0 z-0 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ccff00]"
+          className="absolute inset-0 z-0 rounded-[6px] focus:outline-none focus-visible:ring-2 focus-visible:ring-studio-forest"
         />
       )}
 
       <div className="pointer-events-none relative z-10 flex h-full flex-col p-4">
         {/* Header row */}
         <div className="pointer-events-auto flex items-center gap-2">
-          <Icon className="h-3.5 w-3.5 flex-shrink-0 text-[#ccff00]" />
+          <Icon className="h-3.5 w-3.5 flex-shrink-0 text-studio-forest" />
           <span className="truncate text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             {label}
           </span>
@@ -137,7 +137,7 @@ export function PulseCard({
             {status && (
               <span
                 className={cn(
-                  'rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider',
+                  'font-mono text-[9px] font-bold uppercase tracking-[0.18em]',
                   STATUS_CLASSES[status.tone],
                 )}
               >
@@ -153,7 +153,7 @@ export function PulseCard({
                 className={cn(
                   'flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition',
                   pinned
-                    ? 'text-[#ccff00] opacity-100'
+                    ? 'text-studio-forest opacity-100'
                     : 'opacity-0 hover:text-foreground group-hover:opacity-70 group-focus-within:opacity-70',
                 )}
               >
@@ -176,7 +176,7 @@ export function PulseCard({
         {/* Headline metric */}
         <div className="pointer-events-none mt-2 min-w-0">
           {loading ? (
-            <div className="h-8 w-3/4 animate-pulse rounded bg-muted/60" />
+            <div className="h-8 w-3/4 rounded bg-muted/60" />
           ) : (
             <div className="flex items-baseline gap-2">
               <span className="truncate text-2xl font-semibold tabular-nums text-foreground sm:text-3xl">
@@ -185,7 +185,7 @@ export function PulseCard({
             </div>
           )}
           {error ? (
-            <p className="mt-0.5 line-clamp-2 text-xs text-red-500">
+            <p className="mt-0.5 line-clamp-2 text-xs text-studio-stale">
               {error}
             </p>
           ) : (

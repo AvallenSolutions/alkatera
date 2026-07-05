@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Loader2, Wrench, Calculator, Compass, Leaf, X } from 'lucide-react'
+import { Wrench, Calculator, Compass, Leaf, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { trackRosa } from '@/lib/rosa/track'
 import type { RosaPersona } from '@/lib/rosa/useUserRole'
@@ -125,7 +125,7 @@ export function RosaPersonaPrompt({ onSaved }: Props) {
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-2xl border border-border bg-card p-5 sm:p-6',
+        'relative overflow-hidden rounded-[6px] border border-border bg-card p-5 sm:p-6',
       )}
     >
       <button
@@ -155,14 +155,14 @@ export function RosaPersonaPrompt({ onSaved }: Props) {
               onClick={() => handlePick(value)}
               disabled={saving !== null}
               className={cn(
-                'group flex items-start gap-3 rounded-xl border border-border bg-background/40 p-3 text-left transition',
-                'hover:border-[#ccff00]/40 hover:bg-[#ccff00]/5',
+                'group flex items-start gap-3 rounded-[6px] border border-border bg-background/40 p-3 text-left transition',
+                'hover:border-studio-forest/40 hover:bg-secondary',
                 'disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-background/40',
               )}
             >
-              <span className="flex-shrink-0 rounded-lg bg-muted/40 p-2 text-foreground group-hover:bg-[#ccff00]/15 group-hover:text-[#ccff00]">
+              <span className="flex-shrink-0 rounded-lg bg-muted/40 p-2 text-foreground group-hover:text-studio-forest">
                 {isSaving ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Icon className="h-4 w-4 text-studio-forest" />
                 ) : (
                   <Icon className="h-4 w-4" />
                 )}

@@ -160,7 +160,7 @@ function RosaDrawerBody() {
       {/* The drawer panel itself. */}
       <aside
         className={cn(
-          'flex flex-col bg-card shadow-2xl border-l border-border',
+          'flex flex-col bg-card border-l border-border',
           isPinned
             ? 'h-full flex-shrink-0 relative'
             : 'fixed right-0 top-0 bottom-0 z-50 animate-in slide-in-from-right duration-200',
@@ -172,7 +172,7 @@ function RosaDrawerBody() {
         {/* Resize handle on the left edge — only meaningful when pinned. */}
         {isPinned && (
           <div
-            className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-[#ccff00]/40 active:bg-[#ccff00]/60 transition-colors z-10"
+            className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-studio-forest/40 active:bg-studio-forest/60 transition-colors z-10"
             onMouseDown={onResizeMouseDown}
             aria-label="Resize drawer"
           />
@@ -180,8 +180,8 @@ function RosaDrawerBody() {
 
         {/* Header */}
         <header className="flex items-center gap-2 px-4 py-3 border-b border-border flex-shrink-0">
-          <div className="rounded-md bg-[#ccff00]/15 p-1.5">
-            <Dog className="h-4 w-4 text-[#ccff00]" />
+          <div className="rounded-md bg-secondary p-1.5">
+            <Dog className="h-4 w-4 text-studio-forest" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold leading-tight">Rosa</p>
@@ -211,7 +211,7 @@ function RosaDrawerBody() {
                 onSelect={() => conv.reset()}
                 className="gap-2"
               >
-                <Plus className="h-4 w-4 text-[#ccff00]" />
+                <Plus className="h-4 w-4 text-studio-forest" />
                 <span>New chat</span>
               </DropdownMenuItem>
               {conv.recentConversations.length > 0 && <DropdownMenuSeparator />}
@@ -327,9 +327,9 @@ function DrawerEmptyState({ onAsk }: { onAsk: (prompt: string) => void }) {
           urgent is open. */}
       <NudgeRail />
 
-      <div className="rounded-xl bg-[#ccff00]/[0.06] border border-[#ccff00]/20 p-4">
+      <div className="rounded-[6px] bg-secondary border border-border p-4">
         <h3 className="text-sm font-semibold flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-[#ccff00]" />
+          <Sparkles className="h-4 w-4 text-studio-forest" />
           Hi, I&apos;m Rosa
         </h3>
         <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
@@ -350,7 +350,7 @@ function DrawerEmptyState({ onAsk }: { onAsk: (prompt: string) => void }) {
                 className="group w-full text-left text-sm py-2 px-2 -mx-2 rounded-md hover:bg-muted transition-colors flex items-center justify-between gap-3"
               >
                 <span className="leading-snug">{p.label}</span>
-                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-[#ccff00] transition-colors flex-shrink-0" />
+                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-studio-forest transition-colors flex-shrink-0" />
               </button>
             </li>
           ))}

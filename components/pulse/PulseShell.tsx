@@ -3,17 +3,11 @@
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Activity,
-  CheckCircle2,
-  Loader2,
-  LayoutGrid,
-  MessageSquare,
-  RefreshCw,
-  XCircle,
-} from 'lucide-react';
+import { CheckCircle2, LayoutGrid, MessageSquare, RefreshCw, XCircle } from 'lucide-react';
 import { useRosaPageContext } from '@/lib/rosa/RosaContextProvider';
 import { Button } from '@/components/ui/button';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { StateChip } from '@/components/studio/state-chip';
 // Round 2 (auto-research): lazy-load the react-grid-layout-backed grid so its
 // heavy drag/resize bundle leaves /pulse's First Load JS.
 const PulseGrid = dynamic(
@@ -198,23 +192,22 @@ function PulseHeader({
       : 'Are we on track, what is it costing, and what needs attention.';
 
   return (
-    <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <div className="flex items-center gap-2">
-          <Activity className="h-6 w-6 text-[#ccff00]" aria-hidden="true" />
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground">
-            Pulse
-          </h1>
-        </div>
-        <p className="mt-1 max-w-xl text-sm text-muted-foreground">{subtitle}</p>
+    <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="min-w-0">
+        <Eyebrow className="mb-3">TODAY · PULSE</Eyebrow>
+        <h1 className="font-display text-[clamp(2rem,4vw,3rem)] font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+          The pulse.
+        </h1>
+        <p className="mt-2 max-w-xl text-sm text-muted-foreground">{subtitle}</p>
       </div>
 
       <div className="flex items-center gap-2">
         <ConnectionHeartbeat />
         <RefreshPulseButton />
         <Button
-          variant="ghost"
+          variant="outline"
           size="sm"
+          className="rounded-full"
           onClick={() => onChangeView(view === 'advanced' ? 'tabs' : 'advanced')}
         >
           <LayoutGrid className="mr-2 h-4 w-4" />
@@ -250,18 +243,20 @@ function JobRow({ label, state }: { label: string; state?: PulseJobState }) {
   const status = state?.status ?? 'pending';
   const icon =
     status === 'completed' ? (
-      <CheckCircle2 className="h-3.5 w-3.5 text-[#ccff00]" />
+      <CheckCircle2 className="h-3.5 w-3.5 text-studio-good" />
     ) : status === 'failed' ? (
-      <XCircle className="h-3.5 w-3.5 text-red-500" />
+      <XCircle className="h-3.5 w-3.5 text-studio-stale" />
     ) : status === 'running' ? (
-      <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+      <div className="flex h-3.5 w-3.5 items-center justify-center">
+        <div className="h-2 w-2 rounded-full bg-studio-dim" />
+      </div>
     ) : (
-      <div className="h-3.5 w-3.5 rounded-full border border-muted-foreground/40" />
+      <div className="h-3.5 w-3.5 rounded-full border border-border" />
     );
   return (
     <div className="flex items-center gap-2 py-1 text-xs">
       {icon}
-      <span className={cn(status === 'failed' && 'text-red-500')}>{label}</span>
+      <span className={cn(status === 'failed' && 'text-studio-stale')}>{label}</span>
     </div>
   );
 }
@@ -368,16 +363,17 @@ function RefreshPulseButton() {
       <Button
         variant="outline"
         size="sm"
+        className="rounded-full"
         onClick={handleClick}
         disabled={busy}
         title="Run all Pulse data jobs now"
       >
-        <RefreshCw className={cn('mr-2 h-4 w-4', busy && 'animate-spin')} />
+        <RefreshCw className="mr-2 h-4 w-4" />
         {busy ? 'Refreshing…' : 'Refresh data'}
       </Button>
 
       {runId && (
-        <div className="absolute right-0 z-50 mt-2 w-56 rounded-md border bg-popover p-3 shadow-md">
+        <div className="absolute right-0 z-50 mt-2 w-56 rounded-[6px] border border-border bg-card p-3 shadow-sm">
           <p className="mb-1 text-xs font-medium text-muted-foreground">Refreshing Pulse data…</p>
           {PULSE_REFRESH_JOBS.map((job) => (
             <JobRow key={job.key} label={job.label} state={jobs[job.key]} />
@@ -389,21 +385,22 @@ function RefreshPulseButton() {
 }
 
 /**
- * Animated dot driven by the real Supabase Realtime connection state.
+ * Quiet dot driven by the real Supabase Realtime connection state.
  *
- * - "live"        → green pulsing dot, "Live" label
- * - "reconnecting" → amber dot, "Reconnecting…" label
- * - "connecting"  → muted dot, "Connecting…" label
+ * - "live"         → good tone, "Live" label
+ * - "reconnecting" → attention tone, "Reconnecting…" label
+ * - "connecting"   → dim, "Connecting…" label
  */
 function ConnectionHeartbeat() {
   const { status, lastEventAt, events } = usePulseRealtimeContext();
 
   const dotColour =
     status === 'live'
-      ? 'bg-[#ccff00]'
+      ? 'bg-studio-good'
       : status === 'reconnecting'
-        ? 'bg-amber-500'
-        : 'bg-slate-500';
+        ? 'bg-studio-attention'
+        : 'bg-studio-dim';
+  const tone = status === 'live' ? 'good' : status === 'reconnecting' ? 'attention' : 'quiet';
   const label =
     status === 'live'
       ? 'Live'
@@ -417,21 +414,11 @@ function ConnectionHeartbeat() {
 
   return (
     <div
-      className="flex items-center gap-2 rounded-full border border-border/60 bg-background/60 px-3 py-1.5 text-xs text-muted-foreground"
+      className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5"
       title={tooltip}
     >
-      <span className="relative flex h-2 w-2">
-        {status === 'live' && (
-          <span
-            className={cn(
-              'absolute inline-flex h-full w-full animate-ping rounded-full opacity-60',
-              dotColour,
-            )}
-          />
-        )}
-        <span className={cn('relative inline-flex h-2 w-2 rounded-full', dotColour)} />
-      </span>
-      <span className="font-data uppercase tracking-wider">{label}</span>
+      <span className={cn('inline-flex h-2 w-2 rounded-full', dotColour)} />
+      <StateChip tone={tone}>{label}</StateChip>
     </div>
   );
 }

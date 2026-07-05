@@ -12,7 +12,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Loader2, RefreshCcw, Sparkles, Wrench } from 'lucide-react';
+import { RefreshCcw, Sparkles, Wrench } from 'lucide-react';
 
 export interface RosaCommentaryProps {
   widgetId: string;
@@ -63,33 +63,32 @@ export function RosaCommentaryBlock({
   }, [load]);
 
   return (
-    <section className="space-y-2 rounded-xl border border-[#ccff00]/30 bg-[#ccff00]/5 p-4">
+    <section className="space-y-2 rounded-[6px] border border-border bg-card p-4">
       <header className="flex items-center justify-between gap-2">
         <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-          <Sparkles className="h-4 w-4 text-[#ccff00]" />
+          <Sparkles className="h-4 w-4 text-studio-forest" />
           {title}
         </h3>
         <button
           type="button"
           onClick={() => void load()}
           disabled={loading}
-          className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-background/40 px-2 py-1 text-[10px] text-muted-foreground transition hover:border-[#ccff00]/40 hover:text-foreground disabled:opacity-50"
+          className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-background/40 px-2 py-1 text-[10px] text-muted-foreground transition hover:border-studio-forest/40 hover:text-foreground disabled:opacity-50"
           title="Regenerate commentary"
         >
-          <RefreshCcw className={loading ? 'h-3 w-3 animate-spin' : 'h-3 w-3'} />
+          <RefreshCcw className="h-3 w-3" />
           Refresh
         </button>
       </header>
 
       {loading && !data && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Loader2 className="h-3 w-3 animate-spin" />
           Rosa is reading your data…
         </div>
       )}
 
       {error && (
-        <p className="text-xs text-red-500">Could not generate commentary: {error}</p>
+        <p className="text-xs text-studio-stale">Could not generate commentary: {error}</p>
       )}
 
       {data && (
@@ -136,7 +135,7 @@ function CommentaryText({ text }: { text: string }) {
     <ul className="space-y-1.5 text-sm leading-relaxed text-foreground">
       {bullets.map((b, i) => (
         <li key={i} className="flex gap-2">
-          <span className="text-[#ccff00]">•</span>
+          <span className="text-studio-forest">•</span>
           <span>{renderInline(b.replace(/^[-*•]\s+/, ''))}</span>
         </li>
       ))}

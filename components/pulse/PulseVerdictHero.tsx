@@ -7,14 +7,14 @@
  * every active target's trajectory (lib/pulse/forecast.ts) into a worst-of
  * verdict (lib/pulse/verdict.ts), says it plainly, and DRAWS it: the driving
  * target's history (solid), forecast (dashed) and target line render beside
- * the words, with the hero's ambient tint following the verdict state.
+ * the words, with the verdict spoken as a typographic state chip.
  */
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, AlertTriangle, XCircle, Hourglass, Target as TargetIcon } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { StateChip } from '@/components/studio/state-chip';
+import { STUDIO, type WorkingTone } from '@/components/studio/theme';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
 import { cn } from '@/lib/utils';
@@ -36,50 +36,13 @@ interface TargetRow {
   target_date: string;
 }
 
-const STATE_STYLE: Record<
-  VerdictState,
-  { icon: typeof CheckCircle2; text: string; ring: string; edge: string; glow: string; chart: string }
-> = {
-  on_track: {
-    icon: CheckCircle2,
-    text: 'text-emerald-500',
-    ring: 'border-emerald-500/40',
-    edge: 'border-l-emerald-500',
-    glow: 'bg-emerald-500/15 dark:bg-emerald-500/10',
-    chart: '#10b981',
-  },
-  at_risk: {
-    icon: AlertTriangle,
-    text: 'text-amber-500',
-    ring: 'border-amber-500/40',
-    edge: 'border-l-amber-500',
-    glow: 'bg-amber-500/15 dark:bg-amber-500/10',
-    chart: '#f59e0b',
-  },
-  off_track: {
-    icon: XCircle,
-    text: 'text-red-500',
-    ring: 'border-red-500/40',
-    edge: 'border-l-red-500',
-    glow: 'bg-red-500/15 dark:bg-red-500/10',
-    chart: '#ef4444',
-  },
-  insufficient_data: {
-    icon: Hourglass,
-    text: 'text-muted-foreground',
-    ring: 'border-border/60',
-    edge: 'border-l-border',
-    glow: 'bg-[#ccff00]/10 dark:bg-[#ccff00]/5',
-    chart: '#ccff00',
-  },
-  no_targets: {
-    icon: TargetIcon,
-    text: 'text-muted-foreground',
-    ring: 'border-border/60',
-    edge: 'border-l-[#ccff00]/60',
-    glow: 'bg-[#ccff00]/10 dark:bg-[#ccff00]/5',
-    chart: '#ccff00',
-  },
+/** Verdict states map to the working tones: typographic, never decorative. */
+const STATE_STYLE: Record<VerdictState, { tone: WorkingTone; chip: string }> = {
+  on_track: { tone: 'good', chip: 'On track' },
+  at_risk: { tone: 'attention', chip: 'At risk' },
+  off_track: { tone: 'stale', chip: 'Off track' },
+  insufficient_data: { tone: 'quiet', chip: 'Insufficient data' },
+  no_targets: { tone: 'quiet', chip: 'No targets' },
 };
 
 export function PulseVerdictHero() {
@@ -198,7 +161,6 @@ export function PulseVerdictHero() {
   }, [verdictInputs, focusedInput, aggregate]);
   const copy = useMemo(() => buildVerdictCopy(verdict), [verdict]);
   const style = STATE_STYLE[verdict.state];
-  const Icon = style.icon;
 
   // Chart follows the focused metric: its target trajectory if it has one,
   // otherwise the emissions history so the hero is never a wall of text.
@@ -207,121 +169,107 @@ export function PulseVerdictHero() {
   const showHistoryOnly = !loading && !focusedInput && co2History.length >= 2;
 
   return (
-    <Card
-      className={cn(
-        'overflow-hidden border-border/60 border-l-4 bg-gradient-to-br from-slate-50 via-white to-slate-50 transition-colors dark:from-slate-900/80 dark:via-slate-900 dark:to-slate-800/80',
-        style.edge,
-      )}
-    >
-      <CardContent className="relative p-6 sm:p-8">
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 flex items-center justify-end">
-          <div className={cn('h-56 w-56 -translate-y-12 translate-x-24 rounded-full blur-3xl transition-colors', style.glow)} />
-        </div>
-
-        <div className="relative grid items-center gap-6 lg:grid-cols-[1fr_minmax(220px,300px)]">
-          <div className="flex items-start gap-4">
-            <div className={cn('flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-2 bg-background/40', style.ring)}>
-              {loading ? (
-                <div className="h-6 w-6 animate-pulse rounded-full bg-muted/60" />
-              ) : (
-                <Icon className={cn('h-7 w-7', style.text)} aria-hidden="true" />
+    <section className="rounded-[6px] border border-border bg-card p-6 sm:p-8">
+      <div className="grid items-center gap-6 lg:grid-cols-[1fr_minmax(220px,300px)]">
+        <div className="min-w-0">
+          {loading ? (
+            <>
+              <div className="h-7 w-40 rounded bg-border/60" />
+              <div className="mt-2 h-4 w-3/4 rounded bg-border/40" />
+            </>
+          ) : (
+            <>
+              {availableMetrics.length > 1 && (
+                <div className="mb-3 flex flex-wrap items-baseline gap-x-4 gap-y-1.5">
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
+                    Tracking
+                  </span>
+                  {availableMetrics.map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setFocusMetric(m)}
+                      className={cn(
+                        'border-b-2 pb-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] transition-colors duration-200 ease-studio',
+                        m === focusMetric
+                          ? 'border-room-accent text-room-accent'
+                          : 'border-transparent text-muted-foreground hover:text-foreground',
+                      )}
+                    >
+                      {METRIC_DEFINITIONS[m as MetricKey]?.label ?? m}
+                    </button>
+                  ))}
+                </div>
               )}
-            </div>
-            <div className="min-w-0">
-              {loading ? (
-                <>
-                  <div className="h-7 w-40 animate-pulse rounded bg-muted/60" />
-                  <div className="mt-2 h-4 w-3/4 animate-pulse rounded bg-muted/60" />
-                </>
-              ) : (
-                <>
-                  {availableMetrics.length > 1 && (
-                    <div className="mb-2 flex flex-wrap items-center gap-1.5">
-                      <span className="mr-1 text-[11px] uppercase tracking-wider text-muted-foreground">Tracking</span>
-                      {availableMetrics.map((m) => (
-                        <button
-                          key={m}
-                          type="button"
-                          onClick={() => setFocusMetric(m)}
-                          className={cn(
-                            'rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors',
-                            m === focusMetric
-                              ? 'border-[#ccff00]/60 bg-[#ccff00]/15 text-foreground'
-                              : 'border-border/60 text-muted-foreground hover:text-foreground',
-                          )}
-                        >
-                          {METRIC_DEFINITIONS[m as MetricKey]?.label ?? m}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <h2 className={cn('text-2xl font-semibold sm:text-3xl', style.text)}>{copy.headline}</h2>
-                  <p className="mt-1 max-w-xl text-sm text-muted-foreground sm:text-base">{copy.sub}</p>
-                  <div className="mt-3 flex flex-wrap items-center gap-3">
-                    {verdict.state === 'no_targets' ? (
-                      <Button asChild size="sm">
-                        <Link href="/pulse/targets">Set a target</Link>
-                      </Button>
-                    ) : (
-                      <Button asChild size="sm" variant="outline">
-                        <Link href="/pulse/targets">Targets &amp; actions</Link>
-                      </Button>
-                    )}
-                    {verdict.state === 'no_targets' && emissionsNow && (
-                      <p className="text-xs text-muted-foreground">
-                        Emissions now:{' '}
-                        <span className="font-semibold tabular-nums text-foreground">
-                          {Math.round(emissionsNow.value).toLocaleString('en-GB')} kg CO₂e
-                        </span>
-                        {isFiniteNumber(emissionsNow.deltaPct) && (
-                          <span className={cn('ml-1.5', emissionsNow.deltaPct <= 0 ? 'text-emerald-500' : 'text-red-500')}>
-                            {safePct(emissionsNow.deltaPct, 0, { sign: true })} vs a year ago
-                          </span>
+              <StateChip tone={style.tone}>{style.chip}</StateChip>
+              <h2 className="mt-2 font-display text-2xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground sm:text-3xl">
+                {copy.headline}
+              </h2>
+              <p className="mt-2 max-w-xl text-sm text-muted-foreground">{copy.sub}</p>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                {verdict.state === 'no_targets' ? (
+                  <Button asChild size="sm" className="rounded-full">
+                    <Link href="/pulse/targets">Set a target</Link>
+                  </Button>
+                ) : (
+                  <Button asChild size="sm" variant="outline" className="rounded-full">
+                    <Link href="/pulse/targets">Targets &amp; actions</Link>
+                  </Button>
+                )}
+                {verdict.state === 'no_targets' && emissionsNow && (
+                  <p className="text-xs text-muted-foreground">
+                    Emissions now:{' '}
+                    <span className="font-semibold tabular-nums text-foreground">
+                      {Math.round(emissionsNow.value).toLocaleString('en-GB')} kg CO₂e
+                    </span>
+                    {isFiniteNumber(emissionsNow.deltaPct) && (
+                      <span
+                        className={cn(
+                          'ml-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em]',
+                          emissionsNow.deltaPct <= 0 ? 'text-studio-good' : 'text-studio-stale',
                         )}
-                      </p>
+                      >
+                        {safePct(emissionsNow.deltaPct, 0, { sign: true })} vs a year ago
+                      </span>
                     )}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          {showChart && verdict.driving && (
-            <TrajectoryMiniChart
-              points={chartPoints}
-              targetValue={verdict.driving.targetValue}
-              colour={style.chart}
-              metricKey={verdict.driving.metricKey}
-            />
-          )}
-          {showHistoryOnly && (
-            <TrajectoryMiniChart
-              points={co2History.map(p => ({ ...p, forecast: false }))}
-              targetValue={null}
-              colour={style.chart}
-              metricKey="total_co2e"
-            />
+                  </p>
+                )}
+              </div>
+            </>
           )}
         </div>
-      </CardContent>
-    </Card>
+
+        {showChart && verdict.driving && (
+          <TrajectoryMiniChart
+            points={chartPoints}
+            targetValue={verdict.driving.targetValue}
+            metricKey={verdict.driving.metricKey}
+          />
+        )}
+        {showHistoryOnly && (
+          <TrajectoryMiniChart
+            points={co2History.map(p => ({ ...p, forecast: false }))}
+            targetValue={null}
+            metricKey="total_co2e"
+          />
+        )}
+      </div>
+    </section>
   );
 }
 
 /**
- * Compact hand-rolled SVG trajectory: solid history, dashed forecast, a
- * "today" divider and the target as a dashed horizontal line. Deliberately
- * lighter than the full fan chart in the Performance tab.
+ * Compact hand-rolled SVG trajectory: history in solid forest, forecast in
+ * dim dashed, a "today" divider and the target as a dashed ochre-ink line.
+ * Deliberately lighter than the full fan chart in the Performance tab.
  */
 function TrajectoryMiniChart({
   points,
   targetValue,
-  colour,
   metricKey,
 }: {
   points: Array<{ date: string; value: number; forecast: boolean }>;
   targetValue: number | null;
-  colour: string;
   metricKey: string;
 }) {
   const W = 300;
@@ -358,23 +306,23 @@ function TrajectoryMiniChart({
     >
       {targetY !== null && (
         <>
-          <line x1={PAD} y1={targetY} x2={W - PAD} y2={targetY} stroke={colour} strokeWidth={1} strokeDasharray="2 5" opacity={0.5} />
-          <text x={W - PAD} y={targetY - 4} textAnchor="end" fontSize={9} fill={colour} opacity={0.9}>
+          <line x1={PAD} y1={targetY} x2={W - PAD} y2={targetY} stroke={STUDIO.ochreInk} strokeWidth={1} strokeDasharray="2 5" opacity={0.7} />
+          <text x={W - PAD} y={targetY - 4} textAnchor="end" fontSize={9} fill={STUDIO.ochreInk}>
             target{targetValue !== null ? ` ${Math.round(targetValue).toLocaleString('en-GB')} ${unit}` : ''}
           </text>
         </>
       )}
       {todayX !== null && (
         <>
-          <line x1={todayX} y1={PAD} x2={todayX} y2={H - PAD} stroke="currentColor" strokeWidth={1} strokeDasharray="2 4" opacity={0.2} />
-          <text x={todayX + 4} y={H - PAD - 2} fontSize={9} fill="currentColor" opacity={0.45}>
+          <line x1={todayX} y1={PAD} x2={todayX} y2={H - PAD} stroke={STUDIO.hairline} strokeWidth={1} strokeDasharray="2 4" />
+          <text x={todayX + 4} y={H - PAD - 2} fontSize={9} fill={STUDIO.dim}>
             today
           </text>
         </>
       )}
-      <polyline points={historyLine} fill="none" stroke={colour} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points={historyLine} fill="none" stroke={STUDIO.forest} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
       {forecastPts.length >= 2 && (
-        <polyline points={forecastLine} fill="none" stroke={colour} strokeWidth={2} strokeDasharray="4 4" opacity={0.65} strokeLinecap="round" />
+        <polyline points={forecastLine} fill="none" stroke={STUDIO.dim} strokeWidth={2} strokeDasharray="4 4" strokeLinecap="round" />
       )}
     </svg>
   );

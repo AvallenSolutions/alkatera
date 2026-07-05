@@ -11,7 +11,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Boxes, Loader2, Truck } from 'lucide-react';
+import { ArrowRight, Boxes, Truck } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -111,7 +111,7 @@ export function SupplierHotspotsWidget() {
 
         {loading && (
           <div className="flex h-24 items-center justify-center">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Loading</span>
           </div>
         )}
 
@@ -157,10 +157,10 @@ function Headline({
   const top5Pct = suppliers.slice(0, 5).reduce((s, r) => s + r.pct_of_attributed, 0);
   const concentration =
     top5Pct >= 80
-      ? { tone: 'text-red-500', label: 'Highly concentrated' }
+      ? { tone: 'text-studio-stale', label: 'Highly concentrated' }
       : top5Pct >= 50
-        ? { tone: 'text-amber-500', label: 'Moderately concentrated' }
-        : { tone: 'text-emerald-500', label: 'Well diversified' };
+        ? { tone: 'text-studio-attention', label: 'Moderately concentrated' }
+        : { tone: 'text-studio-good', label: 'Well diversified' };
 
   return (
     <div className="rounded-lg border border-border/60 bg-card/40 p-4">
@@ -195,7 +195,7 @@ function CategorySplit({ categories }: { categories: CategoryRow[] }) {
           <div
             key={c.category}
             className={cn(
-              c.category === 'ingredients' && 'bg-[#ccff00]',
+              c.category === 'ingredients' && 'bg-studio-forest',
               c.category === 'packaging' && 'bg-amber-500',
               c.category === 'transport' && 'bg-sky-500',
               !['ingredients', 'packaging', 'transport'].includes(c.category) && 'bg-slate-400',
@@ -245,7 +245,7 @@ function SupplierList({ suppliers }: { suppliers: SupplierRow[] }) {
             <div className="min-w-0 flex-1">
               <Link
                 href={`/suppliers/${s.supplier_id}`}
-                className="block truncate text-sm text-foreground hover:text-[#ccff00]"
+                className="block truncate text-sm text-foreground hover:text-studio-forest"
               >
                 {s.supplier_name}
               </Link>
@@ -261,7 +261,7 @@ function SupplierList({ suppliers }: { suppliers: SupplierRow[] }) {
               </span>
               <div className="flex h-1 w-16 overflow-hidden rounded-full bg-muted">
                 <div
-                  className="bg-[#ccff00]"
+                  className="bg-studio-forest"
                   style={{ width: `${Math.min(100, s.pct_of_attributed)}%` }}
                 />
               </div>

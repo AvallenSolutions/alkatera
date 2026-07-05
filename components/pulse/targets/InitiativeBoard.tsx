@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2, Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,12 +21,13 @@ import type { Initiative } from './types';
 
 const STATUS_ORDER: InitiativeStatus[] = ['pending_approval', 'active', 'draft', 'completed', 'cancelled'];
 
+// Typographic state chips: working tones from components/studio/theme.ts.
 const STATUS_BADGE: Record<string, string> = {
-  draft: 'bg-slate-500/15 text-slate-400',
-  pending_approval: 'bg-amber-500/15 text-amber-500',
-  active: 'bg-[#ccff00]/15 text-[#9bbf00] dark:text-[#ccff00]',
-  completed: 'bg-green-500/15 text-green-500',
-  cancelled: 'bg-red-500/15 text-red-400',
+  draft: 'text-studio-dim',
+  pending_approval: 'text-studio-attention',
+  active: 'text-studio-forest',
+  completed: 'text-studio-good',
+  cancelled: 'text-studio-stale',
 };
 
 interface InitiativeBoardProps {
@@ -129,7 +130,7 @@ export function InitiativeBoard({ initiatives, viewerRole, viewerUserId, onEdit,
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-sm font-medium">{i.title}</p>
-                            <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-medium', STATUS_BADGE[i.status])}>
+                            <span className={cn('font-mono text-[10px] font-bold uppercase tracking-[0.18em]', STATUS_BADGE[i.status])}>
                               {INITIATIVE_STATUSES[i.status].label}
                             </span>
                             {lever && (
@@ -155,7 +156,7 @@ export function InitiativeBoard({ initiatives, viewerRole, viewerUserId, onEdit,
                               .join(' · ')}
                           </p>
                           {i.status === 'draft' && i.rejection_reason && (
-                            <p className="mt-1 text-xs text-red-400">
+                            <p className="mt-1 text-xs text-studio-stale">
                               Sent back: {i.rejection_reason}
                             </p>
                           )}
@@ -168,7 +169,7 @@ export function InitiativeBoard({ initiatives, viewerRole, viewerUserId, onEdit,
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="h-7 w-7 p-0 text-muted-foreground hover:text-red-500"
+                              className="h-7 w-7 p-0 text-muted-foreground hover:text-studio-stale"
                               onClick={() => deleteInitiative(i.id)}
                               disabled={busy}
                             >
@@ -188,20 +189,18 @@ export function InitiativeBoard({ initiatives, viewerRole, viewerUserId, onEdit,
                       <div className="flex flex-wrap items-center gap-2">
                         {canTransition('submit', i.status, viewerRole, isOwner) && (
                           <Button size="sm" variant="outline" className="h-7 text-xs" disabled={busy} onClick={() => transition(i.id, 'submit')}>
-                            {busy && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
                             Send for approval
                           </Button>
                         )}
                         {canTransition('approve', i.status, viewerRole, isOwner) && (
                           <Button size="sm" className="h-7 text-xs" disabled={busy} onClick={() => transition(i.id, 'approve')}>
-                            {busy && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
                             Approve
                           </Button>
                         )}
                         {canTransition('reject', i.status, viewerRole, isOwner) && (
                           <Popover open={rejectingId === i.id} onOpenChange={(o) => setRejectingId(o ? i.id : null)}>
                             <PopoverTrigger asChild>
-                              <Button size="sm" variant="outline" className="h-7 text-xs text-red-400 hover:text-red-500">
+                              <Button size="sm" variant="outline" className="h-7 text-xs text-studio-stale hover:text-studio-stale">
                                 Send back
                               </Button>
                             </PopoverTrigger>

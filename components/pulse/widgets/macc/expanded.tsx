@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, TrendingUp } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import {
   useRegisterDrillSlot,
@@ -90,7 +90,7 @@ function MaccExpanded() {
   return (
     <div className="space-y-6">
       {/* Discount rate slider */}
-      <section className="space-y-3 rounded-xl border border-[#ccff00]/30 bg-[#ccff00]/5 p-4">
+      <section className="space-y-3 rounded-[6px] border border-border bg-card p-4">
         <div className="flex items-baseline justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-wider text-muted-foreground">
@@ -104,7 +104,7 @@ function MaccExpanded() {
             <p className="text-xs uppercase tracking-wider text-muted-foreground">
               Paying back at ≤£0/t
             </p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums text-emerald-500">
+            <p className="mt-1 text-2xl font-semibold tabular-nums text-studio-good">
               {Math.round(tonnesPayingBack).toLocaleString('en-GB')} tCO₂e
             </p>
           </div>
@@ -116,7 +116,7 @@ function MaccExpanded() {
           step={0.005}
           value={discountRate}
           onChange={e => setDiscountRate(Number(e.target.value))}
-          className="w-full accent-[#ccff00]"
+          className="w-full accent-studio-forest"
           aria-label="Discount rate"
         />
         <div className="flex justify-between text-[10px] text-muted-foreground">
@@ -130,7 +130,9 @@ function MaccExpanded() {
       {/* MACC bars */}
       {loading && (
         <div className="flex h-48 items-center justify-center">
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            Loading
+          </span>
         </div>
       )}
       {!loading && data && data.levers.length === 0 && (
@@ -141,7 +143,7 @@ function MaccExpanded() {
       {!loading && data && data.levers.length > 0 && (
         <section className="space-y-3">
           <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-            <TrendingUp className="h-4 w-4 text-[#ccff00]" />
+            <TrendingUp className="h-4 w-4 text-studio-forest" />
             Levers ranked by £/tCO₂e
           </h3>
           <LeverTable levers={data.levers} />
@@ -157,7 +159,7 @@ function LeverTable({ levers }: { levers: Lever[] }) {
     50,
   );
   return (
-    <div className="overflow-x-auto rounded-xl border border-border/60">
+    <div className="overflow-x-auto rounded-[6px] border border-border/60">
       <table className="w-full text-sm">
         <thead className="bg-muted/40">
           <tr className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -194,7 +196,7 @@ function LeverTable({ levers }: { levers: Lever[] }) {
                       <div
                         className={cn(
                           'absolute h-full rounded-sm',
-                          neg ? 'bg-emerald-500' : 'bg-red-500',
+                          neg ? 'bg-studio-good' : 'bg-studio-stale',
                         )}
                         style={{
                           left: neg ? `${50 - pct / 2}%` : '50%',
@@ -205,7 +207,7 @@ function LeverTable({ levers }: { levers: Lever[] }) {
                     <span
                       className={cn(
                         'w-16 text-right tabular-nums',
-                        neg ? 'text-emerald-500' : 'text-foreground',
+                        neg ? 'text-studio-good' : 'text-foreground',
                       )}
                     >
                       {neg ? '-' : ''}£
@@ -223,7 +225,7 @@ function LeverTable({ levers }: { levers: Lever[] }) {
                 <td
                   className={cn(
                     'px-3 py-2 text-right',
-                    l.npv_gbp >= 0 ? 'text-emerald-500' : 'text-red-500',
+                    l.npv_gbp >= 0 ? 'text-studio-good' : 'text-studio-stale',
                   )}
                 >
                   £{l.npv_gbp.toLocaleString('en-GB', { maximumFractionDigits: 0 })}

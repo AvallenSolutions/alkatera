@@ -52,7 +52,7 @@ export function PulseExplainer({
               {label}
             </p>
             {explainer.isEstimate && (
-              <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-500">
+              <span className="font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-studio-attention">
                 Estimate
               </span>
             )}
@@ -73,7 +73,7 @@ export function PulseExplainer({
 function Field({ heading, body }: { heading: string; body: string }) {
   return (
     <div className="space-y-0.5">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-[#ccff00]">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-studio-forest">
         {heading}
       </p>
       <p className="text-xs leading-relaxed text-muted-foreground">{body}</p>

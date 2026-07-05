@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Gauge, Loader2 } from 'lucide-react';
+import { AlertTriangle, Gauge } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -88,7 +88,7 @@ export function ScenarioSensitivityWidget() {
         <header className="flex items-start justify-between gap-3">
           <div>
             <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              <Gauge className="h-3 w-3 text-[#ccff00]" />
+              <Gauge className="h-3 w-3 text-studio-forest" />
               Carbon price sensitivity
             </p>
             <h3 className="mt-0.5 text-sm font-semibold text-foreground">
@@ -104,12 +104,12 @@ export function ScenarioSensitivityWidget() {
 
         {loading && (
           <div className="flex h-32 items-center justify-center">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Loading</span>
           </div>
         )}
 
         {!loading && error && (
-          <p className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-xs text-red-500">
+          <p className="rounded-[6px] border border-border bg-card p-3 text-xs text-studio-stale">
             {error}
           </p>
         )}
@@ -154,7 +154,7 @@ export function ScenarioSensitivityWidget() {
 
 function SensitivityHeadline({ data }: { data: ApiPayload }) {
   return (
-    <div className="rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5 p-4">
+    <div className="rounded-[6px] border border-border bg-secondary p-4">
       <p className="text-xs text-muted-foreground">
         For every <span className="font-semibold text-foreground">£10 change</span> in
         carbon price per tonne
@@ -190,12 +190,12 @@ function ScenarioBars({
             <li
               key={s.id}
               className={cn(
-                'rounded-md border p-2.5',
+                'rounded-[6px] border p-2.5 bg-card',
                 s.is_current
-                  ? 'border-[#ccff00]/50 bg-[#ccff00]/5'
+                  ? 'border-studio-forest/50'
                   : isStress
-                    ? 'border-red-500/30 bg-red-500/5'
-                    : 'border-border/40 bg-card/30',
+                    ? 'border-studio-brick/40'
+                    : 'border-border/40',
               )}
             >
               <div className="flex items-baseline justify-between gap-2">
@@ -207,12 +207,12 @@ function ScenarioBars({
                     {s.label}
                   </span>
                   {s.is_current && (
-                    <span className="rounded-full bg-[#ccff00] px-1.5 py-0.5 text-[9px] font-bold text-black">
+                    <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-forest">
                       YOU
                     </span>
                   )}
                   {isStress && (
-                    <AlertTriangle className="h-3 w-3 text-red-500" />
+                    <AlertTriangle className="h-3 w-3 text-studio-brick" />
                   )}
                 </div>
                 <span className="text-sm font-medium tabular-nums text-foreground">
@@ -223,7 +223,7 @@ function ScenarioBars({
                 <div
                   className={cn(
                     'h-full transition-all',
-                    s.is_current ? 'bg-[#ccff00]' : isStress ? 'bg-red-500' : 'bg-slate-400',
+                    s.is_current ? 'bg-studio-forest' : isStress ? 'bg-studio-brick' : 'bg-studio-dim',
                   )}
                   style={{ width: `${widthPct}%` }}
                 />
@@ -253,9 +253,9 @@ function CustomScenarioSlider({
   const deltaPrice = customPrice - currentPrice;
   const deltaCost = customCost - annualTonnes * currentPrice;
   const tone =
-    deltaCost > 0 ? 'text-red-500' : deltaCost < 0 ? 'text-emerald-500' : 'text-muted-foreground';
+    deltaCost > 0 ? 'text-studio-stale' : deltaCost < 0 ? 'text-studio-good' : 'text-muted-foreground';
   return (
-    <div className="rounded-md border border-border/40 bg-card/30 p-3">
+    <div className="rounded-[6px] border border-border/40 bg-card p-3">
       <div className="flex items-baseline justify-between gap-2">
         <div>
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -286,7 +286,7 @@ function CustomScenarioSlider({
         step={5}
         value={customPrice}
         onChange={e => onChange(Number(e.target.value))}
-        className="mt-3 w-full accent-[#ccff00]"
+        className="mt-3 w-full accent-studio-forest"
         aria-label="Custom carbon price per tonne"
       />
       <div className="mt-1 flex justify-between text-[10px] text-muted-foreground/60">

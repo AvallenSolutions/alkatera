@@ -36,11 +36,9 @@ export function RosaWelcome({ onAsk, onOpenQueue }: Props) {
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-2xl border border-[#ccff00]/30 bg-gradient-to-br',
-        'from-[#ccff00]/[0.07] via-card to-card p-5 sm:p-6',
+        'relative overflow-hidden rounded-[6px] border border-border bg-card p-5 sm:p-6',
       )}
     >
-      <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-[#ccff00]/10 blur-3xl pointer-events-none" />
       <button
         onClick={dismiss}
         aria-label="Dismiss welcome"
@@ -50,8 +48,8 @@ export function RosaWelcome({ onAsk, onOpenQueue }: Props) {
       </button>
 
       <div className="relative flex items-start gap-4">
-        <div className="flex-shrink-0 rounded-xl bg-[#ccff00]/15 p-2.5">
-          <Dog className="h-6 w-6 text-[#ccff00]" />
+        <div className="flex-shrink-0 rounded-[6px] bg-secondary p-2.5">
+          <Dog className="h-6 w-6 text-studio-forest" />
         </div>
         <div className="flex-1 min-w-0">
           <h2 className="text-lg font-semibold">Hi, I&apos;m Rosa</h2>
@@ -110,9 +108,9 @@ function Chip({
       variant="outline"
       size="sm"
       onClick={onClick}
-      className="rounded-full border-border bg-background/40 hover:bg-[#ccff00]/10 hover:border-[#ccff00]/40 text-xs h-8"
+      className="rounded-full border-border bg-background/40 hover:bg-secondary hover:border-studio-forest/40 text-xs h-8"
     >
-      <span className="mr-1.5 text-[#ccff00]">{icon}</span>
+      <span className="mr-1.5 text-studio-forest">{icon}</span>
       {children}
     </Button>
   )

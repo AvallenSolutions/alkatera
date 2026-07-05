@@ -10,9 +10,10 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, ArrowRight, Info, Loader2, Scale } from 'lucide-react';
+import { ArrowRight, Scale } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { Card, CardContent } from '@/components/ui/card';
+import { StateChip } from '@/components/studio/state-chip';
 import { cn } from '@/lib/utils';
 
 interface RegulatoryLine {
@@ -67,7 +68,7 @@ export function RegulatoryExposureWidget() {
       <CardContent className="space-y-4 p-6">
         <header>
           <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            <Scale className="h-3 w-3 text-[#ccff00]" />
+            <Scale className="h-3 w-3 text-studio-forest" />
             Regulatory exposure
           </p>
           <h3 className="mt-0.5 text-sm font-semibold text-foreground">
@@ -83,13 +84,13 @@ export function RegulatoryExposureWidget() {
 
         {loading && (
           <div className="flex h-24 items-center justify-center">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Loading</span>
           </div>
         )}
 
         {!loading && data && (
           <>
-            <div className="rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5 p-4">
+            <div className="rounded-[6px] border border-border bg-secondary p-4">
               <p className="text-xs text-muted-foreground">
                 Estimated total regulatory cost, trailing 12 months
               </p>
@@ -113,7 +114,7 @@ export function RegulatoryExposureWidget() {
               on{' '}
               <Link
                 href="/pulse/settings/shadow-prices/"
-                className="text-[#ccff00] hover:underline"
+                className="text-studio-forest hover:underline"
               >
                 the Prices page
               </Link>
@@ -140,15 +141,10 @@ function RegulatoryLineEl({ line }: { line: RegulatoryLine }) {
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-foreground">{line.label}</span>
           {line.applies === false && !line.assumed && (
-            <span className="rounded-full border border-border/60 bg-muted/40 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Not applicable
-            </span>
+            <StateChip tone="quiet">Not applicable</StateChip>
           )}
           {line.assumed && (
-            <span className="flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-500">
-              <Info className="h-2.5 w-2.5" />
-              Needs data
-            </span>
+            <StateChip tone="attention">Needs data</StateChip>
           )}
         </div>
         <span
@@ -166,7 +162,7 @@ function RegulatoryLineEl({ line }: { line: RegulatoryLine }) {
         {line.assumed && (
           <Link
             href={line.fix_href}
-            className="inline-flex items-center gap-0.5 text-[#ccff00] hover:underline"
+            className="inline-flex items-center gap-0.5 text-studio-forest hover:underline"
           >
             Add data <ArrowRight className="h-2.5 w-2.5" />
           </Link>
@@ -177,7 +173,7 @@ function RegulatoryLineEl({ line }: { line: RegulatoryLine }) {
 }
 
 function formatGbp(v: number): string {
-  if (v === 0) return '—';
+  if (v === 0) return '£0';
   const abs = Math.abs(v);
   if (abs >= 100_000) {
     return v.toLocaleString('en-GB', {

@@ -4,7 +4,6 @@ import { useState } from 'react'
 import {
   Activity,
   Beaker,
-  Loader2,
   MessageSquare,
   Sparkles,
   Target,
@@ -82,15 +81,9 @@ export function ProgressTrackerSetup({ onPicked, onCancel }: Props) {
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-2xl border border-[#ccff00]/30 bg-gradient-to-br',
-        'from-[#0c1410] via-card to-card p-5 sm:p-6 h-full',
+        'relative overflow-hidden rounded-[6px] border border-border bg-card p-5 sm:p-6 h-full',
       )}
     >
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -top-20 -right-20 h-56 w-56 rounded-full bg-[#ccff00]/10 blur-3xl"
-      />
-
       {onCancel ? (
         <button
           onClick={onCancel}
@@ -103,8 +96,8 @@ export function ProgressTrackerSetup({ onPicked, onCancel }: Props) {
 
       <div className="relative">
         <div className="flex items-start gap-3">
-          <span className="flex-shrink-0 rounded-lg bg-[#ccff00]/15 p-2">
-            <Activity className="h-4 w-4 text-[#ccff00]" />
+          <span className="flex-shrink-0 rounded-lg bg-secondary p-2">
+            <Activity className="h-4 w-4 text-studio-forest" />
           </span>
           <div className="flex-1 min-w-0">
             <h2 className="text-base font-semibold leading-tight">
@@ -128,14 +121,14 @@ export function ProgressTrackerSetup({ onPicked, onCancel }: Props) {
                 onClick={() => handlePick(id)}
                 disabled={saving !== null}
                 className={cn(
-                  'group flex items-start gap-3 rounded-xl border border-border bg-background/40 p-3 text-left transition',
-                  'hover:border-[#ccff00]/40 hover:bg-[#ccff00]/5',
+                  'group flex items-start gap-3 rounded-[6px] border border-border bg-background/40 p-3 text-left transition',
+                  'hover:border-studio-forest/40 hover:bg-secondary',
                   'disabled:opacity-50 disabled:hover:border-border disabled:hover:bg-background/40',
                 )}
               >
-                <span className="flex-shrink-0 rounded-lg bg-muted/40 p-1.5 text-foreground group-hover:bg-[#ccff00]/15 group-hover:text-[#ccff00]">
+                <span className="flex-shrink-0 rounded-lg bg-muted/40 p-1.5 text-foreground group-hover:text-studio-forest">
                   {isSaving ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Icon className="h-4 w-4 text-studio-forest" />
                   ) : (
                     <Icon className="h-4 w-4" />
                   )}
@@ -162,7 +155,7 @@ export function ProgressTrackerSetup({ onPicked, onCancel }: Props) {
             disabled={saving !== null}
             className="gap-1.5"
           >
-            <MessageSquare className="h-3.5 w-3.5 text-[#ccff00]" />
+            <MessageSquare className="h-3.5 w-3.5 text-studio-forest" />
             Ask Rosa to suggest
           </Button>
         </div>

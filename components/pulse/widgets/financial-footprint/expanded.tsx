@@ -27,7 +27,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { ArrowDown, ArrowUp, History, Loader2, Table2, TrendingUp } from 'lucide-react';
+import { ArrowDown, ArrowUp, History, Table2, TrendingUp } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import {
   useRegisterDrillSlot,
@@ -137,13 +137,15 @@ function FinancialFootprintExpanded() {
   if (loading) {
     return (
       <div className="flex h-48 items-center justify-center">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          Loading
+        </span>
       </div>
     );
   }
   if (error || !data) {
     return (
-      <p className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-xs text-red-500">
+      <p className="rounded-[6px] border border-border bg-card p-3 text-xs text-studio-stale">
         {error ?? 'No data'}
       </p>
     );
@@ -165,13 +167,13 @@ function FinancialFootprintExpanded() {
 function Headline({ totals }: { totals: ApiPayload['totals'] }) {
   const tone =
     totals.delta_gbp < 0
-      ? 'text-emerald-500 bg-emerald-500/10 border-emerald-500/30'
+      ? 'text-studio-good'
       : totals.delta_gbp > 0
-        ? 'text-red-500 bg-red-500/10 border-red-500/30'
-        : 'text-muted-foreground bg-muted/30 border-border/60';
+        ? 'text-studio-stale'
+        : 'text-muted-foreground';
   const Arrow = totals.delta_gbp < 0 ? ArrowDown : totals.delta_gbp > 0 ? ArrowUp : TrendingUp;
   return (
-    <section className="grid gap-4 rounded-xl border border-border/60 bg-gradient-to-br from-card via-card to-card/60 p-6 sm:grid-cols-3">
+    <section className="grid gap-4 rounded-[6px] border border-border bg-card p-6 sm:grid-cols-3">
       <div>
         <p className="text-xs uppercase tracking-wider text-muted-foreground">
           Trailing 12m liability
@@ -188,7 +190,7 @@ function Headline({ totals }: { totals: ApiPayload['totals'] }) {
           {formatGbp(totals.prior_gbp)}
         </p>
       </div>
-      <div className={cn('flex flex-col justify-center rounded-lg border px-4 py-3', tone)}>
+      <div className={cn('flex flex-col justify-center rounded-[6px] border border-border px-4 py-3', tone)}>
         <span className="flex items-center gap-1 text-2xl font-semibold tabular-nums">
           <Arrow className="h-4 w-4" />
           {totals.delta_gbp < 0 ? '' : totals.delta_gbp > 0 ? '+' : ''}
@@ -210,22 +212,22 @@ function Waterfall({ steps }: { steps: WaterfallStep[] }) {
   const prior = steps.reduce((s, st) => s + st.prior_gbp, 0);
   const current = steps.reduce((s, st) => s + st.current_gbp, 0);
   const data = [
-    { name: 'Prior 12m', value: prior, fill: '#64748b' },
+    { name: 'Prior 12m', value: prior, fill: '#6F6F68' },
     ...steps.map(s => ({
       name: s.metric_label,
       value: Math.abs(s.delta_gbp),
       signed: s.delta_gbp,
-      fill: s.delta_gbp >= 0 ? '#ef4444' : '#10b981',
+      fill: s.delta_gbp >= 0 ? '#BF4B2A' : '#047857',
     })),
-    { name: 'Current 12m', value: current, fill: '#ccff00' },
+    { name: 'Current 12m', value: current, fill: '#205E40' },
   ];
   return (
     <section className="space-y-3">
       <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-        <TrendingUp className="h-4 w-4 text-[#ccff00]" />
+        <TrendingUp className="h-4 w-4 text-studio-forest" />
         Prior-year to current-year bridge
       </h3>
-      <div className="h-60 rounded-xl border border-border/60 bg-card/40 p-3">
+      <div className="h-60 rounded-[6px] border border-border/60 bg-card/40 p-3">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 8, right: 8, bottom: 16, left: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.1} />
@@ -263,18 +265,18 @@ function MonthlyTable({ monthly }: { monthly: Monthly[] }) {
   return (
     <section className="space-y-3">
       <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-        <Table2 className="h-4 w-4 text-[#ccff00]" />
+        <Table2 className="h-4 w-4 text-studio-forest" />
         Month-by-month
       </h3>
 
       {/* Chart on top */}
-      <div className="h-44 rounded-xl border border-border/60 bg-card/40 p-3">
+      <div className="h-44 rounded-[6px] border border-border/60 bg-card/40 p-3">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={monthly} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
             <defs>
               <linearGradient id="ff-monthly-grad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#ccff00" stopOpacity={0.45} />
-                <stop offset="100%" stopColor="#ccff00" stopOpacity={0} />
+                <stop offset="0%" stopColor="#205E40" stopOpacity={0.45} />
+                <stop offset="100%" stopColor="#205E40" stopOpacity={0} />
               </linearGradient>
             </defs>
             <XAxis
@@ -298,7 +300,7 @@ function MonthlyTable({ monthly }: { monthly: Monthly[] }) {
             <Area
               type="monotone"
               dataKey="total_gbp"
-              stroke="#ccff00"
+              stroke="#205E40"
               strokeWidth={2}
               fill="url(#ff-monthly-grad)"
               isAnimationActive={false}
@@ -308,7 +310,7 @@ function MonthlyTable({ monthly }: { monthly: Monthly[] }) {
       </div>
 
       {/* Table below */}
-      <div className="overflow-x-auto rounded-xl border border-border/60">
+      <div className="overflow-x-auto rounded-[6px] border border-border/60">
         <table className="w-full text-sm">
           <thead className="bg-muted/40">
             <tr className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -383,7 +385,7 @@ function FacilityAttribution({
               </p>
               <div className="mt-1 h-1 w-20 overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full bg-[#ccff00]"
+                  className="h-full bg-studio-forest"
                   style={{
                     width: `${total > 0 ? Math.min(100, (r.total_gbp / total) * 100) : 0}%`,
                   }}
@@ -405,7 +407,7 @@ function PriceHistory({ rows }: { rows: PriceChange[] }) {
   return (
     <section className="space-y-3">
       <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-        <History className="h-4 w-4 text-[#ccff00]" />
+        <History className="h-4 w-4 text-studio-forest" />
         Shadow-price history
       </h3>
       <ul className="space-y-1.5">
@@ -418,7 +420,7 @@ function PriceHistory({ rows }: { rows: PriceChange[] }) {
               <p className="text-foreground">
                 {r.metric_label} · £{r.price_per_unit}/{r.unit}
                 {r.is_org_override && (
-                  <span className="ml-2 rounded-full bg-[#ccff00]/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[#ccff00]">
+                  <span className="ml-2 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-studio-forest">
                     Your override
                   </span>
                 )}

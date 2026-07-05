@@ -24,7 +24,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Activity, Loader2, Target, TrendingUp } from 'lucide-react';
+import { Activity, Target, TrendingUp } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { useReportingPeriod } from '@/hooks/useReportingPeriod';
 import {
@@ -127,13 +127,15 @@ function YearEndForecast() {
   return (
     <section className="space-y-3">
       <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-        <TrendingUp className="h-4 w-4 text-[#ccff00]" />
+        <TrendingUp className="h-4 w-4 text-studio-forest" />
         Year-end forecast
       </h3>
 
       {loading && (
         <div className="flex h-48 items-center justify-center">
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            Loading
+          </span>
         </div>
       )}
 
@@ -170,13 +172,13 @@ function YearEndForecast() {
             />
           </div>
 
-          <div className="h-64 rounded-xl border border-border/60 bg-card/40 p-3">
+          <div className="h-64 rounded-[6px] border border-border/60 bg-card/40 p-3">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={chart.points} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
                 <defs>
                   <linearGradient id="cb-forecast-band" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#ccff00" stopOpacity={0.22} />
-                    <stop offset="100%" stopColor="#ccff00" stopOpacity={0} />
+                    <stop offset="0%" stopColor="#205E40" stopOpacity={0.22} />
+                    <stop offset="100%" stopColor="#205E40" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <XAxis
@@ -213,7 +215,7 @@ function YearEndForecast() {
                 {/* Actual cumulative */}
                 <Line
                   dataKey="actual"
-                  stroke="#ccff00"
+                  stroke="#205E40"
                   strokeWidth={2}
                   dot={false}
                   connectNulls
@@ -222,7 +224,7 @@ function YearEndForecast() {
                 {/* Projected cumulative (dashed) */}
                 <Line
                   dataKey="forecast"
-                  stroke="#ccff00"
+                  stroke="#205E40"
                   strokeWidth={1.5}
                   strokeDasharray="4 3"
                   dot={false}
@@ -231,7 +233,7 @@ function YearEndForecast() {
                 />
                 <ReferenceLine
                   y={annualBudget.budget_tco2e}
-                  stroke="#94a3b8"
+                  stroke="#A97C14"
                   strokeDasharray="2 2"
                   label={{
                     value: 'Budget',
@@ -281,7 +283,9 @@ function MonthlyHistory() {
   if (loading) {
     return (
       <div className="flex h-24 items-center justify-center">
-        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+          Loading
+        </span>
       </div>
     );
   }
@@ -290,10 +294,10 @@ function MonthlyHistory() {
   return (
     <section className="space-y-3">
       <h3 className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-        <Activity className="h-4 w-4 text-[#ccff00]" />
+        <Activity className="h-4 w-4 text-studio-forest" />
         Last 24 months of emissions
       </h3>
-      <div className="h-48 rounded-xl border border-border/60 bg-card/40 p-3">
+      <div className="h-48 rounded-[6px] border border-border/60 bg-card/40 p-3">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={monthly} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
             <XAxis
@@ -320,7 +324,7 @@ function MonthlyHistory() {
             />
             <Line
               dataKey="t_co2e"
-              stroke="#ccff00"
+              stroke="#205E40"
               strokeWidth={2}
               dot={false}
               isAnimationActive={false}
@@ -345,12 +349,12 @@ function Stat({
 }) {
   const toneClass =
     tone === 'good'
-      ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-500'
+      ? 'border-border bg-card text-studio-good'
       : tone === 'bad'
-        ? 'border-red-500/30 bg-red-500/5 text-red-500'
+        ? 'border-border bg-card text-studio-stale'
         : 'border-border/60 bg-card/40 text-foreground';
   return (
-    <div className={`rounded-lg border p-4 ${toneClass}`}>
+    <div className={`rounded-[6px] border p-4 ${toneClass}`}>
       <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
         {label}
       </p>

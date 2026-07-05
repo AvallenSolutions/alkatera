@@ -149,10 +149,10 @@ export function OverviewStats({ onOpenMoneyTab }: { onOpenMoneyTab?: () => void 
       >
         <AnimatedCo2 kg={stats?.emissionsKg ?? null} />
         {stats && stats.emissionsSeries.length >= 2 && (
-          <Sparkline values={stats.emissionsSeries} stroke="#ccff00" height={24} />
+          <Sparkline values={stats.emissionsSeries} stroke="#205E40" height={24} />
         )}
         {stats && isFiniteNumber(stats.emissionsDeltaPct) && (
-          <p className={cn('text-xs', stats.emissionsDeltaPct <= 0 ? 'text-emerald-500' : 'text-red-500')}>
+          <p className={cn('text-xs', stats.emissionsDeltaPct <= 0 ? 'text-studio-good' : 'text-studio-stale')}>
             {safePct(stats.emissionsDeltaPct, 0, { sign: true })} vs a year ago
           </p>
         )}
@@ -162,10 +162,10 @@ export function OverviewStats({ onOpenMoneyTab }: { onOpenMoneyTab?: () => void 
         <StatTile label="What it costs each year" onClick={onOpenMoneyTab}>
           <AnimatedGbp value={stats?.annualCostGbp ?? null} />
           {stats && stats.costSeries.length >= 2 && (
-            <Sparkline values={stats.costSeries} stroke="#a78bfa" height={24} />
+            <Sparkline values={stats.costSeries} stroke="#6F6F68" height={24} />
           )}
           {stats?.costDirection && stats.costDirection !== 'flat' && (
-            <p className={cn('text-xs', stats.costDirection === 'improving' ? 'text-emerald-500' : 'text-red-500')}>
+            <p className={cn('text-xs', stats.costDirection === 'improving' ? 'text-studio-good' : 'text-studio-stale')}>
               {stats.costDirection === 'improving' ? 'Falling year on year' : 'Rising year on year'}
             </p>
           )}
@@ -182,19 +182,19 @@ export function OverviewStats({ onOpenMoneyTab }: { onOpenMoneyTab?: () => void 
         {stats?.alertCounts && totalAlerts !== null && totalAlerts > 0 ? (
           <div className="flex h-6 items-center gap-1">
             {Array.from({ length: Math.min(stats.alertCounts.high, 6) }).map((_, i) => (
-              <span key={`h${i}`} className="h-2 w-2 rounded-full bg-red-500" />
+              <span key={`h${i}`} className="h-2 w-2 rounded-full bg-studio-stale" />
             ))}
             {Array.from({ length: Math.min(stats.alertCounts.medium, 6) }).map((_, i) => (
-              <span key={`m${i}`} className="h-2 w-2 rounded-full bg-amber-500" />
+              <span key={`m${i}`} className="h-2 w-2 rounded-full bg-studio-attention" />
             ))}
             {Array.from({ length: Math.min(stats.alertCounts.low, 6) }).map((_, i) => (
-              <span key={`l${i}`} className="h-2 w-2 rounded-full bg-slate-400" />
+              <span key={`l${i}`} className="h-2 w-2 rounded-full bg-studio-dim" />
             ))}
           </div>
         ) : (
           <div className="h-6" />
         )}
-        <p className={cn('text-xs', totalAlerts === 0 ? 'text-emerald-500' : 'text-amber-500')}>
+        <p className={cn('text-xs', totalAlerts === 0 ? 'text-studio-good' : 'text-studio-attention')}>
           {totalAlerts === 0 ? 'No open alerts' : 'open alerts'}
         </p>
       </StatTile>
@@ -227,7 +227,7 @@ export function OverviewStats({ onOpenMoneyTab }: { onOpenMoneyTab?: () => void 
 }
 
 const TILE_CLASS =
-  'h-full cursor-pointer border-border/60 transition-all duration-200 hover:-translate-y-0.5 hover:border-[#ccff00]/50 hover:shadow-[0_4px_20px_-8px_rgba(204,255,0,0.25)]';
+  'h-full cursor-pointer rounded-[6px] border-border bg-card transition-all duration-200 hover:-translate-y-0.5 hover:border-studio-forest/50';
 
 function StatTile({
   label,
@@ -304,7 +304,7 @@ function ReadinessRing({ pct }: { pct: number }) {
         cy="28"
         r={R}
         fill="none"
-        stroke="#ccff00"
+        stroke="#205E40"
         strokeWidth="5"
         strokeLinecap="round"
         strokeDasharray={`${(clamped / 100) * CIRC} ${CIRC}`}

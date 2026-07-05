@@ -23,8 +23,8 @@ const TIER_LABEL: Record<TierName, string> = {
 
 export function WidgetLockCard({ label, minTier }: { label: string; minTier: TierName }) {
   return (
-    <Link href="/settings/" className="block h-full" aria-label={`${label} — upgrade to ${TIER_LABEL[minTier]}`}>
-      <Card className="h-full border-dashed border-border/60 bg-muted/20 transition-colors hover:border-[#ccff00]/40">
+    <Link href="/settings/" className="block h-full" aria-label={`${label}, upgrade to ${TIER_LABEL[minTier]}`}>
+      <Card className="h-full rounded-[6px] border-dashed border-border/60 bg-muted/20 transition-colors hover:border-studio-forest/40">
         <CardContent className="flex h-full flex-col items-center justify-center gap-1.5 p-4 text-center">
           <Lock className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
           <p className="text-sm font-medium text-foreground">{label}</p>

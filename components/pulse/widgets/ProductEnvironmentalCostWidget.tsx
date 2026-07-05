@@ -13,9 +13,10 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Loader2, Package } from 'lucide-react';
+import { ArrowRight, Package } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { Card, CardContent } from '@/components/ui/card';
+import { StateChip } from '@/components/studio/state-chip';
 import { clampPctWidth } from '@/lib/pulse/format';
 
 interface ProductRow {
@@ -83,7 +84,7 @@ export function ProductEnvironmentalCostWidget() {
         <header className="flex items-start justify-between gap-3">
           <div>
             <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              <Package className="h-3 w-3 text-[#ccff00]" />
+              <Package className="h-3 w-3 text-studio-forest" />
               Environmental cost per unit
             </p>
             <h3 className="mt-0.5 text-sm font-semibold text-foreground">
@@ -105,7 +106,7 @@ export function ProductEnvironmentalCostWidget() {
 
         {loading && (
           <div className="flex h-24 items-center justify-center">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Loading</span>
           </div>
         )}
 
@@ -117,7 +118,7 @@ export function ProductEnvironmentalCostWidget() {
                 {data.lcas_without_climate_figure === 1 ? '' : 's'} found, but
                 none have a climate impact figure recorded yet. Open any LCA in
                 the{' '}
-                <Link href="/products" className="text-[#ccff00] hover:underline">
+                <Link href="/products" className="text-studio-forest hover:underline">
                   Products area
                 </Link>{' '}
                 and re-run the calculation to populate{' '}
@@ -126,7 +127,7 @@ export function ProductEnvironmentalCostWidget() {
             ) : (
               <>
                 No product LCAs on file yet. Complete one in the{' '}
-                <Link href="/products" className="text-[#ccff00] hover:underline">
+                <Link href="/products" className="text-studio-forest hover:underline">
                   Products area
                 </Link>{' '}
                 and it will appear here with its embedded £/unit environmental cost.
@@ -148,12 +149,12 @@ export function ProductEnvironmentalCostWidget() {
                 ? ` + £${data.water_price_gbp_per_m3}/m³ water`
                 : ''}
               . Covers carbon
-              {data.water_price_gbp_per_m3 ? ' and water' : ''} only -- other
+              {data.water_price_gbp_per_m3 ? ' and water' : ''} only. Other
               LCA impact categories (eutrophication, land use, etc.) aren&apos;t
               yet priced. Change rates on the{' '}
               <Link
                 href="/pulse/settings/shadow-prices/"
-                className="text-[#ccff00] hover:underline"
+                className="text-studio-forest hover:underline"
               >
                 Prices page
               </Link>
@@ -183,14 +184,12 @@ function ProductRowEl({
           <div className="flex items-center gap-2">
             <Link
               href={`/products/${product.product_id}`}
-              className="block truncate text-sm font-medium text-foreground hover:text-[#ccff00]"
+              className="block truncate text-sm font-medium text-foreground hover:text-studio-forest"
             >
               {product.product_name}
             </Link>
             {product.status === 'draft' && (
-              <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-500">
-                Draft
-              </span>
+              <StateChip tone="attention">Draft</StateChip>
             )}
           </div>
           {product.product_type && (
@@ -225,7 +224,7 @@ function ProductRowEl({
         {breakdownTotal > 0 ? (
           <>
             <div
-              className="bg-[#ccff00]"
+              className="bg-studio-forest"
               style={{ width: `${(raw_materials / breakdownTotal) * widthPct}%` }}
               title={`Raw materials: ${formatGbp(raw_materials)}`}
             />
@@ -241,7 +240,7 @@ function ProductRowEl({
             />
           </>
         ) : (
-          <div className="bg-[#ccff00]" style={{ width: `${widthPct}%` }} />
+          <div className="bg-studio-forest" style={{ width: `${widthPct}%` }} />
         )}
       </div>
     </li>

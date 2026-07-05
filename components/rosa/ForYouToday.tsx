@@ -22,6 +22,8 @@ const OnboardingResumeBanner = dynamic(() => import('./OnboardingResumeBanner').
 import { SustainableAINote } from './SustainableAINote'
 import { CertificationHealthWidget } from '@/components/certifications/CertificationHealthWidget'
 import { useHubLayout } from '@/lib/rosa/useHubLayout'
+import { useAuth } from '@/hooks/useAuth'
+import { Statement } from '@/components/studio/statement'
 
 interface Props {
   onOpenQueue?: () => void
@@ -48,11 +50,30 @@ interface Props {
  * the hero through the priority tiles fits above the fold on a 1080p
  * monitor.
  */
+/** The brief's one sentence: a greeting by daypart, ending with a full stop. */
+function useGreeting(): string {
+  const { user } = useAuth()
+  const firstName = (user?.user_metadata?.full_name as string | undefined)?.split(' ')[0]
+  const h = new Date().getHours()
+  const daypart = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
+  return `${daypart}${firstName ? `, ${firstName}` : ''}.`
+}
+
+/** Mono date for the eyebrow: "SATURDAY · 5 JULY". */
+function todayEyebrow(): string {
+  const now = new Date()
+  const weekday = now.toLocaleDateString('en-GB', { weekday: 'long' })
+  const day = now.getDate()
+  const month = now.toLocaleDateString('en-GB', { month: 'long' })
+  return `${weekday} · ${day} ${month}`.toUpperCase()
+}
+
 export function ForYouToday({ onOpenQueue, onSubmit }: Props) {
   const handleAsk = (prompt: string) => {
     if (onSubmit) onSubmit(prompt)
   }
   const { isVisible, isLoading, layout } = useHubLayout()
+  const greeting = useGreeting()
 
   // Decide whether the first-visit setup wizard should take over the page.
   // Mirrors HubSetupWizard's own gating so the page doesn't show both the
@@ -75,7 +96,10 @@ export function ForYouToday({ onOpenQueue, onSubmit }: Props) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Band, statement, paper: the brief opens with its one sentence. */}
+      <Statement eyebrow={todayEyebrow()} headline={greeting} />
+
       <SustainableAINote />
       <OnboardingResumeBanner />
       <VitalityHero />

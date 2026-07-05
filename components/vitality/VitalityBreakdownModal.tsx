@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowUpRight, Loader2, Sparkles } from 'lucide-react'
+import { ArrowUpRight, Sparkles } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -89,11 +89,7 @@ export function VitalityBreakdownModal({
             {read ? (
               <div className="rounded-lg border border-border bg-card/40 p-3">
                 <p className="text-xs uppercase tracking-wider text-muted-foreground inline-flex items-center gap-1.5">
-                  {readUpgrading ? (
-                    <Loader2 className="h-3 w-3 text-[#ccff00] animate-spin" />
-                  ) : (
-                    <Sparkles className="h-3 w-3 text-[#ccff00]" />
-                  )}
+                  <Sparkles className="h-3 w-3 text-studio-forest" />
                   Rosa&apos;s read
                   {readUpgrading ? (
                     <span className="text-[10px] text-muted-foreground/70">· deepening</span>
@@ -132,7 +128,7 @@ export function VitalityBreakdownModal({
         </div>
 
         {read?.next_move ? (
-          <div className="mt-4 rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/[0.04] p-3">
+          <div className="mt-4 rounded-[6px] border border-border bg-card p-3">
             <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
               Best next move
             </p>
@@ -143,7 +139,7 @@ export function VitalityBreakdownModal({
         <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
           <Link
             href="/performance/"
-            className="inline-flex items-center gap-1.5 text-sm text-foreground hover:text-[#ccff00] transition-colors"
+            className="inline-flex items-center gap-1.5 text-sm text-foreground hover:text-studio-forest transition-colors"
           >
             View full Vitality dashboard
             <ArrowUpRight className="h-3.5 w-3.5" />
@@ -193,7 +189,7 @@ function CompositeTrend({ trend }: { trend: TrendPoint[] }) {
   }
   return (
     <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="w-full h-12">
-      <path d={seg.join(' ')} stroke="#ccff00" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d={seg.join(' ')} stroke="#205E40" strokeWidth="2" fill="none" strokeLinecap="round" />
     </svg>
   )
 }

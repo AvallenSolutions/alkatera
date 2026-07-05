@@ -25,25 +25,18 @@ const sizeConfig = {
 };
 
 function getScoreLabel(score: number): { label: string; colorClass: string } {
-  if (score >= 85) return { label: 'EXCELLENT', colorClass: 'text-emerald-500' };
-  if (score >= 70) return { label: 'GOOD', colorClass: 'text-green-500' };
-  if (score >= 50) return { label: 'FAIR', colorClass: 'text-amber-500' };
-  if (score >= 30) return { label: 'NEEDS WORK', colorClass: 'text-orange-500' };
-  return { label: 'CRITICAL', colorClass: 'text-red-500' };
+  if (score >= 85) return { label: 'EXCELLENT', colorClass: 'text-studio-good' };
+  if (score >= 70) return { label: 'GOOD', colorClass: 'text-studio-good' };
+  if (score >= 50) return { label: 'FAIR', colorClass: 'text-studio-attention' };
+  if (score >= 30) return { label: 'NEEDS WORK', colorClass: 'text-studio-attention' };
+  return { label: 'CRITICAL', colorClass: 'text-studio-stale' };
 }
 
+// Working tones from components/studio/theme.ts: good / attention / stale.
 function getScoreColor(score: number): string {
-  if (score >= 85) return '#10b981';
-  if (score >= 70) return '#22c55e';
-  if (score >= 50) return '#f59e0b';
-  if (score >= 30) return '#f97316';
-  return '#ef4444';
-}
-
-function getGradientId(score: number): string {
-  if (score >= 70) return 'greenGradient';
-  if (score >= 50) return 'amberGradient';
-  return 'redGradient';
+  if (score >= 70) return '#047857';
+  if (score >= 30) return '#B45309';
+  return '#BE123C';
 }
 
 export function VitalityRing({
@@ -70,9 +63,9 @@ export function VitalityRing({
   const dashOffset = circumference - progress;
 
   const { label: scoreLabel, colorClass } = isNoData
-    ? { label: 'NO DATA', colorClass: 'text-gray-400' }
+    ? { label: 'NO DATA', colorClass: 'text-studio-dim' }
     : getScoreLabel(normalizedScore);
-  const strokeColor = isNoData ? '#9ca3af' : getScoreColor(normalizedScore);
+  const strokeColor = isNoData ? '#6F6F68' : getScoreColor(normalizedScore);
 
   const TrendIcon = trendDirection === 'up' ? TrendingUp :
                     trendDirection === 'down' ? TrendingDown : Minus;
@@ -85,28 +78,6 @@ export function VitalityRing({
           height={config.diameter}
           className="transform -rotate-90"
         >
-          <defs>
-            <linearGradient id="greenGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#10b981" />
-              <stop offset="100%" stopColor="#22c55e" />
-            </linearGradient>
-            <linearGradient id="amberGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#f59e0b" />
-              <stop offset="100%" stopColor="#fbbf24" />
-            </linearGradient>
-            <linearGradient id="redGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#ef4444" />
-              <stop offset="100%" stopColor="#f97316" />
-            </linearGradient>
-            <filter id="glow">
-              <feGaussianBlur stdDeviation="3" result="coloredBlur" />
-              <feMerge>
-                <feMergeNode in="coloredBlur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
-
           <circle
             cx={config.diameter / 2}
             cy={config.diameter / 2}
@@ -114,7 +85,7 @@ export function VitalityRing({
             fill="none"
             stroke="currentColor"
             strokeWidth={config.strokeWidth}
-            className="text-gray-200 dark:text-gray-800"
+            className="text-studio-hairline"
           />
 
           <circle
@@ -122,12 +93,11 @@ export function VitalityRing({
             cy={config.diameter / 2}
             r={radius}
             fill="none"
-            stroke={`url(#${getGradientId(normalizedScore)})`}
+            stroke={strokeColor}
             strokeWidth={config.strokeWidth}
             strokeLinecap="round"
             strokeDasharray={circumference}
             strokeDashoffset={animated ? circumference : dashOffset}
-            filter="url(#glow)"
             className={cn(
               'transition-all duration-1000 ease-out',
               animated && 'animate-ring-progress'
@@ -140,7 +110,7 @@ export function VitalityRing({
         </svg>
 
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={cn('font-bold tabular-nums', config.fontSize, isNoData && 'text-gray-400')}>
+          <span className={cn('font-bold tabular-nums', config.fontSize, isNoData && 'text-studio-dim')}>
             {isNoData ? '--' : Math.round(normalizedScore)}
           </span>
           {showLabel && (
@@ -156,8 +126,8 @@ export function VitalityRing({
           {trend !== undefined && trendDirection && (
             <div className={cn(
               'flex items-center gap-1 text-sm',
-              trendDirection === 'up' ? 'text-green-500' :
-              trendDirection === 'down' ? 'text-red-500' : 'text-gray-500'
+              trendDirection === 'up' ? 'text-studio-good' :
+              trendDirection === 'down' ? 'text-studio-stale' : 'text-studio-dim'
             )}>
               <TrendIcon className="h-4 w-4" />
               <span>{trend > 0 ? '+' : ''}{trend}%</span>
@@ -167,11 +137,11 @@ export function VitalityRing({
           {benchmark !== undefined && (
             <div className="text-sm text-muted-foreground">
               vs industry: {normalizedScore > benchmark ? (
-                <span className="text-green-500">+{normalizedScore - benchmark} better</span>
+                <span className="text-studio-good">+{normalizedScore - benchmark} better</span>
               ) : normalizedScore < benchmark ? (
-                <span className="text-red-500">{normalizedScore - benchmark} below</span>
+                <span className="text-studio-stale">{normalizedScore - benchmark} below</span>
               ) : (
-                <span className="text-gray-500">average</span>
+                <span className="text-studio-dim">average</span>
               )}
             </div>
           )}
@@ -211,7 +181,7 @@ export function MiniVitalityRing({
           fill="none"
           stroke="currentColor"
           strokeWidth={strokeWidth}
-          className="text-gray-200 dark:text-gray-800"
+          className="text-studio-hairline"
         />
         <circle
           cx={size / 2}

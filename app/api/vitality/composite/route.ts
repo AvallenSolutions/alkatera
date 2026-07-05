@@ -1335,7 +1335,13 @@ function fallbackRead(composite: VitalityComposite, trend: TrendPoint[]): Vitali
   if (sentences.length === 0) sentences.push(BAND_DESCRIPTIONS[band])
 
   return {
-    headline: `Your vitality is ${band.toLowerCase()}.`,
+    // "NEEDS ATTENTION" reads wrongly as "is needs attention"; phrase it properly.
+    headline:
+      band === 'NEEDS ATTENTION'
+        ? 'Your vitality needs attention.'
+        : band === 'AWAITING DATA'
+          ? 'Awaiting your first vitality data.'
+          : `Your vitality is ${band.toLowerCase()}.`,
     detail: sentences.join(' '),
     next_move: weakness?.action ?? null,
     confidence: 'medium',
