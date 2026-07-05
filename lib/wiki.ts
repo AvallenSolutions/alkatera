@@ -141,6 +141,22 @@ export function renderWikiHtml(page: WikiPage): string {
   });
 }
 
+export function getPublishedWikiPagesFull(): WikiPage[] {
+  return loadPages().filter((p) => p.status === 'published');
+}
+
+// Wikilinks resolved to absolute markdown links for consumers outside the app
+// router (e.g. Rosa's knowledge base), so citations survive being quoted
+// anywhere. Unresolvable links degrade to plain text.
+export function wikiBodyForExport(page: WikiPage, siteUrl: string): string {
+  const titles = new Map(getPublishedWikiPagesFull().map((p) => [p.slug, p.title]));
+  return page.body.replace(WIKILINK, (_match, slug: string, label?: string) => {
+    const title = titles.get(slug);
+    if (!title) return label || slug.replace(/-/g, ' ');
+    return `[${label || title}](${siteUrl}/wiki/${slug})`;
+  });
+}
+
 export function getWikiBacklinks(slug: string): WikiPageMeta[] {
   const needle = new RegExp(`\\[\\[${slug}(\\|[^\\]]+)?\\]\\]`);
   return loadPages()

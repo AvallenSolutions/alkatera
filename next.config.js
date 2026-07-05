@@ -58,6 +58,7 @@ const nextConfig = {
     // routes themselves are force-static so they only read at build time.
     outputFileTracingIncludes: {
       '/sitemap.xml': ['./wiki/pages/**/*'],
+      '/api/admin/wiki-sync': ['./wiki/pages/**/*'],
     },
     optimizePackageImports: [
       'lucide-react',

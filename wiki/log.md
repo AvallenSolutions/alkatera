@@ -10,4 +10,8 @@ Created the wiki system: `CLAUDE.md` schema, `raw/` source inventory, `pages/`, 
 
 39 pages ingested and published: 12 emissions and measurement, 10 legislation and compliance (all facts verified against primary sources on the day), 17 concepts and glossary. Lint clean: all wikilinks resolve, no orphans, frontmatter complete. Fixed five frontmatter summaries that contained unquoted colons. `index.md` regenerated. Front end shipped at `/wiki` (index with search, per-page rendering with sources and backlinks, sitemap entries).
 
-Known follow-ups: quarterly legislation review due early October 2026; Rosa sync (Phase 4 of `tasks/llm-wiki-plan.md`) not yet built.
+Known follow-ups: quarterly legislation review due early October 2026.
+
+## 2026-07-05: Rosa knowledge base sync built
+
+Published pages now sync into `gaia_knowledge_base` (category `wiki`, entry types definition/guideline, wikilinks exported as absolute links) so Rosa cites wiki pages with clickable `/wiki/<slug>` sources. Admin button at `/admin/wiki` (`POST /api/admin/wiki-sync`, full replace of the wiki category per run). Run the sync after every deploy that changes wiki content.
