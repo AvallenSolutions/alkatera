@@ -15,3 +15,7 @@ Known follow-ups: quarterly legislation review due early October 2026.
 ## 2026-07-05: Rosa knowledge base sync built
 
 Published pages now sync into `gaia_knowledge_base` (category `wiki`, entry types definition/guideline, wikilinks exported as absolute links) so Rosa cites wiki pages with clickable `/wiki/<slug>` sources. Admin button at `/admin/wiki` (`POST /api/admin/wiki-sync`, full replace of the wiki category per run). Run the sync after every deploy that changes wiki content.
+
+## 2026-07-05: Connected-map front end
+
+`/wiki` is now an interactive map (modelled on the "AI Stack, Connected" layout): five typed bands of pills, click a topic to draw its connection curves and open a detail drawer (summary, in-short text, connected topics, sources, link to the full page), search that dims non-matches, three audience tours, and a crawlable "browse as a list" section below for SEO. Map data comes from `getWikiMapData()` in `lib/wiki.ts`; per-page articles at `/wiki/[slug]` unchanged.

@@ -1,14 +1,15 @@
 import { Metadata } from 'next';
+import Link from 'next/link';
 import { Navigation } from '@/marketing/components/Navigation';
 import { Footer } from '@/marketing/components/Footer';
-import { WikiIndexClient } from '@/marketing/components/WikiIndexClient';
-import { getPublishedWikiPages, WIKI_TYPE_LABELS, WIKI_TYPE_ORDER } from '@/lib/wiki';
+import { WikiMapClient } from '@/marketing/components/WikiMapClient';
+import { getWikiMapData, WIKI_TYPE_LABELS, WIKI_TYPE_ORDER } from '@/lib/wiki';
 
 // Pages are read from wiki/pages/*.md at build time.
 export const dynamic = 'force-static';
 
 const description =
-  'Plain-English explanations of carbon accounting, sustainability legislation and green claims for the drinks industry. No jargon, no greenwash.';
+  'Sustainability for the drinks industry on one connected map: carbon accounting, legislation and green claims in plain English. Click anything to explore.';
 
 export const metadata: Metadata = {
   title: 'Sustainability Wiki | alkatera',
@@ -24,13 +25,7 @@ export const metadata: Metadata = {
 };
 
 export default function WikiIndexPage() {
-  const pages = getPublishedWikiPages().map(({ title, slug, type, tags, summary }) => ({
-    title,
-    slug,
-    type,
-    tags,
-    summary,
-  }));
+  const nodes = getWikiMapData();
 
   return (
     <div className="min-h-screen bg-[#050505] text-white relative">
@@ -53,22 +48,56 @@ export default function WikiIndexPage() {
         <Navigation />
 
         <main className="pt-32 pb-24">
-          <div className="max-w-6xl mx-auto px-6">
-            <header className="mb-16 space-y-6 max-w-3xl">
+          <div className="max-w-7xl mx-auto px-6">
+            <header className="mb-10 space-y-4 max-w-3xl">
               <p className="font-mono text-xs uppercase tracking-widest text-[#ccff00]">
                 Sustainability wiki
               </p>
               <h1 className="text-5xl md:text-6xl font-serif leading-[1.1] tracking-tight bg-gradient-to-br from-white via-white to-gray-400 bg-clip-text text-transparent">
-                Sustainability, explained for drinks businesses
+                Sustainability, connected
               </h1>
-              <p className="text-xl text-gray-400 leading-relaxed">
-                {pages.length} plain-English reference pages covering carbon accounting, legislation
-                and certification. Every page links to the pages around it, so you can start
-                anywhere and follow the thread.
+              <p className="text-lg text-gray-400 leading-relaxed">
+                Everything a drinks business needs to know, on one map. Click anything to see what
+                it is and how it connects, or take a tour.
               </p>
             </header>
 
-            <WikiIndexClient pages={pages} typeLabels={WIKI_TYPE_LABELS} typeOrder={WIKI_TYPE_ORDER} />
+            <WikiMapClient nodes={nodes} />
+
+            {/* Crawlable list of every page; the map above is the interactive view. */}
+            <section className="mt-24 border-t border-white/10 pt-12">
+              <h2 className="mb-8 font-serif text-2xl text-white">Browse as a list</h2>
+              <div className="space-y-10">
+                {WIKI_TYPE_ORDER.map((type) => {
+                  const pages = nodes
+                    .filter((n) => n.type === type)
+                    .sort((a, b) => a.title.localeCompare(b.title));
+                  if (pages.length === 0) return null;
+                  return (
+                    <div key={type}>
+                      <h3 className="mb-4 font-mono text-xs uppercase tracking-widest text-[#ccff00]">
+                        {WIKI_TYPE_LABELS[type]}
+                      </h3>
+                      <ul className="grid gap-x-8 gap-y-3 md:grid-cols-2">
+                        {pages.map((page) => (
+                          <li key={page.slug}>
+                            <Link
+                              href={`/wiki/${page.slug}`}
+                              className="group block text-sm"
+                            >
+                              <span className="font-medium text-gray-200 transition-colors duration-300 group-hover:text-[#ccff00]">
+                                {page.title}
+                              </span>
+                              <span className="block text-gray-500">{page.summary}</span>
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
           </div>
         </main>
 

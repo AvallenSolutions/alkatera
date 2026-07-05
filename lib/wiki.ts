@@ -157,6 +157,56 @@ export function wikiBodyForExport(page: WikiPage, siteUrl: string): string {
   });
 }
 
+export interface WikiMapNode {
+  slug: string;
+  title: string;
+  type: WikiPageType;
+  tags: string[];
+  summary: string;
+  inShort: string;
+  lastReviewed: string;
+  sources: WikiSource[];
+  links: string[];
+}
+
+// The first body paragraph ("**In short:** ...") as plain text, for the map
+// drawer: markdown emphasis stripped, wikilinks flattened to their labels.
+function extractInShort(body: string, titles: Map<string, string>): string {
+  const firstParagraph = body.split(/\n\s*\n/)[0] || '';
+  return firstParagraph
+    .replace(/^\*\*In short:\*\*\s*/i, '')
+    .replace(WIKILINK, (_m, slug: string, label?: string) => label || titles.get(slug) || slug.replace(/-/g, ' '))
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .trim();
+}
+
+// Serialisable node list for the interactive map at /wiki: page metadata plus
+// the outbound wikilink graph (published targets only).
+export function getWikiMapData(): WikiMapNode[] {
+  const published = loadPages().filter((p) => p.status === 'published');
+  const titles = new Map(published.map((p) => [p.slug, p.title]));
+  return published.map((page) => {
+    const links = new Set<string>();
+    const re = new RegExp(WIKILINK.source, 'g');
+    let match;
+    while ((match = re.exec(page.body)) !== null) {
+      if (match[1] !== page.slug && titles.has(match[1])) links.add(match[1]);
+    }
+    return {
+      slug: page.slug,
+      title: page.title,
+      type: page.type,
+      tags: page.tags,
+      summary: page.summary,
+      inShort: extractInShort(page.body, titles),
+      lastReviewed: page.lastReviewed,
+      sources: page.sources,
+      links: Array.from(links),
+    };
+  });
+}
+
 export function getWikiBacklinks(slug: string): WikiPageMeta[] {
   const needle = new RegExp(`\\[\\[${slug}(\\|[^\\]]+)?\\]\\]`);
   return loadPages()
