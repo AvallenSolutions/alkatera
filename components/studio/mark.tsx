@@ -44,6 +44,8 @@ export function Mark({ shape, tone = 'paper', corner = 'br', className }: MarkPr
         <rect x="18" y="18" width="64" height="64" fill={fill} transform="rotate(14 50 50)" />
       )}
       {shape === 'quarter' && <path d="M 0 100 A 100 100 0 0 1 100 0 L 100 100 Z" fill={fill} />}
+      {shape === 'diamond' && <polygon points="50,2 98,50 50,98 2,50" fill={fill} />}
+      {shape === 'arch' && <path d="M 10 100 L 10 50 A 40 40 0 0 1 90 50 L 90 100 Z" fill={fill} />}
       {shape === 'ring' && (
         <circle cx="50" cy="50" r="36" fill="none" stroke={fill} strokeWidth="24" />
       )}

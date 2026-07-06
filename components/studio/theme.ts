@@ -19,7 +19,9 @@ export const STUDIO = {
   ink: '#1A1B1D',
   // the rooms — one colour each, spent deliberately
   forest: '#205E40',
+  teal: '#1E5F5B',
   cobalt: '#2B46C0',
+  plum: '#6D3A5D',
   ochre: '#DFA32B',
   ochreInk: '#A97C14', // ochre's accent form on paper (contrast)
   brick: '#BF4B2A',
@@ -32,7 +34,7 @@ export const STUDIO = {
 
 export type WorkingTone = 'good' | 'attention' | 'stale' | 'hold' | 'quiet';
 
-export type MarkShape = 'circle' | 'triangle' | 'square' | 'quarter' | 'ring';
+export type MarkShape = 'circle' | 'triangle' | 'square' | 'quarter' | 'diamond' | 'arch' | 'ring';
 
 export type RoomKey = 'desk' | 'portfolio' | 'supply' | 'post' | 'evidence';
 
@@ -60,7 +62,10 @@ export interface RoomConfig {
   /** "R G B" triplet for the --room-on-rgb variable. */
   onRgb: string;
   mark: MarkShape;
+  /** The room's surfaces, most-used first. */
   tabs: RoomTab[];
+  /** Overflow surfaces shown behind a "More…" menu (rare / long-tail). */
+  more?: RoomTab[];
 }
 
 /** "R G B" triplets for the two permitted text colours on saturated blocks. */

@@ -8,7 +8,8 @@ import { useSubscription } from '@/hooks/useSubscription'
 import { RoomBand } from '@/components/studio/room-band'
 import { AskRosaBand } from '@/components/studio/ask-rosa-band'
 import { BandControls } from '@/components/studio/band-controls'
-import { roomForPath } from '@/components/studio/platform-rooms'
+import { roomForPath, tabsForPersona } from '@/components/studio/platform-rooms'
+import { useUserRole } from '@/lib/rosa/useUserRole'
 import { SupplierLayout } from './SupplierLayout'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PaymentWarningBanner } from '@/components/subscription/PaymentWarningBanner'
@@ -92,6 +93,7 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
   const { user, loading: authLoading } = useAuth()
   const { currentOrganization, isLoading: isOrganizationLoading, userRole } = useOrganization()
   const { subscriptionStatus, isLoading: subscriptionLoading } = useSubscription()
+  const { persona } = useUserRole()
   const pathname = usePathname()
 
   const isSupplier = userRole === 'supplier' || user?.user_metadata?.is_supplier === true
@@ -196,6 +198,7 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
   // The --room-* variables drive bg-room / text-room-on / text-room-accent
   // everywhere below (band, tabs, eyebrows, links).
   const room = roomForPath(pathname)
+  const roomTabs = tabsForPersona(room, persona)
   const roomVars = {
     '--room-rgb': room.rgb,
     '--room-accent-rgb': room.accentRgb,
@@ -208,7 +211,7 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
       <div className="flex h-screen overflow-hidden bg-background" style={roomVars}>
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           {/* Band, statement, paper, band: the room band above... */}
-          <RoomBand room={room} endSlot={<BandControls />} className="shrink-0" />
+          <RoomBand room={room} tabs={roomTabs} endSlot={<BandControls />} className="shrink-0" />
 
           <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background">
             <IntegrationHealthBanner />
@@ -228,7 +231,7 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
           </main>
 
           {/* ...and the ink band below: Rosa's permanent home. */}
-          <AskRosaBand tabs={room.tabs} />
+          <AskRosaBand tabs={roomTabs} />
         </div>
 
         {/*

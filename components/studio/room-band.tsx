@@ -6,7 +6,7 @@ import type { RoomConfig, RoomTab } from './theme';
 
 interface RoomBandProps {
   room: RoomConfig;
-  /** Override the room's default tabs (e.g. gated surfaces removed). */
+  /** Override the room's default tabs (e.g. persona-reordered). */
   tabs?: RoomTab[];
   /** Live mono note on the right, e.g. "12 AWAIT APPROVAL". */
   note?: ReactNode;
@@ -56,7 +56,11 @@ export function RoomBand({
             {room.name}
           </span>
         )}
-        <MonoTabs tabs={tabs ?? room.tabs} className="min-w-0 flex-1 overflow-x-auto" />
+        <MonoTabs
+          tabs={tabs ?? room.tabs}
+          more={room.more}
+          className="min-w-0 flex-1 overflow-x-auto"
+        />
         {note ? (
           <span className="hidden shrink-0 font-mono text-[10px] uppercase tracking-[0.2em] opacity-80 md:block">
             {note}

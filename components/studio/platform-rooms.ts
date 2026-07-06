@@ -1,14 +1,19 @@
 /**
  * The platform's house of rooms.
  *
- * Five rooms, one house: Today (forest), the measures (cobalt), the
- * evidence (brick), the post (ochre), the wiring (ink). The desk
- * (/desk) is the hall; every room keeps it one click away, top left.
+ * Seven rooms, one house, ordered by how often you reach for them:
+ *   Today (forest)      · daily: the brief, the pulse
+ *   The workbench (cobalt) · weekly: the data going in
+ *   The cellar (plum)   · weekly: the product footprints being made
+ *   The network (ochre) · the people you talk to
+ *   The evidence (brick)· the outputs you show
+ *   The library (teal)  · the reference you reach for now and then
+ *   The wiring (ink)    · settings, compliance, the rare and the seasonal
  *
- * Room mapping approved by Tim at the M1 review (5 July 2026). Tabs are
- * the room's surfaces; deep sub-navigation stays inside the pages
- * themselves. Tier/milestone gating still happens on the pages (the
- * band does not hide tabs yet; refine after the M2 review).
+ * The desk (/desk) is the hall; every room keeps it one click away, top
+ * left. Frequency defines the rooms (one set for everyone); the persona
+ * only re-weights the desk order and each room's tab order. Room mapping
+ * approved by Tim (6 July 2026).
  */
 
 import { ON_COLOUR_RGB, STUDIO, type RoomConfig } from './theme';
@@ -16,10 +21,15 @@ import { ON_COLOUR_RGB, STUDIO, type RoomConfig } from './theme';
 export type PlatformRoomKey =
   | 'desk'
   | 'today'
-  | 'measures'
+  | 'workbench'
+  | 'cellar'
+  | 'network'
   | 'evidence'
-  | 'post'
+  | 'library'
   | 'wiring';
+
+/** Rosa's coarse persona (see lib/rosa/useUserRole.ts). */
+export type Persona = 'operator' | 'finance' | 'leadership' | 'sustainability' | 'unknown';
 
 export const PLATFORM_ROOMS: Record<PlatformRoomKey, RoomConfig> = {
   desk: {
@@ -51,9 +61,9 @@ export const PLATFORM_ROOMS: Record<PlatformRoomKey, RoomConfig> = {
       { label: 'Targets', href: '/pulse/targets/' },
     ],
   },
-  measures: {
-    key: 'measures',
-    name: 'The measures.',
+  workbench: {
+    key: 'workbench',
+    name: 'The workbench.',
     colour: STUDIO.cobalt,
     rgb: '43 70 192',
     accentOnPaper: STUDIO.cobalt,
@@ -64,11 +74,52 @@ export const PLATFORM_ROOMS: Record<PlatformRoomKey, RoomConfig> = {
     tabs: [
       { label: 'Facilities', href: '/company/facilities/' },
       { label: 'Emissions', href: '/data/scope-1-2/' },
-      { label: 'Suppliers', href: '/suppliers/' },
-      { label: 'Products', href: '/products/' },
-      { label: 'Vitality', href: '/performance/' },
-      { label: 'People', href: '/people-culture/' },
+      { label: 'Spend', href: '/data/spend-data/' },
+      { label: 'Quality', href: '/data/quality/' },
+      { label: 'Sources', href: '/data/sources/' },
     ],
+    more: [
+      { label: 'Inventory', href: '/data/inventory-ledger/' },
+      { label: 'Fleet', href: '/company/fleet/' },
+      { label: 'Vineyards', href: '/vineyards/' },
+      { label: 'Orchards', href: '/orchards/' },
+      { label: 'Arable fields', href: '/arable-fields/' },
+      { label: 'Hospitality', href: '/hospitality/' },
+    ],
+  },
+  cellar: {
+    key: 'cellar',
+    name: 'The cellar.',
+    colour: STUDIO.plum,
+    rgb: '109 58 93',
+    accentOnPaper: STUDIO.plum,
+    accentRgb: '109 58 93',
+    onColour: 'cream',
+    onRgb: ON_COLOUR_RGB.cream,
+    mark: 'diamond', // the bottled facet
+    tabs: [
+      { label: 'Products', href: '/products/' },
+      { label: 'LCAs', href: '/reports/lcas/' },
+      { label: 'Nature', href: '/nature-assessment/' },
+    ],
+  },
+  network: {
+    key: 'network',
+    name: 'The network.',
+    colour: STUDIO.ochre,
+    rgb: '223 163 43',
+    accentOnPaper: STUDIO.ochreInk,
+    accentRgb: '169 124 20',
+    onColour: 'ink', // ochre always takes ink text
+    onRgb: ON_COLOUR_RGB.ink,
+    mark: 'square', // the envelope, tilted
+    tabs: [
+      { label: 'Suppliers', href: '/suppliers/' },
+      { label: 'Messages', href: '/settings/messages/' },
+      { label: 'Experts', href: '/expert-partners/' },
+      { label: 'Support', href: '/settings/feedback/' },
+    ],
+    more: [{ label: 'Responsibility', href: '/supplier-responsibility/' }],
   },
   evidence: {
     key: 'evidence',
@@ -83,26 +134,23 @@ export const PLATFORM_ROOMS: Record<PlatformRoomKey, RoomConfig> = {
     tabs: [
       { label: 'Reports', href: '/reports/' },
       { label: 'Certifications', href: '/certifications/' },
-      { label: 'EPR', href: '/epr/' },
       { label: 'Guardian', href: '/greenwash-guardian/' },
       { label: 'Library', href: '/evidence-library/' },
-      { label: 'Knowledge', href: '/knowledge-bank/' },
     ],
   },
-  post: {
-    key: 'post',
-    name: 'The post.',
-    colour: STUDIO.ochre,
-    rgb: '223 163 43',
-    accentOnPaper: STUDIO.ochreInk,
-    accentRgb: '169 124 20',
-    onColour: 'ink', // ochre always takes ink text
-    onRgb: ON_COLOUR_RGB.ink,
-    mark: 'square', // the envelope, tilted
+  library: {
+    key: 'library',
+    name: 'The library.',
+    colour: STUDIO.teal,
+    rgb: '30 95 91',
+    accentOnPaper: STUDIO.teal,
+    accentRgb: '30 95 91',
+    onColour: 'cream',
+    onRgb: ON_COLOUR_RGB.cream,
+    mark: 'arch', // the doorway
     tabs: [
-      { label: 'Messages', href: '/settings/messages/' },
-      { label: 'Support', href: '/settings/feedback/' },
-      { label: 'Experts', href: '/expert-partners/' },
+      { label: 'Knowledge', href: '/knowledge-bank/' },
+      { label: 'Wiki', href: '/wiki/' },
     ],
   },
   wiring: {
@@ -115,50 +163,68 @@ export const PLATFORM_ROOMS: Record<PlatformRoomKey, RoomConfig> = {
     onColour: 'cream',
     onRgb: ON_COLOUR_RGB.cream,
     mark: 'ring', // the quiet listener
-    tabs: [{ label: 'Settings', href: '/settings/' }],
+    tabs: [
+      { label: 'Settings', href: '/settings/' },
+      { label: 'EPR', href: '/epr/' },
+      { label: 'People', href: '/people-culture/' },
+    ],
+    more: [
+      { label: 'Governance', href: '/governance/' },
+      { label: 'Community', href: '/community-impact/' },
+      { label: 'Vitality weights', href: '/governance/vitality-weights/' },
+      { label: 'Byproducts', href: '/byproducts/' },
+      { label: 'Nature actions', href: '/nature-actions/' },
+    ],
   },
 };
 
 /**
- * Path-prefix → room resolution. Order matters: the post's surfaces live
- * under /settings/, so its specific prefixes are checked before the
- * wiring's catch-all /settings.
+ * Path-prefix → room resolution. Order matters: specific prefixes are
+ * checked before catch-alls (messages/support live under /settings/ but
+ * belong to the network, so they precede the wiring's /settings).
  */
 const ROOM_PREFIXES: Array<[prefix: string, room: PlatformRoomKey]> = [
   // the hall
   ['/desk', 'desk'],
-  // the post (before /settings)
-  ['/settings/messages', 'post'],
-  ['/settings/feedback', 'post'],
-  ['/expert-partners', 'post'],
+  // the network (before /settings and before /suppliers stays here too)
+  ['/settings/messages', 'network'],
+  ['/settings/feedback', 'network'],
+  ['/expert-partners', 'network'],
+  ['/suppliers', 'network'],
+  ['/supplier-responsibility', 'network'],
   // today
   ['/rosa', 'today'],
   ['/pulse', 'today'],
   ['/dashboard', 'today'],
-  // the measures
-  ['/company', 'measures'],
-  ['/data', 'measures'],
-  ['/suppliers', 'measures'],
-  ['/products', 'measures'],
-  ['/performance', 'measures'],
-  ['/people-culture', 'measures'],
-  ['/community-impact', 'measures'],
-  ['/governance', 'measures'],
-  ['/hospitality', 'measures'],
-  ['/vineyards', 'measures'],
-  ['/orchards', 'measures'],
-  ['/arable-fields', 'measures'],
-  ['/nature-assessment', 'measures'],
-  // the evidence
+  // the workbench (data going in)
+  ['/company', 'workbench'],
+  ['/data', 'workbench'],
+  ['/vineyards', 'workbench'],
+  ['/orchards', 'workbench'],
+  ['/arable-fields', 'workbench'],
+  ['/hospitality', 'workbench'],
+  // the cellar (footprints being made)
+  ['/products', 'cellar'],
+  ['/reports/lcas', 'cellar'],
+  ['/nature-assessment', 'cellar'],
+  ['/performance', 'cellar'],
+  // the evidence (before /reports catch nothing else; /reports/lcas already routed above)
   ['/reports', 'evidence'],
   ['/certifications', 'evidence'],
-  ['/epr', 'evidence'],
-  ['/evidence-library', 'evidence'],
   ['/greenwash-guardian', 'evidence'],
-  ['/knowledge-bank', 'evidence'],
-  ['/wiki', 'evidence'],
-  // the wiring
+  ['/evidence-library', 'evidence'],
+  // the library
+  ['/knowledge-bank', 'library'],
+  ['/wiki', 'library'],
+  // the wiring (settings, compliance, the rare)
   ['/settings', 'wiring'],
+  ['/epr', 'wiring'],
+  ['/people-culture', 'wiring'],
+  ['/governance', 'wiring'],
+  ['/community-impact', 'wiring'],
+  ['/byproducts', 'wiring'],
+  ['/nature-actions', 'wiring'],
+  ['/dependencies', 'wiring'],
   ['/admin', 'wiring'],
   ['/dev', 'wiring'],
   ['/create-organization', 'wiring'],
@@ -176,11 +242,62 @@ export function roomForPath(pathname: string | null): RoomConfig {
   return PLATFORM_ROOMS.wiring;
 }
 
-/** The rooms in desk order: four colours, then the wiring in ink. */
-export const DESK_ORDER: PlatformRoomKey[] = [
+/**
+ * The desk's poster-block order, re-weighted by persona so the room a
+ * user lives in leads. The wiring is always the quiet ink block last.
+ * Every persona sees the same rooms, only the order shifts.
+ */
+const CORE_ORDER: PlatformRoomKey[] = [
   'today',
-  'measures',
+  'workbench',
+  'cellar',
+  'network',
   'evidence',
-  'post',
-  'wiring',
+  'library',
 ];
+
+const PERSONA_LEAD: Record<Persona, PlatformRoomKey[]> = {
+  // operators live in data capture
+  operator: ['today', 'workbench', 'cellar', 'network', 'evidence', 'library'],
+  // finance leads with the numbers and the proof
+  finance: ['today', 'evidence', 'cellar', 'workbench', 'network', 'library'],
+  // leadership wants the headline and what we can show
+  leadership: ['today', 'evidence', 'network', 'cellar', 'workbench', 'library'],
+  // sustainability leads build footprints and chase certifications
+  sustainability: ['today', 'cellar', 'evidence', 'workbench', 'network', 'library'],
+  unknown: CORE_ORDER,
+};
+
+export function deskOrderForPersona(persona: Persona | null | undefined): PlatformRoomKey[] {
+  const order = (persona && PERSONA_LEAD[persona]) || CORE_ORDER;
+  return [...order, 'wiring'];
+}
+
+/**
+ * A room's tabs, re-weighted so the persona's daily driver leads. Only
+ * reorders the primary tabs; the `more` overflow is untouched. Rooms
+ * with no persona-relevant reordering return their tabs unchanged.
+ */
+function moveToFront(tabs: RoomConfig['tabs'], hrefs: string[]): RoomConfig['tabs'] {
+  const lead = hrefs
+    .map((h) => tabs.find((t) => t.href === h))
+    .filter((t): t is RoomConfig['tabs'][number] => Boolean(t));
+  if (lead.length === 0) return tabs;
+  const rest = tabs.filter((t) => !lead.includes(t));
+  return [...lead, ...rest];
+}
+
+export function tabsForPersona(
+  room: RoomConfig,
+  persona: Persona | null | undefined,
+): RoomConfig['tabs'] {
+  if (!persona || persona === 'unknown') return room.tabs;
+  // Finance and leadership want the money surface first in Today.
+  if (room.key === 'today' && (persona === 'finance' || persona === 'leadership')) {
+    return moveToFront(room.tabs, ['/pulse/financial/', '/pulse/']);
+  }
+  return room.tabs;
+}
+
+/** The rooms in desk order: the six colours, then the wiring in ink. */
+export const DESK_ORDER: PlatformRoomKey[] = [...CORE_ORDER, 'wiring'];
