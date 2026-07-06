@@ -66,7 +66,7 @@ export async function POST(
       sections: report.sections || [],
       branding: {
         logo: report.logo_url || null,
-        primaryColor: report.primary_color || '#ccff00',
+        primaryColor: report.primary_color || '#205E40',
       },
     });
 

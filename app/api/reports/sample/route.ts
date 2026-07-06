@@ -30,8 +30,8 @@ export async function GET(request: NextRequest) {
     reportYears: [2023, 2024, 2025],
     branding: {
       logo: null,
-      primaryColor: '#ccff00',
-      secondaryColor: '#10b981',
+      primaryColor: '#205E40',
+      secondaryColor: '#2B46C0',
       // Picsum placeholder photos — replace with real uploads in production
       heroImages: [
         'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&q=80',

@@ -54,16 +54,16 @@ export async function POST(request: NextRequest) {
       to: ['hello@alkatera.com'],
       subject: `New Blog Post Published: ${postTitle}`,
       html: `
-        <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #e0e0e0; padding: 40px; border: 1px solid #222;">
-          <div style="border-bottom: 1px solid #333; padding-bottom: 20px; margin-bottom: 30px;">
-            <h1 style="color: #ccff00; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; margin: 0;">New Blog Post Published</h1>
+        <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #F2F1EA; color: #1A1B1D; padding: 40px; border: 1px solid #D9D6CB;">
+          <div style="border-bottom: 1px solid #D9D6CB; padding-bottom: 20px; margin-bottom: 30px;">
+            <h1 style="color: #205E40; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; margin: 0;">New Blog Post Published</h1>
           </div>
-          <h2 style="color: #fff; font-size: 22px; font-family: Georgia, serif; margin: 0 0 16px 0;">${postTitle}</h2>
-          ${postExcerpt ? `<p style="color: #999; font-size: 14px; line-height: 1.8; margin: 0 0 24px 0;">${postExcerpt}</p>` : ''}
+          <h2 style="color: #1A1B1D; font-size: 22px; font-family: Georgia, serif; margin: 0 0 16px 0;">${postTitle}</h2>
+          ${postExcerpt ? `<p style="color: #6F6F68; font-size: 14px; line-height: 1.8; margin: 0 0 24px 0;">${postExcerpt}</p>` : ''}
           <div style="margin: 30px 0; text-align: center;">
-            <a href="${postUrl}" style="display: inline-block; background: #ccff00; color: #000; font-family: 'Courier New', monospace; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 3px; padding: 16px 32px; text-decoration: none;">Read Post</a>
+            <a href="${postUrl}" style="display: inline-block; background: #1A1B1D; color: #F2F1EA; font-family: 'Courier New', monospace; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 3px; padding: 16px 32px; text-decoration: none;">Read Post</a>
           </div>
-          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #333; color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 2px;">
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #D9D6CB; color: #6F6F68; font-size: 10px; text-transform: uppercase; letter-spacing: 2px;">
             Sent via alka<strong>tera</strong> Blog
           </div>
         </div>

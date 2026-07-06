@@ -205,7 +205,7 @@ export default function MethodologyPageContent({ tier }: MethodologyPageContentP
             transition={{ duration: 0.5 }}
           >
             <div className="inline-block bg-brand-accent px-3 py-1 mb-4">
-              <span className="font-mono text-xs font-bold text-black uppercase tracking-widest">
+              <span className="font-mono text-xs font-bold text-[#F2F1EA] uppercase tracking-widest">
                 {config.title} Documentation
               </span>
             </div>

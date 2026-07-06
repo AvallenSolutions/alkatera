@@ -166,7 +166,7 @@ function buildPasswordResetEmail(firstName: string, resetLink: string, siteUrl: 
                   <table width="100%" cellpadding="0" cellspacing="0" style="margin: 30px 0;">
                     <tr>
                       <td align="center">
-                        <a href="${resetLink}" style="display: inline-block; background-color: #ccff00; color: #0a0a0a; padding: 14px 32px; font-size: 16px; font-weight: 600; text-decoration: none; border-radius: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Reset Password</a>
+                        <a href="${resetLink}" style="display: inline-block; background-color: #1A1B1D; color: #F2F1EA; padding: 14px 32px; font-size: 16px; font-weight: 600; text-decoration: none; border-radius: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Reset Password</a>
                       </td>
                     </tr>
                   </table>
@@ -188,7 +188,7 @@ function buildPasswordResetEmail(firstName: string, resetLink: string, siteUrl: 
                 <td style="background-color: #1a1a1a; padding: 30px 40px; border-radius: 0 0 12px 12px; text-align: center;">
                   <p style="margin: 0 0 10px 0; color: #888; font-size: 14px;">alka<strong style="color: #888;">tera</strong> - Sustainability Platform</p>
                   <p style="margin: 0; color: #666; font-size: 12px;">
-                    <a href="${siteUrl}" style="color: #ccff00; text-decoration: none;">www.alkatera.com</a>
+                    <a href="${siteUrl}" style="color: #F2F1EA; text-decoration: none;">www.alkatera.com</a>
                   </p>
                   <p style="margin: 15px 0 0 0; color: #555; font-size: 11px;">
                     This email was sent because a password reset was requested for this email address.<br>

@@ -31,8 +31,8 @@ export function SocialShare({ url, title, description }: SocialShareProps) {
 
   return (
     <div className="flex items-center gap-3">
-      <span className="text-gray-500 font-mono text-xs uppercase tracking-widest">
-        Share:
+      <span className="text-[#6F6F68] font-mono text-[10px] font-bold uppercase tracking-[0.22em]">
+        Share
       </span>
 
       {/* LinkedIn Share */}
@@ -41,11 +41,11 @@ export function SocialShare({ url, title, description }: SocialShareProps) {
         size="sm"
         onClick={shareOnLinkedIn}
         className={cn(
-          'h-9 px-3 gap-2 border border-white/10 hover:border-[#0077b5] hover:bg-[#0077b5]/10 hover:text-[#0077b5] transition-all'
+          'h-9 px-4 gap-2 rounded-full border border-[#D9D6CB] text-[#1A1B1D] hover:border-[#205E40] hover:text-[#205E40] hover:bg-transparent transition-colors'
         )}
       >
         <Linkedin className="w-4 h-4" />
-        <span className="font-mono text-xs uppercase tracking-widest">LinkedIn</span>
+        <span className="font-mono text-xs uppercase tracking-[0.22em]">LinkedIn</span>
       </Button>
 
       {/* Copy Link */}
@@ -54,21 +54,21 @@ export function SocialShare({ url, title, description }: SocialShareProps) {
         size="sm"
         onClick={copyLink}
         className={cn(
-          'h-9 px-3 gap-2 border border-white/10 transition-all',
+          'h-9 px-4 gap-2 rounded-full border transition-colors hover:bg-transparent',
           copied
-            ? 'border-[#ccff00] bg-[#ccff00]/10 text-[#ccff00]'
-            : 'hover:border-[#ccff00] hover:bg-[#ccff00]/10 hover:text-[#ccff00]'
+            ? 'border-[#047857] text-[#047857] hover:text-[#047857]'
+            : 'border-[#D9D6CB] text-[#1A1B1D] hover:border-[#205E40] hover:text-[#205E40]'
         )}
       >
         {copied ? (
           <>
             <Check className="w-4 h-4" />
-            <span className="font-mono text-xs uppercase tracking-widest">Copied!</span>
+            <span className="font-mono text-xs uppercase tracking-[0.22em]">Copied.</span>
           </>
         ) : (
           <>
             <LinkIcon className="w-4 h-4" />
-            <span className="font-mono text-xs uppercase tracking-widest">Copy Link</span>
+            <span className="font-mono text-xs uppercase tracking-[0.22em]">Copy Link</span>
           </>
         )}
       </Button>

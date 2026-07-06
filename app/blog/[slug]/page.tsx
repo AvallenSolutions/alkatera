@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { Navigation } from '@/marketing/components/Navigation';
 import { Footer } from '@/marketing/components/Footer';
-import { Clock, Calendar, User, Tag, ArrowLeft } from 'lucide-react';
+import { Clock, Calendar, User, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { SocialShare } from '@/components/blog/SocialShare';
@@ -170,31 +170,12 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white relative">
+    <div className="min-h-screen bg-[#ECEAE3] text-[#1A1B1D]">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      {/* Fixed background layer */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <img
-          src="/images/forest.jpg"
-          alt=""
-          className="absolute inset-0 w-full h-full object-cover opacity-15 mix-blend-luminosity"
-        />
-        <div className="absolute inset-0 bg-[#050505]/80" />
-        <div className="absolute inset-0 opacity-10"
-          style={{
-            backgroundImage: 'linear-gradient(#333 1px, transparent 1px), linear-gradient(90deg, #333 1px, transparent 1px)',
-            backgroundSize: '80px 80px'
-          }}
-        />
-        {/* Static gradient blobs */}
-        <div className="absolute top-[20%] left-[10%] w-[500px] h-[500px] bg-[#ccff00] rounded-full opacity-[0.07] blur-[100px]" />
-        <div className="absolute bottom-[10%] right-[15%] w-[600px] h-[600px] bg-[#00ccff] rounded-full opacity-[0.07] blur-[100px]" />
-      </div>
 
-      <div className="relative z-10">
       <Navigation />
 
       <main className="pt-32 pb-20">
@@ -202,9 +183,9 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
           {/* Back Link */}
           <Link
             href="/knowledge"
-            className="inline-flex items-center gap-2 text-gray-400 hover:text-[#ccff00] transition-all duration-300 mb-12 font-mono text-sm uppercase tracking-widest group"
+            className="inline-flex items-center gap-2 text-[#6F6F68] hover:text-[#205E40] transition-colors duration-200 mb-12 font-mono text-xs font-bold uppercase tracking-[0.22em]"
           >
-            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform duration-300" />
+            <ArrowLeft className="w-4 h-4" />
             Back to Knowledge Hub
           </Link>
 
@@ -212,13 +193,12 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
           <header className="mb-16 space-y-8">
             {/* Tags */}
             {post.tags.length > 0 && (
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-x-4 gap-y-1">
                 {post.tags.map((tag, i) => (
                   <span
                     key={i}
-                    className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-[#ccff00]/10 border border-[#ccff00]/30 text-[#ccff00] font-mono text-xs uppercase tracking-widest rounded-md hover:bg-[#ccff00]/20 transition-colors duration-300"
+                    className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-[#205E40]"
                   >
-                    <Tag className="w-3 h-3" />
                     {tag}
                   </span>
                 ))}
@@ -226,19 +206,19 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
             )}
 
             {/* Title */}
-            <h1 className="text-5xl md:text-7xl font-serif leading-[1.1] tracking-tight bg-gradient-to-br from-white via-white to-gray-400 bg-clip-text text-transparent">
+            <h1 className="font-display font-bold text-5xl md:text-6xl leading-[0.95] tracking-[-0.035em] text-[#1A1B1D]">
               {post.title}
             </h1>
 
             {/* Excerpt */}
             {post.excerpt && (
-              <p className="text-xl md:text-2xl text-gray-400 leading-relaxed max-w-3xl">
+              <p className="text-xl md:text-2xl text-[#6F6F68] leading-relaxed max-w-3xl">
                 {post.excerpt}
               </p>
             )}
 
             {/* Meta Info */}
-            <div className="flex flex-wrap items-center gap-6 text-sm text-gray-500 font-mono uppercase tracking-widest">
+            <div className="flex flex-wrap items-center gap-6 text-xs text-[#6F6F68] font-mono uppercase tracking-[0.15em]">
               {post.author_name && (
                 <div className="flex items-center gap-2">
                   <User className="w-4 h-4" />
@@ -248,9 +228,9 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
               {publishedDate && (
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4" />
-                  {publishedDate.toLocaleDateString('en-US', {
-                    month: 'long',
+                  {publishedDate.toLocaleDateString('en-GB', {
                     day: 'numeric',
+                    month: 'long',
                     year: 'numeric',
                   })}
                 </div>
@@ -273,14 +253,13 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
 
           {/* Featured Image (only show if not a video post) */}
           {post.featured_image_url && post.content_type !== 'video' && (
-            <div className="mb-16 -mx-6 md:mx-0 group">
-              <div className="relative overflow-hidden rounded-none md:rounded-xl">
+            <div className="mb-16 -mx-6 md:mx-0">
+              <div className="relative overflow-hidden rounded-none md:rounded-[6px] border-y md:border border-[#D9D6CB]">
                 <img
                   src={post.featured_image_url}
                   alt={post.title}
-                  className="w-full h-auto transition-transform duration-700 group-hover:scale-105"
+                  className="w-full h-auto"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent opacity-50"></div>
               </div>
             </div>
           )}
@@ -290,7 +269,7 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
             <div className="mb-16 -mx-6 md:mx-0">
               {getYouTubeEmbedUrl(post.video_url) ? (
                 // YouTube Video
-                <div className="relative w-full pb-[56.25%] rounded-none md:rounded-xl overflow-hidden shadow-2xl border border-white/5">
+                <div className="relative w-full pb-[56.25%] rounded-none md:rounded-[6px] overflow-hidden border-y md:border border-[#D9D6CB]">
                   <iframe
                     src={getYouTubeEmbedUrl(post.video_url)!}
                     title={post.title}
@@ -303,7 +282,7 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
                 // Direct Video File
                 <video
                   controls
-                  className="w-full h-auto rounded-none md:rounded-xl bg-black shadow-2xl border border-white/5"
+                  className="w-full h-auto rounded-none md:rounded-[6px] bg-[#1A1B1D] border-y md:border border-[#D9D6CB]"
                   poster={post.featured_image_url}
                 >
                   <source src={post.video_url} type="video/mp4" />
@@ -318,22 +297,22 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
           {/* Content */}
           {post.content && (
             <div
-              className="prose prose-invert prose-lg md:prose-xl max-w-none
-                prose-headings:font-serif prose-headings:text-white prose-headings:tracking-tight
+              className="prose prose-lg md:prose-xl max-w-none
+                prose-headings:font-display prose-headings:font-bold prose-headings:text-[#1A1B1D] prose-headings:tracking-tight
                 prose-h1:text-5xl prose-h1:leading-tight prose-h1:mb-6 prose-h1:mt-12
                 prose-h2:text-4xl prose-h2:leading-tight prose-h2:mb-4 prose-h2:mt-10
                 prose-h3:text-3xl prose-h3:leading-snug prose-h3:mb-3 prose-h3:mt-8
-                prose-p:text-gray-300 prose-p:leading-relaxed prose-p:mb-6
-                prose-a:text-[#ccff00] prose-a:no-underline prose-a:font-medium hover:prose-a:underline prose-a:transition-all
-                prose-strong:text-white prose-strong:font-semibold
-                prose-em:text-gray-200 prose-em:italic
-                prose-code:text-[#ccff00] prose-code:bg-[#ccff00]/10 prose-code:px-2 prose-code:py-1 prose-code:rounded prose-code:font-mono prose-code:text-base
-                prose-pre:bg-black/50 prose-pre:border prose-pre:border-white/10 prose-pre:rounded-xl prose-pre:p-6
-                prose-blockquote:border-l-4 prose-blockquote:border-l-[#ccff00] prose-blockquote:text-gray-300 prose-blockquote:italic prose-blockquote:pl-6 prose-blockquote:py-2
-                prose-img:rounded-xl prose-img:w-full prose-img:shadow-2xl prose-img:border prose-img:border-white/5
-                prose-ul:text-gray-300 prose-ul:space-y-2 prose-ol:text-gray-300 prose-ol:space-y-2
-                prose-li:marker:text-[#ccff00] prose-li:leading-relaxed
-                prose-hr:border-white/10 prose-hr:my-12
+                prose-p:text-[#1A1B1D] prose-p:leading-relaxed prose-p:mb-6
+                prose-a:text-[#205E40] prose-a:no-underline prose-a:font-medium hover:prose-a:underline prose-a:transition-all
+                prose-strong:text-[#1A1B1D] prose-strong:font-semibold
+                prose-em:text-[#1A1B1D] prose-em:italic
+                prose-code:text-[#205E40] prose-code:bg-[#F2F1EA] prose-code:px-2 prose-code:py-1 prose-code:rounded prose-code:font-mono prose-code:text-base
+                prose-pre:bg-[#F2F1EA] prose-pre:border prose-pre:border-[#D9D6CB] prose-pre:rounded-[6px] prose-pre:p-6 prose-pre:text-[#1A1B1D]
+                prose-blockquote:border-l-4 prose-blockquote:border-l-[#205E40] prose-blockquote:text-[#6F6F68] prose-blockquote:italic prose-blockquote:pl-6 prose-blockquote:py-2
+                prose-img:rounded-[6px] prose-img:w-full prose-img:border prose-img:border-[#D9D6CB]
+                prose-ul:text-[#1A1B1D] prose-ul:space-y-2 prose-ol:text-[#1A1B1D] prose-ol:space-y-2
+                prose-li:marker:text-[#205E40] prose-li:leading-relaxed
+                prose-hr:border-[#D9D6CB] prose-hr:my-12
                 first:prose-p:text-xl first:prose-p:leading-relaxed"
               dangerouslySetInnerHTML={{ __html: sanitizeHtml(post.content, {
                 allowedTags: sanitizeHtml.defaults.allowedTags.concat(['img', 'iframe', 'video', 'source', 'h1', 'h2']),
@@ -355,7 +334,7 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
           )}
 
           {/* Footer Tags & Share */}
-          <footer className="mt-20 pt-10 border-t border-white/10 space-y-8">
+          <footer className="mt-20 pt-10 border-t border-[#D9D6CB] space-y-8">
             {/* Social Share */}
             <div className="flex justify-center">
               <SocialShare
@@ -367,14 +346,14 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
 
             {/* Tags */}
             {post.tags.length > 0 && (
-              <div className="flex flex-wrap items-center justify-center gap-3 pb-4">
-                <span className="text-gray-500 font-mono text-xs uppercase tracking-widest">
-                  Tagged:
+              <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 pb-4">
+                <span className="text-[#6F6F68] font-mono text-[10px] font-bold uppercase tracking-[0.22em]">
+                  Tagged
                 </span>
                 {post.tags.map((tag, i) => (
                   <span
                     key={i}
-                    className="px-4 py-2 bg-white/5 border border-white/10 text-gray-400 font-mono text-xs uppercase tracking-widest rounded-md hover:border-[#ccff00] hover:text-[#ccff00] hover:bg-[#ccff00]/5 transition-all duration-300 cursor-pointer"
+                    className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-[#205E40]"
                   >
                     {tag}
                   </span>
@@ -386,19 +365,6 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
       </main>
 
       <Footer />
-
-      {/* Photo credit */}
-      <div className="text-center text-[10px] text-white/20 py-4">
-        Photo by{' '}
-        <a href="https://unsplash.com/@zmachacek" target="_blank" rel="noopener noreferrer" className="underline hover:text-white/40">
-          Zden&#283;k Mach&#225;&#269;ek
-        </a>
-        {' '}on{' '}
-        <a href="https://unsplash.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-white/40">
-          Unsplash
-        </a>
-      </div>
-      </div>
     </div>
   );
 }

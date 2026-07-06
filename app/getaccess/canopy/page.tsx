@@ -7,7 +7,6 @@ import { useOrganization } from '@/lib/organizationContext'
 import { useAuth } from '@/hooks/useAuth'
 import { PRODUCT_TYPE_OPTIONS } from '@/lib/industry-benchmarks'
 import {
-  Loader2,
   CheckCircle2,
   TreeDeciduous,
   Building2,
@@ -19,7 +18,6 @@ import {
   Check,
 } from 'lucide-react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 
@@ -42,6 +40,12 @@ const STEPS: { key: Step; label: string; icon: typeof User }[] = [
   { key: 'organization', label: 'Organisation', icon: Building2 },
   { key: 'payment', label: 'Payment', icon: CreditCard },
 ]
+
+const inputClass =
+  'w-full px-4 py-3 bg-[#ECEAE3] border border-[#D9D6CB] rounded-[6px] text-[#1A1B1D] placeholder:text-[#6F6F68]/60 focus:outline-none focus:ring-2 focus:ring-[#1A1B1D]/20 focus:border-[#1A1B1D] transition-colors disabled:opacity-50'
+
+const primaryButtonClass =
+  'w-full py-4 bg-[#1A1B1D] text-[#F2F1EA] font-mono uppercase text-xs tracking-[0.22em] font-bold rounded-full hover:bg-black transition-colors duration-200 disabled:opacity-50'
 
 function CanopyOnboardingContent() {
   const router = useRouter()
@@ -276,27 +280,24 @@ function CanopyOnboardingContent() {
   // --- Payment success screen ---
   if (isPaymentSuccess) {
     return (
-      <div className="relative min-h-screen">
-        <Image src="/images/starry-night-bg.jpg" alt="" fill className="object-cover" priority quality={85} />
-        <div className="absolute inset-0 bg-black/60" />
+      <div className="relative min-h-screen bg-[#ECEAE3] text-[#1A1B1D]">
         <div className="relative z-10 min-h-screen flex items-center justify-center">
           <div className="flex flex-col items-center gap-6 text-center px-4">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-[#ccff00]/20">
-              <CheckCircle2 className="h-10 w-10 text-[#ccff00]" />
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-[#205E40]/10">
+              <CheckCircle2 className="h-10 w-10 text-[#047857]" />
             </div>
-            <h1 className="text-3xl font-bold text-white">Welcome to Canopy!</h1>
-            <p className="text-lg text-slate-300 max-w-md">
-              Setting up your Canopy subscription...
+            <h1 className="font-display font-bold text-3xl tracking-tight text-[#1A1B1D]">Welcome to Canopy.</h1>
+            <p className="text-lg text-[#6F6F68] max-w-md">
+              Setting up your Canopy subscription…
             </p>
-            <Loader2 className="h-8 w-8 animate-spin text-[#ccff00]" />
-            <p className="text-sm text-slate-500">This should only take a moment.</p>
+            <p className="text-sm text-[#6F6F68]">This should only take a moment.</p>
             {showContinueButton && (
               <button
                 onClick={async () => {
                   if (mutate) await mutate()
                   router.push('/dashboard')
                 }}
-                className="mt-4 px-8 py-3 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:opacity-90 transition-all"
+                className="mt-4 px-8 py-3 bg-[#1A1B1D] text-[#F2F1EA] font-mono uppercase text-xs tracking-[0.22em] font-bold rounded-full hover:bg-black transition-colors"
               >
                 Continue to Dashboard
               </button>
@@ -311,26 +312,20 @@ function CanopyOnboardingContent() {
   const stepIndex = STEPS.findIndex(s => s.key === currentStep)
 
   return (
-    <div className="relative min-h-screen text-white flex flex-col items-center justify-center px-4 py-12">
-      <Image src="/images/starry-night-bg2.jpg" alt="" fill className="object-cover" priority quality={85} />
-      <div className="absolute inset-0 bg-black/70" />
-
+    <div className="relative min-h-screen bg-[#ECEAE3] text-[#1A1B1D] flex flex-col items-center justify-center px-4 py-12">
       <div className="relative z-10 w-full max-w-lg space-y-6">
-        {/* Logo */}
+        {/* Wordmark */}
         <Link href="/" className="flex justify-center">
-          <img
-            src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png"
-            alt="alkatera"
-            className="h-10 md:h-14 w-auto object-contain mix-blend-screen brightness-125 contrast-150"
-            style={{ mixBlendMode: 'screen' }}
-          />
+          <span className="font-display text-2xl tracking-tight text-[#1A1B1D]">
+            alka<strong className="font-bold">tera</strong>
+          </span>
         </Link>
 
-        {/* Canopy badge */}
+        {/* Canopy eyebrow */}
         <div className="flex justify-center">
-          <div className="inline-flex items-center gap-2 px-5 py-2 border border-[#ccff00]/30 bg-[#ccff00]/5 rounded-full">
-            <TreeDeciduous className="h-4 w-4 text-[#ccff00]" />
-            <span className="font-mono text-[#ccff00] text-xs tracking-widest uppercase">
+          <div className="inline-flex items-center gap-2">
+            <TreeDeciduous className="h-4 w-4 text-[#205E40]" />
+            <span className="font-mono font-bold text-[#205E40] text-[10px] tracking-[0.22em] uppercase">
               Canopy Plan
             </span>
           </div>
@@ -346,25 +341,25 @@ function CanopyOnboardingContent() {
             return (
               <div key={step.key} className="flex items-center gap-2">
                 {idx > 0 && (
-                  <div className={cn('w-8 h-px', isCompleted ? 'bg-[#ccff00]' : 'bg-white/20')} />
+                  <div className={cn('w-8 h-px', isCompleted ? 'bg-[#205E40]' : 'bg-[#D9D6CB]')} />
                 )}
                 <div className="flex items-center gap-1.5">
                   <div
                     className={cn(
-                      'w-7 h-7 rounded-full flex items-center justify-center text-xs transition-all',
+                      'w-7 h-7 rounded-full flex items-center justify-center text-xs transition-colors',
                       isCompleted
-                        ? 'bg-[#ccff00] text-black'
+                        ? 'bg-[#205E40] text-[#F2F1EA]'
                         : isCurrent
-                          ? 'border-2 border-[#ccff00] text-[#ccff00]'
-                          : 'border border-white/20 text-white/30'
+                          ? 'border-2 border-[#205E40] text-[#205E40]'
+                          : 'border border-[#D9D6CB] text-[#6F6F68]'
                     )}
                   >
                     {isCompleted ? <Check className="h-3.5 w-3.5" /> : <StepIcon className="h-3.5 w-3.5" />}
                   </div>
                   <span
                     className={cn(
-                      'text-xs font-mono uppercase tracking-wider hidden sm:inline',
-                      isCurrent ? 'text-[#ccff00]' : isCompleted ? 'text-white/60' : 'text-white/30'
+                      'text-xs font-mono uppercase tracking-[0.15em] hidden sm:inline',
+                      isCurrent ? 'text-[#205E40] font-bold' : isCompleted ? 'text-[#1A1B1D]' : 'text-[#6F6F68]'
                     )}
                   >
                     {step.label}
@@ -375,13 +370,13 @@ function CanopyOnboardingContent() {
           })}
         </div>
 
-        {/* Main card */}
-        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-8 space-y-6">
+        {/* Main card: cream, hairline, radius 6 */}
+        <div className="bg-[#F2F1EA] border border-[#D9D6CB] rounded-[6px] p-8 space-y-6">
           {/* Error */}
           {error && (
-            <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
-              <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-300">{error}</p>
+            <div className="flex items-start gap-3 p-4 bg-[#ECEAE3] border border-[#D9D6CB] rounded-[6px]">
+              <AlertCircle className="h-5 w-5 text-[#BE123C] flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-[#BE123C]">{error}</p>
             </div>
           )}
 
@@ -389,13 +384,13 @@ function CanopyOnboardingContent() {
           {currentStep === 'account' && (
             <>
               <div className="text-center space-y-2">
-                <h2 className="font-serif text-xl text-white">Create Your Account</h2>
-                <p className="text-white/50 text-sm">Step 1 of 3: Set up your login credentials</p>
+                <h2 className="font-display font-bold text-xl tracking-tight text-[#1A1B1D]">Create your account.</h2>
+                <p className="text-[#6F6F68] text-sm">Step 1 of 3: set up your login credentials</p>
               </div>
 
               <form onSubmit={handleCreateAccount} className="space-y-4">
                 <div className="space-y-2">
-                  <label htmlFor="fullName" className="block text-sm font-medium text-white/60">Full Name</label>
+                  <label htmlFor="fullName" className="block text-sm font-medium text-[#1A1B1D]">Full Name</label>
                   <input
                     id="fullName"
                     type="text"
@@ -404,12 +399,12 @@ function CanopyOnboardingContent() {
                     onChange={(e) => setFullName(e.target.value)}
                     disabled={isLoading}
                     required
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#ccff00]/50 focus:border-[#ccff00]/30 transition-all disabled:opacity-50"
+                    className={inputClass}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label htmlFor="email" className="block text-sm font-medium text-white/60">Email Address</label>
+                  <label htmlFor="email" className="block text-sm font-medium text-[#1A1B1D]">Email Address</label>
                   <input
                     id="email"
                     type="email"
@@ -418,12 +413,12 @@ function CanopyOnboardingContent() {
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={isLoading}
                     required
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#ccff00]/50 focus:border-[#ccff00]/30 transition-all disabled:opacity-50"
+                    className={inputClass}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label htmlFor="password" className="block text-sm font-medium text-white/60">Password</label>
+                  <label htmlFor="password" className="block text-sm font-medium text-[#1A1B1D]">Password</label>
                   <div className="relative">
                     <input
                       id="password"
@@ -433,21 +428,21 @@ function CanopyOnboardingContent() {
                       onChange={(e) => setPassword(e.target.value)}
                       disabled={isLoading}
                       required
-                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#ccff00]/50 focus:border-[#ccff00]/30 transition-all disabled:opacity-50 pr-12"
+                      className={cn(inputClass, 'pr-12')}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6F6F68] hover:text-[#1A1B1D] transition-colors"
                     >
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
-                  <p className="text-xs text-white/30">Min 8 chars with uppercase, lowercase, and number</p>
+                  <p className="text-xs text-[#6F6F68]">Min 8 chars with uppercase, lowercase, and number</p>
                 </div>
 
                 <div className="space-y-2">
-                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-white/60">Confirm Password</label>
+                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-[#1A1B1D]">Confirm Password</label>
                   <div className="relative">
                     <input
                       id="confirmPassword"
@@ -457,12 +452,12 @@ function CanopyOnboardingContent() {
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       disabled={isLoading}
                       required
-                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#ccff00]/50 focus:border-[#ccff00]/30 transition-all disabled:opacity-50 pr-12"
+                      className={cn(inputClass, 'pr-12')}
                     />
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6F6F68] hover:text-[#1A1B1D] transition-colors"
                     >
                       {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
@@ -472,22 +467,15 @@ function CanopyOnboardingContent() {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full py-4 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:opacity-90 hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 disabled:hover:scale-100"
+                  className={primaryButtonClass}
                 >
-                  {isLoading ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Creating account...
-                    </span>
-                  ) : (
-                    'Continue'
-                  )}
+                  {isLoading ? 'Creating account…' : 'Continue'}
                 </button>
               </form>
 
-              <div className="text-center text-sm text-white/40">
+              <div className="text-center text-sm text-[#6F6F68]">
                 Already have an account?{' '}
-                <Link href="/login" className="text-[#ccff00] hover:underline">Sign in</Link>
+                <Link href="/login" className="text-[#205E40] hover:underline">Sign in</Link>
               </div>
             </>
           )}
@@ -496,16 +484,16 @@ function CanopyOnboardingContent() {
           {currentStep === 'organization' && (
             <>
               <div className="text-center space-y-2">
-                <div className="mx-auto w-14 h-14 bg-[#ccff00]/15 rounded-2xl flex items-center justify-center mb-2">
-                  <Building2 className="w-7 h-7 text-[#ccff00]" />
+                <div className="mx-auto w-14 h-14 bg-[#205E40]/10 rounded-[6px] flex items-center justify-center mb-2">
+                  <Building2 className="w-7 h-7 text-[#205E40]" />
                 </div>
-                <h2 className="font-serif text-xl text-white">Set Up Your Organisation</h2>
-                <p className="text-white/50 text-sm">Step 2 of 3: Tell us about your company</p>
+                <h2 className="font-display font-bold text-xl tracking-tight text-[#1A1B1D]">Set up your organisation.</h2>
+                <p className="text-[#6F6F68] text-sm">Step 2 of 3: tell us about your company</p>
               </div>
 
               <form onSubmit={handleCreateOrganization} className="space-y-5">
                 <div className="space-y-2">
-                  <label htmlFor="orgName" className="block text-sm font-medium text-white/60">Company Name</label>
+                  <label htmlFor="orgName" className="block text-sm font-medium text-[#1A1B1D]">Company Name</label>
                   <input
                     id="orgName"
                     type="text"
@@ -514,12 +502,12 @@ function CanopyOnboardingContent() {
                     onChange={(e) => setOrgName(e.target.value)}
                     disabled={isLoading}
                     required
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#ccff00]/50 focus:border-[#ccff00]/30 transition-all disabled:opacity-50"
+                    className={inputClass}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label htmlFor="productType" className="block text-sm font-medium text-white/60">
+                  <label htmlFor="productType" className="block text-sm font-medium text-[#1A1B1D]">
                     What type of products do you primarily produce?
                   </label>
                   <select
@@ -527,16 +515,16 @@ function CanopyOnboardingContent() {
                     value={productType}
                     onChange={(e) => setProductType(e.target.value)}
                     disabled={isLoading}
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#ccff00]/50 focus:border-[#ccff00]/30 transition-all disabled:opacity-50 appearance-none"
+                    className={cn(inputClass, 'appearance-none')}
                   >
-                    <option value="" className="bg-slate-900">Select product type</option>
+                    <option value="">Select product type</option>
                     {PRODUCT_TYPE_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value} className="bg-slate-900">
+                      <option key={opt.value} value={opt.value}>
                         {opt.label}
                       </option>
                     ))}
                   </select>
-                  <p className="text-xs text-white/30">
+                  <p className="text-xs text-[#6F6F68]">
                     This determines the industry benchmarks for your sustainability score. You can change this later.
                   </p>
                 </div>
@@ -544,16 +532,9 @@ function CanopyOnboardingContent() {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full py-4 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:opacity-90 hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 disabled:hover:scale-100"
+                  className={primaryButtonClass}
                 >
-                  {isLoading ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Creating organisation...
-                    </span>
-                  ) : (
-                    'Continue'
-                  )}
+                  {isLoading ? 'Creating organisation…' : 'Continue'}
                 </button>
               </form>
             </>
@@ -563,29 +544,27 @@ function CanopyOnboardingContent() {
           {currentStep === 'payment' && (
             <>
               <div className="text-center space-y-2">
-                <h2 className="font-serif text-xl text-white">Complete Your Subscription</h2>
-                <p className="text-white/50 text-sm">Step 3 of 3: Start your Canopy plan</p>
+                <h2 className="font-display font-bold text-xl tracking-tight text-[#1A1B1D]">Complete your subscription.</h2>
+                <p className="text-[#6F6F68] text-sm">Step 3 of 3: start your Canopy plan</p>
               </div>
 
-              {/* Canopy summary */}
-              <div className="border border-[#ccff00]/20 bg-[#ccff00]/5 rounded-xl p-5 space-y-4">
+              {/* Canopy summary: the one saturated block */}
+              <div className="bg-[#205E40] text-[#F2F1EA] rounded-[6px] p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <TreeDeciduous className="h-5 w-5 text-[#ccff00]" />
-                    <span className="font-serif text-lg text-white">Canopy</span>
+                    <TreeDeciduous className="h-5 w-5 text-[#F2F1EA]/80" />
+                    <span className="font-display font-bold text-lg tracking-tight">Canopy</span>
                   </div>
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#ccff00]/10 rounded-full">
-                    <span className="font-mono text-[#ccff00] text-[10px] tracking-wider uppercase font-bold">
-                      Founding Partner
-                    </span>
-                  </div>
+                  <span className="font-mono text-[#F2F1EA]/80 text-[10px] tracking-[0.2em] uppercase font-bold">
+                    Founding Partner
+                  </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
                   {CANOPY_FEATURES.map((feat, i) => (
                     <div key={i} className="flex items-start gap-2">
-                      <div className="w-1 h-1 rounded-full bg-[#ccff00] mt-1.5 shrink-0" />
-                      <span className="text-xs text-white/60 leading-relaxed">{feat}</span>
+                      <div className="w-1 h-1 rounded-full bg-[#F2F1EA]/70 mt-1.5 shrink-0" />
+                      <span className="text-xs text-[#F2F1EA]/90 leading-relaxed">{feat}</span>
                     </div>
                   ))}
                 </div>
@@ -593,15 +572,15 @@ function CanopyOnboardingContent() {
 
               {/* Billing toggle */}
               <div className="space-y-3">
-                <p className="text-sm text-white/60 text-center">Choose your billing cycle</p>
+                <p className="text-sm text-[#6F6F68] text-center">Choose your billing cycle</p>
                 <div className="flex items-center justify-center gap-3">
                   <button
                     onClick={() => setBillingInterval('monthly')}
                     className={cn(
-                      'font-mono text-xs uppercase tracking-widest px-5 py-2.5 rounded-full transition-all',
+                      'font-mono text-xs uppercase tracking-[0.22em] px-5 py-2.5 rounded-full transition-colors',
                       billingInterval === 'monthly'
-                        ? 'bg-[#ccff00] text-black font-bold'
-                        : 'border border-white/20 text-white/50 hover:text-white hover:border-white/40'
+                        ? 'bg-[#1A1B1D] text-[#F2F1EA] font-bold'
+                        : 'border border-[#D9D6CB] text-[#6F6F68] hover:text-[#1A1B1D] hover:border-[#1A1B1D]'
                     )}
                   >
                     Monthly
@@ -609,10 +588,10 @@ function CanopyOnboardingContent() {
                   <button
                     onClick={() => setBillingInterval('annual')}
                     className={cn(
-                      'font-mono text-xs uppercase tracking-widest px-5 py-2.5 rounded-full transition-all',
+                      'font-mono text-xs uppercase tracking-[0.22em] px-5 py-2.5 rounded-full transition-colors',
                       billingInterval === 'annual'
-                        ? 'bg-[#ccff00] text-black font-bold'
-                        : 'border border-white/20 text-white/50 hover:text-white hover:border-white/40'
+                        ? 'bg-[#1A1B1D] text-[#F2F1EA] font-bold'
+                        : 'border border-[#D9D6CB] text-[#6F6F68] hover:text-[#1A1B1D] hover:border-[#1A1B1D]'
                     )}
                   >
                     Annual
@@ -623,16 +602,16 @@ function CanopyOnboardingContent() {
               {/* Price */}
               <div className="text-center space-y-1">
                 <div className="flex items-baseline justify-center gap-2">
-                  <span className="text-white/40 text-lg line-through font-serif">
+                  <span className="text-[#6F6F68] text-lg line-through font-display">
                     £{billingInterval === 'monthly' ? '899' : '8,990'}
                   </span>
-                  <span className="font-serif text-4xl text-[#ccff00]">
+                  <span className="font-display font-bold text-4xl tabular-nums text-[#1A1B1D]">
                     £{billingInterval === 'monthly' ? '599' : '5,990'}
                   </span>
-                  <span className="text-white/40 text-sm">/{billingInterval === 'monthly' ? 'mo' : 'yr'}</span>
+                  <span className="text-[#6F6F68] text-sm">/{billingInterval === 'monthly' ? 'mo' : 'yr'}</span>
                 </div>
                 {billingInterval === 'annual' && (
-                  <p className="text-xs text-[#ccff00]/70">Save £1,198/yr, that&apos;s 2 months free</p>
+                  <p className="text-xs font-mono font-bold uppercase tracking-[0.15em] text-[#047857]">Save £1,198/yr, that&apos;s 2 months free</p>
                 )}
               </div>
 
@@ -640,19 +619,14 @@ function CanopyOnboardingContent() {
               <button
                 onClick={handleStartCheckout}
                 disabled={isLoading}
-                className="w-full py-5 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:opacity-90 hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 disabled:hover:scale-100"
+                className="w-full py-5 bg-[#1A1B1D] text-[#F2F1EA] font-mono uppercase text-xs tracking-[0.22em] font-bold rounded-full hover:bg-black transition-colors duration-200 disabled:opacity-50"
               >
-                {isLoading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Redirecting to checkout...
-                  </span>
-                ) : (
-                  `Subscribe £${billingInterval === 'monthly' ? '599/mo' : '5,990/yr'}`
-                )}
+                {isLoading
+                  ? 'Redirecting to checkout…'
+                  : `Subscribe £${billingInterval === 'monthly' ? '599/mo' : '5,990/yr'}`}
               </button>
 
-              <p className="text-center text-xs text-white/30">
+              <p className="text-center text-xs text-[#6F6F68]">
                 14-day money-back guarantee. Cancel anytime.
               </p>
             </>
@@ -660,9 +634,9 @@ function CanopyOnboardingContent() {
         </div>
 
         {/* Footer */}
-        <div className="text-center text-sm text-white/30">
+        <div className="text-center text-sm text-[#6F6F68]">
           Questions?{' '}
-          <a href="/contact" className="text-[#ccff00] hover:underline">Contact our team</a>
+          <a href="/contact" className="text-[#205E40] hover:underline">Contact our team</a>
         </div>
       </div>
     </div>
@@ -673,11 +647,8 @@ export default function CanopyOnboardingPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-slate-950">
-          <div className="flex flex-col items-center gap-4">
-            <Loader2 className="h-12 w-12 animate-spin text-[#ccff00]" />
-            <p className="text-sm text-slate-400">Loading...</p>
-          </div>
+        <div className="min-h-screen flex items-center justify-center bg-[#ECEAE3]">
+          <p className="text-sm text-[#6F6F68]">Loading…</p>
         </div>
       }
     >

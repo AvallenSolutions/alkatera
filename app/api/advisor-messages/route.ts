@@ -362,13 +362,13 @@ async function sendAdvisorMessageEmail(
 
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="background: linear-gradient(135deg, #1a1a2e, #0a0a0a); padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
-        <h2 style="color: #ccff00; margin: 0; font-size: 18px;">New Message</h2>
+      <div style="background: #1A1B1D; padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
+        <h2 style="color: #F2F1EA; margin: 0; font-size: 18px;">New Message</h2>
       </div>
-      <div style="background: #f9fafb; padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
-        <p style="color: #374151; margin: 0 0 8px;"><strong>${senderName}</strong> sent a message${conv.subject ? ' regarding "' + conv.subject + '"' : ''}:</p>
-        <blockquote style="border-left: 4px solid #ccff00; padding-left: 16px; margin: 16px 0; color: #4b5563;">${messagePreview}</blockquote>
-        <a href="${messagesUrl}" style="display: inline-block; background: #ccff00; color: #000; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-top: 8px;">View Conversation</a>
+      <div style="background: #F2F1EA; padding: 24px; border: 1px solid #D9D6CB; border-top: none; border-radius: 0 0 12px 12px;">
+        <p style="color: #1A1B1D; margin: 0 0 8px;"><strong>${senderName}</strong> sent a message${conv.subject ? ' regarding "' + conv.subject + '"' : ''}:</p>
+        <blockquote style="border-left: 4px solid #205E40; padding-left: 16px; margin: 16px 0; color: #6F6F68;">${messagePreview}</blockquote>
+        <a href="${messagesUrl}" style="display: inline-block; background: #1A1B1D; color: #F2F1EA; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-top: 8px;">View Conversation</a>
       </div>
       <div style="text-align: center; color: #9ca3af; font-size: 12px; margin-top: 16px;">
         <p>alka<strong>tera</strong> - Sustainability Platform</p>

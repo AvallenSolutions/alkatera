@@ -10,7 +10,7 @@ function SubSectionHeading({ children, icon: Icon }: { children: React.ReactNode
   return (
     <div className="flex items-center gap-3 mb-6">
       <div className="p-2 bg-white/10 rounded-lg">
-        <Icon className="w-5 h-5 text-brand-accent" />
+        <Icon className="w-5 h-5 text-[#F2F1EA]" />
       </div>
       <h3 className="font-serif text-2xl text-white">{children}</h3>
     </div>
@@ -49,7 +49,7 @@ function CarbonFootprintSection({ data, showBreakdown, showBenchmark, showLandUs
             Total Carbon Footprint
           </div>
           <div className="flex items-baseline gap-2 mb-6">
-            <span className="font-serif text-6xl text-brand-accent">
+            <span className="font-serif text-6xl text-[#F2F1EA]">
               {data.totalCarbon.toFixed(2)}
             </span>
             <span className="font-serif text-xl text-stone-400">{data.unit}</span>
@@ -61,7 +61,7 @@ function CarbonFootprintSection({ data, showBreakdown, showBenchmark, showLandUs
                 <span className="text-xs font-mono text-lime-300 uppercase tracking-wider">
                   vs. {data.comparison.benchmarkName}
                 </span>
-                <span className="text-xl font-bold text-brand-accent">
+                <span className="text-xl font-bold text-[#F2F1EA]">
                   -{data.comparison.reductionPercentage}%
                 </span>
               </div>
@@ -142,7 +142,7 @@ function CarbonFootprintSection({ data, showBreakdown, showBenchmark, showLandUs
               <div className="text-lg font-semibold text-white">
                 {item.absoluteValue.toFixed(3)} {data.unit}
               </div>
-              <div className="text-sm text-brand-accent font-mono">
+              <div className="text-sm text-[#F2F1EA] font-mono">
                 {item.value}%
               </div>
               <p className="text-xs text-stone-500 mt-1 line-clamp-2">
@@ -479,7 +479,7 @@ function ImpactAtAGlance({ data, visibility, functionalUnit }: ImpactAtAGlancePr
               transition={{ delay: index * 0.1 }}
               className="bg-white/5 border border-white/10 rounded-xl p-6 text-center"
             >
-              <Icon className="text-brand-accent w-6 h-6 mx-auto mb-3" />
+              <Icon className="text-[#F2F1EA] w-6 h-6 mx-auto mb-3" />
               <p className="font-mono text-xs text-stone-400 uppercase tracking-widest mb-2">
                 {card.label}
               </p>

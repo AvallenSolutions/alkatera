@@ -4,7 +4,6 @@ import { useSearchParams } from 'next/navigation'
 import { SignupForm } from '@/components/auth/SignupForm'
 import { Suspense } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 
 function SignupContent() {
   const searchParams = useSearchParams()
@@ -12,54 +11,37 @@ function SignupContent() {
   const isTrial = searchParams.get('trial') === 'true'
 
   return (
-    <div className="relative min-h-screen text-white flex flex-col items-center justify-center px-4 py-12">
-      {/* Background Image */}
-      <Image
-        src="/images/starry-night-bg2.jpg"
-        alt="Starry night sky"
-        fill
-        className="object-cover"
-        priority
-        quality={85}
-      />
-      {/* Dark overlay */}
-      <div className="absolute inset-0 bg-black/70" />
-
+    <div className="relative min-h-screen bg-[#ECEAE3] text-[#1A1B1D] flex flex-col items-center justify-center px-4 py-12">
       {/* Content */}
       <div className="relative z-10 w-full max-w-md space-y-6">
-        {/* Logo */}
+        {/* Wordmark */}
         <Link href="/" className="flex justify-center">
-          <img
-            src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png"
-            alt="alkatera"
-            className="h-10 md:h-14 w-auto object-contain mix-blend-screen brightness-125 contrast-150"
-            style={{ mixBlendMode: 'screen' }}
-          />
+          <span className="font-display text-2xl tracking-tight text-[#1A1B1D]">
+            alka<strong className="font-bold">tera</strong>
+          </span>
         </Link>
 
-        {/* Glassmorphism Card */}
-        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-8 space-y-6">
+        {/* Panel: cream, hairline, radius 6 */}
+        <div className="bg-[#F2F1EA] border border-[#D9D6CB] rounded-[6px] p-8 space-y-6">
           {/* Header */}
           <div className="text-center space-y-3">
             {(tier || isTrial) && (
               <div className="flex justify-center">
-                <div className="inline-flex items-center gap-2 px-4 py-2 border border-[#ccff00]/30 bg-[#ccff00]/5 rounded-full">
-                  <span className="font-mono text-[#ccff00] text-xs tracking-widest uppercase">
-                    {isTrial ? '30-Day Free Trial' : `${tier} Plan Selected`}
-                  </span>
-                </div>
+                <span className="font-mono font-bold text-[#205E40] text-[10px] tracking-[0.22em] uppercase">
+                  {isTrial ? '30-day free trial' : `${tier} plan selected`}
+                </span>
               </div>
             )}
 
             <div>
-              <h2 className="font-serif text-xl text-white">
+              <h2 className="font-display font-bold text-xl tracking-tight text-[#1A1B1D]">
                 {isTrial
-                  ? 'Create your account to start your free trial'
+                  ? 'Create your account to start your free trial.'
                   : tier
-                  ? `Create your account to start ${tier}`
-                  : 'Create your account'}
+                  ? `Create your account to start ${tier}.`
+                  : 'Create your account.'}
               </h2>
-              <p className="text-white/50 text-sm mt-1">
+              <p className="text-[#6F6F68] text-sm mt-1">
                 {isTrial
                   ? "Sign up, set up your organisation, then start exploring. No charge for 30 days."
                   : tier
@@ -73,35 +55,13 @@ function SignupContent() {
           <SignupForm />
 
           {/* Existing user link */}
-          <div className="text-center text-sm text-white/40">
+          <div className="text-center text-sm text-[#6F6F68]">
             Already have an account?{' '}
-            <Link href="/login" className="text-[#ccff00] hover:underline">
+            <Link href="/login" className="text-[#205E40] hover:underline">
               Sign in
             </Link>
           </div>
         </div>
-      </div>
-
-      {/* Photo credit */}
-      <div className="relative z-10 mt-8 text-center text-[10px] text-white/20">
-        Photo by{' '}
-        <a
-          href="https://unsplash.com/@ventiviews"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline hover:text-white/40"
-        >
-          Venti Views
-        </a>
-        {' '}on{' '}
-        <a
-          href="https://unsplash.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline hover:text-white/40"
-        >
-          Unsplash
-        </a>
       </div>
     </div>
   )
@@ -110,8 +70,8 @@ function SignupContent() {
 export default function GetAccessSignupPage() {
   return (
     <Suspense fallback={
-      <div className="relative min-h-screen bg-[#050505] flex items-center justify-center">
-        <div className="text-white/50">Loading...</div>
+      <div className="relative min-h-screen bg-[#ECEAE3] flex items-center justify-center">
+        <div className="text-[#6F6F68]">Loading…</div>
       </div>
     }>
       <SignupContent />

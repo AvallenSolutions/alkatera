@@ -9,7 +9,7 @@ export default function SectionHeading({ children, number, variant = 'light' }: 
 
   return (
     <div className={`flex items-baseline gap-4 mb-8 md:mb-12 border-b pb-4 ${isDark ? 'border-stone-700' : 'border-stone-200'}`}>
-      <span className={`font-mono text-sm font-bold tracking-widest ${isDark ? 'text-brand-accent' : 'text-lime-800'}`}>
+      <span className={`font-mono text-sm font-bold tracking-widest ${isDark ? 'text-[#F2F1EA]' : 'text-[#205E40]'}`}>
         {number}
       </span>
       <h2 className={`font-serif text-3xl md:text-5xl ${isDark ? 'text-white' : 'text-stone-900'}`}>

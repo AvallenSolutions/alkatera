@@ -74,7 +74,7 @@ export const CircularityPage = ({ data }: { data: LCAReportData }) => (
       </div>
       <div className="bg-[#292524] p-8 rounded-2xl border border-white/5 aspect-square flex flex-col justify-center">
         <div className="text-xs font-mono text-neutral-500 mb-4 uppercase">Circularity Score</div>
-        <div className="text-5xl font-serif text-[#ccff00]">{data.circularity.circularityScore}</div>
+        <div className="text-5xl font-serif text-[#F2F1EA]">{data.circularity.circularityScore}</div>
       </div>
     </div>
 
@@ -154,7 +154,7 @@ export const CommitmentPage = ({ data }: { data: LCAReportData }) => (
 
     <div className="mt-8 flex-none mb-4">
       <AlkaTeraLogoVertical
-        iconClassName="text-[#4d7c0f]"
+        iconClassName="text-[#205E40]"
         wordmarkClassName="text-black"
         iconSize="w-10 h-10"
         textSize="text-xl"

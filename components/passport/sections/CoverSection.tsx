@@ -57,7 +57,7 @@ export default function CoverSection({ meta }: CoverSectionProps) {
           transition={{ duration: 0.8, delay: 0.2 }}
         >
           <div className="inline-block bg-brand-accent px-4 py-1 mb-6">
-            <span className="font-mono text-xs font-bold text-black uppercase tracking-widest">
+            <span className="font-mono text-xs font-bold text-[#F2F1EA] uppercase tracking-widest">
               Product Footprint Analysis
             </span>
           </div>

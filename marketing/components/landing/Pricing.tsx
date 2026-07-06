@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { Flower2, Trees, Check, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import Image from 'next/image';
 
 const SeedIcon = ({ className, size = 24 }: { className?: string, size?: number }) => (
   <svg
@@ -122,12 +121,12 @@ const featureSections: FeatureSection[] = [
 
 const FeatureCell = ({ value }: { value: FeatureValue }) => {
   if (typeof value === 'string') {
-    return <span className="text-xs text-white/70 font-mono">{value}</span>;
+    return <span className="text-xs text-muted-foreground font-mono">{value}</span>;
   }
   if (value) {
-    return <Check size={16} className="text-[#ccff00]" />;
+    return <Check size={16} className="text-[#047857]" />;
   }
-  return <Minus size={14} className="text-white/15" />;
+  return <Minus size={14} className="text-foreground/15" />;
 };
 
 const tiers = [
@@ -194,30 +193,25 @@ const tiers = [
   },
 ];
 
+/* The three tiers take the studio inks: Seed forest, Blossom cobalt
+   (the one saturated poster block in this section), Canopy brick. */
+const tierAccentText = ['text-[#205E40]', 'text-[#2B46C0]', 'text-[#BF4B2A]'];
+const tierAccentDot = ['bg-[#205E40]', 'bg-[#F2F1EA]', 'bg-[#BF4B2A]'];
+
 export const LandingPricing = ({ onOpenContact }: PricingProps) => {
   const [showMatrix, setShowMatrix] = useState(false);
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>('monthly');
 
   return (
-    <section className="relative py-24 px-6 md:px-20 text-white overflow-hidden">
-      {/* Background */}
-      <Image
-        src="/images/starry-night-bg2.jpg"
-        alt="Starry night sky"
-        fill
-        className="object-cover"
-        quality={85}
-      />
-      <div className="absolute inset-0 bg-black/70" />
-
+    <section className="relative py-24 px-6 md:px-20 bg-background text-foreground overflow-hidden">
       <div className="relative z-10 max-w-7xl mx-auto">
         {/* Header */}
         <div className="text-center mb-12">
-          <div className="inline-block mb-6 px-5 py-2 border border-[#ccff00]/30 bg-[#ccff00]/5 rounded-full">
-            <span className="font-mono text-[#ccff00] text-xs tracking-widest uppercase">Founding Partner Pricing: Limited Availability</span>
+          <div className="inline-block mb-6">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-[#A97C14]">Founding Partner Pricing: Limited Availability</span>
           </div>
-          <h3 className="font-serif text-4xl md:text-6xl mb-4">Choose your impact scale.</h3>
-          <p className="text-white/50 text-lg max-w-2xl mx-auto leading-relaxed">
+          <h3 className="font-display font-bold tracking-[-0.035em] text-4xl md:text-6xl mb-4 leading-[0.95]">Choose your impact scale.</h3>
+          <p className="text-muted-foreground text-lg max-w-2xl mx-auto leading-relaxed">
             Lock in exclusive founding partner rates. These prices are available for a limited time only.
           </p>
 
@@ -226,10 +220,10 @@ export const LandingPricing = ({ onOpenContact }: PricingProps) => {
             <button
               onClick={() => setBillingInterval('monthly')}
               className={cn(
-                "font-mono text-xs uppercase tracking-widest px-5 py-2.5 rounded-full transition-all",
+                "font-mono text-[10px] font-bold uppercase tracking-[0.22em] px-5 py-2.5 rounded-full transition-colors duration-200 ease-studio",
                 billingInterval === 'monthly'
-                  ? "bg-[#ccff00] text-black font-bold"
-                  : "border border-white/20 text-white/50 hover:text-white hover:border-white/40"
+                  ? "bg-primary text-primary-foreground"
+                  : "border border-border text-muted-foreground hover:text-foreground hover:border-foreground/40"
               )}
             >
               Monthly
@@ -237,10 +231,10 @@ export const LandingPricing = ({ onOpenContact }: PricingProps) => {
             <button
               onClick={() => setBillingInterval('annual')}
               className={cn(
-                "font-mono text-xs uppercase tracking-widest px-5 py-2.5 rounded-full transition-all",
+                "font-mono text-[10px] font-bold uppercase tracking-[0.22em] px-5 py-2.5 rounded-full transition-colors duration-200 ease-studio",
                 billingInterval === 'annual'
-                  ? "bg-[#ccff00] text-black font-bold"
-                  : "border border-white/20 text-white/50 hover:text-white hover:border-white/40"
+                  ? "bg-primary text-primary-foreground"
+                  : "border border-border text-muted-foreground hover:text-foreground hover:border-foreground/40"
               )}
             >
               Annual
@@ -254,49 +248,49 @@ export const LandingPricing = ({ onOpenContact }: PricingProps) => {
             <div
               key={idx}
               className={cn(
-                "border p-8 flex flex-col transition-all duration-500 group relative rounded-2xl backdrop-blur-md",
+                "border p-8 flex flex-col transition-colors duration-200 ease-studio group relative rounded-[6px]",
                 tier.highlight
-                  ? "border-[#ccff00] bg-[#ccff00]/5 md:-translate-y-4 shadow-[0_20px_50px_rgba(204,255,0,0.1)]"
-                  : "border-white/10 bg-white/5 hover:border-white/30"
+                  ? "border-[#2B46C0] bg-[#2B46C0] text-[#F2F1EA] md:-translate-y-4"
+                  : "border-border bg-card text-card-foreground"
               )}
             >
               {tier.highlight && (
-                <div className="absolute top-0 right-0 bg-[#ccff00] text-black text-[10px] font-bold uppercase px-3 py-1 tracking-widest rounded-tr-2xl rounded-bl-xl">
+                <div className="absolute top-0 right-0 bg-[#F2F1EA] text-[#1A1B1D] text-[10px] font-mono font-bold uppercase px-3 py-1 tracking-[0.22em] rounded-tr-[6px] rounded-bl-[6px]">
                   Recommended
                 </div>
               )}
 
               <div className="flex items-center justify-between mb-4">
-                <h4 className={cn("font-serif text-3xl", tier.highlight ? "text-[#ccff00]" : "text-white")}>
+                <h4 className={cn("font-display font-bold tracking-[-0.02em] text-3xl", tier.highlight ? "text-[#F2F1EA]" : "text-foreground")}>
                   {tier.name}
                 </h4>
-                <tier.icon className={tier.highlight ? "text-[#ccff00]" : "text-gray-500"} />
+                <tier.icon className={tier.highlight ? "text-[#F2F1EA]/80" : tierAccentText[idx]} />
               </div>
 
               <div className="mb-6">
                 <div className="flex items-baseline gap-2 mb-1">
-                  <span className="text-white/40 text-lg line-through font-serif">
+                  <span className={cn("text-lg line-through font-display tabular-nums", tier.highlight ? "text-[#F2F1EA]/50" : "text-muted-foreground")}>
                     £{billingInterval === 'monthly' ? tier.monthly.original : tier.annual.original.toLocaleString()}
                   </span>
-                  <span className={cn("font-serif text-4xl", tier.highlight ? "text-[#ccff00]" : "text-white")}>
+                  <span className={cn("font-display font-bold tracking-[-0.02em] tabular-nums text-4xl", tier.highlight ? "text-[#F2F1EA]" : "text-foreground")}>
                     £{billingInterval === 'monthly' ? tier.monthly.founder : tier.annual.founder.toLocaleString()}
                   </span>
-                  <span className="text-white/40 text-sm">/{billingInterval === 'monthly' ? 'mo' : 'yr'}</span>
+                  <span className={cn("text-sm", tier.highlight ? "text-[#F2F1EA]/60" : "text-muted-foreground")}>/{billingInterval === 'monthly' ? 'mo' : 'yr'}</span>
                 </div>
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#ccff00]/10 rounded-full mb-3">
-                  <span className="font-mono text-[#ccff00] text-[10px] tracking-wider uppercase font-bold">
+                <div className="mb-3">
+                  <span className={cn("font-mono text-[10px] tracking-[0.22em] uppercase font-bold", tier.highlight ? "text-[#F2F1EA]/90" : "text-[#A97C14]")}>
                     Save £{billingInterval === 'monthly'
                       ? tier.monthly.saving
                       : tier.annual.saving.toLocaleString()}{billingInterval === 'monthly' ? '/mo' : '/yr'}
                   </span>
                 </div>
-                <p className="text-white/60 text-sm leading-relaxed">{tier.tagline}</p>
+                <p className={cn("text-sm leading-relaxed", tier.highlight ? "text-[#F2F1EA]/80" : "text-muted-foreground")}>{tier.tagline}</p>
               </div>
 
               {/* Limits */}
-              <div className="grid grid-cols-2 gap-2 mb-8 p-4 bg-white/5 rounded">
+              <div className={cn("grid grid-cols-2 gap-2 mb-8 p-4 rounded-[6px]", tier.highlight ? "bg-[#F2F1EA]/10" : "bg-secondary")}>
                 {tier.limits.map((limit, lIdx) => (
-                  <div key={lIdx} className="font-mono text-[10px] uppercase tracking-wider text-white/50">
+                  <div key={lIdx} className={cn("font-mono text-[10px] uppercase tracking-[0.22em]", tier.highlight ? "text-[#F2F1EA]/70" : "text-muted-foreground")}>
                     {limit}
                   </div>
                 ))}
@@ -306,13 +300,13 @@ export const LandingPricing = ({ onOpenContact }: PricingProps) => {
                 {tier.features.map((feat, fIdx) => (
                   <li key={fIdx} className="flex items-start gap-3 text-sm group/item">
                     <div className={cn(
-                      "w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 transition-colors",
-                      tier.highlight ? "bg-[#ccff00]" : "bg-gray-500 group-hover/item:bg-white"
+                      "w-1.5 h-1.5 rounded-full mt-1.5 shrink-0",
+                      tierAccentDot[idx]
                     )} />
                     <span className={cn(
-                      "leading-relaxed transition-colors",
-                      tier.highlight ? "text-white" : "text-gray-400 group-hover/item:text-white",
-                      feat.startsWith("Everything") && "font-serif italic text-white/90 border-b border-white/10 pb-1 w-full"
+                      "leading-relaxed",
+                      tier.highlight ? "text-[#F2F1EA]" : "text-foreground/80",
+                      feat.startsWith("Everything") && cn("font-medium pb-1 w-full border-b", tier.highlight ? "border-[#F2F1EA]/20" : "border-border")
                     )}>
                       {feat}
                     </span>
@@ -323,10 +317,10 @@ export const LandingPricing = ({ onOpenContact }: PricingProps) => {
               <a
                 href={tier.name === 'Canopy' ? `/contact?tier=${tier.name}` : `/getaccess/signup?tier=${tier.name}`}
                 className={cn(
-                  "w-full py-5 font-mono uppercase text-xs tracking-widest font-bold transition-all duration-300 text-center block rounded-xl",
+                  "w-full py-5 font-mono uppercase text-[11px] tracking-[0.22em] font-bold transition-opacity duration-200 ease-studio text-center block rounded-full hover:opacity-90",
                   tier.highlight
-                    ? "bg-[#ccff00] text-black hover:opacity-90 hover:scale-[1.02]"
-                    : "border border-white/20 hover:bg-white hover:text-black"
+                    ? "bg-[#F2F1EA] text-[#1A1B1D]"
+                    : "bg-primary text-primary-foreground"
                 )}
               >
                 {tier.buttonText}
@@ -336,18 +330,18 @@ export const LandingPricing = ({ onOpenContact }: PricingProps) => {
         </div>
 
         {/* Free Trial CTA band */}
-        <div className="mt-12 max-w-3xl mx-auto text-center border border-[#ccff00]/30 bg-[#ccff00]/5 rounded-2xl p-8">
-          <h3 className="font-serif text-2xl md:text-3xl text-white mb-2">
+        <div className="mt-12 max-w-3xl mx-auto text-center border border-border bg-card rounded-[6px] p-8">
+          <h3 className="font-display font-bold tracking-[-0.02em] text-2xl md:text-3xl text-foreground mb-2">
             Prefer to try before you buy?
           </h3>
-          <p className="text-white/60 text-sm max-w-xl mx-auto mb-6">
+          <p className="text-muted-foreground text-sm max-w-xl mx-auto mb-6">
             Start a 30-day free trial. Add a facility, build a product LCA and explore the
             platform. We never charge automatically when your trial ends, you choose if and
             when to continue.
           </p>
           <a
             href="/getaccess/signup?trial=true"
-            className="inline-block px-10 py-4 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:opacity-90 hover:scale-[1.02] transition-all"
+            className="inline-block px-10 py-4 bg-primary text-primary-foreground font-mono uppercase text-[11px] tracking-[0.22em] font-bold rounded-full hover:opacity-90 transition-opacity duration-200 ease-studio"
           >
             Start free trial
           </a>
@@ -357,7 +351,7 @@ export const LandingPricing = ({ onOpenContact }: PricingProps) => {
         <div className="mt-16 text-center">
           <button
             onClick={() => setShowMatrix(!showMatrix)}
-            className="font-mono text-xs uppercase tracking-widest text-white/40 hover:text-[#ccff00] transition-colors border border-white/10 hover:border-[#ccff00]/30 px-8 py-3 rounded-full"
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground hover:text-foreground transition-colors duration-200 ease-studio border border-border hover:border-foreground/40 px-8 py-3 rounded-full"
           >
             {showMatrix ? "Hide" : "View"} Full Feature Comparison
           </button>
@@ -368,11 +362,11 @@ export const LandingPricing = ({ onOpenContact }: PricingProps) => {
           <div className="mt-12 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-white/10">
-                  <th className="text-left py-4 pr-4 text-white/40 font-mono text-xs uppercase tracking-wider w-1/2">Feature</th>
-                  <th className="text-center py-4 px-4 text-white/40 font-mono text-xs uppercase tracking-wider">Seed</th>
-                  <th className="text-center py-4 px-4 text-[#ccff00]/60 font-mono text-xs uppercase tracking-wider">Blossom</th>
-                  <th className="text-center py-4 px-4 text-white/40 font-mono text-xs uppercase tracking-wider">Canopy</th>
+                <tr className="border-b border-border">
+                  <th className="text-left py-4 pr-4 text-muted-foreground font-mono text-[10px] font-bold uppercase tracking-[0.22em] w-1/2">Feature</th>
+                  <th className="text-center py-4 px-4 text-muted-foreground font-mono text-[10px] font-bold uppercase tracking-[0.22em]">Seed</th>
+                  <th className="text-center py-4 px-4 text-[#2B46C0] font-mono text-[10px] font-bold uppercase tracking-[0.22em]">Blossom</th>
+                  <th className="text-center py-4 px-4 text-muted-foreground font-mono text-[10px] font-bold uppercase tracking-[0.22em]">Canopy</th>
                 </tr>
               </thead>
               <tbody>
@@ -380,14 +374,14 @@ export const LandingPricing = ({ onOpenContact }: PricingProps) => {
                   <React.Fragment key={sIdx}>
                     <tr>
                       <td colSpan={4} className="pt-8 pb-3">
-                        <span className="font-mono text-[#ccff00] text-xs uppercase tracking-[0.2em]">{section.title}</span>
+                        <span className="font-mono text-[#2B46C0] text-[10px] font-bold uppercase tracking-[0.22em]">{section.title}</span>
                       </td>
                     </tr>
                     {section.rows.map((row, rIdx) => (
-                      <tr key={rIdx} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-                        <td className="py-3 pr-4 text-white/70">{row.name}</td>
+                      <tr key={rIdx} className="border-b border-border/60 hover:bg-card transition-colors duration-200 ease-studio">
+                        <td className="py-3 pr-4 text-foreground/80">{row.name}</td>
                         <td className="py-3 px-4 text-center"><div className="flex justify-center"><FeatureCell value={row.seed} /></div></td>
-                        <td className="py-3 px-4 text-center bg-[#ccff00]/[0.02]"><div className="flex justify-center"><FeatureCell value={row.blossom} /></div></td>
+                        <td className="py-3 px-4 text-center bg-[#2B46C0]/[0.04]"><div className="flex justify-center"><FeatureCell value={row.blossom} /></div></td>
                         <td className="py-3 px-4 text-center"><div className="flex justify-center"><FeatureCell value={row.canopy} /></div></td>
                       </tr>
                     ))}
@@ -397,28 +391,6 @@ export const LandingPricing = ({ onOpenContact }: PricingProps) => {
             </table>
           </div>
         )}
-
-        {/* Photo credit */}
-        <div className="mt-12 text-center text-[10px] text-white/20">
-          Photo by{' '}
-          <a
-            href="https://unsplash.com/@ventiviews"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline hover:text-white/40"
-          >
-            Venti Views
-          </a>
-          {' '}on{' '}
-          <a
-            href="https://unsplash.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline hover:text-white/40"
-          >
-            Unsplash
-          </a>
-        </div>
       </div>
     </section>
   );

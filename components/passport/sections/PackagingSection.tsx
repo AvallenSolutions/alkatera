@@ -89,7 +89,7 @@ export default function PackagingSection({
                     cy="40"
                     r="34"
                     fill="none"
-                    stroke="#ccff00"
+                    stroke="#205E40"
                     strokeWidth="6"
                     strokeLinecap="round"
                     strokeDasharray={`${(data.circularityScore / 100) * 213.6} 213.6`}
@@ -136,7 +136,7 @@ export default function PackagingSection({
                     <div className="mb-3">
                       <div className="flex justify-between items-center mb-1">
                         <span className="text-xs text-stone-500">Recycled content</span>
-                        <span className="font-mono text-xs text-lime-800 font-bold">
+                        <span className="font-mono text-xs text-[#205E40] font-bold">
                           {component.recycledContentPercentage}%
                         </span>
                       </div>

@@ -45,7 +45,7 @@ export default function ProductIdentitySection({
             {(data.productCategory || data.volumeDisplay) && (
               <div className="flex flex-wrap gap-2 mb-4">
                 {data.productCategory && (
-                  <span className="bg-brand-accent px-3 py-1 inline-flex font-mono text-xs text-black uppercase tracking-widest font-bold">
+                  <span className="bg-brand-accent px-3 py-1 inline-flex font-mono text-xs text-[#F2F1EA] uppercase tracking-widest font-bold">
                     {data.productCategory}
                   </span>
                 )}

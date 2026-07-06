@@ -101,7 +101,7 @@ export async function POST(
       risks: (tp?.risks_and_opportunities as any[]) || [],
       branding: {
         logo: report.logo_url || null,
-        primaryColor: report.primary_color || '#ccff00',
+        primaryColor: report.primary_color || '#205E40',
       },
     });
 

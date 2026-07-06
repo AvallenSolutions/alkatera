@@ -218,10 +218,10 @@ export const LandUseMethodologyPage = ({ data }: { data: LCAReportData }) => (
 
       <div className="col-span-4 space-y-6">
         <div className="bg-neutral-900 text-white p-6 rounded-lg">
-          <h4 className="font-mono text-xs text-[#ccff00] mb-4 uppercase tracking-wider">Methodological Standards</h4>
+          <h4 className="font-mono text-xs text-[#F2F1EA] mb-4 uppercase tracking-wider">Methodological Standards</h4>
           <ul className="space-y-2">
             {data.landUse.methodology.standards.map((std, i) => (
-              <li key={i} className="text-sm border-l-2 border-[#ccff00] pl-3 py-1">
+              <li key={i} className="text-sm border-l-2 border-[#205E40] pl-3 py-1">
                 {std}
               </li>
             ))}

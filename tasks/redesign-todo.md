@@ -57,19 +57,18 @@ Open questions for the M2 review:
   product components to cobalt studio. Committed 51673c14.
 - [x] THE EVIDENCE (5 July): reports, certifications, EPR (+wizard), guardian, library,
   knowledge, wiki (+connected map) to brick studio. Committed 3e04b042.
-- [~] THE POST + THE WIRING: in flight (settings pages/components, integrations, all admin
-  pages/components, shared chrome: CookieConsent, TrialBanner, UniversalDropzone, agents,
-  error/suspended pages).
-- [ ] Measures leftovers: vineyards/orchards/arable, nature, byproducts, soil-carbon,
-  hospitality, energy, product detail subpages, LCA wizard, materiality/report-builder bits
-- [ ] Journeys: onboarding wizard steps (~30 files), supplier onboarding + portal +
-  SupplierLayout, auth forms, public invite pages, create-organization, complete-subscription
-- [ ] Public + artefacts: marketing landing + page clients + nav/footer, getaccess, blog,
-  public menu, lca-report components + report HTML API routes + email templates + passport
-  accent (globals.css block + tailwind brand-accent token)
-- [ ] Desk: live numbers on the poster blocks
-- [ ] Cleanup: delete dead Sidebar.tsx/Header.tsx/RosaHeaderButton, retire neon-* bridge vars,
-  remove /studio-kit gallery or keep as internal reference (ask Tim)
+- [x] THE POST + THE WIRING (6 July): settings, integrations, all admin surfaces; ochre for
+  the post, quiet ink for the wiring. Committed a3291075.
+- [x] Measures leftovers (6 July): agriculture (vineyards/orchards/arable), nature,
+  byproducts, soil carbon, hospitality, energy, LCA wizard, product detail. Same commit.
+- [x] Journeys (6 July): onboarding wizard (all step families), supplier portal + onboarding,
+  auth forms, public invites, create-organization, complete-subscription. Same commit.
+- [~] Public + artefacts: in flight (landing components, page clients, blog/menu/getaccess,
+  LCA report + report HTML APIs + passport accent + transactional emails)
+- [x] Desk: live numbers via /api/desk/counts (resolveAccessibleOrg, head-count queries)
+- [x] Cleanup: Sidebar.tsx, Header.tsx, RosaHeaderButton.tsx deleted (nothing imported them)
+- [ ] Later cleanup: retire neon-* bridge vars (62 files still reference them; they resolve
+  to studio inks so they render correctly); /studio-kit gallery: keep or delete (ask Tim)
 - [ ] App icons (favicon/apple-icon still lime): brand decision for Tim
 - [ ] Distributor portal (align with generalised studio language; wait for main-checkout
   stream to land to avoid conflicts)

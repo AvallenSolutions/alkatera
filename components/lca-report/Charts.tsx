@@ -50,7 +50,7 @@ export const DonutChart = ({
 };
 
 export const GaugeChart = ({ score }: { score: number }) => {
-  const data = [{ name: 'score', value: score, fill: '#65a30d' }];
+  const data = [{ name: 'score', value: score, fill: '#205E40' }];
 
   return (
     <div className="w-full h-[250px] relative">
@@ -68,12 +68,12 @@ export const GaugeChart = ({ score }: { score: number }) => {
             background
             dataKey="value"
             cornerRadius={30}
-            fill="#ccff00"
+            fill="#205E40"
           />
         </RadialBarChart>
       </ResponsiveContainer>
       <div className="absolute inset-0 flex items-center justify-center pt-10">
-        <span className="text-5xl font-bold font-serif text-[#65a30d]">{score}%</span>
+        <span className="text-5xl font-bold font-serif text-[#205E40]">{score}%</span>
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { Upload, X, Loader2, Image as ImageIcon } from "lucide-react";
+import { Upload, X, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabaseClient";
@@ -122,14 +122,14 @@ export function ImageUpload({
 
   return (
     <div className="space-y-2">
-      <label className="text-sm font-medium">{label}</label>
+      <label className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-[#6F6F68]">{label}</label>
 
       {previewUrl ? (
         <div className="relative">
           <img
             src={previewUrl}
             alt="Preview"
-            className="w-full h-48 object-cover rounded-lg border border-white/10"
+            className="w-full h-48 object-cover rounded-[6px] border border-[#D9D6CB]"
           />
           <Button
             variant="destructive"
@@ -144,10 +144,10 @@ export function ImageUpload({
       ) : (
         <div
           className={cn(
-            "relative border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer",
+            "relative border border-dashed rounded-[6px] bg-[#F2F1EA] p-8 text-center transition-colors cursor-pointer",
             isDragging
-              ? "border-[#ccff00] bg-[#ccff00]/10"
-              : "border-white/20 hover:border-white/40",
+              ? "border-[#205E40] bg-[#205E40]/5"
+              : "border-[#D9D6CB] hover:border-[#6F6F68]",
             isUploading && "opacity-50 cursor-not-allowed"
           )}
           onDrop={handleDrop}
@@ -166,14 +166,13 @@ export function ImageUpload({
 
           {isUploading ? (
             <div className="flex flex-col items-center gap-2">
-              <Loader2 className="w-8 h-8 animate-spin text-[#ccff00]" />
-              <p className="text-sm text-gray-400">Uploading...</p>
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-[#205E40]">Uploading…</p>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-2">
-              <Upload className="w-8 h-8 text-gray-400" />
-              <p className="text-sm text-gray-400">{description}</p>
-              <p className="text-xs text-gray-500">
+              <Upload className="w-8 h-8 text-[#6F6F68]" />
+              <p className="text-sm text-[#6F6F68]">{description}</p>
+              <p className="text-xs text-[#6F6F68]/70">
                 JPEG, PNG, GIF, or WebP
               </p>
             </div>
@@ -182,7 +181,7 @@ export function ImageUpload({
       )}
 
       {error && (
-        <p className="text-sm text-red-500">{error}</p>
+        <p className="text-sm text-[#BE123C]">{error}</p>
       )}
     </div>
   );

@@ -11,13 +11,20 @@ import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
  *    a new org and makes it active, then full-reloads into /dashboard.
  *
  * Inline styles keep the page a self-contained branded artefact (matches the
- * report page), independent of the app shell.
+ * report page), independent of the app shell. Studio grammar: paper ground,
+ * cream panel with a hairline, ink text, forest for the one act.
  */
 
-const LIME = '#ccff00';
-const BG = '#0a0a0a';
-const TEXT = '#fafafa';
-const MUTED = '#9ca3af';
+const PAPER = '#ECEAE3';
+const CREAM = '#F2F1EA';
+const HAIRLINE = '#D9D6CB';
+const DIM = '#6F6F68';
+const INK = '#1A1B1D';
+const FOREST = '#205E40';
+
+const DISPLAY = 'var(--font-display), "Space Grotesk", system-ui, sans-serif';
+const MONO = 'var(--font-data), "JetBrains Mono", monospace';
+const BODY = 'var(--font-body), Inter, system-ui, sans-serif';
 
 type Phase = 'checking' | 'needs-auth' | 'claiming' | 'error';
 
@@ -30,8 +37,8 @@ export interface ClaimFlowProps {
 
 function Wordmark() {
   return (
-    <span style={{ fontWeight: 400 }}>
-      alka<strong style={{ fontWeight: 800 }}>tera</strong>
+    <span style={{ fontWeight: 400, fontFamily: DISPLAY, color: INK }}>
+      alka<strong style={{ fontWeight: 700 }}>tera</strong>
     </span>
   );
 }
@@ -90,9 +97,9 @@ export default function ClaimFlow({ token, brandName, category, kgPerBottle }: C
     <div
       style={{
         minHeight: '100vh',
-        background: BG,
-        color: TEXT,
-        fontFamily: 'system-ui, sans-serif',
+        background: PAPER,
+        color: INK,
+        fontFamily: BODY,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -103,32 +110,53 @@ export default function ClaimFlow({ token, brandName, category, kgPerBottle }: C
         style={{
           maxWidth: 460,
           width: '100%',
-          border: '1px solid #262626',
-          borderRadius: 16,
+          border: `1px solid ${HAIRLINE}`,
+          borderRadius: 6,
           padding: '32px 28px',
-          background: '#141414',
+          background: CREAM,
         }}
       >
-        <p style={{ margin: 0, color: LIME, fontSize: 12, letterSpacing: 1.5, textTransform: 'uppercase' }}>
+        <p
+          style={{
+            margin: 0,
+            color: FOREST,
+            fontSize: 10.5,
+            letterSpacing: '0.22em',
+            textTransform: 'uppercase',
+            fontFamily: MONO,
+            fontWeight: 700,
+          }}
+        >
           Claim your profile
         </p>
-        <h1 style={{ margin: '10px 0 6px', fontSize: 26, fontWeight: 800, lineHeight: 1.15 }}>{brandName}</h1>
-        <p style={{ margin: 0, color: MUTED, fontSize: 14 }}>
+        <h1
+          style={{
+            margin: '10px 0 6px',
+            fontSize: 28,
+            fontWeight: 700,
+            lineHeight: 0.95,
+            fontFamily: DISPLAY,
+            letterSpacing: '-0.035em',
+          }}
+        >
+          {brandName}.
+        </h1>
+        <p style={{ margin: 0, color: DIM, fontSize: 14 }}>
           {[category, kgPerBottle != null ? `${kgPerBottle} kg CO₂e per bottle (estimated)` : null]
             .filter(Boolean)
             .join(' · ') || 'Take ownership of your footprint estimate.'}
         </p>
 
         <div style={{ marginTop: 24 }}>
-          {phase === 'checking' && <p style={{ color: MUTED, fontSize: 14 }}>Checking your session…</p>}
+          {phase === 'checking' && <p style={{ color: DIM, fontSize: 14 }}>Checking your session…</p>}
 
           {phase === 'claiming' && (
-            <p style={{ color: TEXT, fontSize: 15 }}>Setting up your workspace…</p>
+            <p style={{ color: INK, fontSize: 15 }}>Setting up your workspace…</p>
           )}
 
           {phase === 'needs-auth' && (
             <>
-              <p style={{ color: '#cbd5e1', fontSize: 14, lineHeight: 1.6, marginTop: 0 }}>
+              <p style={{ color: INK, fontSize: 14, lineHeight: 1.6, marginTop: 0 }}>
                 Create your account (or sign in) to claim {brandName} and refine this estimate with
                 your own data. It is free to start, with no card required.
               </p>
@@ -139,12 +167,13 @@ export default function ClaimFlow({ token, brandName, category, kgPerBottle }: C
                   width: '100%',
                   marginTop: 16,
                   padding: '14px 20px',
-                  background: LIME,
-                  color: '#0a0a0a',
-                  fontWeight: 800,
+                  background: FOREST,
+                  color: CREAM,
+                  fontWeight: 700,
                   fontSize: 16,
+                  fontFamily: DISPLAY,
                   border: 'none',
-                  borderRadius: 12,
+                  borderRadius: 9999,
                   cursor: 'pointer',
                 }}
               >
@@ -155,18 +184,19 @@ export default function ClaimFlow({ token, brandName, category, kgPerBottle }: C
 
           {phase === 'error' && (
             <>
-              <p style={{ color: '#fca5a5', fontSize: 14 }}>{error}</p>
+              <p style={{ color: '#BE123C', fontSize: 14 }}>{error}</p>
               <button
                 onClick={() => void claim()}
                 style={{
                   marginTop: 12,
                   padding: '10px 16px',
                   background: 'transparent',
-                  color: LIME,
-                  border: `1px solid ${LIME}`,
-                  borderRadius: 10,
+                  color: INK,
+                  border: `1px solid ${INK}`,
+                  borderRadius: 9999,
                   cursor: 'pointer',
                   fontWeight: 600,
+                  fontFamily: DISPLAY,
                 }}
               >
                 Try again
@@ -175,7 +205,7 @@ export default function ClaimFlow({ token, brandName, category, kgPerBottle }: C
           )}
         </div>
 
-        <p style={{ marginTop: 28, color: MUTED, fontSize: 12 }}>
+        <p style={{ marginTop: 28, color: DIM, fontSize: 12 }}>
           Powered by <Wordmark />
         </p>
       </div>

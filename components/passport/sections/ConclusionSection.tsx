@@ -118,7 +118,7 @@ export default function ConclusionSection({
         {visibility.showDownloadPDF && (
           <button
             onClick={onDownloadPDF}
-            className="bg-stone-900 text-white px-8 py-4 font-mono text-xs uppercase tracking-widest hover:bg-brand-accent hover:text-black transition-colors duration-300"
+            className="bg-stone-900 text-white px-8 py-4 font-mono text-xs uppercase tracking-widest hover:bg-brand-accent hover:text-[#F2F1EA] transition-colors duration-300"
           >
             Download Full PDF
           </button>
@@ -127,7 +127,7 @@ export default function ConclusionSection({
           onClick={handleShare}
           className={`border px-8 py-4 font-mono text-xs uppercase tracking-widest transition-colors duration-300 ${
             copied
-              ? 'bg-brand-accent/10 border-brand-accent text-lime-800'
+              ? 'bg-brand-accent/10 border-brand-accent text-[#205E40]'
               : 'bg-white border-stone-200 text-stone-900 hover:bg-stone-50'
           }`}
         >

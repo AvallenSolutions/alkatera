@@ -20,7 +20,7 @@ export function HomePageClient() {
   const [isGuardianOpen, setIsGuardianOpen] = useState(false);
 
   return (
-    <div className="bg-[#050505] min-h-screen w-full text-white selection:bg-[#ccff00] selection:text-black overflow-x-hidden">
+    <div className="bg-[#ECEAE3] min-h-screen w-full text-[#1A1B1D] selection:bg-[#1A1B1D] selection:text-[#F2F1EA] overflow-x-hidden">
       <Navigation onOpenContact={() => setIsContactOpen(true)} />
       <LandingHero onOpenGuardian={() => setIsGuardianOpen(true)} />
       <LandingMarquee />

@@ -187,45 +187,45 @@ export async function POST(request: NextRequest) {
         const safeSupplierName = supplierName ? escapeHtml(supplierName) : '';
 
         const emailHtml = `
-          <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #e0e0e0; padding: 40px; border: 1px solid #222;">
-            <div style="border-bottom: 1px solid #333; padding-bottom: 20px; margin-bottom: 30px; text-align: center;">
+          <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #F2F1EA; color: #1A1B1D; padding: 40px; border: 1px solid #D9D6CB;">
+            <div style="border-bottom: 1px solid #D9D6CB; padding-bottom: 20px; margin-bottom: 30px; text-align: center;">
               <img src="${logoUrl}" alt="alkatera" width="160" height="auto" style="display: block; margin: 0 auto 16px auto;" />
-              <h1 style="color: #ccff00; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; margin: 0;">Supplier Invitation</h1>
+              <h1 style="color: #205E40; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; margin: 0;">Supplier Invitation</h1>
             </div>
-            <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
+            <p style="color: #1A1B1D; font-size: 14px; line-height: 1.8;">
               ${greeting ? `Dear ${greeting},` : 'Hello,'}
             </p>
-            <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
-              <strong style="color: #fff;">${safeInviterName}</strong> at <strong style="color: #fff;">${safeOrgName}</strong> has invited you to join the alka<strong style="color: #fff;">tera</strong> platform to ${safeMaterialName ? `provide verified sustainability data for <strong style="color: #fff;">${safeMaterialName}</strong>` : 'share your sustainability data'}.
+            <p style="color: #1A1B1D; font-size: 14px; line-height: 1.8;">
+              <strong style="color: #1A1B1D;">${safeInviterName}</strong> at <strong style="color: #1A1B1D;">${safeOrgName}</strong> has invited you to join the alka<strong style="color: #1A1B1D;">tera</strong> platform to ${safeMaterialName ? `provide verified sustainability data for <strong style="color: #1A1B1D;">${safeMaterialName}</strong>` : 'share your sustainability data'}.
             </p>
-            ${safePersonalMessage ? `<div style="margin: 20px 0; padding: 16px; border-left: 2px solid #ccff00; background: #111;"><p style="color: #999; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 8px 0;">Message from ${safeInviterName}:</p><p style="color: #ccc; font-size: 14px; line-height: 1.8; margin: 0;">${safePersonalMessage}</p></div>` : ''}
+            ${safePersonalMessage ? `<div style="margin: 20px 0; padding: 16px; border-left: 2px solid #205E40; background: #ffffff;"><p style="color: #6F6F68; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 8px 0;">Message from ${safeInviterName}:</p><p style="color: #1A1B1D; font-size: 14px; line-height: 1.8; margin: 0;">${safePersonalMessage}</p></div>` : ''}
             <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
               <tr>
-                <td style="padding: 10px 0; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; width: 120px;">From</td>
-                <td style="padding: 10px 0; color: #fff; font-size: 14px;">${safeInviterName}, ${safeOrgName}</td>
+                <td style="padding: 10px 0; color: #6F6F68; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; width: 120px;">From</td>
+                <td style="padding: 10px 0; color: #1A1B1D; font-size: 14px;">${safeInviterName}, ${safeOrgName}</td>
               </tr>
               ${safeProductName ? `<tr>
-                <td style="padding: 10px 0; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;">Product</td>
-                <td style="padding: 10px 0; color: #fff; font-size: 14px;">${safeProductName}</td>
+                <td style="padding: 10px 0; color: #6F6F68; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;">Product</td>
+                <td style="padding: 10px 0; color: #1A1B1D; font-size: 14px;">${safeProductName}</td>
               </tr>` : ''}
               ${safeMaterialName ? `<tr>
-                <td style="padding: 10px 0; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;">Material</td>
-                <td style="padding: 10px 0; color: #fff; font-size: 14px;">${safeMaterialName} (${safeMaterialType})</td>
+                <td style="padding: 10px 0; color: #6F6F68; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;">Material</td>
+                <td style="padding: 10px 0; color: #1A1B1D; font-size: 14px;">${safeMaterialName} (${safeMaterialType})</td>
               </tr>` : ''}
             </table>
             <div style="margin: 30px 0; text-align: center;">
-              <a href="${invitationUrl}" style="display: inline-block; background: #ccff00; color: #000; font-family: 'Courier New', monospace; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 3px; padding: 16px 32px; text-decoration: none;">Accept Invitation</a>
+              <a href="${invitationUrl}" style="display: inline-block; background: #1A1B1D; color: #F2F1EA; font-family: 'Courier New', monospace; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 3px; padding: 16px 32px; text-decoration: none;">Accept Invitation</a>
             </div>
-            <div style="margin: 24px 0; padding: 20px; background: #111; border: 1px solid #222; border-radius: 4px;">
-              <p style="color: #ccff00; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 12px 0;">Why join alkatera?</p>
-              <p style="color: #ccc; font-size: 13px; line-height: 1.8; margin: 0;">
-                alkatera is <strong style="color: #fff;">completely free for suppliers</strong>. Your account gives you a streamlined portal to manage your sustainability data and share verified product information with your customers. No hidden costs, no commitment &mdash; just a simpler way to share your environmental credentials.
+            <div style="margin: 24px 0; padding: 20px; background: #ffffff; border: 1px solid #D9D6CB; border-radius: 4px;">
+              <p style="color: #205E40; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 12px 0;">Why join alkatera?</p>
+              <p style="color: #1A1B1D; font-size: 13px; line-height: 1.8; margin: 0;">
+                alkatera is <strong style="color: #1A1B1D;">completely free for suppliers</strong>. Your account gives you a streamlined portal to manage your sustainability data and share verified product information with your customers. No hidden costs, no commitment, just a simpler way to share your environmental credentials.
               </p>
             </div>
-            <p style="color: #666; font-size: 12px; line-height: 1.6;">
-              This invitation will expire in 30 days. If you have any questions, please contact <a href="mailto:hello@alkatera.com" style="color: #ccff00; text-decoration: none;">hello@alkatera.com</a>
+            <p style="color: #6F6F68; font-size: 12px; line-height: 1.6;">
+              This invitation will expire in 30 days. If you have any questions, please contact <a href="mailto:hello@alkatera.com" style="color: #205E40; text-decoration: none;">hello@alkatera.com</a>
             </p>
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #333; color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 2px;">
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #D9D6CB; color: #6F6F68; font-size: 10px; text-transform: uppercase; letter-spacing: 2px;">
               The alka<strong>tera</strong> Team
             </div>
           </div>

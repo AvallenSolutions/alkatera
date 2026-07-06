@@ -46,14 +46,14 @@ interface RichTextEditorProps {
   placeholder?: string;
 }
 
-// Alkatera Color Palette
+// The studio inks (design/studio-design-language.md)
 const ALKATERA_COLORS = [
-  { name: 'Neon Lime', value: '#ccff00', hsl: 'hsl(84, 100%, 60%)' },
-  { name: 'Neon Cyan', value: '#00d4ff', hsl: 'hsl(190, 100%, 50%)' },
-  { name: 'Neon Purple', value: '#c000ff', hsl: 'hsl(280, 100%, 50%)' },
-  { name: 'Neon Emerald', value: '#008a4d', hsl: 'hsl(160, 84%, 39%)' },
-  { name: 'White', value: '#e6e6e6', hsl: 'hsl(0, 0%, 90%)' },
-  { name: 'Gray', value: '#666666', hsl: 'hsl(0, 0%, 40%)' },
+  { name: 'Forest', value: '#205E40', hsl: 'hsl(151, 49%, 25%)' },
+  { name: 'Cobalt', value: '#2B46C0', hsl: 'hsl(229, 63%, 46%)' },
+  { name: 'Ochre', value: '#A97C14', hsl: 'hsl(42, 79%, 37%)' },
+  { name: 'Brick', value: '#BF4B2A', hsl: 'hsl(13, 64%, 46%)' },
+  { name: 'Ink', value: '#1A1B1D', hsl: 'hsl(220, 6%, 11%)' },
+  { name: 'Dim', value: '#6F6F68', hsl: 'hsl(60, 3%, 42%)' },
 ];
 
 export function RichTextEditor({ content, onChange, placeholder = 'Write your content here...' }: RichTextEditorProps) {
@@ -75,12 +75,12 @@ export function RichTextEditor({ content, onChange, placeholder = 'Write your co
       Link.configure({
         openOnClick: false,
         HTMLAttributes: {
-          class: 'text-[#ccff00] underline',
+          class: 'text-[#205E40] underline',
         },
       }),
       Image.configure({
         HTMLAttributes: {
-          class: 'max-w-full h-auto rounded-lg',
+          class: 'max-w-full h-auto rounded-[6px]',
         },
       }),
       Placeholder.configure({
@@ -93,7 +93,7 @@ export function RichTextEditor({ content, onChange, placeholder = 'Write your co
     content,
     editorProps: {
       attributes: {
-        class: 'prose prose-invert max-w-none min-h-[400px] p-4 focus:outline-none',
+        class: 'prose max-w-none min-h-[400px] p-4 focus:outline-none',
       },
     },
     onUpdate: ({ editor }) => {
@@ -153,7 +153,7 @@ export function RichTextEditor({ content, onChange, placeholder = 'Write your co
       disabled={disabled}
       className={cn(
         'h-8 w-8 p-0',
-        active && 'bg-[#ccff00]/20 text-[#ccff00]'
+        active && 'bg-[#205E40]/10 text-[#205E40]'
       )}
     >
       {children}
@@ -161,9 +161,9 @@ export function RichTextEditor({ content, onChange, placeholder = 'Write your co
   );
 
   return (
-    <div className="border border-white/10 rounded-lg overflow-hidden bg-[#0a0a0a]">
+    <div className="border border-[#D9D6CB] rounded-[6px] overflow-hidden bg-[#F2F1EA]">
       {/* Toolbar */}
-      <div className="flex flex-wrap gap-1 p-2 border-b border-white/10 bg-black/30">
+      <div className="flex flex-wrap gap-1 p-2 border-b border-[#D9D6CB] bg-[#ECEAE3]">
         {/* Text Formatting */}
         <MenuButton
           onClick={() => editor.chain().focus().toggleBold().run()}
@@ -208,16 +208,16 @@ export function RichTextEditor({ content, onChange, placeholder = 'Write your co
               size="sm"
               className={cn(
                 'h-8 w-8 p-0',
-                editor.isActive('textStyle') && 'bg-[#ccff00]/20 text-[#ccff00]'
+                editor.isActive('textStyle') && 'bg-[#205E40]/10 text-[#205E40]'
               )}
             >
               <Palette className="h-4 w-4" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-3 bg-black/95 border-white/10">
+          <PopoverContent className="w-auto p-3 bg-[#F2F1EA] border-[#D9D6CB]">
             <div className="flex flex-col gap-2">
-              <div className="text-xs font-mono text-gray-400 uppercase tracking-widest mb-1">
-                Alkatera Colors
+              <div className="text-[10px] font-mono font-bold text-[#6F6F68] uppercase tracking-[0.22em] mb-1">
+                Studio inks
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {ALKATERA_COLORS.map((color) => (
@@ -225,10 +225,10 @@ export function RichTextEditor({ content, onChange, placeholder = 'Write your co
                     key={color.value}
                     onClick={() => editor.chain().focus().setColor(color.value).run()}
                     className={cn(
-                      'w-10 h-10 rounded border-2 transition-all hover:scale-110',
+                      'w-10 h-10 rounded-[6px] border-2 transition-colors',
                       editor.isActive('textStyle', { color: color.value })
-                        ? 'border-white ring-2 ring-white/50'
-                        : 'border-white/20 hover:border-white/50'
+                        ? 'border-[#1A1B1D] ring-2 ring-[#1A1B1D]/30'
+                        : 'border-[#D9D6CB] hover:border-[#6F6F68]'
                     )}
                     style={{ backgroundColor: color.value }}
                     title={color.name}
@@ -237,15 +237,15 @@ export function RichTextEditor({ content, onChange, placeholder = 'Write your co
               </div>
               <button
                 onClick={() => editor.chain().focus().unsetColor().run()}
-                className="mt-2 px-3 py-1.5 text-xs font-mono text-gray-400 border border-white/10 rounded hover:border-[#ccff00] hover:text-[#ccff00] transition-colors"
+                className="mt-2 px-3 py-1.5 text-xs font-mono text-[#6F6F68] border border-[#D9D6CB] rounded-[6px] hover:border-[#205E40] hover:text-[#205E40] transition-colors"
               >
-                Reset Color
+                Reset Colour
               </button>
             </div>
           </PopoverContent>
         </Popover>
 
-        <div className="w-px h-8 bg-white/10 mx-1" />
+        <div className="w-px h-8 bg-[#D9D6CB] mx-1" />
 
         {/* Headings */}
         <MenuButton
@@ -269,7 +269,7 @@ export function RichTextEditor({ content, onChange, placeholder = 'Write your co
           <Heading3 className="h-4 w-4" />
         </MenuButton>
 
-        <div className="w-px h-8 bg-white/10 mx-1" />
+        <div className="w-px h-8 bg-[#D9D6CB] mx-1" />
 
         {/* Lists */}
         <MenuButton
@@ -293,7 +293,7 @@ export function RichTextEditor({ content, onChange, placeholder = 'Write your co
           <Quote className="h-4 w-4" />
         </MenuButton>
 
-        <div className="w-px h-8 bg-white/10 mx-1" />
+        <div className="w-px h-8 bg-[#D9D6CB] mx-1" />
 
         {/* Alignment */}
         <MenuButton
@@ -324,7 +324,7 @@ export function RichTextEditor({ content, onChange, placeholder = 'Write your co
           <AlignJustify className="h-4 w-4" />
         </MenuButton>
 
-        <div className="w-px h-8 bg-white/10 mx-1" />
+        <div className="w-px h-8 bg-[#D9D6CB] mx-1" />
 
         {/* Media */}
         <MenuButton onClick={() => setLinkDialogOpen(true)}>
@@ -335,7 +335,7 @@ export function RichTextEditor({ content, onChange, placeholder = 'Write your co
           <ImageIcon className="h-4 w-4" />
         </MenuButton>
 
-        <div className="w-px h-8 bg-white/10 mx-1" />
+        <div className="w-px h-8 bg-[#D9D6CB] mx-1" />
 
         {/* History */}
         <MenuButton

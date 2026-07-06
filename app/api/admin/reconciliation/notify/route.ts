@@ -125,39 +125,39 @@ export async function POST(request: NextRequest) {
   const safeReason = escapeHtml(s.reason || 'methodology improvement')
 
   const html = `
-    <div style="font-family: 'Courier New', monospace; max-width: 620px; margin: 0 auto; background: #0a0a0a; color: #e0e0e0; padding: 40px; border: 1px solid #222;">
-      <div style="border-bottom: 1px solid #333; padding-bottom: 20px; margin-bottom: 28px; text-align: center;">
-        <h1 style="color: #ccff00; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; margin: 0;">Carbon accounting update</h1>
+    <div style="font-family: 'Courier New', monospace; max-width: 620px; margin: 0 auto; background: #F2F1EA; color: #1A1B1D; padding: 40px; border: 1px solid #D9D6CB;">
+      <div style="border-bottom: 1px solid #D9D6CB; padding-bottom: 20px; margin-bottom: 28px; text-align: center;">
+        <h1 style="color: #205E40; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; margin: 0;">Carbon accounting update</h1>
       </div>
-      <p style="color: #ccc; font-size: 14px; line-height: 1.8;">Hi ${safeOrg} team,</p>
-      <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
-        We've updated how alka<strong style="color:#fff;">tera</strong> calculates your corporate carbon footprint for ${s.year}.
+      <p style="color: #1A1B1D; font-size: 14px; line-height: 1.8;">Hi ${safeOrg} team,</p>
+      <p style="color: #1A1B1D; font-size: 14px; line-height: 1.8;">
+        We've updated how alka<strong style="color:#1A1B1D;">tera</strong> calculates your corporate carbon footprint for ${s.year}.
         Reason: ${safeReason}.
       </p>
-      <table style="width: 100%; border-collapse: collapse; margin: 20px 0; background: #111; border: 1px solid #222;">
+      <table style="width: 100%; border-collapse: collapse; margin: 20px 0; background: #ffffff; border: 1px solid #D9D6CB;">
         <tr>
-          <td style="padding: 12px 16px; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; border-bottom: 1px solid #222;">Previous total</td>
-          <td style="padding: 12px 16px; color: #fff; font-size: 14px; text-align: right; border-bottom: 1px solid #222;">${prevT} tCO<sub>2</sub>e</td>
+          <td style="padding: 12px 16px; color: #6F6F68; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; border-bottom: 1px solid #D9D6CB;">Previous total</td>
+          <td style="padding: 12px 16px; color: #1A1B1D; font-size: 14px; text-align: right; border-bottom: 1px solid #D9D6CB;">${prevT} tCO<sub>2</sub>e</td>
         </tr>
         <tr>
-          <td style="padding: 12px 16px; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; border-bottom: 1px solid #222;">Updated total</td>
-          <td style="padding: 12px 16px; color: #ccff00; font-size: 14px; text-align: right; border-bottom: 1px solid #222;">${newT} tCO<sub>2</sub>e</td>
+          <td style="padding: 12px 16px; color: #6F6F68; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; border-bottom: 1px solid #D9D6CB;">Updated total</td>
+          <td style="padding: 12px 16px; color: #205E40; font-size: 14px; text-align: right; border-bottom: 1px solid #D9D6CB;">${newT} tCO<sub>2</sub>e</td>
         </tr>
         <tr>
-          <td style="padding: 12px 16px; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;">Change</td>
-          <td style="padding: 12px 16px; color: #fff; font-size: 14px; text-align: right;">${deltaT} tCO<sub>2</sub>e ${deltaDirection} (${deltaPctStr})</td>
+          <td style="padding: 12px 16px; color: #6F6F68; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;">Change</td>
+          <td style="padding: 12px 16px; color: #1A1B1D; font-size: 14px; text-align: right;">${deltaT} tCO<sub>2</sub>e ${deltaDirection} (${deltaPctStr})</td>
         </tr>
       </table>
-      <p style="color: #ccc; font-size: 13px; line-height: 1.8;">
+      <p style="color: #1A1B1D; font-size: 13px; line-height: 1.8;">
         This isn't a data change on your side. It's a refinement to our calculation engine, driven by the
         GHG Protocol's data-quality hierarchy (prefer metered over supplier-specific over spend-based) and by
         booking emissions in the period the activity happened, not the period the invoice cleared.
       </p>
-      <p style="color: #ccc; font-size: 13px; line-height: 1.8;">
+      <p style="color: #1A1B1D; font-size: 13px; line-height: 1.8;">
         You can see exactly which sources moved, and which were superseded, on your Company Emissions
         page and in the Inventory Ledger. Every suppression is explained line-by-line.
       </p>
-      <p style="color: #777; font-size: 12px; line-height: 1.6; margin-top: 28px; border-top: 1px solid #222; padding-top: 16px;">
+      <p style="color: #6F6F68; font-size: 12px; line-height: 1.6; margin-top: 28px; border-top: 1px solid #D9D6CB; padding-top: 16px;">
         Questions? Just reply to this email and we'll walk through the diff with you.
       </p>
     </div>
@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
   const { error: sendErr } = await resend.emails.send({
     from: 'alkatera <no-reply@alkatera.com>',
     to: recipient,
-    subject: `Carbon accounting update — ${orgName} ${s.year}`,
+    subject: `Carbon accounting update: ${orgName} ${s.year}`,
     html,
   })
 

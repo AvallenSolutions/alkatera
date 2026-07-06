@@ -47,7 +47,10 @@ export const SectionHeader = ({
       theme === 'dark' ? "border-white/20" : "border-black/10",
       className
     )}>
-      <span className="text-[#ccff00] font-mono text-sm font-bold tracking-widest">{number}</span>
+      <span className={cn(
+        "font-mono text-sm font-bold tracking-widest",
+        theme === 'dark' ? "text-[#F2F1EA]" : "text-[#205E40]"
+      )}>{number}</span>
       <h2 className="text-4xl font-serif font-light">{title}</h2>
     </div>
   );

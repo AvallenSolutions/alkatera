@@ -50,33 +50,33 @@ export async function POST(request: NextRequest) {
           ? `New ${interest} Plan Inquiry from ${name}`
           : `New Contact Form Submission from ${name}`,
         html: `
-          <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #e0e0e0; padding: 40px; border: 1px solid #222;">
-            <div style="border-bottom: 1px solid #333; padding-bottom: 20px; margin-bottom: 30px;">
-              <h1 style="color: #ccff00; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; margin: 0;">New Contact Inquiry</h1>
+          <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #F2F1EA; color: #1A1B1D; padding: 40px; border: 1px solid #D9D6CB;">
+            <div style="border-bottom: 1px solid #D9D6CB; padding-bottom: 20px; margin-bottom: 30px;">
+              <h1 style="color: #205E40; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; margin: 0;">New Contact Inquiry</h1>
             </div>
             <table style="width: 100%; border-collapse: collapse;">
               <tr>
-                <td style="padding: 10px 0; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; width: 120px;">Name</td>
-                <td style="padding: 10px 0; color: #fff; font-size: 14px;">${name}</td>
+                <td style="padding: 10px 0; color: #6F6F68; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; width: 120px;">Name</td>
+                <td style="padding: 10px 0; color: #1A1B1D; font-size: 14px;">${name}</td>
               </tr>
               <tr>
-                <td style="padding: 10px 0; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;">Email</td>
-                <td style="padding: 10px 0; color: #fff; font-size: 14px;"><a href="mailto:${email}" style="color: #ccff00; text-decoration: none;">${email}</a></td>
+                <td style="padding: 10px 0; color: #6F6F68; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;">Email</td>
+                <td style="padding: 10px 0; color: #1A1B1D; font-size: 14px;"><a href="mailto:${email}" style="color: #205E40; text-decoration: none;">${email}</a></td>
               </tr>
               <tr>
-                <td style="padding: 10px 0; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;">Company</td>
-                <td style="padding: 10px 0; color: #fff; font-size: 14px;">${company || 'Not provided'}</td>
+                <td style="padding: 10px 0; color: #6F6F68; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;">Company</td>
+                <td style="padding: 10px 0; color: #1A1B1D; font-size: 14px;">${company || 'Not provided'}</td>
               </tr>
               ${interest ? `<tr>
-                <td style="padding: 10px 0; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;">Interest</td>
-                <td style="padding: 10px 0; color: #ccff00; font-size: 14px; font-weight: bold;">${interest} Plan</td>
+                <td style="padding: 10px 0; color: #6F6F68; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;">Interest</td>
+                <td style="padding: 10px 0; color: #205E40; font-size: 14px; font-weight: bold;">${interest} Plan</td>
               </tr>` : ''}
               <tr>
-                <td style="padding: 10px 0; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;">Mailing List</td>
-                <td style="padding: 10px 0; color: #fff; font-size: 14px;">${subscribe ? 'Yes — opted in' : 'No'}</td>
+                <td style="padding: 10px 0; color: #6F6F68; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;">Mailing List</td>
+                <td style="padding: 10px 0; color: #1A1B1D; font-size: 14px;">${subscribe ? 'Yes, opted in' : 'No'}</td>
               </tr>
             </table>
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #333; color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 2px;">
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #D9D6CB; color: #6F6F68; font-size: 10px; text-transform: uppercase; letter-spacing: 2px;">
               Sent via alka<strong>tera</strong> Contact Form
             </div>
           </div>

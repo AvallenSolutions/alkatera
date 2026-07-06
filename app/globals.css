@@ -223,8 +223,8 @@
 .passport-template {
   --passport-bg: #fafaf9;
   --passport-text: #1c1917;
-  --passport-accent: #ccff00;
-  --passport-accent-dark: #4d5e0d;
+  --passport-accent: #205E40;
+  --passport-accent-dark: #1a4a33;
 }
 
 .passport-template * {
@@ -232,8 +232,8 @@
 }
 
 .passport-template ::selection {
-  background-color: #ccff00;
-  color: #000;
+  background-color: #205E40;
+  color: #F2F1EA;
 }
 
 .passport-template .font-serif {

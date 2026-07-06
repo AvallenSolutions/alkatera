@@ -35,32 +35,32 @@ export const LandingPainPoints = () => {
   const isInView = useInView(ref, { once: true, margin: '-80px' });
 
   return (
-    <section ref={ref} className="py-24 md:py-32 px-6 md:px-20 bg-[#050505] text-white border-t border-white/10">
+    <section ref={ref} className="py-24 md:py-32 px-6 md:px-20 bg-background text-foreground border-t border-border">
       <div className="max-w-7xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.8, ease: [0.2, 0.8, 0.2, 1] }}
           className="mb-16"
         >
-          <h2 className="font-mono text-[#ccff00] text-sm tracking-[0.2em] uppercase mb-6">The Reality</h2>
-          <p className="font-serif text-4xl md:text-6xl leading-tight max-w-3xl">
+          <h2 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-[#BF4B2A] mb-6">The Reality</h2>
+          <p className="font-display font-bold tracking-[-0.035em] text-4xl md:text-6xl leading-[0.95] max-w-3xl">
             Sound familiar?
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-white/10">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-border">
           {painPoints.map((point, i) => (
             <motion.div
               key={i}
               initial={{ opacity: 0, y: 20 }}
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ delay: i * 0.1, duration: 0.6 }}
-              className="bg-[#050505] p-8 md:p-10"
+              className="bg-card p-8 md:p-10"
             >
-              <div className="w-2 h-2 rounded-full bg-[#ccff00] mb-6" />
-              <h3 className="font-serif text-xl md:text-2xl mb-4 leading-snug">{point.label}</h3>
-              <p className="font-mono text-sm text-gray-400 leading-relaxed">{point.description}</p>
+              <div className="w-2 h-2 rounded-full bg-[#BF4B2A] mb-6" />
+              <h3 className="font-display font-bold tracking-[-0.02em] text-xl md:text-2xl mb-4 leading-snug">{point.label}</h3>
+              <p className="font-sans text-sm text-muted-foreground leading-relaxed">{point.description}</p>
             </motion.div>
           ))}
         </div>
@@ -69,10 +69,10 @@ export const LandingPainPoints = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ delay: 0.7, duration: 0.6 }}
-          className="mt-16 border-l border-[#ccff00] pl-8 max-w-2xl"
+          className="mt-16 bg-[#BF4B2A] text-[#F2F1EA] rounded-[6px] p-8 md:p-10 max-w-2xl"
         >
-          <p className="font-serif text-2xl md:text-3xl italic text-gray-200 leading-snug">
-            alkatera is the only platform built specifically for the drinks industry, going far beyond carbon to give you the full picture.
+          <p className="font-display font-bold tracking-[-0.02em] text-2xl md:text-3xl leading-snug">
+            <span className="font-medium">alka</span>tera is the only platform built specifically for the drinks industry, going far beyond carbon to give you the full picture.
           </p>
         </motion.div>
       </div>

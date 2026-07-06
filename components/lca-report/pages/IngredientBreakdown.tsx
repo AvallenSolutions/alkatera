@@ -74,7 +74,7 @@ export const IngredientBreakdownPage = ({ data }: { data: LCAReportData }) => {
                 <div className="w-[10%] text-neutral-400">{ing.quantity} {ing.unit}</div>
                 <div className="w-[14%] text-neutral-500 truncate pr-2">{ing.origin}</div>
                 <div className="w-[12%] text-right font-medium">{ing.climateImpact}</div>
-                <div className="w-[10%] text-right text-[#ccff00]">{ing.climatePercentage}</div>
+                <div className="w-[10%] text-right text-[#F2F1EA]">{ing.climatePercentage}</div>
                 <div className="w-[26%] text-right">
                   <div className="flex items-center justify-end gap-1.5 flex-wrap">
                     {sourceBadge(ing)}
@@ -94,7 +94,7 @@ export const IngredientBreakdownPage = ({ data }: { data: LCAReportData }) => {
 
           {pageIdx === pages.length - 1 && (
             <div className="mt-8 p-4 rounded-xl border border-white/10 bg-white/5 text-xs text-neutral-400 leading-relaxed">
-              <strong className="text-[#ccff00]">Total climate impact:</strong>{' '}
+              <strong className="text-[#F2F1EA]">Total climate impact:</strong>{' '}
               {data.ingredientBreakdown.totalClimateImpact} kg CO₂e per functional unit.
               Source badges show where each emission factor came from; the quality grade and confidence
               score show how well that factor matches this exact ingredient.

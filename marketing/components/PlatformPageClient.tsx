@@ -47,12 +47,12 @@ import { PLATFORM_FAQ_ITEMS } from '@/marketing/components/platform-faq-data';
    ═══════════════════════════════════════════ */
 
 const Hero = () => (
-  <section className="relative min-h-screen w-full overflow-hidden bg-[#050505] text-[#f0f0f0] flex items-center justify-center pt-20">
+  <section className="relative min-h-screen w-full overflow-hidden bg-[#ECEAE3] text-[#1A1B1D] flex items-center justify-center pt-20">
     <div
-      className="absolute inset-0 opacity-[0.06]"
+      className="absolute inset-0 opacity-[0.05]"
       style={{
         backgroundImage:
-          'linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)',
+          'linear-gradient(rgba(26,27,29,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(26,27,29,0.3) 1px, transparent 1px)',
         backgroundSize: '40px 40px',
       }}
     />
@@ -62,29 +62,29 @@ const Hero = () => (
       transition={{ duration: 0.8 }}
       className="relative z-10 max-w-[900px] mx-auto px-6 text-center"
     >
-      <h1 className="font-serif text-5xl md:text-[96px] leading-[0.95] mb-8">
-        The Ecological
+      <h1 className="font-display font-bold tracking-[-0.035em] text-5xl md:text-[96px] leading-[0.95] mb-8">
+        The ecological
         <br />
-        <span className="text-[#ccff00] italic">Intelligence</span> Engine
+        <span className="text-[#2B46C0]">intelligence</span> engine.
       </h1>
-      <p className="text-lg text-gray-400 max-w-[600px] mx-auto leading-relaxed font-light mb-4">
+      <p className="text-lg text-[#6F6F68] max-w-[600px] mx-auto leading-relaxed mb-4">
         The single platform that turns environmental complexity into competitive
         clarity. From carbon to water to biodiversity, measure, report, and
         strategise with confidence.
       </p>
-      <p className="font-mono text-xs text-[#ccff00] uppercase tracking-[4px] mb-12 opacity-80">
+      <p className="font-mono font-bold text-xs text-[#2B46C0] uppercase tracking-[0.22em] mb-12">
         Purpose-built for the drinks industry
       </p>
       <div className="flex gap-4 justify-center flex-wrap">
         <Link
           href="/getaccess"
-          className="bg-[#ccff00] text-black font-mono text-xs font-medium uppercase tracking-widest px-10 py-4 rounded-full hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(204,255,0,0.3)] transition-all"
+          className="bg-[#1A1B1D] text-[#F2F1EA] font-mono text-xs font-bold uppercase tracking-[0.22em] px-10 py-4 rounded-full hover:bg-[#2B46C0] transition-colors"
         >
           Get Access
         </Link>
         <a
           href="#process"
-          className="border border-white/10 text-white font-mono text-xs uppercase tracking-widest px-10 py-4 rounded-full hover:border-[#ccff00] hover:text-[#ccff00] transition-all"
+          className="border border-[#1A1B1D]/30 text-[#1A1B1D] font-mono text-xs uppercase tracking-[0.22em] px-10 py-4 rounded-full hover:border-[#2B46C0] hover:text-[#2B46C0] transition-all"
         >
           See How It Works
         </a>
@@ -131,13 +131,13 @@ const painPoints = [
 ];
 
 const PainPointsSection = () => (
-  <section className="py-28 px-6 md:px-10 border-t border-white/[0.06]">
+  <section className="py-28 px-6 md:px-10 border-t border-[#D9D6CB]">
     <div className="max-w-[1200px] mx-auto">
       <motion.p
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         viewport={{ once: true }}
-        className="font-mono text-[11px] text-[#ccff00] uppercase tracking-[4px] mb-4"
+        className="font-mono font-bold text-[11px] text-[#2B46C0] uppercase tracking-[0.22em] mb-4"
       >
         The Reality
       </motion.p>
@@ -145,9 +145,9 @@ const PainPointsSection = () => (
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        className="font-serif text-4xl md:text-[56px] leading-[1.1] mb-14"
+        className="font-display font-bold tracking-[-0.035em] text-4xl md:text-[56px] leading-[0.95] mb-14"
       >
-        Sound <span className="italic text-gray-500">familiar?</span>
+        Sound <span className="text-[#BF4B2A]">familiar?</span>
       </motion.h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {painPoints.map((pain, i) => (
@@ -157,16 +157,15 @@ const PainPointsSection = () => (
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: i * 0.06 }}
-            className="group relative overflow-hidden backdrop-blur-md bg-white/5 border border-white/10 rounded-2xl p-8 hover:border-red-400/25 transition-all duration-500"
+            className="group relative overflow-hidden bg-[#F2F1EA] border border-[#D9D6CB] rounded-[6px] p-8 hover:border-[#BF4B2A] transition-all duration-500"
           >
-            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-red-400/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="w-11 h-11 rounded-xl bg-red-400/10 flex items-center justify-center mb-5">
-              <pain.icon className="w-5 h-5 text-red-300/80" />
+            <div className="w-11 h-11 rounded-[6px] bg-[#BF4B2A]/10 flex items-center justify-center mb-5">
+              <pain.icon className="w-5 h-5 text-[#BF4B2A]" />
             </div>
-            <h4 className="font-serif text-xl mb-2.5 text-red-300/90">
+            <h4 className="font-display font-semibold tracking-[-0.02em] text-xl mb-2.5 text-[#BF4B2A]">
               {pain.title}
             </h4>
-            <p className="text-sm text-gray-500 leading-relaxed">{pain.desc}</p>
+            <p className="text-sm text-[#6F6F68] leading-relaxed">{pain.desc}</p>
           </motion.div>
         ))}
       </div>
@@ -188,14 +187,13 @@ const solutionBadges = [
 ];
 
 const SolutionOverview = () => (
-  <section className="py-28 px-6 md:px-10 border-t border-white/[0.06] relative overflow-hidden">
-    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[radial-gradient(circle,_rgba(204,255,0,0.04),_transparent_70%)] pointer-events-none" />
+  <section className="py-28 px-6 md:px-10 border-t border-[#D9D6CB] relative overflow-hidden">
     <div className="max-w-[1200px] mx-auto relative z-10 text-center">
       <motion.p
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         viewport={{ once: true }}
-        className="font-mono text-[11px] text-[#ccff00] uppercase tracking-[4px] mb-4"
+        className="font-mono font-bold text-[11px] text-[#2B46C0] uppercase tracking-[0.22em] mb-4"
       >
         The Answer
       </motion.p>
@@ -203,16 +201,16 @@ const SolutionOverview = () => (
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        className="font-serif text-4xl md:text-[56px] leading-[1.1] mb-6"
+        className="font-display font-bold tracking-[-0.035em] text-4xl md:text-[56px] leading-[0.95] mb-6"
       >
-        One Platform. <span className="text-[#ccff00]">Total Clarity.</span>
+        One platform. <span className="text-[#2B46C0]">Total clarity.</span>
       </motion.h2>
       <motion.p
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ delay: 0.1 }}
-        className="text-gray-400 max-w-[640px] mx-auto leading-relaxed font-light mb-12"
+        className="text-[#6F6F68] max-w-[640px] mx-auto leading-relaxed mb-12"
       >
         <Brand /> replaces the spreadsheet chaos, the consultancy invoices, and
         the reporting headaches with a single intelligent platform. We go far
@@ -228,9 +226,9 @@ const SolutionOverview = () => (
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: i * 0.06 }}
-            className="font-mono text-[11px] uppercase tracking-widest px-6 py-3 rounded-full backdrop-blur-md bg-white/5 border border-white/10 text-gray-400 hover:border-[#ccff00] hover:text-[#ccff00] transition-all whitespace-nowrap"
+            className="font-mono text-[11px] uppercase tracking-[0.22em] px-6 py-3 rounded-full bg-[#F2F1EA] border border-[#D9D6CB] text-[#6F6F68] hover:border-[#2B46C0] hover:text-[#2B46C0] transition-all whitespace-nowrap"
           >
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#ccff00] mr-2.5" />
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#2B46C0] mr-2.5" />
             {badge}
           </motion.div>
         ))}
@@ -268,14 +266,14 @@ const processSteps = [
 ];
 
 const ProcessSection = () => (
-  <section id="process" className="py-28 px-6 md:px-10 border-t border-white/[0.06]">
+  <section id="process" className="py-28 px-6 md:px-10 border-t border-[#D9D6CB]">
     <div className="max-w-[1200px] mx-auto">
       <div className="mb-20">
         <motion.p
           initial={{ opacity: 0, x: -50 }}
           whileInView={{ opacity: 1, x: 0 }}
           viewport={{ once: true }}
-          className="font-mono text-[11px] text-[#ccff00] uppercase tracking-[4px] mb-4"
+          className="font-mono font-bold text-[11px] text-[#2B46C0] uppercase tracking-[0.22em] mb-4"
         >
           The Alchemy
         </motion.p>
@@ -284,13 +282,13 @@ const ProcessSection = () => (
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ delay: 0.2 }}
-          className="font-serif text-4xl md:text-[56px] leading-[1.1] max-w-3xl"
+          className="font-display font-bold tracking-[-0.035em] text-4xl md:text-[56px] leading-[0.95] max-w-3xl"
         >
-          From Raw Data to{' '}
-          <span className="italic text-gray-500">Real Impact</span>
+          From raw data to{' '}
+          <span className="text-[#2B46C0]">real impact.</span>
         </motion.h2>
-        <div className="border-l-2 border-[#ccff00] pl-6 mt-6">
-          <p className="font-mono text-[13px] text-gray-400 max-w-2xl tracking-wide">
+        <div className="border-l-2 border-[#2B46C0] pl-6 mt-6">
+          <p className="text-[13px] text-[#6F6F68] max-w-2xl">
             Clarity, not complexity. Action, not ambiguity. Your path to
             environmental leadership, simplified.
           </p>
@@ -298,7 +296,7 @@ const ProcessSection = () => (
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 relative">
-        <div className="hidden lg:block absolute top-12 left-20 right-20 h-[1px] bg-gradient-to-r from-transparent via-[#ccff00]/30 to-transparent z-0" />
+        <div className="hidden lg:block absolute top-12 left-20 right-20 h-[1px] bg-[#D9D6CB] z-0" />
         {processSteps.map((step, i) => (
           <motion.div
             key={step.id}
@@ -308,19 +306,19 @@ const ProcessSection = () => (
             transition={{ delay: i * 0.2 }}
             className="relative z-10 group"
           >
-            <div className="w-24 h-24 backdrop-blur-md bg-white/5 border border-white/10 rounded-full flex items-center justify-center mb-7 group-hover:border-[#ccff00] transition-colors duration-500 relative">
-              <step.icon className="w-8 h-8 text-white group-hover:text-[#ccff00] transition-colors" />
-              <div className="absolute -top-2 -right-2 w-7 h-7 bg-[#ccff00] rounded-full flex items-center justify-center text-black font-bold font-mono text-[11px]">
+            <div className="w-24 h-24 bg-[#F2F1EA] border border-[#D9D6CB] rounded-full flex items-center justify-center mb-7 group-hover:border-[#2B46C0] transition-colors duration-500 relative">
+              <step.icon className="w-8 h-8 text-[#1A1B1D] group-hover:text-[#2B46C0] transition-colors" />
+              <div className="absolute -top-2 -right-2 w-7 h-7 bg-[#2B46C0] rounded-full flex items-center justify-center text-[#F2F1EA] font-bold font-mono text-[11px]">
                 {step.id}
               </div>
             </div>
-            <h4 className="font-serif text-2xl mb-1.5 group-hover:text-[#ccff00] transition-colors">
+            <h4 className="font-display font-semibold tracking-[-0.02em] text-2xl mb-1.5 group-hover:text-[#2B46C0] transition-colors">
               {step.title}
             </h4>
-            <h5 className="font-mono text-[10px] uppercase tracking-[3px] text-gray-500 mb-6">
+            <h5 className="font-mono font-bold text-[10px] uppercase tracking-[0.22em] text-[#6F6F68] mb-6">
               {step.subtitle}
             </h5>
-            <p className="text-sm text-gray-400 leading-relaxed border-t border-white/10 pt-6 group-hover:border-[#ccff00]/20 transition-colors">
+            <p className="text-sm text-[#6F6F68] leading-relaxed border-t border-[#D9D6CB] pt-6 group-hover:border-[#2B46C0]/30 transition-colors">
               {step.desc}
             </p>
           </motion.div>
@@ -341,7 +339,6 @@ const modules = [
     desc: 'One dashboard for your entire business. Automate the tracking of your Scope 1, 2, and 3 emissions alongside water and waste, with a holistic, audit-ready view from the office to the production floor.',
     icon: Footprints,
     features: ['Scope 1, 2 & 3', 'Facilities', 'Fleet', 'Water & Waste', 'Production Data'],
-    gradient: 'from-emerald-500/[0.06]',
   },
   {
     title: 'Liquid & Packaging Intelligence',
@@ -349,7 +346,6 @@ const modules = [
     desc: "Map the environmental footprint of every SKU you produce. Run 'what-if' scenarios to instantly see how a glass-weight change or a new recipe affects your total ecological score.",
     icon: Layers,
     features: ['SKU-Level LCA', 'What-If Scenarios', 'Recipe Modelling', 'Packaging Optimisation'],
-    gradient: 'from-blue-500/[0.06]',
   },
   {
     title: 'The Regulatory Shield',
@@ -357,7 +353,6 @@ const modules = [
     desc: "Say goodbye to regulatory anxiety. Whether you're facing CSRD, the Green Claims Directive, or B Corp certification, generate the verifiable reports you need to stay safe and prove your resilience.",
     icon: ShieldCheck,
     features: ['CSRD', 'GRI', 'CDP', 'B Corp', 'ISO 14001', 'SBTi'],
-    gradient: 'from-yellow-500/[0.06]',
   },
   {
     title: 'Supply Chain Clarity',
@@ -365,7 +360,6 @@ const modules = [
     desc: 'See beyond your own walls. Bridge the data gap by gathering real insights from growers on farming practices and water use. Track your ingredients from the field to the bottle with total confidence.',
     icon: Network,
     features: ['Supplier Engagement', 'Farming Practices', 'Traceability', 'Verification'],
-    gradient: 'from-purple-500/[0.06]',
   },
   {
     title: 'Greenwash Guardian',
@@ -373,7 +367,6 @@ const modules = [
     desc: 'Scan your website, marketing materials, and social posts against UK and EU green claims legislation before the regulators do. Get a risk score and actionable fixes for every claim you make.',
     icon: Eye,
     features: ['Website Scanning', 'Document Analysis', 'Risk Scoring', 'UK & EU Law'],
-    gradient: 'from-red-500/[0.06]',
   },
   {
     title: 'Vitality Score',
@@ -381,19 +374,18 @@ const modules = [
     desc: 'Your sustainability health check at a glance. A four-pillar score across Climate, Water, Circularity, and Nature, benchmarked against your industry so you know exactly where you stand and where to focus.',
     icon: Activity,
     features: ['Climate Score', 'Water Score', 'Circularity', 'Nature & Biodiversity'],
-    gradient: 'from-cyan-500/[0.06]',
   },
 ];
 
 const ModulesSection = () => (
-  <section className="py-28 px-6 md:px-10 border-t border-white/[0.06]">
+  <section className="py-28 px-6 md:px-10 border-t border-[#D9D6CB]">
     <div className="max-w-[1200px] mx-auto">
       <div className="text-center mb-16">
         <motion.p
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          className="font-mono text-[11px] text-[#ccff00] uppercase tracking-[4px] mb-4"
+          className="font-mono font-bold text-[11px] text-[#2B46C0] uppercase tracking-[0.22em] mb-4"
         >
           The Architecture of Impact
         </motion.p>
@@ -401,16 +393,16 @@ const ModulesSection = () => (
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="font-serif text-4xl md:text-[56px] leading-[1.1] mb-6"
+          className="font-display font-bold tracking-[-0.035em] text-4xl md:text-[56px] leading-[0.95] mb-6"
         >
-          Six Modules. <span className="text-[#ccff00]">One Platform.</span>
+          Six modules. <span className="text-[#2B46C0]">One platform.</span>
         </motion.h2>
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ delay: 0.1 }}
-          className="text-gray-400 max-w-[640px] mx-auto font-light"
+          className="text-[#6F6F68] max-w-[640px] mx-auto"
         >
           Each module works independently or together, giving you the flexibility
           to build your sustainability programme at your own pace. Start where it
@@ -426,32 +418,26 @@ const ModulesSection = () => (
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
             transition={{ delay: i * 0.08 }}
-            className="group relative overflow-hidden backdrop-blur-md bg-white/5 border border-white/10 rounded-2xl p-10 hover:border-[#ccff00]/30 transition-all duration-500 min-h-[340px] flex flex-col"
+            className="group relative overflow-hidden bg-[#F2F1EA] border border-[#D9D6CB] rounded-[6px] p-10 hover:border-[#2B46C0] transition-all duration-500 min-h-[340px] flex flex-col"
           >
-            <div
-              className={cn(
-                'absolute inset-0 bg-gradient-to-br to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500',
-                mod.gradient
-              )}
-            />
             <div className="relative z-10 flex flex-col flex-grow">
-              <div className="w-12 h-12 rounded-xl bg-white/[0.06] flex items-center justify-center mb-6 group-hover:bg-[#ccff00] transition-colors duration-300">
-                <mod.icon className="w-6 h-6 text-white group-hover:text-black transition-colors" />
+              <div className="w-12 h-12 rounded-[6px] bg-[#1A1B1D]/[0.06] flex items-center justify-center mb-6 group-hover:bg-[#2B46C0] transition-colors duration-300">
+                <mod.icon className="w-6 h-6 text-[#1A1B1D] group-hover:text-[#F2F1EA] transition-colors" />
               </div>
-              <h3 className="font-serif text-[22px] mb-1.5 group-hover:translate-x-2 transition-transform duration-300">
+              <h3 className="font-display font-semibold tracking-[-0.02em] text-[22px] mb-1.5 group-hover:translate-x-2 transition-transform duration-300">
                 {mod.title}
               </h3>
-              <p className="font-mono text-[10px] text-[#ccff00] uppercase tracking-[3px] mb-4">
+              <p className="font-mono font-bold text-[10px] text-[#2B46C0] uppercase tracking-[0.22em] mb-4">
                 {mod.label}
               </p>
-              <p className="text-sm text-gray-400 leading-relaxed mb-5 flex-grow">
+              <p className="text-sm text-[#6F6F68] leading-relaxed mb-5 flex-grow">
                 {mod.desc}
               </p>
               <div className="flex flex-wrap gap-2">
                 {mod.features.map((f) => (
                   <span
                     key={f}
-                    className="font-mono text-[10px] px-3 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-gray-500 group-hover:border-[#ccff00]/15 group-hover:text-gray-400 transition-all tracking-wide"
+                    className="font-mono text-[10px] px-3 py-1.5 rounded-full bg-transparent border border-[#D9D6CB] text-[#6F6F68] group-hover:border-[#2B46C0]/30 transition-all tracking-wide"
                   >
                     {f}
                   </span>
@@ -473,11 +459,11 @@ const measureColumns = [
   {
     label: 'Environmental',
     headerIcon: Leaf,
-    headerBg: 'bg-emerald-400/15',
-    headerColor: 'text-emerald-400',
+    headerBg: 'bg-[#205E40]/10',
+    headerColor: 'text-[#205E40]',
     items: [
       { title: 'Climate Change', sub: 'GHG Emissions', icon: Thermometer },
-      { title: 'Water Depletion', sub: 'Blue \u00b7 Green \u00b7 Grey', icon: Droplets },
+      { title: 'Water Depletion', sub: 'Blue · Green · Grey', icon: Droplets },
       { title: 'Land Use & Biodiversity', sub: 'Ecological Impact', icon: TreePine },
       { title: 'Circularity & Waste', sub: 'Diversion & Recovery', icon: Recycle },
       { title: 'Eutrophication & Acidification', sub: 'Marine & Terrestrial', icon: Sprout },
@@ -486,8 +472,8 @@ const measureColumns = [
   {
     label: 'Social',
     headerIcon: Users,
-    headerBg: 'bg-blue-400/15',
-    headerColor: 'text-blue-400',
+    headerBg: 'bg-[#2B46C0]/10',
+    headerColor: 'text-[#2B46C0]',
     items: [
       { title: 'People & Culture', sub: 'Fair Work & Wellbeing', icon: UserPlus },
       { title: 'Diversity & Inclusion', sub: 'Workforce Equity', icon: Users },
@@ -499,8 +485,8 @@ const measureColumns = [
   {
     label: 'Governance',
     headerIcon: Building2,
-    headerBg: 'bg-purple-400/15',
-    headerColor: 'text-purple-400',
+    headerBg: 'bg-[#DFA32B]/15',
+    headerColor: 'text-[#A97C14]',
     items: [
       { title: 'Board Composition', sub: 'Leadership Structure', icon: Briefcase },
       { title: 'Policy Management', sub: 'Standards & Procedures', icon: FileText },
@@ -512,14 +498,14 @@ const measureColumns = [
 ];
 
 const MeasureSection = () => (
-  <section className="py-28 px-6 md:px-10 border-t border-white/[0.06]">
+  <section className="py-28 px-6 md:px-10 border-t border-[#D9D6CB]">
     <div className="max-w-[1200px] mx-auto">
       <div className="mb-16">
         <motion.p
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          className="font-mono text-[11px] text-[#ccff00] uppercase tracking-[4px] mb-4"
+          className="font-mono font-bold text-[11px] text-[#2B46C0] uppercase tracking-[0.22em] mb-4"
         >
           Beyond Carbon
         </motion.p>
@@ -527,16 +513,16 @@ const MeasureSection = () => (
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="font-serif text-4xl md:text-[56px] leading-[1.1] mb-6"
+          className="font-display font-bold tracking-[-0.035em] text-4xl md:text-[56px] leading-[0.95] mb-6"
         >
-          We Measure What <span className="text-[#ccff00]">Matters</span>
+          We measure what <span className="text-[#2B46C0]">matters.</span>
         </motion.h2>
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ delay: 0.1 }}
-          className="text-gray-400 max-w-[640px] leading-relaxed font-light"
+          className="text-[#6F6F68] max-w-[640px] leading-relaxed"
         >
           While others count carbon alone, <Brand /> quantifies the full picture
           (environmental, social, and governance) because genuine
@@ -547,16 +533,16 @@ const MeasureSection = () => (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {measureColumns.map((col) => (
           <div key={col.label}>
-            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-white/10">
+            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-[#D9D6CB]">
               <div
                 className={cn(
-                  'w-9 h-9 rounded-[10px] flex items-center justify-center',
+                  'w-9 h-9 rounded-[6px] flex items-center justify-center',
                   col.headerBg
                 )}
               >
                 <col.headerIcon className={cn('w-[18px] h-[18px]', col.headerColor)} />
               </div>
-              <span className="font-mono text-[11px] uppercase tracking-widest">
+              <span className="font-mono font-bold text-[11px] uppercase tracking-[0.22em]">
                 {col.label}
               </span>
             </div>
@@ -568,16 +554,16 @@ const MeasureSection = () => (
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: j * 0.05 }}
-                  className="backdrop-blur-md bg-white/5 border border-white/10 rounded-2xl px-5 py-4 flex items-center gap-4 hover:border-[#ccff00]/25 transition-all"
+                  className="bg-[#F2F1EA] border border-[#D9D6CB] rounded-[6px] px-5 py-4 flex items-center gap-4 hover:border-[#2B46C0] transition-all"
                 >
-                  <div className="w-9 h-9 flex-shrink-0 rounded-[10px] bg-white/[0.06] flex items-center justify-center">
-                    <item.icon className="w-4 h-4 text-gray-400" />
+                  <div className="w-9 h-9 flex-shrink-0 rounded-[6px] bg-[#1A1B1D]/[0.06] flex items-center justify-center">
+                    <item.icon className="w-4 h-4 text-[#6F6F68]" />
                   </div>
                   <div>
                     <h5 className="text-[13px] font-medium leading-tight">
                       {item.title}
                     </h5>
-                    <span className="font-mono text-[9px] text-gray-500 uppercase tracking-wider">
+                    <span className="font-mono text-[9px] text-[#6F6F68] uppercase tracking-wider">
                       {item.sub}
                     </span>
                   </div>
@@ -592,10 +578,10 @@ const MeasureSection = () => (
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         viewport={{ once: true }}
-        className="mt-14 text-center font-serif text-xl text-gray-500 italic"
+        className="mt-14 text-center font-display font-semibold tracking-[-0.02em] text-xl text-[#6F6F68]"
       >
         Every number traceable. Every calculation{' '}
-        <span className="text-[#ccff00] not-italic">audit-ready</span>. ISO
+        <span className="text-[#2B46C0]">audit-ready</span>. ISO
         14044 compliant.
       </motion.p>
     </div>
@@ -636,13 +622,13 @@ const intelligenceTools = [
 ];
 
 const IntelligenceSection = () => (
-  <section className="py-28 px-6 md:px-10 border-t border-white/[0.06]">
+  <section className="py-28 px-6 md:px-10 border-t border-[#D9D6CB]">
     <div className="max-w-[1200px] mx-auto">
       <motion.p
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         viewport={{ once: true }}
-        className="font-mono text-[11px] text-[#ccff00] uppercase tracking-[4px] mb-4"
+        className="font-mono font-bold text-[11px] text-[#2B46C0] uppercase tracking-[0.22em] mb-4"
       >
         Embedded Intelligence
       </motion.p>
@@ -650,16 +636,16 @@ const IntelligenceSection = () => (
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        className="font-serif text-4xl md:text-[56px] leading-[1.1] mb-6"
+        className="font-display font-bold tracking-[-0.035em] text-4xl md:text-[56px] leading-[0.95] mb-6"
       >
-        Your Sustainability <span className="text-[#ccff00]">Brain Trust</span>
+        Your sustainability <span className="text-[#2B46C0]">brain trust.</span>
       </motion.h2>
       <motion.p
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ delay: 0.1 }}
-        className="text-gray-400 max-w-[640px] leading-relaxed font-light"
+        className="text-[#6F6F68] max-w-[640px] leading-relaxed"
       >
         Two embedded tools that turn complex sustainability questions into clear,
         actionable answers, without the consultancy fees.
@@ -674,27 +660,37 @@ const IntelligenceSection = () => (
             viewport={{ once: true }}
             transition={{ delay: i * 0.15 }}
             className={cn(
-              'backdrop-blur-md rounded-2xl p-12 transition-all duration-500',
+              'rounded-[6px] p-12 transition-all duration-500',
               tool.highlighted
-                ? 'bg-[#ccff00]/5 border border-[#ccff00]/15 hover:border-[#ccff00]/30'
-                : 'bg-white/5 border border-white/10 hover:border-[#ccff00]/30'
+                ? 'bg-[#2B46C0] text-[#F2F1EA]'
+                : 'bg-[#F2F1EA] border border-[#D9D6CB] hover:border-[#2B46C0]'
             )}
           >
-            <div className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest px-4 py-2 rounded-full border border-[#ccff00]/20 text-[#ccff00] mb-6">
+            <div
+              className={cn(
+                'inline-flex items-center gap-2 font-mono font-bold text-[10px] uppercase tracking-[0.22em] px-4 py-2 rounded-full border mb-6',
+                tool.highlighted
+                  ? 'border-[#F2F1EA]/40 text-[#F2F1EA]'
+                  : 'border-[#2B46C0]/40 text-[#2B46C0]'
+              )}
+            >
               <tool.badgeIcon className="w-3.5 h-3.5" />
               {tool.badge}
             </div>
-            <h3 className="font-serif text-[28px] mb-3">{tool.title}</h3>
-            <p className="text-[15px] text-gray-400 leading-relaxed mb-7">
+            <h3 className="font-display font-semibold tracking-[-0.02em] text-[28px] mb-3">{tool.title}</h3>
+            <p className={cn('text-[15px] leading-relaxed mb-7', tool.highlighted ? 'text-[#F2F1EA]/80' : 'text-[#6F6F68]')}>
               {tool.desc}
             </p>
             <ul className="flex flex-col gap-3">
               {tool.features.map((feat) => (
                 <li
                   key={feat}
-                  className="text-[13px] text-gray-400 flex items-start gap-3 leading-relaxed"
+                  className={cn(
+                    'text-[13px] flex items-start gap-3 leading-relaxed',
+                    tool.highlighted ? 'text-[#F2F1EA]/80' : 'text-[#6F6F68]'
+                  )}
                 >
-                  <Check className="w-3.5 h-3.5 text-[#ccff00] flex-shrink-0 mt-0.5" />
+                  <Check className={cn('w-3.5 h-3.5 flex-shrink-0 mt-0.5', tool.highlighted ? 'text-[#F2F1EA]' : 'text-[#2B46C0]')} />
                   {feat}
                 </li>
               ))}
@@ -724,13 +720,13 @@ const frameworks = [
 ];
 
 const FrameworksSection = () => (
-  <section className="py-28 px-6 md:px-10 border-t border-white/[0.06]">
+  <section className="py-28 px-6 md:px-10 border-t border-[#D9D6CB]">
     <div className="max-w-[1200px] mx-auto text-center">
       <motion.p
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         viewport={{ once: true }}
-        className="font-mono text-[11px] text-[#ccff00] uppercase tracking-[4px] mb-4"
+        className="font-mono font-bold text-[11px] text-[#2B46C0] uppercase tracking-[0.22em] mb-4"
       >
         Certifications &amp; Frameworks
       </motion.p>
@@ -738,16 +734,16 @@ const FrameworksSection = () => (
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        className="font-serif text-4xl md:text-[56px] leading-[1.1] mb-6"
+        className="font-display font-bold tracking-[-0.035em] text-4xl md:text-[56px] leading-[0.95] mb-6"
       >
-        Every Framework. <span className="text-[#ccff00]">One Place.</span>
+        Every framework. <span className="text-[#2B46C0]">One place.</span>
       </motion.h2>
       <motion.p
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ delay: 0.1 }}
-        className="text-gray-400 max-w-[640px] mx-auto leading-relaxed font-light mb-14"
+        className="text-[#6F6F68] max-w-[640px] mx-auto leading-relaxed mb-14"
       >
         Stop juggling separate tools for each reporting standard. <Brand /> maps
         your data to every major framework automatically.
@@ -760,9 +756,9 @@ const FrameworksSection = () => (
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: i * 0.04 }}
-            className="backdrop-blur-md bg-white/5 border border-white/10 rounded-xl px-7 py-4 flex items-center gap-2.5 text-gray-400 hover:border-[#ccff00]/30 hover:text-white hover:-translate-y-0.5 transition-all"
+            className="bg-[#F2F1EA] border border-[#D9D6CB] rounded-[6px] px-7 py-4 flex items-center gap-2.5 text-[#6F6F68] hover:border-[#2B46C0] hover:text-[#1A1B1D] hover:-translate-y-0.5 transition-all"
           >
-            <span className="w-2 h-2 rounded-full bg-[#ccff00] opacity-60" />
+            <span className="w-2 h-2 rounded-full bg-[#2B46C0] opacity-60" />
             <span className="text-sm font-medium">{fw}</span>
           </motion.div>
         ))}
@@ -800,13 +796,13 @@ const drinksFeatures = [
 
 const drinksStats = [
   { number: '10+', label: 'Environmental impact categories', sub: 'Beyond carbon alone' },
-  { number: '3', label: 'Water footprint types tracked', sub: 'Blue \u00b7 Green \u00b7 Grey' },
-  { number: '7+', label: 'Reporting frameworks supported', sub: 'B Corp \u00b7 CSRD \u00b7 GRI \u00b7 CDP & more' },
-  { number: '\u221e', label: 'What-if scenarios per product', sub: 'Recipe & packaging modelling' },
+  { number: '3', label: 'Water footprint types tracked', sub: 'Blue · Green · Grey' },
+  { number: '7+', label: 'Reporting frameworks supported', sub: 'B Corp · CSRD · GRI · CDP & more' },
+  { number: '∞', label: 'What-if scenarios per product', sub: 'Recipe & packaging modelling' },
 ];
 
 const DrinksSection = () => (
-  <section className="py-28 px-6 md:px-10 border-t border-white/[0.06] relative overflow-hidden">
+  <section className="py-28 px-6 md:px-10 border-t border-[#D9D6CB] relative overflow-hidden">
     <div className="max-w-[1200px] mx-auto">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
         <div>
@@ -814,7 +810,7 @@ const DrinksSection = () => (
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
-            className="font-mono text-[11px] text-[#ccff00] uppercase tracking-[4px] mb-4"
+            className="font-mono font-bold text-[11px] text-[#2B46C0] uppercase tracking-[0.22em] mb-4"
           >
             Industry-Specific
           </motion.p>
@@ -822,16 +818,16 @@ const DrinksSection = () => (
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="font-serif text-4xl md:text-[56px] leading-[1.1] mb-6"
+            className="font-display font-bold tracking-[-0.035em] text-4xl md:text-[56px] leading-[0.95] mb-6"
           >
-            Built for <span className="text-[#ccff00]">Drinks</span>
+            Built for <span className="text-[#2B46C0]">drinks.</span>
           </motion.h2>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.1 }}
-            className="text-gray-400 max-w-[540px] leading-relaxed font-light mb-10"
+            className="text-[#6F6F68] max-w-[540px] leading-relaxed mb-10"
           >
             This isn&apos;t a generic sustainability calculator. <Brand /> is
             engineered from the ground up for the unique science, supply chains,
@@ -847,12 +843,12 @@ const DrinksSection = () => (
                 transition={{ delay: i * 0.1 }}
                 className="flex gap-4 items-start"
               >
-                <div className="w-11 h-11 flex-shrink-0 rounded-xl bg-[#ccff00]/[0.08] flex items-center justify-center">
-                  <feat.icon className="w-5 h-5 text-[#ccff00]" />
+                <div className="w-11 h-11 flex-shrink-0 rounded-[6px] bg-[#2B46C0]/[0.08] flex items-center justify-center">
+                  <feat.icon className="w-5 h-5 text-[#2B46C0]" />
                 </div>
                 <div>
                   <h5 className="text-[15px] font-medium mb-1">{feat.title}</h5>
-                  <p className="text-[13px] text-gray-500 leading-relaxed">
+                  <p className="text-[13px] text-[#6F6F68] leading-relaxed">
                     {feat.desc}
                   </p>
                 </div>
@@ -869,16 +865,16 @@ const DrinksSection = () => (
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.1 }}
-              className="backdrop-blur-md bg-white/5 border border-white/10 rounded-2xl px-7 py-6 flex items-center gap-5 hover:border-[#ccff00]/25 transition-all"
+              className="bg-[#F2F1EA] border border-[#D9D6CB] rounded-[6px] px-7 py-6 flex items-center gap-5 hover:border-[#2B46C0] transition-all"
             >
-              <span className="font-serif text-4xl text-[#ccff00] leading-none min-w-[60px]">
+              <span className="font-display font-bold tabular-nums text-4xl text-[#2B46C0] leading-none min-w-[60px]">
                 {stat.number}
               </span>
               <div>
-                <div className="text-sm text-gray-400 leading-snug">
+                <div className="text-sm text-[#1A1B1D]/80 leading-snug">
                   {stat.label}
                 </div>
-                <span className="font-mono text-[10px] text-gray-500 uppercase tracking-wider">
+                <span className="font-mono text-[10px] text-[#6F6F68] uppercase tracking-wider">
                   {stat.sub}
                 </span>
               </div>
@@ -895,37 +891,37 @@ const DrinksSection = () => (
    ═══════════════════════════════════════════ */
 
 const CTASection = () => (
-  <section className="py-40 px-6 md:px-20 bg-[#ccff00] text-black text-center relative overflow-hidden">
+  <section className="py-40 px-6 md:px-20 bg-[#1A1B1D] text-[#F2F1EA] text-center relative overflow-hidden">
     <div className="relative z-10">
       <motion.h2
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        className="font-serif text-4xl md:text-[56px] leading-[1.1] mb-5"
+        className="font-display font-bold tracking-[-0.035em] text-4xl md:text-[56px] leading-[0.95] mb-5"
       >
-        Ready to Turn Sustainability
+        Ready to turn sustainability
         <br />
-        Into Your Competitive Edge?
+        into your competitive edge?
       </motion.h2>
       <motion.p
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ delay: 0.1 }}
-        className="text-black/60 mb-12 font-light text-base"
+        className="text-[#F2F1EA]/60 mb-12 text-base"
       >
         No PhD required. No spreadsheet chaos. Just clarity.
       </motion.p>
       <div className="flex gap-4 justify-center flex-wrap">
         <Link
           href="/getaccess"
-          className="bg-black text-white font-mono text-xs font-medium uppercase tracking-widest px-10 py-4 rounded-full hover:scale-105 transition-transform duration-300"
+          className="bg-[#F2F1EA] text-[#1A1B1D] font-mono text-xs font-bold uppercase tracking-[0.22em] px-10 py-4 rounded-full hover:bg-white transition-colors duration-300"
         >
           Get Access
         </Link>
         <Link
           href="/manifesto"
-          className="border border-black/30 text-black font-mono text-xs uppercase tracking-widest px-10 py-4 rounded-full hover:border-black hover:bg-black/5 transition-all"
+          className="border border-[#F2F1EA]/30 text-[#F2F1EA] font-mono text-xs uppercase tracking-[0.22em] px-10 py-4 rounded-full hover:border-[#F2F1EA] hover:bg-[#F2F1EA]/5 transition-all"
         >
           Read Our Manifesto
         </Link>
@@ -935,7 +931,7 @@ const CTASection = () => (
         whileInView={{ opacity: 1 }}
         viewport={{ once: true }}
         transition={{ delay: 0.3 }}
-        className="font-mono text-[11px] text-black/50 mt-6 tracking-wider"
+        className="font-mono text-[11px] text-[#F2F1EA]/50 mt-6 tracking-wider"
       >
         Start with Seed from &pound;99/month. No long-term contracts.
       </motion.p>
@@ -953,14 +949,14 @@ const CTASection = () => (
    ═══════════════════════════════════════════ */
 
 const FaqSection = () => (
-  <section className="py-28 px-6 md:px-10 border-t border-white/[0.06]">
+  <section className="py-28 px-6 md:px-10 border-t border-[#D9D6CB]">
     <div className="max-w-3xl mx-auto">
-      <h2 className="font-serif text-4xl md:text-5xl mb-12">Frequently asked questions</h2>
+      <h2 className="font-display font-bold tracking-[-0.035em] text-4xl md:text-5xl mb-12">Frequently asked questions.</h2>
       <div className="space-y-8">
         {PLATFORM_FAQ_ITEMS.map((item) => (
-          <div key={item.question} className="border-b border-white/10 pb-8 last:border-0">
-            <h3 className="text-xl font-semibold text-white mb-3">{item.question}</h3>
-            <p className="text-gray-300 leading-relaxed">{item.answer}</p>
+          <div key={item.question} className="border-b border-[#D9D6CB] pb-8 last:border-0">
+            <h3 className="font-display text-xl font-semibold text-[#1A1B1D] mb-3">{item.question}</h3>
+            <p className="text-[#1A1B1D]/80 leading-relaxed">{item.answer}</p>
           </div>
         ))}
       </div>
@@ -970,29 +966,14 @@ const FaqSection = () => (
 
 export function PlatformPageClient() {
   return (
-    <div className="bg-[#050505] min-h-screen text-white selection:bg-[#ccff00] selection:text-black relative">
-      {/* Fixed background for glassmorphism */}
+    <div className="bg-[#ECEAE3] min-h-screen text-[#1A1B1D] selection:bg-[#1A1B1D] selection:text-[#F2F1EA] relative">
+      {/* Fixed background texture */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <img
           src="https://images.unsplash.com/photo-1511497584788-876760111969?q=80&w=2832&auto=format&fit=crop"
           alt=""
-          className="w-full h-full object-cover opacity-20 mix-blend-overlay"
+          className="w-full h-full object-cover opacity-10 mix-blend-multiply grayscale"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-[#050505]/60 to-[#050505]" />
-
-        {/* Ambient Gradient Blobs */}
-        <div className="absolute inset-0 overflow-hidden">
-          <motion.div
-            animate={{ x: [0, 100, -50, 0], y: [0, -50, 100, 0], scale: [1, 1.2, 0.8, 1] }}
-            transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-            className="absolute top-[20%] left-[10%] w-[500px] h-[500px] bg-[#ccff00] rounded-full opacity-10 blur-[100px]"
-          />
-          <motion.div
-            animate={{ x: [0, -100, 50, 0], y: [0, 100, -50, 0] }}
-            transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-            className="absolute bottom-[10%] right-[15%] w-[600px] h-[600px] bg-[#00ccff] rounded-full opacity-10 blur-[100px]"
-          />
-        </div>
 
         {/* Noise texture overlay */}
         <div className="absolute inset-0 opacity-[0.03]" style={{

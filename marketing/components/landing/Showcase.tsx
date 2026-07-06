@@ -28,23 +28,23 @@ export const LandingShowcase = () => {
   ];
 
   return (
-    <section className="py-32 px-6 md:px-20 bg-[#0a0a0a] text-white flex flex-col md:flex-row gap-20">
+    <section className="py-32 px-6 md:px-20 bg-background text-foreground flex flex-col md:flex-row gap-20">
       <div className="w-full md:w-1/3 space-y-12">
-        <h2 className="font-serif text-5xl">The Process</h2>
-        <div className="flex flex-col gap-0 border-l border-white/20">
+        <h2 className="font-display font-bold tracking-[-0.035em] text-5xl">The process.</h2>
+        <div className="flex flex-col gap-0 border-l border-border">
           {tabs.map((tab, idx) => (
             <button
               key={idx}
               onClick={() => setActiveTab(idx)}
               className={cn(
-                "text-left pl-8 py-6 font-mono text-lg transition-all duration-300 relative",
-                activeTab === idx ? "text-[#ccff00]" : "text-gray-500 hover:text-white"
+                "text-left pl-8 py-6 font-mono text-sm font-bold uppercase tracking-[0.22em] transition-colors duration-200 ease-studio relative",
+                activeTab === idx ? "text-[#2B46C0]" : "text-muted-foreground hover:text-foreground"
               )}
             >
               {activeTab === idx && (
                 <motion.div
                   layoutId="activeTab"
-                  className="absolute left-0 top-0 bottom-0 w-1 bg-[#ccff00]"
+                  className="absolute left-0 top-0 bottom-0 w-[3px] bg-[#2B46C0]"
                 />
               )}
               {tab.label}
@@ -55,13 +55,13 @@ export const LandingShowcase = () => {
           key={activeTab}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-xl leading-relaxed"
+          className="font-sans text-xl leading-relaxed text-foreground/80"
         >
           {tabs[activeTab].content}
         </motion.p>
       </div>
 
-      <div className="w-full md:w-2/3 bg-[#111] rounded-none border border-white/10 relative min-h-[500px] overflow-hidden group">
+      <div className="w-full md:w-2/3 bg-card rounded-[6px] border border-border relative min-h-[500px] overflow-hidden group">
          {/* Image Container */}
          <AnimatePresence mode="wait">
            <motion.div
@@ -75,37 +75,35 @@ export const LandingShowcase = () => {
              <img
                src={tabs[activeTab].image}
                alt={tabs[activeTab].label}
-               className="w-full h-full object-cover opacity-60 grayscale hover:grayscale-0 transition-all duration-700"
+               className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700 ease-studio"
              />
-             <div className="absolute inset-0 bg-[#0a0a0a]/30 mix-blend-multiply" />
-             <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-transparent to-transparent" />
            </motion.div>
          </AnimatePresence>
 
          {/* Overlay Elements */}
          <div className="absolute inset-0 p-8 flex flex-col justify-between pointer-events-none">
             <div className="flex justify-between items-start">
-              <div className="bg-black/50 backdrop-blur-md border border-white/10 px-4 py-2 rounded-full flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-[#ccff00] animate-pulse" />
-                <span className="font-mono text-[10px] uppercase tracking-widest text-[#ccff00]">Live Data Link</span>
+              <div className="bg-card border border-border px-4 py-2 rounded-full flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-[#2B46C0]" />
+                <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-[#2B46C0]">Live Data Link</span>
               </div>
             </div>
 
             <div className="flex justify-end">
-              <div className="bg-black/50 backdrop-blur-md border border-white/10 p-6 max-w-xs">
-                <div className="font-mono text-[10px] uppercase tracking-widest text-gray-400 mb-2">System Status</div>
-                <div className="font-serif text-2xl text-white mb-1">
-                  {activeTab === 0 && "Processing..."}
-                  {activeTab === 1 && "Optimized."}
-                  {activeTab === 2 && "On Target."}
+              <div className="bg-card border border-border rounded-[6px] p-6 max-w-xs">
+                <div className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground mb-2">System Status</div>
+                <div className="font-display font-bold tracking-[-0.02em] text-2xl text-foreground mb-1">
+                  {activeTab === 0 && "Processing."}
+                  {activeTab === 1 && "Optimised."}
+                  {activeTab === 2 && "On target."}
                 </div>
-                <div className="h-1 w-full bg-white/10 mt-2 overflow-hidden">
+                <div className="h-1 w-full bg-secondary mt-2 overflow-hidden">
                   <motion.div
                     key={activeTab}
                     initial={{ width: 0 }}
                     animate={{ width: "100%" }}
                     transition={{ duration: 1.5, ease: "easeInOut" }}
-                    className="h-full bg-[#ccff00]"
+                    className="h-full bg-[#2B46C0]"
                   />
                 </div>
               </div>

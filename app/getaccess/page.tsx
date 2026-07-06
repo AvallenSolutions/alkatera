@@ -6,7 +6,6 @@ import { Flower2, Trees, Check, Minus } from 'lucide-react';
 import { Navigation } from '@/marketing/components/Navigation';
 import { Footer } from '@/marketing/components/Footer';
 import { cn } from '@/lib/utils';
-import Image from 'next/image';
 
 // --- Seed Icon ---
 const SeedIcon = ({ className, size = 24 }: { className?: string; size?: number }) => (
@@ -124,12 +123,12 @@ const featureSections: FeatureSection[] = [
 
 const FeatureCell = ({ value }: { value: FeatureValue }) => {
   if (typeof value === 'string') {
-    return <span className="text-xs text-white/70 font-mono">{value}</span>;
+    return <span className="text-xs text-[#6F6F68] font-mono">{value}</span>;
   }
   if (value) {
-    return <Check size={16} className="text-[#ccff00]" />;
+    return <Check size={16} className="text-[#205E40]" />;
   }
-  return <Minus size={14} className="text-white/15" />;
+  return <Minus size={14} className="text-[#D9D6CB]" />;
 };
 
 // --- Tier Data ---
@@ -202,39 +201,27 @@ export default function GetAccessPage() {
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>('monthly');
 
   return (
-    <div className="relative min-h-screen text-white">
-      {/* Full-page background */}
-      <Image
-        src="/images/starry-night-bg2.jpg"
-        alt="Starry night sky"
-        fill
-        className="object-cover"
-        priority
-        quality={85}
-      />
-      <div className="absolute inset-0 bg-black/70" />
-
-      <div className="relative z-10">
+    <div className="relative min-h-screen bg-[#ECEAE3] text-[#1A1B1D]">
       <Navigation />
 
       {/* Hero Section */}
       <section className="relative w-full overflow-hidden flex items-center justify-center pt-24 pb-8">
 
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
+          transition={{ duration: 0.45, ease: [0.2, 0.8, 0.2, 1] }}
           className="relative z-10 text-center px-6"
         >
-          <div className="inline-block mb-6 px-5 py-2 border border-[#ccff00]/30 bg-[#ccff00]/5 rounded-full">
-            <span className="font-mono text-[#ccff00] text-xs tracking-widest uppercase">
-              Founding Partner Pricing: Limited Availability
+          <div className="inline-block mb-6">
+            <span className="font-mono font-bold text-[#205E40] text-[10px] tracking-[0.22em] uppercase">
+              Founding partner pricing: limited availability
             </span>
           </div>
-          <h1 className="font-serif text-4xl md:text-6xl lg:text-7xl mb-4">
+          <h1 className="font-display font-bold text-4xl md:text-6xl lg:text-[64px] leading-[0.95] tracking-[-0.035em] mb-4">
             Choose your impact scale.
           </h1>
-          <p className="text-white/50 text-lg max-w-2xl mx-auto leading-relaxed">
+          <p className="text-[#6F6F68] text-lg max-w-2xl mx-auto leading-relaxed">
             Lock in exclusive founding partner rates. These prices are available for a limited time only.
           </p>
           {/* Billing Toggle */}
@@ -242,10 +229,10 @@ export default function GetAccessPage() {
             <button
               onClick={() => setBillingInterval('monthly')}
               className={cn(
-                "font-mono text-xs uppercase tracking-widest px-5 py-2.5 rounded-full transition-all",
+                "font-mono text-xs uppercase tracking-[0.22em] px-5 py-2.5 rounded-full transition-colors",
                 billingInterval === 'monthly'
-                  ? "bg-[#ccff00] text-black font-bold"
-                  : "border border-white/20 text-white/50 hover:text-white hover:border-white/40"
+                  ? "bg-[#1A1B1D] text-[#F2F1EA] font-bold"
+                  : "border border-[#D9D6CB] text-[#6F6F68] hover:text-[#1A1B1D] hover:border-[#1A1B1D]"
               )}
             >
               Monthly
@@ -253,10 +240,10 @@ export default function GetAccessPage() {
             <button
               onClick={() => setBillingInterval('annual')}
               className={cn(
-                "font-mono text-xs uppercase tracking-widest px-5 py-2.5 rounded-full transition-all",
+                "font-mono text-xs uppercase tracking-[0.22em] px-5 py-2.5 rounded-full transition-colors",
                 billingInterval === 'annual'
-                  ? "bg-[#ccff00] text-black font-bold"
-                  : "border border-white/20 text-white/50 hover:text-white hover:border-white/40"
+                  ? "bg-[#1A1B1D] text-[#F2F1EA] font-bold"
+                  : "border border-[#D9D6CB] text-[#6F6F68] hover:text-[#1A1B1D] hover:border-[#1A1B1D]"
               )}
             >
               Annual
@@ -266,75 +253,79 @@ export default function GetAccessPage() {
       </section>
 
       {/* Pricing Cards */}
-      <section className="relative px-6 md:px-20 pb-10 overflow-hidden">
-        {/* Radial glow */}
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#ccff00]/5 via-transparent to-transparent pointer-events-none" />
-
+      <section className="relative px-6 md:px-20 pb-10">
         <div className="relative z-10 max-w-7xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
             {tiers.map((tier, idx) => (
               <motion.div
                 key={idx}
-                initial={{ opacity: 0, y: 30 }}
+                initial={{ opacity: 0, y: 6 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: idx * 0.15 }}
+                transition={{ duration: 0.28, delay: idx * 0.1, ease: [0.2, 0.8, 0.2, 1] }}
                 className={cn(
-                  "border p-8 flex flex-col transition-all duration-500 group relative rounded-2xl backdrop-blur-md",
+                  "border p-8 flex flex-col relative rounded-[6px]",
                   tier.highlight
-                    ? "border-[#ccff00] bg-[#ccff00]/5 md:-translate-y-4 shadow-[0_20px_50px_rgba(204,255,0,0.1)]"
-                    : "border-white/10 bg-white/5 hover:border-white/30"
+                    ? "border-[#205E40] bg-[#205E40] text-[#F2F1EA] md:-translate-y-4"
+                    : "border-[#D9D6CB] bg-[#F2F1EA]"
                 )}
               >
                 {tier.highlight && (
-                  <div className="absolute top-0 right-0 bg-[#ccff00] text-black text-[10px] font-bold uppercase px-3 py-1 tracking-widest rounded-tr-2xl rounded-bl-xl">
+                  <div className="absolute top-4 right-6 font-mono font-bold text-[#F2F1EA]/80 text-[10px] uppercase tracking-[0.22em]">
                     Recommended
                   </div>
                 )}
 
                 <div className="flex items-center justify-between mb-4">
-                  <h4
-                    className={cn(
-                      "font-serif text-3xl",
-                      tier.highlight ? "text-[#ccff00]" : "text-white"
-                    )}
-                  >
+                  <h4 className="font-display font-bold text-3xl tracking-tight">
                     {tier.name}
                   </h4>
-                  <tier.icon className={tier.highlight ? "text-[#ccff00]" : "text-gray-500"} />
+                  <tier.icon className={tier.highlight ? "text-[#F2F1EA]/70" : "text-[#6F6F68]"} />
                 </div>
 
                 <div className="mb-6">
                   <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-white/40 text-lg line-through font-serif">
+                    <span className={cn(
+                      "text-lg line-through font-display",
+                      tier.highlight ? "text-[#F2F1EA]/50" : "text-[#6F6F68]"
+                    )}>
                       £{billingInterval === 'monthly' ? tier.monthly.original : tier.annual.original.toLocaleString()}
                     </span>
-                    <span
-                      className={cn(
-                        "font-serif text-4xl",
-                        tier.highlight ? "text-[#ccff00]" : "text-white"
-                      )}
-                    >
+                    <span className="font-display font-bold text-4xl tabular-nums">
                       £{billingInterval === 'monthly' ? tier.monthly.founder : tier.annual.founder.toLocaleString()}
                     </span>
-                    <span className="text-white/40 text-sm">/{billingInterval === 'monthly' ? 'mo' : 'yr'}</span>
+                    <span className={cn("text-sm", tier.highlight ? "text-[#F2F1EA]/60" : "text-[#6F6F68]")}>
+                      /{billingInterval === 'monthly' ? 'mo' : 'yr'}
+                    </span>
                   </div>
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#ccff00]/10 rounded-full mb-3">
-                    <span className="font-mono text-[#ccff00] text-[10px] tracking-wider uppercase font-bold">
+                  <div className="mb-3">
+                    <span className={cn(
+                      "font-mono text-[10px] tracking-[0.2em] uppercase font-bold",
+                      tier.highlight ? "text-[#F2F1EA]/80" : "text-[#047857]"
+                    )}>
                       Save £{billingInterval === 'monthly'
                         ? tier.monthly.saving
                         : tier.annual.saving.toLocaleString()}{billingInterval === 'monthly' ? '/mo' : '/yr'}
                     </span>
                   </div>
-                  <p className="text-white/60 text-sm leading-relaxed">{tier.tagline}</p>
+                  <p className={cn(
+                    "text-sm leading-relaxed",
+                    tier.highlight ? "text-[#F2F1EA]/80" : "text-[#6F6F68]"
+                  )}>{tier.tagline}</p>
                 </div>
 
                 {/* Limits */}
-                <div className="grid grid-cols-2 gap-2 mb-8 p-4 bg-white/5 rounded">
+                <div className={cn(
+                  "grid grid-cols-2 gap-2 mb-8 p-4 rounded-[6px] border",
+                  tier.highlight ? "border-[#F2F1EA]/20" : "border-[#D9D6CB] bg-[#ECEAE3]"
+                )}>
                   {tier.limits.map((limit, lIdx) => (
                     <div
                       key={lIdx}
-                      className="font-mono text-[10px] uppercase tracking-wider text-white/50"
+                      className={cn(
+                        "font-mono text-[10px] uppercase tracking-[0.15em]",
+                        tier.highlight ? "text-[#F2F1EA]/70" : "text-[#6F6F68]"
+                      )}
                     >
                       {limit}
                     </div>
@@ -343,23 +334,22 @@ export default function GetAccessPage() {
 
                 <ul className="space-y-3 mb-12 flex-1">
                   {tier.features.map((feat, fIdx) => (
-                    <li key={fIdx} className="flex items-start gap-3 text-sm group/item">
+                    <li key={fIdx} className="flex items-start gap-3 text-sm">
                       <div
                         className={cn(
-                          "w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 transition-colors",
-                          tier.highlight
-                            ? "bg-[#ccff00]"
-                            : "bg-gray-500 group-hover/item:bg-white"
+                          "w-1.5 h-1.5 rounded-full mt-1.5 shrink-0",
+                          tier.highlight ? "bg-[#F2F1EA]/70" : "bg-[#205E40]"
                         )}
                       />
                       <span
                         className={cn(
-                          "leading-relaxed transition-colors",
-                          tier.highlight
-                            ? "text-white"
-                            : "text-gray-400 group-hover/item:text-white",
+                          "leading-relaxed",
+                          tier.highlight ? "text-[#F2F1EA]" : "text-[#1A1B1D]",
                           feat.startsWith("Everything") &&
-                            "font-serif italic text-white/90 border-b border-white/10 pb-1 w-full"
+                            cn(
+                              "font-display font-semibold pb-1 w-full border-b",
+                              tier.highlight ? "border-[#F2F1EA]/20" : "border-[#D9D6CB]"
+                            )
                         )}
                       >
                         {feat}
@@ -371,10 +361,10 @@ export default function GetAccessPage() {
                 <a
                   href={`/getaccess/signup?tier=${tier.name}`}
                   className={cn(
-                    "w-full py-5 font-mono uppercase text-xs tracking-widest font-bold transition-all duration-300 text-center block rounded-xl",
+                    "w-full py-4 font-mono uppercase text-xs tracking-[0.22em] font-bold transition-colors duration-200 text-center block rounded-full",
                     tier.highlight
-                      ? "bg-[#ccff00] text-black hover:opacity-90 hover:scale-[1.02]"
-                      : "border border-white/20 hover:bg-white hover:text-black"
+                      ? "bg-[#F2F1EA] text-[#1A1B1D] hover:bg-[#ECEAE3]"
+                      : "bg-[#1A1B1D] text-[#F2F1EA] hover:bg-black"
                   )}
                 >
                   {tier.buttonText}
@@ -384,18 +374,18 @@ export default function GetAccessPage() {
           </div>
 
           {/* Free Trial CTA band */}
-          <div className="mt-12 max-w-3xl mx-auto text-center border border-[#ccff00]/30 bg-[#ccff00]/5 rounded-2xl p-8">
-            <h3 className="font-serif text-2xl md:text-3xl text-white mb-2">
-              Prefer to try before you buy?
+          <div className="mt-12 max-w-3xl mx-auto text-center border border-[#D9D6CB] bg-[#F2F1EA] rounded-[6px] p-8">
+            <h3 className="font-display font-bold text-2xl md:text-3xl tracking-tight text-[#1A1B1D] mb-2">
+              Prefer to try before you buy.
             </h3>
-            <p className="text-white/60 text-sm max-w-xl mx-auto mb-6">
+            <p className="text-[#6F6F68] text-sm max-w-xl mx-auto mb-6">
               Start a 30-day free trial. Add a facility, build a product LCA and explore the
               platform. We never charge automatically when your trial ends, you choose if and
               when to continue.
             </p>
             <a
               href="/getaccess/signup?trial=true"
-              className="inline-block px-10 py-4 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:opacity-90 hover:scale-[1.02] transition-all"
+              className="inline-block px-10 py-4 bg-[#1A1B1D] text-[#F2F1EA] font-mono uppercase text-xs tracking-[0.22em] font-bold rounded-full hover:bg-black transition-colors"
             >
               Start free trial
             </a>
@@ -405,7 +395,7 @@ export default function GetAccessPage() {
           <div className="mt-16 text-center">
             <button
               onClick={() => setShowMatrix(!showMatrix)}
-              className="font-mono text-xs uppercase tracking-widest text-white/40 hover:text-[#ccff00] transition-colors border border-white/10 hover:border-[#ccff00]/30 px-8 py-3"
+              className="font-mono text-xs uppercase tracking-[0.22em] text-[#6F6F68] hover:text-[#205E40] transition-colors border border-[#D9D6CB] hover:border-[#205E40] rounded-full px-8 py-3"
             >
               {showMatrix ? 'Hide' : 'View'} Full Feature Comparison
             </button>
@@ -414,24 +404,24 @@ export default function GetAccessPage() {
           {/* Full Feature Matrix */}
           {showMatrix && (
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4 }}
+              transition={{ duration: 0.28, ease: [0.2, 0.8, 0.2, 1] }}
               className="mt-12 overflow-x-auto"
             >
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-white/10">
-                    <th className="text-left py-4 pr-4 text-white/40 font-mono text-xs uppercase tracking-wider w-1/2">
+                  <tr className="border-b border-[#D9D6CB]">
+                    <th className="text-left py-4 pr-4 text-[#6F6F68] font-mono text-xs uppercase tracking-[0.15em] w-1/2">
                       Feature
                     </th>
-                    <th className="text-center py-4 px-4 text-white/40 font-mono text-xs uppercase tracking-wider">
+                    <th className="text-center py-4 px-4 text-[#6F6F68] font-mono text-xs uppercase tracking-[0.15em]">
                       Seed
                     </th>
-                    <th className="text-center py-4 px-4 text-[#ccff00]/60 font-mono text-xs uppercase tracking-wider">
+                    <th className="text-center py-4 px-4 text-[#205E40] font-mono text-xs uppercase tracking-[0.15em]">
                       Blossom
                     </th>
-                    <th className="text-center py-4 px-4 text-white/40 font-mono text-xs uppercase tracking-wider">
+                    <th className="text-center py-4 px-4 text-[#6F6F68] font-mono text-xs uppercase tracking-[0.15em]">
                       Canopy
                     </th>
                   </tr>
@@ -441,7 +431,7 @@ export default function GetAccessPage() {
                     <React.Fragment key={sIdx}>
                       <tr>
                         <td colSpan={4} className="pt-8 pb-3">
-                          <span className="font-mono text-[#ccff00] text-xs uppercase tracking-[0.2em]">
+                          <span className="font-mono font-bold text-[#205E40] text-xs uppercase tracking-[0.22em]">
                             {section.title}
                           </span>
                         </td>
@@ -449,15 +439,15 @@ export default function GetAccessPage() {
                       {section.rows.map((row, rIdx) => (
                         <tr
                           key={rIdx}
-                          className="border-b border-white/5 hover:bg-white/[0.02] transition-colors"
+                          className="border-b border-[#D9D6CB]/60 hover:bg-[#F2F1EA] transition-colors"
                         >
-                          <td className="py-3 pr-4 text-white/70">{row.name}</td>
+                          <td className="py-3 pr-4 text-[#1A1B1D]">{row.name}</td>
                           <td className="py-3 px-4 text-center">
                             <div className="flex justify-center">
                               <FeatureCell value={row.seed} />
                             </div>
                           </td>
-                          <td className="py-3 px-4 text-center bg-[#ccff00]/[0.02]">
+                          <td className="py-3 px-4 text-center bg-[#F2F1EA]/70">
                             <div className="flex justify-center">
                               <FeatureCell value={row.blossom} />
                             </div>
@@ -478,30 +468,7 @@ export default function GetAccessPage() {
         </div>
       </section>
 
-      {/* Photo credit */}
-      <div className="text-center pb-4 text-[10px] text-white/20">
-        Photo by{' '}
-        <a
-          href="https://unsplash.com/@ventiviews"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline hover:text-white/40"
-        >
-          Venti Views
-        </a>
-        {' '}on{' '}
-        <a
-          href="https://unsplash.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline hover:text-white/40"
-        >
-          Unsplash
-        </a>
-      </div>
-
       <Footer />
-      </div>
     </div>
   );
 }

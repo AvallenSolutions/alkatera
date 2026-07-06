@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
-import { Logo } from './Logo';
 import Link from 'next/link';
 
 interface NavigationProps {
@@ -32,32 +31,32 @@ export const Navigation = ({ onOpenContact }: NavigationProps) => {
   ];
 
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 px-6 py-6 flex justify-between items-center text-white transition-colors duration-300 ${scrolled ? 'bg-black' : 'bg-transparent'}`}>
+    <nav className={`fixed top-0 left-0 right-0 z-50 px-6 py-6 flex justify-between items-center transition-colors duration-200 ease-studio ${scrolled ? 'bg-background text-foreground border-b border-border' : 'bg-transparent text-[#F2F1EA]'}`}>
       <div className="z-50">
-        <Link href="/">
-          <Logo />
+        <Link href="/" className="select-none font-display text-2xl tracking-[-0.02em] leading-none">
+          <span className="font-medium">alka</span><span className="font-bold">tera</span>
         </Link>
       </div>
 
-      <div className="hidden md:flex items-center gap-8 font-mono text-xs tracking-widest uppercase">
+      <div className="hidden md:flex items-center gap-8 font-mono text-[10px] font-bold tracking-[0.22em] uppercase">
         {navItems.map((item) => (
           <Link
             key={item.label}
             href={item.href}
-            className="hover:opacity-50 transition-opacity duration-300"
+            className="hover:opacity-60 transition-opacity duration-200 ease-studio"
           >
             {item.label}
           </Link>
         ))}
         <Link
           href="/getaccess"
-          className="border border-white px-6 py-2 rounded-full hover:bg-white hover:text-black transition-colors duration-300"
+          className={`border px-6 py-2 rounded-full transition-colors duration-200 ease-studio ${scrolled ? 'border-foreground/40 hover:border-foreground' : 'border-[#F2F1EA]/40 hover:border-[#F2F1EA]'}`}
         >
           Get Access
         </Link>
         <Link
           href="/getaccess/signup?trial=true"
-          className="bg-[#ccff00] text-black px-6 py-2 rounded-full hover:opacity-90 transition-opacity duration-300"
+          className={`px-6 py-2 rounded-full hover:opacity-90 transition-opacity duration-200 ease-studio ${scrolled ? 'bg-primary text-primary-foreground' : 'bg-[#F2F1EA] text-[#1A1B1D]'}`}
         >
           Start free trial
         </Link>
@@ -68,7 +67,7 @@ export const Navigation = ({ onOpenContact }: NavigationProps) => {
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Toggle menu"
       >
-        {isOpen ? <X /> : <Menu />}
+        {isOpen ? <X className="text-foreground" /> : <Menu />}
       </button>
 
       {/* Mobile Menu Overlay */}
@@ -79,14 +78,14 @@ export const Navigation = ({ onOpenContact }: NavigationProps) => {
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: "spring", damping: 20 }}
-            className="fixed inset-0 bg-[#0a0a0a] z-40 flex flex-col justify-center items-center gap-8 md:hidden"
+            className="fixed inset-0 bg-background text-foreground z-40 flex flex-col justify-center items-center gap-8 md:hidden"
           >
             {navItems.map((item) => (
               <Link
                 key={item.label}
                 href={item.href}
                 onClick={() => setIsOpen(false)}
-                className="text-4xl font-serif hover:text-[#ccff00] transition-colors"
+                className="text-4xl font-display font-bold tracking-[-0.035em] hover:opacity-60 transition-opacity duration-200 ease-studio"
               >
                 {item.label}
               </Link>
@@ -94,14 +93,14 @@ export const Navigation = ({ onOpenContact }: NavigationProps) => {
             <Link
               href="/getaccess"
               onClick={() => setIsOpen(false)}
-              className="mt-8 text-[#ccff00] font-mono uppercase tracking-widest border border-[#ccff00] px-8 py-4 rounded-full"
+              className="mt-8 text-foreground font-mono text-[11px] font-bold uppercase tracking-[0.22em] border border-foreground/40 px-8 py-4 rounded-full"
             >
               Get Access
             </Link>
             <Link
               href="/getaccess/signup?trial=true"
               onClick={() => setIsOpen(false)}
-              className="text-black bg-[#ccff00] font-mono uppercase tracking-widest px-8 py-4 rounded-full"
+              className="bg-primary text-primary-foreground font-mono text-[11px] font-bold uppercase tracking-[0.22em] px-8 py-4 rounded-full"
             >
               Start free trial
             </Link>

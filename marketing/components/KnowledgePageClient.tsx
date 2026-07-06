@@ -68,13 +68,13 @@ const ContentCard = ({ item, index }: { item: ContentItem; index: number }) => {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ delay: index * 0.1 }}
-        className="group relative p-12 bg-gradient-to-br from-[#ccff00]/10 to-transparent border border-[#ccff00]/20 hover:border-[#ccff00] transition-all duration-500"
+        className="group relative p-12 bg-[#2B46C0] text-[#F2F1EA] rounded-[6px] transition-all duration-500"
       >
-        <Icon className="w-8 h-8 text-[#ccff00] mb-6 opacity-60" />
-        <blockquote className="text-3xl md:text-4xl font-serif italic leading-tight mb-6">
+        <Icon className="w-8 h-8 text-[#F2F1EA] mb-6 opacity-60" />
+        <blockquote className="text-3xl md:text-4xl font-display font-bold tracking-[-0.035em] leading-tight mb-6">
           &quot;{item.title}&quot;
         </blockquote>
-        <p className="font-mono text-xs text-gray-400 uppercase tracking-widest">by {item.author}</p>
+        <p className="font-mono text-xs text-[#F2F1EA]/70 uppercase tracking-[0.22em]">by {item.author}</p>
       </motion.div>
     );
   }
@@ -85,7 +85,7 @@ const ContentCard = ({ item, index }: { item: ContentItem; index: number }) => {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ delay: index * 0.1 }}
-      className="group relative bg-[#0a0a0a] border border-white/10 hover:border-[#ccff00]/50 transition-all duration-500 overflow-hidden cursor-pointer h-full"
+      className="group relative bg-[#F2F1EA] border border-[#D9D6CB] rounded-[6px] hover:border-[#2B46C0] transition-all duration-500 overflow-hidden cursor-pointer h-full"
     >
       {item.image && (
         <div className="relative h-64 overflow-hidden">
@@ -94,11 +94,10 @@ const ContentCard = ({ item, index }: { item: ContentItem; index: number }) => {
             alt={item.title}
             className="w-full h-full object-cover grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-700"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] to-transparent" />
           {item.type === 'video' && (
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-16 h-16 rounded-full bg-[#ccff00] flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Play className="w-6 h-6 text-black fill-black ml-1" />
+              <div className="w-16 h-16 rounded-full bg-[#1A1B1D] flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Play className="w-6 h-6 text-[#F2F1EA] fill-[#F2F1EA] ml-1" />
               </div>
             </div>
           )}
@@ -107,38 +106,38 @@ const ContentCard = ({ item, index }: { item: ContentItem; index: number }) => {
 
       <div className="p-8">
         <div className="flex items-center gap-4 mb-4">
-          <Icon className="w-5 h-5 text-[#ccff00]" />
+          <Icon className="w-5 h-5 text-[#2B46C0]" />
           {item.readTime && (
-            <div className="flex items-center gap-2 text-gray-400 text-xs font-mono">
+            <div className="flex items-center gap-2 text-[#6F6F68] text-xs font-mono">
               <Clock className="w-4 h-4" />
               <span>{item.readTime}</span>
             </div>
           )}
         </div>
 
-        <h3 className="text-2xl font-serif mb-3 group-hover:text-[#ccff00] transition-colors">
+        <h3 className="text-2xl font-display font-semibold tracking-[-0.02em] text-[#1A1B1D] mb-3 group-hover:text-[#2B46C0] transition-colors">
           {item.title}
         </h3>
 
         {item.excerpt && (
-          <p className="text-gray-400 text-sm leading-relaxed mb-6">
+          <p className="text-[#6F6F68] text-sm leading-relaxed mb-6">
             {item.excerpt}
           </p>
         )}
 
         <div className="flex items-center justify-between">
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-3 flex-wrap">
             {item.tags.map((tag) => (
               <span
                 key={tag}
-                className="text-[10px] font-mono uppercase tracking-widest px-3 py-1 bg-white/5 border border-white/10 text-gray-400"
+                className="text-[10px] font-mono font-bold uppercase tracking-[0.22em] text-[#6F6F68]"
               >
                 {tag}
               </span>
             ))}
           </div>
 
-          <ArrowRight className="w-5 h-5 text-gray-500 group-hover:text-[#ccff00] group-hover:translate-x-2 transition-all" />
+          <ArrowRight className="w-5 h-5 text-[#6F6F68] group-hover:text-[#2B46C0] group-hover:translate-x-2 transition-all" />
         </div>
       </div>
     </motion.div>
@@ -189,35 +188,14 @@ export function KnowledgePageClient({ initialPosts = [] }: { initialPosts?: Know
     : allContent.filter(item => item.tags.includes(activeFilter));
 
   return (
-    <div className="bg-[#050505] min-h-screen text-white selection:bg-[#ccff00] selection:text-black relative">
+    <div className="bg-[#ECEAE3] min-h-screen text-[#1A1B1D] selection:bg-[#1A1B1D] selection:text-[#F2F1EA] relative">
       {/* Fixed background layer */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <img
           src="/images/blueberry-field.jpg"
           alt=""
-          className="absolute inset-0 w-full h-full object-cover opacity-15 mix-blend-luminosity"
+          className="absolute inset-0 w-full h-full object-cover opacity-10 mix-blend-multiply grayscale"
         />
-        <div className="absolute inset-0 bg-[#050505]/80" />
-        <div className="absolute inset-0 opacity-10"
-          style={{
-            backgroundImage: 'linear-gradient(#333 1px, transparent 1px), linear-gradient(90deg, #333 1px, transparent 1px)',
-            backgroundSize: '80px 80px'
-          }}
-        />
-
-        {/* Ambient Gradient Blobs */}
-        <div className="absolute inset-0 overflow-hidden">
-          <motion.div
-            animate={{ x: [0, 100, -50, 0], y: [0, -50, 100, 0], scale: [1, 1.2, 0.8, 1] }}
-            transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-            className="absolute top-[20%] left-[10%] w-[500px] h-[500px] bg-[#ccff00] rounded-full opacity-10 blur-[100px]"
-          />
-          <motion.div
-            animate={{ x: [0, -100, 50, 0], y: [0, 100, -50, 0] }}
-            transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-            className="absolute bottom-[10%] right-[15%] w-[600px] h-[600px] bg-[#00ccff] rounded-full opacity-10 blur-[100px]"
-          />
-        </div>
       </div>
 
       <div className="relative z-10">
@@ -225,24 +203,20 @@ export function KnowledgePageClient({ initialPosts = [] }: { initialPosts?: Know
 
       {/* Hero */}
       <section className="relative pt-32 pb-20 px-6 md:px-20 overflow-hidden">
-        <div className="absolute inset-0 opacity-10"
-          style={{
-            backgroundImage: 'linear-gradient(#333 1px, transparent 1px), linear-gradient(90deg, #333 1px, transparent 1px)',
-            backgroundSize: '40px 40px'
-          }}
-        />
-
         <div className="relative z-10 max-w-7xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="max-w-4xl"
           >
-            <h1 className="font-serif text-5xl md:text-8xl mb-8 leading-[0.9]">
+            <p className="font-mono font-bold text-[10px] md:text-xs uppercase tracking-[0.22em] text-[#2B46C0] mb-6">
+              The library
+            </p>
+            <h1 className="font-display font-bold tracking-[-0.035em] text-5xl md:text-8xl mb-8 leading-[0.95]">
               Knowledge for the <br />
-              <span className="text-[#ccff00] italic">Conscious Producer</span>
+              <span className="text-[#2B46C0]">conscious producer.</span>
             </h1>
-            <p className="font-mono text-gray-400 text-sm md:text-base max-w-2xl leading-relaxed">
+            <p className="text-[#6F6F68] text-sm md:text-base max-w-2xl leading-relaxed">
               Insights, guides, and perspectives on building a regenerative drinks brand. From carbon accounting to supply chain strategy, explore the science and stories behind sustainable growth.
             </p>
           </motion.div>
@@ -252,16 +226,16 @@ export function KnowledgePageClient({ initialPosts = [] }: { initialPosts?: Know
       {/* Filters */}
       <section className="px-6 md:px-20 mb-12">
         <div className="max-w-7xl mx-auto">
-          <div className="flex gap-3 flex-wrap border-t border-white/10 pt-8">
+          <div className="flex gap-3 flex-wrap border-t border-[#D9D6CB] pt-8">
             {allTags.map((tag) => (
               <button
                 key={tag}
                 onClick={() => setActiveFilter(tag)}
                 className={cn(
-                  "px-4 py-2 font-mono text-xs uppercase tracking-widest transition-all duration-300",
+                  "px-4 py-2 font-mono font-bold text-xs uppercase tracking-[0.22em] rounded-full transition-all duration-300",
                   activeFilter === tag
-                    ? "bg-[#ccff00] text-black"
-                    : "bg-white/5 border border-white/10 text-gray-400 hover:border-[#ccff00] hover:text-white"
+                    ? "bg-[#1A1B1D] text-[#F2F1EA]"
+                    : "bg-[#F2F1EA] border border-[#D9D6CB] text-[#6F6F68] hover:border-[#2B46C0] hover:text-[#2B46C0]"
                 )}
               >
                 {tag}
@@ -276,14 +250,14 @@ export function KnowledgePageClient({ initialPosts = [] }: { initialPosts?: Know
         <div className="max-w-7xl mx-auto">
           {isLoading ? (
             <div className="text-center py-20">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-[#ccff00] border-t-transparent"></div>
-              <p className="mt-4 text-gray-400 font-mono text-sm">Loading knowledge...</p>
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-[#2B46C0] border-t-transparent"></div>
+              <p className="mt-4 text-[#6F6F68] font-mono text-sm">Loading knowledge...</p>
             </div>
           ) : filteredContent.length === 0 ? (
-            <div className="text-center py-20 border border-white/10 bg-white/5">
-              <FileText className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-              <h3 className="text-2xl font-serif mb-2">No content yet</h3>
-              <p className="text-gray-400 font-mono text-sm">
+            <div className="text-center py-20 border border-[#D9D6CB] bg-[#F2F1EA] rounded-[6px]">
+              <FileText className="w-16 h-16 text-[#6F6F68] mx-auto mb-4" />
+              <h3 className="text-2xl font-display font-semibold tracking-[-0.02em] mb-2">No content yet.</h3>
+              <p className="text-[#6F6F68] font-mono text-sm">
                 {activeFilter === 'all'
                   ? 'Blog posts will appear here once published.'
                   : `No content found with tag "${activeFilter}".`}

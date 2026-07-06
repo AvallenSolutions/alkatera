@@ -78,18 +78,18 @@ export const ContactModal = ({ isOpen, onClose }: ContactModalProps) => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={handleClose}
-            className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[60]"
+            className="fixed inset-0 bg-[#1A1B1D]/60 backdrop-blur-sm z-[60]"
           />
           <motion.div
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed top-0 right-0 h-full w-full md:w-[600px] bg-[#0a0a0a] z-[70] border-l border-[#ccff00]/20 p-8 md:p-16 overflow-y-auto"
+            className="fixed top-0 right-0 h-full w-full md:w-[600px] bg-[#F2F1EA] text-[#1A1B1D] z-[70] border-l border-[#D9D6CB] p-8 md:p-16 overflow-y-auto"
           >
             <button
               onClick={handleClose}
-              className="absolute top-8 right-8 text-white hover:text-[#ccff00] transition-colors"
+              className="absolute top-8 right-8 text-[#1A1B1D] hover:text-[#205E40] transition-colors"
               aria-label="Close modal"
             >
               <X size={32} />
@@ -102,25 +102,25 @@ export const ContactModal = ({ isOpen, onClose }: ContactModalProps) => {
                   animate={{ opacity: 1, y: 0 }}
                   className="text-center py-20"
                 >
-                  <div className="w-16 h-16 bg-[#ccff00] rounded-full flex items-center justify-center mx-auto mb-6">
-                    <Check className="w-8 h-8 text-black" />
+                  <div className="w-16 h-16 bg-[#205E40] rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Check className="w-8 h-8 text-[#F2F1EA]" />
                   </div>
-                  <h2 className="font-serif text-4xl mb-4">Transmission Received</h2>
-                  <p className="text-gray-400 font-mono text-sm">
+                  <h2 className="font-display font-bold tracking-[-0.035em] text-4xl mb-4">Message received.</h2>
+                  <p className="text-[#6F6F68] font-mono text-sm">
                     We&apos;ll be in touch shortly to discuss your sustainability journey.
                   </p>
                 </motion.div>
               ) : (
                 <>
-                  <h2 className="font-serif text-4xl md:text-5xl mb-6">
+                  <h2 className="font-display font-bold tracking-[-0.035em] leading-[0.95] text-4xl md:text-5xl mb-6">
                     Let&apos;s engineer your impact.
                   </h2>
-                  <p className="text-gray-400 mb-12 font-mono text-sm">
-                    Tell us about your organization. We&apos;ll build a custom roadmap for your sustainability journey.
+                  <p className="text-[#6F6F68] mb-12 text-sm">
+                    Tell us about your organisation. We&apos;ll build a custom roadmap for your sustainability journey.
                   </p>
 
                   {error && (
-                    <div className="mb-6 p-4 border border-red-500/30 bg-red-500/10 text-red-400 font-mono text-sm rounded">
+                    <div className="mb-6 p-4 border border-[#BE123C]/30 bg-[#BE123C]/10 text-[#BE123C] font-mono text-sm rounded-[6px]">
                       {error}
                     </div>
                   )}
@@ -129,7 +129,7 @@ export const ContactModal = ({ isOpen, onClose }: ContactModalProps) => {
                     <div className="space-y-2 group">
                       <label
                         htmlFor="modal-name"
-                        className="font-mono text-xs uppercase tracking-widest text-[#ccff00]"
+                        className="font-mono font-bold text-xs uppercase tracking-[0.22em] text-[#205E40]"
                       >
                         Name
                       </label>
@@ -140,14 +140,14 @@ export const ContactModal = ({ isOpen, onClose }: ContactModalProps) => {
                         required
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        className="w-full bg-transparent border-b border-white/20 py-4 text-xl focus:outline-none focus:border-[#ccff00] transition-colors placeholder:text-white/20"
+                        className="w-full bg-transparent border-b border-[#D9D6CB] py-4 text-xl focus:outline-none focus:border-[#205E40] transition-colors placeholder:text-[#1A1B1D]/25"
                       />
                     </div>
 
                     <div className="space-y-2 group">
                       <label
                         htmlFor="modal-company"
-                        className="font-mono text-xs uppercase tracking-widest text-[#ccff00]"
+                        className="font-mono font-bold text-xs uppercase tracking-[0.22em] text-[#205E40]"
                       >
                         Company
                       </label>
@@ -158,14 +158,14 @@ export const ContactModal = ({ isOpen, onClose }: ContactModalProps) => {
                         required
                         value={company}
                         onChange={(e) => setCompany(e.target.value)}
-                        className="w-full bg-transparent border-b border-white/20 py-4 text-xl focus:outline-none focus:border-[#ccff00] transition-colors placeholder:text-white/20"
+                        className="w-full bg-transparent border-b border-[#D9D6CB] py-4 text-xl focus:outline-none focus:border-[#205E40] transition-colors placeholder:text-[#1A1B1D]/25"
                       />
                     </div>
 
                     <div className="space-y-2 group">
                       <label
                         htmlFor="modal-email"
-                        className="font-mono text-xs uppercase tracking-widest text-[#ccff00]"
+                        className="font-mono font-bold text-xs uppercase tracking-[0.22em] text-[#205E40]"
                       >
                         Email
                       </label>
@@ -176,12 +176,12 @@ export const ContactModal = ({ isOpen, onClose }: ContactModalProps) => {
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full bg-transparent border-b border-white/20 py-4 text-xl focus:outline-none focus:border-[#ccff00] transition-colors placeholder:text-white/20"
+                        className="w-full bg-transparent border-b border-[#D9D6CB] py-4 text-xl focus:outline-none focus:border-[#205E40] transition-colors placeholder:text-[#1A1B1D]/25"
                       />
                     </div>
 
                     <div className="space-y-2 group">
-                      <label className="font-mono text-xs uppercase tracking-widest text-[#ccff00]">
+                      <label className="font-mono font-bold text-xs uppercase tracking-[0.22em] text-[#205E40]">
                         Interests
                       </label>
                       <div className="flex flex-wrap gap-3 pt-2">
@@ -192,8 +192,8 @@ export const ContactModal = ({ isOpen, onClose }: ContactModalProps) => {
                             onClick={() => toggleInterest(tag)}
                             className={`border px-4 py-2 rounded-full text-sm transition-colors ${
                               interests.includes(tag)
-                                ? 'border-[#ccff00] text-[#ccff00] bg-[#ccff00]/10'
-                                : 'border-white/20 hover:border-[#ccff00] hover:text-[#ccff00]'
+                                ? 'border-[#205E40] text-[#F2F1EA] bg-[#205E40]'
+                                : 'border-[#D9D6CB] text-[#1A1B1D] hover:border-[#205E40] hover:text-[#205E40]'
                             }`}
                           >
                             {tag}
@@ -205,7 +205,7 @@ export const ContactModal = ({ isOpen, onClose }: ContactModalProps) => {
                     <button
                       type="submit"
                       disabled={isLoading}
-                      className="w-full bg-[#ccff00] text-black font-mono uppercase font-bold tracking-widest py-6 hover:opacity-90 transition-opacity mt-8 disabled:opacity-50 flex items-center justify-center gap-3"
+                      className="w-full bg-[#1A1B1D] text-[#F2F1EA] font-mono uppercase font-bold tracking-[0.22em] py-6 rounded-full hover:opacity-90 transition-opacity mt-8 disabled:opacity-50 flex items-center justify-center gap-3"
                     >
                       {isLoading ? (
                         <>

@@ -38,13 +38,13 @@ export const CoverPage = ({ data }: { data: LCAReportData }) => (
         className="items-start"
         iconSize="w-12 h-12"
         textSize="text-2xl"
-        iconClassName="text-[#ccff00]"
+        iconClassName="text-[#F2F1EA]"
         wordmarkClassName="text-white"
       />
     </div>
 
     <div className="relative z-10 w-full max-w-2xl">
-      <div className="bg-[#ccff00] text-black p-8 rounded-xl shadow-2xl mb-24 transform -rotate-1 backdrop-blur-sm bg-opacity-90">
+      <div className="bg-[#205E40] text-[#F2F1EA] p-8 rounded-xl shadow-2xl mb-24 transform -rotate-1 backdrop-blur-sm bg-opacity-90">
         <h2 className="font-mono font-bold italic text-2xl tracking-tighter">LIFE CYCLE ASSESSMENT</h2>
       </div>
 
@@ -55,7 +55,7 @@ export const CoverPage = ({ data }: { data: LCAReportData }) => (
     </div>
 
     <div className="relative z-10 border border-white/20 rounded-3xl p-8 bg-black/40 backdrop-blur-md mb-20 shadow-xl">
-      <div className="text-xs font-mono text-[#ccff00] mb-2 uppercase tracking-widest">Functional Unit</div>
+      <div className="text-xs font-mono text-[#F2F1EA] mb-2 uppercase tracking-widest">Functional Unit</div>
       <div className="text-4xl font-serif mb-2 text-white">1 unit of {data.meta.productName}</div>
       <p className="text-neutral-300 text-sm max-w-lg">{data.functionalUnit.description}</p>
     </div>
@@ -90,9 +90,9 @@ export const ExecSummaryPage = ({ data }: { data: LCAReportData }) => {
     <div className="flex flex-col flex-1 pb-20 relative">
       <div className="grid grid-cols-12 gap-6 mb-6">
         <div className="col-span-3">
-          <div className="w-full aspect-[2/3] border-2 border-dashed border-neutral-300 rounded-2xl flex flex-col items-center justify-center bg-neutral-50 group cursor-pointer hover:border-[#4d7c0f]/50 transition-colors relative">
+          <div className="w-full aspect-[2/3] border-2 border-dashed border-neutral-300 rounded-2xl flex flex-col items-center justify-center bg-neutral-50 group cursor-pointer hover:border-[#205E40]/50 transition-colors relative">
             <div className="flex flex-col items-center justify-center p-6 text-center">
-              <ImageIcon className="w-8 h-8 text-neutral-400 mb-3 group-hover:text-[#4d7c0f] transition-colors" />
+              <ImageIcon className="w-8 h-8 text-neutral-400 mb-3 group-hover:text-[#205E40] transition-colors" />
               <span className="text-neutral-400 font-mono text-[10px] uppercase tracking-widest group-hover:text-neutral-600 transition-colors">Product Image</span>
               <span className="text-neutral-300 text-[9px] mt-1 font-mono">(Bottle Portrait)</span>
             </div>
@@ -117,20 +117,20 @@ export const ExecSummaryPage = ({ data }: { data: LCAReportData }) => {
       </div>
 
       <div className="grid grid-cols-12 gap-6 mb-auto">
-        <div className="col-span-7 bg-[#4d7c0f] text-white p-6 rounded-2xl relative overflow-hidden flex flex-col justify-between min-h-[140px]">
+        <div className="col-span-7 bg-[#205E40] text-white p-6 rounded-2xl relative overflow-hidden flex flex-col justify-between min-h-[140px]">
           <div className="relative z-10">
             <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 rounded-full bg-[#ccff00]" />
-              <div className="font-mono italic text-[#ccff00] text-[10px] uppercase tracking-wider">Key Insight</div>
+              <div className="w-2 h-2 rounded-full bg-[#F2F1EA]" />
+              <div className="font-mono italic text-[#F2F1EA] text-[10px] uppercase tracking-wider">Key Insight</div>
             </div>
             <div className="text-3xl font-serif leading-none mb-2">
               {data.executiveSummary.keyHighlight.value}
             </div>
             <div className="text-white/90 text-sm leading-snug max-w-md">
-              {data.executiveSummary.keyHighlight.label} — {data.executiveSummary.keyHighlight.subtext}
+              {data.executiveSummary.keyHighlight.label}: {data.executiveSummary.keyHighlight.subtext}
             </div>
           </div>
-          <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-[#ccff00] rounded-full blur-[60px] opacity-30 pointer-events-none" />
+          <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-[#F2F1EA] rounded-full blur-[60px] opacity-30 pointer-events-none" />
         </div>
 
         <div className="col-span-5 bg-white p-6 rounded-2xl border border-neutral-200 shadow-sm flex items-center justify-between min-h-[140px]">
@@ -180,11 +180,11 @@ export const MethodologyPage = ({ data }: { data: LCAReportData }) => (
 
     <div className="grid grid-cols-2 gap-8 mb-16">
       <div className="bg-neutral-50 rounded-2xl p-8 border border-neutral-100">
-        <div className="text-[#65a30d] font-mono italic text-sm mb-6 uppercase">Included Stages</div>
+        <div className="text-[#205E40] font-mono italic text-sm mb-6 uppercase">Included Stages</div>
         <ul className="space-y-6">
           {data.methodology.includedStages.map(stage => (
             <li key={stage} className="flex items-center gap-4 text-neutral-700">
-              <Check className="w-4 h-4 text-[#65a30d]" />
+              <Check className="w-4 h-4 text-[#205E40]" />
               {stage}
             </li>
           ))}
@@ -207,7 +207,7 @@ export const MethodologyPage = ({ data }: { data: LCAReportData }) => (
     <div className="grid grid-cols-3 gap-6">
       {data.methodology.dataSources.map(source => (
         <div key={source.name} className="bg-white border rounded-xl p-6 relative">
-          <div className="absolute top-4 right-4 bg-[#4d7c0f] text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full">
+          <div className="absolute top-4 right-4 bg-[#205E40] text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full">
             {source.count}
           </div>
           <div className="font-bold text-lg mt-4">{source.name}</div>
@@ -224,7 +224,7 @@ export const ClimatePage = ({ data }: { data: LCAReportData }) => (
     <div className="flex items-center justify-between mb-8">
       <div className="w-1/3">
         <div className="text-sm font-mono text-neutral-500 mb-2">FOSSIL CARBON FOOTPRINT</div>
-        <div className="text-8xl font-serif text-[#ccff00] leading-none">
+        <div className="text-8xl font-serif text-[#F2F1EA] leading-none">
           {data.climateImpact.totalCarbon}
           <span className="text-2xl text-neutral-500 ml-2 font-sans">kg CO2e</span>
         </div>
@@ -243,7 +243,7 @@ export const ClimatePage = ({ data }: { data: LCAReportData }) => (
           <div className="w-3 h-3 rounded-full mb-3" style={{ backgroundColor: stage.color }} />
           <div className="text-[10px] font-mono uppercase text-neutral-500 mb-2">{stage.label}</div>
           <div className="text-lg font-bold mb-1">{stage.value.toFixed(3)} <span className="text-xs font-normal opacity-50">kg</span></div>
-          <div className="text-[#ccff00] font-mono text-xs">{stage.percentage}%</div>
+          <div className="text-[#F2F1EA] font-mono text-xs">{stage.percentage}%</div>
         </div>
       ))}
     </div>

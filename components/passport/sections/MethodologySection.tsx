@@ -100,7 +100,7 @@ export default function MethodologySection({
                 'hover:border-amber-500 hover:text-amber-600',
                 'hover:border-teal-500 hover:text-teal-600',
               ];
-              const colorClass = stageColors[index] || 'hover:border-brand-accent hover:text-lime-800';
+              const colorClass = stageColors[index] || 'hover:border-brand-accent hover:text-[#205E40]';
 
               return (
                 <motion.div
@@ -121,7 +121,7 @@ export default function MethodologySection({
                     <div className="relative p-4 md:p-0 bg-stone-50 md:bg-transparent rounded-lg md:rounded-none w-full md:w-auto">
                       <div className="md:absolute md:-top-44 md:left-1/2 md:-translate-x-1/2 md:w-56 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300 pointer-events-none mb-2 md:mb-0 z-30">
                         <div className="bg-stone-900 text-white text-xs p-4 rounded shadow-xl leading-relaxed text-left">
-                          <p className="font-bold mb-1 text-brand-accent">
+                          <p className="font-bold mb-1 text-[#F2F1EA]">
                             {stage.name}
                           </p>
                           {stage.description}

@@ -107,7 +107,7 @@ const config: Config = {
           900: '#365314',
           950: '#1a2e05',
         },
-        'brand-accent': '#ccff00',
+        'brand-accent': '#205E40',
         /* Whitelabel tenant tokens. Resolved from CSS variables so the
            server layout can override them per procurement / distributor
            organisation. Defaults (see app/globals.css) match the
