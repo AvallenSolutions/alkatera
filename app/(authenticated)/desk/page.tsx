@@ -6,6 +6,7 @@ import { BreathingGrid } from '@/components/studio/breathing-grid';
 import { PosterBlock } from '@/components/studio/poster-block';
 import { Statement } from '@/components/studio/statement';
 import { PLATFORM_ROOMS } from '@/components/studio/platform-rooms';
+import { VitalityHero } from '@/components/vitality/VitalityHero';
 
 interface DeskCounts {
   products: number;
@@ -59,6 +60,10 @@ export default function DeskPage() {
         eyebrow="THE DESK"
         headline={`${greeting()}${firstName ? `, ${firstName}` : ''}.`}
       />
+
+      {/* The key numbers greet you in the hall: the vitality panel
+          (composite ring, trend, pillars) moved here from the brief. */}
+      <VitalityHero />
 
       <BreathingGrid>
         <PosterBlock

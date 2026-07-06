@@ -102,7 +102,7 @@ export function ForYouToday({ onOpenQueue, onSubmit }: Props) {
 
       <SustainableAINote />
       <OnboardingResumeBanner />
-      <VitalityHero />
+      {/* The vitality panel lives on the desk now (Tim, 6 July). */}
       <CertificationHealthWidget />
 
       {isVisible('priority_tiles') && <PriorityTiles onOpenQueue={onOpenQueue} />}
