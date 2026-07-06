@@ -124,7 +124,7 @@ export function BrewwRecipeImportDialog({
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Beer className="h-5 w-5 text-studio-cobalt" />
+            <Beer className="h-5 w-5 text-room-accent" />
             Import recipe from Breww
           </DialogTitle>
           <DialogDescription>

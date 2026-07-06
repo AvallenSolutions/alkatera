@@ -352,22 +352,22 @@ export default function EPRDashboardPage() {
       {/* EPR Setup Wizard CTA */}
       {!wizardCompleted && (
         <Link href="/epr/wizard">
-          <Card className="rounded-[6px] border-border bg-card hover:border-studio-brick/40 transition-colors cursor-pointer group">
+          <Card className="rounded-[6px] border-border bg-card hover:border-room-accent/40 transition-colors cursor-pointer group">
             <CardContent className="p-6">
               <div className="flex items-center gap-5">
                 <div className="w-14 h-14 rounded-[6px] border border-border bg-secondary flex items-center justify-center flex-shrink-0">
-                  <Dog className="w-7 h-7 text-studio-brick" />
+                  <Dog className="w-7 h-7 text-room-accent" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="text-base font-semibold text-foreground">EPR Setup Wizard</h3>
-                    <StateChip className="text-studio-brick">New</StateChip>
+                    <StateChip className="text-room-accent">New</StateChip>
                   </div>
                   <p className="text-sm text-muted-foreground">
                     Let Rosa guide you through setting up your EPR data, from organisation details to generating your RPD submission. Takes about 13 minutes.
                   </p>
                 </div>
-                <ArrowRight className="w-5 h-5 text-studio-dim group-hover:text-studio-brick transition-colors flex-shrink-0" />
+                <ArrowRight className="w-5 h-5 text-studio-dim group-hover:text-room-accent transition-colors flex-shrink-0" />
               </div>
             </CardContent>
           </Card>
@@ -454,7 +454,7 @@ function PageHeader({ onRefresh }: { onRefresh?: () => void }) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
       <div className="min-w-0">
-        <Eyebrow tone="inherit" className="mb-3 text-studio-brick">
+        <Eyebrow tone="inherit" className="mb-3 text-room-accent">
           THE EVIDENCE · EPR
         </Eyebrow>
         <h1 className="font-display text-[clamp(2.5rem,5vw,4.25rem)] font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
@@ -497,7 +497,7 @@ function ObligationStatusCard({
               ) : effectiveStatus === 'below_threshold' ? (
                 <CheckCircle2 className="h-8 w-8 text-studio-good" />
               ) : (
-                <Shield className="h-8 w-8 text-studio-brick" />
+                <Shield className="h-8 w-8 text-room-accent" />
               )}
             </div>
             <div>
@@ -571,7 +571,7 @@ function MetricCard({
   return (
     <Card
       className={`rounded-[6px] border-border bg-card ${
-        clickable ? 'hover:border-studio-brick/40 transition-colors cursor-pointer' : ''
+        clickable ? 'hover:border-room-accent/40 transition-colors cursor-pointer' : ''
       }`}
     >
       <CardContent className="p-4">
@@ -579,18 +579,18 @@ function MetricCard({
           <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
             {label}
           </span>
-          <span className={accent ? 'text-studio-brick' : 'text-studio-dim'}>{icon}</span>
+          <span className={accent ? 'text-room-accent' : 'text-studio-dim'}>{icon}</span>
         </div>
         <p
           className={`text-2xl font-display font-bold tabular-nums ${
-            valueColor ?? (accent ? 'text-studio-brick' : 'text-foreground')
+            valueColor ?? (accent ? 'text-room-accent' : 'text-foreground')
           }`}
         >
           {value}
         </p>
         <p className="text-xs text-muted-foreground mt-1">{sublabel}</p>
         {clickable && (
-          <div className="flex items-center gap-1 mt-2 text-xs text-studio-brick">
+          <div className="flex items-center gap-1 mt-2 text-xs text-room-accent">
             <span>View details</span>
             <ChevronRight className="h-3 w-3" />
           </div>
@@ -621,7 +621,7 @@ function DeadlineTimeline({ obligation }: { obligation: ObligationResult | null 
     <Card className="rounded-[6px] border-border bg-card">
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
-          <Clock className="h-4 w-4 text-studio-brick" />
+          <Clock className="h-4 w-4 text-room-accent" />
           Upcoming Deadlines
         </CardTitle>
       </CardHeader>
@@ -699,10 +699,10 @@ function MaterialBreakdown({
 
   // Assign colours to materials: brick primary, dim secondary
   const materialColors: Record<string, string> = {
-    GL: 'bg-studio-brick',
-    AL: 'bg-studio-brick/75',
-    PL: 'bg-studio-brick/55',
-    PC: 'bg-studio-brick/35',
+    GL: 'bg-room',
+    AL: 'bg-room/75',
+    PL: 'bg-room/55',
+    PC: 'bg-room/35',
     ST: 'bg-studio-dim',
     FC: 'bg-studio-dim/70',
     WD: 'bg-studio-dim/50',
@@ -713,7 +713,7 @@ function MaterialBreakdown({
     <Card className="rounded-[6px] border-border bg-card">
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
-          <BarChart3 className="h-4 w-4 text-studio-brick" />
+          <BarChart3 className="h-4 w-4 text-room-accent" />
           Material Breakdown
         </CardTitle>
       </CardHeader>
@@ -784,7 +784,7 @@ function MaterialBreakdown({
                   {(totalWeight / 1000).toFixed(1)}t
                 </span>
                 <span className="text-studio-dim tabular-nums w-10 text-right">100%</span>
-                <span className="text-studio-brick tabular-nums w-16 text-right font-medium">
+                <span className="text-room-accent tabular-nums w-16 text-right font-medium">
                   {formatGBP(totalFee)}
                 </span>
               </div>
@@ -830,14 +830,14 @@ function DataGapAlerts({ gaps }: { gaps: EPRDataGap[] }) {
                   Missing: {gap.missing_fields.join(', ')}
                 </p>
               </div>
-              <ChevronRight className="h-4 w-4 text-studio-dim group-hover:text-studio-brick transition-colors flex-shrink-0 ml-2" />
+              <ChevronRight className="h-4 w-4 text-studio-dim group-hover:text-room-accent transition-colors flex-shrink-0 ml-2" />
             </div>
           </Link>
         ))}
         {gaps.length > 5 && (
           <button
             onClick={() => setExpanded(!expanded)}
-            className="w-full text-center py-2 text-sm text-studio-brick hover:text-studio-brick/80 transition-colors"
+            className="w-full text-center py-2 text-sm text-room-accent hover:text-room-accent/80 transition-colors"
           >
             {expanded ? 'Show less' : `Show all ${gaps.length} items`}
           </button>
@@ -896,16 +896,16 @@ function QuickActions({ wizardCompleted }: { wizardCompleted: boolean }) {
               <div
                 className={`p-4 rounded-[6px] border transition-colors group cursor-pointer ${
                   action.primary
-                    ? 'bg-secondary border-border hover:border-studio-brick/40'
+                    ? 'bg-secondary border-border hover:border-room-accent/40'
                     : 'bg-card border-border hover:bg-secondary'
                 }`}
               >
                 <div className="flex items-center gap-3 mb-2">
-                  <span className={action.primary ? 'text-studio-brick' : 'text-studio-dim'}>
+                  <span className={action.primary ? 'text-room-accent' : 'text-studio-dim'}>
                     {action.icon}
                   </span>
                   <span className="text-sm font-medium text-foreground">{action.label}</span>
-                  <ArrowRight className="h-3.5 w-3.5 text-studio-dim ml-auto group-hover:text-studio-brick transition-colors" />
+                  <ArrowRight className="h-3.5 w-3.5 text-studio-dim ml-auto group-hover:text-room-accent transition-colors" />
                 </div>
                 <p className="text-xs text-muted-foreground">{action.description}</p>
               </div>

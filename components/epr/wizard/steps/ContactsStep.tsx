@@ -173,7 +173,7 @@ export function ContactsStep({ onComplete, onBack, onSkip }: ContactsStepProps) 
               {HMRC_CONTACT_TYPE_NAMES[type]}
             </h4>
             {isRequired ? (
-              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-brick">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-room-accent">
                 Required
               </span>
             ) : (
@@ -292,7 +292,7 @@ export function ContactsStep({ onComplete, onBack, onSkip }: ContactsStepProps) 
         {/* Header */}
         <div className="text-center space-y-3">
           <div className="mx-auto w-16 h-16 rounded-[6px] border border-border bg-card flex items-center justify-center">
-            <Users className="w-8 h-8 text-studio-brick" />
+            <Users className="w-8 h-8 text-room-accent" />
           </div>
           <h3 className="text-xl font-display font-bold text-foreground">
             HMRC Contacts

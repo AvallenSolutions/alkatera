@@ -417,7 +417,7 @@ export default function EPRSubmissionsPage() {
     <TableHead>
       <button
         type="button"
-        className="flex items-center gap-1 hover:text-studio-brick transition-colors text-left"
+        className="flex items-center gap-1 hover:text-room-accent transition-colors text-left"
         onClick={() => toggleSort(field)}
       >
         {children}
@@ -448,7 +448,7 @@ export default function EPRSubmissionsPage() {
     <div className="container mx-auto py-8 px-4 max-w-7xl space-y-6">
       {/* Page Header */}
       <div className="min-w-0">
-        <Eyebrow tone="inherit" className="mb-3 text-studio-brick">
+        <Eyebrow tone="inherit" className="mb-3 text-room-accent">
           THE EVIDENCE · EPR · SUBMISSIONS
         </Eyebrow>
         <h1 className="font-display text-[clamp(2rem,4vw,3.25rem)] font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
@@ -561,8 +561,8 @@ export default function EPRSubmissionsPage() {
             {submissions.map(sub => (
               <Card
                 key={sub.id}
-                className={`rounded-[6px] border-border bg-card cursor-pointer transition-colors hover:border-studio-brick/50 ${
-                  activeSubmission?.id === sub.id ? 'border-studio-brick ring-1 ring-studio-brick/30' : ''
+                className={`rounded-[6px] border-border bg-card cursor-pointer transition-colors hover:border-room-accent/50 ${
+                  activeSubmission?.id === sub.id ? 'border-room-accent ring-1 ring-room-accent/30' : ''
                 }`}
                 onClick={() => selectSubmission(sub)}
               >

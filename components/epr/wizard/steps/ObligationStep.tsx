@@ -121,7 +121,7 @@ export function ObligationStep({ onComplete, onBack }: ObligationStepProps) {
         {/* Header */}
         <div className="text-center space-y-3">
           <div className="mx-auto w-16 h-16 rounded-[6px] border border-border bg-card flex items-center justify-center">
-            <Scale className="w-8 h-8 text-studio-brick" />
+            <Scale className="w-8 h-8 text-room-accent" />
           </div>
           <h3 className="text-xl font-display font-bold text-foreground">
             Your EPR Obligation

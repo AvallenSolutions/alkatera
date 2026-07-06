@@ -109,7 +109,7 @@ export function RecipeChecklist({
         <CollapsibleTrigger asChild>
           <button className="flex items-center justify-between w-full px-4 py-3 text-left hover:bg-muted/50 transition-colors rounded-lg">
             <div className="flex items-center gap-2">
-              <Lightbulb className="h-4 w-4 text-studio-cobalt" />
+              <Lightbulb className="h-4 w-4 text-room-accent" />
               <span className="text-sm font-medium">
                 Typical {categoryLabel} Recipe
               </span>
@@ -160,7 +160,7 @@ export function RecipeChecklist({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-6 px-2 text-xs text-studio-cobalt hover:text-studio-cobalt hover:bg-secondary"
+                      className="h-6 px-2 text-xs text-room-accent hover:text-room-accent hover:bg-secondary"
                       onClick={(e) => {
                         e.stopPropagation();
                         onQuickAdd(

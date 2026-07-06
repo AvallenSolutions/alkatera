@@ -915,7 +915,7 @@ export function IngredientFormCard({
                       key={product.id}
                       type="button"
                       onClick={() => handleSupplierProductSelect(product)}
-                      className="flex items-center gap-2 px-3 py-2 rounded-[6px] border border-border bg-card hover:border-studio-cobalt transition-all text-left"
+                      className="flex items-center gap-2 px-3 py-2 rounded-[6px] border border-border bg-card hover:border-room-accent transition-all text-left"
                     >
                       <Shield className="h-3.5 w-3.5 text-studio-good shrink-0" />
                       <div className="min-w-0">

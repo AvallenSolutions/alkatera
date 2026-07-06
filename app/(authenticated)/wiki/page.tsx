@@ -57,7 +57,7 @@ export default async function WikiIndexPage() {
                   {pages.map((page) => (
                     <li key={page.slug}>
                       <Link href={`/wiki/${page.slug}`} className="group block text-sm">
-                        <span className="font-medium text-foreground transition-colors duration-200 group-hover:text-studio-brick">
+                        <span className="font-medium text-foreground transition-colors duration-200 group-hover:text-room-accent">
                           {page.title}
                         </span>
                         <span className="block text-studio-dim">{page.summary}</span>

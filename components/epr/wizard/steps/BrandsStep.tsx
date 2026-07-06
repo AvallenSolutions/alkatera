@@ -129,7 +129,7 @@ export function BrandsStep({ onComplete, onBack, onSkip }: BrandsStepProps) {
         {/* Header */}
         <div className="text-center space-y-3">
           <div className="mx-auto w-16 h-16 rounded-[6px] border border-border bg-card flex items-center justify-center">
-            <Tag className="w-8 h-8 text-studio-brick" />
+            <Tag className="w-8 h-8 text-room-accent" />
           </div>
           <h3 className="text-xl font-display font-bold text-foreground">
             Brand Details
@@ -198,7 +198,7 @@ export function BrandsStep({ onComplete, onBack, onSkip }: BrandsStepProps) {
             variant="ghost"
             onClick={addBrand}
             disabled={isSaving}
-            className="w-full border border-dashed border-border text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:border-studio-brick/40"
+            className="w-full border border-dashed border-border text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:border-room-accent/40"
           >
             <Plus className="w-4 h-4 mr-2" />
             Add Brand

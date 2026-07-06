@@ -95,7 +95,7 @@ export function CompanyDetailsStep({ onComplete, onBack, onSkip }: CompanyDetail
         {/* Header */}
         <div className="text-center space-y-3">
           <div className="mx-auto w-16 h-16 rounded-[6px] border border-border bg-card flex items-center justify-center">
-            <Building2 className="w-8 h-8 text-studio-brick" />
+            <Building2 className="w-8 h-8 text-room-accent" />
           </div>
           <h3 className="text-xl font-display font-bold text-foreground">
             Company Details
@@ -177,7 +177,7 @@ export function CompanyDetailsStep({ onComplete, onBack, onSkip }: CompanyDetail
                       type="button"
                       onClick={() => setSicCode(sic.code)}
                       disabled={isSaving}
-                      className="text-left text-xs text-studio-brick hover:text-studio-brick/80 hover:underline transition-colors"
+                      className="text-left text-xs text-room-accent hover:text-room-accent/80 hover:underline transition-colors"
                     >
                       {sic.label}
                     </button>

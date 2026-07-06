@@ -204,7 +204,7 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
         ) : (
           <>
             <div className="w-20 h-20 rounded-full border border-border bg-card flex items-center justify-center mx-auto">
-              <Download className="w-10 h-10 text-studio-brick" />
+              <Download className="w-10 h-10 text-room-accent" />
             </div>
             <h2 className="text-2xl md:text-3xl font-display font-bold text-foreground">
               Export &amp; Finish
@@ -306,7 +306,7 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
                       href={exportResult.download_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-sm font-medium text-studio-brick hover:text-studio-brick/80 transition-colors"
+                      className="inline-flex items-center gap-2 text-sm font-medium text-room-accent hover:text-room-accent/80 transition-colors"
                     >
                       <Download className="w-4 h-4" />
                       Download CSV
@@ -354,7 +354,7 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
                               href={result.downloadUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 text-xs font-medium text-studio-brick hover:text-studio-brick/80 transition-colors"
+                              className="inline-flex items-center gap-1.5 text-xs font-medium text-room-accent hover:text-room-accent/80 transition-colors"
                             >
                               <Download className="w-3.5 h-3.5" />
                               Download
@@ -392,10 +392,10 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
           {/* Rosa Celebration */}
           <div className="flex items-start gap-4 p-5 rounded-[6px] border border-border bg-card">
             <div className="w-10 h-10 rounded-[6px] border border-border bg-secondary flex items-center justify-center flex-shrink-0">
-              <Dog className="w-5 h-5 text-studio-brick" />
+              <Dog className="w-5 h-5 text-room-accent" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-studio-brick">Rosa</p>
+              <p className="text-sm font-semibold text-room-accent">Rosa</p>
               <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
                 Brilliant! Your RPD CSV is ready to download. You can upload
                 this directly to the Defra portal. I&apos;ve also recorded
@@ -418,14 +418,14 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
                     href={step.href}
                     className="group rounded-[6px] border border-border bg-card p-4 hover:bg-muted/80 hover:border-border transition-all"
                   >
-                    <Icon className="w-5 h-5 text-studio-brick mb-3 group-hover:scale-110 transition-transform" />
+                    <Icon className="w-5 h-5 text-room-accent mb-3 group-hover:scale-110 transition-transform" />
                     <p className="text-sm font-medium text-foreground">
                       {step.title}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
                       {step.description}
                     </p>
-                    <div className="flex items-center gap-1 mt-3 text-xs text-studio-brick/60 group-hover:text-studio-brick transition-colors">
+                    <div className="flex items-center gap-1 mt-3 text-xs text-room-accent/60 group-hover:text-room-accent transition-colors">
                       <span>Open</span>
                       <ArrowRight className="w-3 h-3" />
                     </div>

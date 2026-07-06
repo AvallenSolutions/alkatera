@@ -233,7 +233,7 @@ export function GenerateStep({ onComplete, onBack }: GenerateStepProps) {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {/* Total Weight */}
                 <div className="rounded-[6px] border border-border bg-secondary p-4 text-center">
-                  <Weight className="w-5 h-5 text-studio-brick mx-auto mb-2" />
+                  <Weight className="w-5 h-5 text-room-accent mx-auto mb-2" />
                   <p className="text-2xl font-bold text-foreground tabular-nums">
                     {totalWeightTonnes}
                   </p>
@@ -244,7 +244,7 @@ export function GenerateStep({ onComplete, onBack }: GenerateStepProps) {
 
                 {/* Estimated Fee */}
                 <div className="rounded-[6px] border border-border bg-secondary p-4 text-center">
-                  <PoundSterling className="w-5 h-5 text-studio-brick mx-auto mb-2" />
+                  <PoundSterling className="w-5 h-5 text-room-accent mx-auto mb-2" />
                   <p className="text-2xl font-bold text-foreground tabular-nums">
                     {formatGBP(submission.total_estimated_fee_gbp)}
                   </p>
@@ -253,7 +253,7 @@ export function GenerateStep({ onComplete, onBack }: GenerateStepProps) {
 
                 {/* Line Count */}
                 <div className="rounded-[6px] border border-border bg-secondary p-4 text-center">
-                  <Rows3 className="w-5 h-5 text-studio-brick mx-auto mb-2" />
+                  <Rows3 className="w-5 h-5 text-room-accent mx-auto mb-2" />
                   <p className="text-2xl font-bold text-foreground tabular-nums">
                     {submission.total_line_items}
                   </p>

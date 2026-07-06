@@ -169,7 +169,7 @@ export function NationSplitStep({ onComplete, onBack, onSkip }: NationSplitStepP
         {/* Header */}
         <div className="text-center space-y-3">
           <div className="mx-auto w-16 h-16 rounded-[6px] border border-border bg-card flex items-center justify-center">
-            <MapPin className="w-8 h-8 text-studio-brick" />
+            <MapPin className="w-8 h-8 text-room-accent" />
           </div>
           <h3 className="text-xl font-display font-bold text-foreground">
             Nation Sales Split
@@ -192,7 +192,7 @@ export function NationSplitStep({ onComplete, onBack, onSkip }: NationSplitStepP
             </>
           ) : (
             <>
-              <Sparkles className="w-4 h-4 mr-2 text-studio-brick" />
+              <Sparkles className="w-4 h-4 mr-2 text-room-accent" />
               Auto-Estimate from Delivery Data
             </>
           )}
@@ -201,7 +201,7 @@ export function NationSplitStep({ onComplete, onBack, onSkip }: NationSplitStepP
         {/* Method + confidence indicators */}
         {method === 'auto_estimated' && confidence && (
           <div className="flex items-center justify-center gap-2 animate-in fade-in duration-200">
-            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-brick">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-room-accent">
               Auto-estimated
             </span>
             <span className={`font-mono text-[10px] font-bold uppercase tracking-[0.18em] ${CONFIDENCE_TONES[confidence] || 'text-studio-dim'}`}>

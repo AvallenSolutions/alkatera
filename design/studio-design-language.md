@@ -43,10 +43,17 @@ assistant block · coloured text on coloured blocks (cream or ink only) · em da
 | Room colour | Hex | Text on it |
 |---|---|---|
 | forest | `#205E40` | cream |
+| teal | `#1E5F5B` | cream |
 | cobalt | `#2B46C0` | cream |
+| plum | `#6D3A5D` | cream |
 | ochre | `#DFA32B` | ink, always (accent form on paper: `#A97C14`) |
 | brick | `#BF4B2A` | cream |
-| ink (settings, assistant) | `#1A1B1D` | paper |
+| ink (the wiring, assistant) | `#1A1B1D` | paper |
+
+> The platform (not alkatera·OS) uses **seven** rooms sorted by frequency of use.
+> Teal and plum were added to the four original inks so each room keeps a distinct
+> colour. See `components/studio/platform-rooms.ts` for the registry and the
+> persona-adaptive ordering.
 
 ### Working tones (states, never decoration)
 | Hex | Meaning |

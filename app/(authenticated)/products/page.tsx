@@ -437,9 +437,9 @@ export default function ProductsPage() {
       {matchCount > 0 && (
         <Link
           href="/products/supplier-matches"
-          className="flex items-center gap-2 rounded-[6px] border border-border bg-card px-4 py-2.5 text-sm transition-colors duration-150 ease-studio hover:border-studio-cobalt"
+          className="flex items-center gap-2 rounded-[6px] border border-border bg-card px-4 py-2.5 text-sm transition-colors duration-150 ease-studio hover:border-room-accent"
         >
-          <Sparkles className="h-4 w-4 shrink-0 text-studio-cobalt" />
+          <Sparkles className="h-4 w-4 shrink-0 text-room-accent" />
           <span className="flex-1">
             {matchCount} supplier {matchCount === 1 ? 'match' : 'matches'} to review. Linking adds real
             supplier data to your footprints.
@@ -495,7 +495,7 @@ export default function ProductsPage() {
         <Card className="border-2 border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <div className="h-14 w-14 rounded-full bg-secondary flex items-center justify-center mb-4">
-              <Leaf className="h-7 w-7 text-studio-cobalt" />
+              <Leaf className="h-7 w-7 text-room-accent" />
             </div>
             <h3 className="font-display text-xl font-semibold mb-2">Build your product portfolio.</h3>
             <p className="text-muted-foreground text-center max-w-md mb-6">

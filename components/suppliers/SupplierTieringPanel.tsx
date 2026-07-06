@@ -93,7 +93,7 @@ export function SupplierTieringPanel({ organizationId }: { organizationId: strin
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Layers className="h-4 w-4 text-studio-cobalt" />
+          <Layers className="h-4 w-4 text-room-accent" />
           Supplier tiers
         </CardTitle>
         <p className="text-sm text-muted-foreground">
@@ -122,7 +122,7 @@ export function SupplierTieringPanel({ organizationId }: { organizationId: strin
                   </SelectContent>
                 </Select>
                 {isSuggested && s.suggestedTier === 'tier_1' && (
-                  <span className="w-16 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-cobalt">Suggested</span>
+                  <span className="w-16 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-room-accent">Suggested</span>
                 )}
                 {!isSuggested || s.suggestedTier !== 'tier_1' ? <span className="w-16" /> : null}
               </div>

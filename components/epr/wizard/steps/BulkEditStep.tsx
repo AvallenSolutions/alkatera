@@ -263,7 +263,7 @@ export function BulkEditStep({ onComplete, onBack, onSkip }: BulkEditStepProps) 
         {/* Header */}
         <div className="text-center space-y-3">
           <div className="mx-auto w-16 h-16 rounded-[6px] border border-border bg-card flex items-center justify-center">
-            <Layers className="w-8 h-8 text-studio-brick" />
+            <Layers className="w-8 h-8 text-room-accent" />
           </div>
           <h3 className="text-xl font-display font-bold text-foreground">
             Bulk Edit Packaging Items
@@ -277,11 +277,11 @@ export function BulkEditStep({ onComplete, onBack, onSkip }: BulkEditStepProps) 
         <div className="rounded-[6px] border border-border bg-card p-4 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-studio-brick" />
+              <Zap className="w-4 h-4 text-room-accent" />
               <span className="text-sm font-medium text-muted-foreground">Batch Actions</span>
             </div>
             {selectedIds.size > 0 && (
-              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-brick">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-room-accent">
                 {selectedIds.size} selected
               </span>
             )}

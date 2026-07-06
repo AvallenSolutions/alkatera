@@ -91,7 +91,7 @@ export function DefaultsStep({ onComplete, onBack, onSkip }: DefaultsStepProps) 
         {/* Header */}
         <div className="text-center space-y-3">
           <div className="mx-auto w-16 h-16 rounded-[6px] border border-border bg-card flex items-center justify-center">
-            <Settings2 className="w-8 h-8 text-studio-brick" />
+            <Settings2 className="w-8 h-8 text-room-accent" />
           </div>
           <h3 className="text-xl font-display font-bold text-foreground">
             Set your packaging defaults

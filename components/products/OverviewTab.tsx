@@ -349,7 +349,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
               <div className="flex-1">
                 <div className="h-4 bg-muted rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-studio-cobalt transition-all"
+                    className="h-full bg-room transition-all"
                     style={{ width: `${circularityRate}%` }}
                   />
                 </div>
@@ -417,7 +417,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
             <button className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-[6px] bg-secondary flex items-center justify-center">
-                  <Map className="h-5 w-5 text-studio-cobalt" />
+                  <Map className="h-5 w-5 text-room-accent" />
                 </div>
                 <div className="text-left">
                   <h3 className="font-semibold text-foreground">Supply Chain Network</h3>
@@ -426,7 +426,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
                   </p>
                 </div>
               </div>
-              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-cobalt">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-room-accent">
                 {showSupplyChain ? 'Hide' : 'Show'} Map
               </span>
             </button>
@@ -453,7 +453,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-[6px] bg-secondary flex items-center justify-center">
-                  <FileText className="h-5 w-5 text-studio-cobalt" />
+                  <FileText className="h-5 w-5 text-room-accent" />
                 </div>
                 <div>
                   <CardTitle className="text-foreground">LCA Reports</CardTitle>
@@ -462,7 +462,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
               </div>
               {lcaReports.length > 0 && (
                 <Link href="/reports/lcas">
-                  <Button variant="ghost" size="sm" className="text-studio-cobalt hover:text-studio-cobalt/80">
+                  <Button variant="ghost" size="sm" className="text-room-accent hover:text-room-accent/80">
                     View All
                   </Button>
                 </Link>

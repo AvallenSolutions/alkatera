@@ -107,7 +107,7 @@ export function ProductPortfolioMatrix({ data }: { data: PortfolioResult }) {
                         <p className="text-muted-foreground">{d.perUnitKgCo2e.toFixed(2)} kg CO2e per unit</p>
                         <p className="text-muted-foreground">{Number(d.annualVolume).toLocaleString('en-GB')} units</p>
                         <p className="text-muted-foreground">{fmtKg(d.totalKgCo2e)} CO2e total</p>
-                        <p className="mt-1 text-studio-cobalt">{QUADRANT_LABELS[d.quadrant as keyof typeof QUADRANT_LABELS]}</p>
+                        <p className="mt-1 text-room-accent">{QUADRANT_LABELS[d.quadrant as keyof typeof QUADRANT_LABELS]}</p>
                       </div>
                     );
                   }}
@@ -157,7 +157,7 @@ export function ProductPortfolioMatrix({ data }: { data: PortfolioResult }) {
                   key={p.id}
                   type="button"
                   onClick={() => router.push(`/products/${p.id}`)}
-                  className="rounded-[6px] border border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-studio-cobalt hover:text-foreground"
+                  className="rounded-[6px] border border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-room-accent hover:text-foreground"
                 >
                   {p.name}
                 </button>

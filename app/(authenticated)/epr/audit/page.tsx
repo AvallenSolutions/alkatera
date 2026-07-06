@@ -415,7 +415,7 @@ export default function AuditTrailPage() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div className="min-w-0">
-          <Eyebrow tone="inherit" className="mb-3 text-studio-brick">
+          <Eyebrow tone="inherit" className="mb-3 text-room-accent">
             THE EVIDENCE · EPR · AUDIT
           </Eyebrow>
           <h1 className="font-display text-[clamp(2rem,4vw,3.25rem)] font-bold leading-[0.95] tracking-[-0.035em] text-foreground">

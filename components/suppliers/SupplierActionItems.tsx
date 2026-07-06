@@ -77,7 +77,7 @@ export function SupplierActionItems({
       label: 'Add impact data to your products',
       description: 'Provide climate, water, waste, and land impact figures to strengthen your sustainability credentials.',
       href: '/supplier-portal/products',
-      colour: 'text-studio-cobalt',
+      colour: 'text-room-accent',
       bgColour: 'bg-secondary',
     });
   }
@@ -120,7 +120,7 @@ export function SupplierActionItems({
             <Link
               key={item.id}
               href={item.href}
-              className="group flex items-center justify-between p-4 rounded-[6px] border border-border bg-card hover:border-studio-cobalt/40 hover:bg-secondary transition-all"
+              className="group flex items-center justify-between p-4 rounded-[6px] border border-border bg-card hover:border-room-accent/40 hover:bg-secondary transition-all"
             >
               <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-[6px] border border-border ${item.bgColour}`}>
@@ -131,7 +131,7 @@ export function SupplierActionItems({
                   <p className="text-xs text-muted-foreground">{item.description}</p>
                 </div>
               </div>
-              <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-studio-cobalt transition-colors flex-shrink-0 ml-3" />
+              <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-room-accent transition-colors flex-shrink-0 ml-3" />
             </Link>
           );
         })}

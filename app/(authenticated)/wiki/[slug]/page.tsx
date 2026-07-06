@@ -50,7 +50,7 @@ export default async function WikiPage({ params }: { params: { slug: string } })
       <article className="mx-auto max-w-3xl">
         <Link
           href="/wiki"
-          className="group mb-10 inline-flex items-center gap-2 font-mono text-xs font-bold uppercase tracking-[0.18em] text-studio-dim transition-colors duration-200 hover:text-studio-brick"
+          className="group mb-10 inline-flex items-center gap-2 font-mono text-xs font-bold uppercase tracking-[0.18em] text-studio-dim transition-colors duration-200 hover:text-room-accent"
         >
           <ArrowLeft className="h-4 w-4 transition-transform duration-300 group-hover:-translate-x-1" />
           Back to the wiki
@@ -87,7 +87,7 @@ export default async function WikiPage({ params }: { params: { slug: string } })
                       href={source.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-foreground transition-colors duration-200 hover:text-studio-brick"
+                      className="text-foreground transition-colors duration-200 hover:text-room-accent"
                     >
                       {source.title}
                     </a>
@@ -111,9 +111,9 @@ export default async function WikiPage({ params }: { params: { slug: string } })
                 <Link
                   key={link.slug}
                   href={`/wiki/${link.slug}`}
-                  className="group block rounded-[6px] border border-border bg-card p-5 transition-colors duration-200 hover:border-studio-brick/60"
+                  className="group block rounded-[6px] border border-border bg-card p-5 transition-colors duration-200 hover:border-room-accent/60"
                 >
-                  <h3 className="mb-1 text-base font-semibold text-foreground transition-colors duration-200 group-hover:text-studio-brick">
+                  <h3 className="mb-1 text-base font-semibold text-foreground transition-colors duration-200 group-hover:text-room-accent">
                     {link.title}
                   </h3>
                   <p className="line-clamp-2 text-sm leading-relaxed text-studio-dim">

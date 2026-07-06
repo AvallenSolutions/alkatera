@@ -76,7 +76,7 @@ export function ProductProductionSparkline({
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-[6px] bg-secondary flex items-center justify-center">
-              <Beer className="h-4 w-4 text-studio-cobalt" />
+              <Beer className="h-4 w-4 text-room-accent" />
             </div>
             <div>
               <h3 className="text-sm font-semibold text-foreground">Brewery Production</h3>
@@ -104,7 +104,7 @@ export function ProductProductionSparkline({
             return (
               <div key={m.period_start} className="flex-1 flex flex-col items-center gap-1 group relative">
                 <div
-                  className="w-full rounded-sm bg-studio-cobalt/30 hover:bg-studio-cobalt/60 transition-colors cursor-help"
+                  className="w-full rounded-sm bg-room/30 hover:bg-room/60 transition-colors cursor-help"
                   style={{ height: `${h}%` }}
                 />
                 <div className="absolute bottom-full mb-1 px-2 py-1 rounded bg-popover border text-[10px] whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-10 shadow-md">

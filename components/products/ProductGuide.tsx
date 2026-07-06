@@ -65,7 +65,7 @@ function SparkleParticles() {
       {particles.map((p) => (
         <motion.div
           key={p.id}
-          className="absolute rounded-full bg-studio-cobalt/30"
+          className="absolute rounded-full bg-room/30"
           style={{
             width: p.size,
             height: p.size,
@@ -99,9 +99,9 @@ function StepDots({ total, current }: { total: number; current: number }) {
           key={i}
           className={`h-1.5 rounded-full transition-all duration-300 ${
             i === current
-              ? 'w-4 bg-studio-cobalt'
+              ? 'w-4 bg-room'
               : i < current
-                ? 'w-1.5 bg-studio-cobalt/50'
+                ? 'w-1.5 bg-room/50'
                 : 'w-1.5 bg-border'
           }`}
         />
@@ -148,10 +148,10 @@ function RosaCard({
       {/* Header */}
       <div className="flex items-center gap-3 mb-3">
         <div className="w-10 h-10 rounded-[6px] bg-secondary border border-border flex items-center justify-center flex-shrink-0">
-          <Dog className="w-5 h-5 text-studio-cobalt" />
+          <Dog className="w-5 h-5 text-room-accent" />
         </div>
         <div>
-          <p className="text-studio-cobalt font-medium text-sm">Rosa</p>
+          <p className="text-room-accent font-medium text-sm">Rosa</p>
           <p className="text-muted-foreground text-xs">Your sustainability guide</p>
         </div>
       </div>
@@ -166,7 +166,7 @@ function RosaCard({
           <motion.span
             animate={{ opacity: [1, 0] }}
             transition={{ duration: 0.5, repeat: Infinity }}
-            className="inline-block w-0.5 h-4 bg-studio-cobalt ml-0.5 align-text-bottom"
+            className="inline-block w-0.5 h-4 bg-room ml-0.5 align-text-bottom"
           />
         )}
       </div>
@@ -292,7 +292,7 @@ function GuideOverlay({
       />
 
       <motion.div
-        className="absolute rounded-[6px] ring-2 ring-studio-cobalt/40"
+        className="absolute rounded-[6px] ring-2 ring-room-accent/40"
         animate={{
           top: targetRect.top - padding,
           left: targetRect.left - padding,
@@ -560,7 +560,7 @@ export function ProductGuideTrigger() {
       variant="outline"
       size="sm"
       onClick={() => window.dispatchEvent(new Event('product-guide:start'))}
-      className="gap-2 text-studio-cobalt hover:text-studio-cobalt hover:bg-secondary"
+      className="gap-2 text-room-accent hover:text-room-accent hover:bg-secondary"
       title="Take a guided tour of this product page"
     >
       <Dog className="h-4 w-4" />

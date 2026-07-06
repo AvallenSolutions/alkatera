@@ -671,7 +671,7 @@ export default function EprSettingsPage() {
     <div className="space-y-6">
       {/* Page header */}
       <div className="min-w-0">
-        <Eyebrow tone="inherit" className="mb-3 text-studio-brick">
+        <Eyebrow tone="inherit" className="mb-3 text-room-accent">
           THE EVIDENCE · EPR · SETTINGS
         </Eyebrow>
         <h1 className="font-display text-[clamp(2rem,4vw,3.25rem)] font-bold leading-[0.95] tracking-[-0.035em] text-foreground">

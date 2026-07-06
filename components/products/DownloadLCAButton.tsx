@@ -125,9 +125,9 @@ export function DownloadLCAButton({
                   variant={variant}
                   size={size}
                   onClick={() => setShowUpgradeModal(true)}
-                  className="border-studio-cobalt/50"
+                  className="border-room-accent/50"
                 >
-                  <Lock className="h-4 w-4 mr-2 text-studio-cobalt" />
+                  <Lock className="h-4 w-4 mr-2 text-room-accent" />
                   {exportReason === "read_only" ? "Subscribe to download" : "Download (trial)"}
                 </Button>
               </span>

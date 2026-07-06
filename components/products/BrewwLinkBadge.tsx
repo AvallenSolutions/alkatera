@@ -115,7 +115,7 @@ export function BrewwLinkBadge({ productId, onChanged, onOpenRecipeImport }: Bre
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="inline-flex items-center gap-1.5 rounded-[6px] border border-border bg-card px-2.5 py-1 text-xs font-medium text-studio-cobalt hover:bg-secondary transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-[6px] border border-border bg-card px-2.5 py-1 text-xs font-medium text-room-accent hover:bg-secondary transition-colors"
             title="Linked to Breww"
           >
             <Link2 className="h-3 w-3" />

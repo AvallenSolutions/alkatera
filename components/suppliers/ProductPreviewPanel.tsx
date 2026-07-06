@@ -53,7 +53,7 @@ const PILLAR_CONFIG = [
     key: 'climate' as const,
     label: 'Climate',
     icon: Cloud,
-    color: 'text-studio-cobalt',
+    color: 'text-room-accent',
     bg: 'bg-card',
     border: 'border-border',
     unit: 'kg CO₂e',
@@ -62,7 +62,7 @@ const PILLAR_CONFIG = [
     key: 'water' as const,
     label: 'Water',
     icon: Droplets,
-    color: 'text-studio-cobalt',
+    color: 'text-room-accent',
     bg: 'bg-card',
     border: 'border-border',
     unit: 'L',
@@ -261,7 +261,7 @@ export default function ProductPreviewPanel({ product }: ProductPreviewPanelProp
             {product.certifications.map((cert) => (
               <span
                 key={cert}
-                className="inline-flex items-center font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-cobalt"
+                className="inline-flex items-center font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-room-accent"
               >
                 <Award className="h-3 w-3 mr-1" />
                 {cert}

@@ -329,7 +329,7 @@ export function AddressesStep({ onComplete, onBack, onSkip }: AddressesStepProps
         {/* Header */}
         <div className="text-center space-y-3">
           <div className="mx-auto w-16 h-16 bg-card border border-border rounded-[6px] flex items-center justify-center">
-            <MapPin className="w-8 h-8 text-studio-brick" />
+            <MapPin className="w-8 h-8 text-room-accent" />
           </div>
           <h3 className="text-xl font-display font-bold text-foreground">
             Organisation Addresses
@@ -365,7 +365,7 @@ export function AddressesStep({ onComplete, onBack, onSkip }: AddressesStepProps
                   <div className="flex items-center gap-3">
                     <div className={`
                       w-8 h-8 rounded-[6px] flex items-center justify-center text-xs font-bold font-mono
-                      ${isRegistered ? 'bg-secondary text-studio-brick' : 'bg-secondary text-muted-foreground'}
+                      ${isRegistered ? 'bg-secondary text-room-accent' : 'bg-secondary text-muted-foreground'}
                     `}>
                       {type === 'registered' ? 'R' : type === 'audit' ? 'A' : type === 'service_of_notice' ? 'S' : 'P'}
                     </div>

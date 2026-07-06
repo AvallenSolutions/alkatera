@@ -199,7 +199,7 @@ function UpdatePRNDialog({
             {purchased && costPerTonne && (
               <div className="space-y-2">
                 <Label>Estimated Total Cost</Label>
-                <p className="text-sm font-mono text-studio-brick">
+                <p className="text-sm font-mono text-room-accent">
                   {fmtGBP(parseFloat(purchased) * parseFloat(costPerTonne))}
                 </p>
               </div>
@@ -377,7 +377,7 @@ export default function PRNTrackerPage() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div className="min-w-0">
-          <Eyebrow tone="inherit" className="mb-3 text-studio-brick">
+          <Eyebrow tone="inherit" className="mb-3 text-room-accent">
             THE EVIDENCE · EPR · PRN
           </Eyebrow>
           <h1 className="font-display text-[clamp(2rem,4vw,3.25rem)] font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
@@ -418,7 +418,7 @@ export default function PRNTrackerPage() {
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-[6px] border border-border bg-secondary">
-                <PoundSterling className="h-5 w-5 text-studio-brick" />
+                <PoundSterling className="h-5 w-5 text-room-accent" />
               </div>
               <div>
                 <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">Total PRN Spend</p>
@@ -487,7 +487,7 @@ export default function PRNTrackerPage() {
                   <span className="font-mono">{fmtGBP(totalPRNSpend)}</span>
                   <span className="text-muted-foreground">PRN Costs</span>
                   <span className="text-muted-foreground">=</span>
-                  <span className="font-mono text-base font-bold text-studio-brick">
+                  <span className="font-mono text-base font-bold text-room-accent">
                     {fmtGBP(totalComplianceCost)}
                   </span>
                   <span className="text-muted-foreground font-medium">Total</span>
