@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import {
@@ -27,19 +26,14 @@ import {
   Lightbulb,
   TrendingUp,
   Search,
-  Clock,
-  Loader2,
-  CheckCircle,
-  AlertCircle,
-  Circle,
-  Mail,
   Building2,
   ExternalLink,
   ChevronLeft,
   ChevronRight,
-  Flame,
-  AlertOctagon,
 } from "lucide-react";
+import { Eyebrow } from "@/components/studio/eyebrow";
+import { BigNumber } from "@/components/studio/big-number";
+import { StateChip } from "@/components/studio/state-chip";
 import { useIsAlkateraAdmin } from "@/hooks/usePermissions";
 import { fetchAllTickets, getTicketStats } from "@/lib/feedback";
 import type {
@@ -66,48 +60,31 @@ const categoryLabels: Record<FeedbackCategory, string> = {
   other: "Other",
 };
 
-const statusIcons: Record<FeedbackStatus, React.ElementType> = {
-  open: Circle,
-  in_progress: AlertCircle,
-  resolved: CheckCircle,
-  closed: CheckCircle,
+const statusTones: Record<FeedbackStatus, "good" | "attention" | "stale" | "hold" | "quiet"> = {
+  open: "attention",
+  in_progress: "hold",
+  resolved: "good",
+  closed: "quiet",
 };
 
 function StatusBadge({ status }: { status: FeedbackStatus }) {
   const config = FEEDBACK_STATUSES[status];
-  const Icon = statusIcons[status];
 
-  const colorClasses: Record<string, string> = {
-    blue: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-    amber: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-    green: "bg-green-500/20 text-green-400 border-green-500/30",
-    slate: "bg-slate-500/20 text-slate-400 border-slate-500/30",
-  };
-
-  return (
-    <Badge className={colorClasses[config.color]}>
-      <Icon className="h-3 w-3 mr-1" />
-      {config.label}
-    </Badge>
-  );
+  return <StateChip tone={statusTones[status]}>{config.label}</StateChip>;
 }
 
 function PriorityBadge({ priority }: { priority: string }) {
   const config = FEEDBACK_PRIORITIES[priority as keyof typeof FEEDBACK_PRIORITIES];
   if (!config) return null;
 
-  const colorClasses: Record<string, string> = {
-    slate: "bg-slate-500/10 text-slate-400 border-slate-500/20",
-    blue: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-    amber: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-    red: "bg-red-500/10 text-red-400 border-red-500/20",
+  const toneByColor: Record<string, "good" | "attention" | "stale" | "hold" | "quiet"> = {
+    slate: "quiet",
+    blue: "quiet",
+    amber: "attention",
+    red: "stale",
   };
 
-  return (
-    <Badge variant="outline" className={colorClasses[config.color]}>
-      {config.label}
-    </Badge>
-  );
+  return <StateChip tone={toneByColor[config.color]}>{config.label}</StateChip>;
 }
 
 const ITEMS_PER_PAGE = 20;
@@ -238,7 +215,7 @@ export default function AdminFeedbackPage() {
     return (
       <div className="container mx-auto py-8 px-4">
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground">Loading.</p>
         </div>
       </div>
     );
@@ -247,7 +224,7 @@ export default function AdminFeedbackPage() {
   if (!isAlkateraAdmin) {
     return (
       <div className="container mx-auto py-8 px-4">
-        <Card>
+        <Card className="rounded-[6px]">
           <CardContent className="py-12 text-center">
             <h3 className="text-lg font-medium mb-2">Access Denied</h3>
             <p className="text-muted-foreground">
@@ -262,57 +239,27 @@ export default function AdminFeedbackPage() {
   return (
     <div className="container mx-auto py-8 px-4">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold mb-2">Feedback Dashboard</h1>
-        <p className="text-muted-foreground">
+      <header className="mb-8">
+        <Eyebrow className="mb-3">THE WIRING · FEEDBACK</Eyebrow>
+        <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+          The feedback.
+        </h1>
+        <p className="text-muted-foreground mt-2 text-sm">
           Manage user feedback, bug reports, and feature requests
         </p>
-      </div>
+      </header>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold">{stats.total}</div>
-            <div className="text-xs text-muted-foreground">Total</div>
-          </CardContent>
-        </Card>
-        <Card className="border-blue-500/30 bg-blue-500/5">
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-blue-500">{stats.open}</div>
-            <div className="text-xs text-muted-foreground">Open</div>
-          </CardContent>
-        </Card>
-        <Card className="border-amber-500/30 bg-amber-500/5">
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-amber-500">{stats.inProgress}</div>
-            <div className="text-xs text-muted-foreground">In Progress</div>
-          </CardContent>
-        </Card>
-        <Card className="border-green-500/30 bg-green-500/5">
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-green-500">{stats.resolved}</div>
-            <div className="text-xs text-muted-foreground">Resolved</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold">{stats.bugs}</div>
-            <div className="text-xs text-muted-foreground">Bugs</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold">{stats.features}</div>
-            <div className="text-xs text-muted-foreground">Features</div>
-          </CardContent>
-        </Card>
-        <Card className="border-red-500/30 bg-red-500/5">
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-red-500">{stats.unreadMessages}</div>
-            <div className="text-xs text-muted-foreground">Unread</div>
-          </CardContent>
-        </Card>
+      {/* Stats */}
+      <div className="rounded-[6px] border border-border bg-card p-6 mb-8">
+        <div className="flex flex-wrap gap-x-12 gap-y-6">
+          <BigNumber value={stats.total} label="TOTAL" />
+          <BigNumber value={stats.open} label="OPEN" tone="attention" />
+          <BigNumber value={stats.inProgress} label="IN PROGRESS" tone="hold" />
+          <BigNumber value={stats.resolved} label="RESOLVED" tone="good" />
+          <BigNumber value={stats.bugs} label="BUGS" />
+          <BigNumber value={stats.features} label="FEATURES" />
+          <BigNumber value={stats.unreadMessages} label="UNREAD" tone={stats.unreadMessages > 0 ? "stale" : "ink"} />
+        </div>
       </div>
 
       {/* Filters */}
@@ -350,9 +297,9 @@ export default function AdminFeedbackPage() {
           <TabsTrigger value="unread">
             Unread
             {stats.unreadMessages > 0 && (
-              <Badge variant="destructive" className="ml-2">
+              <StateChip tone="stale" className="ml-2">
                 {stats.unreadMessages}
-              </Badge>
+              </StateChip>
             )}
           </TabsTrigger>
         </TabsList>
@@ -360,10 +307,10 @@ export default function AdminFeedbackPage() {
         <TabsContent value={activeTab}>
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground">Loading.</p>
             </div>
           ) : filteredTickets.length === 0 ? (
-            <Card>
+            <Card className="rounded-[6px]">
               <CardContent className="py-12 text-center">
                 <MessageSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                 <h3 className="text-lg font-medium mb-2">No tickets found</h3>
@@ -375,7 +322,7 @@ export default function AdminFeedbackPage() {
               </CardContent>
             </Card>
           ) : (
-            <Card>
+            <Card className="rounded-[6px]">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -402,13 +349,13 @@ export default function AdminFeedbackPage() {
                                 <span className="font-medium truncate max-w-[200px]">
                                   {ticket.title}
                                 </span>
-                                <Badge variant="outline" className="text-xs">
+                                <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
                                   {categoryLabels[ticket.category]}
-                                </Badge>
+                                </span>
                                 {ticket.unread_user_messages > 0 && (
-                                  <Badge variant="destructive" className="text-xs">
+                                  <StateChip tone="stale">
                                     {ticket.unread_user_messages} new
-                                  </Badge>
+                                  </StateChip>
                                 )}
                               </div>
                               <p className="text-xs text-muted-foreground truncate max-w-[300px]">
@@ -449,26 +396,13 @@ export default function AdminFeedbackPage() {
                               const daysOpen = Math.floor(
                                 (Date.now() - new Date(ticket.created_at).getTime()) / (1000 * 60 * 60 * 24)
                               );
-                              if (daysOpen >= 21) {
+                              if (daysOpen >= 14) {
                                 return (
-                                  <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs">
-                                    <Flame className="h-3 w-3 mr-1" />
-                                    {daysOpen}d
-                                  </Badge>
-                                );
-                              } else if (daysOpen >= 14) {
-                                return (
-                                  <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30 text-xs">
-                                    <AlertOctagon className="h-3 w-3 mr-1" />
-                                    {daysOpen}d
-                                  </Badge>
+                                  <StateChip tone="stale">{daysOpen}d</StateChip>
                                 );
                               } else if (daysOpen >= 7) {
                                 return (
-                                  <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-xs">
-                                    <Clock className="h-3 w-3 mr-1" />
-                                    {daysOpen}d
-                                  </Badge>
+                                  <StateChip tone="attention">{daysOpen}d</StateChip>
                                 );
                               }
                               return null;

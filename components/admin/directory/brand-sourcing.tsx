@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Search, Loader2, Sparkles, CheckCircle2, AlertTriangle, Globe2 } from 'lucide-react';
+import { Search, Sparkles, CheckCircle2, AlertTriangle, Globe2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -163,7 +163,7 @@ export function BrandSourcing() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-border/60 bg-card/40 p-5 space-y-4">
+      <div className="rounded-[6px] border border-border bg-card p-5 space-y-4">
         <div className="flex gap-2">
           <ModeTab active={mode === 'filter'} onClick={() => setMode('filter')} label="Search by filters" />
           <ModeTab active={mode === 'manual'} onClick={() => setMode('manual')} label="Find a specific brand" />
@@ -174,7 +174,7 @@ export function BrandSourcing() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <Field label="Category">
                 <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger className="bg-background/40 h-9 text-sm">
+                  <SelectTrigger className="bg-secondary h-9 text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -193,7 +193,7 @@ export function BrandSourcing() {
                   value={country}
                   onChange={(e) => setCountry(e.target.value)}
                   placeholder="e.g. United Kingdom"
-                  className="w-full px-3 py-2 rounded-md border border-border/60 bg-background/40 text-sm h-9 focus:outline-none focus:border-neon-lime focus:ring-1 focus:ring-neon-lime"
+                  className="w-full px-3 py-2 rounded-[6px] border border-border bg-secondary text-sm h-9 focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground"
                 />
               </Field>
               <Field label="Keywords">
@@ -202,7 +202,7 @@ export function BrandSourcing() {
                   value={keywords}
                   onChange={(e) => setKeywords(e.target.value)}
                   placeholder="e.g. small-batch gin"
-                  className="w-full px-3 py-2 rounded-md border border-border/60 bg-background/40 text-sm h-9 focus:outline-none focus:border-neon-lime focus:ring-1 focus:ring-neon-lime"
+                  className="w-full px-3 py-2 rounded-[6px] border border-border bg-secondary text-sm h-9 focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground"
                 />
               </Field>
             </div>
@@ -215,8 +215,8 @@ export function BrandSourcing() {
                     onClick={() => toggleCert(c)}
                     className={`text-[11px] rounded-full border px-2.5 py-1 transition-colors ${
                       certs.has(c)
-                        ? 'bg-neon-lime/15 border-neon-lime/40 text-neon-lime'
-                        : 'border-border/60 text-muted-foreground hover:border-neon-lime/40'
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'border-border text-muted-foreground hover:border-foreground'
                     }`}
                   >
                     {c}
@@ -234,7 +234,7 @@ export function BrandSourcing() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="e.g. Avallen, Nc'nean, Two Drifters Rum"
-                className="w-full pl-9 pr-3 py-2 rounded-md border border-border/60 bg-background/40 text-sm h-9 focus:outline-none focus:border-neon-lime focus:ring-1 focus:ring-neon-lime"
+                className="w-full pl-9 pr-3 py-2 rounded-[6px] border border-border bg-secondary text-sm h-9 focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground"
               />
             </div>
           </Field>
@@ -253,8 +253,8 @@ export function BrandSourcing() {
                   onClick={() => setTargetCount(n)}
                   className={`text-[11px] rounded-full border px-3 py-1 transition-colors ${
                     targetCount === n
-                      ? 'bg-neon-lime/15 border-neon-lime/40 text-neon-lime'
-                      : 'border-border/60 text-muted-foreground hover:border-neon-lime/40'
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'border-border text-muted-foreground hover:border-foreground'
                   }`}
                 >
                   {n}
@@ -270,12 +270,10 @@ export function BrandSourcing() {
           <Button
             onClick={run}
             disabled={!canRun || busy}
-            className="bg-neon-lime hover:bg-neon-lime/90 text-black font-semibold"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold"
           >
             {busy ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Searching the web…
-              </>
+              'Searching the web…'
             ) : (
               <>
                 <Sparkles className="h-4 w-4 mr-1.5" /> Find brands
@@ -305,9 +303,9 @@ export function BrandSourcing() {
                     )}
                   </span>
                 </div>
-                <div className="h-1.5 rounded-full bg-background/60 overflow-hidden">
+                <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
                   <div
-                    className="h-full bg-neon-lime transition-[width] duration-500"
+                    className="h-full bg-[#6F6F68] transition-[width] duration-500"
                     style={{
                       width: `${Math.min(100, (progress.chunks_run / progress.chunks_target) * 100)}%`,
                     }}
@@ -320,8 +318,8 @@ export function BrandSourcing() {
       </div>
 
       {error && (
-        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm flex items-start gap-2">
-          <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+        <div className="rounded-[6px] border border-border bg-card px-4 py-3 text-sm flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 text-studio-stale shrink-0 mt-0.5" />
           <div>{error}</div>
         </div>
       )}
@@ -334,7 +332,7 @@ export function BrandSourcing() {
 function ResultPanel({ result }: { result: SourcingResponse }) {
   if (result.found_brands === 0) {
     return (
-      <div className="rounded-xl border border-border/60 bg-card/40 p-6 text-sm text-muted-foreground">
+      <div className="rounded-[6px] border border-border bg-card p-6 text-sm text-muted-foreground">
         No matching brands found. {result.summary}
       </div>
     );
@@ -343,9 +341,9 @@ function ResultPanel({ result }: { result: SourcingResponse }) {
   const linked = result.brands.linked;
   const alkateraLinked = result.brands.alkatera_linked ?? 0;
   return (
-    <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-5 space-y-3">
+    <div className="rounded-[6px] border border-border bg-card p-5 space-y-3">
       <div className="flex items-start gap-3">
-        <CheckCircle2 className="h-5 w-5 text-emerald-300 shrink-0 mt-0.5" />
+        <CheckCircle2 className="h-5 w-5 text-studio-good shrink-0 mt-0.5" />
         <div>
           <div className="text-sm font-semibold">
             Found {result.found_brands} brand{result.found_brands === 1 ? '' : 's'} ·{' '}
@@ -371,7 +369,7 @@ function ResultPanel({ result }: { result: SourcingResponse }) {
                 enrichment.{' '}
               </>
             )}
-            New entries are <strong>pending</strong> — review and verify them before they go
+            New entries are <strong>pending</strong>: review and verify them before they go
             live.
           </div>
           {result.summary && (
@@ -385,7 +383,7 @@ function ResultPanel({ result }: { result: SourcingResponse }) {
           {result.brand_names.map((n) => (
             <li
               key={n}
-              className="inline-flex items-center gap-1 text-[11px] rounded-full border border-border/60 bg-background/40 px-2.5 py-1"
+              className="inline-flex items-center gap-1 text-[11px] rounded-full border border-border bg-secondary px-2.5 py-1"
             >
               <Globe2 className="h-3 w-3 text-muted-foreground" />
               {n}
@@ -395,7 +393,7 @@ function ResultPanel({ result }: { result: SourcingResponse }) {
       )}
 
       <div className="flex gap-2 pt-1">
-        <Button asChild size="sm" className="bg-neon-lime hover:bg-neon-lime/90 text-black font-semibold">
+        <Button asChild size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold">
           <Link href="/admin/directory/review">Review &amp; verify →</Link>
         </Button>
         <Button asChild size="sm" variant="outline">
@@ -404,7 +402,7 @@ function ResultPanel({ result }: { result: SourcingResponse }) {
       </div>
 
       {(result.brands.errors.length > 0 || result.products.errors.length > 0) && (
-        <div className="text-[11px] text-amber-300 pt-1">
+        <div className="text-[11px] text-studio-attention pt-1">
           {result.brands.errors.length + result.products.errors.length} row
           {result.brands.errors.length + result.products.errors.length === 1 ? '' : 's'} skipped
           (e.g. unresolved brand or empty name).
@@ -427,10 +425,10 @@ function ModeTab({
     <button
       type="button"
       onClick={onClick}
-      className={`text-xs font-semibold rounded-md px-3 py-1.5 transition-colors ${
+      className={`text-xs font-semibold rounded-[6px] px-3 py-1.5 transition-colors ${
         active
-          ? 'bg-neon-lime/15 border border-neon-lime/40 text-neon-lime'
-          : 'border border-border/60 text-muted-foreground hover:text-foreground'
+          ? 'bg-primary text-primary-foreground border border-primary'
+          : 'border border-border text-muted-foreground hover:text-foreground'
       }`}
     >
       {label}

@@ -14,7 +14,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft, Save, Send, AlertTriangle, Loader2 } from "lucide-react";
+import { ArrowLeft, Save, Send, AlertTriangle } from "lucide-react";
+import { Eyebrow } from "@/components/studio/eyebrow";
 import { useIsAlkateraAdmin } from "@/hooks/usePermissions";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -25,7 +26,7 @@ import { ImageUpload } from "@/components/blog/ImageUpload";
 // starts editing content, not on initial page load.
 const RichTextEditor = dynamic(
   () => import("@/components/blog/RichTextEditor").then(mod => ({ default: mod.RichTextEditor })),
-  { ssr: false, loading: () => <div className="h-64 w-full rounded-xl border bg-muted animate-pulse" /> }
+  { ssr: false, loading: () => <div className="h-64 w-full rounded-[6px] border border-border bg-secondary" /> }
 );
 
 interface BlogPostFormData {
@@ -252,7 +253,7 @@ export default function NewBlogPost() {
   if (isLoadingAuth) {
     return (
       <div className="p-8 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin" />
+        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground">Loading.</p>
       </div>
     );
   }
@@ -281,8 +282,11 @@ export default function NewBlogPost() {
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Create New Post</h1>
-            <p className="text-muted-foreground">Write and publish content for the Knowledge Hub</p>
+            <Eyebrow className="mb-3">THE WIRING · BLOG</Eyebrow>
+            <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+              New post.
+            </h1>
+            <p className="text-muted-foreground mt-2 text-sm">Write and publish content for the Knowledge Hub</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -296,12 +300,8 @@ export default function NewBlogPost() {
               (formData.content_type === 'video' && !formData.video_url)
             }
           >
-            {isSubmitting ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <Save className="w-4 h-4 mr-2" />
-            )}
-            Save Draft
+            <Save className="w-4 h-4 mr-2" />
+            {isSubmitting ? 'Saving...' : 'Save Draft'}
           </Button>
           <Button
             onClick={() => handleSubmit('published')}
@@ -312,12 +312,8 @@ export default function NewBlogPost() {
               (formData.content_type === 'video' && !formData.video_url)
             }
           >
-            {isSubmitting ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <Send className="w-4 h-4 mr-2" />
-            )}
-            Publish
+            <Send className="w-4 h-4 mr-2" />
+            {isSubmitting ? 'Publishing...' : 'Publish'}
           </Button>
         </div>
       </div>
@@ -336,7 +332,7 @@ export default function NewBlogPost() {
 
       {/* Success/Error Messages */}
       {successMessage && (
-        <Alert className="bg-green-50 text-green-900 border-green-200">
+        <Alert className="rounded-[6px] border-border bg-card text-studio-good">
           <AlertDescription>
             {successMessage}
           </AlertDescription>
@@ -353,7 +349,7 @@ export default function NewBlogPost() {
       <div className="grid gap-6 md:grid-cols-3">
         {/* Main Content */}
         <div className="md:col-span-2 space-y-6">
-          <Card>
+          <Card className="rounded-[6px]">
             <CardHeader>
               <CardTitle>Post Content</CardTitle>
             </CardHeader>
@@ -455,8 +451,7 @@ export default function NewBlogPost() {
                       disabled={isUploadingVideo}
                     />
                     {isUploadingVideo && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                      <div className="text-sm text-muted-foreground">
                         Uploading video...
                       </div>
                     )}
@@ -510,7 +505,7 @@ export default function NewBlogPost() {
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Post Settings */}
-          <Card>
+          <Card className="rounded-[6px]">
             <CardHeader>
               <CardTitle>Post Settings</CardTitle>
             </CardHeader>
@@ -581,7 +576,7 @@ export default function NewBlogPost() {
           </Card>
 
           {/* SEO Settings */}
-          <Card>
+          <Card className="rounded-[6px]">
             <CardHeader>
               <CardTitle>SEO Metadata</CardTitle>
               <CardDescription>Customize how this appears in search</CardDescription>

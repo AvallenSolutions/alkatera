@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { CheckCircle2, Loader2, AlertCircle, Beer, Package, ClipboardList, Factory, Boxes } from 'lucide-react'
+import { CheckCircle2, AlertCircle, Beer, Package, ClipboardList, Factory, Boxes } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 /**
@@ -165,7 +165,7 @@ export function BrewwImportDialog({ open, onClose, organizationId, onSuccess }: 
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Beer className="h-5 w-5 text-[#ccff00]" />
+            <Beer className="h-5 w-5 text-studio-forest" />
             Import your Breww data
           </DialogTitle>
           <DialogDescription>
@@ -187,19 +187,19 @@ export function BrewwImportDialog({ open, onClose, organizationId, onSuccess }: 
                     key={dt.key}
                     onClick={() => toggle(dt.key)}
                     className={cn(
-                      'w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-colors',
+                      'w-full flex items-start gap-3 p-3 rounded-[6px] border text-left transition-colors',
                       checked
-                        ? 'bg-[#ccff00]/10 border-[#ccff00]/40'
+                        ? 'bg-secondary border-studio-forest'
                         : 'bg-card border-border hover:bg-muted/40',
                     )}
                   >
                     <div className={cn(
                       'h-5 w-5 rounded-md border flex items-center justify-center shrink-0 mt-0.5 transition-colors',
-                      checked ? 'bg-[#ccff00] border-[#ccff00]' : 'bg-background border-border',
+                      checked ? 'bg-studio-forest border-studio-forest' : 'bg-background border-border',
                     )}>
-                      {checked && <CheckCircle2 className="h-3.5 w-3.5 text-black" />}
+                      {checked && <CheckCircle2 className="h-3.5 w-3.5 text-studio-cream" />}
                     </div>
-                    <Icon className={cn('h-5 w-5 shrink-0 mt-0.5', checked ? 'text-[#ccff00]' : 'text-muted-foreground')} />
+                    <Icon className={cn('h-5 w-5 shrink-0 mt-0.5', checked ? 'text-studio-forest' : 'text-muted-foreground')} />
                     <div className="min-w-0">
                       <p className="text-sm font-medium">{dt.label}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">{dt.description}</p>
@@ -209,13 +209,13 @@ export function BrewwImportDialog({ open, onClose, organizationId, onSuccess }: 
               })}
             </div>
             {error && (
-              <p className="text-xs text-red-300 mt-2">{error}</p>
+              <p className="text-xs text-studio-stale mt-2">{error}</p>
             )}
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={handleClose}>Skip for now</Button>
               <Button
                 onClick={handleImport}
-                className="bg-[#ccff00] text-black hover:bg-[#ccff00]/90"
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
                 disabled={selected.size === 0}
               >
                 Import {selected.size === DATA_TYPES.length ? 'all' : `${selected.size} of ${DATA_TYPES.length}`}
@@ -226,7 +226,7 @@ export function BrewwImportDialog({ open, onClose, organizationId, onSuccess }: 
 
         {stage === 'syncing' && (
           <div className="py-8 flex flex-col items-center gap-3 text-center">
-            <Loader2 className="h-10 w-10 animate-spin text-[#ccff00]" />
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-forest">Working</p>
             <p className="text-sm text-muted-foreground">
               This usually takes 10-30 seconds depending on how many batches you have.
             </p>
@@ -235,17 +235,17 @@ export function BrewwImportDialog({ open, onClose, organizationId, onSuccess }: 
 
         {stage === 'done' && summary && (
           <div className="py-4 flex flex-col items-center gap-3 text-center">
-            <CheckCircle2 className="h-10 w-10 text-emerald-400" />
+            <CheckCircle2 className="h-10 w-10 text-studio-good" />
             <div className="space-y-1">
               {summaryLines(summary).length > 0 ? (
                 summaryLines(summary).map((line, i) => (
                   <p key={i} className="text-sm text-foreground">{line}</p>
                 ))
               ) : (
-                <p className="text-sm text-muted-foreground">Nothing to import — your Breww account is empty.</p>
+                <p className="text-sm text-muted-foreground">Nothing to import: your Breww account is empty.</p>
               )}
             </div>
-            <Button onClick={handleClose} className="bg-[#ccff00] text-black hover:bg-[#ccff00]/90 mt-2">
+            <Button onClick={handleClose} className="bg-primary text-primary-foreground hover:bg-primary/90 mt-2">
               Continue onboarding
             </Button>
           </div>
@@ -253,11 +253,11 @@ export function BrewwImportDialog({ open, onClose, organizationId, onSuccess }: 
 
         {stage === 'error' && (
           <div className="py-4 flex flex-col items-center gap-3 text-center">
-            <AlertCircle className="h-10 w-10 text-red-400" />
-            <p className="text-sm font-medium text-red-300 break-words">{error}</p>
+            <AlertCircle className="h-10 w-10 text-studio-stale" />
+            <p className="text-sm font-medium text-studio-stale break-words">{error}</p>
             <div className="flex gap-2 pt-2">
               <Button variant="outline" onClick={handleClose}>Cancel</Button>
-              <Button onClick={() => { setStage('choose'); setError('') }} className="bg-[#ccff00] text-black hover:bg-[#ccff00]/90">
+              <Button onClick={() => { setStage('choose'); setError('') }} className="bg-primary text-primary-foreground hover:bg-primary/90">
                 Try again
               </Button>
             </div>

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Check, Loader2, X } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { confirmRosaAction, cancelRosaAction } from '@/lib/gaia';
 
@@ -55,7 +55,7 @@ export function ActionProposalCard({ proposal, onResolved }: Props) {
   };
 
   return (
-    <Card className="my-2 border-[#ccff00]/40 bg-[#ccff00]/5">
+    <Card className="my-2 rounded-[6px] border-border bg-card">
       <CardContent className="p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
@@ -63,9 +63,9 @@ export function ActionProposalCard({ proposal, onResolved }: Props) {
               Rosa wants to
             </p>
             <p className="text-sm">{proposal.preview}</p>
-            {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
+            {error && <p className="text-xs text-studio-stale mt-2">{error}</p>}
             {status === 'done' && result && (
-              <p className="text-xs text-emerald-600 mt-2">Done. {formatResult(result)}</p>
+              <p className="text-xs text-studio-good mt-2">Done. {formatResult(result)}</p>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -82,10 +82,10 @@ export function ActionProposalCard({ proposal, onResolved }: Props) {
               </>
             )}
             {status === 'executing' && (
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">Working…</span>
             )}
             {status === 'done' && (
-              <span className="text-xs font-medium text-emerald-600 inline-flex items-center gap-1">
+              <span className="text-xs font-medium text-studio-good inline-flex items-center gap-1">
                 <Check className="h-3.5 w-3.5" />
                 Saved
               </span>
@@ -94,7 +94,7 @@ export function ActionProposalCard({ proposal, onResolved }: Props) {
               <span className="text-xs text-muted-foreground">Cancelled</span>
             )}
             {status === 'failed' && (
-              <span className="text-xs text-red-600">Failed</span>
+              <span className="text-xs text-studio-stale">Failed</span>
             )}
           </div>
         </div>

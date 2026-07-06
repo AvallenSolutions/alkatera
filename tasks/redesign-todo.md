@@ -53,13 +53,27 @@ Open questions for the M2 review:
   (~60 files), rosa surfaces incl. the drawer, vitality modals, targets and financial cards are
   de-limed to studio (forest accents, working-tone typographic chips, no spinners/gradients/
   glows). grep for ccff00/#0c1410 in components/{rosa,vitality,pulse} returns nothing.
-- [ ] Products + LCA
-- [ ] Reports / certifications / passports
-- [ ] Settings (the wiring)
-- [ ] Rosa surfaces
-- [ ] Distributor portal (align with generalised studio language)
+- [x] THE MEASURES (5 July): statement headers on all 9 pages; facilities, supplier and
+  product components to cobalt studio. Committed 51673c14.
+- [x] THE EVIDENCE (5 July): reports, certifications, EPR (+wizard), guardian, library,
+  knowledge, wiki (+connected map) to brick studio. Committed 3e04b042.
+- [~] THE POST + THE WIRING: in flight (settings pages/components, integrations, all admin
+  pages/components, shared chrome: CookieConsent, TrialBanner, UniversalDropzone, agents,
+  error/suspended pages).
+- [ ] Measures leftovers: vineyards/orchards/arable, nature, byproducts, soil-carbon,
+  hospitality, energy, product detail subpages, LCA wizard, materiality/report-builder bits
+- [ ] Journeys: onboarding wizard steps (~30 files), supplier onboarding + portal +
+  SupplierLayout, auth forms, public invite pages, create-organization, complete-subscription
+- [ ] Public + artefacts: marketing landing + page clients + nav/footer, getaccess, blog,
+  public menu, lca-report components + report HTML API routes + email templates + passport
+  accent (globals.css block + tailwind brand-accent token)
+- [ ] Desk: live numbers on the poster blocks
+- [ ] Cleanup: delete dead Sidebar.tsx/Header.tsx/RosaHeaderButton, retire neon-* bridge vars,
+  remove /studio-kit gallery or keep as internal reference (ask Tim)
+- [ ] App icons (favicon/apple-icon still lime): brand decision for Tim
+- [ ] Distributor portal (align with generalised studio language; wait for main-checkout
+  stream to land to avoid conflicts)
 - [ ] Procurement portal (respect tenant whitelabel injection)
-- [ ] Public pages (landing, wiki, public menus/labels)
 
 ## Go-live (later)
 - [ ] Merge latest `main`, full `pnpm build`, full walk-through

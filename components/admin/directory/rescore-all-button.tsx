@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, RefreshCw, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { RefreshCw, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface RescoreBatch {
@@ -106,23 +106,19 @@ export function RescoreAllButton() {
       )}
       {result && (
         <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
-          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+          <CheckCircle2 className="h-3.5 w-3.5 text-studio-good" />
           Rescored {result.updated}/{result.total}
           {result.error_count > 0 ? ` · ${result.error_count} errors` : ''}
         </span>
       )}
       {error && (
-        <span className="text-[11px] text-destructive inline-flex items-center gap-1">
+        <span className="text-[11px] text-studio-stale inline-flex items-center gap-1">
           <AlertTriangle className="h-3.5 w-3.5" />
           {error}
         </span>
       )}
       <Button variant="outline" size="sm" onClick={run} disabled={busy}>
-        {busy ? (
-          <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-        ) : (
-          <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-        )}
+        {!busy && <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
         {busy ? 'Rescoring…' : 'Rescore all'}
       </Button>
     </div>

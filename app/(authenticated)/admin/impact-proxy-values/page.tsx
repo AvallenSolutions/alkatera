@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
@@ -27,14 +26,14 @@ import {
 } from '@/components/ui/sheet';
 import {
   Shield,
-  TrendingUp,
   Pencil,
   History,
   X,
   Save,
   Info,
-  Loader2,
 } from 'lucide-react';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { StateChip } from '@/components/studio/state-chip';
 import { toast } from 'sonner';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -244,16 +243,14 @@ export default function AdminImpactProxyValuesPage() {
   return (
     <div className="container mx-auto py-8 space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="h-10 w-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center">
-          <TrendingUp className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Impact Proxy Values</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage shadow prices used in Impact Valuation calculations
-          </p>
-        </div>
+      <div>
+        <Eyebrow tone="dim" className="mb-3">THE WIRING · ADMIN</Eyebrow>
+        <h1 className="font-display text-3xl font-bold tracking-[-0.035em] text-foreground">
+          Impact proxy values.
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Manage shadow prices used in Impact Valuation calculations
+        </p>
       </div>
 
       {/* Info banner */}
@@ -339,12 +336,8 @@ export default function AdminImpactProxyValuesPage() {
                                   disabled={saving}
                                   className="gap-1.5"
                                 >
-                                  {saving ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  ) : (
-                                    <Save className="h-3.5 w-3.5" />
-                                  )}
-                                  Save
+                                  {!saving && <Save className="h-3.5 w-3.5" />}
+                                  {saving ? 'Saving…' : 'Save'}
                                 </Button>
                                 <Button
                                   size="sm"
@@ -371,7 +364,7 @@ export default function AdminImpactProxyValuesPage() {
                             {proxy.source}
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline">v{proxy.version}</Badge>
+                            <span className="font-mono text-xs text-muted-foreground">v{proxy.version}</span>
                           </TableCell>
                           <TableCell className="text-muted-foreground">
                             {new Date(proxy.effective_from).toLocaleDateString('en-GB')}
@@ -423,7 +416,7 @@ export default function AdminImpactProxyValuesPage() {
           <div className="mt-6 space-y-4">
             {historyLoading ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">Loading…</p>
               </div>
             ) : historyItems.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">
@@ -432,20 +425,13 @@ export default function AdminImpactProxyValuesPage() {
             ) : (
               <div className="space-y-3">
                 {historyItems.map((item) => (
-                  <Card
-                    key={item.id}
-                    className={item.is_active ? 'border-emerald-200 dark:border-emerald-800' : ''}
-                  >
+                  <Card key={item.id}>
                     <CardContent className="py-3 px-4">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          <Badge variant={item.is_active ? 'default' : 'outline'}>
-                            v{item.version}
-                          </Badge>
+                          <span className="font-mono text-xs text-muted-foreground">v{item.version}</span>
                           {item.is_active && (
-                            <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800">
-                              Current
-                            </Badge>
+                            <StateChip tone="good">Current</StateChip>
                           )}
                         </div>
                         <span className="text-xs text-muted-foreground">

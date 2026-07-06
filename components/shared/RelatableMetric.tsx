@@ -98,7 +98,7 @@ export function RelatableMetric(props: RelatableMetricProps) {
     ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200'
     : 'bg-white/10 border-white/15 text-slate-100'
 
-  const accent = variant === 'light' ? 'text-emerald-700 dark:text-emerald-300' : 'text-[#ccff00]'
+  const accent = variant === 'light' ? 'text-studio-good' : 'text-studio-cream'
   const muted = variant === 'light' ? 'text-slate-500 dark:text-slate-400' : 'text-slate-300/80'
   const trigger = variant === 'light' ? 'text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300' : 'text-slate-400 hover:text-slate-200'
 

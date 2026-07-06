@@ -65,7 +65,7 @@ export function FramingStep({ config, onChange, smartDefaultsApplied }: FramingS
     <div className="space-y-8 max-w-2xl">
       {/* Smart defaults notice */}
       {smartDefaultsApplied && (
-        <div className="flex items-start gap-3 rounded-xl bg-[#ccff00]/10 border border-[#ccff00]/30 p-4">
+        <div className="flex items-start gap-3 rounded-[6px] bg-card border border-border p-4">
           <Sparkles className="w-4 h-4 text-stone-600 flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-medium text-stone-700">Smart defaults applied</p>
@@ -97,7 +97,7 @@ export function FramingStep({ config, onChange, smartDefaultsApplied }: FramingS
                 type="button"
                 onClick={() => onChange({ audience: audience.value as ReportConfig['audience'] })}
                 className={cn(
-                  'relative text-left p-4 rounded-xl border-2 transition-all hover:border-stone-300',
+                  'relative text-left p-4 rounded-[6px] border-2 transition-all hover:border-stone-300',
                   isSelected
                     ? 'border-stone-900 bg-stone-900 text-white shadow-md'
                     : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
@@ -105,10 +105,10 @@ export function FramingStep({ config, onChange, smartDefaultsApplied }: FramingS
               >
                 {isSelected && (
                   <div className="absolute top-2 right-2">
-                    <CheckCircle2 className="w-4 h-4 text-[#ccff00]" />
+                    <CheckCircle2 className="w-4 h-4 text-[#F2F1EA]" />
                   </div>
                 )}
-                <Icon className={cn('w-5 h-5 mb-2', isSelected ? 'text-[#ccff00]' : 'text-stone-400')} />
+                <Icon className={cn('w-5 h-5 mb-2', isSelected ? 'text-[#F2F1EA]' : 'text-stone-400')} />
                 <div className={cn('text-sm font-semibold', isSelected ? 'text-white' : 'text-stone-800')}>
                   {audience.label}
                 </div>
@@ -128,7 +128,7 @@ export function FramingStep({ config, onChange, smartDefaultsApplied }: FramingS
             </p>
             {selectedMeta.cues.map(cue => (
               <div key={cue} className="flex items-start gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-[#84cc16] mt-1.5 flex-shrink-0" />
+                <div className="w-1.5 h-1.5 rounded-full bg-[#2B46C0] mt-1.5 flex-shrink-0" />
                 <p className="text-xs text-stone-600">{cue}</p>
               </div>
             ))}
@@ -153,7 +153,7 @@ export function FramingStep({ config, onChange, smartDefaultsApplied }: FramingS
           onChange={e => onChange({ reportFramingStatement: e.target.value || undefined })}
           placeholder={
             config.audience === 'investors'
-              ? 'e.g. Despite a 12% revenue increase, absolute emissions fell — demonstrating that our growth is now decoupled from carbon.'
+              ? 'e.g. Despite a 12% revenue increase, absolute emissions fell, demonstrating that our growth is now decoupled from carbon.'
               : config.audience === 'customers'
               ? 'e.g. Every product in our range is now below 1 kg CO2e per unit, and we can show the full supply chain behind every number.'
               : 'e.g. We have a credible, costed pathway to net zero by 2040 with three major milestones already achieved.'

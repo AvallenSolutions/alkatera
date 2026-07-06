@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { ArrowLeft, ArrowRight, Building2, SkipForward, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Building2, SkipForward } from 'lucide-react'
 import { toast } from 'sonner'
 
 export function SupplierCompleteProfile() {
@@ -97,7 +97,7 @@ export function SupplierCompleteProfile() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-6 h-6 text-[#ccff00] animate-spin" />
+        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">Loading&hellip;</p>
       </div>
     )
   }
@@ -106,21 +106,21 @@ export function SupplierCompleteProfile() {
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 animate-in fade-in duration-300">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-3">
-          <div className="mx-auto w-16 h-16 bg-[#ccff00]/20 backdrop-blur-md border border-[#ccff00]/30 rounded-2xl flex items-center justify-center">
-            <Building2 className="w-8 h-8 text-[#ccff00]" />
+          <div className="mx-auto w-16 h-16 rounded-[6px] bg-card border border-border flex items-center justify-center">
+            <Building2 className="w-8 h-8 text-studio-forest" />
           </div>
-          <h3 className="text-xl font-serif font-bold text-white">
-            Complete Your Company Profile
+          <h3 className="text-xl font-display font-bold tracking-tight text-foreground">
+            Complete your company profile.
           </h3>
-          <p className="text-sm text-white/50">
+          <p className="text-sm text-muted-foreground">
             This helps your customers know who they&apos;re working with.
           </p>
         </div>
 
-        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 space-y-4">
+        <div className="rounded-[6px] border border-border bg-card p-6 space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="sup-name" className="text-sm font-medium text-white/70">
-              Company Name <span className="text-red-400">*</span>
+            <Label htmlFor="sup-name" className="text-sm font-medium text-foreground">
+              Company Name <span className="text-studio-stale">*</span>
             </Label>
             <Input
               id="sup-name"
@@ -128,12 +128,11 @@ export function SupplierCompleteProfile() {
               value={name}
               onChange={e => setName(e.target.value)}
               disabled={isSaving}
-              className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="sup-description" className="text-sm font-medium text-white/70">
+            <Label htmlFor="sup-description" className="text-sm font-medium text-foreground">
               Description
             </Label>
             <Textarea
@@ -143,13 +142,12 @@ export function SupplierCompleteProfile() {
               onChange={e => setDescription(e.target.value)}
               disabled={isSaving}
               rows={3}
-              className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="sup-industry" className="text-sm font-medium text-white/70">
+              <Label htmlFor="sup-industry" className="text-sm font-medium text-foreground">
                 Industry
               </Label>
               <Input
@@ -158,11 +156,10 @@ export function SupplierCompleteProfile() {
                 value={industrySector}
                 onChange={e => setIndustrySector(e.target.value)}
                 disabled={isSaving}
-                className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="sup-country" className="text-sm font-medium text-white/70">
+              <Label htmlFor="sup-country" className="text-sm font-medium text-foreground">
                 Country
               </Label>
               <Input
@@ -171,13 +168,12 @@ export function SupplierCompleteProfile() {
                 value={country}
                 onChange={e => setCountry(e.target.value)}
                 disabled={isSaving}
-                className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="sup-website" className="text-sm font-medium text-white/70">
+            <Label htmlFor="sup-website" className="text-sm font-medium text-foreground">
               Website
             </Label>
             <Input
@@ -187,13 +183,12 @@ export function SupplierCompleteProfile() {
               value={website}
               onChange={e => setWebsite(e.target.value)}
               disabled={isSaving}
-              className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="sup-contact-name" className="text-sm font-medium text-white/70">
+              <Label htmlFor="sup-contact-name" className="text-sm font-medium text-foreground">
                 Contact Name
               </Label>
               <Input
@@ -202,11 +197,10 @@ export function SupplierCompleteProfile() {
                 value={contactName}
                 onChange={e => setContactName(e.target.value)}
                 disabled={isSaving}
-                className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="sup-contact-email" className="text-sm font-medium text-white/70">
+              <Label htmlFor="sup-contact-email" className="text-sm font-medium text-foreground">
                 Contact Email
               </Label>
               <Input
@@ -216,36 +210,32 @@ export function SupplierCompleteProfile() {
                 value={contactEmail}
                 onChange={e => setContactEmail(e.target.value)}
                 disabled={isSaving}
-                className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
               />
             </div>
           </div>
         </div>
 
-        <p className="text-xs text-white/30 text-center">
+        <p className="text-xs text-studio-dim text-center">
           You can add a logo and update these details anytime from your profile page.
         </p>
 
         <div className="flex items-center justify-between pt-2">
-          <Button variant="ghost" onClick={previousStep} className="text-white/40 hover:text-white hover:bg-white/10">
+          <Button variant="ghost" onClick={previousStep} className="text-muted-foreground hover:text-foreground hover:bg-secondary">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" onClick={skipStep} className="text-white/40 hover:text-white hover:bg-white/10 text-sm">
+            <Button variant="ghost" onClick={skipStep} className="text-muted-foreground hover:text-foreground hover:bg-secondary text-sm">
               <SkipForward className="w-4 h-4 mr-1" />
               Skip
             </Button>
             <Button
               onClick={handleSave}
               disabled={isSaving}
-              className="bg-[#ccff00] text-black hover:bg-[#ccff00]/90 font-medium rounded-xl"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full"
             >
               {isSaving ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
-                </>
+                'Saving...'
               ) : (
                 <>
                   Save & Continue

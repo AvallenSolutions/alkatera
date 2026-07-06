@@ -291,7 +291,7 @@ export function LcaReportGenerator({
         <Card>
           <CardContent className="flex items-center justify-center py-16">
             <div className="text-center space-y-3">
-              <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+              <Loader2 className="h-8 w-8 mx-auto text-muted-foreground" />
               <p className="text-muted-foreground">Checking ISO compliance status...</p>
             </div>
           </CardContent>
@@ -339,7 +339,7 @@ export function LcaReportGenerator({
                       <div>
                         <div className="font-medium text-sm">{section.title}</div>
                         <div className="text-xs text-muted-foreground mt-0.5">
-                          ISO {section.isoRef} — {section.completedItems}/{section.totalItems} items complete
+                          ISO {section.isoRef} · {section.completedItems}/{section.totalItems} items complete
                         </div>
                       </div>
                     </div>
@@ -372,18 +372,18 @@ export function LcaReportGenerator({
       {state === 'ready' && compliance && (
         <div className="space-y-4">
           {/* Compliance badge */}
-          <Card className="border-green-200 bg-green-50/50 dark:bg-green-950/10 dark:border-green-900">
+          <Card className="border-border bg-card">
             <CardContent className="flex items-center gap-4 py-4">
-              <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400 flex-shrink-0" />
+              <CheckCircle2 className="h-8 w-8 text-[#047857] flex-shrink-0" />
               <div className="flex-1">
-                <div className="font-semibold text-green-900 dark:text-green-300">ISO Compliance Ready</div>
-                <div className="text-sm text-green-700 dark:text-green-400">
-                  Score: {compliance.overallScore}% — {compliance.completedSections}/{compliance.totalSections} sections complete
+                <div className="font-semibold text-foreground">ISO Compliance Ready</div>
+                <div className="text-sm text-muted-foreground">
+                  Score: {compliance.overallScore}% · {compliance.completedSections}/{compliance.totalSections} sections complete
                 </div>
               </div>
               {compliance.overallScore < 100 && (
                 <Link href={`/products/${productId}/compliance-wizard`}>
-                  <Button variant="outline" size="sm" className="text-green-700 border-green-300">
+                  <Button variant="outline" size="sm" className="text-[#047857] border-border">
                     Improve Score
                   </Button>
                 </Link>
@@ -423,42 +423,42 @@ export function LcaReportGenerator({
                 <div className="text-sm font-medium">Report will include:</div>
                 <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                   <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-[#047857]" />
                     Cover page
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-[#047857]" />
                     Executive summary
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-[#047857]" />
                     Methodology
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-[#047857]" />
                     Climate impact
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-[#047857]" />
                     Water footprint
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-[#047857]" />
                     Circularity & waste
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-[#047857]" />
                     Land use
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-[#047857]" />
                     Supply chain
                   </div>
                 </div>
               </div>
 
               <Button
-                className="w-full gap-2 h-12 text-base bg-[#ccff00] hover:bg-[#b8e600] text-black font-semibold"
+                className="w-full gap-2 h-12 text-base bg-primary text-primary-foreground hover:bg-primary/90 font-semibold"
                 onClick={generatePdf}
               >
                 <FileText className="h-5 w-5" />
@@ -475,7 +475,7 @@ export function LcaReportGenerator({
           <CardContent className="py-12">
             <div className="max-w-md mx-auto space-y-6">
               <div className="text-center">
-                <Loader2 className="h-10 w-10 animate-spin mx-auto text-[#ccff00] mb-4" />
+                <Loader2 className="h-10 w-10 mx-auto text-[#2B46C0] mb-4" />
                 <h3 className="text-lg font-semibold mb-1">Generating Report</h3>
                 <p className="text-sm text-muted-foreground">
                   {STEP_LABELS[generationStep]}
@@ -496,15 +496,15 @@ export function LcaReportGenerator({
                     <div
                       key={step}
                       className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm ${
-                        isActive ? 'bg-[#ccff00]/10 text-foreground font-medium' :
+                        isActive ? 'bg-secondary text-foreground font-medium' :
                         isPast ? 'text-muted-foreground' :
                         'text-muted-foreground/50'
                       }`}
                     >
                       {isPast ? (
-                        <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+                        <CheckCircle2 className="h-4 w-4 text-[#047857] flex-shrink-0" />
                       ) : isActive ? (
-                        <Loader2 className="h-4 w-4 animate-spin text-[#ccff00] flex-shrink-0" />
+                        <Loader2 className="h-4 w-4 text-[#2B46C0] flex-shrink-0" />
                       ) : (
                         <div className="h-4 w-4 rounded-full border border-muted-foreground/30 flex-shrink-0" />
                       )}
@@ -521,14 +521,14 @@ export function LcaReportGenerator({
       {/* Preview State */}
       {state === 'preview' && pdfUrl && (
         <div className="space-y-4">
-          <Card className="border-green-200 bg-green-50/50 dark:bg-green-950/10 dark:border-green-900">
+          <Card className="border-border bg-card">
             <CardContent className="flex items-center justify-between py-4">
               <div className="flex items-center gap-3">
-                <CheckCircle2 className="h-6 w-6 text-green-600" />
+                <CheckCircle2 className="h-6 w-6 text-[#047857]" />
                 <div>
-                  <div className="font-semibold text-green-900 dark:text-green-300">Report Generated Successfully</div>
-                  <div className="text-sm text-green-700 dark:text-green-400">
-                    {pdfBlob ? `${(pdfBlob.size / 1024).toFixed(0)} KB` : ''} — Ready for download
+                  <div className="font-semibold text-foreground">Report Generated Successfully</div>
+                  <div className="text-sm text-muted-foreground">
+                    {pdfBlob ? `${(pdfBlob.size / 1024).toFixed(0)} KB` : ''} · Ready for download
                   </div>
                 </div>
               </div>
@@ -537,7 +537,7 @@ export function LcaReportGenerator({
                   <RefreshCw className="h-4 w-4" />
                   Regenerate
                 </Button>
-                <Button size="sm" onClick={downloadPdf} className="gap-1.5 bg-[#ccff00] hover:bg-[#b8e600] text-black font-semibold">
+                <Button size="sm" onClick={downloadPdf} className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 font-semibold">
                   <Download className="h-4 w-4" />
                   Download PDF
                 </Button>

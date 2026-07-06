@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import {
   Table,
   TableBody,
@@ -11,7 +10,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Brain, Loader2, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react'
+import { AlertCircle, ChevronDown, ChevronRight } from 'lucide-react'
+import { Eyebrow } from '@/components/studio/eyebrow'
+import { StateChip } from '@/components/studio/state-chip'
 import { useIsAlkateraAdmin } from '@/hooks/usePermissions'
 import { format } from 'date-fns'
 
@@ -75,7 +76,7 @@ export default function IngestLearningPage() {
   if (adminLoading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">Loading…</p>
       </div>
     )
   }
@@ -94,11 +95,11 @@ export default function IngestLearningPage() {
   return (
     <div className="space-y-6 p-6">
       <div>
-        <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <Brain className="h-5 w-5 text-[#8da300] dark:text-[#ccff00]" />
-          Smart Upload learning
+        <Eyebrow tone="dim" className="mb-3">THE WIRING · ADMIN</Eyebrow>
+        <h1 className="font-display text-3xl font-bold tracking-[-0.035em] text-foreground">
+          Smart Upload learning.
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-sm text-muted-foreground mt-2">
           What the classifier extracted vs what users saved. Edit rate falling over time means the
           learning loop is working.
         </p>
@@ -106,7 +107,7 @@ export default function IngestLearningPage() {
 
       {loading ? (
         <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Loading…</p>
         </div>
       ) : error ? (
         <div className="flex items-center gap-2 py-16 justify-center text-sm text-muted-foreground">
@@ -139,9 +140,9 @@ export default function IngestLearningPage() {
                         <TableCell className="text-right">{t.total}</TableCell>
                         <TableCell className="text-right">{t.edited}</TableCell>
                         <TableCell className="text-right">
-                          <Badge variant={t.edit_rate > 50 ? 'destructive' : t.edit_rate > 20 ? 'secondary' : 'outline'}>
+                          <StateChip tone={t.edit_rate > 50 ? 'stale' : t.edit_rate > 20 ? 'attention' : 'good'}>
                             {t.edit_rate}%
-                          </Badge>
+                          </StateChip>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -232,7 +233,7 @@ export default function IngestLearningPage() {
                           <TableCell className="text-xs">{f.supplier_key || '—'}</TableCell>
                           <TableCell className="text-xs text-muted-foreground">{f.organization_name || '—'}</TableCell>
                           <TableCell className="text-right">
-                            <Badge variant={diffCount(f) > 0 ? 'secondary' : 'outline'}>{diffCount(f)}</Badge>
+                            <StateChip tone={diffCount(f) > 0 ? 'attention' : 'quiet'}>{diffCount(f)}</StateChip>
                           </TableCell>
                         </TableRow>
                         {expanded === f.id && (

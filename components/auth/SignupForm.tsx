@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabaseClient"
-import { Eye, EyeOff, AlertCircle, Loader2, CheckCircle2 } from "lucide-react"
+import { Eye, EyeOff, AlertCircle, CheckCircle2 } from "lucide-react"
 
 export function SignupForm({ redirectTo }: { redirectTo?: string }) {
   const router = useRouter()
@@ -137,17 +137,17 @@ export function SignupForm({ redirectTo }: { redirectTo?: string }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
-        <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+        <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-[6px]">
           <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
           <p className="text-sm text-red-300">{error}</p>
         </div>
       )}
 
       {success && (
-        <div className="flex items-start gap-3 p-4 bg-[#ccff00]/10 border border-[#ccff00]/20 rounded-xl">
-          <CheckCircle2 className="h-5 w-5 text-[#ccff00] flex-shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 p-4 bg-white/10 border border-white/20 rounded-[6px]">
+          <CheckCircle2 className="h-5 w-5 text-[#F2F1EA] flex-shrink-0 mt-0.5" />
           <p className="text-sm text-white/80">
-            Account created successfully! Redirecting...
+            Account created. Taking you there now...
           </p>
         </div>
       )}
@@ -164,7 +164,7 @@ export function SignupForm({ redirectTo }: { redirectTo?: string }) {
           onChange={(e) => setFullName(e.target.value)}
           disabled={loading}
           required
-          className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#ccff00]/50 focus:border-[#ccff00]/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-[6px] text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#F2F1EA]/40 focus:border-[#F2F1EA]/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         />
       </div>
 
@@ -180,7 +180,7 @@ export function SignupForm({ redirectTo }: { redirectTo?: string }) {
           onChange={(e) => setEmail(e.target.value)}
           disabled={loading}
           required
-          className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#ccff00]/50 focus:border-[#ccff00]/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-[6px] text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#F2F1EA]/40 focus:border-[#F2F1EA]/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         />
       </div>
 
@@ -197,7 +197,7 @@ export function SignupForm({ redirectTo }: { redirectTo?: string }) {
             onChange={(e) => setPassword(e.target.value)}
             disabled={loading}
             required
-            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#ccff00]/50 focus:border-[#ccff00]/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed pr-12"
+            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-[6px] text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#F2F1EA]/40 focus:border-[#F2F1EA]/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed pr-12"
           />
           <button
             type="button"
@@ -225,7 +225,7 @@ export function SignupForm({ redirectTo }: { redirectTo?: string }) {
             onChange={(e) => setConfirmPassword(e.target.value)}
             disabled={loading}
             required
-            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#ccff00]/50 focus:border-[#ccff00]/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed pr-12"
+            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-[6px] text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#F2F1EA]/40 focus:border-[#F2F1EA]/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed pr-12"
           />
           <button
             type="button"
@@ -240,16 +240,9 @@ export function SignupForm({ redirectTo }: { redirectTo?: string }) {
       <button
         type="submit"
         disabled={loading}
-        className="w-full py-4 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:opacity-90 hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+        className="w-full py-4 bg-[#F2F1EA] text-[#1A1B1D] font-mono uppercase text-xs tracking-[0.22em] font-bold rounded-full hover:bg-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {loading ? (
-          <span className="flex items-center justify-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Creating account...
-          </span>
-        ) : (
-          "Create Account"
-        )}
+        {loading ? "Creating account..." : "Create account"}
       </button>
     </form>
   )

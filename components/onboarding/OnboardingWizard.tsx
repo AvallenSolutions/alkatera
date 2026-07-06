@@ -1,14 +1,13 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import Image from 'next/image'
 import { useOnboarding, ONBOARDING_STEPS, MEMBER_ONBOARDING_STEPS, FAST_TRACK_STEPS, ADVISOR_ONBOARDING_STEPS, FAST_TRACK_PHASES, PHASE_CONFIG, MEMBER_PHASES, ADVISOR_PHASES, getStepConfig } from '@/lib/onboarding'
 import { trackOnboarding } from '@/lib/onboarding/telemetry'
 import type { OnboardingPhase } from '@/lib/onboarding'
 import { useOrganization } from '@/lib/organizationContext'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
-import { X, ChevronLeft, Check, Loader2, AlertCircle } from 'lucide-react'
+import { X, ChevronLeft, Check, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // Step components — owner flow
@@ -146,22 +145,14 @@ export function OnboardingWizard() {
 
   return (
     <div className="fixed inset-0 z-[60] overflow-y-auto" role="dialog" aria-label="Onboarding wizard">
-      {/* Full-screen background image + dark overlay — fixed so they stay during scroll */}
-      <div className="fixed inset-0 z-0">
-        <Image
-          src="/images/starry-night-bg3.jpg"
-          alt=""
-          fill
-          className="object-cover"
-          priority
-          quality={85}
-        />
-        <div className="absolute inset-0 bg-black/70" />
-      </div>
+      {/* Full-screen paper ground, fixed so it stays during scroll. It is
+          opaque on purpose: it does the scrim's job of screening the app
+          behind the wizard while keeping the studio's gallery grey. */}
+      <div className="fixed inset-0 z-0 bg-background" />
 
-      {/* Top bar - glassmorphic, hidden on welcome */}
+      {/* Top bar - cream panel, hidden on welcome */}
       {!isWelcome && (
-        <div className="sticky top-0 z-10 bg-black/40 backdrop-blur-md border-b border-white/10 px-4 py-3">
+        <div className="sticky top-0 z-10 bg-card/95 backdrop-blur-sm border-b border-border px-4 py-3">
           <div className="max-w-2xl mx-auto">
             {/* Phase indicators */}
             <div className="flex items-center justify-between mb-3">
@@ -177,18 +168,18 @@ export function OnboardingWizard() {
                     <div
                       key={phase}
                       className={cn(
-                        'flex items-center gap-1 px-2 py-1 rounded-full text-xs transition-all',
+                        'flex items-center gap-1.5 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em] transition-all',
                         isActive
-                          ? 'bg-[#ccff00]/10 text-[#ccff00] font-medium'
+                          ? 'text-studio-forest font-bold'
                           : isPast || isComplete
-                          ? 'text-white/50'
-                          : 'text-white/25'
+                          ? 'text-muted-foreground'
+                          : 'text-muted-foreground/50'
                       )}
                     >
                       <div
                         className={cn(
-                          'w-2 h-2 rounded-full',
-                          isActive ? 'bg-[#ccff00]' : isPast || isComplete ? 'bg-white/40' : 'bg-white/15'
+                          'w-1.5 h-1.5 rounded-full',
+                          isActive ? 'bg-studio-forest' : isPast || isComplete ? 'bg-muted-foreground' : 'bg-border'
                         )}
                       />
                       <span className="hidden sm:inline">{pConfig.label}</span>
@@ -207,11 +198,11 @@ export function OnboardingWizard() {
                       'hidden sm:inline-flex items-center gap-1 text-[11px] mr-1 transition-opacity',
                       saveStatus === 'idle' && 'opacity-0',
                       saveStatus !== 'idle' && 'opacity-100',
-                      saveStatus === 'error' ? 'text-red-300' : 'text-white/40',
+                      saveStatus === 'error' ? 'text-studio-stale' : 'text-muted-foreground',
                     )}
                     aria-live="polite"
                   >
-                    {saveStatus === 'saving' && (<><Loader2 className="w-3 h-3 animate-spin" />Saving…</>)}
+                    {saveStatus === 'saving' && (<>Saving…</>)}
                     {saveStatus === 'saved' && (<><Check className="w-3 h-3" />Saved</>)}
                     {saveStatus === 'error' && (<><AlertCircle className="w-3 h-3" />Couldn't save</>)}
                   </span>
@@ -221,7 +212,7 @@ export function OnboardingWizard() {
                     variant="ghost"
                     size="sm"
                     onClick={previousStep}
-                    className="text-white/40 hover:text-white hover:bg-white/10"
+                    className="text-muted-foreground hover:text-foreground hover:bg-secondary"
                     aria-label="Go back to previous step"
                   >
                     <ChevronLeft className="w-4 h-4" />
@@ -232,7 +223,7 @@ export function OnboardingWizard() {
                     variant="ghost"
                     size="sm"
                     onClick={dismissOnboarding}
-                    className="text-white/40 hover:text-white hover:bg-white/10 -mr-2"
+                    className="text-muted-foreground hover:text-foreground hover:bg-secondary -mr-2"
                     aria-label="Skip onboarding"
                   >
                     <X className="w-4 h-4" />
@@ -242,12 +233,12 @@ export function OnboardingWizard() {
             </div>
 
             {/* Progress bar */}
-            <Progress value={progress} indicatorColor="lime" className="h-1 bg-white/10" />
+            <Progress value={progress} indicatorClassName="bg-studio-forest" className="h-1 bg-secondary" />
             <div className="flex items-center justify-between mt-1">
-              <p className="text-xs text-white/40">
-                {currentStepConfig.title} &mdash; {isAdvisorFlow ? '~1 min' : isMemberFlow ? '~3 min' : phaseConfig.duration}
+              <p className="text-xs text-muted-foreground">
+                {currentStepConfig.title} &middot; {isAdvisorFlow ? '~1 min' : isMemberFlow ? '~3 min' : phaseConfig.duration}
               </p>
-              <p className="text-xs text-white/40">{progress}%</p>
+              <p className="text-xs text-muted-foreground">{progress}%</p>
             </div>
           </div>
         </div>
@@ -260,7 +251,7 @@ export function OnboardingWizard() {
             variant="ghost"
             size="sm"
             onClick={dismissOnboarding}
-            className="text-white/40 hover:text-white hover:bg-white/10"
+            className="text-muted-foreground hover:text-foreground hover:bg-secondary"
             aria-label="Skip onboarding"
           >
             <X className="w-4 h-4 mr-1" />

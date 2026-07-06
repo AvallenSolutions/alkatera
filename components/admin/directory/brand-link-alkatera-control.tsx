@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Link2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Link2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -67,8 +67,8 @@ export function BrandLinkAlkateraControl({ brandId, brandName, unlinkedOrgs }: P
 
   if (linked) {
     return (
-      <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-5 flex items-start gap-3">
-        <CheckCircle2 className="h-5 w-5 text-emerald-300 shrink-0 mt-0.5" />
+      <div className="rounded-[6px] border border-border bg-card p-5 flex items-start gap-3">
+        <CheckCircle2 className="h-5 w-5 text-studio-good shrink-0 mt-0.5" />
         <div className="text-sm">
           <div className="font-semibold">{brandName} is now linked to an alkatera customer.</div>
           <div className="text-xs text-muted-foreground mt-0.5">
@@ -82,17 +82,17 @@ export function BrandLinkAlkateraControl({ brandId, brandName, unlinkedOrgs }: P
 
   if (unlinkedOrgs.length === 0) {
     return (
-      <div className="rounded-xl border border-border/60 bg-card/40 p-5 text-sm text-muted-foreground">
+      <div className="rounded-[6px] border border-border bg-card p-5 text-sm text-muted-foreground">
         No unlinked alka<strong>tera</strong> customer organisations available.
       </div>
     );
   }
 
   return (
-    <div className="rounded-xl border border-border/60 bg-card/40 p-5 space-y-4">
+    <div className="rounded-[6px] border border-border bg-card p-5 space-y-4">
       <div>
         <div className="text-sm font-semibold flex items-center gap-2">
-          <Link2 className="h-4 w-4 text-neon-lime" />
+          <Link2 className="h-4 w-4 text-muted-foreground" />
           Mark as alka<strong>tera</strong> customer
         </div>
         <p className="text-xs text-muted-foreground mt-1">
@@ -104,7 +104,7 @@ export function BrandLinkAlkateraControl({ brandId, brandName, unlinkedOrgs }: P
 
       <div className="flex flex-col sm:flex-row gap-2">
         <Select value={orgId} onValueChange={setOrgId}>
-          <SelectTrigger className="bg-background/40 h-9 text-sm flex-1 min-w-0">
+          <SelectTrigger className="bg-secondary h-9 text-sm flex-1 min-w-0">
             <SelectValue placeholder="Pick an alkatera organisation…" />
           </SelectTrigger>
           <SelectContent>
@@ -121,12 +121,10 @@ export function BrandLinkAlkateraControl({ brandId, brandName, unlinkedOrgs }: P
         <Button
           onClick={link}
           disabled={!orgId || busy}
-          className="bg-neon-lime hover:bg-neon-lime/90 text-black font-semibold"
+          className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold"
         >
           {busy ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Linking…
-            </>
+            'Linking…'
           ) : (
             <>
               <Link2 className="h-4 w-4 mr-1.5" /> Link &amp; verify
@@ -136,8 +134,8 @@ export function BrandLinkAlkateraControl({ brandId, brandName, unlinkedOrgs }: P
       </div>
 
       {error && (
-        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs flex items-start gap-2">
-          <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+        <div className="rounded-[6px] border border-border bg-secondary px-3 py-2 text-xs flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 text-studio-stale shrink-0 mt-0.5" />
           <div>{error}</div>
         </div>
       )}

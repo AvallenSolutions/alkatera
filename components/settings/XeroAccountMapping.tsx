@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
 import {
   Tooltip,
   TooltipContent,
@@ -16,7 +15,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
-import { Loader2, Save, MapPin, Check, Sparkles, X, ChevronDown, ChevronRight, HelpCircle, Lightbulb, Ban } from 'lucide-react'
+import { Save, MapPin, Check, Sparkles, X, ChevronDown, ChevronRight, HelpCircle, Lightbulb, Ban } from 'lucide-react'
+import { StateChip } from '@/components/studio/state-chip'
 import { toast } from 'sonner'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
@@ -374,9 +374,9 @@ export function XeroAccountMapping() {
   }
 
   function getConfidenceColour(confidence: number): string {
-    if (confidence >= 0.8) return 'bg-emerald-500'
-    if (confidence >= 0.5) return 'bg-amber-500'
-    return 'bg-red-500'
+    if (confidence >= 0.8) return 'bg-studio-good'
+    if (confidence >= 0.5) return 'bg-studio-attention'
+    return 'bg-studio-stale'
   }
 
   // ── Early returns ─────────────────────────────────────────────────
@@ -399,8 +399,8 @@ export function XeroAccountMapping() {
     return (
       <div
         key={mapping.xero_account_id}
-        className={`grid grid-cols-[1fr_1fr_auto] gap-3 items-center rounded-md border px-3 py-2 ${
-          mapping.is_excluded ? 'opacity-60 bg-slate-50 dark:bg-slate-900/30' : ''
+        className={`grid grid-cols-[1fr_1fr_auto] gap-3 items-center rounded-[6px] border border-border bg-card px-3 py-2 ${
+          mapping.is_excluded ? 'opacity-60 bg-secondary' : ''
         }`}
       >
         {/* Account name + code + guidance */}
@@ -417,7 +417,7 @@ export function XeroAccountMapping() {
             <TooltipProvider delayDuration={200}>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Lightbulb className="h-3.5 w-3.5 shrink-0 text-amber-500 cursor-help" />
+                  <Lightbulb className="h-3.5 w-3.5 shrink-0 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent side="right" className="max-w-xs text-xs">
                   {guidanceTip}
@@ -462,19 +462,15 @@ export function XeroAccountMapping() {
                 </SelectContent>
               </Select>
 
-              {/* AI suggestion badge with confidence + reasoning tooltip */}
+              {/* AI suggestion state with confidence + reasoning tooltip */}
               {aiSuggestion ? (
                 <TooltipProvider delayDuration={200}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Badge
-                        variant="outline"
-                        className="text-xs shrink-0 border-violet-500/30 bg-violet-500/10 text-violet-600 dark:text-violet-400 cursor-help gap-1"
-                      >
+                      <span className="inline-flex items-center gap-1 shrink-0 cursor-help">
                         <span className={`inline-block h-1.5 w-1.5 rounded-full ${getConfidenceColour(aiSuggestion.confidence)}`} />
-                        <Sparkles className="h-3 w-3" />
-                        AI
-                      </Badge>
+                        <StateChip tone="hold">AI</StateChip>
+                      </span>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="max-w-xs">
                       <p className="text-xs font-medium mb-1">
@@ -487,9 +483,9 @@ export function XeroAccountMapping() {
                   </Tooltip>
                 </TooltipProvider>
               ) : keywordSuggestion ? (
-                <Badge variant="outline" className="text-xs shrink-0 border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                <StateChip tone="attention" className="shrink-0">
                   Suggested
-                </Badge>
+                </StateChip>
               ) : null}
             </>
           )}
@@ -498,12 +494,7 @@ export function XeroAccountMapping() {
         {/* Status / Quick exclude */}
         <div className="w-20 flex justify-end gap-1">
           {mapping.emission_category || mapping.is_excluded ? (
-            <Badge
-              variant="outline"
-              className="text-xs border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-            >
-              <Check className="h-3 w-3" />
-            </Badge>
+            <Check className="h-3.5 w-3.5 text-studio-good" />
           ) : (
             <>
               <TooltipProvider delayDuration={200}>
@@ -512,7 +503,7 @@ export function XeroAccountMapping() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-7 w-7 p-0 text-muted-foreground hover:text-red-600 dark:hover:text-red-400"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-studio-stale"
                       onClick={() => handleQuickExclude(mapping.xero_account_id)}
                     >
                       <Ban className="h-3.5 w-3.5" />
@@ -547,8 +538,7 @@ export function XeroAccountMapping() {
           </div>
           <div className="flex items-center gap-2">
             {isReclassifying && (
-              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin" />
+              <span className="text-xs text-muted-foreground">
                 Reclassifying...
               </span>
             )}
@@ -568,22 +558,14 @@ export function XeroAccountMapping() {
                 size="sm"
                 variant="outline"
               >
-                {isAiSuggesting ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4 mr-2" />
-                )}
+                {!isAiSuggesting && <Sparkles className="h-4 w-4 mr-2" />}
                 {isAiSuggesting ? 'Analysing...' : 'AI Suggest'}
               </Button>
             )}
             {hasChanges && (
               <Button onClick={handleSave} disabled={isSaving || isReclassifying} size="sm">
-                {isSaving ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4 mr-2" />
-                )}
-                Save Mappings
+                {!isSaving && <Save className="h-4 w-4 mr-2" />}
+                {isSaving ? 'Saving...' : 'Save Mappings'}
               </Button>
             )}
           </div>
@@ -595,9 +577,9 @@ export function XeroAccountMapping() {
             <span>{completedCount} of {totalAccounts} accounts mapped or excluded</span>
             <span>{progressPercent}%</span>
           </div>
-          <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+          <div className="h-2 rounded-full bg-secondary overflow-hidden">
             <div
-              className="h-full rounded-full bg-[#ccff00] transition-all duration-500"
+              className="h-full rounded-full bg-foreground transition-all duration-500"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
@@ -607,10 +589,10 @@ export function XeroAccountMapping() {
       <CardContent className="space-y-4">
         {/* Guidance panel */}
         {showGuide && (
-          <div className="rounded-lg border border-amber-200 dark:border-amber-800/30 bg-amber-50/50 dark:bg-amber-950/20 p-4 space-y-3">
+          <div className="rounded-[6px] border border-border bg-card p-4 space-y-3">
             <div className="flex items-start justify-between">
               <h4 className="text-sm font-semibold flex items-center gap-1.5">
-                <Lightbulb className="h-4 w-4 text-amber-500" />
+                <Lightbulb className="h-4 w-4 text-muted-foreground" />
                 How to map your accounts
               </h4>
               <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setShowGuide(false)}>
@@ -647,7 +629,7 @@ export function XeroAccountMapping() {
               <div className="mt-2 pt-2 border-t space-y-1">
                 <p className="font-semibold text-foreground">Not sure?</p>
                 <p>
-                  Look for the <Lightbulb className="h-3 w-3 inline-block text-amber-500" /> icon next to account names for
+                  Look for the <Lightbulb className="h-3 w-3 inline-block text-muted-foreground" /> icon next to account names for
                   contextual guidance. Or click <strong>AI Suggest</strong> to let AI analyse all your unmapped accounts at once.
                 </p>
               </div>
@@ -701,7 +683,7 @@ export function XeroAccountMapping() {
         {/* All done state */}
         {unmappedCount === 0 && (
           <div className="text-center py-4 text-sm text-muted-foreground">
-            <Check className="h-5 w-5 mx-auto mb-1.5 text-emerald-500" />
+            <Check className="h-5 w-5 mx-auto mb-1.5 text-studio-good" />
             All accounts mapped or excluded. Save to apply.
           </div>
         )}

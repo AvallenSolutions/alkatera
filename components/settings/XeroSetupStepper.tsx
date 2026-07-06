@@ -14,7 +14,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { Eyebrow } from '@/components/studio/eyebrow'
 import { Check, RefreshCw, Users, BarChart3, X, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import { useOrganization } from '@/lib/organizationContext'
@@ -183,13 +183,11 @@ export function XeroSetupStepper() {
   }
 
   return (
-    <Card className="border-neon-lime/30 bg-neon-lime/5">
+    <Card className="rounded-[6px] border-border bg-card">
       <CardContent className="py-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-xs border-neon-lime/50 text-neon-lime">
-              Setup Guide
-            </Badge>
+            <Eyebrow tone="dim">Setup guide</Eyebrow>
           </div>
           <Button
             variant="ghost"
@@ -209,12 +207,12 @@ export function XeroSetupStepper() {
                 <div className={`
                   flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold
                   ${step.status === 'complete'
-                    ? 'bg-emerald-500 text-white'
+                    ? 'bg-studio-good text-studio-cream'
                     : step.status === 'active'
                       ? isStaleSyncing && step.number === 1
-                        ? 'bg-amber-500 text-white'
-                        : 'bg-neon-lime text-black'
-                      : 'bg-slate-200 dark:bg-slate-700 text-muted-foreground'
+                        ? 'bg-studio-attention text-studio-cream'
+                        : 'bg-primary text-primary-foreground'
+                      : 'bg-secondary text-muted-foreground'
                   }
                 `}>
                   {step.status === 'complete' ? (
@@ -223,7 +221,7 @@ export function XeroSetupStepper() {
                     isStaleSyncing ? (
                       <AlertTriangle className="h-3.5 w-3.5" />
                     ) : (
-                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      <RefreshCw className="h-3.5 w-3.5" />
                     )
                   ) : step.number === 2 ? (
                     <Users className="h-3.5 w-3.5" />
@@ -246,8 +244,8 @@ export function XeroSetupStepper() {
               {index < steps.length - 1 && (
                 <div className={`h-px w-6 mx-1 shrink-0 ${
                   steps[index + 1].status !== 'pending'
-                    ? 'bg-emerald-400'
-                    : 'bg-slate-200 dark:bg-slate-700'
+                    ? 'bg-studio-good'
+                    : 'bg-border'
                 }`} />
               )}
             </div>
@@ -256,15 +254,15 @@ export function XeroSetupStepper() {
 
         {/* Stale sync warning */}
         {isStaleSyncing && (
-          <div className="mt-3 pt-3 border-t border-amber-500/30">
+          <div className="mt-3 pt-3 border-t border-border">
             <div className="flex items-center justify-between">
-              <p className="text-xs text-amber-400">
+              <p className="text-xs text-studio-attention">
                 Sync appears to have stalled. You can reset it and try again.
               </p>
               <Button
                 size="sm"
                 variant="outline"
-                className="text-xs border-amber-500/50 text-amber-400 hover:bg-amber-500/10"
+                className="text-xs"
                 onClick={handleResetSync}
                 disabled={isResettingSync}
               >
@@ -276,7 +274,7 @@ export function XeroSetupStepper() {
 
         {/* Action button for current step */}
         {hasSynced && !allClassified && supplierStats.total > 0 && (
-          <div className="mt-3 pt-3 border-t border-neon-lime/20">
+          <div className="mt-3 pt-3 border-t border-border">
             <Button size="sm" variant="outline" className="w-full" asChild>
               <Link href="/data/spend-data/">
                 <Users className="h-3.5 w-3.5 mr-1.5" />
@@ -287,7 +285,7 @@ export function XeroSetupStepper() {
         )}
 
         {allClassified && (
-          <div className="mt-3 pt-3 border-t border-neon-lime/20">
+          <div className="mt-3 pt-3 border-t border-border">
             <Button size="sm" variant="outline" className="w-full" asChild>
               <Link href="/data/spend-data/">
                 <BarChart3 className="h-3.5 w-3.5 mr-1.5" />

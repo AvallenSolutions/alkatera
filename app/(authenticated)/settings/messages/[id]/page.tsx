@@ -5,14 +5,12 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   ArrowLeft,
   Clock,
   Send,
-  Loader2,
   MessageSquare,
   Users,
 } from "lucide-react";
@@ -227,7 +225,7 @@ export default function ConversationDetailPage() {
     return (
       <div className="container mx-auto py-8 px-4 max-w-4xl">
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">Loading</span>
         </div>
       </div>
     );
@@ -248,7 +246,7 @@ export default function ConversationDetailPage() {
           <Card className="mb-6">
             <CardHeader className="py-4">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                <div className="h-10 w-10 rounded-[6px] bg-secondary flex items-center justify-center">
                   <Users className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div>
@@ -312,12 +310,8 @@ export default function ConversationDetailPage() {
                 Press ⌘+Enter to send
               </p>
               <Button type="submit" disabled={isSending || !newMessage.trim()}>
-                {isSending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4 mr-2" />
-                )}
-                Send Message
+                <Send className="h-4 w-4 mr-2" />
+                {isSending ? "Sending..." : "Send Message"}
               </Button>
             </div>
           </form>
@@ -349,8 +343,8 @@ function MessageBubble({
         </Avatar>
         <div>
           <div
-            className={`px-4 py-2 rounded-lg ${
-              isOwnMessage ? "bg-muted" : "bg-primary/10 border border-primary/20"
+            className={`px-4 py-2 rounded-[6px] border border-border ${
+              isOwnMessage ? "bg-secondary" : "bg-card"
             }`}
           >
             <div className="flex items-center gap-2 mb-1">

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabaseClient'
-import { Download, AlertTriangle, Loader2 } from 'lucide-react'
+import { Download, AlertTriangle } from 'lucide-react'
 
 /**
  * Self-serve data-subject-rights controls (UK GDPR): download a copy of your
@@ -70,19 +70,15 @@ export function DataPrivacySettings() {
         </CardHeader>
         <CardContent>
           <Button variant="outline" onClick={handleExport} disabled={exporting}>
-            {exporting ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Download className="mr-2 h-4 w-4" />
-            )}
-            Download my data
+            <Download className="mr-2 h-4 w-4" />
+            {exporting ? 'Preparing your data' : 'Download my data'}
           </Button>
         </CardContent>
       </Card>
 
-      <Card className="border-red-200 dark:border-red-900/50">
+      <Card className="border-studio-stale/30">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+          <CardTitle className="flex items-center gap-2 text-studio-stale">
             <AlertTriangle className="h-5 w-5" />
             Delete my account
           </CardTitle>
@@ -95,7 +91,7 @@ export function DataPrivacySettings() {
           {!confirmOpen ? (
             <Button
               variant="outline"
-              className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
+              className="text-studio-stale hover:text-studio-stale hover:bg-secondary"
               onClick={() => setConfirmOpen(true)}
             >
               Delete my account
@@ -126,8 +122,7 @@ export function DataPrivacySettings() {
                   disabled={confirmText !== 'DELETE' || deleting}
                   onClick={handleDelete}
                 >
-                  {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Permanently delete
+                  {deleting ? 'Deleting' : 'Permanently delete'}
                 </Button>
               </div>
             </div>

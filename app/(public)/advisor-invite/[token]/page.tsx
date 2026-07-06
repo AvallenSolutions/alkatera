@@ -7,7 +7,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import {
-  Loader2,
   CheckCircle2,
   XCircle,
   AlertCircle,
@@ -214,8 +213,7 @@ export default function AdvisorInvitePage() {
             transition={{ duration: 0.6 }}
             className="flex flex-col items-center"
           >
-            <Loader2 className="h-10 w-10 animate-spin text-[#ccff00] mb-4" />
-            <p className="text-white/60 font-mono text-sm uppercase tracking-widest">
+            <p className="text-[#F2F1EA]/70 font-mono text-sm uppercase tracking-[0.22em]">
               Loading invitation...
             </p>
           </motion.div>
@@ -247,24 +245,24 @@ export default function AdvisorInvitePage() {
               <img src={ALKATERA_LOGO} alt="alkatera" className="h-12 md:h-14 w-auto object-contain" />
             </div>
 
-            <div className="border border-white/10 bg-white/5 backdrop-blur-md rounded-2xl p-8">
+            <div className="border border-white/10 bg-white/5 backdrop-blur-md rounded-[6px] p-8">
               <div className="flex items-center gap-3 mb-6">
-                <div className="p-3 rounded-xl bg-red-500/20 border border-red-500/30">
+                <div className="p-3 rounded-[6px] bg-red-500/20 border border-red-500/30">
                   <XCircle className="h-6 w-6 text-red-400" />
                 </div>
-                <h2 className="font-serif text-2xl text-white">Invitation Error</h2>
+                <h2 className="font-display font-bold tracking-tight text-2xl text-[#F2F1EA]">This invitation can&apos;t be opened.</h2>
               </div>
 
-              <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl mb-6">
+              <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-[6px] mb-6">
                 <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-red-300">{error}</p>
               </div>
 
               <Link
                 href="/"
-                className="block w-full py-4 bg-white/10 text-white font-mono uppercase text-xs tracking-widest font-bold rounded-xl text-center hover:bg-white/20 transition-all"
+                className="block w-full py-4 border border-[#F2F1EA]/40 text-[#F2F1EA] font-mono uppercase text-xs tracking-[0.22em] font-bold rounded-full text-center hover:border-[#F2F1EA] transition-colors"
               >
-                Return to Home
+                Return to home
               </Link>
             </div>
           </motion.div>
@@ -296,22 +294,21 @@ export default function AdvisorInvitePage() {
               <img src={ALKATERA_LOGO} alt="alkatera" className="h-12 md:h-14 w-auto object-contain" />
             </div>
 
-            <div className="border border-[#ccff00]/30 bg-[#ccff00]/5 backdrop-blur-md rounded-2xl p-8 text-center">
+            <div className="border border-white/20 bg-white/5 backdrop-blur-md rounded-[6px] p-8 text-center">
               <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
-                className="inline-flex p-4 rounded-full bg-[#ccff00]/20 border border-[#ccff00]/30 mb-6"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.2, duration: 0.4 }}
+                className="inline-flex p-4 rounded-full bg-white/10 border border-white/20 mb-6"
               >
-                <CheckCircle2 className="h-10 w-10 text-[#ccff00]" />
+                <CheckCircle2 className="h-10 w-10 text-[#F2F1EA]" />
               </motion.div>
 
-              <h2 className="font-serif text-3xl text-white mb-3">Invitation accepted!</h2>
+              <h2 className="font-display font-bold tracking-tight text-3xl text-[#F2F1EA] mb-3">Invitation accepted.</h2>
               <p className="text-white/60 mb-6">
                 You now have advisor access to <strong className="text-white">{invitation?.organization_name}</strong>.
                 Taking you there now...
               </p>
-              <Loader2 className="h-6 w-6 animate-spin text-[#ccff00] mx-auto" />
             </div>
           </motion.div>
         </div>
@@ -352,7 +349,7 @@ export default function AdvisorInvitePage() {
           </div>
 
           {/* Hero headline */}
-          <h1 className="font-serif text-4xl md:text-5xl text-white text-center mb-4">
+          <h1 className="font-display font-bold tracking-tight text-4xl md:text-5xl text-[#F2F1EA] text-center mb-4">
             You&apos;re invited.
           </h1>
           <p className="text-white/50 text-center mb-8">
@@ -360,11 +357,11 @@ export default function AdvisorInvitePage() {
           </p>
 
           {/* Glassmorphism Card */}
-          <div className="border border-white/10 bg-white/5 backdrop-blur-md rounded-2xl p-8 space-y-6">
+          <div className="border border-white/10 bg-white/5 backdrop-blur-md rounded-[6px] p-8 space-y-6">
             {/* Organisation Info */}
-            <div className="flex items-center gap-4 p-4 bg-white/5 border border-white/10 rounded-xl">
-              <div className="p-3 rounded-xl bg-[#ccff00]/10 border border-[#ccff00]/20">
-                <Building2 className="h-6 w-6 text-[#ccff00]" />
+            <div className="flex items-center gap-4 p-4 bg-white/5 border border-white/10 rounded-[6px]">
+              <div className="p-3 rounded-[6px] bg-white/10 border border-white/20">
+                <Building2 className="h-6 w-6 text-[#F2F1EA]" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-mono text-white/40 uppercase tracking-widest mb-1">
@@ -378,14 +375,14 @@ export default function AdvisorInvitePage() {
 
             {/* Invitation Details */}
             <div className="grid grid-cols-1 gap-3 text-sm">
-              <div className="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-xl">
+              <div className="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-[6px]">
                 <span className="text-xs font-mono text-white/40 uppercase tracking-widest">
                   Invited Email
                 </span>
                 <span className="font-medium text-white truncate ml-3">{invitation.advisor_email}</span>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 bg-white/5 border border-white/10 rounded-xl">
+                <div className="p-3 bg-white/5 border border-white/10 rounded-[6px]">
                   <p className="text-xs font-mono text-white/40 uppercase tracking-widest mb-1">Sent</p>
                   <p className="font-medium text-white">
                     {new Date(invitation.invited_at).toLocaleDateString('en-GB', {
@@ -394,7 +391,7 @@ export default function AdvisorInvitePage() {
                     })}
                   </p>
                 </div>
-                <div className="p-3 bg-white/5 border border-white/10 rounded-xl">
+                <div className="p-3 bg-white/5 border border-white/10 rounded-[6px]">
                   <p className="text-xs font-mono text-white/40 uppercase tracking-widest mb-1">Expires</p>
                   <p className="font-medium text-white">
                     {new Date(invitation.expires_at).toLocaleDateString('en-GB', {
@@ -408,7 +405,7 @@ export default function AdvisorInvitePage() {
 
             {/* Access Notes */}
             {invitation.access_notes && (
-              <div className="p-4 bg-white/5 border border-white/10 rounded-xl">
+              <div className="p-4 bg-white/5 border border-white/10 rounded-[6px]">
                 <p className="text-xs font-mono text-white/40 uppercase tracking-widest mb-2">
                   Message from the organisation
                 </p>
@@ -417,9 +414,9 @@ export default function AdvisorInvitePage() {
             )}
 
             {/* What advisors can do (depends on the access level granted) */}
-            <div className="p-4 bg-[#ccff00]/5 border border-[#ccff00]/20 rounded-xl">
+            <div className="p-4 bg-white/5 border border-white/20 rounded-[6px]">
               <div className="flex items-center gap-2 mb-3">
-                <Briefcase className="h-4 w-4 text-[#ccff00]" />
+                <Briefcase className="h-4 w-4 text-[#F2F1EA]" />
                 <p className="text-sm font-medium text-white">
                   {invitation.access_level === 'read_only'
                     ? 'You have been granted read-only access. You will be able to:'
@@ -437,7 +434,7 @@ export default function AdvisorInvitePage() {
                     ]
                 ).map((item) => (
                   <li key={item} className="flex items-start gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-[#ccff00] flex-shrink-0 mt-0.5" />
+                    <CheckCircle2 className="h-4 w-4 text-[#F2F1EA] flex-shrink-0 mt-0.5" />
                     <span>{item}</span>
                   </li>
                 ))}
@@ -446,7 +443,7 @@ export default function AdvisorInvitePage() {
 
             {/* Error message */}
             {error && (
-              <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+              <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-[6px]">
                 <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-red-300">{error}</p>
               </div>
@@ -455,7 +452,7 @@ export default function AdvisorInvitePage() {
             {/* Authentication & Accept */}
             {!isAuthenticated ? (
               <div className="space-y-4">
-                <div className="flex items-start gap-3 p-4 bg-white/5 border border-white/10 rounded-xl">
+                <div className="flex items-start gap-3 p-4 bg-white/5 border border-white/10 rounded-[6px]">
                   <AlertCircle className="h-5 w-5 text-white/40 flex-shrink-0 mt-0.5" />
                   <p className="text-sm text-white/70">
                     Sign in to accept this invitation, or create an account if you don&apos;t
@@ -466,14 +463,14 @@ export default function AdvisorInvitePage() {
                 <button
                   type="button"
                   onClick={handleSignIn}
-                  className="w-full py-4 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:opacity-90 hover:scale-[1.02] transition-all duration-300 flex items-center justify-center gap-2"
+                  className="w-full py-4 bg-[#F2F1EA] text-[#1A1B1D] font-mono uppercase text-xs tracking-[0.22em] font-bold rounded-full hover:bg-white transition-colors duration-200 flex items-center justify-center gap-2"
                 >
                   <LogIn className="h-4 w-4" />
-                  Sign In or Create Account
+                  Sign in or create account
                 </button>
               </div>
             ) : emailMismatch ? (
-              <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+              <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-[6px]">
                 <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-red-300">
                   This invitation was sent to <strong className="text-white">{invitation.advisor_email}</strong>, but you
@@ -486,17 +483,14 @@ export default function AdvisorInvitePage() {
                 type="button"
                 onClick={handleAcceptInvitation}
                 disabled={isAccepting}
-                className="w-full py-4 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:opacity-90 hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
+                className="w-full py-4 bg-[#F2F1EA] text-[#1A1B1D] font-mono uppercase text-xs tracking-[0.22em] font-bold rounded-full hover:bg-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isAccepting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Accepting...
-                  </>
+                  'Accepting...'
                 ) : (
                   <>
                     <CheckCircle2 className="h-4 w-4" />
-                    Accept Invitation
+                    Accept invitation
                   </>
                 )}
               </button>

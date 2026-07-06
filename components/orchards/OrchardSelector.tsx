@@ -102,7 +102,7 @@ export function OrchardSelector({
           {orchards.map((v) => (
             <SelectItem key={v.id} value={v.id}>
               <span className="flex items-center gap-2">
-                <TreePine className="h-3 w-3 text-[#ccff00]" />
+                <TreePine className="h-3 w-3 text-studio-forest" />
                 {v.name}
                 <span className="text-xs text-muted-foreground">
                   ({v.hectares} ha)

@@ -4,9 +4,10 @@ import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { TreePine, MapPin, Trash2, Edit2, Sprout, AlertCircle, ArrowRight } from 'lucide-react';
+import { TreePine, MapPin, Trash2, Edit2, Sprout, ArrowRight } from 'lucide-react';
 import type { Orchard } from '@/lib/types/orchard';
 import { ORCHARD_TYPE_LABELS } from '@/lib/orchard-utils';
+import { StateChip } from '@/components/studio/state-chip';
 
 interface OrchardCardProps {
   orchard: Orchard & { facilities?: { id: string; name: string } | null };
@@ -32,13 +33,13 @@ export function OrchardCard({ orchard, hasGrowingProfile, harvestCount, onEdit, 
   const treeAge = orchard.planting_year ? currentYear - orchard.planting_year : null;
 
   return (
-    <Card className="bg-card border-border hover:border-[#ccff00]/30 transition-colors">
+    <Card className="bg-card border-border hover:border-studio-cobalt transition-colors">
       <Link href={`/orchards/${orchard.id}`} className="block">
         <CardContent className="p-4">
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-3">
-              <div className="rounded-lg bg-[#ccff00]/10 p-2">
-                <TreePine className="h-5 w-5 text-[#ccff00]" />
+              <div className="rounded-lg bg-secondary p-2">
+                <TreePine className="h-5 w-5 text-studio-forest" />
               </div>
               <div>
                 <h3 className="font-semibold text-foreground">{orchard.name}</h3>
@@ -78,16 +79,10 @@ export function OrchardCard({ orchard, hasGrowingProfile, harvestCount, onEdit, 
                     </Badge>
                   )}
                   {hasGrowingProfile === true && (
-                    <Badge variant="outline" className="bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800">
-                      <Sprout className="h-3 w-3 mr-1" />
-                      Profile complete
-                    </Badge>
+                    <StateChip tone="good">Profile complete</StateChip>
                   )}
                   {hasGrowingProfile === false && (
-                    <Badge variant="outline" className="bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800">
-                      <AlertCircle className="h-3 w-3 mr-1" />
-                      Needs growing data
-                    </Badge>
+                    <StateChip tone="attention">Needs growing data</StateChip>
                   )}
                   {orchard.fruit_varieties && orchard.fruit_varieties.length > 0 && (
                     <span className="text-xs text-muted-foreground">

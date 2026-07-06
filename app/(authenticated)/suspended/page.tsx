@@ -45,29 +45,29 @@ export default function SuspendedPage() {
       <div className="relative z-10 flex min-h-screen items-center justify-center px-4">
         <div className="w-full max-w-lg">
           {/* Card */}
-          <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-8 md:p-10 text-center">
+          <div className="rounded-[6px] border border-border bg-card p-8 md:p-10 text-center">
             {/* Icon */}
-            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-red-500/10 border border-red-500/20">
-              <AlertTriangle className="h-8 w-8 text-red-400" />
+            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-border bg-secondary">
+              <AlertTriangle className="h-8 w-8 text-studio-attention" />
             </div>
 
             {/* Heading */}
-            <h1 className="font-serif text-3xl md:text-4xl text-white mb-3">
-              Account Suspended
+            <h1 className="font-display font-bold text-3xl md:text-4xl text-foreground mb-3">
+              Your account is suspended.
             </h1>
 
-            <p className="text-white/60 text-sm md:text-base mb-8 leading-relaxed">
+            <p className="text-muted-foreground text-sm md:text-base mb-8 leading-relaxed">
               Your subscription payment could not be processed and the grace period has expired.
               Please update your payment method to restore access.
             </p>
 
             {/* Reassurance */}
-            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 mb-8">
+            <div className="rounded-[6px] border border-border bg-secondary p-4 mb-8">
               <div className="flex items-center justify-center gap-2 mb-2">
-                <ShieldCheck className="h-5 w-5 text-emerald-400" />
-                <span className="text-emerald-400 font-semibold text-sm">Your data is safe</span>
+                <ShieldCheck className="h-5 w-5 text-studio-good" />
+                <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-good">Your data is safe</span>
               </div>
-              <p className="text-white/50 text-xs">
+              <p className="text-muted-foreground text-xs">
                 All your products, LCAs, reports and organisation data are kept intact.
                 Once you update your payment, everything will be restored immediately.
               </p>
@@ -78,18 +78,18 @@ export default function SuspendedPage() {
               <button
                 onClick={handleUpdatePayment}
                 disabled={portalLoading}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#ccff00] px-6 py-3 font-mono text-sm font-bold uppercase tracking-wider text-black hover:bg-[#b8e600] transition-colors disabled:opacity-50"
+                className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
               >
                 <CreditCard className="h-4 w-4" />
-                {portalLoading ? 'Opening...' : 'Update Payment Method'}
+                {portalLoading ? 'Opening...' : 'Update payment method'}
               </button>
 
               <a
                 href="mailto:support@alkatera.com"
-                className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-6 py-3 font-mono text-sm uppercase tracking-wider text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+                className="w-full inline-flex items-center justify-center gap-2 rounded-full border border-border bg-card px-6 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
               >
                 <Mail className="h-4 w-4" />
-                Contact Support
+                Contact support
               </a>
             </div>
           </div>

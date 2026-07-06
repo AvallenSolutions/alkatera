@@ -36,22 +36,22 @@ export default function PasswordResetPage() {
             />
           </div>
 
-          {/* Hero headline - matching /getaccess styling */}
-          <h1 className="font-serif text-4xl md:text-5xl text-white text-center mb-4 whitespace-nowrap">
+          {/* Hero headline */}
+          <h1 className="font-display font-bold tracking-tight text-4xl md:text-5xl text-[#F2F1EA] text-center mb-4 whitespace-nowrap">
             Reset your password.
           </h1>
           <p className="text-white/50 text-center mb-8">
             Enter your email and we&apos;ll send you a reset link.
           </p>
 
-          {/* Glassmorphism Card - matching /getaccess styling */}
-          <div className="border border-white/10 bg-white/5 backdrop-blur-md rounded-2xl p-8">
+          {/* Dark glass panel over the photo */}
+          <div className="border border-white/10 bg-white/5 backdrop-blur-md rounded-[6px] p-8">
             <PasswordResetRequestForm />
 
             <div className="mt-6 pt-6 border-t border-white/10">
               <Link
                 href="/login"
-                className="flex items-center justify-center gap-2 text-sm text-white/40 hover:text-[#ccff00] transition-colors"
+                className="flex items-center justify-center gap-2 text-sm text-white/40 hover:text-[#F2F1EA] transition-colors"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back to sign in

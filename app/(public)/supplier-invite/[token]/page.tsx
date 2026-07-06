@@ -7,7 +7,6 @@ import { supabase } from '@/lib/supabaseClient';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
-  Loader2,
   CheckCircle2,
   XCircle,
   AlertCircle,
@@ -339,8 +338,7 @@ export default function SupplierInvitePage() {
         <div className="absolute inset-0 bg-black/60" />
         <div className="relative z-10 flex min-h-screen flex-col items-center justify-center p-6">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="flex flex-col items-center">
-            <Loader2 className="h-10 w-10 animate-spin text-[#ccff00] mb-4" />
-            <p className="text-white/60 font-mono text-sm uppercase tracking-widest">Loading invitation...</p>
+            <p className="text-[#F2F1EA]/70 font-mono text-sm uppercase tracking-[0.22em]">Loading invitation...</p>
           </motion.div>
         </div>
       </div>
@@ -358,19 +356,19 @@ export default function SupplierInvitePage() {
             <div className="mb-8 flex justify-center">
               <img src={logoUrl} alt="alkatera" className="h-12 md:h-14 w-auto object-contain" />
             </div>
-            <div className="border border-white/10 bg-white/5 backdrop-blur-xl rounded-2xl p-8">
+            <div className="border border-white/10 bg-white/5 backdrop-blur-xl rounded-[6px] p-8">
               <div className="flex items-center gap-3 mb-6">
-                <div className="p-3 rounded-xl bg-red-500/20 border border-red-500/30">
+                <div className="p-3 rounded-[6px] bg-red-500/20 border border-red-500/30">
                   <XCircle className="h-6 w-6 text-red-400" />
                 </div>
-                <h2 className="font-serif text-2xl text-white">Invitation Error</h2>
+                <h2 className="font-display font-bold tracking-tight text-2xl text-[#F2F1EA]">This invitation can&apos;t be opened.</h2>
               </div>
-              <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl mb-6">
+              <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-[6px] mb-6">
                 <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-red-300">{error}</p>
               </div>
-              <a href="mailto:hello@alkatera.com" className="block w-full py-4 bg-white/10 text-white font-mono uppercase text-xs tracking-widest font-bold rounded-xl text-center hover:bg-white/20 transition-all">
-                Contact Support
+              <a href="mailto:hello@alkatera.com" className="block w-full py-4 border border-[#F2F1EA]/40 text-[#F2F1EA] font-mono uppercase text-xs tracking-[0.22em] font-bold rounded-full text-center hover:border-[#F2F1EA] transition-colors">
+                Contact support
               </a>
             </div>
           </motion.div>
@@ -393,12 +391,12 @@ export default function SupplierInvitePage() {
             <div className="mb-8 flex justify-center">
               <img src={logoUrl} alt="alkatera" className="h-12 md:h-14 w-auto object-contain" />
             </div>
-            <div className="border border-[#ccff00]/30 bg-[#ccff00]/5 backdrop-blur-xl rounded-2xl p-8 text-center">
-              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}>
-                <CheckCircle2 className="h-16 w-16 text-[#ccff00] mx-auto mb-4" />
+            <div className="border border-white/20 bg-white/5 backdrop-blur-xl rounded-[6px] p-8 text-center">
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2, duration: 0.4 }}>
+                <CheckCircle2 className="h-16 w-16 text-[#F2F1EA] mx-auto mb-4" />
               </motion.div>
-              <h2 className="font-serif text-2xl text-white mb-2">Welcome aboard!</h2>
-              <p className="text-white/60 text-sm">You&apos;ve successfully joined as a supplier. Redirecting to your portal...</p>
+              <h2 className="font-display font-bold tracking-tight text-2xl text-[#F2F1EA] mb-2">Welcome aboard.</h2>
+              <p className="text-white/60 text-sm">You&apos;ve joined as a supplier. Taking you to your portal...</p>
             </div>
           </motion.div>
         </div>
@@ -425,10 +423,10 @@ export default function SupplierInvitePage() {
           </div>
 
           {/* Main card */}
-          <div className="border border-white/10 bg-white/5 backdrop-blur-xl rounded-2xl p-8 space-y-6">
+          <div className="border border-white/10 bg-white/5 backdrop-blur-xl rounded-[6px] p-8 space-y-6">
             {/* Header */}
             <div className="text-center space-y-2">
-              <h1 className="font-serif text-3xl text-white">You&apos;re Invited</h1>
+              <h1 className="font-display font-bold tracking-tight text-3xl text-[#F2F1EA]">You&apos;re invited.</h1>
               <p className="text-white/60 text-sm">
                 {isEsgSurvey ? (
                   <>
@@ -444,9 +442,9 @@ export default function SupplierInvitePage() {
 
             {/* Organisation & material info */}
             <div className="space-y-3">
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10">
-                <div className="p-2 rounded-lg bg-[#ccff00]/10">
-                  <Building2 className="h-4 w-4 text-[#ccff00]" />
+              <div className="flex items-center gap-3 p-3 rounded-[6px] bg-white/5 border border-white/10">
+                <div className="p-2 rounded-[6px] bg-white/10">
+                  <Building2 className="h-4 w-4 text-[#F2F1EA]" />
                 </div>
                 <div>
                   <p className="text-xs text-white/40 uppercase tracking-wider">From</p>
@@ -457,9 +455,9 @@ export default function SupplierInvitePage() {
               </div>
 
               {invitation?.material_name && (
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10">
-                  <div className="p-2 rounded-lg bg-blue-500/10">
-                    <Package className="h-4 w-4 text-blue-400" />
+                <div className="flex items-center gap-3 p-3 rounded-[6px] bg-white/5 border border-white/10">
+                  <div className="p-2 rounded-[6px] bg-white/10">
+                    <Package className="h-4 w-4 text-[#F2F1EA]" />
                   </div>
                   <div>
                     <p className="text-xs text-white/40 uppercase tracking-wider">Data requested for</p>
@@ -473,8 +471,8 @@ export default function SupplierInvitePage() {
 
             {/* ESG survey: what to expect */}
             {isEsgSurvey && (
-              <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                <p className="text-xs text-[#ccff00] uppercase tracking-wider font-bold mb-1">What to expect</p>
+              <div className="p-4 rounded-[6px] bg-white/5 border border-white/10">
+                <p className="font-mono text-xs text-[#F2F1EA]/80 uppercase tracking-[0.22em] font-bold mb-1">What to expect</p>
                 <p className="text-xs text-white/50 leading-relaxed">
                   Two quick steps, around 10 minutes, and it&apos;s free: first confirm a few details about your business, then a short survey covering labour &amp; human rights, environment, ethics, health &amp; safety and management systems. You can upload supporting evidence and save your progress as you go.
                 </p>
@@ -483,11 +481,11 @@ export default function SupplierInvitePage() {
 
             {/* Personal message */}
             {invitation?.personal_message && (
-              <div className="p-4 rounded-xl bg-[#ccff00]/5 border border-[#ccff00]/20">
+              <div className="p-4 rounded-[6px] bg-white/5 border border-white/20">
                 <div className="flex items-start gap-2">
-                  <Quote className="h-4 w-4 text-[#ccff00]/60 flex-shrink-0 mt-0.5" />
+                  <Quote className="h-4 w-4 text-[#F2F1EA]/60 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-xs text-[#ccff00]/60 uppercase tracking-wider mb-1">
+                    <p className="font-mono text-xs text-[#F2F1EA]/60 uppercase tracking-[0.22em] mb-1">
                       Message from {invitation.inviter_name}
                     </p>
                     <p className="text-sm text-white/80 leading-relaxed">{invitation.personal_message}</p>
@@ -497,11 +495,11 @@ export default function SupplierInvitePage() {
             )}
 
             {/* Why join */}
-            <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+            <div className="p-4 rounded-[6px] bg-white/5 border border-white/10">
               <div className="flex items-start gap-2">
-                <Leaf className="h-4 w-4 text-[#ccff00] flex-shrink-0 mt-0.5" />
+                <Leaf className="h-4 w-4 text-[#F2F1EA] flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-xs text-[#ccff00] uppercase tracking-wider font-bold mb-1">Free for suppliers</p>
+                  <p className="font-mono text-xs text-[#F2F1EA]/80 uppercase tracking-[0.22em] font-bold mb-1">Free for suppliers</p>
                   <p className="text-xs text-white/50 leading-relaxed">
                     alkatera gives you a streamlined portal to manage your sustainability data and share verified product information with your customers. No hidden costs, no commitment.
                   </p>
@@ -511,7 +509,7 @@ export default function SupplierInvitePage() {
 
             {/* Expiry warning */}
             {daysUntilExpiry <= 7 && (
-              <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+              <div className="flex items-center gap-2 p-3 rounded-[6px] bg-amber-500/10 border border-amber-500/20">
                 <AlertCircle className="h-4 w-4 text-amber-400 flex-shrink-0" />
                 <p className="text-xs text-amber-200">
                   This invitation expires in {daysUntilExpiry} {daysUntilExpiry === 1 ? 'day' : 'days'}
@@ -521,7 +519,7 @@ export default function SupplierInvitePage() {
 
             {/* Error display */}
             {error && (
-              <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+              <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-[6px]">
                 <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-red-300">{error}</p>
               </div>
@@ -531,7 +529,7 @@ export default function SupplierInvitePage() {
             {mismatchedUserEmail ? (
               /* A different account is signed in this browser — let the user choose. */
               <div className="space-y-4">
-                <div className="flex items-start gap-3 p-4 bg-white/5 border border-white/10 rounded-xl">
+                <div className="flex items-start gap-3 p-4 bg-white/5 border border-white/10 rounded-[6px]">
                   <AlertCircle className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
                   <p className="text-sm text-white/70">
                     You&apos;re signed in as <strong className="text-white">{mismatchedUserEmail}</strong>.
@@ -541,10 +539,10 @@ export default function SupplierInvitePage() {
                 <button
                   onClick={handleSwitchAccount}
                   disabled={isSubmitting}
-                  className="w-full py-4 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:bg-[#b8e600] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full py-4 bg-[#F2F1EA] text-[#1A1B1D] font-mono uppercase text-xs tracking-[0.22em] font-bold rounded-full hover:bg-white transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    'Signing out...'
                   ) : (
                     <>Sign out &amp; continue as {invitation?.supplier_email} <ArrowRight className="h-4 w-4" /></>
                   )}
@@ -562,10 +560,10 @@ export default function SupplierInvitePage() {
                 <button
                   onClick={handleAcceptAsExistingUser}
                   disabled={isSubmitting}
-                  className="w-full py-4 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:bg-[#b8e600] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full py-4 bg-[#F2F1EA] text-[#1A1B1D] font-mono uppercase text-xs tracking-[0.22em] font-bold rounded-full hover:bg-white transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    'Accepting...'
                   ) : (
                     <>{acceptLabel} <ArrowRight className="h-4 w-4" /></>
                   )}
@@ -585,7 +583,7 @@ export default function SupplierInvitePage() {
                     value={signInPassword}
                     onChange={(e) => setSignInPassword(e.target.value)}
                     placeholder="Password"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-[#ccff00]/50 focus:ring-1 focus:ring-[#ccff00]/20 text-sm pr-10"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-[6px] text-white placeholder:text-white/30 focus:outline-none focus:border-[#F2F1EA]/40 focus:ring-1 focus:ring-[#F2F1EA]/20 text-sm pr-10"
                     required
                   />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/60">
@@ -596,9 +594,9 @@ export default function SupplierInvitePage() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full py-4 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:bg-[#b8e600] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full py-4 bg-[#F2F1EA] text-[#1A1B1D] font-mono uppercase text-xs tracking-[0.22em] font-bold rounded-full hover:bg-white transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <>{signInLabel} <ArrowRight className="h-4 w-4" /></>}
+                  {isSubmitting ? 'Signing in...' : <>{signInLabel} <ArrowRight className="h-4 w-4" /></>}
                 </button>
 
                 <button type="button" onClick={() => setShowSignIn(false)} className="w-full text-center text-xs text-white/40 hover:text-white/60">
@@ -618,7 +616,7 @@ export default function SupplierInvitePage() {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Full name"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-[#ccff00]/50 focus:ring-1 focus:ring-[#ccff00]/20 text-sm"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-[6px] text-white placeholder:text-white/30 focus:outline-none focus:border-[#F2F1EA]/40 focus:ring-1 focus:ring-[#F2F1EA]/20 text-sm"
                     required
                   />
                 </div>
@@ -628,7 +626,7 @@ export default function SupplierInvitePage() {
                     type="email"
                     value={invitation?.supplier_email || ''}
                     disabled
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white/50 text-sm cursor-not-allowed"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-[6px] text-white/50 text-sm cursor-not-allowed"
                   />
                 </div>
 
@@ -638,7 +636,7 @@ export default function SupplierInvitePage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Password (min 8 characters)"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-[#ccff00]/50 focus:ring-1 focus:ring-[#ccff00]/20 text-sm pr-10"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-[6px] text-white placeholder:text-white/30 focus:outline-none focus:border-[#F2F1EA]/40 focus:ring-1 focus:ring-[#F2F1EA]/20 text-sm pr-10"
                     required
                   />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/60">
@@ -652,7 +650,7 @@ export default function SupplierInvitePage() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Confirm password"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-[#ccff00]/50 focus:ring-1 focus:ring-[#ccff00]/20 text-sm pr-10"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-[6px] text-white placeholder:text-white/30 focus:outline-none focus:border-[#F2F1EA]/40 focus:ring-1 focus:ring-[#F2F1EA]/20 text-sm pr-10"
                     required
                   />
                   <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/60">
@@ -663,13 +661,13 @@ export default function SupplierInvitePage() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full py-4 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:bg-[#b8e600] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full py-4 bg-[#F2F1EA] text-[#1A1B1D] font-mono uppercase text-xs tracking-[0.22em] font-bold rounded-full hover:bg-white transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <>{createLabel} <ArrowRight className="h-4 w-4" /></>}
+                  {isSubmitting ? 'Creating account...' : <>{createLabel} <ArrowRight className="h-4 w-4" /></>}
                 </button>
 
                 <button type="button" onClick={() => setShowSignIn(true)} className="w-full text-center text-xs text-white/40 hover:text-white/60">
-                  Already have an account? <span className="text-[#ccff00]/60 underline">Sign in</span>
+                  Already have an account? <span className="text-[#F2F1EA]/80 underline underline-offset-4">Sign in</span>
                 </button>
               </form>
             )}

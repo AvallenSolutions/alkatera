@@ -1,6 +1,5 @@
 'use client'
 
-import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
   useSupplierOnboarding,
@@ -56,27 +55,14 @@ export function SupplierOnboardingWizard() {
   const isCompletion = state.currentStep === 'supplier-all-set'
 
   return (
-    <div className="fixed inset-0 z-[60] overflow-y-auto" role="dialog" aria-label="Supplier onboarding wizard">
-      {/* Full-screen background image + dark overlay — fixed so they stay during scroll */}
-      <div className="fixed inset-0 z-0">
-        <Image
-          src="/images/starry-night-bg3.jpg"
-          alt=""
-          fill
-          className="object-cover"
-          priority
-          quality={85}
-        />
-        <div className="absolute inset-0 bg-black/70" />
-      </div>
-
-      {/* Top bar — glassmorphic, hidden on welcome */}
+    <div className="fixed inset-0 z-[60] overflow-y-auto bg-background" role="dialog" aria-label="Supplier onboarding wizard">
+      {/* Top bar — cream band on paper, hidden on welcome */}
       {!isWelcome && (
-        <div className="sticky top-0 z-10 bg-black/40 backdrop-blur-md border-b border-white/10 px-4 py-3">
+        <div className="sticky top-0 z-10 bg-card border-b border-border px-4 py-3">
           <div className="max-w-2xl mx-auto">
             {/* Phase indicators */}
             <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-4">
                 {SUPPLIER_PHASES.map((phase) => {
                   const pConfig = SUPPLIER_PHASE_CONFIG[phase]
                   const isActive = phase === currentPhase
@@ -88,18 +74,18 @@ export function SupplierOnboardingWizard() {
                     <div
                       key={phase}
                       className={cn(
-                        'flex items-center gap-1 px-2 py-1 rounded-full text-xs transition-all',
+                        'flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] transition-colors',
                         isActive
-                          ? 'bg-[#ccff00]/10 text-[#ccff00] font-medium'
+                          ? 'text-studio-forest'
                           : isPast || isComplete
-                          ? 'text-white/50'
-                          : 'text-white/25'
+                          ? 'text-foreground/60'
+                          : 'text-muted-foreground/60'
                       )}
                     >
                       <div
                         className={cn(
                           'w-2 h-2 rounded-full',
-                          isActive ? 'bg-[#ccff00]' : isPast || isComplete ? 'bg-white/40' : 'bg-white/15'
+                          isActive ? 'bg-studio-forest' : isPast || isComplete ? 'bg-foreground/40' : 'bg-border'
                         )}
                       />
                       <span className="hidden sm:inline">{pConfig.label}</span>
@@ -113,7 +99,7 @@ export function SupplierOnboardingWizard() {
                   variant="ghost"
                   size="sm"
                   onClick={dismissOnboarding}
-                  className="text-white/40 hover:text-white hover:bg-white/10 -mr-2"
+                  className="text-muted-foreground hover:text-foreground -mr-2"
                   aria-label="Skip onboarding"
                 >
                   <X className="w-4 h-4" />
@@ -122,12 +108,12 @@ export function SupplierOnboardingWizard() {
             </div>
 
             {/* Progress bar */}
-            <Progress value={progress} indicatorColor="lime" className="h-1 bg-white/10" />
+            <Progress value={progress} indicatorClassName="bg-studio-forest" className="h-1 bg-secondary" />
             <div className="flex items-center justify-between mt-1">
-              <p className="text-xs text-white/40">
+              <p className="font-mono text-[10px] text-muted-foreground">
                 {currentStepConfig.title}
               </p>
-              <p className="text-xs text-white/40">{progress}%</p>
+              <p className="font-mono text-[10px] tabular-nums text-muted-foreground">{progress}%</p>
             </div>
           </div>
         </div>
@@ -140,7 +126,7 @@ export function SupplierOnboardingWizard() {
             variant="ghost"
             size="sm"
             onClick={dismissOnboarding}
-            className="text-white/40 hover:text-white hover:bg-white/10"
+            className="text-muted-foreground hover:text-foreground"
             aria-label="Skip onboarding"
           >
             <X className="w-4 h-4 mr-1" />
@@ -150,7 +136,7 @@ export function SupplierOnboardingWizard() {
       )}
 
       {/* Step content */}
-      <div className="relative z-[1] max-w-2xl mx-auto py-8 px-4">
+      <div className="relative max-w-2xl mx-auto py-8 px-4">
         {CurrentStepComponent ? <CurrentStepComponent /> : null}
       </div>
     </div>

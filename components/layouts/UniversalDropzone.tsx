@@ -24,7 +24,6 @@ import {
 } from '@/components/ui/select'
 import {
   Upload,
-  Loader2,
   FileSpreadsheet,
   FileText,
   AlertCircle,
@@ -183,7 +182,7 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
         let data: IngestResponse | null = null
         while (!abortFlag.cancelled) {
           if (Date.now() - start > TIMEOUT_MS) {
-            throw new Error('This is taking longer than expected — please try again.')
+            throw new Error('This is taking longer than expected. Please try again.')
           }
           await new Promise((r) => setTimeout(r, POLL_MS))
           if (abortFlag.cancelled) return
@@ -414,7 +413,7 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-[#8da300] dark:text-[#ccff00]" />
+            <Sparkles className="h-4 w-4 text-room-accent" />
             Upload anything
           </DialogTitle>
           <DialogDescription>
@@ -447,7 +446,7 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
               }}
               onDragLeave={() => setDragOver(false)}
               onDrop={handleDrop}
-              className={`w-full flex flex-col items-center gap-3 p-8 border-2 border-dashed rounded-xl transition-colors cursor-pointer ${
+              className={`w-full flex flex-col items-center gap-3 p-8 border-2 border-dashed rounded-[6px] transition-colors cursor-pointer ${
                 dragOver
                   ? 'border-primary bg-primary/5'
                   : 'border-muted-foreground/25 hover:border-muted-foreground/50 hover:bg-muted/30'
@@ -469,7 +468,6 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
 
         {step === 'analysing' && (
           <div className="flex flex-col items-center gap-3 py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             <p className="text-sm font-medium">
               {phaseMessage || 'Analysing your document…'}
             </p>
@@ -505,15 +503,14 @@ export function UniversalDropzone({ trigger, file, onFileConsumed }: UniversalDr
 
         {step === 'saving' && (
           <div className="flex flex-col items-center gap-3 py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             <p className="text-sm font-medium">Saving…</p>
           </div>
         )}
 
         {step === 'saved' && (
           <div className="flex flex-col items-center gap-3 py-6 text-center">
-            <div className="h-10 w-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
-              <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+            <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center">
+              <CheckCircle2 className="h-5 w-5 text-studio-good" />
             </div>
             <p className="text-sm font-medium">
               Saved to <span className="font-semibold">{detectedFacilityName()}</span>
@@ -587,8 +584,8 @@ function ReviewPanel(props: ReviewPanelProps) {
   if (result.type === 'unsupported') {
     return (
       <div className="space-y-3">
-        <div className="flex items-start gap-3 p-4 rounded-lg border border-amber-400/30 bg-amber-500/5">
-          <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+        <div className="flex items-start gap-3 p-4 rounded-[6px] border border-border bg-card">
+          <AlertCircle className="h-4 w-4 text-studio-attention mt-0.5 flex-shrink-0" />
           <div className="text-sm">
             <p className="font-medium">We don&apos;t recognise this document yet.</p>
             {result.reason && (
@@ -620,7 +617,7 @@ function ReviewPanel(props: ReviewPanelProps) {
             {sm.totalKwh.toLocaleString('en-GB')} kWh · {sm.months} month{sm.months === 1 ? '' : 's'} ({sm.format})
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            We&apos;ll derive your monthly totals from this — no separate bill needed for these months.
+            We&apos;ll derive your monthly totals from this. No separate bill needed for these months.
           </p>
         </div>
 
@@ -659,9 +656,9 @@ function ReviewPanel(props: ReviewPanelProps) {
         </div>
 
         {props.smConflict ? (
-          <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
-            <p className="font-medium text-amber-800">You already have bill data for these months</p>
-            <p className="mt-1 text-xs text-amber-800/90">
+          <div className="rounded-[6px] border border-border bg-card p-3 text-sm">
+            <p className="font-medium text-studio-attention">You already have bill data for these months</p>
+            <p className="mt-1 text-xs text-muted-foreground">
               This covers {props.smConflict.span.from} → {props.smConflict.span.to} and overlaps existing entries.
               Choose one so the same energy isn&apos;t counted twice:
             </p>
@@ -686,7 +683,7 @@ function ReviewPanel(props: ReviewPanelProps) {
         kind="spray"
         detectedLabel="spray diary"
         icon={<ClipboardList className="h-4 w-4" />}
-        description="Pick the asset type this diary is for — we'll carry the file across so you don't re-upload."
+        description="Pick the asset type this diary is for. We'll carry the file across so you don't re-upload."
         extraNote={
           result.sprayDiary?.sheetNames?.length
             ? `Sheets: ${result.sprayDiary.sheetNames.join(', ')}`
@@ -746,7 +743,7 @@ function ReviewPanel(props: ReviewPanelProps) {
         kind="evidence"
         detectedLabel="soil-carbon evidence"
         icon={<ScrollText className="h-4 w-4" />}
-        description="Pick the asset this evidence is for — we'll carry the file across so you don't re-upload."
+        description="Pick the asset this evidence is for. We'll carry the file across so you don't re-upload."
         extraNote={result.soilCarbonEvidence?.note}
         stashId={result.soilCarbonEvidence?.stashId}
         onClose={props.onClose}
@@ -775,7 +772,7 @@ function ReviewPanel(props: ReviewPanelProps) {
   if (result.type === 'accounts_csv') {
     return (
       <div className="space-y-3">
-        <div className="flex items-start gap-3 p-4 rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5">
+        <div className="flex items-start gap-3 p-4 rounded-[6px] border border-border bg-card">
           <FileSpreadsheet className="h-4 w-4 mt-0.5" />
           <div className="text-sm">
             <p className="font-medium">This looks like an accounting export.</p>
@@ -797,8 +794,8 @@ function ReviewPanel(props: ReviewPanelProps) {
     const { summary, errors } = result.xlsx
     return (
       <div className="space-y-3">
-        <div className="flex items-start gap-3 p-4 rounded-lg border border-emerald-400/30 bg-emerald-500/5">
-          <FileSpreadsheet className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+        <div className="flex items-start gap-3 p-4 rounded-[6px] border border-border bg-card">
+          <FileSpreadsheet className="h-4 w-4 text-studio-good mt-0.5" />
           <div className="text-sm">
             <p className="font-medium">We detected a product workbook.</p>
             <p className="text-xs text-muted-foreground mt-1">
@@ -808,7 +805,7 @@ function ReviewPanel(props: ReviewPanelProps) {
           </div>
         </div>
         {errors.length > 0 && (
-          <div className="text-xs text-amber-600 dark:text-amber-400 space-y-1">
+          <div className="text-xs text-studio-attention space-y-1">
             {errors.slice(0, 3).map((e, i) => (
               <p key={i}>· {e}</p>
             ))}
@@ -850,7 +847,7 @@ function ReviewPanel(props: ReviewPanelProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-3 p-4 rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5">
+      <div className="flex items-start gap-3 p-4 rounded-[6px] border border-border bg-card">
         <Icon className="h-4 w-4 mt-0.5" />
         <div className="text-sm">
           <p className="font-medium">We detected a {typeLabel}.</p>
@@ -1044,8 +1041,8 @@ function HistoricalReportPanel({ result, onClose, onSaved }: { result: IngestRes
   if (saved) {
     return (
       <div className="flex flex-col items-center gap-3 py-6 text-center">
-        <div className="h-10 w-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
-          <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+        <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center">
+          <CheckCircle2 className="h-5 w-5 text-studio-good" />
         </div>
         <p className="text-sm font-medium">Saved</p>
         <Button asChild size="sm" variant="outline">
@@ -1057,16 +1054,16 @@ function HistoricalReportPanel({ result, onClose, onSaved }: { result: IngestRes
 
   return (
     <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-      <div className="flex items-start gap-3 p-4 rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5">
+      <div className="flex items-start gap-3 p-4 rounded-[6px] border border-border bg-card">
         <ScrollText className="h-4 w-4 mt-0.5" />
         <div className="text-sm">
           <p className="font-medium">
             We detected a sustainability report
-            {data.organization_name ? ` — ${data.organization_name}` : ''}
+            {data.organization_name ? `: ${data.organization_name}` : ''}
             {form.reporting_year ? ` (${form.reporting_year})` : ''}.
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            Check the extracted headline metrics, edit anything that looks off, then save. This is stored as historical reference — it won&apos;t mix with your measured data.
+            Check the extracted headline metrics, edit anything that looks off, then save. This is stored as historical reference, it won&apos;t mix with your measured data.
           </p>
         </div>
       </div>
@@ -1097,7 +1094,7 @@ function HistoricalReportPanel({ result, onClose, onSaved }: { result: IngestRes
 
       <div className="flex items-center justify-end gap-2 pt-1">
         <Button size="sm" onClick={handleSave} disabled={saving}>
-          {saving ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <FileText className="h-3.5 w-3.5 mr-1.5" />}
+          <FileText className="h-3.5 w-3.5 mr-1.5" />
           Save historical import
         </Button>
       </div>
@@ -1173,8 +1170,8 @@ function HistoricalLcaPanel({ result, onClose, onSaved }: { result: IngestRespon
   if (saved) {
     return (
       <div className="flex flex-col items-center gap-3 py-6 text-center">
-        <div className="h-10 w-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
-          <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+        <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center">
+          <CheckCircle2 className="h-5 w-5 text-studio-good" />
         </div>
         <p className="text-sm font-medium">Saved</p>
         <Button asChild size="sm" variant="outline">
@@ -1188,14 +1185,14 @@ function HistoricalLcaPanel({ result, onClose, onSaved }: { result: IngestRespon
 
   return (
     <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-      <div className="flex items-start gap-3 p-4 rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5">
+      <div className="flex items-start gap-3 p-4 rounded-[6px] border border-border bg-card">
         <ScrollText className="h-4 w-4 mt-0.5" />
         <div className="text-sm">
           <p className="font-medium">
-            We detected a prior LCA{form.product_name ? ` — ${form.product_name}` : ''}.
+            We detected a prior LCA{form.product_name ? `: ${form.product_name}` : ''}.
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            Stored as historical reference — not mixed with your operational LCAs.
+            Stored as historical reference, not mixed with your operational LCAs.
           </p>
         </div>
       </div>
@@ -1233,7 +1230,7 @@ function HistoricalLcaPanel({ result, onClose, onSaved }: { result: IngestRespon
           {Object.entries(stages).map(([stage, value]) => (
             <div key={stage} className="flex justify-between">
               <span className="text-muted-foreground">{stage.replace('_', ' ')}</span>
-              <span className="font-mono">{value ?? '—'}</span>
+              <span className="font-mono">{value ?? '·'}</span>
             </div>
           ))}
         </div>
@@ -1241,7 +1238,7 @@ function HistoricalLcaPanel({ result, onClose, onSaved }: { result: IngestRespon
 
       <div className="flex items-center justify-end gap-2 pt-1">
         <Button size="sm" onClick={handleSave} disabled={saving}>
-          {saving ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <FileText className="h-3.5 w-3.5 mr-1.5" />}
+          <FileText className="h-3.5 w-3.5 mr-1.5" />
           Save historical LCA
         </Button>
       </div>
@@ -1367,7 +1364,7 @@ function BomHandoffPanel({ bom, onClose }: { bom?: BomPayload; onClose: () => vo
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-3 p-4 rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5">
+      <div className="flex items-start gap-3 p-4 rounded-[6px] border border-border bg-card">
         <ScrollText className="h-4 w-4 mt-0.5" />
         <div className="text-sm">
           <p className="font-medium">We detected a bill of materials.</p>
@@ -1464,12 +1461,12 @@ function AttachToExistingPanel({
         <Label htmlFor="dropzone-bom-product" className="text-xs">Attach to product</Label>
         {loading ? (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading products…
+            Loading products…
           </div>
         ) : error ? (
-          <p className="text-xs text-amber-600 dark:text-amber-400">{error}</p>
+          <p className="text-xs text-studio-attention">{error}</p>
         ) : products.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No products yet — use Create new product instead.</p>
+          <p className="text-xs text-muted-foreground">No products yet. Use Create new product instead.</p>
         ) : (
           <Select value={productId} onValueChange={setProductId}>
             <SelectTrigger id="dropzone-bom-product">
@@ -1488,7 +1485,7 @@ function AttachToExistingPanel({
         <p>
           <span className="font-medium text-foreground">Next step:</span>{' '}
           {stashId
-            ? "Open the product — we'll carry the file across and parse it automatically."
+            ? "Open the product. We'll carry the file across and parse it automatically."
             : 'Open the product, then use the BOM upload button inside the recipe editor.'}
         </p>
       </div>
@@ -1558,7 +1555,7 @@ function CreateFromBomPanel({
         .single()
       if (createErr || !created) throw new Error(createErr?.message || 'Could not create product')
 
-      toast.success(`Created ${name.trim()} — opening recipe editor…`)
+      toast.success(`Created ${name.trim()}, opening recipe editor…`)
       const params = stashId
         ? `?${new URLSearchParams({ stash_id: stashId, stash_kind: 'bom' }).toString()}`
         : ''
@@ -1639,7 +1636,7 @@ function CreateFromBomPanel({
 
       <div className="flex items-center justify-end gap-2 pt-1">
         <Button size="sm" onClick={handleCreate} disabled={!canCreate || creating}>
-          {creating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Package className="h-3.5 w-3.5 mr-1.5" />}
+          <Package className="h-3.5 w-3.5 mr-1.5" />
           Create product &amp; attach BOM
         </Button>
       </div>
@@ -1688,7 +1685,7 @@ function UtilityBillEnrichmentSummary({ bill }: { bill: ExtractedBillData }) {
               key={`${c.label}-${c.value}`}
               className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
                 c.tone === 'emerald'
-                  ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                  ? 'text-studio-good font-bold uppercase tracking-[0.18em]'
                   : 'bg-background border border-border text-muted-foreground'
               }`}
             >
@@ -1712,7 +1709,7 @@ function UtilityBillEnrichmentSummary({ bill }: { bill: ExtractedBillData }) {
           ]
             .filter((x) => typeof x.pct === 'number')
             .map((x) => `${x.label} ${Math.round(x.pct as number)}%`)
-            .join(' · ') || '—'}
+            .join(' · ') || '·'}
         </div>
       )}
     </div>
@@ -1821,7 +1818,7 @@ function AssetHandoffPanel({ kind, detectedLabel, icon, description, extraNote, 
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-3 p-4 rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5">
+      <div className="flex items-start gap-3 p-4 rounded-[6px] border border-border bg-card">
         <div className="mt-0.5">{icon}</div>
         <div className="text-sm">
           <p className="font-medium">We detected a {detectedLabel}.</p>
@@ -1854,10 +1851,10 @@ function AssetHandoffPanel({ kind, detectedLabel, icon, description, extraNote, 
           <Label htmlFor="handoff-asset" className="text-xs">Select {typeMeta?.label.toLowerCase()}</Label>
           {loading ? (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+              Loading…
             </div>
           ) : loadError ? (
-            <p className="text-xs text-amber-600 dark:text-amber-400">{loadError}</p>
+            <p className="text-xs text-studio-attention">{loadError}</p>
           ) : assets.length === 0 ? (
             <p className="text-xs text-muted-foreground">
               No {typeMeta?.label.toLowerCase()}s yet.{' '}
@@ -1886,8 +1883,8 @@ function AssetHandoffPanel({ kind, detectedLabel, icon, description, extraNote, 
           <span className="font-medium text-foreground">Next step:</span>{' '}
           {stashId
             ? kind === 'spray'
-              ? 'Open the asset — we\'ll hand the file across and parse the chemicals automatically.'
-              : 'Open the asset — we\'ll attach the file to the growing profile queue. Complete and Save to finalise.'
+              ? 'Open the asset. We\'ll hand the file across and parse the chemicals automatically.'
+              : 'Open the asset. We\'ll attach the file to the growing profile queue. Complete and Save to finalise.'
             : kind === 'spray'
               ? 'Open the asset page, scroll to Spray / Crop Protection, and drop the same file there to run the full import.'
               : 'Open the asset page, scroll to Soil Carbon Evidence, and attach the same file to your growing profile.'}
@@ -2032,8 +2029,8 @@ function SupplierInvoicePanel({
     const tonnes = saved.co2e / 1000
     return (
       <div className="space-y-4">
-        <div className="flex items-start gap-3 p-4 rounded-lg border border-emerald-400/30 bg-emerald-500/5">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+        <div className="flex items-start gap-3 p-4 rounded-[6px] border border-border bg-card">
+          <CheckCircle2 className="h-4 w-4 text-studio-good mt-0.5" />
           <div className="text-sm">
             <p className="font-medium">
               Saved {saved.count} spend line{saved.count === 1 ? '' : 's'} to your Scope 3 footprint.
@@ -2057,7 +2054,7 @@ function SupplierInvoicePanel({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-3 p-4 rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5">
+      <div className="flex items-start gap-3 p-4 rounded-[6px] border border-border bg-card">
         <FileText className="h-4 w-4 mt-0.5" />
         <div className="text-sm">
           <p className="font-medium">We read a supplier invoice{supplierName ? ` from ${supplierName}` : ''}.</p>
@@ -2123,7 +2120,7 @@ function SupplierInvoicePanel({
                 variant="ghost"
                 size="sm"
                 onClick={() => removeRow(i)}
-                className="h-9 w-9 p-0 text-muted-foreground hover:text-red-500"
+                className="h-9 w-9 p-0 text-muted-foreground hover:text-studio-stale"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
@@ -2152,7 +2149,6 @@ function SupplierInvoicePanel({
           Cancel
         </Button>
         <Button type="button" size="sm" onClick={save} disabled={!canSave}>
-          {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
           Save to Scope 3
         </Button>
       </div>
@@ -2266,8 +2262,8 @@ function PackagingSpecPanel({
     const product = products.find((p) => p.id === productId)
     return (
       <div className="space-y-4">
-        <div className="flex items-start gap-3 p-4 rounded-lg border border-emerald-400/30 bg-emerald-500/5">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+        <div className="flex items-start gap-3 p-4 rounded-[6px] border border-border bg-card">
+          <CheckCircle2 className="h-4 w-4 text-studio-good mt-0.5" />
           <div className="text-sm">
             <p className="font-medium">
               Saved {saved.count} component{saved.count === 1 ? '' : 's'} to {product?.name || 'the product'}.
@@ -2291,7 +2287,7 @@ function PackagingSpecPanel({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-3 p-4 rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5">
+      <div className="flex items-start gap-3 p-4 rounded-[6px] border border-border bg-card">
         <Package className="h-4 w-4 mt-0.5" />
         <div className="text-sm">
           <p className="font-medium">We read a packaging spec sheet.</p>
@@ -2306,7 +2302,7 @@ function PackagingSpecPanel({
         <Label className="text-[11px] text-muted-foreground">Product</Label>
         {loading ? (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+            Loading…
           </div>
         ) : products.length === 0 ? (
           <p className="text-xs text-muted-foreground">
@@ -2340,7 +2336,7 @@ function PackagingSpecPanel({
                 variant="ghost"
                 size="sm"
                 onClick={() => removeRow(i)}
-                className="h-8 w-8 shrink-0 p-0 text-muted-foreground hover:text-red-500"
+                className="h-8 w-8 shrink-0 p-0 text-muted-foreground hover:text-studio-stale"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
@@ -2377,7 +2373,6 @@ function PackagingSpecPanel({
       <div className="flex items-center justify-end gap-2 pt-1">
         <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
         <Button type="button" size="sm" onClick={save} disabled={!canSave}>
-          {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
           Save packaging
         </Button>
       </div>
@@ -2479,8 +2474,8 @@ function SupplierCoaPanel({
   if (saved) {
     return (
       <div className="space-y-4">
-        <div className="flex items-start gap-3 p-4 rounded-lg border border-emerald-400/30 bg-emerald-500/5">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+        <div className="flex items-start gap-3 p-4 rounded-[6px] border border-border bg-card">
+          <CheckCircle2 className="h-4 w-4 text-studio-good mt-0.5" />
           <div className="text-sm">
             <p className="font-medium">Filed against the supplier product, pending verification.</p>
             <p className="text-xs text-muted-foreground mt-1">
@@ -2500,7 +2495,7 @@ function SupplierCoaPanel({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-3 p-4 rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5">
+      <div className="flex items-start gap-3 p-4 rounded-[6px] border border-border bg-card">
         <FileText className="h-4 w-4 mt-0.5" />
         <div className="text-sm">
           <p className="font-medium">
@@ -2517,7 +2512,7 @@ function SupplierCoaPanel({
         <Label className="text-[11px] text-muted-foreground">Supplier product</Label>
         {loading ? (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+            Loading…
           </div>
         ) : supplierProducts.length === 0 ? (
           <p className="text-xs text-muted-foreground">
@@ -2568,7 +2563,6 @@ function SupplierCoaPanel({
       <div className="flex items-center justify-end gap-2 pt-1">
         <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
         <Button type="button" size="sm" onClick={save} disabled={!canSave}>
-          {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
           File document
         </Button>
       </div>
@@ -2669,8 +2663,8 @@ function CertificationPanel({
   if (saved) {
     return (
       <div className="space-y-4">
-        <div className="flex items-start gap-3 p-4 rounded-lg border border-emerald-400/30 bg-emerald-500/5">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+        <div className="flex items-start gap-3 p-4 rounded-[6px] border border-border bg-card">
+          <CheckCircle2 className="h-4 w-4 text-studio-good mt-0.5" />
           <div className="text-sm">
             <p className="font-medium">Certification recorded as certified.</p>
             <p className="text-xs text-muted-foreground mt-1">
@@ -2692,7 +2686,7 @@ function CertificationPanel({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-3 p-4 rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5">
+      <div className="flex items-start gap-3 p-4 rounded-[6px] border border-border bg-card">
         <ScrollText className="h-4 w-4 mt-0.5" />
         <div className="text-sm">
           <p className="font-medium">We read a certification certificate{cert?.certificate_name ? `: ${cert.certificate_name}` : ''}.</p>
@@ -2706,7 +2700,7 @@ function CertificationPanel({
         <Label className="text-[11px] text-muted-foreground">Framework</Label>
         {loading ? (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+            Loading…
           </div>
         ) : (
           <>
@@ -2719,7 +2713,7 @@ function CertificationPanel({
               </SelectContent>
             </Select>
             {noMatch && !frameworkId && (
-              <p className="text-[11px] text-amber-600">
+              <p className="text-[11px] text-studio-attention">
                 We couldn&apos;t match this to a known framework. Pick the closest one, or skip if it isn&apos;t tracked here.
               </p>
             )}
@@ -2745,7 +2739,6 @@ function CertificationPanel({
       <div className="flex items-center justify-end gap-2 pt-1">
         <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
         <Button type="button" size="sm" onClick={save} disabled={!canSave}>
-          {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
           Record certification
         </Button>
       </div>
@@ -2839,8 +2832,8 @@ function FreightInvoicePanel({
     const tonnes = saved.co2e / 1000
     return (
       <div className="space-y-4">
-        <div className="flex items-start gap-3 p-4 rounded-lg border border-emerald-400/30 bg-emerald-500/5">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+        <div className="flex items-start gap-3 p-4 rounded-[6px] border border-border bg-card">
+          <CheckCircle2 className="h-4 w-4 text-studio-good mt-0.5" />
           <div className="text-sm">
             <p className="font-medium">Freight saved to your Scope 3 footprint.</p>
             <p className="text-xs text-muted-foreground mt-1">
@@ -2861,7 +2854,7 @@ function FreightInvoicePanel({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-3 p-4 rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5">
+      <div className="flex items-start gap-3 p-4 rounded-[6px] border border-border bg-card">
         <FileText className="h-4 w-4 mt-0.5" />
         <div className="text-sm">
           <p className="font-medium">We read a freight invoice{carrier ? ` from ${carrier}` : ''}.</p>
@@ -2924,7 +2917,6 @@ function FreightInvoicePanel({
       <div className="flex items-center justify-end gap-2 pt-1">
         <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
         <Button type="button" size="sm" onClick={save} disabled={!canSave}>
-          {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
           Save to Scope 3
         </Button>
       </div>
@@ -3030,8 +3022,8 @@ function RefrigerantPanel({
   if (saved) {
     return (
       <div className="space-y-4">
-        <div className="flex items-start gap-3 p-4 rounded-lg border border-emerald-400/30 bg-emerald-500/5">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+        <div className="flex items-start gap-3 p-4 rounded-[6px] border border-border bg-card">
+          <CheckCircle2 className="h-4 w-4 text-studio-good mt-0.5" />
           <div className="text-sm">
             <p className="font-medium">Refrigerant record saved as a Scope 1 fugitive emission.</p>
             <p className="text-xs text-muted-foreground mt-1">
@@ -3052,7 +3044,7 @@ function RefrigerantPanel({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-3 p-4 rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5">
+      <div className="flex items-start gap-3 p-4 rounded-[6px] border border-border bg-card">
         <Zap className="h-4 w-4 mt-0.5" />
         <div className="text-sm">
           <p className="font-medium">We read a refrigerant service record.</p>
@@ -3106,7 +3098,6 @@ function RefrigerantPanel({
       <div className="flex items-center justify-end gap-2 pt-1">
         <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
         <Button type="button" size="sm" onClick={save} disabled={!canSave}>
-          {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
           Save to Scope 1
         </Button>
       </div>
@@ -3293,8 +3284,8 @@ function SoilCarbonLabPanel({
     const link = typeMeta && assetId ? `${typeMeta.pageBase}/${assetId}` : null
     return (
       <div className="space-y-4">
-        <div className="flex items-start gap-3 p-4 rounded-lg border border-emerald-400/30 bg-emerald-500/5">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+        <div className="flex items-start gap-3 p-4 rounded-[6px] border border-border bg-card">
+          <CheckCircle2 className="h-4 w-4 text-studio-good mt-0.5" />
           <div className="text-sm">
             <p className="font-medium">
               Saved {saved.count} measurement{saved.count === 1 ? '' : 's'} to {typeMeta?.label.toLowerCase()}.
@@ -3324,7 +3315,7 @@ function SoilCarbonLabPanel({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-3 p-4 rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5">
+      <div className="flex items-start gap-3 p-4 rounded-[6px] border border-border bg-card">
         <Leaf className="h-4 w-4 mt-0.5" />
         <div className="text-sm">
           <p className="font-medium">We read a soil carbon lab report.</p>
@@ -3367,10 +3358,10 @@ function SoilCarbonLabPanel({
           </Label>
           {loadingAssets ? (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+              Loading…
             </div>
           ) : loadError ? (
-            <p className="text-xs text-amber-600 dark:text-amber-400">{loadError}</p>
+            <p className="text-xs text-studio-attention">{loadError}</p>
           ) : assets.length === 0 ? (
             <p className="text-xs text-muted-foreground">
               No {typeMeta?.label.toLowerCase()}s yet.{' '}
@@ -3412,7 +3403,7 @@ function SoilCarbonLabPanel({
                 variant="ghost"
                 size="sm"
                 onClick={() => removeRow(i)}
-                className="h-7 w-7 p-0 text-muted-foreground hover:text-red-500"
+                className="h-7 w-7 p-0 text-muted-foreground hover:text-studio-stale"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </Button>
@@ -3492,7 +3483,6 @@ function SoilCarbonLabPanel({
           Cancel
         </Button>
         <Button type="button" size="sm" onClick={save} disabled={!canSave}>
-          {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
           Save {rows.length} measurement{rows.length === 1 ? '' : 's'}
         </Button>
       </div>

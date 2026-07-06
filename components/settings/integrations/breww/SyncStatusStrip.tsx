@@ -2,7 +2,6 @@
 
 import { useMemo } from 'react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { AlertTriangle, CheckCircle2, Loader2, MoreHorizontal, RefreshCcw } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, MoreHorizontal, RefreshCcw } from 'lucide-react'
 
 interface SyncStatusStripProps {
   status: 'active' | 'error' | 'disconnected' | 'unknown'
@@ -63,10 +62,10 @@ export function SyncStatusStrip({
 
   const statusDot = useMemo(() => {
     if (syncing || syncStatus === 'syncing') {
-      return <Loader2 className="h-3 w-3 animate-spin text-[#8da300] dark:text-[#ccff00]" />
+      return <RefreshCcw className="h-3 w-3 text-muted-foreground" />
     }
-    if (inError) return <AlertTriangle className="h-3 w-3 text-amber-500" />
-    if (status === 'active') return <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+    if (inError) return <AlertTriangle className="h-3 w-3 text-studio-attention" />
+    if (status === 'active') return <CheckCircle2 className="h-3 w-3 text-studio-good" />
     return <span className="inline-block h-2 w-2 rounded-full bg-muted-foreground/40" />
   }, [syncing, syncStatus, inError, status])
 
@@ -79,7 +78,7 @@ export function SyncStatusStrip({
         : 'Not connected'
 
   return (
-    <div className={`rounded-lg border p-3 ${inError ? 'border-amber-500/40 bg-amber-500/5' : 'bg-muted/30'}`}>
+    <div className="rounded-[6px] border border-border bg-card p-3">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         {/* Status + last sync */}
         <div className="flex items-center gap-2 min-w-0">
@@ -123,8 +122,8 @@ export function SyncStatusStrip({
             disabled={syncing}
             className="gap-1.5"
           >
-            {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5" />}
-            Sync now
+            <RefreshCcw className="h-3.5 w-3.5" />
+            {syncing ? 'Syncing' : 'Sync now'}
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -137,7 +136,7 @@ export function SyncStatusStrip({
                 Rebuild packaging
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onDisconnect} className="text-red-600 focus:text-red-600">
+              <DropdownMenuItem onClick={onDisconnect} className="text-studio-stale focus:text-studio-stale">
                 Disconnect
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -148,7 +147,7 @@ export function SyncStatusStrip({
       {/* Error detail (full, not truncated) */}
       {inError && syncError && (
         <details className="mt-2 text-xs">
-          <summary className="cursor-pointer text-amber-700 dark:text-amber-300">
+          <summary className="cursor-pointer text-studio-attention">
             Show technical details
           </summary>
           <div className="mt-1.5 flex items-start gap-2">

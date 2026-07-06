@@ -42,22 +42,18 @@ export function AuthForm({ tier, returnUrl }: AuthFormProps) {
           <div className="mb-8 flex justify-center">
             <img
               src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png"
-              alt="AlkaTera"
+              alt="alkatera"
               className="h-12 md:h-14 w-auto object-contain"
             />
           </div>
 
-          {/* Hero headline - matching /getaccess styling */}
+          {/* Hero headline */}
           {tier && (
-            <div className="flex justify-center mb-4">
-              <div className="inline-block px-4 py-1.5 border border-[#ccff00]/30 bg-[#ccff00]/5 rounded-full">
-                <span className="font-mono text-[#ccff00] text-[10px] tracking-widest uppercase">
-                  {tier} Plan Selected
-                </span>
-              </div>
-            </div>
+            <p className="font-mono font-bold text-[#F2F1EA]/80 text-[10px] tracking-[0.22em] uppercase text-center mb-4">
+              {tier} plan selected
+            </p>
           )}
-          <h1 className="font-serif text-4xl md:text-5xl text-white text-center mb-4">
+          <h1 className="font-display font-bold tracking-tight text-4xl md:text-5xl text-[#F2F1EA] text-center mb-4">
             {mode === "login"
               ? tier ? `Sign in to activate ${tier}.` : "Welcome back."
               : tier ? `Sign up to start ${tier}.` : "Create an account."}
@@ -65,11 +61,11 @@ export function AuthForm({ tier, returnUrl }: AuthFormProps) {
           <p className="text-white/50 text-center mb-8">
             {mode === "login"
               ? tier ? "Sign in and you'll be taken to complete your subscription." : "Enter your credentials to access the platform."
-              : tier ? "Create your account, then complete your subscription." : "Sign up to get started with AlkaTera."}
+              : tier ? "Create your account, then complete your subscription." : "Sign up to get started with alkatera."}
           </p>
 
-          {/* Glassmorphism Card - matching /getaccess styling */}
-          <div className="border border-white/10 bg-white/5 backdrop-blur-md rounded-2xl p-8">
+          {/* Dark glass panel over the photo */}
+          <div className="border border-white/10 bg-white/5 backdrop-blur-md rounded-[6px] p-8">
             {/* Auth Forms */}
             {mode === "login" ? (
               <LoginForm redirectTo={redirectTo} />
@@ -83,7 +79,7 @@ export function AuthForm({ tier, returnUrl }: AuthFormProps) {
                 <div className="flex justify-center">
                   <Link
                     href="/password-reset"
-                    className="text-xs font-mono text-white/40 hover:text-[#ccff00] transition-colors uppercase tracking-widest"
+                    className="text-xs font-mono text-white/40 hover:text-[#F2F1EA] transition-colors uppercase tracking-widest"
                   >
                     Forgot Password?
                   </Link>
@@ -101,7 +97,7 @@ export function AuthForm({ tier, returnUrl }: AuthFormProps) {
                   onClick={() =>
                     setMode(mode === "login" ? "signup" : "login")
                   }
-                  className="text-[#ccff00] font-mono text-xs uppercase tracking-widest hover:underline"
+                  className="text-[#F2F1EA] font-mono text-xs uppercase tracking-widest underline underline-offset-4 hover:text-white"
                 >
                   {mode === "login" ? "Sign up" : "Sign in"}
                 </button>

@@ -4,8 +4,9 @@ import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Leaf, MapPin, Trash2, Edit2, Sprout, AlertCircle, ArrowRight, GrapeIcon } from 'lucide-react';
+import { Leaf, MapPin, Trash2, Edit2, Sprout, ArrowRight, GrapeIcon } from 'lucide-react';
 import type { Vineyard } from '@/lib/types/viticulture';
+import { StateChip } from '@/components/studio/state-chip';
 
 interface VineyardCardProps {
   vineyard: Vineyard & { facilities?: { id: string; name: string } | null };
@@ -27,13 +28,13 @@ export function VineyardCard({ vineyard, hasGrowingProfile, vintageCount, onEdit
   const cert = CERTIFICATION_LABELS[vineyard.certification] || CERTIFICATION_LABELS.conventional;
 
   return (
-    <Card className="bg-card border-border hover:border-[#ccff00]/30 transition-colors">
+    <Card className="bg-card border-border hover:border-studio-cobalt transition-colors">
       <Link href={`/vineyards/${vineyard.id}`} className="block">
         <CardContent className="p-4">
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-3">
-              <div className="rounded-lg bg-[#ccff00]/10 p-2">
-                <Leaf className="h-5 w-5 text-[#ccff00]" />
+              <div className="rounded-lg bg-secondary p-2">
+                <Leaf className="h-5 w-5 text-studio-forest" />
               </div>
               <div>
                 <h3 className="font-semibold text-foreground">{vineyard.name}</h3>
@@ -62,16 +63,10 @@ export function VineyardCard({ vineyard, hasGrowingProfile, vintageCount, onEdit
                     </Badge>
                   )}
                   {hasGrowingProfile === true && (
-                    <Badge variant="outline" className="bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800">
-                      <Sprout className="h-3 w-3 mr-1" />
-                      Profile complete
-                    </Badge>
+                    <StateChip tone="good">Profile complete</StateChip>
                   )}
                   {hasGrowingProfile === false && (
-                    <Badge variant="outline" className="bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800">
-                      <AlertCircle className="h-3 w-3 mr-1" />
-                      Needs growing data
-                    </Badge>
+                    <StateChip tone="attention">Needs growing data</StateChip>
                   )}
                   {vineyard.grape_varieties && vineyard.grape_varieties.length > 0 && (
                     <span className="text-xs text-muted-foreground">

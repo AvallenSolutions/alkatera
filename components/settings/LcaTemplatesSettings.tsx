@@ -44,7 +44,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast as sonnerToast } from 'sonner';
-import { Loader2, Star, Pencil, Trash2, StarOff } from 'lucide-react';
+import { Star, Pencil, Trash2, StarOff } from 'lucide-react';
 import { format } from 'date-fns';
 import { useOrganization } from '@/lib/organizationContext';
 import { LcaTemplateEditorDialog } from './LcaTemplateEditorDialog';
@@ -167,7 +167,9 @@ export function LcaTemplatesSettings({
       <CardContent className={showHeader ? '' : 'pt-6'}>
         {isLoading ? (
           <div className="flex items-center justify-center h-48">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
+              Loading
+            </span>
           </div>
         ) : loadError ? (
           <div className="text-center py-10">
@@ -182,8 +184,8 @@ export function LcaTemplatesSettings({
             </Button>
           </div>
         ) : templates.length === 0 ? (
-          <div className="rounded-md border border-dashed p-8 text-center">
-            <p className="text-sm font-medium">No LCA templates yet</p>
+          <div className="rounded-[6px] border border-dashed p-8 text-center">
+            <p className="text-sm font-medium">No LCA templates yet.</p>
             <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
               Open the LCA wizard on any product, configure the Goal &amp;
               Scope step, and click &ldquo;Save as template&rdquo; to create
@@ -191,7 +193,7 @@ export function LcaTemplatesSettings({
             </p>
           </div>
         ) : (
-          <div className="rounded-lg border">
+          <div className="rounded-[6px] border border-border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -219,7 +221,7 @@ export function LcaTemplatesSettings({
                         <div className="flex items-center gap-2">
                           {isCurrentDefault && (
                             <Star
-                              className="h-4 w-4 fill-amber-500 text-amber-500 shrink-0"
+                              className="h-4 w-4 fill-current text-foreground shrink-0"
                               aria-label="Organisation default"
                             />
                           )}
@@ -228,12 +230,12 @@ export function LcaTemplatesSettings({
                       </TableCell>
                       <TableCell className="hidden md:table-cell max-w-xs">
                         <span className="text-sm text-muted-foreground line-clamp-2">
-                          {template.description || '—'}
+                          {template.description || '-'}
                         </span>
                       </TableCell>
                       <TableCell>
                         {isCurrentDefault ? (
-                          <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 dark:text-amber-400">
+                          <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-foreground">
                             <Star className="h-3 w-3 fill-current" />
                             Org default
                           </span>
@@ -244,18 +246,12 @@ export function LcaTemplatesSettings({
                             onClick={() => handleSetDefault(template)}
                             disabled={settingDefaultBusy}
                           >
-                            {settingDefaultBusy ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <>
-                                <StarOff className="h-3 w-3 mr-1" />
-                                Set default
-                              </>
-                            )}
+                            <StarOff className="h-3 w-3 mr-1" />
+                            {settingDefaultBusy ? 'Setting...' : 'Set default'}
                           </Button>
                         ) : (
                           <span className="text-xs text-muted-foreground">
-                            —
+                            -
                           </span>
                         )}
                       </TableCell>
@@ -279,7 +275,7 @@ export function LcaTemplatesSettings({
                               onClick={() => setTemplateToDelete(template)}
                               title="Delete template"
                             >
-                              <Trash2 className="h-4 w-4 text-red-500" />
+                              <Trash2 className="h-4 w-4 text-studio-stale" />
                             </Button>
                           )}
                         </div>
@@ -337,16 +333,9 @@ export function LcaTemplatesSettings({
             <AlertDialogAction
               onClick={handleDelete}
               disabled={isDeleting}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-studio-stale text-white hover:bg-studio-stale/90"
             >
-              {isDeleting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                'Delete template'
-              )}
+              {isDeleting ? 'Deleting...' : 'Delete template'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

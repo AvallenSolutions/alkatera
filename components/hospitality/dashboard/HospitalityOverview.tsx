@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { VitalityRing } from '@/components/vitality/VitalityRing';
+import { Eyebrow } from '@/components/studio/eyebrow';
 import { PillarCard, PillarGrid, PerformanceSummary } from '@/components/vitality/PillarCard';
 
 type Kind = 'hospitality_meal' | 'hospitality_drink' | 'hospitality_room_night';
@@ -111,7 +112,7 @@ function WeeklyTrend({ weekly }: { weekly: { label: string; value: number }[] })
             <div key={i} className="flex-1 flex items-end h-full" aria-hidden="true">
               <div
                 className={cn('w-full rounded-sm transition-colors', filled ? (i === lastNonZero ? 'opacity-100' : 'opacity-65') : 'opacity-15')}
-                style={{ height: `${heightPct}%`, backgroundColor: '#ccff00' }}
+                style={{ height: `${heightPct}%`, backgroundColor: '#2B46C0' }}
               />
             </div>
           );
@@ -169,9 +170,9 @@ export function HospitalityOverview() {
   if (loading && !data) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-64 rounded-2xl" />
+        <Skeleton className="h-64 rounded-[6px]" />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-32 rounded-xl" />)}
+          {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-32 rounded-[6px]" />)}
         </div>
       </div>
     );
@@ -189,10 +190,10 @@ export function HospitalityOverview() {
   return (
     <div className="space-y-6">
       {/* Vitality hero — identical structure to /performance EsgVitalityScoreHero */}
-      <div className="rounded-2xl border border-border bg-card p-6 sm:p-8">
+      <div className="rounded-[6px] border border-border bg-card p-6 sm:p-8">
         <div className="mb-4">
-          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Hospitality vitality</p>
-          <h1 className="mt-1 text-2xl sm:text-3xl font-semibold leading-tight">
+          <Eyebrow>Hospitality vitality</Eyebrow>
+          <h1 className="mt-2 font-display text-2xl sm:text-3xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
             {score.value > 0 ? `Your hospitality vitality is ${band}.` : 'Awaiting more data to call your score.'}
           </h1>
         </div>
@@ -220,7 +221,7 @@ export function HospitalityOverview() {
           <select
             value={year}
             onChange={(e) => setYear(parseInt(e.target.value))}
-            className="px-3 py-1.5 text-sm font-medium rounded-md border border-emerald-500 text-emerald-700 dark:text-emerald-400 bg-transparent hover:bg-emerald-50 dark:hover:bg-emerald-950/30 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="px-3 py-1.5 text-sm font-medium rounded-[6px] border border-border text-foreground bg-transparent hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-studio-cobalt"
           >
             {AVAILABLE_YEARS.map((y) => (
               <option key={y} value={y}>{y} Data</option>
@@ -313,7 +314,7 @@ function ClimateDeepDive({ byKind, total }: { byKind: KindBreakdown[]; total: nu
               <p className="flex-shrink-0 text-sm font-semibold tabular-nums">{fmtCo2(k.contribution)} CO₂e</p>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-              <div className="h-full rounded-full bg-emerald-500" style={{ width: `${share}%` }} />
+              <div className="h-full rounded-full bg-studio-cobalt" style={{ width: `${share}%` }} />
             </div>
           </div>
         );
@@ -341,7 +342,7 @@ function WasteDeepDive({ waste }: { waste: WasteSummary }) {
               <span className="tabular-nums">{fmtCo2(r.kg)} · {fmtCo2(r.co2e)} CO₂e</span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-              <div className="h-full rounded-full bg-amber-500" style={{ width: `${pct}%` }} />
+              <div className="h-full rounded-full bg-studio-dim" style={{ width: `${pct}%` }} />
             </div>
           </div>
         );

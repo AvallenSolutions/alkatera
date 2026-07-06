@@ -27,7 +27,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertTriangle, Loader2 } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import type { LcaReportTemplate } from '@/types/lca-templates';
 
 interface LcaTemplateEditorDialogProps {
@@ -64,13 +64,13 @@ const SETTING_LABELS: Record<string, string> = {
 };
 
 function formatSettingValue(value: unknown): string {
-  if (value === null || value === undefined) return '—';
+  if (value === null || value === undefined) return '-';
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
   if (typeof value === 'number' || typeof value === 'string') {
-    return String(value) || '—';
+    return String(value) || '-';
   }
   if (Array.isArray(value)) {
-    if (value.length === 0) return '—';
+    if (value.length === 0) return '-';
     return value.map((v) => (typeof v === 'string' ? v : JSON.stringify(v))).join(', ');
   }
   // Object — pretty JSON for dataQuality, lifecycle configs etc.
@@ -253,14 +253,7 @@ export function LcaTemplateEditorDialog({
           </Button>
           {canEdit && (
             <Button type="button" onClick={handleSave} disabled={!canSave}>
-              {saving ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                'Save changes'
-              )}
+              {saving ? 'Saving...' : 'Save changes'}
             </Button>
           )}
         </DialogFooter>

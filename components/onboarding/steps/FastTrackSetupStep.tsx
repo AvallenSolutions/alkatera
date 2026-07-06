@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { ArrowRight, Building2, Globe, Upload, Loader2, Image as ImageIcon, X } from 'lucide-react'
+import { ArrowRight, Building2, Globe, Upload, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { CountrySelect } from '@/components/shared/CountrySelect'
@@ -244,30 +244,29 @@ export function FastTrackSetupStep() {
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 py-6 animate-in fade-in duration-300">
       <div className="w-full max-w-md space-y-5">
 
-        <RosaIntro message="Tell me about your company. If you give me a website, I'll go and read it while you finish — saves you typing." />
+        <RosaIntro message="Tell me about your company. If you give me a website, I'll go and read it while you finish, which saves you typing." />
 
         <div className="text-center space-y-2">
-          <div className="mx-auto w-16 h-16 bg-[#ccff00]/20 backdrop-blur-md border border-[#ccff00]/30 rounded-2xl flex items-center justify-center">
-            <Building2 className="w-8 h-8 text-[#ccff00]" />
+          <div className="mx-auto w-16 h-16 bg-card border border-border rounded-[6px] flex items-center justify-center">
+            <Building2 className="w-8 h-8 text-studio-forest" />
           </div>
-          <h3 className="text-xl font-serif font-bold text-white">Your company</h3>
-          <p className="text-sm text-white/50">This goes straight into your account profile.</p>
+          <h3 className="text-xl font-display font-bold tracking-tight text-foreground">Your company.</h3>
+          <p className="text-sm text-muted-foreground">This goes straight into your account profile.</p>
         </div>
 
         {/* Company name */}
         <div className="space-y-2">
-          <Label className="text-sm font-medium text-white/70">Company name <span className="text-white/30">(required)</span></Label>
+          <Label className="text-sm font-medium text-foreground">Company name <span className="text-studio-dim">(required)</span></Label>
           <Input
             placeholder='e.g., "Oxford Artisan Distillery"'
             value={companyName}
             onChange={e => setCompanyName(e.target.value)}
-            className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
           />
         </div>
 
         {/* Logo */}
         <div className="space-y-2">
-          <Label className="text-sm font-medium text-white/70">Logo</Label>
+          <Label className="text-sm font-medium text-foreground">Logo</Label>
           <input
             ref={fileInputRef}
             type="file"
@@ -277,18 +276,18 @@ export function FastTrackSetupStep() {
             disabled={uploadingLogo}
           />
           {logoUrl ? (
-            <div className="flex items-center gap-3 p-3 bg-white/5 border border-white/10 rounded-xl">
+            <div className="flex items-center gap-3 p-3 bg-card border border-border rounded-[6px]">
               <img
                 src={logoUrl}
                 alt="Company logo"
-                className="h-12 w-12 rounded-lg object-contain bg-white/10 p-1"
+                className="h-12 w-12 rounded-[6px] object-contain bg-secondary p-1"
               />
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-white/60 truncate">Logo uploaded</p>
+                <p className="text-xs text-muted-foreground truncate">Logo uploaded</p>
               </div>
               <button
                 onClick={() => { setLogoUrl(null); if (fileInputRef.current) fileInputRef.current.value = '' }}
-                className="text-white/30 hover:text-white/60 transition-colors"
+                className="text-studio-dim hover:text-foreground transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -297,16 +296,12 @@ export function FastTrackSetupStep() {
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingLogo}
-              className="w-full flex items-center gap-3 p-4 bg-white/5 border border-dashed border-white/15 hover:bg-white/8 hover:border-white/25 rounded-xl transition-all text-left"
+              className="w-full flex items-center gap-3 p-4 bg-card border border-dashed border-border hover:bg-secondary hover:border-studio-ink/25 rounded-[6px] transition-colors text-left"
             >
-              {uploadingLogo ? (
-                <Loader2 className="w-5 h-5 text-white/40 animate-spin shrink-0" />
-              ) : (
-                <Upload className="w-5 h-5 text-white/40 shrink-0" />
-              )}
+              <Upload className="w-5 h-5 text-studio-dim shrink-0" />
               <div>
-                <p className="text-sm text-white/60">{uploadingLogo ? 'Uploading...' : 'Upload your logo'}</p>
-                <p className="text-xs text-white/30">PNG, JPG or SVG, max 10MB</p>
+                <p className="text-sm text-muted-foreground">{uploadingLogo ? 'Uploading...' : 'Upload your logo'}</p>
+                <p className="text-xs text-studio-dim">PNG, JPG or SVG, max 10MB</p>
               </div>
             </button>
           )}
@@ -314,80 +309,78 @@ export function FastTrackSetupStep() {
 
         {/* Website */}
         <div className="space-y-2">
-          <Label className="text-sm font-medium text-white/70">Website</Label>
+          <Label className="text-sm font-medium text-foreground">Website</Label>
           <div className="relative">
-            <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+            <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-studio-dim" />
             <Input
               placeholder="www.yourcompany.com"
               value={websiteUrl}
               onChange={e => setWebsiteUrl(e.target.value)}
               aria-invalid={!!websiteUrlError}
               className={cn(
-                'bg-white/5 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50 pl-9',
-                websiteUrlError ? 'border-red-400/60' : 'border-white/10',
+                'pl-9',
+                websiteUrlError && 'border-studio-stale/60',
               )}
             />
           </div>
           {websiteUrlError ? (
-            <p className="text-xs text-red-300">{websiteUrlError}</p>
+            <p className="text-xs text-studio-stale">{websiteUrlError}</p>
           ) : (
-            <p className="text-xs text-white/30">We'll scan this to import your products automatically in the next step.</p>
+            <p className="text-xs text-studio-dim">We'll scan this to import your products automatically in the next step.</p>
           )}
         </div>
 
         {/* Description */}
         <div className="space-y-2">
-          <Label className="text-sm font-medium text-white/70">About your company</Label>
+          <Label className="text-sm font-medium text-foreground">About your company</Label>
           <Textarea
             placeholder="A few words about what you make and your sustainability ambitions..."
             value={description}
             onChange={e => { setDescription(e.target.value); autofilledFromSite.delete('description') }}
             rows={2}
-            className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50 resize-none"
+            className="resize-none"
           />
           {autofilledFromSite.has('description') && (
-            <p className="text-xs text-[#ccff00]/70">Pulled from your website — edit if needed.</p>
+            <p className="text-xs text-studio-forest">Pulled from your website, edit if needed.</p>
           )}
         </div>
 
         {/* Country + Year */}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
-            <Label className="text-sm font-medium text-white/70">Country</Label>
+            <Label className="text-sm font-medium text-foreground">Country</Label>
             <CountrySelect
-              dark
               value={countryCode}
               onChange={setCountryCode}
               placeholder="Select country"
             />
           </div>
           <div className="space-y-2">
-            <Label className="text-sm font-medium text-white/70">Year founded</Label>
+            <Label className="text-sm font-medium text-foreground">Year founded</Label>
             <Input
               placeholder="e.g., 2018"
               value={foundingYear}
               onChange={e => { setFoundingYear(e.target.value.replace(/\D/g, '').slice(0, 4)); autofilledFromSite.delete('foundingYear') }}
-              className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
             />
             {autofilledFromSite.has('foundingYear') && (
-              <p className="text-xs text-[#ccff00]/70">From your website</p>
+              <p className="text-xs text-studio-forest">From your website</p>
             )}
           </div>
         </div>
 
         {/* Drink type — maps to organizations.product_type */}
         <div className="space-y-2">
-          <Label className="text-sm font-medium text-white/70">What do you make? <span className="text-white/30">(required)</span></Label>
+          <Label className="text-sm font-medium text-foreground">What do you make? <span className="text-studio-dim">(required)</span></Label>
           <div className="grid grid-cols-3 gap-2">
             {BEVERAGE_OPTIONS.map(opt => (
               <button
                 key={opt.value}
                 onClick={() => setBeverageType(opt.value)}
                 className={cn(
-                  'flex flex-col items-center gap-1 p-3 rounded-xl border text-xs font-medium transition-all',
+                  'flex flex-col items-center gap-1 p-3 rounded-[6px] border text-xs font-medium transition-colors',
                   beverageType === opt.value
-                    ? 'bg-[#ccff00]/15 border-[#ccff00]/50 text-[#ccff00]'
-                    : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10 hover:border-white/20'
+                    ? 'bg-secondary border-studio-forest text-studio-forest'
+                    : 'bg-card border-border text-muted-foreground hover:bg-secondary hover:border-studio-ink/25'
                 )}
               >
                 <span className="text-xl">{opt.icon}</span>
@@ -399,17 +392,17 @@ export function FastTrackSetupStep() {
 
         {/* Team size — maps to organizations.company_size */}
         <div className="space-y-2">
-          <Label className="text-sm font-medium text-white/70">Team size <span className="text-white/30">(required)</span></Label>
+          <Label className="text-sm font-medium text-foreground">Team size <span className="text-studio-dim">(required)</span></Label>
           <div className="grid grid-cols-4 gap-2">
             {TEAM_SIZE_OPTIONS.map(opt => (
               <button
                 key={opt.value}
                 onClick={() => setTeamSize(opt.value)}
                 className={cn(
-                  'py-2 px-3 rounded-xl border text-xs font-semibold transition-all',
+                  'py-2 px-3 rounded-[6px] border text-xs font-semibold transition-colors',
                   teamSize === opt.value
-                    ? 'bg-[#ccff00]/15 border-[#ccff00]/50 text-[#ccff00]'
-                    : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10 hover:border-white/20'
+                    ? 'bg-secondary border-studio-forest text-studio-forest'
+                    : 'bg-card border-border text-muted-foreground hover:bg-secondary hover:border-studio-ink/25'
                 )}
               >
                 {opt.label}
@@ -421,10 +414,10 @@ export function FastTrackSetupStep() {
         <Button
           onClick={handleContinue}
           disabled={!isValid || isSaving}
-          className="w-full bg-[#ccff00] text-black hover:bg-[#ccff00]/90 font-medium rounded-xl"
+          className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full"
         >
           {isSaving ? (
-            <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</>
+            <>Saving...</>
           ) : (
             <>Continue <ArrowRight className="w-4 h-4 ml-2" /></>
           )}

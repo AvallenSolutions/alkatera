@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface Props {
@@ -43,13 +43,13 @@ export function BrandDiscoveryOptOutToggle({ brandId, brandName, initialOptOut }
   }
 
   return (
-    <div className="rounded-xl border border-border/60 bg-card/40 px-5 py-4 flex items-center justify-between gap-4">
+    <div className="rounded-[6px] border border-border bg-card px-5 py-4 flex items-center justify-between gap-4">
       <div className="min-w-0">
         <div className="text-sm font-semibold flex items-center gap-2">
           {optOut ? (
-            <EyeOff className="h-4 w-4 text-amber-300" />
+            <EyeOff className="h-4 w-4 text-studio-attention" />
           ) : (
-            <Eye className="h-4 w-4 text-emerald-300" />
+            <Eye className="h-4 w-4 text-studio-good" />
           )}
           Discovery visibility
         </div>
@@ -58,7 +58,7 @@ export function BrandDiscoveryOptOutToggle({ brandId, brandName, initialOptOut }
             ? `${brandName} is hidden from the distributor Discover search. Existing distributor listings still see this brand normally.`
             : `${brandName} is discoverable to every distributor in the network.`}
         </div>
-        {error && <div className="text-[11px] text-destructive mt-1">{error}</div>}
+        {error && <div className="text-[11px] text-studio-stale mt-1">{error}</div>}
       </div>
       <Button
         variant={optOut ? 'default' : 'outline'}
@@ -66,8 +66,7 @@ export function BrandDiscoveryOptOutToggle({ brandId, brandName, initialOptOut }
         onClick={toggle}
         disabled={busy}
       >
-        {busy && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
-        {optOut ? 'Make discoverable' : 'Hide from Discover'}
+        {busy ? 'Working…' : optOut ? 'Make discoverable' : 'Hide from Discover'}
       </Button>
     </div>
   );

@@ -6,7 +6,6 @@ import { motion } from 'framer-motion';
 import { supabase } from '@/lib/supabaseClient';
 import Image from 'next/image';
 import {
-  Loader2,
   CheckCircle2,
   AlertCircle,
   Eye,
@@ -214,12 +213,12 @@ export default function SupplierRegisterPage() {
             <div className="mb-8 flex justify-center">
               <img src={logoUrl} alt="alkatera" className="h-12 md:h-14 w-auto object-contain" />
             </div>
-            <div className="border border-[#ccff00]/30 bg-[#ccff00]/5 backdrop-blur-xl rounded-2xl p-8 text-center">
-              <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}>
-                <CheckCircle2 className="h-16 w-16 text-[#ccff00] mx-auto mb-4" />
+            <div className="border border-white/20 bg-white/5 backdrop-blur-xl rounded-[6px] p-8 text-center">
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2, duration: 0.4 }}>
+                <CheckCircle2 className="h-16 w-16 text-[#F2F1EA] mx-auto mb-4" />
               </motion.div>
-              <h2 className="font-serif text-2xl text-white mb-2">Welcome aboard!</h2>
-              <p className="text-white/60 text-sm">You&apos;ve successfully registered as a supplier. Redirecting to your portal...</p>
+              <h2 className="font-display font-bold tracking-tight text-2xl text-[#F2F1EA] mb-2">Welcome aboard.</h2>
+              <p className="text-white/60 text-sm">You&apos;ve registered as a supplier. Taking you to your portal...</p>
             </div>
           </motion.div>
         </div>
@@ -246,10 +245,10 @@ export default function SupplierRegisterPage() {
           </div>
 
           {/* Main card */}
-          <div className="border border-white/10 bg-white/5 backdrop-blur-xl rounded-2xl p-8 space-y-6">
+          <div className="border border-white/10 bg-white/5 backdrop-blur-xl rounded-[6px] p-8 space-y-6">
             {/* Header */}
             <div className="text-center space-y-2">
-              <h1 className="font-serif text-3xl text-white">Supplier Registration</h1>
+              <h1 className="font-display font-bold tracking-tight text-3xl text-[#F2F1EA]">Register as a supplier.</h1>
               <p className="text-white/60 text-sm">
                 Join alkatera&apos;s supplier network and share your sustainability data with your customers
               </p>
@@ -257,26 +256,26 @@ export default function SupplierRegisterPage() {
 
             {/* Benefits */}
             <div className="grid grid-cols-3 gap-3">
-              <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
-                <Package className="h-5 w-5 text-[#ccff00] mx-auto mb-1.5" />
+              <div className="p-3 rounded-[6px] bg-white/5 border border-white/10 text-center">
+                <Package className="h-5 w-5 text-[#F2F1EA] mx-auto mb-1.5" />
                 <p className="text-[10px] text-white/50 leading-tight">Manage your product data</p>
               </div>
-              <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
-                <BarChart3 className="h-5 w-5 text-[#ccff00] mx-auto mb-1.5" />
+              <div className="p-3 rounded-[6px] bg-white/5 border border-white/10 text-center">
+                <BarChart3 className="h-5 w-5 text-[#F2F1EA] mx-auto mb-1.5" />
                 <p className="text-[10px] text-white/50 leading-tight">Share verified impact data</p>
               </div>
-              <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
-                <Shield className="h-5 w-5 text-[#ccff00] mx-auto mb-1.5" />
+              <div className="p-3 rounded-[6px] bg-white/5 border border-white/10 text-center">
+                <Shield className="h-5 w-5 text-[#F2F1EA] mx-auto mb-1.5" />
                 <p className="text-[10px] text-white/50 leading-tight">Secure & confidential</p>
               </div>
             </div>
 
             {/* Free for suppliers */}
-            <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+            <div className="p-4 rounded-[6px] bg-white/5 border border-white/10">
               <div className="flex items-start gap-2">
-                <Leaf className="h-4 w-4 text-[#ccff00] flex-shrink-0 mt-0.5" />
+                <Leaf className="h-4 w-4 text-[#F2F1EA] flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-xs text-[#ccff00] uppercase tracking-wider font-bold mb-1">Free for suppliers</p>
+                  <p className="font-mono text-xs text-[#F2F1EA]/80 uppercase tracking-[0.22em] font-bold mb-1">Free for suppliers</p>
                   <p className="text-xs text-white/50 leading-relaxed">
                     alkatera gives you a streamlined portal to manage your sustainability data and share verified product information with your customers. No hidden costs, no commitment.
                   </p>
@@ -286,7 +285,7 @@ export default function SupplierRegisterPage() {
 
             {/* Error display */}
             {error && (
-              <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+              <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-[6px]">
                 <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-red-300">{error}</p>
               </div>
@@ -306,7 +305,7 @@ export default function SupplierRegisterPage() {
                     value={signInEmail}
                     onChange={(e) => setSignInEmail(e.target.value)}
                     placeholder="Email address"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-[#ccff00]/50 focus:ring-1 focus:ring-[#ccff00]/20 text-sm"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-[6px] text-white placeholder:text-white/30 focus:outline-none focus:border-[#F2F1EA]/40 focus:ring-1 focus:ring-[#F2F1EA]/20 text-sm"
                     required
                   />
                 </div>
@@ -317,7 +316,7 @@ export default function SupplierRegisterPage() {
                     value={signInPassword}
                     onChange={(e) => setSignInPassword(e.target.value)}
                     placeholder="Password"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-[#ccff00]/50 focus:ring-1 focus:ring-[#ccff00]/20 text-sm pr-10"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-[6px] text-white placeholder:text-white/30 focus:outline-none focus:border-[#F2F1EA]/40 focus:ring-1 focus:ring-[#F2F1EA]/20 text-sm pr-10"
                     required
                   />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/60">
@@ -328,9 +327,9 @@ export default function SupplierRegisterPage() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full py-4 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:bg-[#b8e600] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full py-4 bg-[#F2F1EA] text-[#1A1B1D] font-mono uppercase text-xs tracking-[0.22em] font-bold rounded-full hover:bg-white transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Sign In <ArrowRight className="h-4 w-4" /></>}
+                  {isSubmitting ? 'Signing in...' : <>Sign in <ArrowRight className="h-4 w-4" /></>}
                 </button>
 
                 <button type="button" onClick={() => { setShowSignIn(false); setError(null); }} className="w-full text-center text-xs text-white/40 hover:text-white/60">
@@ -350,7 +349,7 @@ export default function SupplierRegisterPage() {
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
                     placeholder="Company name"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-[#ccff00]/50 focus:ring-1 focus:ring-[#ccff00]/20 text-sm"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-[6px] text-white placeholder:text-white/30 focus:outline-none focus:border-[#F2F1EA]/40 focus:ring-1 focus:ring-[#F2F1EA]/20 text-sm"
                     required
                   />
                 </div>
@@ -361,7 +360,7 @@ export default function SupplierRegisterPage() {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Your full name"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-[#ccff00]/50 focus:ring-1 focus:ring-[#ccff00]/20 text-sm"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-[6px] text-white placeholder:text-white/30 focus:outline-none focus:border-[#F2F1EA]/40 focus:ring-1 focus:ring-[#F2F1EA]/20 text-sm"
                     required
                   />
                 </div>
@@ -372,7 +371,7 @@ export default function SupplierRegisterPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Email address"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-[#ccff00]/50 focus:ring-1 focus:ring-[#ccff00]/20 text-sm"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-[6px] text-white placeholder:text-white/30 focus:outline-none focus:border-[#F2F1EA]/40 focus:ring-1 focus:ring-[#F2F1EA]/20 text-sm"
                     required
                   />
                 </div>
@@ -383,7 +382,7 @@ export default function SupplierRegisterPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Password (min 8 characters)"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-[#ccff00]/50 focus:ring-1 focus:ring-[#ccff00]/20 text-sm pr-10"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-[6px] text-white placeholder:text-white/30 focus:outline-none focus:border-[#F2F1EA]/40 focus:ring-1 focus:ring-[#F2F1EA]/20 text-sm pr-10"
                     required
                   />
                   <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/60">
@@ -397,7 +396,7 @@ export default function SupplierRegisterPage() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Confirm password"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-[#ccff00]/50 focus:ring-1 focus:ring-[#ccff00]/20 text-sm pr-10"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-[6px] text-white placeholder:text-white/30 focus:outline-none focus:border-[#F2F1EA]/40 focus:ring-1 focus:ring-[#F2F1EA]/20 text-sm pr-10"
                     required
                   />
                   <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/60">
@@ -408,13 +407,13 @@ export default function SupplierRegisterPage() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full py-4 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:bg-[#b8e600] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full py-4 bg-[#F2F1EA] text-[#1A1B1D] font-mono uppercase text-xs tracking-[0.22em] font-bold rounded-full hover:bg-white transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Create Account <ArrowRight className="h-4 w-4" /></>}
+                  {isSubmitting ? 'Creating account...' : <>Create account <ArrowRight className="h-4 w-4" /></>}
                 </button>
 
                 <button type="button" onClick={() => { setShowSignIn(true); setError(null); }} className="w-full text-center text-xs text-white/40 hover:text-white/60">
-                  Already have an account? <span className="text-[#ccff00]/60 underline">Sign in</span>
+                  Already have an account? <span className="text-[#F2F1EA]/80 underline underline-offset-4">Sign in</span>
                 </button>
               </form>
             )}

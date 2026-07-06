@@ -9,10 +9,11 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Plus, Pause, ArrowDown, ArrowUp, Minus, ExternalLink } from 'lucide-react'
+import { Plus, ArrowDown, ArrowUp, Minus, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Badge } from '@/components/ui/badge'
+import { StateChip } from '@/components/studio/state-chip'
+import type { WorkingTone } from '@/components/studio/theme'
 import {
   BYPRODUCT_DESTINATION_TYPES,
   getDestinationMeta,
@@ -38,10 +39,10 @@ export interface Byproduct {
   prior_flow_kg?: number | null
 }
 
-const STATUS_COPY: Record<Byproduct['status'], { label: string; tone: string }> = {
-  active: { label: 'Active', tone: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' },
-  paused: { label: 'Paused', tone: 'bg-amber-500/10 text-amber-300 border-amber-500/30' },
-  ended: { label: 'Historical', tone: 'bg-muted text-muted-foreground' },
+const STATUS_COPY: Record<Byproduct['status'], { label: string; tone: WorkingTone }> = {
+  active: { label: 'Active', tone: 'good' },
+  paused: { label: 'Paused', tone: 'attention' },
+  ended: { label: 'Historical', tone: 'quiet' },
 }
 
 export function ByproductsGallery() {
@@ -120,15 +121,15 @@ export function ByproductsGallery() {
       {byproducts === null && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-44 w-full rounded-xl" />
+            <Skeleton key={i} className="h-44 w-full rounded-[6px]" />
           ))}
         </div>
       )}
 
       {empty && (
-        <div className="rounded-xl border border-dashed border-border bg-card/50 p-10 text-center">
+        <div className="rounded-[6px] border border-dashed border-border bg-card p-10 text-center">
           <p className="text-sm text-muted-foreground">
-            No byproducts logged yet. Register a circular destination — animal feed, biogas, recaptured CO₂ — and the platform will track it as part of your circularity score.
+            No byproducts logged yet. Register a circular destination (animal feed, biogas, recaptured CO₂) and the platform will track it as part of your circularity score.
           </p>
           <Button className="mt-4" size="sm" onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4 mr-1.5" />
@@ -180,7 +181,7 @@ function ByproductCard({ byproduct, onClick }: { byproduct: Byproduct; onClick: 
     <button
       type="button"
       onClick={onClick}
-      className="text-left rounded-xl border border-border bg-card p-4 hover:bg-card/80 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ccff00]"
+      className="text-left rounded-[6px] border border-border bg-card p-4 hover:bg-secondary transition focus:outline-none focus-visible:ring-2 focus-visible:ring-studio-cobalt"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
@@ -190,10 +191,7 @@ function ByproductCard({ byproduct, onClick }: { byproduct: Byproduct; onClick: 
             <p className="text-xs text-muted-foreground truncate">{meta?.label ?? byproduct.destination_type}</p>
           </div>
         </div>
-        <Badge variant="outline" className={`text-[10px] h-5 ${statusCopy.tone}`}>
-          {byproduct.status === 'paused' && <Pause className="h-3 w-3 mr-1" />}
-          {statusCopy.label}
-        </Badge>
+        <StateChip tone={statusCopy.tone}>{statusCopy.label}</StateChip>
       </div>
 
       <div className="mt-3 space-y-1.5 text-xs">
@@ -243,8 +241,8 @@ function ByproductCard({ byproduct, onClick }: { byproduct: Byproduct; onClick: 
 }
 
 function TrendIcon({ delta }: { delta: number }) {
-  if (delta > 1) return <ArrowUp className="h-3 w-3 text-emerald-300" aria-label={`+${delta.toFixed(0)}%`} />
-  if (delta < -1) return <ArrowDown className="h-3 w-3 text-amber-300" aria-label={`${delta.toFixed(0)}%`} />
+  if (delta > 1) return <ArrowUp className="h-3 w-3 text-studio-good" aria-label={`+${delta.toFixed(0)}%`} />
+  if (delta < -1) return <ArrowDown className="h-3 w-3 text-studio-attention" aria-label={`${delta.toFixed(0)}%`} />
   return <Minus className="h-3 w-3 text-muted-foreground" aria-label="flat" />
 }
 

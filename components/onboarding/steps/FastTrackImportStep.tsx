@@ -188,7 +188,7 @@ export function FastTrackImportStep() {
           // Don't mark the tile complete yet — open the data-import picker
           // first so the user explicitly chooses what to bring across. The
           // tile flips on import success (or skip) inside the dialog.
-          toast.success('Breww connected — choose what to import')
+          toast.success('Breww connected: choose what to import')
           setShowBrewwImport(true)
         } else {
           persistCompleted(slug)
@@ -264,12 +264,12 @@ export function FastTrackImportStep() {
         <div className="w-full max-w-2xl space-y-6">
           <RosaIntro message="Anything you've already got in a system, I can read in the background. The more you bring in, the less you'll have to type." />
           <div className="text-center space-y-2">
-            <div className="inline-flex items-center gap-1.5 text-xs text-[#ccff00] bg-[#ccff00]/10 border border-[#ccff00]/30 rounded-full px-2.5 py-0.5">
+            <div className="inline-flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-forest">
               <Sparkles className="w-3 h-3" />
               <span>Recommended</span>
             </div>
-            <h3 className="text-2xl font-serif font-bold text-white">Bring your data with you</h3>
-            <p className="text-sm text-white/50 max-w-md mx-auto">
+            <h3 className="text-2xl font-display font-bold tracking-tight text-foreground">Bring your data with you.</h3>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
               Connect a system or upload what you have. Rosa will read it in the background while you finish setting up.
             </p>
           </div>
@@ -293,13 +293,13 @@ export function FastTrackImportStep() {
                     }
                   }}
                   className={cn(
-                    'group relative flex flex-col gap-3 p-4 rounded-2xl border text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ccff00]/60',
+                    'group relative flex flex-col gap-3 p-4 rounded-[6px] border text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                     handler.recommended
-                      ? 'bg-[#ccff00]/8 border-[#ccff00]/40'
-                      : 'bg-white/5 border-white/10',
+                      ? 'bg-card border-studio-forest/40'
+                      : 'bg-card border-border',
                     !isCompleted && !isWorking && (handler.recommended
-                      ? 'hover:bg-[#ccff00]/12 hover:border-[#ccff00]/60 cursor-pointer'
-                      : 'hover:bg-white/10 hover:border-white/20 cursor-pointer'),
+                      ? 'hover:bg-secondary hover:border-studio-forest cursor-pointer'
+                      : 'hover:bg-secondary hover:border-studio-ink/25 cursor-pointer'),
                     isCompleted && 'opacity-90',
                     isWorking && 'opacity-50 cursor-wait',
                   )}
@@ -314,37 +314,32 @@ export function FastTrackImportStep() {
                         void handleReset(handler.slug)
                       }}
                       aria-label={`Disconnect ${handler.label}`}
-                      className="absolute top-2 right-2 p-1 rounded-md text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+                      className="absolute top-2 right-2 p-1 rounded-[6px] text-studio-dim hover:text-foreground hover:bg-secondary transition-colors"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
                   )}
 
                   <div className="flex items-start justify-between gap-2">
-                    <div
-                      className={cn(
-                        'h-10 w-10 rounded-xl flex items-center justify-center shrink-0',
-                        handler.recommended ? 'bg-[#ccff00]/20' : 'bg-white/10',
-                      )}
-                    >
+                    <div className="h-10 w-10 rounded-[6px] bg-secondary flex items-center justify-center shrink-0">
                       <Icon
                         className={cn(
                           'w-5 h-5',
-                          handler.recommended ? 'text-[#ccff00]' : 'text-white/80',
+                          handler.recommended ? 'text-studio-forest' : 'text-muted-foreground',
                         )}
                       />
                     </div>
                     {isCompleted ? (
-                      <CheckCircle2 className="w-4 h-4 text-[#ccff00] mt-1 mr-6" />
+                      <CheckCircle2 className="w-4 h-4 text-studio-good mt-1 mr-6" />
                     ) : (
-                      <ArrowRight className="w-4 h-4 text-white/30 group-hover:text-white/60 transition-colors mt-1" />
+                      <ArrowRight className="w-4 h-4 text-studio-dim group-hover:text-foreground transition-colors mt-1" />
                     )}
                   </div>
                   <div className="space-y-1">
-                    <p className="font-medium text-sm text-white">
+                    <p className="font-medium text-sm text-foreground">
                       {isUrlImportWithSite ? `Import from ${websiteUrl.replace(/^https?:\/\//, '')}` : handler.label}
                     </p>
-                    <p className="text-xs text-white/50 leading-relaxed line-clamp-3">
+                    <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
                       {handler.description}
                     </p>
                   </div>
@@ -356,19 +351,19 @@ export function FastTrackImportStep() {
           <div className="flex flex-col sm:flex-row gap-2 pt-2">
             <button
               onClick={skipStep}
-              className="flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border border-white/10 bg-white/3 hover:bg-white/5 transition-colors"
+              className="flex-1 flex items-center justify-center gap-2 p-3 rounded-full border border-border bg-transparent hover:bg-secondary transition-colors"
             >
-              <SkipForward className="w-4 h-4 text-white/40" />
-              <span className="text-sm text-white/60">Skip for now</span>
+              <SkipForward className="w-4 h-4 text-studio-dim" />
+              <span className="text-sm text-muted-foreground">Skip for now</span>
             </button>
             <button
               onClick={completeStep}
               disabled={!hasCompletedAny}
               className={cn(
-                'flex-1 flex items-center justify-center gap-2 p-3 rounded-xl font-medium text-sm transition-all',
+                'flex-1 flex items-center justify-center gap-2 p-3 rounded-full font-medium text-sm transition-colors',
                 hasCompletedAny
-                  ? 'bg-[#ccff00] text-black hover:bg-[#ccff00]/90'
-                  : 'bg-white/5 text-white/30 cursor-not-allowed',
+                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                  : 'bg-secondary text-muted-foreground cursor-not-allowed',
               )}
             >
               <span>Continue</span>
@@ -376,7 +371,7 @@ export function FastTrackImportStep() {
             </button>
           </div>
 
-          <p className="text-xs text-center text-white/30">
+          <p className="text-xs text-center text-studio-dim">
             You can connect more systems later from Settings.
           </p>
         </div>
@@ -389,7 +384,6 @@ export function FastTrackImportStep() {
             onClose={() => setOpenModal(null)}
             organizationId={currentOrganization.id}
             onSuccess={() => markCompleted('website-url')}
-            darkMode
             initialUrl={websiteUrl ?? undefined}
           />
           <OnboardingUploadDialog

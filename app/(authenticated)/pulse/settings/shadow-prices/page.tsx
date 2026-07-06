@@ -134,7 +134,7 @@ export default function ShadowPricesPage() {
             </Link>
           </Button>
           <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-            <PoundSterling className="h-6 w-6 text-[#ccff00]" />
+            <PoundSterling className="h-6 w-6 text-[#2B46C0]" />
             Shadow prices
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
@@ -148,7 +148,7 @@ export default function ShadowPricesPage() {
 
       {loading || !data ? (
         <div className="flex h-40 items-center justify-center">
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          <Loader2 className="h-5 w-5 text-muted-foreground" />
         </div>
       ) : (
         <div className="space-y-4">
@@ -235,11 +235,11 @@ function PriceRow({
             </p>
             <p className="mt-2 text-[11px] text-muted-foreground">
               {isOverridden ? (
-                <span className="inline-flex items-center rounded-full border border-[#ccff00]/40 bg-[#ccff00]/10 px-2 py-0.5 text-[#ccff00]">
+                <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#2B46C0]">
                   Org override
                 </span>
               ) : (
-                <span className="inline-flex items-center rounded-full border border-border/60 px-2 py-0.5 text-muted-foreground/80">
+                <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/80">
                   Using global default
                 </span>
               )}
@@ -304,7 +304,7 @@ function PriceRow({
             disabled={!canEdit || saving || !dirty || !Number.isFinite(numericPrice)}
           >
             {saving ? (
-              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              <Loader2 className="mr-1.5 h-3.5 w-3.5" />
             ) : (
               <Save className="mr-1.5 h-3.5 w-3.5" />
             )}

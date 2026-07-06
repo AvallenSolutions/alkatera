@@ -22,7 +22,7 @@
  */
 
 import { useState } from 'react';
-import { Loader2, RefreshCw, CheckCircle2, AlertTriangle, SkipForward } from 'lucide-react';
+import { RefreshCw, CheckCircle2, AlertTriangle, SkipForward } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { useOrganization } from '@/lib/organizationContext';
@@ -118,7 +118,7 @@ export function RecalculateOrgLcasButton() {
       try {
         const outcome = await recalculateProductLca(sb, product, orgId);
         if (outcome === 'skipped') {
-          results.push({ name, status: 'skipped', detail: 'no recoverable facility allocations — re-run via the wizard' });
+          results.push({ name, status: 'skipped', detail: 'no recoverable facility allocations, re-run via the wizard' });
         } else {
           results.push({ name, status: 'done' });
         }
@@ -140,7 +140,7 @@ export function RecalculateOrgLcasButton() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <Button onClick={run} disabled={busy} variant="outline" size="sm">
-          {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+          {!busy && <RefreshCw className="mr-2 h-4 w-4" />}
           {busy ? 'Recalculating…' : 'Recalculate all LCAs in this org'}
         </Button>
         {currentOrganization?.name && (
@@ -150,12 +150,12 @@ export function RecalculateOrgLcasButton() {
 
       {busy && progress && (
         <p className="text-xs text-muted-foreground">
-          {progress.done}/{progress.total} — recalculating <span className="font-medium">{progress.current}</span>…
+          {progress.done}/{progress.total}: recalculating <span className="font-medium">{progress.current}</span>…
         </p>
       )}
 
       {error && (
-        <p className="flex items-center gap-1.5 text-xs text-destructive">
+        <p className="flex items-center gap-1.5 text-xs text-studio-stale">
           <AlertTriangle className="h-3.5 w-3.5" /> {error}
         </p>
       )}
@@ -163,16 +163,16 @@ export function RecalculateOrgLcasButton() {
       {outcomes && (
         <div className="space-y-2 text-xs">
           <p className="flex flex-wrap items-center gap-3">
-            <span className="flex items-center gap-1 text-green-600"><CheckCircle2 className="h-3.5 w-3.5" /> {doneCount} recalculated</span>
-            {skipCount > 0 && <span className="flex items-center gap-1 text-amber-600"><SkipForward className="h-3.5 w-3.5" /> {skipCount} skipped</span>}
-            {errCount > 0 && <span className="flex items-center gap-1 text-destructive"><AlertTriangle className="h-3.5 w-3.5" /> {errCount} failed</span>}
+            <span className="flex items-center gap-1 text-studio-good"><CheckCircle2 className="h-3.5 w-3.5" /> {doneCount} recalculated</span>
+            {skipCount > 0 && <span className="flex items-center gap-1 text-studio-attention"><SkipForward className="h-3.5 w-3.5" /> {skipCount} skipped</span>}
+            {errCount > 0 && <span className="flex items-center gap-1 text-studio-stale"><AlertTriangle className="h-3.5 w-3.5" /> {errCount} failed</span>}
           </p>
           {(skipCount > 0 || errCount > 0) && (
             <ul className="space-y-1 text-muted-foreground">
               {outcomes.filter(o => o.status !== 'done').map((o, idx) => (
                 <li key={idx}>
-                  <span className={o.status === 'error' ? 'text-destructive' : 'text-amber-600'}>{o.status}</span>
-                  {': '}<span className="font-medium">{o.name}</span>{o.detail ? ` — ${o.detail}` : ''}
+                  <span className={o.status === 'error' ? 'text-studio-stale' : 'text-studio-attention'}>{o.status}</span>
+                  {': '}<span className="font-medium">{o.name}</span>{o.detail ? `, ${o.detail}` : ''}
                 </li>
               ))}
             </ul>

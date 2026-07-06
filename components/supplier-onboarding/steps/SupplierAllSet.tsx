@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Trophy,
 } from 'lucide-react'
+import { StateChip } from '@/components/studio'
 
 export function SupplierAllSet() {
   const { completeOnboarding, state } = useSupplierOnboarding()
@@ -46,37 +47,34 @@ export function SupplierAllSet() {
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 animate-in fade-in duration-500 text-center">
       <div className="w-full max-w-md space-y-6">
         <div className="space-y-3">
-          <div className="text-4xl">&#127881; &#127942; &#127881;</div>
-          <h2 className="text-3xl font-serif font-bold text-white">
-            You&apos;re All Set!
+          <h2 className="text-3xl font-display font-bold tracking-tight text-foreground">
+            You&apos;re all set.
           </h2>
-          <p className="text-lg text-white/60">
+          <p className="text-lg text-muted-foreground">
             Welcome to the alka<span className="font-bold">tera</span> supplier community.
           </p>
         </div>
 
         {/* Achievement badge */}
-        <div className="mx-auto w-20 h-20 rounded-2xl bg-gradient-to-br from-[#ccff00]/30 to-emerald-400/30 backdrop-blur-md flex items-center justify-center border border-[#ccff00]/30">
-          <Trophy className="w-10 h-10 text-[#ccff00]" />
+        <div className="mx-auto w-20 h-20 rounded-[6px] bg-card border border-border flex items-center justify-center">
+          <Trophy className="w-10 h-10 text-studio-forest" />
         </div>
-        <p className="text-sm font-medium text-[#ccff00]">
-          Achievement Unlocked: &quot;Sustainability Partner&quot;
-        </p>
+        <StateChip tone="good">Sustainability Partner</StateChip>
 
         {/* What you accomplished */}
-        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-4 space-y-2 text-left">
-          <p className="text-sm font-medium text-white mb-3">You&apos;ve successfully:</p>
+        <div className="rounded-[6px] border border-border bg-card p-4 space-y-2 text-left">
+          <p className="text-sm font-medium text-foreground mb-3">You&apos;ve successfully:</p>
           {achievements.map(item => (
             <div key={item} className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-[#ccff00] flex-shrink-0" />
-              <span className="text-sm text-white">{item}</span>
+              <CheckCircle2 className="w-4 h-4 text-studio-good flex-shrink-0" />
+              <span className="text-sm text-foreground">{item}</span>
             </div>
           ))}
         </div>
 
         {/* What's next */}
         <div className="space-y-3">
-          <p className="text-sm font-medium text-white">What&apos;s next?</p>
+          <p className="text-sm font-medium text-foreground">What&apos;s next?</p>
           <div className="grid grid-cols-2 gap-2">
             {quickActions.map(action => (
               <button
@@ -85,10 +83,10 @@ export function SupplierAllSet() {
                   await completeOnboarding()
                   router.push(action.href)
                 }}
-                className="flex items-center gap-2 p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 transition-all text-left"
+                className="flex items-center gap-2 p-3 rounded-[6px] border border-border bg-card hover:bg-secondary hover:border-foreground/30 transition-all text-left"
               >
-                <action.icon className="w-4 h-4 text-[#ccff00] flex-shrink-0" />
-                <span className="text-xs text-white">{action.label}</span>
+                <action.icon className="w-4 h-4 text-studio-forest flex-shrink-0" />
+                <span className="text-xs text-foreground">{action.label}</span>
               </button>
             ))}
           </div>
@@ -97,7 +95,7 @@ export function SupplierAllSet() {
         <Button
           size="lg"
           onClick={handleGoToDashboard}
-          className="bg-[#ccff00] text-black hover:bg-[#ccff00]/90 font-medium text-base px-8 rounded-xl w-full"
+          className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium text-base px-8 rounded-full w-full"
         >
           Go to Dashboard
         </Button>

@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -16,14 +15,11 @@ import {
   MessageSquare,
   Clock,
   Send,
-  Loader2,
   CheckCircle,
-  AlertCircle,
-  Circle,
   Paperclip,
-  Image as ImageIcon,
   ExternalLink,
 } from "lucide-react";
+import { StateChip } from "@/components/studio";
 import {
   fetchTicket,
   fetchMessages,
@@ -56,30 +52,17 @@ const categoryLabels: Record<FeedbackCategory, string> = {
   other: "Other",
 };
 
-const statusIcons: Record<FeedbackStatus, React.ElementType> = {
-  open: Circle,
-  in_progress: AlertCircle,
-  resolved: CheckCircle,
-  closed: CheckCircle,
+const statusTones: Record<FeedbackStatus, "attention" | "hold" | "good" | "quiet"> = {
+  open: "attention",
+  in_progress: "hold",
+  resolved: "good",
+  closed: "quiet",
 };
 
 function StatusBadge({ status }: { status: FeedbackStatus }) {
   const config = FEEDBACK_STATUSES[status];
-  const Icon = statusIcons[status];
 
-  const colorClasses: Record<string, string> = {
-    blue: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-    amber: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-    green: "bg-green-500/20 text-green-400 border-green-500/30",
-    slate: "bg-slate-500/20 text-slate-400 border-slate-500/30",
-  };
-
-  return (
-    <Badge className={colorClasses[config.color]}>
-      <Icon className="h-3 w-3 mr-1" />
-      {config.label}
-    </Badge>
-  );
+  return <StateChip tone={statusTones[status]}>{config.label}</StateChip>;
 }
 
 export default function TicketDetailPage() {
@@ -202,7 +185,7 @@ export default function TicketDetailPage() {
     return (
       <div className="container mx-auto py-8 px-4 max-w-4xl">
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">Loading</span>
         </div>
       </div>
     );
@@ -243,7 +226,7 @@ export default function TicketDetailPage() {
         <Card>
           <CardHeader>
             <div className="flex items-start gap-4">
-              <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+              <div className="h-12 w-12 rounded-[6px] bg-secondary flex items-center justify-center flex-shrink-0">
                 <Icon className="h-6 w-6 text-muted-foreground" />
               </div>
               <div className="flex-1">
@@ -251,7 +234,7 @@ export default function TicketDetailPage() {
                   <CardTitle className="text-xl">{ticket.title}</CardTitle>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
-                  <Badge variant="outline">{categoryLabels[ticket.category]}</Badge>
+                  <StateChip tone="quiet">{categoryLabels[ticket.category]}</StateChip>
                   <StatusBadge status={ticket.status} />
                   <span className="text-muted-foreground flex items-center gap-1">
                     <Clock className="h-3 w-3" />
@@ -282,7 +265,7 @@ export default function TicketDetailPage() {
             {/* Resolution Notes */}
             {ticket.resolution_notes && (
               <div className="mt-4 pt-4 border-t">
-                <h4 className="text-sm font-medium mb-2 flex items-center gap-2 text-green-600">
+                <h4 className="text-sm font-medium mb-2 flex items-center gap-2 text-studio-good">
                   <CheckCircle className="h-4 w-4" />
                   Resolution
                 </h4>
@@ -331,12 +314,8 @@ export default function TicketDetailPage() {
               />
               <div className="flex justify-end">
                 <Button type="submit" disabled={isSending || !newMessage.trim()}>
-                  {isSending ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4 mr-2" />
-                  )}
-                  Send Message
+                  <Send className="h-4 w-4 mr-2" />
+                  {isSending ? "Sending..." : "Send Message"}
                 </Button>
               </div>
             </form>
@@ -347,11 +326,11 @@ export default function TicketDetailPage() {
       {isResolved && (
         <Card>
           <CardContent className="py-6 text-center text-muted-foreground">
-            <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-500" />
+            <CheckCircle className="h-8 w-8 mx-auto mb-2 text-studio-good" />
             <p>This ticket has been resolved.</p>
             <p className="text-sm mt-1">
               Need more help?{" "}
-              <Link href="/settings/feedback" className="text-primary hover:underline">
+              <Link href="/settings/feedback" className="text-studio-ochre-ink hover:underline">
                 Submit a new ticket
               </Link>
             </p>
@@ -384,23 +363,15 @@ function MessageBubble({
         </Avatar>
         <div>
           <div
-            className={`px-4 py-2 rounded-lg ${
-              isAdmin
-                ? "bg-primary/10 border border-primary/20"
-                : isOwnMessage
-                ? "bg-muted"
-                : "bg-muted"
+            className={`px-4 py-2 rounded-[6px] border border-border ${
+              isAdmin ? "bg-card" : "bg-secondary"
             }`}
           >
             <div className="flex items-center gap-2 mb-1">
               <span className="text-sm font-medium">
                 {isAdmin ? "alkatera Support" : message.sender_name || "You"}
               </span>
-              {isAdmin && (
-                <Badge variant="secondary" className="text-xs">
-                  Staff
-                </Badge>
-              )}
+              {isAdmin && <StateChip tone="quiet">Staff</StateChip>}
             </div>
             <p className="text-sm whitespace-pre-wrap">{message.message}</p>
           </div>
@@ -432,8 +403,8 @@ function AttachmentPreview({ attachment }: { attachment: any }) {
 
   if (!url) {
     return (
-      <div className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center">
-        <Loader2 className="h-4 w-4 animate-spin" />
+      <div className="w-20 h-20 rounded-[6px] bg-secondary flex items-center justify-center">
+        <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-studio-dim">...</span>
       </div>
     );
   }
@@ -444,7 +415,7 @@ function AttachmentPreview({ attachment }: { attachment: any }) {
         <img
           src={url}
           alt={attachment.name}
-          className="w-20 h-20 object-cover rounded-lg border hover:opacity-80 transition-opacity"
+          className="w-20 h-20 object-cover rounded-[6px] border hover:opacity-80 transition-opacity"
         />
       </a>
     );
@@ -455,7 +426,7 @@ function AttachmentPreview({ attachment }: { attachment: any }) {
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-center gap-2 px-3 py-2 rounded-lg border hover:bg-muted transition-colors"
+      className="flex items-center gap-2 px-3 py-2 rounded-[6px] border hover:bg-secondary transition-colors"
     >
       <Paperclip className="h-4 w-4" />
       <span className="text-sm truncate max-w-[150px]">{attachment.name}</span>

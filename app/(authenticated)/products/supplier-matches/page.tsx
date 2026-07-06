@@ -71,7 +71,7 @@ export default function SupplierMatchesPage() {
           Back to products
         </Link>
         <div className="flex items-center gap-2">
-          <Sparkles className="h-6 w-6 text-[#ccff00]" />
+          <Sparkles className="h-6 w-6 text-[#2B46C0]" />
           <h1 className="text-3xl font-semibold tracking-tight">Supplier matches</h1>
         </div>
         <p className="max-w-xl text-sm text-muted-foreground">
@@ -116,7 +116,7 @@ export default function SupplierMatchesPage() {
                     {Math.round(s.match_confidence * 100)}% match
                   </Badge>
                   <Button size="sm" className="h-7 text-xs" disabled={busyId === s.id} onClick={() => act(s.id, 'accept')}>
-                    {busyId === s.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="mr-1 h-3.5 w-3.5" />}
+                    {busyId === s.id ? <Loader2 className="h-3.5 w-3.5" /> : <Check className="mr-1 h-3.5 w-3.5" />}
                     Accept
                   </Button>
                   <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" disabled={busyId === s.id} onClick={() => act(s.id, 'dismiss')}>

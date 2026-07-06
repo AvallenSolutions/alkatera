@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import { useOrganization } from '@/lib/organizationContext'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Loader2, Package, Layers, Truck, Building2, Receipt } from 'lucide-react'
+import { StateChip } from '@/components/studio/state-chip'
+import { ArrowLeft, Package, Layers, Truck, Building2, Receipt } from 'lucide-react'
 
 interface ProductRow {
   id: string
@@ -109,7 +109,7 @@ export default function UnleashedSettingsPage() {
             Synced data from your Unleashed account. Use the connection card on the integrations page to sync.
           </p>
         </div>
-        <Badge variant="outline" className="ml-auto text-[10px] uppercase tracking-wider">Beta</Badge>
+        <StateChip tone="quiet" className="ml-auto">Beta</StateChip>
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
@@ -123,7 +123,7 @@ export default function UnleashedSettingsPage() {
 
         {loading && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center">
-            <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+            Loading...
           </div>
         )}
 
@@ -217,12 +217,12 @@ function SimpleTable<T extends { id: string }>({
     return <div className="text-center text-sm text-muted-foreground py-12">{empty}</div>
   }
   return (
-    <div className="border rounded-md overflow-x-auto">
+    <div className="border border-border rounded-[6px] overflow-x-auto">
       <table className="w-full text-sm">
         <thead className="bg-muted/40">
           <tr>
             {columns.map((c) => (
-              <th key={c.header} className="text-left font-medium px-3 py-2 text-xs uppercase tracking-wider text-muted-foreground">
+              <th key={c.header} className="text-left px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground">
                 {c.header}
               </th>
             ))}

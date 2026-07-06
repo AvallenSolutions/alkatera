@@ -63,7 +63,7 @@ export function PriorityConfirmation({ materialTopics, priorityOrder, onChange }
       </p>
 
       {orderedTopics.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+        <div className="rounded-[6px] border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
           No material topics scored yet. Go back to Step 2 and score your material topics.
         </div>
       ) : (
@@ -77,15 +77,15 @@ export function PriorityConfirmation({ materialTopics, priorityOrder, onChange }
               <div
                 key={topic.id}
                 className={cn(
-                  'rounded-xl border bg-card transition-all',
-                  index < 5 ? 'border-lime-300 dark:border-lime-700' : 'border-border',
+                  'rounded-[6px] border bg-card transition-all',
+                  index < 5 ? 'border-[#2B46C0]/40' : 'border-border',
                 )}
               >
                 <div className="flex items-center gap-3 p-3">
                   {/* Rank badge */}
                   <div className={cn(
                     'w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0',
-                    index < 3 ? 'bg-[#ccff00] text-stone-900' : 'bg-muted text-muted-foreground',
+                    index < 3 ? 'bg-[#2B46C0] text-[#F2F1EA]' : 'bg-muted text-muted-foreground',
                   )}>
                     {index + 1}
                   </div>
@@ -127,7 +127,7 @@ export function PriorityConfirmation({ materialTopics, priorityOrder, onChange }
                     </button>
                     <button
                       onClick={() => removeFromPriority(topic.id)}
-                      className="p-1 rounded hover:bg-red-950/20 text-muted-foreground hover:text-red-400"
+                      className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-[#BE123C]"
                       title="Remove from priority list"
                     >
                       ×
@@ -163,7 +163,7 @@ export function PriorityConfirmation({ materialTopics, priorityOrder, onChange }
                 <span className="text-sm text-muted-foreground flex-1">{topic.name}</span>
                 <button
                   onClick={() => addToPriority(topic.id)}
-                  className="text-xs text-muted-foreground hover:text-lime-500 flex items-center gap-1"
+                  className="text-xs text-muted-foreground hover:text-[#2B46C0] flex items-center gap-1"
                 >
                   <Star className="w-3 h-3" />
                   Add to priority

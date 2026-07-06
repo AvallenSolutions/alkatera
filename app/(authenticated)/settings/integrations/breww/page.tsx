@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useOrganization } from '@/lib/organizationContext'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { StateChip } from '@/components/studio/state-chip'
 import {
   Dialog,
   DialogContent,
@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import {
-  ArrowLeft, Loader2, Package, Box, Beer, CheckCircle2, Link2, Link2Off, Plus, ExternalLink, Building2, FlaskConical,
+  ArrowLeft, Package, Box, Beer, CheckCircle2, Link2, Link2Off, Plus, ExternalLink, Building2, FlaskConical,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { LinkPicker } from '@/components/settings/integrations/breww/LinkPicker'
@@ -498,7 +498,6 @@ export default function BrewwDataPage() {
 
       {loading ? (
         <div className="flex items-center gap-2 text-muted-foreground py-12 justify-center">
-          <Loader2 className="h-5 w-5 animate-spin" />
           <span className="text-sm">Loading synced data...</span>
         </div>
       ) : (
@@ -543,36 +542,36 @@ export default function BrewwDataPage() {
                 <Beer className="h-3.5 w-3.5" />
                 Products
                 {visibleSkus.length > 0 && (
-                  <Badge variant={unlinkedSkus.length > 0 ? 'default' : 'secondary'} className="text-[10px] ml-1 px-1.5">
+                  <span className={`font-mono text-[10px] font-bold tabular-nums ml-1 ${unlinkedSkus.length > 0 ? 'text-studio-attention' : 'text-muted-foreground'}`}>
                     {unlinkedSkus.length > 0 ? `${unlinkedSkus.length}` : `${linkedSkuCount}/${visibleSkus.length}`}
-                  </Badge>
+                  </span>
                 )}
               </TabsTrigger>
               <TabsTrigger value="sites" className="gap-1.5">
                 <Building2 className="h-3.5 w-3.5" />
                 Sites
                 {sites.length > 0 && (
-                  <Badge variant={unlinkedSites.length > 0 ? 'default' : 'secondary'} className="text-[10px] ml-1 px-1.5">
+                  <span className={`font-mono text-[10px] font-bold tabular-nums ml-1 ${unlinkedSites.length > 0 ? 'text-studio-attention' : 'text-muted-foreground'}`}>
                     {unlinkedSites.length > 0 ? `${unlinkedSites.length}` : `${linkedSiteCount}/${sites.length}`}
-                  </Badge>
+                  </span>
                 )}
               </TabsTrigger>
               <TabsTrigger value="production" className="gap-1.5">
                 <Package className="h-3.5 w-3.5" />
                 Production
                 {production.length > 0 && (
-                  <Badge variant="secondary" className="text-[10px] ml-1 px-1.5">
+                  <span className="font-mono text-[10px] font-bold tabular-nums ml-1 text-muted-foreground">
                     {Object.keys(productionByProduct).length}
-                  </Badge>
+                  </span>
                 )}
               </TabsTrigger>
               <TabsTrigger value="reference" className="gap-1.5">
                 <FlaskConical className="h-3.5 w-3.5" />
                 Reference
                 {(ingredients.length > 0 || containers.length > 0) && (
-                  <Badge variant="secondary" className="text-[10px] ml-1 px-1.5">
+                  <span className="font-mono text-[10px] font-bold tabular-nums ml-1 text-muted-foreground">
                     {ingredients.length + containers.length}
-                  </Badge>
+                  </span>
                 )}
               </TabsTrigger>
             </TabsList>
@@ -620,7 +619,7 @@ export default function BrewwDataPage() {
                               <td className="px-4 py-3">
                                 {link ? (
                                   <div className="flex items-center gap-1.5">
-                                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
+                                    <CheckCircle2 className="h-3.5 w-3.5 text-studio-good flex-shrink-0" />
                                     <button
                                       type="button"
                                       onClick={() => router.push(`/products/${link.alkatera_product_id}`)}
@@ -631,7 +630,7 @@ export default function BrewwDataPage() {
                                     </button>
                                   </div>
                                 ) : (
-                                  <Badge variant="outline" className="text-[10px]">Not linked</Badge>
+                                  <StateChip tone="quiet">Not linked</StateChip>
                                 )}
                               </td>
                               <td className="px-4 py-3 text-right">
@@ -639,7 +638,7 @@ export default function BrewwDataPage() {
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    className="h-7 text-xs text-muted-foreground hover:text-red-500 gap-1"
+                                    className="h-7 text-xs text-muted-foreground hover:text-studio-stale gap-1"
                                     onClick={() => setConfirmUnlinkSku(sku)}
                                   >
                                     <Link2Off className="h-3 w-3" />
@@ -711,11 +710,11 @@ export default function BrewwDataPage() {
                               <td className="px-4 py-3">
                                 {link && linkedFacility ? (
                                   <div className="flex items-center gap-1.5">
-                                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
+                                    <CheckCircle2 className="h-3.5 w-3.5 text-studio-good flex-shrink-0" />
                                     <span className="text-xs font-medium">{linkedFacility.name}</span>
                                   </div>
                                 ) : (
-                                  <Badge variant="outline" className="text-[10px]">Not linked</Badge>
+                                  <StateChip tone="quiet">Not linked</StateChip>
                                 )}
                               </td>
                               <td className="px-4 py-3 text-right">
@@ -723,7 +722,7 @@ export default function BrewwDataPage() {
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    className="h-7 text-xs text-muted-foreground hover:text-red-500 gap-1"
+                                    className="h-7 text-xs text-muted-foreground hover:text-studio-stale gap-1"
                                     onClick={() => setConfirmUnlinkSite(site)}
                                   >
                                     <Link2Off className="h-3 w-3" />
@@ -789,10 +788,10 @@ export default function BrewwDataPage() {
                       </button>
                     </div>
                     <div className="text-right">
-                      <div className="text-[10px] text-muted-foreground uppercase tracking-wide">12-month total</div>
                       <div className="text-lg font-semibold tabular-nums">
                         {monthlyBrewery.reduce((s, r) => s + r.hl, 0).toFixed(1)} hL
                       </div>
+                      <div className="font-mono text-[9.5px] font-bold uppercase tracking-[0.2em] text-muted-foreground">12-month total</div>
                     </div>
                   </div>
 
@@ -890,7 +889,7 @@ export default function BrewwDataPage() {
                       <div className="flex items-center gap-2 mb-2">
                         <FlaskConical className="h-4 w-4 text-muted-foreground" />
                         <h2 className="text-sm font-medium">Ingredients</h2>
-                        <Badge variant="secondary" className="text-[10px]">{ingredients.length}</Badge>
+                        <span className="font-mono text-[10px] font-bold tabular-nums text-muted-foreground">{ingredients.length}</span>
                       </div>
                       <div className="rounded-lg border overflow-hidden">
                         <table className="w-full text-sm">
@@ -922,7 +921,7 @@ export default function BrewwDataPage() {
                       <div className="flex items-center gap-2 mb-2">
                         <Box className="h-4 w-4 text-muted-foreground" />
                         <h2 className="text-sm font-medium">Container types</h2>
-                        <Badge variant="secondary" className="text-[10px]">{containers.length}</Badge>
+                        <span className="font-mono text-[10px] font-bold tabular-nums text-muted-foreground">{containers.length}</span>
                       </div>
                       <div className="rounded-lg border overflow-hidden">
                         <table className="w-full text-sm">
@@ -1063,8 +1062,7 @@ export default function BrewwDataPage() {
                 Cancel
               </Button>
               <Button size="sm" onClick={() => handleCreateSku(createSkuTarget)} disabled={creatingSku}>
-                {creatingSku && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
-                Create &amp; link
+                {creatingSku ? 'Creating' : <>Create &amp; link</>}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1084,7 +1082,7 @@ export default function BrewwDataPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => { e.preventDefault(); if (confirmUnlinkSku) handleUnlinkSku(confirmUnlinkSku) }}
-              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+              className="bg-studio-stale hover:bg-studio-stale/90 focus:ring-studio-stale"
             >
               Unlink
             </AlertDialogAction>
@@ -1104,7 +1102,7 @@ export default function BrewwDataPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => { e.preventDefault(); if (confirmUnlinkSite) handleUnlinkSite(confirmUnlinkSite) }}
-              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+              className="bg-studio-stale hover:bg-studio-stale/90 focus:ring-studio-stale"
             >
               Unlink
             </AlertDialogAction>

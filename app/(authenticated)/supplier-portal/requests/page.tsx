@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Statement, StateChip } from '@/components/studio';
+import type { WorkingTone } from '@/components/studio';
 import {
   Dialog,
   DialogContent,
@@ -20,10 +21,8 @@ import {
   CheckCircle2,
   XCircle,
   MessageSquare,
-  Loader2,
   ThumbsUp,
   ThumbsDown,
-  AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
@@ -146,14 +145,13 @@ export default function SupplierRequestsPage() {
 
   const requestStatusConfig: Record<string, {
     label: string;
-    variant: 'default' | 'secondary' | 'destructive' | 'outline';
+    tone: WorkingTone;
     icon: typeof CheckCircle2;
-    colour: string;
   }> = {
-    pending: { label: 'Awaiting Response', variant: 'outline', icon: Clock, colour: 'text-amber-400' },
-    accepted: { label: 'Accepted', variant: 'default', icon: CheckCircle2, colour: 'text-green-400' },
-    declined: { label: 'Declined', variant: 'destructive', icon: XCircle, colour: 'text-red-400' },
-    completed: { label: 'Completed', variant: 'secondary', icon: CheckCircle2, colour: 'text-blue-400' },
+    pending: { label: 'Awaiting Response', tone: 'attention', icon: Clock },
+    accepted: { label: 'Accepted', tone: 'good', icon: CheckCircle2 },
+    declined: { label: 'Declined', tone: 'stale', icon: XCircle },
+    completed: { label: 'Completed', tone: 'quiet', icon: CheckCircle2 },
   };
 
   // Split requests into categories. ESG survey requests are handled separately.
@@ -166,22 +164,19 @@ export default function SupplierRequestsPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6 animate-pulse">
+      <div className="space-y-6">
         <div className="space-y-2">
           <div className="h-8 w-40 bg-muted rounded" />
           <div className="h-4 w-80 bg-muted rounded" />
         </div>
         <div className="space-y-3">
           {[1, 2, 3].map(i => (
-            <div key={i} className="flex items-center justify-between p-5 rounded-xl border border-border bg-card">
-              <div className="flex items-center gap-4">
-                <div className="p-2.5 rounded-lg bg-muted w-10 h-10" />
-                <div className="space-y-2">
-                  <div className="h-5 w-36 bg-muted rounded" />
-                  <div className="h-3 w-48 bg-muted rounded" />
-                </div>
+            <div key={i} className="flex items-center justify-between p-5 rounded-[6px] border border-border bg-card">
+              <div className="space-y-2">
+                <div className="h-5 w-36 bg-muted rounded" />
+                <div className="h-3 w-48 bg-muted rounded" />
               </div>
-              <div className="h-6 w-20 bg-muted rounded-full" />
+              <div className="h-4 w-20 bg-muted rounded" />
             </div>
           ))}
         </div>
@@ -192,14 +187,14 @@ export default function SupplierRequestsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-serif text-foreground">Data Requests</h1>
-        <p className="text-muted-foreground mt-1">
+        <Statement eyebrow="SUPPLIER PORTAL · REQUESTS" headline="Data requests." />
+        <p className="text-muted-foreground mt-3 text-sm">
           Manage requests from your customers to share sustainability data on alka<span className="font-bold">tera</span>.
         </p>
       </div>
 
       {fetchError && (
-        <div className="p-4 rounded-xl border border-destructive/30 bg-destructive/10 text-destructive text-sm">
+        <div className="p-4 rounded-[6px] border border-studio-stale/40 bg-card text-studio-stale text-sm">
           {fetchError}
         </div>
       )}
@@ -217,25 +212,20 @@ export default function SupplierRequestsPage() {
           {/* ESG survey requests */}
           {esgSurveys.length > 0 && (
             <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="p-1 rounded bg-emerald-500/10">
-                  <ClipboardCheck className="h-4 w-4 text-emerald-400" />
-                </div>
-                <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                  Sustainability Surveys ({esgSurveys.length})
-                </h2>
-              </div>
+              <h2 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-forest">
+                Sustainability surveys · {esgSurveys.length}
+              </h2>
 
               {esgSurveys.map((req) => (
                 <Link
                   key={req.id}
                   href="/supplier-portal/esg-assessment"
-                  className="block rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-5 transition-colors hover:bg-emerald-500/10"
+                  className="block rounded-[6px] border border-border bg-card p-5 transition-colors hover:border-foreground/30"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-4 min-w-0">
-                      <div className="p-2.5 rounded-lg flex-shrink-0 bg-emerald-500/10">
-                        <ClipboardCheck className="h-5 w-5 text-emerald-400" />
+                      <div className="p-2.5 rounded-[6px] flex-shrink-0 bg-secondary">
+                        <ClipboardCheck className="h-5 w-5 text-studio-forest" />
                       </div>
                       <div className="min-w-0">
                         <p className="font-medium text-foreground">ESG Self-Assessment</p>
@@ -255,7 +245,7 @@ export default function SupplierRequestsPage() {
                           </span>
                         </div>
                         {req.personal_message && (
-                          <div className="mt-2 flex items-start gap-2 p-2 rounded-lg bg-muted/50 border border-border">
+                          <div className="mt-2 flex items-start gap-2 p-2 rounded-[6px] bg-secondary border border-border">
                             <MessageSquare className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 mt-0.5" />
                             <p className="text-xs text-muted-foreground leading-relaxed">
                               {req.personal_message}
@@ -264,7 +254,7 @@ export default function SupplierRequestsPage() {
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0 text-sm font-medium text-emerald-400">
+                    <div className="flex items-center gap-1.5 flex-shrink-0 text-sm font-medium text-studio-forest">
                       Complete survey
                       <ArrowRight className="h-4 w-4" />
                     </div>
@@ -277,14 +267,9 @@ export default function SupplierRequestsPage() {
           {/* Pending requests - needs action */}
           {pendingRequests.length > 0 && (
             <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="p-1 rounded bg-amber-500/10">
-                  <AlertCircle className="h-4 w-4 text-amber-400" />
-                </div>
-                <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                  Awaiting Your Response ({pendingRequests.length})
-                </h2>
-              </div>
+              <h2 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-attention">
+                Awaiting your response · {pendingRequests.length}
+              </h2>
 
               {pendingRequests.map((req) => (
                 <RequestCard
@@ -302,14 +287,9 @@ export default function SupplierRequestsPage() {
           {/* Accepted requests */}
           {acceptedRequests.length > 0 && (
             <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="p-1 rounded bg-green-500/10">
-                  <CheckCircle2 className="h-4 w-4 text-green-400" />
-                </div>
-                <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                  Accepted ({acceptedRequests.length})
-                </h2>
-              </div>
+              <h2 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-good">
+                Accepted · {acceptedRequests.length}
+              </h2>
 
               {acceptedRequests.map((req) => (
                 <RequestCard
@@ -324,14 +304,9 @@ export default function SupplierRequestsPage() {
           {/* Declined requests */}
           {declinedRequests.length > 0 && (
             <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="p-1 rounded bg-red-500/10">
-                  <XCircle className="h-4 w-4 text-red-400" />
-                </div>
-                <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                  Declined ({declinedRequests.length})
-                </h2>
-              </div>
+              <h2 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-stale">
+                Declined · {declinedRequests.length}
+              </h2>
 
               {declinedRequests.map((req) => (
                 <RequestCard
@@ -346,8 +321,8 @@ export default function SupplierRequestsPage() {
           {/* General invitations (no specific material) */}
           {generalInvitations.length > 0 && (
             <div className="space-y-3">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                General Invitations ({generalInvitations.length})
+              <h2 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
+                General invitations · {generalInvitations.length}
               </h2>
 
               {generalInvitations.map((req) => (
@@ -411,14 +386,7 @@ export default function SupplierRequestsPage() {
               }}
               disabled={respondingId !== null}
             >
-              {respondingId === declineTarget?.id ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Declining...
-                </>
-              ) : (
-                'Decline Request'
-              )}
+              {respondingId === declineTarget?.id ? 'Declining...' : 'Decline Request'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -433,9 +401,8 @@ interface RequestCardProps {
   request: DataRequest;
   statusConfig: Record<string, {
     label: string;
-    variant: 'default' | 'secondary' | 'destructive' | 'outline';
+    tone: WorkingTone;
     icon: typeof CheckCircle2;
-    colour: string;
   }>;
   respondingId?: string | null;
   onAccept?: () => void;
@@ -444,26 +411,19 @@ interface RequestCardProps {
 
 function RequestCard({ request, statusConfig, respondingId, onAccept, onDecline }: RequestCardProps) {
   const config = statusConfig[request.request_status] || statusConfig.pending;
-  const StatusIcon = config.icon;
   const isPending = request.request_status === 'pending' && request.status === 'accepted';
   const isResponding = respondingId === request.id;
 
   return (
     <div
-      className={`rounded-xl border bg-card p-5 transition-colors ${
-        isPending
-          ? 'border-amber-500/30 bg-amber-500/5'
-          : 'border-border'
+      className={`rounded-[6px] border bg-card p-5 transition-colors ${
+        isPending ? 'border-studio-attention/40' : 'border-border'
       }`}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-4 min-w-0">
-          <div className={`p-2.5 rounded-lg flex-shrink-0 ${
-            request.material_type === 'packaging' ? 'bg-purple-500/10' : 'bg-blue-500/10'
-          }`}>
-            <Package className={`h-5 w-5 ${
-              request.material_type === 'packaging' ? 'text-purple-400' : 'text-blue-400'
-            }`} />
+          <div className="p-2.5 rounded-[6px] flex-shrink-0 bg-secondary">
+            <Package className="h-5 w-5 text-muted-foreground" />
           </div>
           <div className="min-w-0">
             <p className="font-medium text-foreground">{request.material_name}</p>
@@ -493,7 +453,7 @@ function RequestCard({ request, statusConfig, respondingId, onAccept, onDecline 
 
             {/* Personal message from the requesting org */}
             {request.personal_message && (
-              <div className="mt-2 flex items-start gap-2 p-2 rounded-lg bg-muted/50 border border-border">
+              <div className="mt-2 flex items-start gap-2 p-2 rounded-[6px] bg-secondary border border-border">
                 <MessageSquare className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   {request.personal_message}
@@ -503,9 +463,9 @@ function RequestCard({ request, statusConfig, respondingId, onAccept, onDecline 
 
             {/* Decline reason (shown on declined requests) */}
             {request.request_status === 'declined' && request.request_decline_reason && (
-              <div className="mt-2 flex items-start gap-2 p-2 rounded-lg bg-red-500/5 border border-red-500/20">
-                <XCircle className="h-3.5 w-3.5 text-red-400 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-red-300 leading-relaxed">
+              <div className="mt-2 flex items-start gap-2 p-2 rounded-[6px] bg-card border border-studio-stale/30">
+                <XCircle className="h-3.5 w-3.5 text-studio-stale flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-studio-stale leading-relaxed">
                   {request.request_decline_reason}
                 </p>
               </div>
@@ -533,7 +493,7 @@ function RequestCard({ request, statusConfig, respondingId, onAccept, onDecline 
                 variant="outline"
                 onClick={onDecline}
                 disabled={isResponding}
-                className="text-red-400 border-red-500/30 hover:bg-red-500/10 hover:text-red-300"
+                className="text-studio-stale hover:text-studio-stale"
               >
                 <ThumbsDown className="h-3.5 w-3.5 mr-1.5" />
                 Decline
@@ -542,10 +502,10 @@ function RequestCard({ request, statusConfig, respondingId, onAccept, onDecline 
                 size="sm"
                 onClick={onAccept}
                 disabled={isResponding}
-                className="bg-[#ccff00] text-black hover:bg-[#ccff00]/90"
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 {isResponding ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  'Accepting...'
                 ) : (
                   <>
                     <ThumbsUp className="h-3.5 w-3.5 mr-1.5" />
@@ -555,11 +515,8 @@ function RequestCard({ request, statusConfig, respondingId, onAccept, onDecline 
               </Button>
             </div>
           ) : (
-            /* Status badge for responded requests */
-            <Badge variant={config.variant} className="flex items-center gap-1">
-              <StatusIcon className="h-3 w-3" />
-              {config.label}
-            </Badge>
+            /* Typographic state for responded requests */
+            <StateChip tone={config.tone}>{config.label}</StateChip>
           )}
         </div>
       </div>

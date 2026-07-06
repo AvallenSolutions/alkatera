@@ -160,8 +160,8 @@ export default function VineyardDetailPage() {
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="flex items-start gap-4">
-            <div className="rounded-lg bg-[#ccff00]/10 p-3">
-              <Leaf className="h-6 w-6 text-[#ccff00]" />
+            <div className="rounded-lg bg-secondary p-3">
+              <Leaf className="h-6 w-6 text-studio-forest" />
             </div>
             <div>
               <h1 className="text-2xl font-bold tracking-tight">{vineyard.name}</h1>

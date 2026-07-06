@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Leaf, Flower2, TreeDeciduous, Loader2, CheckCircle2 } from 'lucide-react'
+import { Flower2, TreeDeciduous, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -285,26 +285,25 @@ function CompleteSubscriptionContent() {
         <div className="absolute inset-0 bg-black/60" />
         <div className="relative z-10 min-h-screen flex items-center justify-center">
           <div className="flex flex-col items-center gap-6 text-center px-4">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-neon-lime/20">
-              <CheckCircle2 className="h-10 w-10 text-neon-lime" />
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white/10 border border-white/20">
+              <CheckCircle2 className="h-10 w-10 text-[#F2F1EA]" />
             </div>
-            <h1 className="text-3xl font-bold text-white">{isTrialParam ? "You're all set!" : 'Payment Successful!'}</h1>
-            <p className="text-lg text-slate-300 max-w-md">
+            <h1 className="text-3xl font-display font-bold tracking-tight text-[#F2F1EA]">{isTrialParam ? "You're all set." : 'Payment received.'}</h1>
+            <p className="text-lg text-white/70 max-w-md">
               {isTrialParam
                 ? 'Setting up your free trial...'
                 : `Setting up your ${tierParam ? tierParam.charAt(0).toUpperCase() + tierParam.slice(1) : ''} subscription...`}
             </p>
-            <Loader2 className="h-8 w-8 animate-spin text-neon-lime" />
-            <p className="text-sm text-slate-500">This should only take a moment.</p>
+            <p className="text-sm text-white/40">This should only take a moment.</p>
             {showContinueButton && (
               <button
                 onClick={async () => {
                   if (mutate) await mutate()
                   router.push('/dashboard')
                 }}
-                className="mt-4 px-8 py-3 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:opacity-90 transition-all"
+                className="mt-4 px-8 py-3 bg-[#F2F1EA] text-[#1A1B1D] font-mono uppercase text-xs tracking-[0.22em] font-bold rounded-full hover:bg-white transition-colors"
               >
-                Continue to Dashboard
+                Continue to dashboard
               </button>
             )}
           </div>
@@ -315,11 +314,8 @@ function CompleteSubscriptionContent() {
 
   if (isOrgLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-12 w-12 animate-spin text-neon-lime" />
-          <p className="text-sm text-slate-400 font-data">Loading...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-[#1A1B1D]">
+        <p className="font-mono text-sm uppercase tracking-[0.22em] text-[#F2F1EA]/70">Loading...</p>
       </div>
     )
   }
@@ -351,10 +347,10 @@ function CompleteSubscriptionContent() {
 
         {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="font-serif text-4xl md:text-6xl lg:text-7xl text-white mb-4">
-            Welcome to alka<span className="font-bold">tera</span>!
+          <h1 className="font-display font-medium tracking-tight text-4xl md:text-6xl lg:text-7xl text-[#F2F1EA] mb-4">
+            Welcome to alka<span className="font-bold">tera</span>.
           </h1>
-          <p className="text-lg text-slate-300 max-w-2xl mx-auto">
+          <p className="text-lg text-white/70 max-w-2xl mx-auto">
             Your organisation <strong className="text-white">{currentOrganization?.name}</strong> has been created.
             Choose a plan below to start your sustainability journey.
           </p>
@@ -362,14 +358,12 @@ function CompleteSubscriptionContent() {
 
         {/* Free Trial Hero — primary path for new orgs */}
         <div className="relative z-10 max-w-3xl mx-auto mb-12">
-          <div className="border border-[#ccff00] bg-[#ccff00]/5 rounded-2xl p-8 text-center backdrop-blur-md shadow-[0_20px_50px_rgba(204,255,0,0.1)]">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 border border-[#ccff00]/30 bg-[#ccff00]/10 rounded-full mb-4">
-              <span className="font-mono text-[#ccff00] text-[10px] tracking-widest uppercase font-bold">
-                Not ready to commit?
-              </span>
-            </div>
-            <h2 className="font-serif text-3xl md:text-4xl text-white mb-3">
-              Start your 30-day free trial
+          <div className="border border-[#F2F1EA]/60 bg-white/5 rounded-[6px] p-8 text-center backdrop-blur-md">
+            <p className="font-mono text-[#F2F1EA]/80 text-[10px] tracking-[0.22em] uppercase font-bold mb-4">
+              Not ready to commit?
+            </p>
+            <h2 className="font-display font-bold tracking-tight text-3xl md:text-4xl text-[#F2F1EA] mb-3">
+              Start your 30-day free trial.
             </h2>
             <p className="text-white/70 text-sm md:text-base max-w-xl mx-auto mb-6 leading-relaxed">
               Add a facility, build a product LCA and explore the platform. We ask for a card to keep
@@ -379,16 +373,9 @@ function CompleteSubscriptionContent() {
             <button
               onClick={handleStartTrial}
               disabled={processingCheckout}
-              className="px-10 py-4 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:opacity-90 hover:scale-[1.02] transition-all"
+              className="px-10 py-4 bg-[#F2F1EA] text-[#1A1B1D] font-mono uppercase text-xs tracking-[0.22em] font-bold rounded-full hover:bg-white transition-colors disabled:opacity-50"
             >
-              {processingTier === 'trial' ? (
-                <span className="flex items-center justify-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Starting trial...
-                </span>
-              ) : (
-                'Start free trial'
-              )}
+              {processingTier === 'trial' ? 'Starting trial...' : 'Start free trial'}
             </button>
             <p className="text-white/40 text-[11px] mt-4">
               30 days free. No automatic charge. Your card stays on file so choosing a plan later is one click.
@@ -410,7 +397,7 @@ function CompleteSubscriptionContent() {
             className={cn(
               "font-mono text-xs uppercase tracking-widest px-5 py-2.5 rounded-full transition-all",
               billingInterval === 'monthly'
-                ? "bg-[#ccff00] text-black font-bold"
+                ? "bg-[#F2F1EA] text-[#1A1B1D] font-bold"
                 : "border border-white/20 text-white/50 hover:text-white hover:border-white/40"
             )}
           >
@@ -421,7 +408,7 @@ function CompleteSubscriptionContent() {
             className={cn(
               "font-mono text-xs uppercase tracking-widest px-5 py-2.5 rounded-full transition-all",
               billingInterval === 'annual'
-                ? "bg-[#ccff00] text-black font-bold"
+                ? "bg-[#F2F1EA] text-[#1A1B1D] font-bold"
                 : "border border-white/20 text-white/50 hover:text-white hover:border-white/40"
             )}
           >
@@ -429,17 +416,12 @@ function CompleteSubscriptionContent() {
           </button>
         </div>
 
-        {/* Founding Partner Badge */}
+        {/* Founding partner note */}
         <div className="flex justify-center mb-8">
-          <div className="inline-flex items-center gap-2 px-5 py-2 border border-[#ccff00]/30 bg-[#ccff00]/5 rounded-full">
-            <span className="font-mono text-[#ccff00] text-xs tracking-widest uppercase">
-              Founding Partner Pricing — Limited Availability
-            </span>
-          </div>
+          <span className="font-mono font-bold text-[#F2F1EA]/80 text-xs tracking-[0.22em] uppercase">
+            Founding partner pricing: limited availability
+          </span>
         </div>
-
-        {/* Radial glow */}
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#ccff00]/5 via-transparent to-transparent pointer-events-none" />
 
         {/* Plans Grid */}
         <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch mb-12">
@@ -450,14 +432,14 @@ function CompleteSubscriptionContent() {
               <div
                 key={idx}
                 className={cn(
-                  "border p-8 flex flex-col transition-all duration-500 group relative rounded-2xl backdrop-blur-md",
+                  "border p-8 flex flex-col transition-all duration-500 group relative rounded-[6px] backdrop-blur-md",
                   tier.highlight
-                    ? "border-[#ccff00] bg-[#ccff00]/5 md:-translate-y-4 shadow-[0_20px_50px_rgba(204,255,0,0.1)]"
+                    ? "border-[#F2F1EA]/60 bg-white/10 md:-translate-y-4"
                     : "border-white/10 bg-white/5 hover:border-white/30"
                 )}
               >
                 {tier.highlight && (
-                  <div className="absolute top-0 right-0 bg-[#ccff00] text-black text-[10px] font-bold uppercase px-3 py-1 tracking-widest rounded-tr-2xl rounded-bl-xl">
+                  <div className="absolute top-0 right-0 bg-[#F2F1EA] text-[#1A1B1D] text-[10px] font-mono font-bold uppercase px-3 py-1 tracking-[0.22em] rounded-tr-[6px] rounded-bl-[6px]">
                     Recommended
                   </div>
                 )}
@@ -465,32 +447,32 @@ function CompleteSubscriptionContent() {
                 <div className="flex items-center justify-between mb-4">
                   <h4
                     className={cn(
-                      "font-serif text-3xl",
-                      tier.highlight ? "text-[#ccff00]" : "text-white"
+                      "font-display font-bold tracking-tight text-3xl",
+                      tier.highlight ? "text-[#F2F1EA]" : "text-white"
                     )}
                   >
                     {tier.name}
                   </h4>
-                  <tier.icon className={tier.highlight ? "text-[#ccff00]" : "text-gray-500"} />
+                  <tier.icon className={tier.highlight ? "text-[#F2F1EA]" : "text-white/40"} />
                 </div>
 
                 <div className="mb-6">
                   <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-white/40 text-lg line-through font-serif">
+                    <span className="text-white/40 text-lg line-through font-display">
                       £{billingInterval === 'monthly' ? tier.monthly.original : tier.annual.original.toLocaleString()}
                     </span>
                     <span
                       className={cn(
-                        "font-serif text-4xl",
-                        tier.highlight ? "text-[#ccff00]" : "text-white"
+                        "font-display font-bold tracking-tight text-4xl tabular-nums",
+                        tier.highlight ? "text-[#F2F1EA]" : "text-white"
                       )}
                     >
                       £{billingInterval === 'monthly' ? tier.monthly.founder : tier.annual.founder.toLocaleString()}
                     </span>
                     <span className="text-white/40 text-sm">/{billingInterval === 'monthly' ? 'mo' : 'yr'}</span>
                   </div>
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#ccff00]/10 rounded-full mb-3">
-                    <span className="font-mono text-[#ccff00] text-[10px] tracking-wider uppercase font-bold">
+                  <div className="mb-3">
+                    <span className="font-mono text-[#F2F1EA]/80 text-[10px] tracking-[0.22em] uppercase font-bold">
                       Save £{billingInterval === 'monthly'
                         ? tier.monthly.saving
                         : tier.annual.saving.toLocaleString()}{billingInterval === 'monthly' ? '/mo' : '/yr'}
@@ -518,8 +500,8 @@ function CompleteSubscriptionContent() {
                         className={cn(
                           "w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 transition-colors",
                           tier.highlight
-                            ? "bg-[#ccff00]"
-                            : "bg-gray-500 group-hover/item:bg-white"
+                            ? "bg-[#F2F1EA]"
+                            : "bg-white/40 group-hover/item:bg-white"
                         )}
                       />
                       <span
@@ -527,9 +509,9 @@ function CompleteSubscriptionContent() {
                           "leading-relaxed transition-colors",
                           tier.highlight
                             ? "text-white"
-                            : "text-gray-400 group-hover/item:text-white",
+                            : "text-white/60 group-hover/item:text-white",
                           feat.startsWith("Everything") &&
-                            "font-serif italic text-white/90 border-b border-white/10 pb-1 w-full"
+                            "font-display font-medium text-white/90 border-b border-white/10 pb-1 w-full"
                         )}
                       >
                         {feat}
@@ -542,20 +524,13 @@ function CompleteSubscriptionContent() {
                   onClick={() => handleSelectPlan(tier.tierKey)}
                   disabled={processingCheckout}
                   className={cn(
-                    "w-full py-5 font-mono uppercase text-xs tracking-widest font-bold transition-all duration-300 text-center block rounded-xl",
+                    "w-full py-5 font-mono uppercase text-xs tracking-[0.22em] font-bold transition-colors duration-200 text-center block rounded-full disabled:opacity-50",
                     tier.highlight
-                      ? "bg-[#ccff00] text-black hover:opacity-90 hover:scale-[1.02]"
-                      : "border border-white/20 hover:bg-white hover:text-black text-white"
+                      ? "bg-[#F2F1EA] text-[#1A1B1D] hover:bg-white"
+                      : "border border-[#F2F1EA]/40 text-[#F2F1EA] hover:border-[#F2F1EA]"
                   )}
                 >
-                  {isProcessing ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Processing...
-                    </span>
-                  ) : (
-                    tier.buttonText
-                  )}
+                  {isProcessing ? "Processing..." : tier.buttonText}
                 </button>
               </div>
             )
@@ -566,7 +541,7 @@ function CompleteSubscriptionContent() {
         <div className="text-center text-sm text-white/40">
           <p>All plans include a 14-day money-back guarantee. Cancel anytime.</p>
           <p className="mt-2">
-            Questions? <a href="/contact" className="text-[#ccff00] hover:underline">Contact our team</a>
+            Questions? <a href="/contact" className="text-[#F2F1EA] underline underline-offset-4 hover:text-white">Contact our team</a>
           </p>
         </div>
 
@@ -599,11 +574,8 @@ function CompleteSubscriptionContent() {
 export default function CompleteSubscriptionPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-slate-950">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-12 w-12 animate-spin text-neon-lime" />
-          <p className="text-sm text-slate-400 font-data">Loading...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-[#1A1B1D]">
+        <p className="font-mono text-sm uppercase tracking-[0.22em] text-[#F2F1EA]/70">Loading...</p>
       </div>
     }>
       <CompleteSubscriptionContent />

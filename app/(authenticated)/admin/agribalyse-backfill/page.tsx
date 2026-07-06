@@ -11,11 +11,12 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { UtensilsCrossed, Play, RefreshCw, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Play, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { StateChip } from '@/components/studio/state-chip';
 import { useToast } from '@/hooks/use-toast';
 
 interface Coverage {
@@ -99,15 +100,15 @@ export default function AgribalyseBackfillPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
-      <div className="flex items-center gap-3">
-        <UtensilsCrossed className="h-7 w-7" />
-        <div>
-          <h1 className="text-2xl font-semibold">Agribalyse food factors</h1>
-          <p className="text-sm text-muted-foreground">
-            Backfill cradle-to-gate carbon, water and land factors for common restaurant
-            ingredients from Agribalyse v3.2, so hospitality meals resolve to real numbers.
-          </p>
-        </div>
+      <div>
+        <Eyebrow tone="dim" className="mb-3">THE WIRING · ADMIN</Eyebrow>
+        <h1 className="font-display text-3xl font-bold tracking-[-0.035em] text-foreground">
+          Agribalyse food factors.
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Backfill cradle-to-gate carbon, water and land factors for common restaurant
+          ingredients from Agribalyse v3.2, so hospitality meals resolve to real numbers.
+        </p>
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -127,13 +128,9 @@ export default function AgribalyseBackfillPage() {
             <>
               <div className="flex items-center gap-2">
                 {coverage.configured ? (
-                  <Badge variant="secondary" className="gap-1">
-                    <CheckCircle2 className="h-3.5 w-3.5" /> Agribalyse server configured
-                  </Badge>
+                  <StateChip tone="good">Agribalyse server configured</StateChip>
                 ) : (
-                  <Badge variant="destructive" className="gap-1">
-                    <AlertTriangle className="h-3.5 w-3.5" /> Server not configured
-                  </Badge>
+                  <StateChip tone="stale">Server not configured</StateChip>
                 )}
               </div>
 
@@ -163,8 +160,7 @@ export default function AgribalyseBackfillPage() {
           {running ? 'Starting…' : 'Run backfill'}
         </Button>
         {polling && (
-          <span className="flex items-center gap-2 text-sm text-muted-foreground">
-            <RefreshCw className="h-4 w-4 animate-spin" />
+          <span className="text-sm text-muted-foreground">
             Running in the background…
           </span>
         )}
@@ -172,7 +168,7 @@ export default function AgribalyseBackfillPage() {
 
       <p className="text-xs text-muted-foreground">
         Each commodity needs a short Agribalyse calculation, so the full run takes several
-        minutes. It&apos;s safe to run repeatedly — factors are refreshed in place, not duplicated.
+        minutes. It&apos;s safe to run repeatedly: factors are refreshed in place, not duplicated.
       </p>
     </div>
   );

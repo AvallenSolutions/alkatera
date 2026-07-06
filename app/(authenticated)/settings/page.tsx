@@ -5,9 +5,9 @@ import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Building2, Truck, Plus, CreditCard, Check, Sparkles, Leaf, Flower2, TreeDeciduous, AlertCircle, FileText, Calendar, History, Loader2 } from 'lucide-react'
+import { Building2, Truck, Plus, CreditCard, Check, Sparkles, Leaf, Flower2, TreeDeciduous, AlertCircle, FileText, Calendar, History } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Badge } from '@/components/ui/badge'
+import { Statement, StateChip } from '@/components/studio'
 import { Separator } from '@/components/ui/separator'
 import Link from 'next/link'
 import { useSubscription, TierName } from '@/hooks/useSubscription'
@@ -94,7 +94,7 @@ export default function SettingsPage() {
       router.replace('/dashboard')
     }
     if (searchParams.get('canceled') === 'true') {
-      toast.info('Checkout cancelled — please select a plan to continue')
+      toast.info('Checkout cancelled, please select a plan to continue')
       router.replace('/settings')
     }
     if (searchParams.get('payment_required') === 'true') {
@@ -315,14 +315,14 @@ export default function SettingsPage() {
     <div className="space-y-6">
       {/* Subscription Required Banner - only shown to admins */}
       {isOrgAdmin && subscriptionStatus !== 'active' && subscriptionStatus !== 'trial' && (
-        <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-2">
+        <div className="rounded-[6px] border border-border bg-card p-4 mb-2">
           <div className="flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+            <AlertCircle className="h-5 w-5 text-studio-attention mt-0.5 flex-shrink-0" />
             <div>
-              <h3 className="font-semibold text-amber-800 dark:text-amber-200">
+              <h3 className="font-semibold text-foreground">
                 Subscription Required
               </h3>
-              <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 Please select a plan below to access the alkatera platform.
                 Choose from Seed or Blossom to get started, or contact us for Canopy.
               </p>
@@ -385,11 +385,9 @@ export default function SettingsPage() {
         />
       )}
 
-      <div>
-        <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-          Settings
-        </h1>
-        <p className="text-sm text-muted-foreground mt-2">
+      <div className="space-y-3">
+        <Statement eyebrow="THE WIRING · SETTINGS" headline="The wiring." />
+        <p className="text-sm text-studio-dim">
           Manage your account, team, and organisation settings
         </p>
       </div>
@@ -432,15 +430,13 @@ export default function SettingsPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {isLoading ? (
-                  <div className="animate-pulse space-y-3">
+                  <div className="space-y-3">
                     <div className="h-8 w-32 bg-muted rounded" />
                     <div className="h-4 w-48 bg-muted rounded" />
                   </div>
                 ) : subscriptionStatus === 'trial' ? (
                   <>
-                    <span className="inline-block text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
-                      Free Trial
-                    </span>
+                    <StateChip tone="hold">Free Trial</StateChip>
                     <p className="text-sm text-muted-foreground">
                       You&apos;re on a 30-day free trial with full Seed features.
                       {organizationData?.subscription_expires_at
@@ -454,15 +450,17 @@ export default function SettingsPage() {
                   <>
                     <div className="flex items-center gap-3">
                       <TierBadge tier={tierName} size="lg" />
-                      <span className={cn(
-                        "text-xs px-2 py-1 rounded-full",
-                        subscriptionStatus === 'active' && "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
-                        subscriptionStatus === 'trial' && "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-                        subscriptionStatus === 'suspended' && "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
-                        subscriptionStatus === 'cancelled' && "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
-                      )}>
+                      <StateChip
+                        tone={
+                          subscriptionStatus === 'active' ? 'good'
+                            : subscriptionStatus === 'trial' ? 'hold'
+                            : subscriptionStatus === 'suspended' ? 'attention'
+                            : subscriptionStatus === 'cancelled' ? 'stale'
+                            : 'quiet'
+                        }
+                      >
                         {subscriptionStatus.charAt(0).toUpperCase() + subscriptionStatus.slice(1)}
-                      </span>
+                      </StateChip>
                     </div>
                     <p className="text-sm text-muted-foreground">
                       {allTiers.find(t => t.tier_name === tierName)?.description || 'Manage your sustainability tracking'}
@@ -481,7 +479,7 @@ export default function SettingsPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {isLoading || !usage ? (
-                  <div className="animate-pulse space-y-4">
+                  <div className="space-y-4">
                     {[1, 2, 3].map(i => (
                       <div key={i} className="space-y-2">
                         <div className="h-4 w-24 bg-muted rounded" />
@@ -527,15 +525,13 @@ export default function SettingsPage() {
                 <div>
                   <div className="flex items-center gap-3 mb-1">
                     <CardTitle>Available Plans</CardTitle>
-                    <Badge variant="outline" className="border-neon-lime/50 bg-neon-lime/10 text-neon-lime text-[10px] uppercase tracking-widest">
-                      Founding Partner Pricing
-                    </Badge>
+                    <StateChip tone="quiet">Founding Partner Pricing</StateChip>
                   </div>
                   <CardDescription>
-                    Lock in exclusive founding partner rates — honoured for the lifetime of your subscription.
+                    Lock in exclusive founding partner rates, honoured for the lifetime of your subscription.
                   </CardDescription>
                 </div>
-                <div className="flex items-center gap-2 rounded-lg border p-1">
+                <div className="flex items-center gap-2 rounded-[6px] border p-1">
                   <Button
                     size="sm"
                     variant={billingInterval === 'monthly' ? 'default' : 'ghost'}
@@ -550,7 +546,7 @@ export default function SettingsPage() {
                     className="gap-1"
                   >
                     Annual
-                    <Badge variant="secondary" className="ml-1 text-xs">Save 17%</Badge>
+                    <span className="ml-1 font-mono text-[10px] uppercase tracking-[0.18em]">Save 17%</span>
                   </Button>
                 </div>
               </div>
@@ -583,33 +579,27 @@ export default function SettingsPage() {
                     <div
                       key={tier.tier_name}
                       className={cn(
-                        "relative rounded-lg border p-6 transition-all hover:shadow-md flex flex-col",
-                        isCurrent && "border-neon-lime bg-neon-lime/5",
-                        tier.tier_name === 'blossom' && !isCurrent && "border-pink-200 dark:border-pink-900"
+                        "relative rounded-[6px] border bg-card p-6 transition-colors flex flex-col",
+                        isCurrent ? "border-foreground" : "border-border"
                       )}
                     >
                       {isCurrent && (
                         <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                          <span className="rounded-full bg-neon-lime px-3 py-1 text-xs font-medium text-black">
+                          <span className="rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground">
                             Current Plan
                           </span>
                         </div>
                       )}
                       {tier.tier_name === 'blossom' && !isCurrent && (
                         <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                          <span className="rounded-full bg-pink-500 px-3 py-1 text-xs font-medium text-white">
+                          <span className="rounded-full border border-border bg-secondary px-3 py-1 text-xs font-medium text-foreground">
                             Popular
                           </span>
                         </div>
                       )}
 
                       <div className="mb-4 flex items-center gap-2 pt-2">
-                        <Icon className={cn(
-                          "h-5 w-5",
-                          tier.tier_name === 'seed' && "text-emerald-500",
-                          tier.tier_name === 'blossom' && "text-pink-500",
-                          tier.tier_name === 'canopy' && "text-teal-500"
-                        )} />
+                        <Icon className="h-5 w-5 text-foreground" />
                         <span className="font-semibold">{tier.display_name}</span>
                       </div>
 
@@ -620,7 +610,7 @@ export default function SettingsPage() {
                             <span className="text-sm text-muted-foreground">/month</span>
                           </div>
                           {billingInterval === 'annual' && annualSavings > 0 && (
-                            <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                            <p className="text-xs text-studio-good mt-1">
                               £{annualPrice} billed annually (save £{annualSavings})
                             </p>
                           )}
@@ -642,37 +632,37 @@ export default function SettingsPage() {
                           </p>
                           <ul className="space-y-2">
                             <li className="flex items-center gap-2 text-sm">
-                              <Check className="h-4 w-4 text-neon-lime flex-shrink-0" />
+                              <Check className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                               <span>
                                 {tier.max_products ? `${tier.max_products} Products` : 'Unlimited Products'}
                               </span>
                             </li>
                             <li className="flex items-center gap-2 text-sm">
-                              <Check className="h-4 w-4 text-neon-lime flex-shrink-0" />
+                              <Check className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                               <span>
                                 {tier.max_lcas ? `${tier.max_lcas} LCAs` : 'Unlimited LCAs'}
                               </span>
                             </li>
                             <li className="flex items-center gap-2 text-sm">
-                              <Check className="h-4 w-4 text-neon-lime flex-shrink-0" />
+                              <Check className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                               <span>
                                 {tier.max_team_members ? `${tier.max_team_members} Team Members` : 'Unlimited Team Members'}
                               </span>
                             </li>
                             <li className="flex items-center gap-2 text-sm">
-                              <Check className="h-4 w-4 text-neon-lime flex-shrink-0" />
+                              <Check className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                               <span>
                                 {tier.max_facilities ? `${tier.max_facilities} Facilities` : 'Unlimited Facilities'}
                               </span>
                             </li>
                             <li className="flex items-center gap-2 text-sm">
-                              <Check className="h-4 w-4 text-neon-lime flex-shrink-0" />
+                              <Check className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                               <span>
                                 {tier.max_suppliers ? `${tier.max_suppliers} Suppliers` : 'Unlimited Suppliers'}
                               </span>
                             </li>
                             <li className="flex items-center gap-2 text-sm">
-                              <Check className="h-4 w-4 text-neon-lime flex-shrink-0" />
+                              <Check className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                               <span>
                                 {tier.max_reports_per_month ? `${tier.max_reports_per_month} Reports/month` : 'Unlimited Reports'}
                               </span>
@@ -688,7 +678,7 @@ export default function SettingsPage() {
                             <ul className="space-y-1">
                               {tier.features_enabled.slice(0, 6).map((feature) => (
                                 <li key={feature} className="flex items-center gap-2 text-xs">
-                                  <Check className="h-3 w-3 text-neon-lime flex-shrink-0" />
+                                  <Check className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                                   <span className="capitalize">{feature.replace(/_/g, ' ')}</span>
                                 </li>
                               ))}
@@ -734,7 +724,7 @@ export default function SettingsPage() {
 
           {/* Cancel Subscription */}
           {tierName !== 'seed' && subscriptionStatus === 'active' && (
-            <Card className="border-red-200 dark:border-red-900/50">
+            <Card>
               <CardContent className="flex items-center justify-between py-6">
                 <div>
                   <p className="text-sm font-medium">Cancel Subscription</p>
@@ -744,7 +734,7 @@ export default function SettingsPage() {
                 </div>
                 <Button
                   variant="ghost"
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/30"
+                  className="text-studio-stale hover:text-studio-stale hover:bg-secondary"
                   onClick={() => setCancelModalOpen(true)}
                 >
                   Cancel Plan
@@ -769,13 +759,13 @@ export default function SettingsPage() {
               <CardContent className="space-y-4">
                 {loadingPaymentMethod ? (
                   <div className="flex items-center justify-center py-6">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">Loading</span>
                   </div>
                 ) : paymentMethod ? (
                   <>
-                    <div className="flex items-center gap-3 p-3 rounded-lg border">
-                      <div className="h-10 w-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded flex items-center justify-center">
-                        <CreditCard className="h-6 w-6 text-white" />
+                    <div className="flex items-center gap-3 p-3 rounded-[6px] border border-border bg-card">
+                      <div className="h-10 w-16 rounded-[6px] border border-border bg-secondary flex items-center justify-center">
+                        <CreditCard className="h-6 w-6 text-foreground" />
                       </div>
                       <div className="flex-1">
                         <p className="text-sm font-medium">{getCardBrandIcon(paymentMethod.brand)}</p>
@@ -793,21 +783,14 @@ export default function SettingsPage() {
                       onClick={handleManageSubscription}
                       disabled={updatingPaymentMethod}
                     >
-                      {updatingPaymentMethod ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Opening Portal...
-                        </>
-                      ) : (
-                        'Update Payment Method'
-                      )}
+                      {updatingPaymentMethod ? 'Opening Portal...' : 'Update Payment Method'}
                     </Button>
                   </>
                 ) : organizationData?.stripe_customer_id ? (
                   <>
-                    <div className="flex items-center gap-3 p-3 rounded-lg border">
-                      <div className="h-10 w-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded flex items-center justify-center">
-                        <CreditCard className="h-6 w-6 text-white" />
+                    <div className="flex items-center gap-3 p-3 rounded-[6px] border border-border bg-card">
+                      <div className="h-10 w-16 rounded-[6px] border border-border bg-secondary flex items-center justify-center">
+                        <CreditCard className="h-6 w-6 text-foreground" />
                       </div>
                       <div className="flex-1">
                         <p className="text-sm font-medium">Payment method on file</p>
@@ -820,14 +803,7 @@ export default function SettingsPage() {
                       onClick={handleManageSubscription}
                       disabled={updatingPaymentMethod}
                     >
-                      {updatingPaymentMethod ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Opening Portal...
-                        </>
-                      ) : (
-                        'Update Payment Method'
-                      )}
+                      {updatingPaymentMethod ? 'Opening Portal...' : 'Update Payment Method'}
                     </Button>
                   </>
                 ) : (
@@ -957,7 +933,7 @@ export default function SettingsPage() {
                   {invoices.map((invoice: any) => (
                     <div
                       key={invoice.id}
-                      className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                      className="flex items-center justify-between p-3 rounded-[6px] border border-border bg-card hover:bg-secondary transition-colors"
                     >
                       <div className="flex items-center gap-3">
                         <FileText className="h-4 w-4 text-muted-foreground" />
@@ -975,9 +951,9 @@ export default function SettingsPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        <Badge variant={invoice.status === 'paid' ? 'default' : 'secondary'}>
+                        <StateChip tone={invoice.status === 'paid' ? 'good' : 'attention'}>
                           {invoice.status}
-                        </Badge>
+                        </StateChip>
                         <span className="text-sm font-medium">
                           £{(invoice.amount_paid / 100).toFixed(2)}
                         </span>
@@ -1015,25 +991,25 @@ export default function SettingsPage() {
             <CardContent>
               {loadingHistory ? (
                 <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">Loading</span>
                 </div>
               ) : subscriptionHistory.length > 0 ? (
                 <div className="space-y-2">
                   {subscriptionHistory.map((entry) => (
                     <div
                       key={entry.id}
-                      className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                      className="flex items-center justify-between p-3 rounded-[6px] border border-border bg-card hover:bg-secondary transition-colors"
                     >
                       <div className="flex items-center gap-3">
                         <div className={cn(
                           "h-2 w-2 rounded-full",
-                          entry.eventType === 'upgrade' && "bg-green-500",
-                          entry.eventType === 'downgrade' && "bg-amber-500",
-                          entry.eventType === 'payment_failed' && "bg-red-500",
-                          entry.eventType === 'payment_succeeded' && "bg-green-500",
-                          entry.eventType === 'grace_period_started' && "bg-amber-500",
-                          entry.eventType === 'grace_period_auto_deletion' && "bg-red-500",
-                          !['upgrade', 'downgrade', 'payment_failed', 'payment_succeeded', 'grace_period_started', 'grace_period_auto_deletion'].includes(entry.eventType) && "bg-blue-500"
+                          entry.eventType === 'upgrade' && "bg-studio-good",
+                          entry.eventType === 'downgrade' && "bg-studio-attention",
+                          entry.eventType === 'payment_failed' && "bg-studio-stale",
+                          entry.eventType === 'payment_succeeded' && "bg-studio-good",
+                          entry.eventType === 'grace_period_started' && "bg-studio-attention",
+                          entry.eventType === 'grace_period_auto_deletion' && "bg-studio-stale",
+                          !['upgrade', 'downgrade', 'payment_failed', 'payment_succeeded', 'grace_period_started', 'grace_period_auto_deletion'].includes(entry.eventType) && "bg-studio-dim"
                         )} />
                         <div>
                           <p className="text-sm font-medium">{entry.eventTypeLabel}</p>
@@ -1057,7 +1033,7 @@ export default function SettingsPage() {
                           </span>
                         )}
                         {entry.amountCredited && entry.amountCredited > 0 && (
-                          <span className="text-sm font-medium text-green-600">
+                          <span className="text-sm font-medium text-studio-good">
                             +£{entry.amountCredited.toFixed(2)}
                           </span>
                         )}

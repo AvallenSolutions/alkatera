@@ -6,11 +6,12 @@ import { useOnboarding } from '@/lib/onboarding'
 import { useOrganization } from '@/lib/organizationContext'
 import type { AnnualProductionBucket } from '@/lib/onboarding'
 import { Button } from '@/components/ui/button'
-import { Zap, BarChart3, Package, Users, ArrowRight, Beer, Banknote, Factory, Globe, Target as TargetIcon, Sparkles } from 'lucide-react'
+import { Zap, BarChart3, Package, Users, ArrowRight, Beer, Banknote, Factory, Globe, Target as TargetIcon } from 'lucide-react'
 import { getBenchmarkForCategory } from '@/lib/industry-benchmarks'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabaseClient'
 import { RosaIntro } from './RosaIntro'
+import { BigNumber, Eyebrow } from '@/components/studio'
 
 const BEVERAGE_TO_CATEGORY: Record<string, string> = {
   beer: 'Lager',
@@ -159,64 +160,61 @@ export function FastTrackCompletionStep() {
         <RosaIntro message="Lovely. I've got what I need to start. Whenever you're ready, head to the dashboard and I'll show you what to look at first." />
         {/* Success header */}
         <div className="text-center space-y-3">
-          <div className="mx-auto w-20 h-20 rounded-3xl bg-[#ccff00]/20 border border-[#ccff00]/30 flex items-center justify-center animate-in zoom-in duration-500">
-            <Zap className="w-10 h-10 text-[#ccff00]" />
+          <div className="mx-auto w-20 h-20 rounded-[6px] bg-card border border-border flex items-center justify-center">
+            <Zap className="w-10 h-10 text-studio-forest" />
           </div>
-          <h3 className="text-2xl font-serif font-bold text-white">
-            You&apos;re ready to go
+          <h3 className="text-2xl font-display font-bold tracking-tight text-foreground">
+            You&apos;re ready to go.
           </h3>
-          <div className="bg-[#ccff00]/10 border border-[#ccff00]/30 rounded-xl px-5 py-3 inline-block">
-            <p className="text-sm text-white/60">Estimated footprint</p>
-            <p className="text-3xl font-bold text-[#ccff00]">
-              ~{estimateTonnes > 0 ? estimateTonnes.toLocaleString() : '<1'} t CO&#8322;e/yr
-            </p>
+          <div className="bg-card border border-border rounded-[6px] px-5 py-3 inline-block">
+            <BigNumber
+              value={<span className="text-studio-forest">~{estimateTonnes > 0 ? estimateTonnes.toLocaleString() : '<1'}</span>}
+              label={'t CO₂e / year, estimated'}
+            />
           </div>
-          <p className="text-sm text-white/50 max-w-xs mx-auto">
+          <p className="text-sm text-muted-foreground max-w-xs mx-auto">
             Here are 3 ways to sharpen this number and unlock your full sustainability picture.
           </p>
         </div>
 
         {/* Personalised summary of what the user actually did */}
         {counts && (counts.products > 0 || counts.facilities > 0 || counts.brewwConnected || counts.xeroConnected || counts.importedFromWebsite || counts.hasTarget) && (
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2">
-            <p className="text-xs uppercase tracking-wide text-white/40 flex items-center gap-1.5">
-              <Sparkles className="w-3 h-3 text-[#ccff00]" />
-              You set up
-            </p>
-            <ul className="space-y-1.5 text-sm text-white/80">
+          <div className="bg-card border border-border rounded-[6px] p-4 space-y-2">
+            <Eyebrow tone="inherit" className="text-studio-forest">You set up</Eyebrow>
+            <ul className="space-y-1.5 text-sm text-foreground">
               {counts.products > 0 && (
                 <li className="flex items-center gap-2">
-                  <Package className="w-4 h-4 text-[#ccff00] shrink-0" />
+                  <Package className="w-4 h-4 text-studio-forest shrink-0" />
                   {counts.products} product{counts.products === 1 ? '' : 's'}
                 </li>
               )}
               {counts.facilities > 0 && (
                 <li className="flex items-center gap-2">
-                  <Factory className="w-4 h-4 text-[#ccff00] shrink-0" />
+                  <Factory className="w-4 h-4 text-studio-forest shrink-0" />
                   {counts.facilities} facilit{counts.facilities === 1 ? 'y' : 'ies'}
                 </li>
               )}
               {counts.importedFromWebsite && (
                 <li className="flex items-center gap-2">
-                  <Globe className="w-4 h-4 text-[#ccff00] shrink-0" />
+                  <Globe className="w-4 h-4 text-studio-forest shrink-0" />
                   Imported data from your website
                 </li>
               )}
               {counts.brewwConnected && (
                 <li className="flex items-center gap-2">
-                  <Beer className="w-4 h-4 text-[#ccff00] shrink-0" />
+                  <Beer className="w-4 h-4 text-studio-forest shrink-0" />
                   Connected Breww
                 </li>
               )}
               {counts.xeroConnected && (
                 <li className="flex items-center gap-2">
-                  <Banknote className="w-4 h-4 text-[#ccff00] shrink-0" />
+                  <Banknote className="w-4 h-4 text-studio-forest shrink-0" />
                   Connected Xero
                 </li>
               )}
               {counts.hasTarget && (
                 <li className="flex items-center gap-2">
-                  <TargetIcon className="w-4 h-4 text-[#ccff00] shrink-0" />
+                  <TargetIcon className="w-4 h-4 text-studio-forest shrink-0" />
                   Target: reduce by {counts.targetReductionPct}% by {counts.targetYear}
                 </li>
               )}
@@ -234,29 +232,26 @@ export function FastTrackCompletionStep() {
                 onClick={() => handleNavigate(card.href, card.cta)}
                 disabled={!!launching}
                 className={cn(
-                  'w-full flex items-center gap-4 p-4 border rounded-xl text-left transition-all group',
+                  'w-full flex items-center gap-4 p-4 border rounded-[6px] text-left transition-colors group',
                   isLaunching
-                    ? 'bg-[#ccff00]/10 border-[#ccff00]/40'
-                    : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+                    ? 'bg-secondary border-studio-forest'
+                    : 'bg-card border-border hover:bg-secondary hover:border-studio-ink/25'
                 )}
               >
-                <div className={cn(
-                  'h-10 w-10 rounded-lg flex items-center justify-center shrink-0 transition-colors',
-                  isLaunching ? 'bg-[#ccff00]/20' : 'bg-white/10'
-                )}>
-                  <card.icon className={cn('w-5 h-5 transition-colors', isLaunching ? 'text-[#ccff00]' : 'text-white/60')} />
+                <div className="h-10 w-10 rounded-[6px] bg-secondary flex items-center justify-center shrink-0">
+                  <card.icon className={cn('w-5 h-5 transition-colors', isLaunching ? 'text-studio-forest' : 'text-muted-foreground')} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className={cn('text-sm font-semibold transition-colors', isLaunching ? 'text-[#ccff00]' : 'text-white')}>{card.title}</p>
-                    <span className="text-xs bg-white/10 text-white/40 px-1.5 py-0.5 rounded-full shrink-0">
+                    <p className={cn('text-sm font-semibold transition-colors', isLaunching ? 'text-studio-forest' : 'text-foreground')}>{card.title}</p>
+                    <span className="font-mono text-[10px] text-studio-dim shrink-0">
                       #{i + 1}
                     </span>
                   </div>
-                  <p className="text-xs text-white/40 mt-0.5">{card.description}</p>
-                  <p className={cn('text-xs mt-1 transition-colors', isLaunching ? 'text-[#ccff00]/80' : 'text-[#ccff00]/60')}>{card.impact}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{card.description}</p>
+                  <p className="text-xs mt-1 text-studio-forest">{card.impact}</p>
                 </div>
-                <ArrowRight className={cn('w-4 h-4 transition-colors shrink-0', isLaunching ? 'text-[#ccff00]/60' : 'text-white/20 group-hover:text-white/60')} />
+                <ArrowRight className={cn('w-4 h-4 transition-colors shrink-0', isLaunching ? 'text-studio-forest' : 'text-studio-dim group-hover:text-foreground')} />
               </button>
             )
           })}
@@ -267,13 +262,13 @@ export function FastTrackCompletionStep() {
           onClick={() => handleNavigate('/dashboard', 'Go to Dashboard')}
           disabled={!!launching}
           size="lg"
-          className="w-full bg-[#ccff00] text-black hover:bg-[#ccff00]/90 font-medium text-base rounded-xl"
+          className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-medium text-base rounded-full"
         >
           {launching === 'Go to Dashboard' ? 'Loading...' : 'Go to Dashboard'}
           <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
 
-        <p className="text-xs text-white/30 text-center">
+        <p className="text-xs text-studio-dim text-center">
           Your estimate is saved. You can improve it any time from your dashboard.
         </p>
       </div>

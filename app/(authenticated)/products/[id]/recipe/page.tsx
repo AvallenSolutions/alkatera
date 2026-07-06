@@ -141,7 +141,7 @@ export default function ProductRecipePage() {
               variant="default"
               size="sm"
               onClick={() => setShowBrewwImport(true)}
-              className="bg-[#8da300] hover:bg-[#708200] text-black"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               <Sparkles className="h-4 w-4 mr-2" />
               Import from Breww
@@ -152,7 +152,7 @@ export default function ProductRecipePage() {
               variant="outline"
               size="sm"
               onClick={() => router.push("/settings/integrations/breww?tab=products")}
-              className="text-[#8da300] dark:text-[#ccff00] border-[#ccff00]/40"
+              className="text-[#2B46C0] border-border"
             >
               <Sparkles className="h-4 w-4 mr-2" />
               Link to Breww

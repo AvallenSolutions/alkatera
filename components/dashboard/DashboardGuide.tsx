@@ -45,51 +45,6 @@ function useTypewriter(text: string, speed: number = 25) {
   return { displayed, isComplete, skipToEnd }
 }
 
-// ─── Sparkle Particles (Final Step) ────────────────────────────────────────────
-
-function SparkleParticles() {
-  const particles = useMemo(
-    () =>
-      Array.from({ length: 12 }, (_, i) => ({
-        id: i,
-        x: Math.random() * 100,
-        y: Math.random() * 100,
-        delay: Math.random() * 2,
-        duration: 2 + Math.random() * 2,
-        size: 4 + Math.random() * 6,
-      })),
-    []
-  )
-
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {particles.map((p) => (
-        <motion.div
-          key={p.id}
-          className="absolute rounded-full bg-[#ccff00]/30"
-          style={{
-            width: p.size,
-            height: p.size,
-            left: `${p.x}%`,
-            top: `${p.y}%`,
-          }}
-          animate={{
-            y: [0, -20, 0],
-            opacity: [0, 1, 0],
-            scale: [0.5, 1, 0.5],
-          }}
-          transition={{
-            duration: p.duration,
-            delay: p.delay,
-            repeat: Infinity,
-            ease: 'easeInOut',
-          }}
-        />
-      ))}
-    </div>
-  )
-}
-
 // ─── Step Dots ─────────────────────────────────────────────────────────────────
 
 function StepDots({
@@ -106,10 +61,10 @@ function StepDots({
           key={i}
           className={`h-1.5 rounded-full transition-all duration-300 ${
             i === current
-              ? 'w-4 bg-emerald-400'
+              ? 'w-4 bg-foreground'
               : i < current
-                ? 'w-1.5 bg-emerald-400/50'
-                : 'w-1.5 bg-white/20'
+                ? 'w-1.5 bg-foreground/50'
+                : 'w-1.5 bg-border'
           }`}
         />
       ))}
@@ -148,33 +103,27 @@ function RosaCard({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 12, scale: 0.97 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
-      className="bg-black/80 backdrop-blur-xl border border-emerald-400/20 rounded-2xl p-5 max-w-sm shadow-2xl relative"
+      className="bg-card border border-border rounded-[6px] p-5 max-w-sm shadow-lg relative"
     >
-      {isLastStep && <SparkleParticles />}
-
       {/* Header */}
       <div className="flex items-center gap-3 mb-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400/20 to-cyan-400/20 border border-emerald-400/30 flex items-center justify-center flex-shrink-0">
-          <Dog className="w-5 h-5 text-emerald-400" />
+        <div className="w-10 h-10 rounded-[6px] bg-secondary border border-border flex items-center justify-center flex-shrink-0">
+          <Dog className="w-5 h-5 text-foreground" />
         </div>
         <div>
-          <p className="text-emerald-400 font-medium text-sm">Rosa</p>
-          <p className="text-white/30 text-xs">Your sustainability guide</p>
+          <p className="text-foreground font-medium text-sm">Rosa</p>
+          <p className="text-muted-foreground text-xs">Your sustainability guide</p>
         </div>
       </div>
 
       {/* Message with typewriter effect */}
       <div
-        className="text-white/80 text-sm leading-relaxed mb-4 min-h-[60px] cursor-pointer"
+        className="text-foreground/80 text-sm leading-relaxed mb-4 min-h-[60px] cursor-pointer"
         onClick={!isComplete ? skipToEnd : undefined}
       >
         {displayed}
         {!isComplete && (
-          <motion.span
-            animate={{ opacity: [1, 0] }}
-            transition={{ duration: 0.5, repeat: Infinity }}
-            className="inline-block w-0.5 h-4 bg-emerald-400 ml-0.5 align-text-bottom"
-          />
+          <span className="inline-block w-0.5 h-4 bg-foreground ml-0.5 align-text-bottom" />
         )}
       </div>
 
@@ -186,7 +135,7 @@ function RosaCard({
               <Button
                 key={action.label}
                 onClick={() => onAction(action.href)}
-                className="bg-[#ccff00] text-black hover:bg-[#ccff00]/90 font-medium rounded-xl w-full"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full w-full"
               >
                 <Sparkles className="w-4 h-4 mr-2" />
                 {action.label}
@@ -196,7 +145,7 @@ function RosaCard({
                 key={action.label}
                 variant="ghost"
                 onClick={() => onAction('')}
-                className="text-white/50 hover:text-white hover:bg-white/10 rounded-xl w-full"
+                className="text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full w-full"
               >
                 {action.label}
               </Button>
@@ -216,7 +165,7 @@ function RosaCard({
                 variant="ghost"
                 size="sm"
                 onClick={onBack}
-                className="text-white/40 hover:text-white hover:bg-white/10 h-8 px-2"
+                className="text-muted-foreground hover:text-foreground hover:bg-secondary h-8 px-2"
               >
                 <ChevronLeft className="w-4 h-4" />
               </Button>
@@ -224,7 +173,7 @@ function RosaCard({
             <Button
               size="sm"
               onClick={onNext}
-              className="bg-[#ccff00] text-black hover:bg-[#ccff00]/90 font-medium rounded-lg h-8 px-3"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full h-8 px-3"
             >
               Next
               <ChevronRight className="w-4 h-4 ml-1" />
@@ -237,7 +186,7 @@ function RosaCard({
       {!isLastStep && (
         <button
           onClick={onSkip}
-          className="w-full text-center text-xs text-white/30 hover:text-white/50 mt-3 transition-colors"
+          className="w-full text-center text-xs text-muted-foreground hover:text-foreground mt-3 transition-colors"
         >
           Skip tour
         </button>
@@ -287,7 +236,7 @@ function GuideOverlay({
     >
       {/* Dark overlay with cutout via box-shadow */}
       <motion.div
-        className="absolute rounded-xl"
+        className="absolute rounded-[6px]"
         animate={{
           top: targetRect.top - padding,
           left: targetRect.left - padding,
@@ -302,13 +251,7 @@ function GuideOverlay({
 
       {/* Highlight ring */}
       <motion.div
-        className={`absolute rounded-xl ring-2 ring-emerald-400/30 ${
-          highlight === 'pulse'
-            ? 'animate-pulse'
-            : highlight === 'glow'
-              ? 'shadow-[0_0_30px_rgba(52,211,153,0.25)]'
-              : 'shadow-[0_0_20px_rgba(52,211,153,0.1)]'
-        }`}
+        className="absolute rounded-[6px] ring-2 ring-studio-cream/60"
         animate={{
           top: targetRect.top - padding,
           left: targetRect.left - padding,
@@ -567,7 +510,7 @@ export function DashboardGuideTrigger() {
       variant="outline"
       size="sm"
       onClick={() => window.dispatchEvent(new Event('dashboard-guide:start'))}
-      className="gap-2 border-[#ccff00]/30 text-[#ccff00] hover:bg-[#ccff00]/10 hover:text-[#ccff00] hover:border-[#ccff00]/50"
+      className="gap-2 border-border text-foreground hover:bg-secondary hover:text-foreground"
       title="Take a guided tour of your dashboard"
     >
       <Dog className="h-4 w-4" />

@@ -7,10 +7,11 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Pause, ExternalLink } from 'lucide-react'
+import { Plus, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Badge } from '@/components/ui/badge'
+import { StateChip } from '@/components/studio/state-chip'
+import type { WorkingTone } from '@/components/studio/theme'
 import {
   getActionTypeMeta,
   type NatureActionType,
@@ -36,18 +37,12 @@ export interface NatureAction {
   latest_flow_ha?: number | null
 }
 
-const STATUS_COPY: Record<NatureAction['status'], { label: string; tone: string }> = {
-  planned: { label: 'Planned', tone: 'bg-sky-500/10 text-sky-300 border-sky-500/30' },
-  in_progress: {
-    label: 'In progress',
-    tone: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
-  },
-  established: {
-    label: 'Established',
-    tone: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
-  },
-  paused: { label: 'Paused', tone: 'bg-amber-500/10 text-amber-300 border-amber-500/30' },
-  ended: { label: 'Historical', tone: 'bg-muted text-muted-foreground' },
+const STATUS_COPY: Record<NatureAction['status'], { label: string; tone: WorkingTone }> = {
+  planned: { label: 'Planned', tone: 'hold' },
+  in_progress: { label: 'In progress', tone: 'good' },
+  established: { label: 'Established', tone: 'good' },
+  paused: { label: 'Paused', tone: 'attention' },
+  ended: { label: 'Historical', tone: 'quiet' },
 }
 
 export function NatureActionsGallery() {
@@ -118,13 +113,13 @@ export function NatureActionsGallery() {
       {actions === null && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-44 w-full rounded-xl" />
+            <Skeleton key={i} className="h-44 w-full rounded-[6px]" />
           ))}
         </div>
       )}
 
       {empty && (
-        <div className="rounded-xl border border-dashed border-border bg-card/50 p-10 text-center">
+        <div className="rounded-[6px] border border-dashed border-border bg-card p-10 text-center">
           <p className="text-sm text-muted-foreground">
             No nature-positive actions logged yet. Register a regenerative-ag, restoration, or
             habitat-creation partnership and the platform will start tracking it as part of your
@@ -173,7 +168,7 @@ function ActionCard({ action, onClick }: { action: NatureAction; onClick: () => 
     <button
       type="button"
       onClick={onClick}
-      className="text-left rounded-xl border border-border bg-card p-4 hover:bg-card/80 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ccff00]"
+      className="text-left rounded-[6px] border border-border bg-card p-4 hover:bg-secondary transition focus:outline-none focus-visible:ring-2 focus-visible:ring-studio-cobalt"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
@@ -185,10 +180,7 @@ function ActionCard({ action, onClick }: { action: NatureAction; onClick: () => 
             </p>
           </div>
         </div>
-        <Badge variant="outline" className={`text-[10px] h-5 ${statusCopy.tone}`}>
-          {action.status === 'paused' && <Pause className="h-3 w-3 mr-1" />}
-          {statusCopy.label}
-        </Badge>
+        <StateChip tone={statusCopy.tone}>{statusCopy.label}</StateChip>
       </div>
 
       <div className="mt-3 space-y-1.5 text-xs">

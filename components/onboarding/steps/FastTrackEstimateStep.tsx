@@ -8,10 +8,11 @@ import { supabase } from '@/lib/supabaseClient'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ArrowRight, TrendingDown, Loader2, Sparkles } from 'lucide-react'
+import { ArrowRight, TrendingDown, Sparkles } from 'lucide-react'
 import { RosaIntro } from './RosaIntro'
 import { getBenchmarkForCategory } from '@/lib/industry-benchmarks'
 import { cn } from '@/lib/utils'
+import { BigNumber, Eyebrow } from '@/components/studio'
 
 const BEVERAGE_TO_CATEGORY: Record<string, string> = {
   beer: 'Lager',
@@ -64,9 +65,9 @@ interface ProductVolume {
 }
 
 const SCOPE_ROWS = [
-  { label: 'Scope 3: ingredients and raw materials', pct: 57, color: 'bg-[#ccff00]' },
-  { label: 'Scope 1+2: energy and operations', pct: 18, color: 'bg-blue-400' },
-  { label: 'Scope 3: packaging', pct: 25, color: 'bg-orange-400' },
+  { label: 'Scope 3: ingredients and raw materials', pct: 57, color: 'bg-studio-forest' },
+  { label: 'Scope 1+2: energy and operations', pct: 18, color: 'bg-studio-forest/60' },
+  { label: 'Scope 3: packaging', pct: 25, color: 'bg-studio-forest/35' },
 ]
 
 /** Convert a product's unit_size to litres */
@@ -374,9 +375,9 @@ export function FastTrackEstimateStep() {
 
         {/* Header */}
         <div className="text-center space-y-2">
-          <div className="text-5xl">🌍</div>
-          <h3 className="text-2xl font-serif font-bold text-white">Your estimated footprint</h3>
-          <p className="text-sm text-white/50">
+          <Eyebrow tone="inherit" className="text-studio-forest">Your estimate</Eyebrow>
+          <h3 className="text-2xl font-display font-bold tracking-tight text-foreground">Your estimated footprint.</h3>
+          <p className="text-sm text-muted-foreground">
             {hasProducts
               ? 'Tell us how much you produce each year and we\'ll calculate your estimate.'
               : `Based on industry averages for ${beverageLabel.toLowerCase()} producers.`}
@@ -386,14 +387,14 @@ export function FastTrackEstimateStep() {
         {/* Per-product volume inputs */}
         {!isLoading && hasProducts && (
           <div className="space-y-2">
-            <p className="text-sm font-medium text-white/70">Annual production per product</p>
+            <p className="text-sm font-medium text-foreground">Annual production per product</p>
             <div className="space-y-2">
               {products.map(product => {
                 const entry = productVolumes[product.id] ?? { volume: '', unit: 'Litres' as ProductionUnit }
                 const canUseUnits = !!product.unit_size_value
                 return (
-                  <div key={product.id} className="bg-white/5 border border-white/10 rounded-xl p-3 space-y-2">
-                    <p className="text-xs font-medium text-white/70 truncate">{product.name}</p>
+                  <div key={product.id} className="bg-card border border-border rounded-[6px] p-3 space-y-2">
+                    <p className="text-xs font-medium text-foreground truncate">{product.name}</p>
                     <div className="flex gap-2">
                       <Input
                         type="number"
@@ -401,13 +402,13 @@ export function FastTrackEstimateStep() {
                         placeholder="0"
                         value={entry.volume}
                         onChange={e => setVolume(product.id, { volume: e.target.value })}
-                        className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50 flex-1 min-w-0"
+                        className="flex-1 min-w-0"
                       />
                       <Select
                         value={entry.unit}
                         onValueChange={val => setVolume(product.id, { unit: val as ProductionUnit })}
                       >
-                        <SelectTrigger className="bg-white/5 border-white/10 text-white w-36 shrink-0">
+                        <SelectTrigger className="w-36 shrink-0">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -418,14 +419,14 @@ export function FastTrackEstimateStep() {
                       </Select>
                     </div>
                     {entry.unit === 'Units' && canUseUnits && (
-                      <p className="text-xs text-white/30">
+                      <p className="text-xs text-studio-dim">
                         {product.unit_size_value}{product.unit_size_unit} per unit
                       </p>
                     )}
                     {autofilledFromBreww.has(product.id) && (
-                      <p className="text-xs text-[#ccff00]/70 flex items-center gap-1">
+                      <p className="text-xs text-studio-forest flex items-center gap-1">
                         <Sparkles className="w-3 h-3" />
-                        Auto-filled from Breww — edit if needed
+                        Auto-filled from Breww, edit if needed
                       </p>
                     )}
                   </div>
@@ -438,23 +439,23 @@ export function FastTrackEstimateStep() {
         {/* Fallback bucket selector when no products */}
         {!isLoading && !hasProducts && (
           <div className="space-y-2">
-            <p className="text-sm font-medium text-white/70">Annual production volume</p>
+            <p className="text-sm font-medium text-foreground">Annual production volume</p>
             <div className="grid grid-cols-2 gap-2">
               {VOLUME_OPTIONS.map(opt => (
                 <button
                   key={opt.value}
                   onClick={() => setVolumeBucket(opt.value)}
                   className={cn(
-                    'flex flex-col gap-0.5 p-3 rounded-xl border text-left transition-all',
+                    'flex flex-col gap-0.5 p-3 rounded-[6px] border text-left transition-colors',
                     volumeBucket === opt.value
-                      ? 'bg-[#ccff00]/15 border-[#ccff00]/50'
-                      : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+                      ? 'bg-secondary border-studio-forest'
+                      : 'bg-card border-border hover:bg-secondary hover:border-studio-ink/25'
                   )}
                 >
-                  <span className={cn('text-xs font-semibold', volumeBucket === opt.value ? 'text-[#ccff00]' : 'text-white')}>
+                  <span className={cn('text-xs font-semibold', volumeBucket === opt.value ? 'text-studio-forest' : 'text-foreground')}>
                     {opt.label}
                   </span>
-                  <span className="text-xs text-white/40">{opt.sublabel}</span>
+                  <span className="text-xs text-muted-foreground">{opt.sublabel}</span>
                 </button>
               ))}
             </div>
@@ -462,18 +463,21 @@ export function FastTrackEstimateStep() {
         )}
 
         {/* Main estimate */}
-        <div className="bg-[#ccff00]/10 border border-[#ccff00]/30 rounded-2xl p-6 text-center space-y-1">
+        <div className="bg-card border border-border rounded-[6px] p-6 text-center space-y-1">
           {isLoading ? (
             <div className="h-12 flex items-center justify-center">
-              <div className="w-6 h-6 border-2 border-[#ccff00]/30 border-t-[#ccff00] rounded-full animate-spin" />
+              <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">Calculating&hellip;</span>
             </div>
           ) : (
             <>
-              <p className="text-5xl font-bold text-[#ccff00]">
-                ~{displayTonnes > 0 ? displayTonnes.toLocaleString() : '<1'}
-              </p>
-              <p className="text-sm text-white/60">tonnes CO&#8322;e / year</p>
-              <p className="text-xs text-white/30 mt-2">
+              <div className="flex justify-center">
+                <BigNumber
+                  size="display"
+                  value={<span className="text-studio-forest">~{displayTonnes > 0 ? displayTonnes.toLocaleString() : '<1'}</span>}
+                  label={'tonnes CO₂e / year'}
+                />
+              </div>
+              <p className="text-xs text-studio-dim pt-2">
                 Likely range: {low.toLocaleString()} &ndash; {high.toLocaleString()} t CO&#8322;e (&plusmn;30%)
               </p>
             </>
@@ -481,15 +485,15 @@ export function FastTrackEstimateStep() {
         </div>
 
         {/* Scope breakdown */}
-        <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-3">
-          <p className="text-xs font-medium text-white/50 uppercase tracking-wide">Typical emissions breakdown</p>
+        <div className="bg-card border border-border rounded-[6px] p-4 space-y-3">
+          <Eyebrow tone="dim">Typical emissions breakdown</Eyebrow>
           {SCOPE_ROWS.map(row => (
             <div key={row.label} className="space-y-1">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-white/60">{row.label}</span>
-                <span className="text-white font-medium">{row.pct}%</span>
+                <span className="text-muted-foreground">{row.label}</span>
+                <span className="text-foreground font-medium tabular-nums">{row.pct}%</span>
               </div>
-              <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
                 <div className={cn('h-full rounded-full', row.color)} style={{ width: `${row.pct}%` }} />
               </div>
             </div>
@@ -497,14 +501,14 @@ export function FastTrackEstimateStep() {
         </div>
 
         {/* Industry comparison */}
-        <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-start gap-3">
-          <TrendingDown className="w-5 h-5 text-white/40 mt-0.5 shrink-0" />
+        <div className="bg-card border border-border rounded-[6px] p-4 flex items-start gap-3">
+          <TrendingDown className="w-5 h-5 text-studio-dim mt-0.5 shrink-0" />
           <div>
-            <p className="text-sm text-white">
+            <p className="text-sm text-foreground">
               Typical {beverageLabel.toLowerCase()} brand your size:{' '}
-              <span className="font-semibold text-white">~{Math.round(industryTonnes).toLocaleString()} t CO&#8322;e</span>
+              <span className="font-semibold tabular-nums">~{Math.round(industryTonnes).toLocaleString()} t CO&#8322;e</span>
             </p>
-            <p className="text-xs text-white/40 mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5">
               Industry average: {industryBenchmark.kgCO2ePerLitre} kg CO&#8322;e/L ({industryBenchmark.sourceName}, {industryBenchmark.sourceYear})
             </p>
           </div>
@@ -513,17 +517,17 @@ export function FastTrackEstimateStep() {
         <Button
           onClick={handleContinue}
           disabled={isSaving}
-          className="w-full bg-[#ccff00] text-black hover:bg-[#ccff00]/90 font-medium rounded-xl"
+          className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full"
         >
           {isSaving ? (
-            <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</>
+            <>Saving...</>
           ) : (
             <>See how to improve this <ArrowRight className="w-4 h-4 ml-2" /></>
           )}
         </Button>
 
         {hasProducts && !anyVolumeEntered && (
-          <p className="text-xs text-center text-white/30">
+          <p className="text-xs text-center text-studio-dim">
             Enter at least one volume above for a more accurate estimate, or continue to use an industry average.
           </p>
         )}

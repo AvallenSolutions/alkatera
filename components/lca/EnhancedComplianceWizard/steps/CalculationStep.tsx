@@ -255,9 +255,9 @@ export function CalculationStep() {
 
       {/* Validation in progress */}
       {preCalcState.materialDataLoading && (
-        <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50/50 dark:bg-blue-950/10 dark:border-blue-800 p-3">
-          <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-          <p className="text-sm text-blue-800 dark:text-blue-400">
+        <div className="flex items-center gap-2 rounded-[6px] border border-border bg-card p-3">
+          <Loader2 className="h-4 w-4 text-[#2B46C0]" />
+          <p className="text-sm text-muted-foreground">
             Material validation is still running in the background. The calculate button will enable once complete.
           </p>
         </div>
@@ -356,11 +356,11 @@ export function CalculationStep() {
             !canCalculate || calculating || hasFacilitiesMissingVolumes
           }
           size="lg"
-          className="min-w-[220px] bg-[#ccff00] hover:bg-[#b8e600] text-black font-semibold"
+          className="min-w-[220px] bg-primary text-primary-foreground hover:bg-primary/90 font-semibold"
         >
           {calculating ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="mr-2 h-4 w-4" />
               Calculating...
             </>
           ) : (

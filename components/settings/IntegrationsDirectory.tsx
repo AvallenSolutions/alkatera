@@ -5,11 +5,9 @@ import { useOrganization } from '@/lib/organizationContext'
 import { useSubscription } from '@/hooks/useSubscription'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { StateChip } from '@/components/studio/state-chip'
 import { toast } from 'sonner'
-import {
-  Link2, Link2Off, Loader2, Mail, CheckCircle2, AlertTriangle, ChevronRight,
-} from 'lucide-react'
+import { Mail, CheckCircle2 } from 'lucide-react'
 import {
   INTEGRATIONS,
   CATEGORY_LABEL,
@@ -126,11 +124,11 @@ function ProviderCard({
   onRefreshConnections: () => void
 }) {
   // Providers with an explicit featureFlag are actively in private beta.
-  // Show the yellow "private beta — request access" note unless the org has
-  // been granted access. Everything else falls through to a plain ComingSoonCard.
+  // Show the "private beta: request access" note unless the org has been
+  // granted access. Everything else falls through to a plain ComingSoonCard.
   const flag = getIntegrationFeatureFlag(provider)
   if (flag && !hasFeature(flag)) {
-    return <ComingSoonCard provider={provider} note="In private beta — request access to enable." />
+    return <ComingSoonCard provider={provider} note="In private beta: request access to enable." />
   }
 
   // Beta granted (or no flag at all): providers with bespoke connect cards
@@ -184,7 +182,7 @@ function ComingSoonCard({ provider, note }: { provider: IntegrationProvider; not
         throw new Error(body.error || 'Could not log request')
       }
       setRequested(true)
-      toast.success(`Noted — we'll prioritise ${provider.name} based on demand.`)
+      toast.success(`Noted, we'll prioritise ${provider.name} based on demand.`)
     } catch (err: any) {
       toast.error(err.message || 'Failed to log request')
     } finally {
@@ -206,10 +204,10 @@ function ComingSoonCard({ provider, note }: { provider: IntegrationProvider; not
                   : 'Manual export'}
             </p>
           </div>
-          <Badge variant="outline" className="text-[10px] uppercase tracking-wider">Coming soon</Badge>
+          <StateChip tone="quiet">Coming soon</StateChip>
         </div>
         <p className="text-xs text-muted-foreground line-clamp-3">{provider.description}</p>
-        {note && <p className="text-[11px] text-amber-700 dark:text-amber-300">{note}</p>}
+        {note && <p className="text-[11px] text-studio-attention">{note}</p>}
         <div className="flex flex-wrap gap-1 pt-1">
           {provider.provides.slice(0, 3).map((p) => (
             <span key={p} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
@@ -219,13 +217,13 @@ function ComingSoonCard({ provider, note }: { provider: IntegrationProvider; not
         </div>
         <div className="mt-auto pt-2">
           {requested ? (
-            <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+            <div className="flex items-center gap-1.5 text-xs text-studio-good">
               <CheckCircle2 className="h-3.5 w-3.5" />
               Request logged
             </div>
           ) : (
             <Button size="sm" variant="outline" className="w-full gap-1.5" onClick={handleRequest} disabled={requesting}>
-              {requesting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
+              <Mail className="h-3.5 w-3.5" />
               Request access
             </Button>
           )}

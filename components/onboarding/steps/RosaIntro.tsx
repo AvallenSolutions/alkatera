@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils'
  * doing with the AI partner they'll meet on the hub.
  *
  * Kept deliberately lightweight: a single line of copy, dog avatar, and
- * the lime accent. No interactivity beyond the visual nudge.
+ * a quiet cream panel. No interactivity beyond the visual nudge.
  */
 interface Props {
   message: string
@@ -21,11 +21,11 @@ export function RosaIntro({ message, className }: Props) {
   return (
     <div
       className={cn(
-        'flex items-start gap-3 px-4 py-3 rounded-2xl border border-[#ccff00]/20 bg-[#ccff00]/5',
+        'flex items-start gap-3 px-4 py-3 rounded-[6px] border border-border bg-card',
         className,
       )}
     >
-      <div className="h-9 w-9 rounded-full bg-[#ccff00]/15 flex items-center justify-center shrink-0 overflow-hidden">
+      <div className="h-9 w-9 rounded-full bg-secondary flex items-center justify-center shrink-0 overflow-hidden">
         {/* Rosa is a dog; fall back to a paw glyph if the asset is missing. */}
         <Image
           src="/images/rosa-avatar.png"
@@ -34,12 +34,12 @@ export function RosaIntro({ message, className }: Props) {
           height={36}
           className="object-cover"
           onError={(e) => {
-            // Hide the broken image so the lime circle shows through.
+            // Hide the broken image so the quiet circle shows through.
             (e.target as HTMLImageElement).style.display = 'none'
           }}
         />
       </div>
-      <p className="text-sm text-white/80 leading-relaxed pt-1">{message}</p>
+      <p className="text-sm text-foreground leading-relaxed pt-1">{message}</p>
     </div>
   )
 }

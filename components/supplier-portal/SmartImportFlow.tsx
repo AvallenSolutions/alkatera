@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -23,12 +22,12 @@ import {
   AlertCircle,
   CheckCircle2,
   FileText,
-  Loader2,
   Sparkles,
   UploadCloud,
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { StateChip } from '@/components/studio';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import {
   PACKAGING_CATEGORY_LABELS,
@@ -285,7 +284,7 @@ export function SmartImportFlow({ open, onClose, supplierId, onSuccess }: SmartI
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-[#ccff00]" />
+            <Sparkles className="h-5 w-5 text-studio-forest" />
             Smart Import
           </DialogTitle>
           <DialogDescription>
@@ -295,8 +294,8 @@ export function SmartImportFlow({ open, onClose, supplierId, onSuccess }: SmartI
         </DialogHeader>
 
         {error && (
-          <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm">
-            <AlertCircle className="h-4 w-4 mt-0.5 text-destructive shrink-0" />
+          <div className="flex items-start gap-2 rounded-md border border-studio-stale/40 bg-card p-3 text-sm text-studio-stale">
+            <AlertCircle className="h-4 w-4 mt-0.5 text-studio-stale shrink-0" />
             <span>{error}</span>
           </div>
         )}
@@ -305,7 +304,7 @@ export function SmartImportFlow({ open, onClose, supplierId, onSuccess }: SmartI
           <div className="space-y-4">
             <label
               htmlFor="smart-import-file"
-              className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-muted/30 p-8 cursor-pointer hover:bg-muted/50 transition"
+              className="flex flex-col items-center justify-center gap-2 rounded-[6px] border-2 border-dashed border-border bg-secondary p-8 cursor-pointer hover:border-foreground/40 transition-colors"
             >
               <UploadCloud className="h-10 w-10 text-muted-foreground" />
               <div className="text-sm font-medium">
@@ -333,7 +332,9 @@ export function SmartImportFlow({ open, onClose, supplierId, onSuccess }: SmartI
 
         {stage === 'processing' && (
           <div className="flex flex-col items-center justify-center gap-3 py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
+              Working
+            </p>
             <p className="text-sm text-muted-foreground">{phaseMessage}</p>
           </div>
         )}
@@ -352,7 +353,7 @@ export function SmartImportFlow({ open, onClose, supplierId, onSuccess }: SmartI
 
         {stage === 'success' && (
           <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
-            <CheckCircle2 className="h-10 w-10 text-emerald-500" />
+            <CheckCircle2 className="h-10 w-10 text-studio-good" />
             <h3 className="text-lg font-semibold">Imported {createdCount} product{createdCount === 1 ? '' : 's'}</h3>
             <p className="text-sm text-muted-foreground">Open each product to add evidence and verify the data.</p>
             <Button onClick={handleClose}>Done</Button>
@@ -428,7 +429,7 @@ function ReviewStage({
           <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
             {unmapped.map((u, i) => (
               <li key={i}>
-                <span className="font-medium text-foreground">{u.raw.slice(0, 80)}</span> — {u.reason}
+                <span className="font-medium text-foreground">{u.raw.slice(0, 80)}</span> · {u.reason}
               </li>
             ))}
           </ul>
@@ -441,10 +442,7 @@ function ReviewStage({
         </Button>
         <Button onClick={onConfirm} disabled={isConfirming || includedCount === 0}>
           {isConfirming ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Importing…
-            </>
+            'Importing…'
           ) : (
             `Import ${includedCount} product${includedCount === 1 ? '' : 's'}`
           )}
@@ -466,8 +464,8 @@ function ReviewRowCard({ row, idx, updateRow, updateNumeric }: ReviewRowCardProp
   const lowConfidence = row.row_confidence === 'low';
   return (
     <div
-      className={`rounded-lg border p-4 space-y-3 transition ${
-        lowConfidence ? 'border-amber-400/60 bg-amber-50/40 dark:bg-amber-950/10' : 'border-border bg-card'
+      className={`rounded-[6px] border p-4 space-y-3 transition-colors ${
+        lowConfidence ? 'border-studio-attention/50 bg-card' : 'border-border bg-card'
       } ${row.included ? '' : 'opacity-50'}`}
     >
       <div className="flex items-start justify-between gap-3">
@@ -517,9 +515,7 @@ function ReviewRowCard({ row, idx, updateRow, updateNumeric }: ReviewRowCardProp
                 </Select>
               )}
               {lowConfidence && (
-                <Badge variant="outline" className="text-amber-600 border-amber-400">
-                  Low confidence
-                </Badge>
+                <StateChip tone="attention">Low confidence</StateChip>
               )}
             </div>
           </div>
@@ -585,14 +581,14 @@ function NumericField({
     <div className="space-y-1">
       <Label className="text-xs flex items-center gap-1">
         {label}
-        {lowConf && <span className="text-amber-500">●</span>}
+        {lowConf && <span className="text-studio-attention">●</span>}
       </Label>
       <Input
         type="number"
         step="any"
         value={f.value ?? ''}
         onChange={e => onChange(e.target.value)}
-        className={lowConf ? 'border-amber-400/70' : ''}
+        className={lowConf ? 'border-studio-attention/60' : ''}
         title={f.source_quote ? `From the document: "${f.source_quote.slice(0, 200)}"` : undefined}
       />
       {f.source_quote && (

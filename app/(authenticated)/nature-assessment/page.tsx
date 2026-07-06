@@ -17,7 +17,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { AlertCircle, ChevronLeft, ChevronRight, Loader2, Save, CheckCircle2 } from 'lucide-react'
+import { AlertCircle, ChevronLeft, ChevronRight, Save, CheckCircle2 } from 'lucide-react'
+import { Eyebrow } from '@/components/studio/eyebrow'
 import { toast } from 'sonner'
 import { useOrganization } from '@/lib/organizationContext'
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client'
@@ -132,9 +133,9 @@ function overallProgress(form: NatureForm, locate: LocateSummary | null): number
 }
 
 function statusColour(s: 'complete' | 'partial' | 'empty') {
-  if (s === 'complete') return 'bg-emerald-600 text-white hover:bg-emerald-600'
-  if (s === 'partial') return 'bg-amber-500 text-white hover:bg-amber-500'
-  return 'bg-slate-700 text-slate-300 hover:bg-slate-700'
+  if (s === 'complete') return 'text-studio-good'
+  if (s === 'partial') return 'text-studio-attention'
+  return 'text-muted-foreground'
 }
 
 /* ------------------------------------------------------------------ */
@@ -310,33 +311,37 @@ export default function NatureAssessmentPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">Loading the assessment…</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
+    <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Nature Impact Assessment</h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <Eyebrow className="mb-3">THE MEASURES · NATURE</Eyebrow>
+        <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+          Nature impact assessment.
+        </h1>
+        <p className="mt-3 text-sm text-muted-foreground">
           Annual assessment per TNFD LEAP Framework and CSRD ESRS E4
         </p>
       </div>
 
-      {/* LEAP phase pills */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* LEAP phase tabs */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
         {SECTIONS.map((label, idx) => {
           const status = sectionStatus(idx, form, locateSummary)
           return (
-            <Badge
+            <button
               key={label}
-              className={`cursor-pointer text-xs px-3 py-1 ${statusColour(status)} ${currentSection === idx ? 'ring-2 ring-[#ccff00] ring-offset-2 ring-offset-background' : ''}`}
+              type="button"
               onClick={() => goTo(idx)}
+              className={`border-b-[3px] pb-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] transition-colors ${statusColour(status)} ${currentSection === idx ? 'border-room-accent' : 'border-transparent hover:border-border'}`}
             >
               {label}
-            </Badge>
+            </button>
           )
         })}
       </div>
@@ -361,9 +366,9 @@ export default function NatureAssessmentPage() {
           </p>
 
           {locateSummary && locateSummary.totalSites === 0 && (
-            <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3 flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
-              <p className="text-xs text-amber-200">
+            <div className="rounded-[6px] border border-border bg-card p-3 flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-studio-attention mt-0.5 shrink-0" />
+              <p className="text-xs text-muted-foreground">
                 No vineyard or orchard sites found. Add sites in your growing profiles to populate TNFD Locate data.
               </p>
             </div>
@@ -429,9 +434,9 @@ export default function NatureAssessmentPage() {
               )}
 
               {locateSummary.withEcosystem < locateSummary.totalSites && (
-                <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3 flex items-start gap-2">
-                  <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
-                  <p className="text-xs text-amber-200">
+                <div className="rounded-[6px] border border-border bg-card p-3 flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-studio-attention mt-0.5 shrink-0" />
+                  <p className="text-xs text-muted-foreground">
                     Complete location data in your vineyard/orchard profiles to improve your TNFD Locate disclosure.
                   </p>
                 </div>
@@ -728,13 +733,12 @@ export default function NatureAssessmentPage() {
                 disabled={saving}
                 onClick={() => save('draft')}
               >
-                {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
-                Save Draft
+                <Save className="h-4 w-4 mr-1" />
+                {saving ? 'Saving…' : 'Save Draft'}
               </Button>
               <Button
                 size="sm"
                 disabled={saving}
-                className="bg-emerald-600 hover:bg-emerald-700"
                 onClick={() => save('complete')}
               >
                 <CheckCircle2 className="h-4 w-4 mr-1" />

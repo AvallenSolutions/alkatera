@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/hooks/use-toast'
-import { User, Mail, Phone, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
+import { User, Mail, Phone, CheckCircle, AlertCircle } from 'lucide-react'
 
 interface ProfileSettingsProps {
   showHeader?: boolean
@@ -94,7 +94,7 @@ export function ProfileSettings({ showHeader = true }: ProfileSettingsProps) {
       <div className="space-y-6">
         {showHeader && (
           <div className="space-y-1">
-            <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+            <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-foreground">
               Profile Settings
             </h1>
             <p className="text-sm text-muted-foreground">
@@ -143,7 +143,7 @@ export function ProfileSettings({ showHeader = true }: ProfileSettingsProps) {
                     type="email"
                     value={profile?.email || ''}
                     disabled
-                    className="pl-9 bg-slate-50 dark:bg-slate-900"
+                    className="pl-9 bg-secondary"
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -188,10 +188,7 @@ export function ProfileSettings({ showHeader = true }: ProfileSettingsProps) {
               <div className="flex items-center gap-4 pt-4 border-t">
                 <Button type="submit" disabled={isUpdating}>
                   {isUpdating ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
+                    'Saving...'
                   ) : (
                     <>
                       <CheckCircle className="mr-2 h-4 w-4" />

@@ -13,11 +13,10 @@ import {
   Plus,
   Clock,
   ChevronRight,
-  Loader2,
   CheckCircle,
   AlertCircle,
-  Circle,
 } from "lucide-react";
+import { StateChip } from "@/components/studio/state-chip";
 import { fetchUserTickets } from "@/lib/feedback";
 import { cn } from "@/lib/utils";
 import { FeedbackDialog } from "@/components/feedback/FeedbackDialog";
@@ -40,48 +39,31 @@ const categoryLabels: Record<FeedbackCategory, string> = {
   other: "Other",
 };
 
-const statusIcons: Record<FeedbackStatus, React.ElementType> = {
-  open: Circle,
-  in_progress: AlertCircle,
-  resolved: CheckCircle,
-  closed: CheckCircle,
+const STATUS_TONES: Record<string, "good" | "attention" | "stale" | "hold" | "quiet"> = {
+  blue: "hold",
+  amber: "attention",
+  green: "good",
+  slate: "quiet",
 };
 
 function StatusBadge({ status }: { status: FeedbackStatus }) {
   const config = FEEDBACK_STATUSES[status];
-  const Icon = statusIcons[status];
 
-  const colorClasses: Record<string, string> = {
-    blue: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-    amber: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-    green: "bg-green-500/20 text-green-400 border-green-500/30",
-    slate: "bg-slate-500/20 text-slate-400 border-slate-500/30",
-  };
-
-  return (
-    <Badge className={colorClasses[config.color]}>
-      <Icon className="h-3 w-3 mr-1" />
-      {config.label}
-    </Badge>
-  );
+  return <StateChip tone={STATUS_TONES[config.color] ?? "quiet"}>{config.label}</StateChip>;
 }
 
 function PriorityBadge({ priority }: { priority: string }) {
   const config = FEEDBACK_PRIORITIES[priority as keyof typeof FEEDBACK_PRIORITIES];
   if (!config) return null;
 
-  const colorClasses: Record<string, string> = {
-    slate: "bg-slate-500/10 text-slate-400 border-slate-500/20",
-    blue: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-    amber: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-    red: "bg-red-500/10 text-red-400 border-red-500/20",
+  const priorityTones: Record<string, "good" | "attention" | "stale" | "hold" | "quiet"> = {
+    slate: "quiet",
+    blue: "hold",
+    amber: "attention",
+    red: "stale",
   };
 
-  return (
-    <Badge variant="outline" className={colorClasses[config.color]}>
-      {config.label}
-    </Badge>
-  );
+  return <StateChip tone={priorityTones[config.color] ?? "quiet"}>{config.label}</StateChip>;
 }
 
 interface SupportSettingsProps {
@@ -182,7 +164,9 @@ export function SupportSettings({ showHeader = true }: SupportSettingsProps) {
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground">
+            Loading
+          </span>
         </div>
       ) : tickets.length === 0 ? (
         <Card>

@@ -48,10 +48,7 @@ export function TrialBanner({
   return (
     <div
       className={cn(
-        'relative px-4 py-2.5 flex items-center justify-between gap-4 border-b',
-        urgent
-          ? 'bg-amber-50 border-amber-200 dark:bg-amber-950/50 dark:border-amber-900'
-          : 'bg-[#ccff00]/10 border-[#ccff00]/30',
+        'relative px-4 py-2.5 flex items-center justify-between gap-4 border-b border-border bg-card',
         className
       )}
       role="status"
@@ -59,10 +56,8 @@ export function TrialBanner({
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <div
           className={cn(
-            'p-1.5 rounded-full shrink-0',
-            urgent
-              ? 'bg-amber-100 text-amber-600 dark:bg-amber-900 dark:text-amber-400'
-              : 'bg-[#ccff00]/20 text-[#7a9900] dark:text-[#ccff00]'
+            'p-1.5 rounded-full shrink-0 bg-secondary',
+            urgent ? 'text-studio-attention' : 'text-room-accent'
           )}
         >
           {urgent ? <Clock className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
@@ -83,7 +78,7 @@ export function TrialBanner({
         </p>
       </div>
 
-      <Button size="sm" asChild className={urgent ? '' : 'bg-[#ccff00] text-black hover:bg-[#ccff00]/90'}>
+      <Button size="sm" asChild className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90">
         <Link href="/settings?tab=subscription">
           Subscribe now
           <ArrowRight className="ml-1 h-4 w-4" />

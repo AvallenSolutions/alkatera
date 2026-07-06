@@ -13,7 +13,6 @@ import {
   Sparkles,
   AlertTriangle,
   TrendingUp,
-  Loader2,
 } from 'lucide-react';
 import {
   Bar,
@@ -81,14 +80,25 @@ interface OverviewResponse {
   }>;
 }
 
+/* Categorical series take the studio room inks; unknowns fall back to dim. */
 const SOURCE_COLOURS: Record<string, string> = {
-  sku_upload: '#38bdf8',
-  alkatera_signup: '#34d399',
-  manual: '#ccff00',
-  phase1_backfill: '#a78bfa',
+  sku_upload: '#2B46C0',
+  alkatera_signup: '#205E40',
+  manual: '#A97C14',
+  phase1_backfill: '#BF4B2A',
 };
 
-const COMPLETENESS_COLOURS = ['#f87171', '#fbbf24', '#38bdf8', '#34d399'];
+/* Completeness is a status scale: stale, attention, dim, good. */
+const COMPLETENESS_COLOURS = ['#BE123C', '#B45309', '#6F6F68', '#047857'];
+
+const CHART_GRID = '#D9D6CB';
+const CHART_AXIS = '#6F6F68';
+const CHART_TOOLTIP_STYLE = {
+  background: '#F2F1EA',
+  border: '1px solid #D9D6CB',
+  color: '#1A1B1D',
+  fontSize: 12,
+} as const;
 
 export function AnalyticsDashboard() {
   const [data, setData] = useState<OverviewResponse | null>(null);
@@ -119,14 +129,14 @@ export function AnalyticsDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground py-12 justify-center">
-        <Loader2 className="h-4 w-4 animate-spin" /> Loading analytics…
+      <div className="text-sm text-muted-foreground py-12 text-center">
+        Loading analytics…
       </div>
     );
   }
   if (error || !data) {
     return (
-      <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm">
+      <div className="rounded-[6px] border border-border bg-card p-4 text-sm text-studio-stale">
         Could not load analytics: {error ?? 'unknown error'}
       </div>
     );
@@ -215,30 +225,28 @@ export function AnalyticsDashboard() {
       </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <PanelCard title="Directory growth (12 weeks)" icon={<TrendingUp className="h-4 w-4 text-neon-lime" />}>
+        <PanelCard title="Directory growth (12 weeks)" icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}>
           {data.growth.length === 0 ? (
             <EmptyState text="No directory growth in the last 12 weeks." />
           ) : (
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={data.growth}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#222" />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
                 <XAxis
                   dataKey="week_start"
-                  stroke="#666"
+                  stroke={CHART_AXIS}
                   fontSize={10}
                   tickFormatter={(v: string) => v.slice(5)}
                 />
-                <YAxis stroke="#666" fontSize={10} allowDecimals={false} />
-                <Tooltip
-                  contentStyle={{ background: '#0a0a0a', border: '1px solid #1f1f1f', fontSize: 12 }}
-                />
+                <YAxis stroke={CHART_AXIS} fontSize={10} allowDecimals={false} />
+                <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 {sourceKeys.map((key) => (
                   <Bar
                     key={key}
                     dataKey={key}
                     stackId="a"
-                    fill={SOURCE_COLOURS[key] ?? '#888'}
+                    fill={SOURCE_COLOURS[key] ?? '#6F6F68'}
                   />
                 ))}
               </BarChart>
@@ -246,15 +254,13 @@ export function AnalyticsDashboard() {
           )}
         </PanelCard>
 
-        <PanelCard title="Discovery sources" icon={<Sparkles className="h-4 w-4 text-neon-lime" />}>
+        <PanelCard title="Discovery sources" icon={<Sparkles className="h-4 w-4 text-muted-foreground" />}>
           {data.sources.length === 0 ? (
             <EmptyState text="No brands in the directory yet." />
           ) : (
             <ResponsiveContainer width="100%" height={240}>
               <PieChart>
-                <Tooltip
-                  contentStyle={{ background: '#0a0a0a', border: '1px solid #1f1f1f', fontSize: 12 }}
-                />
+                <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Pie
                   data={data.sources}
@@ -265,7 +271,7 @@ export function AnalyticsDashboard() {
                   paddingAngle={2}
                 >
                   {data.sources.map((s) => (
-                    <Cell key={s.source} fill={SOURCE_COLOURS[s.source] ?? '#888'} />
+                    <Cell key={s.source} fill={SOURCE_COLOURS[s.source] ?? '#6F6F68'} />
                   ))}
                 </Pie>
               </PieChart>
@@ -275,19 +281,17 @@ export function AnalyticsDashboard() {
 
         <PanelCard
           title="Completeness distribution"
-          icon={<TrendingUp className="h-4 w-4 text-neon-lime" />}
+          icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
         >
           {data.completeness.every((b) => b.count === 0) ? (
             <EmptyState text="No completeness scores computed yet." />
           ) : (
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={data.completeness}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#222" />
-                <XAxis dataKey="bucket" stroke="#666" fontSize={10} />
-                <YAxis stroke="#666" fontSize={10} allowDecimals={false} />
-                <Tooltip
-                  contentStyle={{ background: '#0a0a0a', border: '1px solid #1f1f1f', fontSize: 12 }}
-                />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
+                <XAxis dataKey="bucket" stroke={CHART_AXIS} fontSize={10} />
+                <YAxis stroke={CHART_AXIS} fontSize={10} allowDecimals={false} />
+                <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
                 <Bar dataKey="count">
                   {data.completeness.map((b, i) => (
                     <Cell key={b.bucket} fill={COMPLETENESS_COLOURS[i]} />
@@ -298,28 +302,26 @@ export function AnalyticsDashboard() {
           )}
         </PanelCard>
 
-        <PanelCard title="Sync queue (last 7 days)" icon={<Database className="h-4 w-4 text-neon-lime" />}>
+        <PanelCard title="Sync queue (last 7 days)" icon={<Database className="h-4 w-4 text-muted-foreground" />}>
           {data.sync_health.every((d) => d.done + d.failed + d.pending + d.running === 0) ? (
             <EmptyState text="Sync queue idle." />
           ) : (
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={data.sync_health}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#222" />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
                 <XAxis
                   dataKey="day"
-                  stroke="#666"
+                  stroke={CHART_AXIS}
                   fontSize={10}
                   tickFormatter={(v: string) => v.slice(5)}
                 />
-                <YAxis stroke="#666" fontSize={10} allowDecimals={false} />
-                <Tooltip
-                  contentStyle={{ background: '#0a0a0a', border: '1px solid #1f1f1f', fontSize: 12 }}
-                />
+                <YAxis stroke={CHART_AXIS} fontSize={10} allowDecimals={false} />
+                <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="done" stackId="a" fill="#34d399" />
-                <Bar dataKey="failed" stackId="a" fill="#f87171" />
-                <Bar dataKey="pending" stackId="a" fill="#fbbf24" />
-                <Bar dataKey="running" stackId="a" fill="#38bdf8" />
+                <Bar dataKey="done" stackId="a" fill="#047857" />
+                <Bar dataKey="failed" stackId="a" fill="#BE123C" />
+                <Bar dataKey="pending" stackId="a" fill="#B45309" />
+                <Bar dataKey="running" stackId="a" fill="#6D28D9" />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -327,7 +329,7 @@ export function AnalyticsDashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <PanelCard title="Top contributing distributors" icon={<Building2 className="h-4 w-4 text-neon-lime" />}>
+        <PanelCard title="Top contributing distributors" icon={<Building2 className="h-4 w-4 text-muted-foreground" />}>
           {data.top_contributors.length === 0 ? (
             <EmptyState text="No distributors have surfaced brands yet." />
           ) : (
@@ -350,9 +352,9 @@ export function AnalyticsDashboard() {
           )}
         </PanelCard>
 
-        <PanelCard title="Most-viewed brands (30d)" icon={<Activity className="h-4 w-4 text-neon-lime" />}>
+        <PanelCard title="Most-viewed brands (30d)" icon={<Activity className="h-4 w-4 text-muted-foreground" />}>
           {data.top_viewed.length === 0 ? (
-            <EmptyState text="No brand views logged yet — telemetry starts on the next refresh." />
+            <EmptyState text="No brand views logged yet. Telemetry starts on the next refresh." />
           ) : (
             <table className="w-full text-sm">
               <thead className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-semibold">
@@ -367,11 +369,11 @@ export function AnalyticsDashboard() {
                     <td className="py-1.5">
                       <Link
                         href={`/admin/directory/brands/${b.brand_directory_id}`}
-                        className="hover:text-neon-lime"
+                        className="hover:underline"
                       >
                         {b.name}
                         {b.on_alkatera && (
-                          <span className="ml-2 text-[9px] uppercase tracking-wider text-emerald-300">
+                          <span className="ml-2 font-mono text-[9px] font-bold uppercase tracking-wider text-studio-good">
                             on alkatera
                           </span>
                         )}
@@ -389,7 +391,7 @@ export function AnalyticsDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <PanelCard
           title="Failed scraping jobs"
-          icon={<AlertTriangle className="h-4 w-4 text-amber-300" />}
+          icon={<AlertTriangle className="h-4 w-4 text-studio-attention" />}
         >
           {data.failed_scraping.length === 0 ? (
             <EmptyState text="No failed scraping jobs." />
@@ -410,7 +412,7 @@ export function AnalyticsDashboard() {
 
         <PanelCard
           title="Stuck sync-queue rows"
-          icon={<AlertTriangle className="h-4 w-4 text-amber-300" />}
+          icon={<AlertTriangle className="h-4 w-4 text-studio-attention" />}
         >
           {data.stuck_sync_queue.length === 0 ? (
             <EmptyState text="No stuck sync queue rows." />
@@ -449,23 +451,21 @@ function StatCard({
   icon: React.ReactNode;
   tone: 'brand' | 'positive' | 'warn' | 'neutral';
 }) {
-  const toneStyle =
+  const accent =
     tone === 'positive'
-      ? 'border-emerald-400/30 bg-emerald-500/5 text-emerald-300'
+      ? 'text-studio-good'
       : tone === 'warn'
-        ? 'border-amber-400/30 bg-amber-500/5 text-amber-300'
-        : tone === 'brand'
-          ? 'border-neon-lime/30 bg-neon-lime/5 text-neon-lime'
-          : 'border-border/60 bg-card/40 text-muted-foreground';
+        ? 'text-studio-attention'
+        : 'text-muted-foreground';
   return (
-    <div className={`rounded-xl border bg-card/40 px-4 py-3 ${toneStyle.split(' ').slice(0, 2).join(' ')}`}>
+    <div className="rounded-[6px] border border-border bg-card px-4 py-3">
       <div className="flex items-center justify-between gap-2">
-        <div className={`text-[10px] uppercase tracking-wider font-semibold ${toneStyle.split(' ')[2] ?? ''}`}>
+        <div className={`font-mono text-[10px] font-bold uppercase tracking-[0.18em] ${accent}`}>
           {label}
         </div>
-        <div className={toneStyle.split(' ')[2] ?? ''}>{icon}</div>
+        <div className={accent}>{icon}</div>
       </div>
-      <div className="text-2xl font-semibold tabular-nums mt-1">{value}</div>
+      <div className="font-display text-2xl font-bold tabular-nums mt-1">{value}</div>
       {hint && <div className="text-[10px] text-muted-foreground mt-0.5">{hint}</div>}
     </div>
   );
@@ -481,7 +481,7 @@ function PanelCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-border/60 bg-card/40 overflow-hidden">
+    <div className="rounded-[6px] border border-border bg-card overflow-hidden">
       <div className="flex items-center gap-2 px-5 pt-5 pb-3">
         {icon}
         <div className="text-sm font-semibold">{title}</div>
@@ -499,7 +499,7 @@ function SectionEyebrow({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-semibold text-neon-lime bg-neon-lime/10 border border-neon-lime/30 rounded-full px-2 py-0.5">
+    <div className="inline-flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground">
       {icon}
       {children}
     </div>

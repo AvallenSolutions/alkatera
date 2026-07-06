@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
+import { StateChip } from '@/components/studio/state-chip'
 import {
   Dialog,
   DialogContent,
@@ -34,7 +34,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
 import {
-  Link2, Link2Off, Loader2, CheckCircle2, AlertTriangle, RefreshCcw, ExternalLink, MoreHorizontal,
+  Link2, Link2Off, RefreshCcw, ExternalLink, MoreHorizontal,
 } from 'lucide-react'
 
 interface ConnectionRow {
@@ -108,7 +108,7 @@ export function UnleashedConnectionCard({ connection, onChanged }: UnleashedConn
       onChanged()
       if (!quiet) {
         toast.success('Sync complete', {
-          description: `${body.productsUpserted ?? 0} products • ${body.bomLinesUpserted ?? 0} BoM lines • ${body.suppliersUpserted ?? 0} suppliers`,
+          description: `${body.productsUpserted ?? 0} products · ${body.bomLinesUpserted ?? 0} BoM lines · ${body.suppliersUpserted ?? 0} suppliers`,
         })
       }
     } catch (err: any) {
@@ -147,17 +147,9 @@ export function UnleashedConnectionCard({ connection, onChanged }: UnleashedConn
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <p className="font-medium text-sm">Unleashed</p>
-              {isConnected && (
-                <Badge variant="outline" className="text-[10px] gap-1 text-emerald-600 dark:text-emerald-400 border-emerald-600/30">
-                  <CheckCircle2 className="h-3 w-3" /> Connected
-                </Badge>
-              )}
-              {inError && (
-                <Badge variant="outline" className="text-[10px] gap-1 text-amber-600 dark:text-amber-400 border-amber-600/30">
-                  <AlertTriangle className="h-3 w-3" /> Needs attention
-                </Badge>
-              )}
-              <Badge variant="outline" className="text-[10px] uppercase tracking-wider">Beta</Badge>
+              {isConnected && <StateChip tone="good">Connected</StateChip>}
+              {inError && <StateChip tone="attention">Needs attention</StateChip>}
+              <StateChip tone="quiet">Beta</StateChip>
             </div>
             <p className="text-xs text-muted-foreground max-w-xl">
               Pull SKUs, Bills of Materials, suppliers and purchase orders. Auto-builds the LCA recipe for each finished product so you start with a draft footprint, not a blank page.
@@ -168,7 +160,7 @@ export function UnleashedConnectionCard({ connection, onChanged }: UnleashedConn
               </p>
             )}
             {connection?.sync_error && (
-              <p className="text-[11px] text-amber-600 dark:text-amber-400">{connection.sync_error}</p>
+              <p className="text-[11px] text-studio-attention">{connection.sync_error}</p>
             )}
           </div>
 
@@ -187,8 +179,8 @@ export function UnleashedConnectionCard({ connection, onChanged }: UnleashedConn
                   disabled={syncing}
                   className="gap-1.5"
                 >
-                  {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
-                  Sync now
+                  <RefreshCcw className="h-4 w-4" />
+                  {syncing ? 'Syncing' : 'Sync now'}
                 </Button>
                 <Button
                   size="sm"
@@ -259,8 +251,7 @@ export function UnleashedConnectionCard({ connection, onChanged }: UnleashedConn
                   Cancel
                 </Button>
                 <Button onClick={handleConnect} disabled={connecting || !apiId || !apiKey}>
-                  {connecting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Connect
+                  {connecting ? 'Connecting' : 'Connect'}
                 </Button>
               </div>
             </div>
@@ -278,8 +269,7 @@ export function UnleashedConnectionCard({ connection, onChanged }: UnleashedConn
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction onClick={handleDisconnect} disabled={disconnecting}>
-                {disconnecting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Disconnect
+                {disconnecting ? 'Disconnecting' : 'Disconnect'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

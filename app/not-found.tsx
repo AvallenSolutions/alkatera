@@ -15,19 +15,19 @@ const instrumentSerif = Instrument_Serif({ subsets: ['latin'], weight: '400', st
 
 const SUSTAINABILITY_FACTS = [
   {
-    icon: <Leaf className="text-[#ccff00]" />,
+    icon: <Leaf className="text-foreground" />,
     text: "Distilling one litre of whisky typically produces 15 litres of wastewater, known as pot ale. We turn that burden into biology."
   },
   {
-    icon: <Globe className="text-[#ccff00]" />,
+    icon: <Globe className="text-foreground" />,
     text: "Supply chains account for more than 90% of a consumer company's environmental impact. Clarity starts with data."
   },
   {
-    icon: <Wind className="text-[#ccff00]" />,
+    icon: <Wind className="text-foreground" />,
     text: "By 2030, the drink industry aims to reduce carbon emissions by 50%. alkatera provides the operating system to get there."
   },
   {
-    icon: <Search className="text-[#ccff00]" />,
+    icon: <Search className="text-foreground" />,
     text: "Transparency is the new luxury. 73% of consumers say they would change their consumption habits to reduce environmental impact."
   }
 ];
@@ -41,18 +41,6 @@ export default function NotFound() {
 
   return (
     <div className={`relative min-h-screen w-full text-white overflow-hidden flex flex-col items-center justify-center p-6 ${instrumentSans.className}`}>
-      <style>{`
-        .glass-404 {
-          background: rgba(255, 255, 255, 0.03);
-          backdrop-filter: blur(12px);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-
-        .text-glow {
-          text-shadow: 0 0 30px rgba(204, 255, 0, 0.3);
-        }
-      `}</style>
-
       {/* Full-page background */}
       <Image
         src="/images/404.jpg"
@@ -100,7 +88,7 @@ export default function NotFound() {
           >
             <div className="text-center">
               <h2
-                className="text-4xl md:text-6xl text-white mb-4 text-glow italic"
+                className="text-4xl md:text-6xl text-white mb-4 italic"
                 style={{ fontFamily: instrumentSerif.style.fontFamily }}
               >
                 Lost in the ecosystem.
@@ -117,14 +105,14 @@ export default function NotFound() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8, duration: 0.8 }}
-          className="glass-404 rounded-2xl p-8 mb-12 max-w-lg w-full relative overflow-hidden group"
+          className="rounded-[6px] border border-border bg-card p-8 mb-12 max-w-lg w-full relative overflow-hidden group"
         >
           <div className="flex items-start gap-4 text-left relative z-10">
-            <div className="p-3 bg-white/5 rounded-xl group-hover:bg-[#ccff00]/10 transition-colors duration-500">
+            <div className="p-3 bg-secondary rounded-[6px]">
               {SUSTAINABILITY_FACTS[factIndex].icon}
             </div>
             <div>
-              <h3 className="text-[#ccff00] text-xs font-mono uppercase tracking-widest mb-2 opacity-80">
+              <h3 className="text-muted-foreground text-xs font-mono font-bold uppercase tracking-[0.22em] mb-2">
                 Knowledge Seed
               </h3>
               <AnimatePresence mode="wait">
@@ -133,7 +121,7 @@ export default function NotFound() {
                   initial={{ opacity: 0, x: 10 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -10 }}
-                  className="text-white/80 text-sm md:text-base leading-relaxed font-light italic"
+                  className="text-foreground/80 text-sm md:text-base leading-relaxed font-light italic"
                 >
                   &ldquo;{SUSTAINABILITY_FACTS[factIndex].text}&rdquo;
                 </motion.p>
@@ -143,13 +131,11 @@ export default function NotFound() {
 
           <button
             onClick={rotateFact}
-            className="absolute bottom-4 right-4 p-2 text-white/20 hover:text-[#ccff00] transition-colors"
+            className="absolute bottom-4 right-4 p-2 text-muted-foreground hover:text-foreground transition-colors"
             title="Next fact"
           >
-            <RefreshCw size={14} className="hover:rotate-180 transition-transform duration-700" />
+            <RefreshCw size={14} />
           </button>
-
-          <div className="absolute top-[-50%] right-[-20%] w-64 h-64 bg-[#ccff00]/5 blur-[80px] rounded-full pointer-events-none" />
         </motion.div>
 
         {/* Action Buttons */}
@@ -161,17 +147,17 @@ export default function NotFound() {
         >
           <Link
             href="/"
-            className="group flex items-center gap-2 px-8 py-4 bg-[#ccff00] text-black rounded-full font-semibold transition-all hover:scale-105 active:scale-95"
+            className="group flex items-center gap-2 px-8 py-4 bg-card text-foreground rounded-full font-semibold transition-colors hover:bg-secondary"
           >
-            <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-            Return to Safety
+            <ArrowLeft size={18} />
+            Return to safety
           </Link>
 
           <Link
             href="/#platform"
-            className="flex items-center gap-2 px-8 py-4 bg-white/5 border border-white/10 text-white rounded-full font-medium transition-all hover:bg-white/10 hover:border-white/20"
+            className="flex items-center gap-2 px-8 py-4 bg-white/5 border border-white/20 text-white rounded-full font-medium transition-colors hover:bg-white/10 hover:border-white/30"
           >
-            Explore the Platform
+            Explore the platform
           </Link>
         </motion.div>
 

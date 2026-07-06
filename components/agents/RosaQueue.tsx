@@ -67,7 +67,7 @@ export function RosaQueue() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-semibold">
-            <Dog className="h-6 w-6 text-[#ccff00]" />
+            <Dog className="h-6 w-6 text-room-accent" />
             Rosa
           </h1>
           <p className="mt-1 text-sm text-muted-foreground max-w-2xl">
@@ -79,7 +79,7 @@ export function RosaQueue() {
         </div>
         <UniversalDropzone
           trigger={
-            <Button className="bg-[#ccff00] text-black hover:bg-[#b8e600]">
+            <Button className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90">
               <Sparkles className="mr-2 h-4 w-4" />
               Drop a document
             </Button>
@@ -147,7 +147,7 @@ function StatCard({
           <span className="text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
           <span className="text-muted-foreground">{icon}</span>
         </div>
-        <div className={`mt-2 text-2xl font-semibold ${tone === 'primary' ? 'text-[#ccff00]' : ''}`}>
+        <div className={`mt-2 text-2xl font-semibold tabular-nums ${tone === 'primary' ? 'text-room-accent' : ''}`}>
           {value}
         </div>
       </CardContent>

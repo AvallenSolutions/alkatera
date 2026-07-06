@@ -9,7 +9,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
-  Loader2,
   Save,
   CheckCircle2,
   Building2,
@@ -18,6 +17,7 @@ import {
   ImageIcon,
   FileText,
 } from 'lucide-react';
+import { Statement } from '@/components/studio';
 
 interface SupplierProfile {
   id: string;
@@ -342,22 +342,22 @@ export default function SupplierProfilePage() {
 
   if (loading) {
     return (
-      <div className="space-y-6 animate-pulse">
+      <div className="space-y-6">
         <div className="space-y-2">
           <div className="h-8 w-48 bg-muted rounded" />
           <div className="h-4 w-80 bg-muted rounded" />
         </div>
-        <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+        <div className="rounded-[6px] border border-border bg-card p-6 space-y-4">
           <div className="h-4 w-32 bg-muted rounded" />
           <div className="flex items-start gap-6">
-            <div className="h-24 w-24 bg-muted rounded-xl" />
+            <div className="h-24 w-24 bg-muted rounded-[6px]" />
             <div className="space-y-2">
               <div className="h-4 w-48 bg-muted rounded" />
               <div className="h-9 w-28 bg-muted rounded" />
             </div>
           </div>
         </div>
-        <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+        <div className="rounded-[6px] border border-border bg-card p-6 space-y-4">
           <div className="h-4 w-32 bg-muted rounded" />
           <div className="h-10 w-full bg-muted rounded" />
           <div className="h-24 w-full bg-muted rounded" />
@@ -385,8 +385,8 @@ export default function SupplierProfilePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-serif text-foreground">Company Profile</h1>
-        <p className="text-muted-foreground mt-1">
+        <Statement eyebrow="SUPPLIER PORTAL · PROFILE" headline="Company profile." />
+        <p className="text-muted-foreground mt-3 text-sm">
           Manage your company information. This will be visible to your customers on alkatera.
         </p>
       </div>
@@ -399,17 +399,17 @@ export default function SupplierProfilePage() {
         )}
 
         {success && (
-          <Alert className="border-green-500/30 bg-green-500/10">
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
-            <AlertDescription className="text-green-400">
+          <Alert className="border-studio-good/40 bg-card">
+            <CheckCircle2 className="h-4 w-4 text-studio-good" />
+            <AlertDescription className="text-studio-good">
               Profile updated successfully
             </AlertDescription>
           </Alert>
         )}
 
         {/* Logo Upload */}
-        <div className="space-y-4 rounded-xl border border-border bg-card p-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="space-y-4 rounded-[6px] border border-border bg-card p-6">
+          <h2 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-forest">
             Company Logo
           </h2>
 
@@ -420,7 +420,7 @@ export default function SupplierProfilePage() {
                   <img
                     src={logoUrl}
                     alt="Company logo"
-                    className="h-24 w-24 rounded-xl object-contain border border-border bg-background p-1"
+                    className="h-24 w-24 rounded-[6px] object-contain border border-border bg-background p-1"
                   />
                   <button
                     type="button"
@@ -432,7 +432,7 @@ export default function SupplierProfilePage() {
                   </button>
                 </div>
               ) : (
-                <div className="h-24 w-24 rounded-xl border-2 border-dashed border-border flex items-center justify-center bg-muted/30">
+                <div className="h-24 w-24 rounded-[6px] border-2 border-dashed border-border flex items-center justify-center bg-muted/30">
                   <ImageIcon className="h-8 w-8 text-muted-foreground/50" />
                 </div>
               )}
@@ -458,10 +458,7 @@ export default function SupplierProfilePage() {
                 disabled={uploadingLogo}
               >
                 {uploadingLogo ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Uploading...
-                  </>
+                  'Uploading...'
                 ) : (
                   <>
                     <Upload className="mr-2 h-4 w-4" />
@@ -474,8 +471,8 @@ export default function SupplierProfilePage() {
         </div>
 
         {/* Company Details */}
-        <div className="space-y-4 rounded-xl border border-border bg-card p-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="space-y-4 rounded-[6px] border border-border bg-card p-6">
+          <h2 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-forest">
             Company Details
           </h2>
 
@@ -594,8 +591,8 @@ export default function SupplierProfilePage() {
         </div>
 
         {/* Contact Information */}
-        <div className="space-y-4 rounded-xl border border-border bg-card p-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="space-y-4 rounded-[6px] border border-border bg-card p-6">
+          <h2 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-forest">
             Contact Information
           </h2>
 
@@ -627,8 +624,8 @@ export default function SupplierProfilePage() {
         </div>
 
         {/* Product Catalogue */}
-        <div className="space-y-4 rounded-xl border border-border bg-card p-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="space-y-4 rounded-[6px] border border-border bg-card p-6">
+          <h2 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-forest">
             Product Catalogue
           </h2>
 
@@ -645,7 +642,7 @@ export default function SupplierProfilePage() {
                   href={catalogueUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs text-[#ccff00] hover:underline"
+                  className="text-xs text-studio-forest hover:underline"
                 >
                   View file
                 </a>
@@ -677,10 +674,7 @@ export default function SupplierProfilePage() {
             disabled={uploadingCatalogue}
           >
             {uploadingCatalogue ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Uploading...
-              </>
+              'Uploading...'
             ) : (
               <>
                 <Upload className="mr-2 h-4 w-4" />
@@ -691,8 +685,8 @@ export default function SupplierProfilePage() {
         </div>
 
         {/* Additional Notes */}
-        <div className="space-y-4 rounded-xl border border-border bg-card p-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="space-y-4 rounded-[6px] border border-border bg-card p-6">
+          <h2 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-forest">
             Additional Notes
           </h2>
 
@@ -711,10 +705,7 @@ export default function SupplierProfilePage() {
         <div className="flex justify-end">
           <Button type="submit" disabled={saving}>
             {saving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving...
-              </>
+              'Saving...'
             ) : (
               <>
                 <Save className="mr-2 h-4 w-4" />

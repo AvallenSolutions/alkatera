@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Loader2, RotateCcw, Save, Leaf, Users, Scale } from 'lucide-react'
+import { RotateCcw, Save, Leaf, Users, Scale } from 'lucide-react'
 import { Slider } from '@/components/ui/slider'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -17,21 +17,21 @@ const PILLAR_INFO = [
     label: 'Environmental',
     description: 'Climate, water, circularity, nature.',
     Icon: Leaf,
-    toneClass: 'text-emerald-300',
+    toneClass: 'text-studio-forest',
   },
   {
     key: 's' as const,
     label: 'Social',
     description: 'Community impact, people & culture, supplier ESG.',
     Icon: Users,
-    toneClass: 'text-sky-300',
+    toneClass: 'text-studio-cobalt',
   },
   {
     key: 'g' as const,
     label: 'Governance',
     description: 'Policies, board, ethics, certifications.',
     Icon: Scale,
-    toneClass: 'text-purple-300',
+    toneClass: 'text-muted-foreground',
   },
 ]
 
@@ -171,7 +171,7 @@ export function VitalityWeightsSettings({ compact = false }: Props) {
         {PILLAR_INFO.map(({ key, label, description, Icon, toneClass }) => {
           const pct = Math.round(weights[key] * 100)
           return (
-            <div key={key} className="rounded-xl border border-border bg-card p-4">
+            <div key={key} className="rounded-[6px] border border-border bg-card p-4">
               <div className="flex items-center justify-between gap-3 mb-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <Icon className={cn('h-4 w-4', toneClass)} />
@@ -203,29 +203,21 @@ export function VitalityWeightsSettings({ compact = false }: Props) {
           disabled={resetting || saving}
           className="gap-1.5"
         >
-          {resetting ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <RotateCcw className="h-3.5 w-3.5" />
-          )}
-          Reset to default
+          <RotateCcw className="h-3.5 w-3.5" />
+          {resetting ? 'Resetting…' : 'Reset to default'}
         </Button>
         <Button
           onClick={handleSave}
           disabled={!dirty || saving}
-          className="bg-[#ccff00] text-black hover:bg-[#b8e600] disabled:opacity-50 gap-1.5"
+          className="gap-1.5"
         >
-          {saving ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Save className="h-3.5 w-3.5" />
-          )}
-          Save weights
+          <Save className="h-3.5 w-3.5" />
+          {saving ? 'Saving…' : 'Save weights'}
         </Button>
       </div>
 
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
-      {success ? <p className="text-xs text-emerald-300">{success}</p> : null}
+      {success ? <p className="text-xs text-studio-good">{success}</p> : null}
     </div>
   )
 }

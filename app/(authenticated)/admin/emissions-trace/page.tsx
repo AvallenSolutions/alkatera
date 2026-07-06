@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import {
   Select,
   SelectContent,
@@ -23,10 +22,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { AlertTriangle, Loader2, ShieldAlert } from 'lucide-react'
+import { AlertTriangle, ShieldAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import type { EmissionsTrace } from '@/lib/emissions/types'
 import { Brand } from '@/components/shared/Brand'
+import { Eyebrow } from '@/components/studio/eyebrow'
+import { BigNumber } from '@/components/studio/big-number'
 
 interface Organization {
   id: string
@@ -81,7 +82,7 @@ export default function EmissionsTracePage() {
   if (adminLoading) {
     return (
       <div className="flex justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">Loading…</p>
       </div>
     )
   }
@@ -108,7 +109,10 @@ export default function EmissionsTracePage() {
   return (
     <div className="space-y-6 max-w-6xl">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Emissions Trace</h1>
+        <Eyebrow tone="dim" className="mb-3">THE WIRING · ADMIN</Eyebrow>
+        <h1 className="font-display text-3xl font-bold tracking-[-0.035em] text-foreground">
+          Emissions trace.
+        </h1>
         <p className="text-sm text-muted-foreground mt-2">
           Phase 0 instrumentation. Enumerates every row currently contributing to an
           organisation&apos;s corporate footprint and flags source overlaps that indicate
@@ -148,8 +152,7 @@ export default function EmissionsTracePage() {
             />
           </div>
           <Button onClick={runTrace} disabled={!orgId || loading}>
-            {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-            Run trace
+            {loading ? 'Running…' : 'Run trace'}
           </Button>
         </CardContent>
       </Card>
@@ -179,7 +182,7 @@ export default function EmissionsTracePage() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  <AlertTriangle className="h-4 w-4 text-studio-attention" />
                   Overlap warnings
                 </CardTitle>
                 <CardDescription>
@@ -201,12 +204,8 @@ export default function EmissionsTracePage() {
                       <TableRow key={i}>
                         <TableCell className="font-mono text-xs">{w.scopeSlice}</TableCell>
                         <TableCell>{w.period}</TableCell>
-                        <TableCell className="flex gap-1 flex-wrap">
-                          {w.sources.map((s) => (
-                            <Badge key={s} variant="outline" className="text-xs">
-                              {s}
-                            </Badge>
-                          ))}
+                        <TableCell className="font-mono text-xs">
+                          {w.sources.join(' · ')}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -264,17 +263,14 @@ export default function EmissionsTracePage() {
 }
 
 function StatCard({ label, value, tone = 'neutral' }: { label: string; value: string; tone?: 'neutral' | 'warn' | 'ok' }) {
-  const toneClass =
-    tone === 'warn'
-      ? 'text-amber-600 dark:text-amber-400'
-      : tone === 'ok'
-      ? 'text-emerald-600 dark:text-emerald-400'
-      : 'text-foreground'
   return (
     <Card>
       <CardContent className="py-4">
-        <div className="text-xs uppercase text-muted-foreground tracking-wide">{label}</div>
-        <div className={`text-2xl font-semibold mt-1 ${toneClass}`}>{value}</div>
+        <BigNumber
+          value={value}
+          label={label}
+          tone={tone === 'warn' ? 'attention' : tone === 'ok' ? 'good' : 'ink'}
+        />
       </CardContent>
     </Card>
   )

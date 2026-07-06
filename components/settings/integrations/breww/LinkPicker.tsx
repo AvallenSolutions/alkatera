@@ -11,8 +11,8 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { Check, Loader2, Plus, Search } from 'lucide-react'
+import { StateChip } from '@/components/studio/state-chip'
+import { Check, Plus, Search } from 'lucide-react'
 
 export interface LinkPickerEntity {
   id: string
@@ -95,8 +95,8 @@ export function LinkPicker<T extends LinkPickerEntity>({
         </DialogHeader>
 
         {/* Source entity summary */}
-        <div className="rounded-lg border bg-muted/30 p-3 text-sm">
-          <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
+        <div className="rounded-[6px] border border-border bg-secondary p-3 text-sm">
+          <div className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground">
             {sourceLabel}
           </div>
           <div className="font-medium mt-0.5">{sourceName}</div>
@@ -128,7 +128,7 @@ export function LinkPicker<T extends LinkPickerEntity>({
         </div>
 
         {/* Results list */}
-        <div className="rounded-lg border max-h-[260px] overflow-y-auto">
+        <div className="rounded-[6px] border border-border max-h-[260px] overflow-y-auto">
           {entities.length === 0 ? (
             <div className="py-8 text-center text-xs text-muted-foreground">
               {emptyHint || `No ${entityLabel}s yet.`}
@@ -171,7 +171,7 @@ export function LinkPicker<T extends LinkPickerEntity>({
               onCreate()
               onClose()
             }}
-            className="flex items-center gap-2 text-xs text-[#8da300] dark:text-[#ccff00] hover:underline disabled:opacity-50"
+            className="flex items-center gap-2 text-xs font-medium text-foreground hover:underline disabled:opacity-50"
           >
             <Plus className="h-3 w-3" />
             {createLabel}
@@ -184,7 +184,6 @@ export function LinkPicker<T extends LinkPickerEntity>({
           </Button>
           {saving && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground pr-2">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
               Linking...
             </div>
           )}
@@ -194,12 +193,7 @@ export function LinkPicker<T extends LinkPickerEntity>({
   )
 }
 
-// Quick badge helper for "already linked" summaries elsewhere.
+// Quick typographic state helper for "already linked" summaries elsewhere.
 export function LinkedBadge({ label }: { label: string }) {
-  return (
-    <Badge variant="outline" className="border-emerald-500/40 text-emerald-700 dark:text-emerald-300 gap-1 text-[10px]">
-      <Check className="h-3 w-3" />
-      {label}
-    </Badge>
-  )
+  return <StateChip tone="good">{label}</StateChip>
 }

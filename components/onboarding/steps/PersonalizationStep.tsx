@@ -125,11 +125,11 @@ export function PersonalizationStep() {
       <div className="w-full max-w-md space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
-          <p className="text-sm text-white/60">
+          <p className="text-sm text-muted-foreground">
             Let&apos;s personalise your experience
           </p>
-          <p className="text-xs text-white/40">
-            ({totalSubSteps} quick questions) &mdash; {subStepIndex + 1}/{totalSubSteps}
+          <p className="text-xs text-muted-foreground">
+            ({totalSubSteps} quick questions) &middot; {subStepIndex + 1}/{totalSubSteps}
           </p>
           {/* Sub-step progress dots */}
           <div className="flex items-center justify-center gap-2 pt-2">
@@ -139,10 +139,10 @@ export function PersonalizationStep() {
                 className={cn(
                   'h-2 rounded-full transition-all duration-300',
                   i === subStepIndex
-                    ? 'bg-[#ccff00] w-6'
+                    ? 'bg-studio-forest w-6'
                     : i < subStepIndex
-                    ? 'bg-[#ccff00]/50 w-2'
-                    : 'bg-white/15 w-2'
+                    ? 'bg-studio-forest/50 w-2'
+                    : 'bg-border w-2'
                 )}
               />
             ))}
@@ -151,8 +151,8 @@ export function PersonalizationStep() {
 
         {/* Question: Role */}
         {currentSubStep === 'role' && (
-          <div className="space-y-4 animate-in slide-in-from-right duration-300 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6">
-            <h3 className="text-xl font-serif font-bold text-white text-center">
+          <div className="space-y-4 animate-in fade-in duration-300 rounded-[6px] border border-border bg-card p-6">
+            <h3 className="text-xl font-display font-bold text-foreground text-center">
               What&apos;s your role?
             </h3>
             <div className="space-y-2">
@@ -161,10 +161,10 @@ export function PersonalizationStep() {
                   key={opt.value}
                   onClick={() => setRole(opt.value)}
                   className={cn(
-                    'w-full text-left px-4 py-3 rounded-xl border transition-all',
+                    'w-full text-left px-4 py-3 rounded-[6px] border transition-all',
                     role === opt.value
-                      ? 'border-[#ccff00] bg-[#ccff00]/10 text-white'
-                      : 'border-white/10 bg-white/5 hover:border-white/20 text-white/80'
+                      ? 'border-studio-forest bg-secondary text-foreground'
+                      : 'border-border bg-card hover:border-foreground/30 text-foreground'
                   )}
                 >
                   {opt.label}
@@ -175,11 +175,11 @@ export function PersonalizationStep() {
                   placeholder="Please specify..."
                   value={roleOther}
                   onChange={e => setRoleOther(e.target.value)}
-                  className="mt-2 bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
+                  className="mt-2"
                 />
               )}
             </div>
-            <p className="text-xs text-white/30 text-center">
+            <p className="text-xs text-muted-foreground text-center">
               We&apos;ll prioritise the features and data most relevant to you.
             </p>
           </div>
@@ -187,11 +187,11 @@ export function PersonalizationStep() {
 
         {/* Question: Beverage type (owner only) */}
         {currentSubStep === 'beverage' && (
-          <div className="space-y-4 animate-in slide-in-from-right duration-300 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6">
-            <h3 className="text-xl font-serif font-bold text-white text-center">
+          <div className="space-y-4 animate-in fade-in duration-300 rounded-[6px] border border-border bg-card p-6">
+            <h3 className="text-xl font-display font-bold text-foreground text-center">
               What do you produce?
             </h3>
-            <p className="text-sm text-white/50 text-center">
+            <p className="text-sm text-muted-foreground text-center">
               Select all that apply:
             </p>
             <div className="space-y-2">
@@ -200,10 +200,10 @@ export function PersonalizationStep() {
                   key={opt.value}
                   onClick={() => toggleBeverage(opt.value)}
                   className={cn(
-                    'w-full text-left px-4 py-3 rounded-xl border transition-all',
+                    'w-full text-left px-4 py-3 rounded-[6px] border transition-all',
                     beverageTypes.includes(opt.value)
-                      ? 'border-[#ccff00] bg-[#ccff00]/10 text-white'
-                      : 'border-white/10 bg-white/5 hover:border-white/20 text-white/80'
+                      ? 'border-studio-forest bg-secondary text-foreground'
+                      : 'border-border bg-card hover:border-foreground/30 text-foreground'
                   )}
                 >
                   {opt.label}
@@ -214,11 +214,11 @@ export function PersonalizationStep() {
                   placeholder="Please specify..."
                   value={beverageTypeOther}
                   onChange={e => setBeverageTypeOther(e.target.value)}
-                  className="mt-2 bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
+                  className="mt-2"
                 />
               )}
             </div>
-            <p className="text-xs text-white/30 text-center">
+            <p className="text-xs text-muted-foreground text-center">
               Helps us show relevant benchmarks.
             </p>
           </div>
@@ -226,8 +226,8 @@ export function PersonalizationStep() {
 
         {/* Question: Company size (owner only) */}
         {currentSubStep === 'size' && (
-          <div className="space-y-4 animate-in slide-in-from-right duration-300 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6">
-            <h3 className="text-xl font-serif font-bold text-white text-center">
+          <div className="space-y-4 animate-in fade-in duration-300 rounded-[6px] border border-border bg-card p-6">
+            <h3 className="text-xl font-display font-bold text-foreground text-center">
               Company size?
             </h3>
             <div className="space-y-2">
@@ -236,17 +236,17 @@ export function PersonalizationStep() {
                   key={opt.value}
                   onClick={() => setCompanySize(opt.value)}
                   className={cn(
-                    'w-full text-left px-4 py-3 rounded-xl border transition-all',
+                    'w-full text-left px-4 py-3 rounded-[6px] border transition-all',
                     companySize === opt.value
-                      ? 'border-[#ccff00] bg-[#ccff00]/10 text-white'
-                      : 'border-white/10 bg-white/5 hover:border-white/20 text-white/80'
+                      ? 'border-studio-forest bg-secondary text-foreground'
+                      : 'border-border bg-card hover:border-foreground/30 text-foreground'
                   )}
                 >
                   {opt.label}
                 </button>
               ))}
             </div>
-            <p className="text-xs text-white/30 text-center">
+            <p className="text-xs text-muted-foreground text-center">
               Determines data complexity.
             </p>
           </div>
@@ -254,11 +254,11 @@ export function PersonalizationStep() {
 
         {/* Question: Primary goal */}
         {currentSubStep === 'goals' && (
-          <div className="space-y-4 animate-in slide-in-from-right duration-300 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6">
-            <h3 className="text-xl font-serif font-bold text-white text-center">
+          <div className="space-y-4 animate-in fade-in duration-300 rounded-[6px] border border-border bg-card p-6">
+            <h3 className="text-xl font-display font-bold text-foreground text-center">
               Your primary goal?
             </h3>
-            <p className="text-sm text-white/50 text-center">
+            <p className="text-sm text-muted-foreground text-center">
               Select up to 2:
             </p>
             <div className="space-y-2">
@@ -267,10 +267,10 @@ export function PersonalizationStep() {
                   key={opt.value}
                   onClick={() => toggleGoal(opt.value)}
                   className={cn(
-                    'w-full text-left px-4 py-3 rounded-xl border transition-all',
+                    'w-full text-left px-4 py-3 rounded-[6px] border transition-all',
                     primaryGoals.includes(opt.value)
-                      ? 'border-[#ccff00] bg-[#ccff00]/10 text-white'
-                      : 'border-white/10 bg-white/5 hover:border-white/20 text-white/80',
+                      ? 'border-studio-forest bg-secondary text-foreground'
+                      : 'border-border bg-card hover:border-foreground/30 text-foreground',
                     primaryGoals.length >= 2 && !primaryGoals.includes(opt.value)
                       ? 'opacity-50 cursor-not-allowed'
                       : ''
@@ -281,7 +281,7 @@ export function PersonalizationStep() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-white/30 text-center">
+            <p className="text-xs text-muted-foreground text-center">
               We&apos;ll prioritise your key features.
             </p>
           </div>
@@ -289,14 +289,14 @@ export function PersonalizationStep() {
 
         {/* Navigation */}
         <div className="flex items-center justify-between pt-4">
-          <Button variant="ghost" onClick={handleBack} className="text-white/40 hover:text-white hover:bg-white/10">
+          <Button variant="ghost" onClick={handleBack} className="text-muted-foreground hover:text-foreground hover:bg-secondary">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
           <Button
             onClick={handleNext}
             disabled={!canProceed()}
-            className="bg-[#ccff00] text-black hover:bg-[#ccff00]/90 font-medium rounded-xl"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-[6px]"
           >
             {subStepIndex === totalSubSteps - 1 ? 'Continue' : 'Next'}
             <ArrowRight className="w-4 h-4 ml-2" />

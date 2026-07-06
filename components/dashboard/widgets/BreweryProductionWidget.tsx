@@ -129,7 +129,7 @@ export function BreweryProductionWidget() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <Beer className="h-5 w-5 text-[#8da300] dark:text-[#ccff00]" />
+            <Beer className="h-5 w-5 text-room-accent" />
             Brewery Production
           </CardTitle>
         </CardHeader>
@@ -146,7 +146,7 @@ export function BreweryProductionWidget() {
       <Card className="border-dashed">
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-base">
-            <Beer className="h-5 w-5 text-[#8da300] dark:text-[#ccff00]" />
+            <Beer className="h-5 w-5 text-room-accent" />
             Brewery Production
           </CardTitle>
           <CardDescription>Connect Breww to surface production volumes here</CardDescription>
@@ -178,7 +178,7 @@ export function BreweryProductionWidget() {
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Beer className="h-5 w-5 text-[#8da300] dark:text-[#ccff00]" />
+              <Beer className="h-5 w-5 text-room-accent" />
               Brewery Production
             </CardTitle>
             <CardDescription>
@@ -210,7 +210,7 @@ export function BreweryProductionWidget() {
             return (
               <div key={m.key} className="flex-1 group relative">
                 <div
-                  className="w-full rounded-sm bg-[#ccff00]/30 hover:bg-[#ccff00]/60 transition-colors cursor-help"
+                  className="w-full rounded-sm bg-room-accent/30 hover:bg-room-accent/60 transition-colors cursor-help"
                   style={{ height: `${h}%` }}
                 />
                 <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-popover border text-[10px] whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-10 shadow-md">

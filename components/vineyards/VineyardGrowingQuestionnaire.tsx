@@ -20,7 +20,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -72,11 +71,11 @@ const CHEMICAL_TYPE_OPTIONS: { value: ChemicalType; label: string }[] = [
 
 function chemicalTypeBadgeClass(type: ChemicalType): string {
   switch (type) {
-    case 'fertiliser': return 'bg-green-500/10 text-green-400 border-green-500/20';
-    case 'fungicide': return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
-    case 'herbicide': return 'bg-orange-500/10 text-orange-400 border-orange-500/20';
-    case 'insecticide': return 'bg-red-500/10 text-red-400 border-red-500/20';
-    default: return 'bg-muted/50 text-muted-foreground border-border';
+    case 'fertiliser': return 'text-studio-forest border-border';
+    case 'fungicide': return 'text-studio-attention border-border';
+    case 'herbicide': return 'text-studio-hold border-border';
+    case 'insecticide': return 'text-studio-stale border-border';
+    default: return 'text-muted-foreground border-border';
   }
 }
 
@@ -384,7 +383,7 @@ export function VineyardGrowingQuestionnaire({
   useIngestStash('spray', handleSprayImport);
   useIngestStash('evidence', (file) => {
     setEvidenceFile(file);
-    toast.info('Evidence ready to upload — complete the questionnaire and click Save to attach it.');
+    toast.info('Evidence ready to upload: complete the questionnaire and click Save to attach it.');
   });
 
   // Build vintage year options (current year down to current-10)
@@ -667,7 +666,7 @@ export function VineyardGrowingQuestionnaire({
                 onClick={() => setCurrentStep(i)}
                 className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
                   i === currentStep
-                    ? 'bg-[#ccff00]/20 text-[#ccff00]'
+                    ? 'bg-secondary text-studio-cobalt'
                     : i < currentStep
                     ? 'bg-muted text-foreground'
                     : 'text-muted-foreground'
@@ -714,7 +713,7 @@ export function VineyardGrowingQuestionnaire({
                       Vineyard total: {vineyardHectares} ha. Enter the area used for this product.
                     </p>
                     {form.area_ha > vineyardHectares && (
-                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                      <p className="text-xs text-studio-attention">
                         ⚠ Area exceeds vineyard total ({vineyardHectares} ha)
                       </p>
                     )}
@@ -738,12 +737,12 @@ export function VineyardGrowingQuestionnaire({
                           Calculated yield: {(form.grape_yield_tonnes / form.area_ha).toFixed(1)} t/ha
                         </p>
                         {form.grape_yield_tonnes / form.area_ha > 25 && (
-                          <p className="text-xs text-amber-600 dark:text-amber-400">
+                          <p className="text-xs text-studio-attention">
                             ⚠ Yield above 25 t/ha is unusually high. Please check your figures.
                           </p>
                         )}
                         {form.grape_yield_tonnes / form.area_ha < 1 && (
-                          <p className="text-xs text-amber-600 dark:text-amber-400">
+                          <p className="text-xs text-studio-attention">
                             ⚠ Yield below 1 t/ha is very low. Is this a newly planted vineyard?
                           </p>
                         )}
@@ -761,17 +760,17 @@ export function VineyardGrowingQuestionnaire({
                         onClick={() => updateForm({ soil_management: practice.value })}
                         className={`flex items-start gap-3 p-3 rounded-lg border text-left transition-colors ${
                           form.soil_management === practice.value
-                            ? 'border-[#ccff00] bg-[#ccff00]/5'
+                            ? 'border-studio-cobalt bg-secondary'
                             : 'border-border hover:border-muted-foreground/30'
                         }`}
                       >
                         <div className={`mt-0.5 h-4 w-4 rounded-full border-2 flex items-center justify-center ${
                           form.soil_management === practice.value
-                            ? 'border-[#ccff00]'
+                            ? 'border-studio-cobalt'
                             : 'border-muted-foreground/30'
                         }`}>
                           {form.soil_management === practice.value && (
-                            <div className="h-2 w-2 rounded-full bg-[#ccff00]" />
+                            <div className="h-2 w-2 rounded-full bg-studio-cobalt" />
                           )}
                         </div>
                         <div>
@@ -967,8 +966,8 @@ export function VineyardGrowingQuestionnaire({
                           />
                         </div>
 
-                        <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-                          <p className="text-xs text-amber-400">
+                        <div className="rounded-lg border border-border bg-secondary p-3">
+                          <p className="text-xs text-studio-attention">
                             Operations within or adjacent to sensitive areas require enhanced disclosure under TNFD and CSRD ESRS E4. Consider commissioning a biodiversity impact assessment.
                           </p>
                         </div>
@@ -1044,7 +1043,7 @@ export function VineyardGrowingQuestionnaire({
                       <p className="text-xs text-muted-foreground">
                         Emissions from land use change are amortised over 20 years.
                         {form.land_conversion_year && currentYear - form.land_conversion_year >= 20 && (
-                          <span className="block mt-1 text-green-600 dark:text-green-400">
+                          <span className="block mt-1 text-studio-good">
                             Conversion was 20+ years ago, so dLUC emissions are fully amortised (zero).
                           </span>
                         )}
@@ -1120,7 +1119,7 @@ export function VineyardGrowingQuestionnaire({
                             placeholder="e.g. 480"
                           />
                           {form.soil_carbon_override_kg_co2e_per_ha != null && form.soil_carbon_override_kg_co2e_per_ha > 1500 && (
-                            <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                            <p className="text-xs text-studio-attention flex items-center gap-1">
                               <AlertTriangle className="h-3 w-3" />
                               Unusually high. Please verify your measurement.
                             </p>
@@ -1129,7 +1128,7 @@ export function VineyardGrowingQuestionnaire({
                             form.soil_carbon_override_kg_co2e_per_ha > 0 &&
                             (SOIL_CARBON_REMOVAL_DEFAULTS[form.soil_management] ?? 0) > 0 &&
                             form.soil_carbon_override_kg_co2e_per_ha > (SOIL_CARBON_REMOVAL_DEFAULTS[form.soil_management] ?? 0) * 3 && (
-                            <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                            <p className="text-xs text-studio-attention flex items-center gap-1">
                               <AlertTriangle className="h-3 w-3" />
                               Significantly above the practice-based estimate.
                             </p>
@@ -1288,8 +1287,8 @@ export function VineyardGrowingQuestionnaire({
 
                         {/* Pending upload indicator */}
                         {evidenceFile && (
-                          <div className="flex items-center gap-2 rounded-lg border border-dashed border-[#ccff00]/50 bg-[#ccff00]/5 p-2">
-                            <Upload className="h-4 w-4 text-[#ccff00]" />
+                          <div className="flex items-center gap-2 rounded-lg border border-dashed border-border bg-secondary p-2">
+                            <Upload className="h-4 w-4 text-studio-cobalt" />
                             <span className="text-sm">{evidenceFile.name}</span>
                             <span className="text-xs text-muted-foreground">
                               (will upload on save)
@@ -1417,16 +1416,16 @@ export function VineyardGrowingQuestionnaire({
                           )}
 
                           {form.removal_verification_status === 'unverified' && (
-                            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-                              <p className="text-xs text-amber-400">
+                            <div className="rounded-lg border border-border bg-secondary p-3">
+                              <p className="text-xs text-studio-attention">
                                 Third-party verification to ISO 14064-3 or equivalent is required for SBTi FLAG submission. Unverified removals will be flagged in reports.
                               </p>
                             </div>
                           )}
 
                           {form.removal_verification_status === 'expired' && (
-                            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-                              <p className="text-xs text-amber-400">
+                            <div className="rounded-lg border border-border bg-secondary p-3">
+                              <p className="text-xs text-studio-attention">
                                 Removal verification has expired. Removals will not meet LSR standard until re-verification is completed.
                               </p>
                             </div>
@@ -1456,7 +1455,7 @@ export function VineyardGrowingQuestionnaire({
                   <div>
                     <p className="text-sm font-medium">Import spray diary</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Accepts any Excel format — spray schedule, application diary, field records.
+                      Accepts any Excel format: spray schedule, application diary, field records.
                     </p>
                   </div>
                   <Button
@@ -1467,7 +1466,7 @@ export function VineyardGrowingQuestionnaire({
                   >
                     {isImporting ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader2 className="mr-2 h-4 w-4" />
                         Analysing...
                       </>
                     ) : (
@@ -1559,13 +1558,13 @@ export function VineyardGrowingQuestionnaire({
                             }
                             disabled={chem.chemical_type !== 'fertiliser'}
                             className="h-7 text-xs px-2 w-14"
-                            placeholder={chem.chemical_type === 'fertiliser' ? '0' : '—'}
+                            placeholder={chem.chemical_type === 'fertiliser' ? '0' : '·'}
                           />
                           {chem.chemical_type === 'fertiliser' && chem.library_matched && (
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger>
-                                  <span className="text-green-400 text-xs leading-none">✓</span>
+                                  <span className="text-studio-good text-xs leading-none">✓</span>
                                 </TooltipTrigger>
                                 <TooltipContent>
                                   <p className="text-xs">Matched from chemical library</p>
@@ -1650,7 +1649,7 @@ export function VineyardGrowingQuestionnaire({
                                   toast.error('Failed to add chemical to library');
                                 }
                               }}
-                              className="text-muted-foreground hover:text-green-600 transition-colors p-1 rounded"
+                              className="text-muted-foreground hover:text-studio-good transition-colors p-1 rounded"
                               title="Add to chemical library"
                             >
                               <Plus className="h-3.5 w-3.5" />
@@ -1670,7 +1669,7 @@ export function VineyardGrowingQuestionnaire({
 
                   {/* Unmatched warning */}
                   {sprayChemicals.some((c) => !c.library_matched) && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 px-1">
+                    <p className="text-xs text-studio-attention flex items-center gap-1 px-1">
                       <AlertTriangle className="h-3 w-3" />
                       Some chemicals were not found in our library. Verify their classification and click <Plus className="h-3 w-3 inline" /> to save them for future use.
                     </p>
@@ -1730,7 +1729,7 @@ export function VineyardGrowingQuestionnaire({
                       <p className="text-xs text-muted-foreground">
                         {(form.diesel_litres_per_year / form.area_ha).toFixed(0)} L/ha
                         {form.diesel_litres_per_year / form.area_ha > 300 && (
-                          <span className="text-amber-600 dark:text-amber-400 ml-1">
+                          <span className="text-studio-attention ml-1">
                             ⚠ Above 300 L/ha is unusually high
                           </span>
                         )}
@@ -1857,8 +1856,8 @@ export function VineyardGrowingQuestionnaire({
                     </div>
                   </div>
                   {previewResult.total_removals > 0 && (
-                    <div className="rounded-lg border border-green-800/30 bg-green-950/20 p-3">
-                      <div className="text-xs text-green-400/70 flex items-center gap-1">
+                    <div className="rounded-lg border border-border bg-card p-3">
+                      <div className="text-xs text-studio-dim flex items-center gap-1">
                         Soil carbon removals
                         <TooltipProvider>
                           <Tooltip>
@@ -1875,11 +1874,11 @@ export function VineyardGrowingQuestionnaire({
                           </Tooltip>
                         </TooltipProvider>
                       </div>
-                      <div className="text-lg font-bold text-green-400">
+                      <div className="text-lg font-bold text-studio-forest">
                         {previewResult.total_removals.toFixed(1)}
-                        <span className="text-xs font-normal text-green-400/70 ml-1">kg CO2e removed/year</span>
+                        <span className="text-xs font-normal text-studio-dim ml-1">kg CO2e removed/year</span>
                       </div>
-                      <div className="text-xs text-green-400/50 mt-1">
+                      <div className="text-xs text-studio-dim mt-1">
                         {previewResult.flag_removals.methodology === 'practice_based_default'
                           ? 'Practice-based estimate'
                           : 'Verified measurement'}
@@ -1953,7 +1952,7 @@ export function VineyardGrowingQuestionnaire({
               disabled={saving}
             >
               {saving ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4" />
               ) : (
                 <Save className="mr-2 h-4 w-4" />
               )}
@@ -1962,10 +1961,10 @@ export function VineyardGrowingQuestionnaire({
             <Button
               onClick={() => handleSave(false)}
               disabled={saving}
-              className="bg-[#ccff00] text-black hover:bg-[#ccff00]/90"
+              className="bg-primary text-primary-foreground"
             >
               {saving ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4" />
               ) : (
                 <Check className="mr-2 h-4 w-4" />
               )}

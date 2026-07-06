@@ -9,11 +9,9 @@ import {
   ChevronDown,
   ChevronRight,
   FileText,
-  Loader2,
   RefreshCw,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -46,12 +44,12 @@ function ConfidencePill({ value }: { value: number | null }) {
   const pct = Math.round(value * 100)
   const color =
     pct >= 80
-      ? 'bg-emerald-500/15 text-emerald-200 border-emerald-500/30'
+      ? 'text-studio-good'
       : pct >= 60
-      ? 'bg-amber-500/15 text-amber-200 border-amber-500/30'
-      : 'bg-red-500/15 text-red-200 border-red-500/30'
+      ? 'text-studio-attention'
+      : 'text-studio-stale'
   return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs ${color}`}>
+    <span className={`font-mono text-[10px] font-bold uppercase tracking-[0.18em] ${color}`}>
       {pct}% confidence
     </span>
   )
@@ -70,7 +68,11 @@ function SourceBadge({ source }: { source: string }) {
       : source === 'integration_sync'
       ? 'Integration'
       : 'Manual'
-  return <Badge variant="outline" className="text-xs">{label}</Badge>
+  return (
+    <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+      {label}
+    </span>
+  )
 }
 
 function Row({
@@ -148,7 +150,7 @@ function Row({
   )
 
   return (
-    <div className="rounded-lg border border-border bg-card">
+    <div className="rounded-[6px] border border-border bg-card">
       <button
         className="flex w-full items-start gap-3 p-4 text-left"
         onClick={() => setExpanded(v => !v)}
@@ -216,13 +218,13 @@ function Row({
               size="sm"
               onClick={() => act('approve')}
               disabled={busy !== null}
-              className="bg-[#ccff00] text-black hover:bg-[#b8e600]"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
-              {busy === 'approve' ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-1 h-4 w-4" />}
+              <CheckCircle2 className="mr-1 h-4 w-4" />
               Approve
             </Button>
             <Button size="sm" variant="outline" onClick={() => act('defer')} disabled={busy !== null}>
-              {busy === 'defer' ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Clock3 className="mr-1 h-4 w-4" />}
+              <Clock3 className="mr-1 h-4 w-4" />
               Defer
             </Button>
             <Button
@@ -230,9 +232,9 @@ function Row({
               variant="outline"
               onClick={() => act('reject')}
               disabled={busy !== null}
-              className="text-red-300 hover:bg-red-500/10 hover:text-red-200"
+              className="text-studio-stale hover:bg-secondary hover:text-studio-stale"
             >
-              {busy === 'reject' ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <XCircle className="mr-1 h-4 w-4" />}
+              <XCircle className="mr-1 h-4 w-4" />
               Reject
             </Button>
           </div>
@@ -382,21 +384,23 @@ export function ExceptionQueue() {
         <h2 className="text-lg font-semibold">
           Exception queue
           {exceptions.length > 0 && (
-            <Badge variant="outline" className="ml-2">{exceptions.length}</Badge>
+            <span className="ml-2 font-mono text-sm font-bold text-studio-dim tabular-nums">
+              {exceptions.length}
+            </span>
           )}
         </h2>
         <Button variant="outline" size="sm" onClick={triggerRun} disabled={running}>
-          {running ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1 h-4 w-4" />}
+          <RefreshCw className="mr-1 h-4 w-4" />
           Run agent now
         </Button>
       </div>
 
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading queue…
+          Loading queue…
         </div>
       ) : exceptions.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+        <div className="rounded-[6px] border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
           Nothing waiting for review. The agent is up to date.
         </div>
       ) : (

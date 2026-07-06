@@ -17,8 +17,6 @@ import {
 import {
   Package,
   Plus,
-  Loader2,
-  CheckCircle2,
   AlertCircle,
   ChevronRight,
   Globe,
@@ -27,14 +25,12 @@ import {
   Droplets,
   Recycle,
   Leaf,
-  FileText,
-  ImageIcon,
   Wheat,
   Box,
   Eye,
   Sparkles,
 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Statement, StateChip } from '@/components/studio';
 import {
   Sheet,
   SheetContent,
@@ -216,16 +212,16 @@ export default function SupplierProductsPage() {
   const getPillarBadges = (product: SupplierProduct) => {
     const climate = product.impact_climate ?? product.carbon_intensity;
     const badges = [];
-    if (climate !== null) badges.push({ icon: Cloud, color: 'text-blue-400 bg-blue-500/10', label: 'Climate' });
-    if (product.impact_water !== null) badges.push({ icon: Droplets, color: 'text-cyan-400 bg-cyan-500/10', label: 'Water' });
-    if (product.impact_waste !== null || product.recycled_content_pct !== null) badges.push({ icon: Recycle, color: 'text-amber-400 bg-amber-500/10', label: 'Circularity' });
-    if (product.impact_land !== null) badges.push({ icon: Leaf, color: 'text-green-400 bg-green-500/10', label: 'Nature' });
+    if (climate !== null) badges.push({ icon: Cloud, label: 'Climate' });
+    if (product.impact_water !== null) badges.push({ icon: Droplets, label: 'Water' });
+    if (product.impact_waste !== null || product.recycled_content_pct !== null) badges.push({ icon: Recycle, label: 'Circularity' });
+    if (product.impact_land !== null) badges.push({ icon: Leaf, label: 'Nature' });
     return badges;
   };
 
   if (loading) {
     return (
-      <div className="space-y-6 animate-pulse">
+      <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="space-y-2">
             <div className="h-8 w-32 bg-muted rounded" />
@@ -235,8 +231,8 @@ export default function SupplierProductsPage() {
         </div>
         <div className="grid gap-3">
           {[1, 2, 3].map(i => (
-            <div key={i} className="flex items-center gap-4 p-5 rounded-xl border border-border bg-card">
-              <div className="w-12 h-12 bg-muted rounded-lg" />
+            <div key={i} className="flex items-center gap-4 p-5 rounded-[6px] border border-border bg-card">
+              <div className="w-12 h-12 bg-muted rounded-[6px]" />
               <div className="space-y-2 flex-1">
                 <div className="h-5 w-40 bg-muted rounded" />
                 <div className="h-3 w-24 bg-muted rounded" />
@@ -250,11 +246,11 @@ export default function SupplierProductsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-serif text-foreground">Products</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage your product catalog with environmental data, evidence, and certifications.
+          <Statement eyebrow="SUPPLIER PORTAL · CATALOGUE" headline="Products." />
+          <p className="text-muted-foreground mt-3 text-sm">
+            Manage your product catalogue with environmental data, evidence, and certifications.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -313,40 +309,37 @@ export default function SupplierProductsPage() {
               <button
                 key={product.id}
                 onClick={() => router.push(`/supplier-portal/products/${product.id}`)}
-                className="flex items-center justify-between p-5 rounded-xl border border-border bg-card hover:border-[#ccff00]/30 hover:bg-card/80 transition-colors text-left w-full group"
+                className="flex items-center justify-between p-5 rounded-[6px] border border-border bg-card hover:border-foreground/30 transition-colors text-left w-full group"
               >
                 <div className="flex items-center gap-4 min-w-0">
                   {product.product_image_url ? (
-                    <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 border border-border flex items-center justify-center bg-slate-100 dark:bg-slate-800">
+                    <div className="w-12 h-12 rounded-[6px] overflow-hidden flex-shrink-0 border border-border flex items-center justify-center bg-secondary">
                       <img src={product.product_image_url} alt="" className="max-w-full max-h-full object-contain" />
                     </div>
                   ) : (
-                    <div className="p-2.5 rounded-lg bg-purple-500/10 flex-shrink-0">
-                      <Package className="h-5 w-5 text-purple-400" />
+                    <div className="p-2.5 rounded-[6px] bg-secondary flex-shrink-0">
+                      <Package className="h-5 w-5 text-muted-foreground" />
                     </div>
                   )}
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-2.5 flex-wrap">
                       <p className="font-medium text-foreground truncate">{product.name}</p>
                       {product.product_type === 'packaging' ? (
-                        <Badge variant="secondary" className="text-xs bg-purple-500/10 text-purple-400 border-purple-500/20">
-                          <Box className="h-3 w-3 mr-1" />
+                        <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+                          <Box className="h-3 w-3" />
                           Packaging
-                        </Badge>
+                        </span>
                       ) : (
-                        <Badge variant="secondary" className="text-xs bg-amber-500/10 text-amber-400 border-amber-500/20">
-                          <Wheat className="h-3 w-3 mr-1" />
+                        <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+                          <Wheat className="h-3 w-3" />
                           Ingredient
-                        </Badge>
+                        </span>
                       )}
                       {product.is_verified && (
-                        <Badge variant="default" className="text-xs bg-green-500/20 text-green-400 border-green-500/30">
-                          <CheckCircle2 className="h-3 w-3 mr-1" />
-                          Verified
-                        </Badge>
+                        <StateChip tone="good">Verified</StateChip>
                       )}
                       {!product.is_active && (
-                        <Badge variant="secondary" className="text-xs">Inactive</Badge>
+                        <StateChip tone="quiet">Inactive</StateChip>
                       )}
                     </div>
                     <div className="flex items-center gap-3 mt-1.5 flex-wrap">
@@ -375,9 +368,9 @@ export default function SupplierProductsPage() {
                       )}
                       {/* Pillar coverage indicators */}
                       {pillarBadges.length > 0 && (
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1.5">
                           {pillarBadges.map((badge) => (
-                            <div key={badge.label} className={`p-1 rounded ${badge.color}`} title={badge.label}>
+                            <div key={badge.label} className="text-studio-forest" title={badge.label}>
                               <badge.icon className="h-3 w-3" />
                             </div>
                           ))}
@@ -399,12 +392,12 @@ export default function SupplierProductsPage() {
                       e.stopPropagation();
                       setPreviewProduct(product);
                     }}
-                    className="p-1.5 rounded-md text-muted-foreground hover:text-[#ccff00] hover:bg-[#ccff00]/10 transition-colors"
+                    className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
                     title="Preview product"
                   >
                     <Eye className="h-4 w-4" />
                   </button>
-                  <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-[#ccff00] transition-colors" />
+                  <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors" />
                 </div>
               </button>
             );
@@ -440,10 +433,10 @@ export default function SupplierProductsPage() {
                 <button
                   type="button"
                   onClick={() => setProductType('ingredient')}
-                  className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg border text-sm font-medium transition-all ${
+                  className={`flex items-center justify-center gap-2 px-4 py-3 rounded-[6px] border text-sm font-medium transition-colors ${
                     productType === 'ingredient'
-                      ? 'border-[#ccff00]/50 bg-[#ccff00]/10 text-foreground'
-                      : 'border-border bg-background text-muted-foreground hover:border-border/80'
+                      ? 'border-foreground bg-secondary text-foreground'
+                      : 'border-border bg-background text-muted-foreground hover:border-foreground/40'
                   }`}
                 >
                   <Wheat className="h-4 w-4" />
@@ -452,10 +445,10 @@ export default function SupplierProductsPage() {
                 <button
                   type="button"
                   onClick={() => setProductType('packaging')}
-                  className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg border text-sm font-medium transition-all ${
+                  className={`flex items-center justify-center gap-2 px-4 py-3 rounded-[6px] border text-sm font-medium transition-colors ${
                     productType === 'packaging'
-                      ? 'border-purple-500/50 bg-purple-500/10 text-foreground'
-                      : 'border-border bg-background text-muted-foreground hover:border-border/80'
+                      ? 'border-foreground bg-secondary text-foreground'
+                      : 'border-border bg-background text-muted-foreground hover:border-foreground/40'
                   }`}
                 >
                   <Box className="h-4 w-4" />
@@ -576,14 +569,7 @@ export default function SupplierProductsPage() {
                 Cancel
               </Button>
               <Button type="submit" disabled={saving}>
-                {saving ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  'Create & Continue'
-                )}
+                {saving ? 'Creating...' : 'Create & Continue'}
               </Button>
             </div>
           </form>

@@ -66,17 +66,17 @@ export function CompanyBasics() {
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 animate-in fade-in duration-300">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-3">
-          <div className="mx-auto w-16 h-16 bg-[#ccff00]/20 backdrop-blur-md border border-[#ccff00]/30 rounded-2xl flex items-center justify-center">
-            <Building2 className="w-8 h-8 text-[#ccff00]" />
+          <div className="mx-auto w-16 h-16 rounded-[6px] border border-border bg-card flex items-center justify-center">
+            <Building2 className="w-8 h-8 text-studio-forest" />
           </div>
-          <h3 className="text-xl font-serif font-bold text-white">
-            Let&apos;s add your company details
+          <h3 className="text-xl font-display font-bold text-foreground">
+            Let&apos;s add your company details.
           </h3>
         </div>
 
-        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 space-y-4">
+        <div className="rounded-[6px] border border-border bg-card p-6 space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="onb-company-name" className="text-sm font-medium text-white/70">
+            <Label htmlFor="onb-company-name" className="text-sm font-medium text-foreground">
               Company Name
             </Label>
             <Input
@@ -85,12 +85,11 @@ export function CompanyBasics() {
               value={companyName}
               onChange={e => setCompanyName(e.target.value)}
               disabled={isSaving}
-              className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="onb-address" className="text-sm font-medium text-white/70">
+            <Label htmlFor="onb-address" className="text-sm font-medium text-foreground">
               Headquarters Address
             </Label>
             <Input
@@ -99,32 +98,31 @@ export function CompanyBasics() {
               value={address}
               onChange={e => setAddress(e.target.value)}
               disabled={isSaving}
-              className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
             />
-            <p className="text-xs text-white/30">
+            <p className="text-xs text-muted-foreground">
               Used for location-based emission factors and regulations.
             </p>
           </div>
         </div>
 
-        <p className="text-xs text-white/30 text-center">
+        <p className="text-xs text-muted-foreground text-center">
           Seeing your branding makes this feel like YOUR platform. You can add a logo later in Settings.
         </p>
 
         <div className="flex items-center justify-between pt-2">
-          <Button variant="ghost" onClick={previousStep} className="text-white/40 hover:text-white hover:bg-white/10">
+          <Button variant="ghost" onClick={previousStep} className="text-muted-foreground hover:text-foreground hover:bg-secondary">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" onClick={skipStep} className="text-white/40 hover:text-white hover:bg-white/10 text-sm">
+            <Button variant="ghost" onClick={skipStep} className="text-muted-foreground hover:text-foreground hover:bg-secondary text-sm">
               <SkipForward className="w-4 h-4 mr-1" />
               Skip
             </Button>
             <Button
               onClick={handleSave}
               disabled={isSaving}
-              className="bg-[#ccff00] text-black hover:bg-[#ccff00]/90 font-medium rounded-xl"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-[6px]"
             >
               Continue
               <ArrowRight className="w-4 h-4 ml-2" />

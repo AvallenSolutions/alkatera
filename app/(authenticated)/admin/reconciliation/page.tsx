@@ -7,14 +7,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
-import { Loader2, ShieldAlert, Mail, Camera } from 'lucide-react'
+import { ShieldAlert, Mail, Camera } from 'lucide-react'
+import { Eyebrow } from '@/components/studio/eyebrow'
+import { StateChip } from '@/components/studio/state-chip'
 import { toast } from 'sonner'
 
 interface Organization { id: string; name: string }
@@ -128,7 +129,7 @@ export default function ReconciliationPage() {
   if (adminLoading) {
     return (
       <div className="flex justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">Loading…</p>
       </div>
     )
   }
@@ -152,7 +153,10 @@ export default function ReconciliationPage() {
   return (
     <div className="space-y-6 max-w-6xl">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Emissions reconciliation</h1>
+        <Eyebrow tone="dim" className="mb-3">THE WIRING · ADMIN</Eyebrow>
+        <h1 className="font-display text-3xl font-bold tracking-[-0.035em] text-foreground">
+          Emissions reconciliation.
+        </h1>
         <p className="text-sm text-muted-foreground mt-2">
           Capture the current corporate footprint for an organisation and year, and notify the
           customer when a methodology change moves their total by more than 5&#37;. Each snapshot
@@ -197,8 +201,8 @@ export default function ReconciliationPage() {
             />
           </div>
           <Button onClick={captureSnapshot} disabled={capturing || !orgId}>
-            {capturing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Camera className="h-4 w-4 mr-2" />}
-            Capture
+            {!capturing && <Camera className="h-4 w-4 mr-2" />}
+            {capturing ? 'Capturing…' : 'Capture'}
           </Button>
         </CardContent>
       </Card>
@@ -207,7 +211,7 @@ export default function ReconciliationPage() {
         <CardHeader>
           <CardTitle className="text-base">Recent snapshots</CardTitle>
           <CardDescription>
-            Snapshots flagged in amber moved the total by more than 5&#37; — notify the customer.
+            Snapshots flagged for attention moved the total by more than 5&#37;: notify the customer.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -233,7 +237,7 @@ export default function ReconciliationPage() {
                 {snapshots.map((s) => {
                   const material = s.delta_pct !== null && Math.abs(s.delta_pct) > 5
                   return (
-                    <TableRow key={s.id} className={material ? 'bg-amber-50/40 dark:bg-amber-950/20' : undefined}>
+                    <TableRow key={s.id}>
                       <TableCell className="text-xs">
                         {new Date(s.captured_at).toLocaleString('en-GB')}
                       </TableCell>
@@ -247,9 +251,9 @@ export default function ReconciliationPage() {
                       </TableCell>
                       <TableCell className="text-right font-mono text-xs">
                         {s.delta_pct !== null ? (
-                          <Badge variant="outline" className={material ? 'text-amber-700 border-amber-300' : ''}>
+                          <StateChip tone={material ? 'attention' : 'quiet'}>
                             {s.delta_pct > 0 ? '+' : ''}{s.delta_pct.toFixed(1)}&#37;
-                          </Badge>
+                          </StateChip>
                         ) : '—'}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground max-w-[160px] truncate">
@@ -267,10 +271,8 @@ export default function ReconciliationPage() {
                             disabled={notifyingId === s.id}
                             onClick={() => notify(s.id)}
                           >
-                            {notifyingId === s.id
-                              ? <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
-                              : <Mail className="h-3 w-3 mr-1.5" />}
-                            Email
+                            {notifyingId !== s.id && <Mail className="h-3 w-3 mr-1.5" />}
+                            {notifyingId === s.id ? 'Sending…' : 'Email'}
                           </Button>
                         )}
                       </TableCell>

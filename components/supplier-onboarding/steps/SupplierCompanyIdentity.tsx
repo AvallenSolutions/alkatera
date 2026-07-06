@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { ArrowLeft, ArrowRight, Building2, Upload, X, ImageIcon, Loader2, SkipForward } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Building2, Upload, X, ImageIcon, SkipForward } from 'lucide-react'
 import { toast } from 'sonner'
 
 const MAX_LOGO_SIZE = 10 * 1024 * 1024 // 10MB
@@ -161,7 +161,7 @@ export function SupplierCompanyIdentity() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-6 h-6 text-[#ccff00] animate-spin" />
+        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">Loading&hellip;</p>
       </div>
     )
   }
@@ -170,22 +170,22 @@ export function SupplierCompanyIdentity() {
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 animate-in fade-in duration-300">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-3">
-          <div className="mx-auto w-16 h-16 bg-[#ccff00]/20 backdrop-blur-md border border-[#ccff00]/30 rounded-2xl flex items-center justify-center">
-            <Building2 className="w-8 h-8 text-[#ccff00]" />
+          <div className="mx-auto w-16 h-16 rounded-[6px] bg-card border border-border flex items-center justify-center">
+            <Building2 className="w-8 h-8 text-studio-forest" />
           </div>
-          <h3 className="text-xl font-serif font-bold text-white">
-            Your Company Identity
+          <h3 className="text-xl font-display font-bold tracking-tight text-foreground">
+            Your company identity.
           </h3>
-          <p className="text-sm text-white/50">
+          <p className="text-sm text-muted-foreground">
             Add your logo and basic details so your customers know who they&apos;re working with.
           </p>
         </div>
 
-        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 space-y-4">
+        <div className="rounded-[6px] border border-border bg-card p-6 space-y-4">
           {/* Company Name */}
           <div className="space-y-2">
-            <Label htmlFor="ci-name" className="text-sm font-medium text-white/70">
-              Company Name <span className="text-red-400">*</span>
+            <Label htmlFor="ci-name" className="text-sm font-medium text-foreground">
+              Company Name <span className="text-studio-stale">*</span>
             </Label>
             <Input
               id="ci-name"
@@ -193,27 +193,26 @@ export function SupplierCompanyIdentity() {
               value={name}
               onChange={e => setName(e.target.value)}
               disabled={isSaving}
-              className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
             />
           </div>
 
           {/* Logo Upload */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium text-white/70">Logo</Label>
+            <Label className="text-sm font-medium text-foreground">Logo</Label>
             <div className="flex items-center gap-4">
               {logoUrl ? (
                 <div className="relative group">
                   <img
                     src={logoUrl}
                     alt="Company logo"
-                    className="w-24 h-24 rounded-xl object-cover border border-white/10"
+                    className="w-24 h-24 rounded-[6px] object-cover border border-border"
                   />
                   <button
                     type="button"
                     onClick={handleRemoveLogo}
-                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                   >
-                    <X className="w-3 h-3 text-white" />
+                    <X className="w-3 h-3" />
                   </button>
                 </div>
               ) : (
@@ -221,14 +220,14 @@ export function SupplierCompanyIdentity() {
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploading}
-                  className="w-24 h-24 rounded-xl border-2 border-dashed border-white/20 hover:border-[#ccff00]/40 flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer"
+                  className="w-24 h-24 rounded-[6px] border border-dashed border-border hover:border-studio-forest/50 bg-secondary/50 flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer"
                 >
                   {isUploading ? (
-                    <Loader2 className="w-5 h-5 text-white/40 animate-spin" />
+                    <span className="text-[10px] text-muted-foreground">Uploading&hellip;</span>
                   ) : (
                     <>
-                      <ImageIcon className="w-5 h-5 text-white/40" />
-                      <span className="text-[10px] text-white/30">Upload</span>
+                      <ImageIcon className="w-5 h-5 text-muted-foreground" />
+                      <span className="text-[10px] text-muted-foreground">Upload</span>
                     </>
                   )}
                 </button>
@@ -241,14 +240,16 @@ export function SupplierCompanyIdentity() {
                   size="sm"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploading}
-                  className="text-white/40 hover:text-white hover:bg-white/10 text-xs"
+                  className="text-muted-foreground hover:text-foreground hover:bg-secondary text-xs"
                 >
                   {isUploading ? (
-                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    'Uploading...'
                   ) : (
-                    <Upload className="w-3 h-3 mr-1" />
+                    <>
+                      <Upload className="w-3 h-3 mr-1" />
+                      Change
+                    </>
                   )}
-                  Change
                 </Button>
               )}
 
@@ -264,12 +265,12 @@ export function SupplierCompanyIdentity() {
                 }}
               />
             </div>
-            <p className="text-[11px] text-white/30">JPG, PNG, or WebP. Max 10MB.</p>
+            <p className="text-[11px] text-studio-dim">JPG, PNG, or WebP. Max 10MB.</p>
           </div>
 
           {/* Description */}
           <div className="space-y-2">
-            <Label htmlFor="ci-description" className="text-sm font-medium text-white/70">
+            <Label htmlFor="ci-description" className="text-sm font-medium text-foreground">
               Description
             </Label>
             <Textarea
@@ -279,13 +280,12 @@ export function SupplierCompanyIdentity() {
               onChange={e => setDescription(e.target.value)}
               disabled={isSaving}
               rows={3}
-              className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
             />
           </div>
 
           {/* Website */}
           <div className="space-y-2">
-            <Label htmlFor="ci-website" className="text-sm font-medium text-white/70">
+            <Label htmlFor="ci-website" className="text-sm font-medium text-foreground">
               Website
             </Label>
             <Input
@@ -295,35 +295,31 @@ export function SupplierCompanyIdentity() {
               value={website}
               onChange={e => setWebsite(e.target.value)}
               disabled={isSaving}
-              className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
             />
           </div>
         </div>
 
-        <p className="text-xs text-white/30 text-center">
+        <p className="text-xs text-studio-dim text-center">
           You can update these details anytime from your profile page.
         </p>
 
         <div className="flex items-center justify-between pt-2">
-          <Button variant="ghost" onClick={previousStep} className="text-white/40 hover:text-white hover:bg-white/10">
+          <Button variant="ghost" onClick={previousStep} className="text-muted-foreground hover:text-foreground hover:bg-secondary">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" onClick={skipStep} className="text-white/40 hover:text-white hover:bg-white/10 text-sm">
+            <Button variant="ghost" onClick={skipStep} className="text-muted-foreground hover:text-foreground hover:bg-secondary text-sm">
               <SkipForward className="w-4 h-4 mr-1" />
               Skip
             </Button>
             <Button
               onClick={handleSave}
               disabled={isSaving}
-              className="bg-[#ccff00] text-black hover:bg-[#ccff00]/90 font-medium rounded-xl"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full"
             >
               {isSaving ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
-                </>
+                'Saving...'
               ) : (
                 <>
                   Save & Continue

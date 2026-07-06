@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { LocationPicker } from '@/components/shared/LocationPicker'
 import type { LocationData } from '@/components/shared/LocationPicker'
-import { ArrowRight, Factory, Loader2, SkipForward } from 'lucide-react'
+import { ArrowRight, Factory, SkipForward } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const FACILITY_TYPE_OPTIONS = [
@@ -107,34 +107,34 @@ export function FastTrackFacilityStep() {
       <div className="w-full max-w-md space-y-5">
 
         <div className="text-center space-y-2">
-          <div className="mx-auto w-16 h-16 bg-[#ccff00]/20 backdrop-blur-md border border-[#ccff00]/30 rounded-2xl flex items-center justify-center">
-            <Factory className="w-8 h-8 text-[#ccff00]" />
+          <div className="mx-auto w-16 h-16 bg-card border border-border rounded-[6px] flex items-center justify-center">
+            <Factory className="w-8 h-8 text-studio-forest" />
           </div>
-          <h3 className="text-xl font-serif font-bold text-white">Your production facility</h3>
-          <p className="text-sm text-white/50">
+          <h3 className="text-xl font-display font-bold tracking-tight text-foreground">Your production facility.</h3>
+          <p className="text-sm text-muted-foreground">
             This links your products to a location so we can track Scope 1 and 2 emissions accurately.
           </p>
         </div>
 
         {/* Production type */}
         <div className="space-y-2">
-          <Label className="text-sm font-medium text-white/70">How do you produce?</Label>
+          <Label className="text-sm font-medium text-foreground">How do you produce?</Label>
           <div className="grid grid-cols-2 gap-2">
             {FACILITY_TYPE_OPTIONS.map(opt => (
               <button
                 key={opt.value}
                 onClick={() => setOperationalControl(opt.value)}
                 className={cn(
-                  'flex flex-col gap-1 p-4 rounded-xl border text-left transition-all',
+                  'flex flex-col gap-1 p-4 rounded-[6px] border text-left transition-colors',
                   operationalControl === opt.value
-                    ? 'bg-[#ccff00]/15 border-[#ccff00]/50'
-                    : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+                    ? 'bg-secondary border-studio-forest'
+                    : 'bg-card border-border hover:bg-secondary hover:border-studio-ink/25'
                 )}
               >
-                <span className={cn('text-sm font-semibold', operationalControl === opt.value ? 'text-[#ccff00]' : 'text-white')}>
+                <span className={cn('text-sm font-semibold', operationalControl === opt.value ? 'text-studio-forest' : 'text-foreground')}>
                   {opt.label}
                 </span>
-                <span className="text-xs text-white/40">{opt.description}</span>
+                <span className="text-xs text-muted-foreground">{opt.description}</span>
               </button>
             ))}
           </div>
@@ -142,28 +142,26 @@ export function FastTrackFacilityStep() {
 
         {/* Facility name */}
         <div className="space-y-2">
-          <Label className="text-sm font-medium text-white/70">
-            Facility name <span className="text-white/30">(required)</span>
+          <Label className="text-sm font-medium text-foreground">
+            Facility name <span className="text-studio-dim">(required)</span>
           </Label>
           <Input
             placeholder='e.g., "Bristol Distillery"'
             value={facilityName}
             onChange={e => setFacilityName(e.target.value)}
-            className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
           />
         </div>
 
         {/* Address */}
         <div className="space-y-2">
-          <Label className="text-sm font-medium text-white/70">Address</Label>
+          <Label className="text-sm font-medium text-foreground">Address</Label>
           <LocationPicker
             value={location?.address}
             onLocationSelect={setLocation}
             placeholder="Search for your facility address..."
-            className="[&_button]:bg-white/5 [&_button]:border-white/10 [&_button]:text-white [&_input]:bg-white/5 [&_input]:border-white/10 [&_input]:text-white [&_input]:placeholder:text-white/20"
           />
           {location && (
-            <p className="text-xs text-white/40">
+            <p className="text-xs text-muted-foreground">
               {[location.city, location.country].filter(Boolean).join(', ')}
             </p>
           )}
@@ -171,7 +169,7 @@ export function FastTrackFacilityStep() {
 
         {/* What happens here — drives Scope 1/2/3 boundary calculations */}
         <div className="space-y-2">
-          <Label className="text-sm font-medium text-white/70">What happens at this site?</Label>
+          <Label className="text-sm font-medium text-foreground">What happens at this site?</Label>
           <div className="flex flex-wrap gap-1.5">
             {FUNCTION_OPTIONS.map(opt => {
               const picked = functions.includes(opt.value)
@@ -180,10 +178,10 @@ export function FastTrackFacilityStep() {
                   key={opt.value}
                   onClick={() => toggleFunction(opt.value)}
                   className={cn(
-                    'px-3 py-1.5 rounded-full text-xs border transition-all',
+                    'px-3 py-1.5 rounded-full text-xs border transition-colors',
                     picked
-                      ? 'bg-[#ccff00]/15 border-[#ccff00]/50 text-[#ccff00]'
-                      : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10 hover:border-white/20',
+                      ? 'bg-secondary border-studio-forest text-studio-forest'
+                      : 'bg-card border-border text-muted-foreground hover:bg-secondary hover:border-studio-ink/25',
                   )}
                 >
                   {opt.label}
@@ -191,16 +189,16 @@ export function FastTrackFacilityStep() {
               )
             })}
           </div>
-          <p className="text-[11px] text-white/30">Helps us draw the right Scope 1, 2 and 3 boundaries.</p>
+          <p className="text-[11px] text-studio-dim">Helps us draw the right Scope 1, 2 and 3 boundaries.</p>
         </div>
 
         <Button
           onClick={handleSave}
           disabled={!isValid || isSaving}
-          className="w-full bg-[#ccff00] text-black hover:bg-[#ccff00]/90 font-medium rounded-xl"
+          className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full"
         >
           {isSaving ? (
-            <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</>
+            <>Saving...</>
           ) : (
             <>Continue <ArrowRight className="w-4 h-4 ml-2" /></>
           )}
@@ -208,7 +206,7 @@ export function FastTrackFacilityStep() {
 
         <button
           onClick={completeStep}
-          className="w-full flex items-center justify-center gap-2 text-sm text-white/30 hover:text-white/50 transition-colors py-2"
+          className="w-full flex items-center justify-center gap-2 text-sm text-studio-dim hover:text-foreground transition-colors py-2"
         >
           <SkipForward className="w-4 h-4" />
           Skip for now

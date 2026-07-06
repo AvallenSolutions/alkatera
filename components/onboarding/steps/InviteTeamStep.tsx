@@ -5,7 +5,7 @@ import { useOnboarding } from '@/lib/onboarding'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, ArrowRight, SkipForward, Users, Loader2, CheckCircle2, XCircle } from 'lucide-react'
+import { ArrowLeft, ArrowRight, SkipForward, Users, CheckCircle2, XCircle } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -99,7 +99,7 @@ export function InviteTeamStep() {
           inviteResults.push({
             email,
             success: false,
-            message: 'Network error — try again from Settings',
+            message: 'Network error, try again from Settings',
           })
         }
       }
@@ -145,26 +145,26 @@ export function InviteTeamStep() {
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 animate-in fade-in duration-300">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-3">
-          <div className="mx-auto w-16 h-16 bg-purple-400/20 backdrop-blur-md border border-purple-400/30 rounded-2xl flex items-center justify-center">
-            <Users className="w-8 h-8 text-purple-400" />
+          <div className="mx-auto w-16 h-16 rounded-[6px] border border-border bg-card flex items-center justify-center">
+            <Users className="w-8 h-8 text-studio-forest" />
           </div>
-          <h3 className="text-xl font-serif font-bold text-white">
-            One Last Thing...
+          <h3 className="text-xl font-display font-bold text-foreground">
+            One last thing.
           </h3>
-          <p className="text-sm text-white/50">
+          <p className="text-sm text-muted-foreground">
             Sustainability is a team sport! Invite colleagues to:
           </p>
         </div>
 
-        <ul className="text-sm text-white/50 space-y-1 text-left max-w-xs mx-auto">
+        <ul className="text-sm text-muted-foreground space-y-1 text-left max-w-xs mx-auto">
           <li>&bull; View your dashboards</li>
           <li>&bull; Add their department&apos;s data</li>
           <li>&bull; Collaborate on improvements</li>
         </ul>
 
         {!hasResults ? (
-          <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 space-y-2">
-            <Label htmlFor="onb-emails" className="text-sm font-medium text-white/70">
+          <div className="rounded-[6px] border border-border bg-card p-6 space-y-2">
+            <Label htmlFor="onb-emails" className="text-sm font-medium text-foreground">
               Email addresses (comma or newline separated)
             </Label>
             <Textarea
@@ -174,25 +174,24 @@ export function InviteTeamStep() {
               onChange={e => setEmails(e.target.value)}
               rows={3}
               disabled={isSending}
-              className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
             />
-            <p className="text-xs text-white/30">
+            <p className="text-xs text-muted-foreground">
               They&apos;ll receive an email invitation to join your organisation.
             </p>
           </div>
         ) : (
-          <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-4 space-y-2">
-            <p className="text-sm font-medium text-white/70 mb-3">Invitation results:</p>
+          <div className="rounded-[6px] border border-border bg-card p-4 space-y-2">
+            <p className="text-sm font-medium text-foreground mb-3">Invitation results:</p>
             {results.map(r => (
               <div key={r.email} className="flex items-center gap-2 text-sm">
                 {r.success ? (
-                  <CheckCircle2 className="w-4 h-4 text-[#ccff00] flex-shrink-0" />
+                  <CheckCircle2 className="w-4 h-4 text-studio-good flex-shrink-0" />
                 ) : (
-                  <XCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                  <XCircle className="w-4 h-4 text-studio-stale flex-shrink-0" />
                 )}
-                <span className={r.success ? 'text-white' : 'text-red-300'}>{r.email}</span>
+                <span className={r.success ? 'text-foreground' : 'text-studio-stale'}>{r.email}</span>
                 {!r.success && (
-                  <span className="text-xs text-white/30 ml-auto">{r.message}</span>
+                  <span className="text-xs text-muted-foreground ml-auto">{r.message}</span>
                 )}
               </div>
             ))}
@@ -200,13 +199,13 @@ export function InviteTeamStep() {
         )}
 
         <div className="flex items-center justify-between pt-2">
-          <Button variant="ghost" onClick={previousStep} className="text-white/40 hover:text-white hover:bg-white/10">
+          <Button variant="ghost" onClick={previousStep} className="text-muted-foreground hover:text-foreground hover:bg-secondary">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
           <div className="flex items-center gap-2">
             {!hasResults && (
-              <Button variant="ghost" onClick={skipStep} className="text-white/40 hover:text-white hover:bg-white/10 text-sm">
+              <Button variant="ghost" onClick={skipStep} className="text-muted-foreground hover:text-foreground hover:bg-secondary text-sm">
                 <SkipForward className="w-4 h-4 mr-1" />
                 I&apos;ll do this later
               </Button>
@@ -214,7 +213,7 @@ export function InviteTeamStep() {
             {hasResults ? (
               <Button
                 onClick={completeStep}
-                className="bg-[#ccff00] text-black hover:bg-[#ccff00]/90 font-medium rounded-xl"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-[6px]"
               >
                 Continue
                 <ArrowRight className="w-4 h-4 ml-2" />
@@ -223,12 +222,9 @@ export function InviteTeamStep() {
               <Button
                 onClick={handleInvite}
                 disabled={isSending}
-                className="bg-[#ccff00] text-black hover:bg-[#ccff00]/90 font-medium rounded-xl"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-[6px]"
               >
-                {isSending ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : null}
-                {emails.trim() ? 'Send invites' : 'Continue'}
+                {isSending ? 'Sending…' : emails.trim() ? 'Send invites' : 'Continue'}
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             )}

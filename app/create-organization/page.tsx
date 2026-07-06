@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { PRODUCT_TYPE_OPTIONS } from '@/lib/industry-benchmarks'
-import { Building2, Loader2 } from 'lucide-react'
+import { Building2 } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 
@@ -152,8 +152,7 @@ export default function CreateOrganizationPage() {
         <Image src="/images/starry-night-bg3.jpg" alt="Starry night sky" fill className="object-cover" priority quality={85} />
         <div className="absolute inset-0 bg-black/70" />
         <div className="relative z-10 flex flex-col items-center gap-4">
-          <Loader2 className="h-12 w-12 animate-spin text-[#ccff00]" />
-          <p className="text-sm text-white/50">Checking access...</p>
+          <p className="font-mono text-sm uppercase tracking-[0.22em] text-[#F2F1EA]/70">Checking access...</p>
         </div>
       </div>
     )
@@ -175,13 +174,13 @@ export default function CreateOrganizationPage() {
           />
         </Link>
 
-        {/* Glassmorphism Card */}
-        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-8 space-y-6">
+        {/* Dark glass panel over the photo */}
+        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-[6px] p-8 space-y-6">
           <div className="text-center space-y-3">
-            <div className="mx-auto w-16 h-16 bg-[#ccff00]/20 rounded-2xl flex items-center justify-center">
-              <Building2 className="w-8 h-8 text-[#ccff00]" />
+            <div className="mx-auto w-16 h-16 bg-white/10 border border-white/20 rounded-[6px] flex items-center justify-center">
+              <Building2 className="w-8 h-8 text-[#F2F1EA]" />
             </div>
-            <h1 className="text-2xl font-serif text-white">Create Your Company Account</h1>
+            <h1 className="text-2xl font-display font-bold tracking-tight text-[#F2F1EA]">Create your company account.</h1>
             <p className="text-white/50 text-sm">
               Get started by creating an organisation for your team
             </p>
@@ -225,17 +224,10 @@ export default function CreateOrganizationPage() {
             </div>
             <Button
               type="submit"
-              className="w-full h-11 text-base font-medium bg-[#ccff00] text-black hover:bg-[#ccff00]/90 rounded-xl"
+              className="w-full h-11 text-base font-medium bg-[#F2F1EA] text-[#1A1B1D] hover:bg-white rounded-full"
               disabled={isLoading}
             >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating Organisation...
-                </>
-              ) : (
-                'Create Company'
-              )}
+              {isLoading ? 'Creating organisation...' : 'Create company'}
             </Button>
           </form>
         </div>

@@ -8,6 +8,8 @@ import { toast } from 'sonner';
 import { useOrganization } from '@/lib/organizationContext';
 import { PageLoader } from '@/components/ui/page-loader';
 import { FeatureGate } from '@/components/subscription/FeatureGate';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { BigNumber } from '@/components/studio/big-number';
 import { ArableFieldCard } from '@/components/arable-fields/ArableFieldCard';
 import { AddArableFieldDialog } from '@/components/arable-fields/AddArableFieldDialog';
 import { ArableGrowingQuestionnaire } from '@/components/arable-fields/ArableGrowingQuestionnaire';
@@ -149,33 +151,36 @@ export default function ArableFieldsPage() {
   return (
     <FeatureGate feature="arable_beta">
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Arable Fields</h1>
-            <p className="text-muted-foreground mt-2">
+        <header className="flex flex-wrap items-end justify-between gap-x-12 gap-y-6">
+          <div className="min-w-0">
+            <Eyebrow className="mb-3">THE MEASURES · ARABLE FIELDS</Eyebrow>
+            <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+              The arable fields.
+            </h1>
+            <p className="mt-3 max-w-xl text-sm text-muted-foreground">
               Manage your arable fields and track the environmental impact of your grain growing operations.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex shrink-0 items-end gap-8 pb-1">
+            <BigNumber size="display" value={fields.length} label="Arable fields" />
             <Button
               onClick={() => {
                 setEditField(null);
                 setDialogOpen(true);
               }}
-              size="lg"
-              className="gap-2 bg-[#ccff00] text-black hover:bg-[#ccff00]/90"
+              className="gap-2 bg-primary text-primary-foreground"
             >
-              <Plus className="h-5 w-5" />
+              <Plus className="h-4 w-4" />
               Add Arable Field
             </Button>
           </div>
-        </div>
+        </header>
 
         {fields.length === 0 ? (
           <Card className="border-2 border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <div className="h-14 w-14 rounded-full bg-[#ccff00]/20 flex items-center justify-center mb-4">
-                <Wheat className="h-7 w-7 text-[#ccff00]" />
+              <div className="h-14 w-14 rounded-full bg-secondary flex items-center justify-center mb-4">
+                <Wheat className="h-7 w-7 text-studio-forest" />
               </div>
               <h3 className="text-xl font-semibold mb-2">Add Your First Arable Field</h3>
               <p className="text-muted-foreground text-center max-w-md mb-6">
@@ -189,7 +194,7 @@ export default function ArableFieldsPage() {
                   setDialogOpen(true);
                 }}
                 size="lg"
-                className="gap-2 bg-[#ccff00] text-black hover:bg-[#ccff00]/90"
+                className="gap-2 bg-primary text-primary-foreground"
               >
                 <Plus className="h-5 w-5" />
                 Add Arable Field

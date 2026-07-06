@@ -20,49 +20,49 @@ const FEATURES = [
     icon: Dog,
     title: 'Ask Rosa for insights',
     description: '"What\'s my biggest emission source?"',
-    color: 'text-emerald-400',
+    color: 'text-studio-forest',
   },
   {
     icon: Calculator,
     title: 'Calculate Product LCAs',
     description: 'Full ISO 14044/14067 compliant assessments',
-    color: 'text-blue-400',
+    color: 'text-studio-forest',
   },
   {
     icon: ShieldCheck,
     title: 'Use Greenwash Guardian',
     description: 'Verify your sustainability claims',
-    color: 'text-amber-400',
+    color: 'text-studio-forest',
   },
   {
     icon: BarChart3,
     title: 'View Vitality Score',
     description: 'Multi-dimensional sustainability rating',
-    color: 'text-purple-400',
+    color: 'text-studio-forest',
   },
   {
     icon: Target,
     title: 'Set reduction targets',
     description: 'Track progress toward your goals',
-    color: 'text-red-400',
+    color: 'text-studio-forest',
   },
   {
     icon: FileText,
     title: 'Generate reports',
     description: 'Professional sustainability reports in 1 click',
-    color: 'text-cyan-400',
+    color: 'text-studio-forest',
   },
   {
     icon: BookOpen,
     title: 'Access Knowledge Bank',
     description: 'Comprehensive sustainability resources',
-    color: 'text-orange-400',
+    color: 'text-studio-forest',
   },
   {
     icon: TrendingUp,
     title: 'Compare to industry',
     description: 'See how you stack up against peers',
-    color: 'text-[#ccff00]',
+    color: 'text-studio-forest',
   },
 ]
 
@@ -73,11 +73,10 @@ export function FeatureShowcase() {
     <div className="flex flex-col items-center min-h-[60vh] px-4 animate-in fade-in duration-300">
       <div className="w-full max-w-lg space-y-6">
         <div className="text-center space-y-2">
-          <div className="text-3xl">&#128640;</div>
-          <h3 className="text-xl font-serif font-bold text-white">
-            You&apos;ve Unlocked New Capabilities!
+          <h3 className="text-xl font-display font-bold text-foreground">
+            New capabilities unlocked.
           </h3>
-          <p className="text-sm text-white/50">
+          <p className="text-sm text-muted-foreground">
             Now that you have your foundation set, you can:
           </p>
         </div>
@@ -86,12 +85,12 @@ export function FeatureShowcase() {
           {FEATURES.map(feature => (
             <div
               key={feature.title}
-              className="flex items-start gap-3 p-3 rounded-xl bg-white/5 backdrop-blur-md border border-white/10"
+              className="flex items-start gap-3 p-3 rounded-[6px] border border-border bg-card"
             >
               <CheckCircle2 className={`w-5 h-5 ${feature.color} flex-shrink-0 mt-0.5`} />
               <div>
-                <p className="text-sm font-medium text-white">{feature.title}</p>
-                <p className="text-xs text-white/40">{feature.description}</p>
+                <p className="text-sm font-medium text-foreground">{feature.title}</p>
+                <p className="text-xs text-muted-foreground">{feature.description}</p>
               </div>
             </div>
           ))}
@@ -100,7 +99,7 @@ export function FeatureShowcase() {
         <Button
           size="lg"
           onClick={completeStep}
-          className="bg-[#ccff00] text-black hover:bg-[#ccff00]/90 font-medium text-base rounded-xl w-full"
+          className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium text-base rounded-[6px] w-full"
         >
           Almost done!
           <ArrowRight className="w-4 h-4 ml-2" />

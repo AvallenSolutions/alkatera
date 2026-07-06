@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ArrowLeft, ArrowRight, SkipForward, Factory, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, SkipForward, Factory } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { LocationPicker, type LocationData } from '@/components/shared/LocationPicker'
 
@@ -122,34 +122,33 @@ export function FacilitiesSetup() {
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 animate-in fade-in duration-300">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-3">
-          <div className="mx-auto w-16 h-16 bg-cyan-400/20 backdrop-blur-md border border-cyan-400/30 rounded-2xl flex items-center justify-center">
-            <Factory className="w-8 h-8 text-cyan-400" />
+          <div className="mx-auto w-16 h-16 rounded-[6px] border border-border bg-card flex items-center justify-center">
+            <Factory className="w-8 h-8 text-studio-forest" />
           </div>
-          <h3 className="text-xl font-serif font-bold text-white">
-            Facilities Setup
+          <h3 className="text-xl font-display font-bold text-foreground">
+            Your facilities.
           </h3>
-          <p className="text-sm text-white/50">
+          <p className="text-sm text-muted-foreground">
             Let&apos;s map out where your operations happen.
           </p>
         </div>
 
-        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 space-y-4">
+        <div className="rounded-[6px] border border-border bg-card p-6 space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="onb-facility-name" className="text-sm font-medium text-white/70">Facility Name</Label>
+            <Label htmlFor="onb-facility-name" className="text-sm font-medium text-foreground">Facility Name</Label>
             <Input
               id="onb-facility-name"
               placeholder="e.g., Main Distillery"
               value={facilityName}
               onChange={e => setFacilityName(e.target.value)}
               disabled={isSaving}
-              className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
             />
           </div>
 
           <div className="space-y-2">
-            <Label className="text-sm font-medium text-white/70">Facility Type</Label>
+            <Label className="text-sm font-medium text-foreground">Facility Type</Label>
             <Select value={facilityType} onValueChange={setFacilityType} disabled={isSaving}>
-              <SelectTrigger className="bg-white/5 border-white/10 text-white">
+              <SelectTrigger>
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
               <SelectContent className="z-[70]">
@@ -161,8 +160,8 @@ export function FacilitiesSetup() {
           </div>
 
           <div className="space-y-2">
-            <Label className="text-sm font-medium text-white/70">Location</Label>
-            <p className="text-xs text-white/30">
+            <Label className="text-sm font-medium text-foreground">Location</Label>
+            <p className="text-xs text-muted-foreground">
               Search for your facility&apos;s city or address
             </p>
             <LocationPicker
@@ -172,36 +171,33 @@ export function FacilitiesSetup() {
               disabled={isSaving}
             />
             {addressCity && (
-              <p className="text-xs text-white/40 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 {addressCity}{addressCountry ? `, ${addressCountry}` : ''}
               </p>
             )}
           </div>
         </div>
 
-        <p className="text-xs text-white/30 text-center">
-          You can add contract partners and co-packers too &mdash; they count toward your Scope 3 emissions. You can add more facilities later.
+        <p className="text-xs text-muted-foreground text-center">
+          You can add contract partners and co-packers too, they count toward your Scope 3 emissions. You can add more facilities later.
         </p>
 
         <div className="flex items-center justify-between pt-2">
-          <Button variant="ghost" onClick={previousStep} className="text-white/40 hover:text-white hover:bg-white/10">
+          <Button variant="ghost" onClick={previousStep} className="text-muted-foreground hover:text-foreground hover:bg-secondary">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" onClick={skipStep} className="text-white/40 hover:text-white hover:bg-white/10 text-sm">
+            <Button variant="ghost" onClick={skipStep} className="text-muted-foreground hover:text-foreground hover:bg-secondary text-sm">
               <SkipForward className="w-4 h-4 mr-1" />
               Skip
             </Button>
             <Button
               onClick={handleSave}
               disabled={!facilityName.trim() || isSaving}
-              className="bg-[#ccff00] text-black hover:bg-[#ccff00]/90 font-medium rounded-xl"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-[6px]"
             >
-              {isSaving ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : null}
-              Continue
+              {isSaving ? 'Saving…' : 'Continue'}
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </div>

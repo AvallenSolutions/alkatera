@@ -144,20 +144,20 @@ export function EmissionsGuide({
   }
 
   return (
-    <Card className="border-[#ccff00]/20 bg-card mb-6">
+    <Card className="border-border bg-card mb-6">
       <Collapsible open={expanded} onOpenChange={setExpanded}>
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-3">
           <CollapsibleTrigger asChild>
             <button className="flex items-center gap-3 text-left group">
-              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-400/20 to-cyan-400/20 border border-emerald-400/30 flex items-center justify-center shrink-0">
-                <Dog className="w-5 h-5 text-emerald-400" />
+              <div className="w-9 h-9 rounded-[6px] bg-secondary border border-border flex items-center justify-center shrink-0">
+                <Dog className="w-5 h-5 text-studio-cobalt" />
               </div>
               <div>
                 <h3 className="font-semibold text-sm flex items-center gap-2">
                   Getting Started
                   {allComplete && (
-                    <span className="text-xs text-emerald-500 font-normal">Complete!</span>
+                    <span className="text-xs text-studio-good font-normal">Complete!</span>
                   )}
                   <ChevronDown className={cn(
                     'h-4 w-4 text-muted-foreground transition-transform',
@@ -172,7 +172,7 @@ export function EmissionsGuide({
           </CollapsibleTrigger>
           <div className="flex items-center gap-3">
             <div className="w-24">
-              <Progress value={progressPct} indicatorColor="lime" className="h-1.5" />
+              <Progress value={progressPct} className="h-1.5" />
             </div>
             <Button
               variant="ghost"
@@ -188,8 +188,8 @@ export function EmissionsGuide({
         <CollapsibleContent>
           <CardContent className="pt-0 pb-5">
             {allComplete ? (
-              <div className="flex items-center gap-3 py-4 px-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+              <div className="flex items-center gap-3 py-4 px-4 rounded-[6px] bg-secondary border border-border">
+                <CheckCircle2 className="h-5 w-5 text-studio-good shrink-0" />
                 <div>
                   <p className="text-sm font-medium">You&apos;ve mapped your full footprint</p>
                   <p className="text-xs text-muted-foreground">
@@ -215,7 +215,7 @@ export function EmissionsGuide({
                       >
                         {/* Completion indicator */}
                         {isComplete ? (
-                          <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+                          <CheckCircle2 className="h-5 w-5 text-studio-good shrink-0" />
                         ) : (
                           <div className="h-5 w-5 rounded-full border-2 border-muted-foreground/30 flex items-center justify-center shrink-0">
                             <span className="text-[10px] text-muted-foreground font-medium">{index + 1}</span>
@@ -245,9 +245,9 @@ export function EmissionsGuide({
 
                       {/* Expanded content */}
                       {isOpen && (
-                        <div className="ml-8 mr-3 mt-1 mb-2 pl-3 border-l-2 border-emerald-400/30">
+                        <div className="ml-8 mr-3 mt-1 mb-2 pl-3 border-l-2 border-border">
                           <div className="flex items-start gap-2 mb-3">
-                            <Dog className="h-4 w-4 text-emerald-400 mt-0.5 shrink-0" />
+                            <Dog className="h-4 w-4 text-studio-cobalt mt-0.5 shrink-0" />
                             <p className="text-sm text-muted-foreground leading-relaxed">
                               {step.rosa}
                             </p>

@@ -8,7 +8,6 @@ import {
   Calendar,
   Briefcase,
   Save,
-  Loader2,
   ArrowLeft,
   Clock,
   Upload,
@@ -359,7 +358,9 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
+          Loading
+        </span>
       </div>
     );
   }
@@ -415,14 +416,14 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
                   <img
                     src={logoUrl}
                     alt="Organisation logo"
-                    className="h-16 w-16 rounded-lg object-contain border bg-white p-1"
+                    className="h-16 w-16 rounded-[6px] object-contain border bg-white p-1"
                   />
                   <div className="flex gap-2">
                     <label htmlFor="logo-upload-org" className="cursor-pointer">
                       <Button variant="outline" size="sm" asChild disabled={uploadingLogo || isSaving}>
                         <span>
-                          {uploadingLogo ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}
-                          Change
+                          <Upload className="h-4 w-4 mr-1" />
+                          {uploadingLogo ? 'Uploading' : 'Change'}
                         </span>
                       </Button>
                     </label>
@@ -441,7 +442,7 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
                   />
                 </div>
               ) : (
-                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4">
+                <div className="border-2 border-dashed border-muted-foreground/25 rounded-[6px] p-4">
                   <input
                     type="file"
                     id="logo-upload-org"
@@ -451,13 +452,9 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
                     disabled={uploadingLogo || isSaving}
                   />
                   <label htmlFor="logo-upload-org" className="cursor-pointer flex items-center gap-3">
-                    {uploadingLogo ? (
-                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                    ) : (
-                      <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                    )}
+                    <ImageIcon className="h-5 w-5 text-muted-foreground" />
                     <div>
-                      <p className="text-sm font-medium">Upload logo</p>
+                      <p className="text-sm font-medium">{uploadingLogo ? 'Uploading logo' : 'Upload logo'}</p>
                       <p className="text-xs text-muted-foreground">PNG, JPG or SVG, max 10MB</p>
                     </div>
                   </label>
@@ -721,7 +718,7 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
             Production Profile
           </CardTitle>
           <CardDescription>
-            Your production setup — used to calibrate emissions estimates and benchmark comparisons
+            Your production setup: used to calibrate emissions estimates and benchmark comparisons
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -809,10 +806,7 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
         )}
         <Button onClick={handleSave} disabled={isSaving}>
           {isSaving ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Saving...
-            </>
+            'Saving...'
           ) : (
             <>
               <Save className="mr-2 h-4 w-4" />
@@ -892,14 +886,7 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
                         disabled={deleteConfirmName !== currentOrganization?.name || isDeleting}
                         onClick={handleDeleteOrganization}
                       >
-                        {isDeleting ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Deleting...
-                          </>
-                        ) : (
-                          "Delete Organisation"
-                        )}
+                        {isDeleting ? "Deleting..." : "Delete Organisation"}
                       </Button>
                     </AlertDialogFooter>
                   </AlertDialogContent>

@@ -3,7 +3,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Upload, FileText, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Upload, FileText, CheckCircle2, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -104,7 +104,7 @@ const CONFIG: Record<OnboardingUploadKind, KindConfig> = {
       if (!queueRes.ok) throw new Error(queueBody?.error || 'Could not queue the bill')
 
       return {
-        summary: `Got it — Rosa is reading "${file.name}"`,
+        summary: `Got it: Rosa is reading "${file.name}"`,
         subline: 'You can review the extracted entries from /rosa/ once she\'s done.',
       }
     },
@@ -180,8 +180,8 @@ export function OnboardingUploadDialog({ open, onClose, organizationId, userId, 
               if (f) void processFile(f)
             }}
             className={cn(
-              'border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer',
-              dragOver ? 'border-[#ccff00] bg-[#ccff00]/5' : 'border-border hover:border-foreground/30',
+              'border-2 border-dashed rounded-[6px] p-8 text-center transition-colors cursor-pointer',
+              dragOver ? 'border-studio-forest bg-secondary' : 'border-border hover:border-foreground/30',
             )}
             onClick={() => fileInputRef.current?.click()}
           >
@@ -203,18 +203,18 @@ export function OnboardingUploadDialog({ open, onClose, organizationId, userId, 
 
         {stage === 'uploading' && (
           <div className="py-8 flex flex-col items-center gap-3">
-            <Loader2 className="w-8 h-8 animate-spin text-[#ccff00]" />
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-forest">Working</p>
             <p className="text-sm text-muted-foreground">Uploading and reading...</p>
           </div>
         )}
 
         {stage === 'success' && (
           <div className="py-6 flex flex-col items-center gap-3 text-center">
-            <CheckCircle2 className="w-10 h-10 text-emerald-400" />
+            <CheckCircle2 className="w-10 h-10 text-studio-good" />
             <p className="text-sm font-medium">{message}</p>
             {subline && <p className="text-xs text-muted-foreground max-w-xs">{subline}</p>}
             <div className="flex gap-2 pt-2">
-              <Button onClick={() => { onSuccess(); handleClose() }} className="bg-[#ccff00] text-black hover:bg-[#ccff00]/90">
+              <Button onClick={() => { onSuccess(); handleClose() }} className="bg-primary text-primary-foreground hover:bg-primary/90">
                 Continue
               </Button>
             </div>
@@ -223,8 +223,8 @@ export function OnboardingUploadDialog({ open, onClose, organizationId, userId, 
 
         {stage === 'error' && (
           <div className="py-6 flex flex-col items-center gap-3 text-center">
-            <AlertCircle className="w-10 h-10 text-red-400" />
-            <p className="text-sm font-medium text-red-300">{error}</p>
+            <AlertCircle className="w-10 h-10 text-studio-stale" />
+            <p className="text-sm font-medium text-studio-stale">{error}</p>
             <Button variant="outline" onClick={reset}>Try again</Button>
           </div>
         )}
@@ -232,7 +232,7 @@ export function OnboardingUploadDialog({ open, onClose, organizationId, userId, 
         {stage === 'idle' && (
           <p className="text-xs text-muted-foreground flex items-center gap-1.5">
             <FileText className="w-3 h-3" />
-            All processing happens here in onboarding — we won't redirect you anywhere.
+            All processing happens here in onboarding, we won't redirect you anywhere.
           </p>
         )}
       </DialogContent>

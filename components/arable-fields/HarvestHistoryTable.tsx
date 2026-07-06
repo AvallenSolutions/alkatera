@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   Table,
   TableBody,
@@ -13,6 +12,7 @@ import {
 } from '@/components/ui/table';
 import { Plus, Edit2, ArrowUp, ArrowDown, ChevronRight, ChevronDown } from 'lucide-react';
 import type { ArableHarvestImpactSummary } from '@/lib/types/arable';
+import { StateChip } from '@/components/studio/state-chip';
 
 interface HarvestHistoryTableProps {
   harvestImpacts: ArableHarvestImpactSummary[];
@@ -42,7 +42,7 @@ function DeltaIndicator({ current, previous, invert }: { current: number; previo
   return (
     <span
       className={`inline-flex items-center gap-0.5 text-xs ml-1 ${
-        isGood ? 'text-green-500' : 'text-red-500'
+        isGood ? 'text-studio-good' : 'text-studio-stale'
       }`}
     >
       {isUp ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
@@ -137,9 +137,7 @@ export function HarvestHistoryTable({
                       <TableCell className="font-medium">
                         {v.harvest_year}
                         {v.is_draft && (
-                          <Badge variant="outline" className="ml-2 text-xs font-normal text-amber-500 border-amber-500/50">
-                            Draft
-                          </Badge>
+                          <StateChip tone="attention" className="ml-2">Draft</StateChip>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
@@ -154,7 +152,7 @@ export function HarvestHistoryTable({
                         {fmt(v.water_per_ha)}
                         {prev && <DeltaIndicator current={v.water_per_ha} previous={prev.water_per_ha} />}
                       </TableCell>
-                      <TableCell className="text-right text-[#ccff00]">
+                      <TableCell className="text-right text-studio-forest">
                         {fmt(v.removals_per_ha)}
                       </TableCell>
                       <TableCell className="text-right">
@@ -167,18 +165,17 @@ export function HarvestHistoryTable({
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={
+                        <StateChip
+                          tone={
                             imp.data_quality_grade === 'HIGH'
-                              ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800'
+                              ? 'good'
                               : imp.data_quality_grade === 'MEDIUM'
-                              ? 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-                              : 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800'
+                              ? 'attention'
+                              : 'stale'
                           }
                         >
                           {imp.data_quality_grade}
-                        </Badge>
+                        </StateChip>
                       </TableCell>
                       <TableCell className="text-right">
                         <Button

@@ -14,10 +14,10 @@ export function DataEntryMethodStep() {
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 animate-in fade-in duration-300">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-2">
-          <h3 className="text-xl font-serif font-bold text-white">
-            How would you like to add your data?
+          <h3 className="text-xl font-display font-bold text-foreground">
+            How you&apos;ll add your data.
           </h3>
-          <p className="text-sm text-white/50">
+          <p className="text-sm text-muted-foreground">
             Choose your preferred method:
           </p>
         </div>
@@ -26,23 +26,23 @@ export function DataEntryMethodStep() {
           <button
             onClick={() => setSelected('guided')}
             className={cn(
-              'w-full text-left p-4 rounded-xl border transition-all',
+              'w-full text-left p-4 rounded-[6px] border transition-all',
               selected === 'guided'
-                ? 'border-[#ccff00] bg-[#ccff00]/10'
-                : 'border-white/10 bg-white/5 hover:border-white/20'
+                ? 'border-studio-forest bg-secondary'
+                : 'border-border bg-card hover:border-foreground/30'
             )}
           >
             <div className="flex items-start gap-3">
-              <ClipboardList className="w-6 h-6 text-[#ccff00] flex-shrink-0 mt-0.5" />
+              <ClipboardList className="w-6 h-6 text-studio-forest flex-shrink-0 mt-0.5" />
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="font-medium text-white">Guided Setup</p>
-                  <span className="text-xs bg-[#ccff00]/20 text-[#ccff00] px-2 py-0.5 rounded-full">Recommended</span>
+                  <p className="font-medium text-foreground">Guided Setup</p>
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-forest">Recommended</span>
                 </div>
-                <p className="text-sm text-white/50 mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   We&apos;ll walk you through step-by-step
                 </p>
-                <p className="text-xs text-white/30 mt-0.5">~5-8 minutes</p>
+                <p className="text-xs text-muted-foreground mt-0.5">~5-8 minutes</p>
               </div>
             </div>
           </button>
@@ -50,43 +50,43 @@ export function DataEntryMethodStep() {
           <button
             onClick={() => setSelected('bulk')}
             className={cn(
-              'w-full text-left p-4 rounded-xl border transition-all',
+              'w-full text-left p-4 rounded-[6px] border transition-all',
               selected === 'bulk'
-                ? 'border-[#ccff00] bg-[#ccff00]/10'
-                : 'border-white/10 bg-white/5 hover:border-white/20'
+                ? 'border-studio-forest bg-secondary'
+                : 'border-border bg-card hover:border-foreground/30'
             )}
           >
             <div className="flex items-start gap-3">
-              <Upload className="w-6 h-6 text-cyan-400 flex-shrink-0 mt-0.5" />
+              <Upload className="w-6 h-6 text-studio-forest flex-shrink-0 mt-0.5" />
               <div>
-                <p className="font-medium text-white">Bulk Import from Files</p>
-                <p className="text-sm text-white/50 mt-1">
+                <p className="font-medium text-foreground">Bulk Import from Files</p>
+                <p className="text-sm text-muted-foreground mt-1">
                   Upload CSV or Excel
                 </p>
-                <p className="text-xs text-white/30 mt-0.5">~2 minutes (if files ready)</p>
+                <p className="text-xs text-muted-foreground mt-0.5">~2 minutes (if files ready)</p>
               </div>
             </div>
           </button>
         </div>
 
-        <p className="text-xs text-white/30 text-center">
+        <p className="text-xs text-muted-foreground text-center">
           You can mix & match these anytime.
         </p>
 
         <div className="flex items-center justify-between pt-2">
-          <Button variant="ghost" onClick={previousStep} className="text-white/40 hover:text-white hover:bg-white/10">
+          <Button variant="ghost" onClick={previousStep} className="text-muted-foreground hover:text-foreground hover:bg-secondary">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" onClick={skipStep} className="text-white/40 hover:text-white hover:bg-white/10 text-sm">
+            <Button variant="ghost" onClick={skipStep} className="text-muted-foreground hover:text-foreground hover:bg-secondary text-sm">
               <SkipForward className="w-4 h-4 mr-1" />
               Skip
             </Button>
             <Button
               onClick={completeStep}
               disabled={!selected}
-              className="bg-[#ccff00] text-black hover:bg-[#ccff00]/90 font-medium rounded-xl"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-[6px]"
             >
               Continue
               <ArrowRight className="w-4 h-4 ml-2" />

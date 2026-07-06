@@ -7,7 +7,6 @@ import { supabase } from '@/lib/supabaseClient';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
-  Loader2,
   CheckCircle2,
   XCircle,
   AlertCircle,
@@ -281,8 +280,7 @@ export default function TeamInvitePage() {
             transition={{ duration: 0.6 }}
             className="flex flex-col items-center"
           >
-            <Loader2 className="h-10 w-10 animate-spin text-[#ccff00] mb-4" />
-            <p className="text-white/60 font-mono text-sm uppercase tracking-widest">
+            <p className="text-[#F2F1EA]/70 font-mono text-sm uppercase tracking-[0.22em]">
               Loading invitation...
             </p>
           </motion.div>
@@ -319,24 +317,24 @@ export default function TeamInvitePage() {
               />
             </div>
 
-            <div className="border border-white/10 bg-white/5 backdrop-blur-md rounded-2xl p-8">
+            <div className="border border-white/10 bg-white/5 backdrop-blur-md rounded-[6px] p-8">
               <div className="flex items-center gap-3 mb-6">
-                <div className="p-3 rounded-xl bg-red-500/20 border border-red-500/30">
+                <div className="p-3 rounded-[6px] bg-red-500/20 border border-red-500/30">
                   <XCircle className="h-6 w-6 text-red-400" />
                 </div>
-                <h2 className="font-serif text-2xl text-white">Invitation Error</h2>
+                <h2 className="font-display font-bold tracking-tight text-2xl text-[#F2F1EA]">This invitation can&apos;t be opened.</h2>
               </div>
 
-              <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl mb-6">
+              <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-[6px] mb-6">
                 <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-red-300">{error}</p>
               </div>
 
               <Link
                 href="/"
-                className="block w-full py-4 bg-white/10 text-white font-mono uppercase text-xs tracking-widest font-bold rounded-xl text-center hover:bg-white/20 transition-all"
+                className="block w-full py-4 border border-[#F2F1EA]/40 text-[#F2F1EA] font-mono uppercase text-xs tracking-[0.22em] font-bold rounded-full text-center hover:border-[#F2F1EA] transition-colors"
               >
-                Return to Home
+                Return to home
               </Link>
             </div>
           </motion.div>
@@ -373,23 +371,22 @@ export default function TeamInvitePage() {
               />
             </div>
 
-            <div className="border border-[#ccff00]/30 bg-[#ccff00]/5 backdrop-blur-md rounded-2xl p-8 text-center">
+            <div className="border border-white/20 bg-white/5 backdrop-blur-md rounded-[6px] p-8 text-center">
               <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-                className="inline-flex p-4 rounded-full bg-[#ccff00]/20 border border-[#ccff00]/30 mb-6"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.2, duration: 0.4 }}
+                className="inline-flex p-4 rounded-full bg-white/10 border border-white/20 mb-6"
               >
-                <CheckCircle2 className="h-10 w-10 text-[#ccff00]" />
+                <CheckCircle2 className="h-10 w-10 text-[#F2F1EA]" />
               </motion.div>
 
-              <h2 className="font-serif text-3xl text-white mb-3">
-                Welcome to {invitation?.organization_name}!
+              <h2 className="font-display font-bold tracking-tight text-3xl text-[#F2F1EA] mb-3">
+                Welcome to {invitation?.organization_name}.
               </h2>
               <p className="text-white/60 mb-6">
-                You have successfully joined the team. Redirecting you to the dashboard...
+                You have joined the team. Taking you to your dashboard...
               </p>
-              <Loader2 className="h-6 w-6 animate-spin text-[#ccff00] mx-auto" />
             </div>
           </motion.div>
         </div>
@@ -431,7 +428,7 @@ export default function TeamInvitePage() {
           </div>
 
           {/* Hero headline */}
-          <h1 className="font-serif text-4xl md:text-5xl text-white text-center mb-4">
+          <h1 className="font-display font-bold tracking-tight text-4xl md:text-5xl text-[#F2F1EA] text-center mb-4">
             You&apos;re invited.
           </h1>
           <p className="text-white/50 text-center mb-8">
@@ -439,11 +436,11 @@ export default function TeamInvitePage() {
           </p>
 
           {/* Glassmorphism Card */}
-          <div className="border border-white/10 bg-white/5 backdrop-blur-md rounded-2xl p-8">
+          <div className="border border-white/10 bg-white/5 backdrop-blur-md rounded-[6px] p-8">
             {/* Organisation Info */}
-            <div className="flex items-center gap-4 p-4 bg-white/5 border border-white/10 rounded-xl mb-6">
-              <div className="p-3 rounded-xl bg-[#ccff00]/10 border border-[#ccff00]/20">
-                <Building2 className="h-6 w-6 text-[#ccff00]" />
+            <div className="flex items-center gap-4 p-4 bg-white/5 border border-white/10 rounded-[6px] mb-6">
+              <div className="p-3 rounded-[6px] bg-white/10 border border-white/20">
+                <Building2 className="h-6 w-6 text-[#F2F1EA]" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-mono text-white/40 uppercase tracking-widest mb-1">
@@ -457,7 +454,7 @@ export default function TeamInvitePage() {
 
             {/* Invitation Details */}
             <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="p-3 bg-white/5 border border-white/10 rounded-xl">
+              <div className="p-3 bg-white/5 border border-white/10 rounded-[6px]">
                 <p className="text-xs font-mono text-white/40 uppercase tracking-widest mb-1">
                   Your Role
                 </p>
@@ -468,7 +465,7 @@ export default function TeamInvitePage() {
                   </span>
                 </div>
               </div>
-              <div className="p-3 bg-white/5 border border-white/10 rounded-xl">
+              <div className="p-3 bg-white/5 border border-white/10 rounded-[6px]">
                 <p className="text-xs font-mono text-white/40 uppercase tracking-widest mb-1">
                   Expires
                 </p>
@@ -483,7 +480,7 @@ export default function TeamInvitePage() {
 
             {/* Error message */}
             {error && (
-              <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl mb-6">
+              <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-[6px] mb-6">
                 <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-red-300">{error}</p>
               </div>
@@ -492,8 +489,8 @@ export default function TeamInvitePage() {
             {existingUser ? (
               // Existing user - just accept
               <div className="space-y-4">
-                <div className="flex items-start gap-3 p-4 bg-[#ccff00]/10 border border-[#ccff00]/20 rounded-xl">
-                  <CheckCircle2 className="h-5 w-5 text-[#ccff00] flex-shrink-0 mt-0.5" />
+                <div className="flex items-start gap-3 p-4 bg-white/10 border border-white/20 rounded-[6px]">
+                  <CheckCircle2 className="h-5 w-5 text-[#F2F1EA] flex-shrink-0 mt-0.5" />
                   <p className="text-sm text-white/80">
                     You already have an alkatera account. Click below to join the team.
                   </p>
@@ -503,16 +500,9 @@ export default function TeamInvitePage() {
                   type="button"
                   onClick={handleAcceptAsExistingUser}
                   disabled={isSubmitting}
-                  className="w-full py-4 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:opacity-90 hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  className="w-full py-4 bg-[#F2F1EA] text-[#1A1B1D] font-mono uppercase text-xs tracking-[0.22em] font-bold rounded-full hover:bg-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isSubmitting ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Joining team...
-                    </span>
-                  ) : (
-                    "Join Team"
-                  )}
+                  {isSubmitting ? "Joining team..." : "Join team"}
                 </button>
               </div>
             ) : (
@@ -534,7 +524,7 @@ export default function TeamInvitePage() {
                     onChange={(e) => setFullName(e.target.value)}
                     disabled={isSubmitting}
                     required
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#ccff00]/50 focus:border-[#ccff00]/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-[6px] text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#F2F1EA]/40 focus:border-[#F2F1EA]/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                 </div>
 
@@ -547,7 +537,7 @@ export default function TeamInvitePage() {
                     type="email"
                     value={invitation.email}
                     disabled
-                    className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white/60 cursor-not-allowed"
+                    className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-[6px] text-white/60 cursor-not-allowed"
                   />
                 </div>
 
@@ -564,7 +554,7 @@ export default function TeamInvitePage() {
                       onChange={(e) => setPassword(e.target.value)}
                       disabled={isSubmitting}
                       required
-                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#ccff00]/50 focus:border-[#ccff00]/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed pr-12"
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-[6px] text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#F2F1EA]/40 focus:border-[#F2F1EA]/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed pr-12"
                     />
                     <button
                       type="button"
@@ -592,7 +582,7 @@ export default function TeamInvitePage() {
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       disabled={isSubmitting}
                       required
-                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#ccff00]/50 focus:border-[#ccff00]/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed pr-12"
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-[6px] text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#F2F1EA]/40 focus:border-[#F2F1EA]/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed pr-12"
                     />
                     <button
                       type="button"
@@ -607,16 +597,9 @@ export default function TeamInvitePage() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full py-4 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:opacity-90 hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  className="w-full py-4 bg-[#F2F1EA] text-[#1A1B1D] font-mono uppercase text-xs tracking-[0.22em] font-bold rounded-full hover:bg-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isSubmitting ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Creating account...
-                    </span>
-                  ) : (
-                    "Create Account & Join"
-                  )}
+                  {isSubmitting ? "Creating account..." : "Create account & join"}
                 </button>
               </form>
             )}
@@ -629,7 +612,7 @@ export default function TeamInvitePage() {
                 </span>
                 <Link
                   href="/login"
-                  className="text-[#ccff00] font-mono text-xs uppercase tracking-widest hover:underline"
+                  className="text-[#F2F1EA] font-mono text-xs uppercase tracking-widest underline underline-offset-4 hover:text-white"
                 >
                   Sign in
                 </Link>

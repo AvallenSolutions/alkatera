@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  Loader2,
   Sparkles,
   AlertTriangle,
   CheckCircle2,
@@ -119,29 +118,29 @@ export function BrandDeepEnrichControl({ brandId, brandName, hasWebsite }: Props
       }
     }
     if (!cancelledRef.current) {
-      setError("Timed out waiting for results — the job may still finish. Refresh the page to see what landed.");
+      setError("Timed out waiting for results. The job may still finish, refresh the page to see what landed.");
       setBusy(false);
       setPhase(null);
     }
   }
 
   return (
-    <div className="rounded-xl border border-sky-500/30 bg-gradient-to-br from-sky-500/5 via-card/40 to-card/40 p-5 space-y-4">
+    <div className="rounded-[6px] border border-border bg-card p-5 space-y-4">
       <div>
         <div className="text-sm font-semibold flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-sky-300" />
+          <Sparkles className="h-4 w-4 text-muted-foreground" />
           Deep enrich with web search
         </div>
         <p className="text-xs text-muted-foreground mt-1">
           One-shot pass that searches the web for {brandName}'s products and any sustainability
           documents (EPDs, LCAs, impact reports). PDF URLs get downloaded and queued for the
-          document processor. Use when the crawler misses things — JS-heavy sites or docs hosted
+          document processor. Use when the crawler misses things: JS-heavy sites or docs hosted
           on third-party platforms.
           {!hasWebsite && (
             <>
               {' '}
-              <span className="text-amber-300">
-                No website on file yet — results will be best with one set.
+              <span className="text-studio-attention">
+                No website on file yet, results will be best with one set.
               </span>
             </>
           )}
@@ -151,12 +150,10 @@ export function BrandDeepEnrichControl({ brandId, brandName, hasWebsite }: Props
       <Button
         onClick={run}
         disabled={busy}
-        className="bg-sky-400 hover:bg-sky-400/90 text-black font-semibold"
+        className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold"
       >
         {busy ? (
-          <>
-            <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Searching the web…
-          </>
+          'Searching the web…'
         ) : (
           <>
             <Sparkles className="h-4 w-4 mr-1.5" /> Deep enrich
@@ -173,16 +170,16 @@ export function BrandDeepEnrichControl({ brandId, brandName, hasWebsite }: Props
       )}
 
       {error && (
-        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs flex items-start gap-2">
-          <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+        <div className="rounded-[6px] border border-border bg-secondary px-3 py-2 text-xs flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 text-studio-stale shrink-0 mt-0.5" />
           <div>{error}</div>
         </div>
       )}
 
       {result && (
         <div className="space-y-3">
-          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-sm flex items-start gap-2">
-            <CheckCircle2 className="h-4 w-4 text-emerald-300 shrink-0 mt-0.5" />
+          <div className="rounded-[6px] border border-border bg-secondary px-4 py-3 text-sm flex items-start gap-2">
+            <CheckCircle2 className="h-4 w-4 text-studio-good shrink-0 mt-0.5" />
             <div className="space-y-1 min-w-0">
               <div className="font-semibold flex flex-wrap gap-x-3 gap-y-0.5">
                 {result.brand.fields_updated > 0 && (
@@ -217,7 +214,7 @@ export function BrandDeepEnrichControl({ brandId, brandName, hasWebsite }: Props
                 <div className="text-[11px] italic text-muted-foreground">{result.summary}</div>
               )}
               {result.enrich_error && (
-                <div className="text-[11px] text-amber-300">{result.enrich_error}</div>
+                <div className="text-[11px] text-studio-attention">{result.enrich_error}</div>
               )}
             </div>
           </div>
@@ -232,9 +229,9 @@ export function BrandDeepEnrichControl({ brandId, brandName, hasWebsite }: Props
                   <FileText
                     className={`h-3.5 w-3.5 shrink-0 ${
                       d.status === 'ingested'
-                        ? 'text-emerald-300'
+                        ? 'text-studio-good'
                         : d.status === 'failed'
-                          ? 'text-destructive'
+                          ? 'text-studio-stale'
                           : 'text-muted-foreground'
                     }`}
                   />
@@ -242,7 +239,7 @@ export function BrandDeepEnrichControl({ brandId, brandName, hasWebsite }: Props
                     href={d.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="hover:text-neon-lime truncate flex-1 min-w-0"
+                    className="hover:underline truncate flex-1 min-w-0"
                     title={d.url}
                   >
                     {d.url}

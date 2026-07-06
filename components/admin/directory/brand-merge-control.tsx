@@ -4,13 +4,13 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-  Loader2,
   Combine,
   AlertTriangle,
   CheckCircle2,
   ArrowUpRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { StateChip } from '@/components/studio/state-chip';
 
 export interface DuplicateCandidate {
   id: string;
@@ -74,10 +74,10 @@ export function BrandMergeControl({ canonicalId, canonicalName, candidates }: Pr
   if (visible.length === 0 && mergedIds.size === 0) return null;
 
   return (
-    <div className="rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-500/5 via-card/40 to-card/40 p-5 space-y-4">
+    <div className="rounded-[6px] border border-border bg-card p-5 space-y-4">
       <div>
         <div className="text-sm font-semibold flex items-center gap-2">
-          <Combine className="h-4 w-4 text-amber-300" />
+          <Combine className="h-4 w-4 text-muted-foreground" />
           Duplicate candidates
           <span className="text-[11px] font-normal text-muted-foreground">
             {visible.length} row{visible.length === 1 ? '' : 's'}
@@ -91,8 +91,8 @@ export function BrandMergeControl({ canonicalId, canonicalName, candidates }: Pr
       </div>
 
       {mergedIds.size > 0 && visible.length === 0 && (
-        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-sm flex items-center gap-2">
-          <CheckCircle2 className="h-4 w-4 text-emerald-300 shrink-0" />
+        <div className="rounded-[6px] border border-border bg-secondary px-3 py-2 text-sm flex items-center gap-2">
+          <CheckCircle2 className="h-4 w-4 text-studio-good shrink-0" />
           <span>
             {mergedIds.size} duplicate{mergedIds.size === 1 ? '' : 's'} merged in.
           </span>
@@ -100,8 +100,8 @@ export function BrandMergeControl({ canonicalId, canonicalName, candidates }: Pr
       )}
 
       {error && (
-        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs flex items-start gap-2">
-          <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+        <div className="rounded-[6px] border border-border bg-secondary px-3 py-2 text-xs flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 text-studio-stale shrink-0 mt-0.5" />
           <div>{error}</div>
         </div>
       )}
@@ -111,13 +111,13 @@ export function BrandMergeControl({ canonicalId, canonicalName, candidates }: Pr
           {visible.map((c) => (
             <li
               key={c.id}
-              className="flex items-center gap-3 rounded-lg border border-border/60 bg-background/40 px-3 py-2"
+              className="flex items-center gap-3 rounded-[6px] border border-border bg-secondary px-3 py-2"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <Link
                     href={`/admin/directory/brands/${c.id}`}
-                    className="text-sm font-medium hover:text-neon-lime truncate inline-flex items-center gap-1"
+                    className="text-sm font-medium hover:underline truncate inline-flex items-center gap-1"
                   >
                     {c.name}
                     <ArrowUpRight className="h-3 w-3" />
@@ -142,12 +142,10 @@ export function BrandMergeControl({ canonicalId, canonicalName, candidates }: Pr
                 size="sm"
                 disabled={busyId !== null}
                 onClick={() => merge(c.id)}
-                className="bg-amber-300 hover:bg-amber-300/90 text-black font-semibold shrink-0"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold shrink-0"
               >
                 {busyId === c.id ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Folding…
-                  </>
+                  'Folding…'
                 ) : (
                   <>
                     <Combine className="h-3.5 w-3.5 mr-1.5" /> Fold in
@@ -169,19 +167,11 @@ function Pill({
   children: React.ReactNode;
   tone: 'verified' | 'pending' | 'alkatera' | 'match';
 }) {
-  const styles =
+  const chipTone =
     tone === 'verified'
-      ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+      ? ('good' as const)
       : tone === 'pending'
-        ? 'bg-amber-300/15 border-amber-300/40 text-amber-300'
-        : tone === 'alkatera'
-          ? 'bg-neon-lime/15 border-neon-lime/40 text-neon-lime'
-          : 'bg-sky-500/15 border-sky-500/40 text-sky-300';
-  return (
-    <span
-      className={`text-[10px] uppercase tracking-wider font-semibold rounded-full border px-2 py-0.5 ${styles}`}
-    >
-      {children}
-    </span>
-  );
+        ? ('attention' as const)
+        : ('quiet' as const);
+  return <StateChip tone={chipTone}>{children}</StateChip>;
 }

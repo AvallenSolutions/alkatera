@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -12,7 +11,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Plus, Trash2, TrendingUp, TrendingDown, Sprout, Info } from 'lucide-react';
+import { Plus, Trash2, TrendingUp, TrendingDown, Sprout, Info } from 'lucide-react';
+import { StateChip } from '@/components/studio/state-chip';
+import type { WorkingTone } from '@/components/studio/theme';
 import { toast } from 'sonner';
 import {
   computeAnnualStockChange,
@@ -40,10 +41,10 @@ const VERIFICATION_OPTIONS = [
   { value: 'verified', label: 'Third-party verified' },
 ];
 
-const CONFIDENCE_STYLE: Record<string, string> = {
-  HIGH: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/30',
-  MEDIUM: 'bg-amber-500/15 text-amber-600 border-amber-500/30',
-  LOW: 'bg-red-500/15 text-red-600 border-red-500/30',
+const CONFIDENCE_TONE: Record<string, WorkingTone> = {
+  HIGH: 'good',
+  MEDIUM: 'attention',
+  LOW: 'stale',
 };
 
 const emptyDraft = {
@@ -159,9 +160,7 @@ export function SoilCarbonSamplesPanel({
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" /> Loading measurements…
-      </div>
+      <div className="py-4 text-sm text-muted-foreground">Loading measurements…</div>
     );
   }
 
@@ -169,18 +168,18 @@ export function SoilCarbonSamplesPanel({
     <div className="space-y-4">
       {/* Computed change headline */}
       {change.methodology === 'measured_stock_change' && (
-        <div className="rounded-lg border border-[#ccff00]/40 bg-[#ccff00]/5 p-4">
+        <div className="rounded-[6px] border border-border bg-card p-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
             {change.is_loss ? (
-              <TrendingDown className="h-4 w-4 text-red-500" />
+              <TrendingDown className="h-4 w-4 text-studio-stale" />
             ) : (
-              <TrendingUp className="h-4 w-4 text-emerald-500" />
+              <TrendingUp className="h-4 w-4 text-studio-good" />
             )}
             Measured soil carbon trajectory
             {change.confidence && (
-              <Badge variant="outline" className={CONFIDENCE_STYLE[change.confidence]}>
+              <StateChip tone={CONFIDENCE_TONE[change.confidence]}>
                 {change.confidence} confidence
-              </Badge>
+              </StateChip>
             )}
           </div>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -201,9 +200,9 @@ export function SoilCarbonSamplesPanel({
 
       {/* Estimate → measured nudge */}
       {change.methodology !== 'measured_stock_change' && (
-        <div className="rounded-lg border border-border bg-muted/20 p-4">
+        <div className="rounded-[6px] border border-border bg-card p-4">
           <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-            <Sprout className="h-4 w-4 text-[#ccff00]" /> Move from estimate to measured
+            <Sprout className="h-4 w-4 text-studio-forest" /> Move from estimate to measured
           </div>
           <p className="mt-1.5 text-xs text-muted-foreground">
             {change.methodology === 'baseline_only'
@@ -213,7 +212,7 @@ export function SoilCarbonSamplesPanel({
                 : 'Add repeated soil samples (same depth, same lab) to claim a measured soil carbon trajectory.'}
           </p>
           {change.warning && (
-            <p className="mt-1.5 flex items-start gap-1.5 text-xs text-amber-600">
+            <p className="mt-1.5 flex items-start gap-1.5 text-xs text-studio-attention">
               <Info className="mt-0.5 h-3 w-3 shrink-0" /> {change.warning}
             </p>
           )}
@@ -238,9 +237,7 @@ export function SoilCarbonSamplesPanel({
                   <span className="text-muted-foreground">{stock.toFixed(1)} tC/ha</span>
                   <span className="text-xs text-muted-foreground">{s.depth_cm} cm</span>
                   {s.verification_status === 'verified' && (
-                    <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600">
-                      Verified
-                    </Badge>
+                    <StateChip tone="good">Verified</StateChip>
                   )}
                 </div>
                 <Button
@@ -248,7 +245,7 @@ export function SoilCarbonSamplesPanel({
                   variant="ghost"
                   size="sm"
                   onClick={() => remove(s.id)}
-                  className="h-7 w-7 p-0 text-muted-foreground hover:text-red-500"
+                  className="h-7 w-7 p-0 text-muted-foreground hover:text-studio-stale"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
@@ -260,7 +257,7 @@ export function SoilCarbonSamplesPanel({
 
       {/* Add form */}
       {adding ? (
-        <div className="space-y-3 rounded-lg border border-border p-4">
+        <div className="space-y-3 rounded-[6px] border border-border bg-card p-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs">Sample date</Label>
@@ -372,8 +369,7 @@ export function SoilCarbonSamplesPanel({
               Cancel
             </Button>
             <Button type="button" size="sm" onClick={saveDraft} disabled={saving}>
-              {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
-              Save measurement
+              {saving ? 'Saving…' : 'Save measurement'}
             </Button>
           </div>
         </div>

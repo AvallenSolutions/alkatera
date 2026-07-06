@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { Loader2, ShieldAlert, Sprout, Wine, RotateCcw } from 'lucide-react'
+import { ShieldAlert, Sprout, Wine, RotateCcw } from 'lucide-react'
+import { Eyebrow } from '@/components/studio/eyebrow'
 import { toast } from 'sonner'
 
 interface Organization { id: string; name: string }
@@ -68,7 +69,7 @@ export default function DemoSeedPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Seed failed')
-      toast.success(`Seeded — ${data.xeroTransactionsInserted} new Xero rows`)
+      toast.success(`Seeded: ${data.xeroTransactionsInserted} new Xero rows`)
       setResult(data)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Seed failed')
@@ -104,7 +105,7 @@ export default function DemoSeedPage() {
   if (adminLoading) {
     return (
       <div className="flex justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">Loading…</p>
       </div>
     )
   }
@@ -128,12 +129,15 @@ export default function DemoSeedPage() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Demo seed — inventory &amp; Xero</h1>
+        <Eyebrow tone="dim" className="mb-3">THE WIRING · ADMIN</Eyebrow>
+        <h1 className="font-display text-3xl font-bold tracking-[-0.035em] text-foreground">
+          Demo seed: inventory and Xero.
+        </h1>
         <p className="text-sm text-muted-foreground mt-2">
           One-click seed so you can test the full double-counting pipeline: two products
           (one with a completed LCA, one without), three ingredients, a demo facility, and
           five unlinked Xero raw_materials invoices spread across the last six months.
-          Idempotent — safe to click multiple times.
+          Idempotent, safe to click multiple times.
         </p>
       </div>
 
@@ -157,8 +161,8 @@ export default function DemoSeedPage() {
             </Select>
           </div>
           <Button onClick={seed} disabled={seeding || !orgId}>
-            {seeding ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sprout className="h-4 w-4 mr-2" />}
-            Seed demo data
+            {!seeding && <Sprout className="h-4 w-4 mr-2" />}
+            {seeding ? 'Seeding…' : 'Seed demo data'}
           </Button>
         </CardContent>
       </Card>
@@ -167,7 +171,7 @@ export default function DemoSeedPage() {
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Wine className="h-4 w-4" />
-            alka<strong>tera</strong> Drinks Co — full showcase demo
+            alka<strong>tera</strong> Drinks Co: full showcase demo
           </CardTitle>
           <CardDescription>
             Builds the complete dataset for the <strong>alkatera Drinks Co</strong> org: curated
@@ -203,7 +207,7 @@ export default function DemoSeedPage() {
               ))}
             </ul>
             {drinksResult.warnings.length > 0 && (
-              <div className="text-amber-600 dark:text-amber-400">
+              <div className="text-studio-attention">
                 <p className="font-medium">Warnings:</p>
                 <ul className="list-disc pl-5">{drinksResult.warnings.map((w) => <li key={w}>{w}</li>)}</ul>
               </div>

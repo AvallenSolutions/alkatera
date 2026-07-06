@@ -23,16 +23,17 @@ import {
 } from 'lucide-react';
 import { ORCHARD_PESTICIDE_TYPE_LABELS } from '@/lib/orchard-utils';
 import type { OrchardImpactResult, OrchardGrowingProfile } from '@/lib/types/orchard';
+import { StateChip } from '@/components/studio/state-chip';
 
 interface OrchardImpactOverviewProps {
   impacts: OrchardImpactResult | null;
   profile: OrchardGrowingProfile | null;
 }
 
-const DATA_QUALITY_COLOURS: Record<string, string> = {
-  HIGH: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 border-green-200 dark:border-green-800',
-  MEDIUM: 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 border-amber-200 dark:border-amber-800',
-  LOW: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300 border-red-200 dark:border-red-800',
+const DATA_QUALITY_TONES: Record<string, 'good' | 'attention' | 'stale'> = {
+  HIGH: 'good',
+  MEDIUM: 'attention',
+  LOW: 'stale',
 };
 
 const SOIL_LABELS: Record<string, string> = {
@@ -109,29 +110,29 @@ export function OrchardImpactOverview({ impacts, profile }: OrchardImpactOvervie
           label="Emissions/ha"
           value={fmt(emissionsPerHa)}
           unit="kg CO₂e"
-          icon={<TreePine className="h-5 w-5 text-green-500" />}
-          bgClass="bg-green-500/10"
+          icon={<TreePine className="h-5 w-5 text-studio-good" />}
+          bgClass="bg-secondary"
         />
         <MetricCard
           label="Water/ha"
           value={fmt(waterPerHa)}
           unit="m³"
-          icon={<Droplets className="h-5 w-5 text-blue-500" />}
-          bgClass="bg-blue-500/10"
+          icon={<Droplets className="h-5 w-5 text-studio-dim" />}
+          bgClass="bg-secondary"
         />
         <MetricCard
           label="Removals/ha"
           value={fmt(removalsPerHa)}
           unit="kg CO₂e"
-          icon={<TreePine className="h-5 w-5 text-[#ccff00]" />}
-          bgClass="bg-[#ccff00]/10"
+          icon={<TreePine className="h-5 w-5 text-studio-forest" />}
+          bgClass="bg-secondary"
         />
         <MetricCard
           label="Yield"
           value={fmt(yieldPerHa, 1)}
           unit="t/ha"
-          icon={<Wheat className="h-5 w-5 text-amber-500" />}
-          bgClass="bg-amber-500/10"
+          icon={<Wheat className="h-5 w-5 text-studio-attention" />}
+          bgClass="bg-secondary"
         />
       </div>
 
@@ -203,7 +204,7 @@ export function OrchardImpactOverview({ impacts, profile }: OrchardImpactOvervie
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <FlaskConical className="h-4 w-4 text-amber-500" />
+              <FlaskConical className="h-4 w-4 text-studio-attention" />
               FLAG Emissions (N₂O + dLUC)
             </CardTitle>
           </CardHeader>
@@ -226,7 +227,7 @@ export function OrchardImpactOverview({ impacts, profile }: OrchardImpactOvervie
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <Zap className="h-4 w-4 text-red-500" />
+              <Zap className="h-4 w-4 text-studio-dim" />
               Energy & Industrial Emissions
             </CardTitle>
           </CardHeader>
@@ -247,7 +248,7 @@ export function OrchardImpactOverview({ impacts, profile }: OrchardImpactOvervie
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <Droplets className="h-4 w-4 text-blue-500" />
+              <Droplets className="h-4 w-4 text-studio-dim" />
               Water Impact
             </CardTitle>
           </CardHeader>
@@ -262,7 +263,7 @@ export function OrchardImpactOverview({ impacts, profile }: OrchardImpactOvervie
               <p className="text-xs text-muted-foreground mt-1">
                 AWARE factor: {(impacts.water_scarcity_m3_eq / impacts.water_m3).toFixed(2)}x
                 {(impacts.water_scarcity_m3_eq / impacts.water_m3) > 3 && (
-                  <span className="text-amber-500 ml-1">(high water stress region)</span>
+                  <span className="text-studio-attention ml-1">(high water stress region)</span>
                 )}
               </p>
             )}
@@ -276,7 +277,7 @@ export function OrchardImpactOverview({ impacts, profile }: OrchardImpactOvervie
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <Bug className="h-4 w-4 text-purple-500" />
+              <Bug className="h-4 w-4 text-studio-dim" />
               Ecotoxicity & Environmental Quality
             </CardTitle>
           </CardHeader>
@@ -286,7 +287,7 @@ export function OrchardImpactOverview({ impacts, profile }: OrchardImpactOvervie
             <DetailRow label="Human toxicity (non-carc.)" value={`${fmtSci(impacts.human_toxicity_non_carcinogenic)} CTUh`} />
             <DetailRow label="Freshwater eutrophication" value={`${fmtSci(impacts.freshwater_eutrophication)} kg P eq`} />
             {!profile.uses_pesticides && !profile.uses_herbicides && (
-              <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+              <p className="text-xs text-studio-good mt-2">
                 No pesticides or herbicides applied
               </p>
             )}
@@ -309,7 +310,7 @@ export function OrchardImpactOverview({ impacts, profile }: OrchardImpactOvervie
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <TreePine className="h-4 w-4 text-[#ccff00]" />
+              <TreePine className="h-4 w-4 text-studio-forest" />
               Soil Carbon & Removals (FLAG)
             </CardTitle>
           </CardHeader>
@@ -323,15 +324,13 @@ export function OrchardImpactOverview({ impacts, profile }: OrchardImpactOvervie
                 value={impacts.flag_removals.methodology === 'measured' ? 'Verified measurement' : 'Practice-based default'}
               />
               {impacts.flag_removals.is_verified && (
-                <Badge variant="outline" className="mt-1 bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 border-green-200 dark:border-green-800">
-                  Verified
-                </Badge>
+                <StateChip tone="good" className="mt-1">Verified</StateChip>
               )}
             </div>
             {impacts.flag_removals.removals_warning && (
-              <div className="flex items-start gap-2 mt-2 p-2 rounded-md bg-amber-500/10 border border-amber-500/20">
-                <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
-                <p className="text-xs text-amber-700 dark:text-amber-400">
+              <div className="flex items-start gap-2 mt-2 p-2 rounded-md bg-secondary border border-border">
+                <AlertTriangle className="h-3.5 w-3.5 text-studio-attention shrink-0 mt-0.5" />
+                <p className="text-xs text-studio-attention">
                   {impacts.flag_removals.removals_warning}
                 </p>
               </div>
@@ -347,7 +346,7 @@ export function OrchardImpactOverview({ impacts, profile }: OrchardImpactOvervie
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
-                <TreePine className="h-4 w-4 text-emerald-600" />
+                <TreePine className="h-4 w-4 text-studio-forest" />
                 Location & Nature (TNFD)
               </CardTitle>
             </CardHeader>
@@ -363,8 +362,8 @@ export function OrchardImpactOverview({ impacts, profile }: OrchardImpactOvervie
                 <DetailRow label="Designation" value={profile.sensitive_area_details} muted />
               )}
               {profile.in_biodiversity_sensitive_area && (
-                <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2 mt-1">
-                  <p className="text-xs text-amber-400">
+                <div className="rounded-md border border-border bg-secondary p-2 mt-1">
+                  <p className="text-xs text-studio-attention">
                     Enhanced TNFD and CSRD ESRS E4 disclosure required for operations in or adjacent to sensitive areas.
                   </p>
                 </div>
@@ -380,7 +379,7 @@ export function OrchardImpactOverview({ impacts, profile }: OrchardImpactOvervie
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <Sprout className="h-4 w-4 text-green-600" />
+              <Sprout className="h-4 w-4 text-studio-forest" />
               Growing Profile Inputs
             </CardTitle>
           </CardHeader>
@@ -425,7 +424,7 @@ export function OrchardImpactOverview({ impacts, profile }: OrchardImpactOvervie
               <p className="text-xs text-muted-foreground">kg CO₂e/kg fruit</p>
             </div>
             <div>
-              <p className="text-lg font-bold text-[#ccff00]">{impacts.removals_per_kg.toFixed(3)}</p>
+              <p className="text-lg font-bold text-studio-forest">{impacts.removals_per_kg.toFixed(3)}</p>
               <p className="text-xs text-muted-foreground">kg CO₂e removed/kg</p>
             </div>
             <div>
@@ -443,16 +442,11 @@ export function OrchardImpactOverview({ impacts, profile }: OrchardImpactOvervie
       {/* Data quality and methodology */}
       <div className="flex items-center gap-3 flex-wrap">
         <span className="text-sm text-muted-foreground">Data quality:</span>
-        <Badge
-          variant="outline"
-          className={DATA_QUALITY_COLOURS[impacts.data_quality_grade] || ''}
-        >
+        <StateChip tone={DATA_QUALITY_TONES[impacts.data_quality_grade] || 'quiet'}>
           {impacts.data_quality_grade}
-        </Badge>
+        </StateChip>
         {impacts.flag_removals.methodology === 'measured' && (
-          <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300 border-green-200 dark:border-green-800">
-            Verified soil carbon
-          </Badge>
+          <StateChip tone="good">Verified soil carbon</StateChip>
         )}
         <TooltipProvider>
           <Tooltip>

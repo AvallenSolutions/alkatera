@@ -350,7 +350,7 @@ export function OrchardGrowingQuestionnaire({
   useIngestStash('spray', handleSprayImport);
   useIngestStash('evidence', (file) => {
     setEvidenceFile(file);
-    toast.info('Evidence ready to upload — complete the questionnaire and click Save to attach it.');
+    toast.info('Evidence ready to upload: complete the questionnaire and click Save to attach it.');
   });
 
   // Build harvest year options (current year down to current-10)
@@ -627,7 +627,7 @@ export function OrchardGrowingQuestionnaire({
                 onClick={() => setCurrentStep(i)}
                 className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
                   i === currentStep
-                    ? 'bg-[#ccff00]/20 text-[#ccff00]'
+                    ? 'bg-secondary text-studio-cobalt'
                     : i < currentStep
                     ? 'bg-muted text-foreground'
                     : 'text-muted-foreground'
@@ -674,7 +674,7 @@ export function OrchardGrowingQuestionnaire({
                       Orchard total: {orchardHectares} ha. Enter the area used for this product.
                     </p>
                     {form.area_ha > orchardHectares && (
-                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                      <p className="text-xs text-studio-attention">
                         Area exceeds orchard total ({orchardHectares} ha)
                       </p>
                     )}
@@ -698,12 +698,12 @@ export function OrchardGrowingQuestionnaire({
                           Calculated yield: {(form.fruit_yield_tonnes / form.area_ha).toFixed(1)} t/ha
                         </p>
                         {form.fruit_yield_tonnes / form.area_ha > 60 && (
-                          <p className="text-xs text-amber-600 dark:text-amber-400">
+                          <p className="text-xs text-studio-attention">
                             Yield above 60 t/ha is unusually high. Please check your figures.
                           </p>
                         )}
                         {form.fruit_yield_tonnes / form.area_ha < 1 && (
-                          <p className="text-xs text-amber-600 dark:text-amber-400">
+                          <p className="text-xs text-studio-attention">
                             Yield below 1 t/ha is very low. Is this a newly planted orchard?
                           </p>
                         )}
@@ -721,17 +721,17 @@ export function OrchardGrowingQuestionnaire({
                         onClick={() => updateForm({ soil_management: practice.value })}
                         className={`flex items-start gap-3 p-3 rounded-lg border text-left transition-colors ${
                           form.soil_management === practice.value
-                            ? 'border-[#ccff00] bg-[#ccff00]/5'
+                            ? 'border-studio-cobalt bg-secondary'
                             : 'border-border hover:border-muted-foreground/30'
                         }`}
                       >
                         <div className={`mt-0.5 h-4 w-4 rounded-full border-2 flex items-center justify-center ${
                           form.soil_management === practice.value
-                            ? 'border-[#ccff00]'
+                            ? 'border-studio-cobalt'
                             : 'border-muted-foreground/30'
                         }`}>
                           {form.soil_management === practice.value && (
-                            <div className="h-2 w-2 rounded-full bg-[#ccff00]" />
+                            <div className="h-2 w-2 rounded-full bg-studio-cobalt" />
                           )}
                         </div>
                         <div>
@@ -903,8 +903,8 @@ export function OrchardGrowingQuestionnaire({
                           />
                         </div>
 
-                        <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-                          <p className="text-xs text-amber-400">
+                        <div className="rounded-lg border border-border bg-secondary p-3">
+                          <p className="text-xs text-studio-attention">
                             Operations within or adjacent to sensitive areas require enhanced disclosure under TNFD and CSRD ESRS E4. Consider commissioning a biodiversity impact assessment.
                           </p>
                         </div>
@@ -980,7 +980,7 @@ export function OrchardGrowingQuestionnaire({
                       <p className="text-xs text-muted-foreground">
                         Emissions from land use change are amortised over 20 years.
                         {form.land_conversion_year && currentYear - form.land_conversion_year >= 20 && (
-                          <span className="block mt-1 text-green-600 dark:text-green-400">
+                          <span className="block mt-1 text-studio-good">
                             Conversion was 20+ years ago, so dLUC emissions are fully amortised (zero).
                           </span>
                         )}
@@ -1056,7 +1056,7 @@ export function OrchardGrowingQuestionnaire({
                             placeholder="e.g. 480"
                           />
                           {form.soil_carbon_override_kg_co2e_per_ha != null && form.soil_carbon_override_kg_co2e_per_ha > 1500 && (
-                            <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                            <p className="text-xs text-studio-attention flex items-center gap-1">
                               <AlertTriangle className="h-3 w-3" />
                               Unusually high. Please verify your measurement.
                             </p>
@@ -1065,7 +1065,7 @@ export function OrchardGrowingQuestionnaire({
                             form.soil_carbon_override_kg_co2e_per_ha > 0 &&
                             (SOIL_CARBON_REMOVAL_DEFAULTS[form.soil_management] ?? 0) > 0 &&
                             form.soil_carbon_override_kg_co2e_per_ha > (SOIL_CARBON_REMOVAL_DEFAULTS[form.soil_management] ?? 0) * 3 && (
-                            <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                            <p className="text-xs text-studio-attention flex items-center gap-1">
                               <AlertTriangle className="h-3 w-3" />
                               Significantly above the practice-based estimate.
                             </p>
@@ -1224,8 +1224,8 @@ export function OrchardGrowingQuestionnaire({
 
                         {/* Pending upload indicator */}
                         {evidenceFile && (
-                          <div className="flex items-center gap-2 rounded-lg border border-dashed border-[#ccff00]/50 bg-[#ccff00]/5 p-2">
-                            <Upload className="h-4 w-4 text-[#ccff00]" />
+                          <div className="flex items-center gap-2 rounded-lg border border-dashed border-border bg-secondary p-2">
+                            <Upload className="h-4 w-4 text-studio-cobalt" />
                             <span className="text-sm">{evidenceFile.name}</span>
                             <span className="text-xs text-muted-foreground">
                               (will upload on save)
@@ -1353,16 +1353,16 @@ export function OrchardGrowingQuestionnaire({
                           )}
 
                           {form.removal_verification_status === 'unverified' && (
-                            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-                              <p className="text-xs text-amber-400">
+                            <div className="rounded-lg border border-border bg-secondary p-3">
+                              <p className="text-xs text-studio-attention">
                                 Third-party verification to ISO 14064-3 or equivalent is required for SBTi FLAG submission. Unverified removals will be flagged in reports.
                               </p>
                             </div>
                           )}
 
                           {form.removal_verification_status === 'expired' && (
-                            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-                              <p className="text-xs text-amber-400">
+                            <div className="rounded-lg border border-border bg-secondary p-3">
+                              <p className="text-xs text-studio-attention">
                                 Removal verification has expired. Removals will not meet LSR standard until re-verification is completed.
                               </p>
                             </div>
@@ -1405,7 +1405,7 @@ export function OrchardGrowingQuestionnaire({
                       >
                         {isImporting ? (
                           <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            <Loader2 className="h-4 w-4 mr-2" />
                             Analysing...
                           </>
                         ) : (
@@ -1478,10 +1478,10 @@ export function OrchardGrowingQuestionnaire({
                           <Badge
                             variant="secondary"
                             className={`text-[10px] justify-center ${
-                              chem.chemical_type === 'fertiliser' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-                              chem.chemical_type === 'fungicide' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' :
-                              chem.chemical_type === 'herbicide' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' :
-                              chem.chemical_type === 'insecticide' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
+                              chem.chemical_type === 'fertiliser' ? 'text-studio-forest' :
+                              chem.chemical_type === 'fungicide' ? 'text-studio-attention' :
+                              chem.chemical_type === 'herbicide' ? 'text-studio-hold' :
+                              chem.chemical_type === 'insecticide' ? 'text-studio-stale' :
                               ''
                             }`}
                           >
@@ -1549,7 +1549,7 @@ export function OrchardGrowingQuestionnaire({
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 text-muted-foreground hover:text-green-600"
+                                className="h-7 w-7 text-muted-foreground hover:text-studio-good"
                                 title="Add to chemical library"
                                 onClick={async () => {
                                   try {
@@ -1603,7 +1603,7 @@ export function OrchardGrowingQuestionnaire({
                     </div>
                   </div>
                   {sprayChemicals.some((c) => !c.library_matched) && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                    <p className="text-xs text-studio-attention flex items-center gap-1">
                       <AlertTriangle className="h-3 w-3" />
                       Some chemicals were not found in our library. Verify their classification and click <Plus className="h-3 w-3 inline" /> to save them for future use.
                     </p>
@@ -1659,7 +1659,7 @@ export function OrchardGrowingQuestionnaire({
                         <p className="text-xs text-muted-foreground">
                           {(form.fertiliser_quantity_kg / form.area_ha).toFixed(0)} kg/ha
                           {form.fertiliser_type === 'synthetic_n' && form.fertiliser_quantity_kg / form.area_ha > 250 && (
-                            <span className="text-amber-600 dark:text-amber-400 ml-1">
+                            <span className="text-studio-attention ml-1">
                               High for orchards (typical: 50-150 kg N/ha)
                             </span>
                           )}
@@ -1836,7 +1836,7 @@ export function OrchardGrowingQuestionnaire({
                       <p className="text-xs text-muted-foreground">
                         {(form.diesel_litres_per_year / form.area_ha).toFixed(0)} L/ha
                         {form.diesel_litres_per_year / form.area_ha > 400 && (
-                          <span className="text-amber-600 dark:text-amber-400 ml-1">
+                          <span className="text-studio-attention ml-1">
                             Above 400 L/ha is unusually high
                           </span>
                         )}
@@ -1991,8 +1991,8 @@ export function OrchardGrowingQuestionnaire({
                     </div>
                   </div>
                   {previewResult.total_removals > 0 && (
-                    <div className="rounded-lg border border-green-800/30 bg-green-950/20 p-3">
-                      <div className="text-xs text-green-400/70 flex items-center gap-1">
+                    <div className="rounded-lg border border-border bg-card p-3">
+                      <div className="text-xs text-studio-dim flex items-center gap-1">
                         Soil carbon removals
                         <TooltipProvider>
                           <Tooltip>
@@ -2009,11 +2009,11 @@ export function OrchardGrowingQuestionnaire({
                           </Tooltip>
                         </TooltipProvider>
                       </div>
-                      <div className="text-lg font-bold text-green-400">
+                      <div className="text-lg font-bold text-studio-forest">
                         {previewResult.total_removals.toFixed(1)}
-                        <span className="text-xs font-normal text-green-400/70 ml-1">kg CO2e removed/year</span>
+                        <span className="text-xs font-normal text-studio-dim ml-1">kg CO2e removed/year</span>
                       </div>
-                      <div className="text-xs text-green-400/50 mt-1">
+                      <div className="text-xs text-studio-dim mt-1">
                         {previewResult.flag_removals.methodology === 'practice_based_default'
                           ? 'Practice-based estimate'
                           : 'Verified measurement'}
@@ -2085,7 +2085,7 @@ export function OrchardGrowingQuestionnaire({
               disabled={saving}
             >
               {saving ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4" />
               ) : (
                 <Save className="mr-2 h-4 w-4" />
               )}
@@ -2094,10 +2094,10 @@ export function OrchardGrowingQuestionnaire({
             <Button
               onClick={() => handleSave(false)}
               disabled={saving}
-              className="bg-[#ccff00] text-black hover:bg-[#ccff00]/90"
+              className="bg-primary text-primary-foreground"
             >
               {saving ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4" />
               ) : (
                 <Check className="mr-2 h-4 w-4" />
               )}

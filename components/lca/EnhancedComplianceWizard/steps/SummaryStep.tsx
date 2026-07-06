@@ -564,16 +564,16 @@ export function SummaryStep() {
               return (
                 <>
                   {dataQualityIssues.length > 0 && (
-                    <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800">
-                      <Info className="h-4 w-4 text-amber-600" />
-                      <AlertTitle className="text-amber-900 dark:text-amber-300">Please check these entries</AlertTitle>
+                    <Alert className="border-border bg-card">
+                      <Info className="h-4 w-4 text-[#B45309]" />
+                      <AlertTitle className="text-[#B45309]">Please check these entries</AlertTitle>
                       <AlertDescription>
-                        <p className="text-sm text-amber-800 dark:text-amber-400 mb-1">
+                        <p className="text-sm text-muted-foreground mb-1">
                           {dataQualityIssues.length} item{dataQualityIssues.length > 1 ? 's' : ''} may have been
                           calculated with the wrong quantity. Please review and correct the entries below, then
                           re-run the calculation.
                         </p>
-                        <ul className="mt-1 space-y-0.5 ml-4 text-xs text-amber-800 dark:text-amber-400">
+                        <ul className="mt-1 space-y-0.5 ml-4 text-xs text-muted-foreground">
                           {dataQualityIssues.map((fw, i) => (
                             <li key={i}>
                               <strong>{fw.material_name}</strong>: {fw.fallback_reason}
@@ -584,17 +584,17 @@ export function SummaryStep() {
                     </Alert>
                   )}
                   {transientIssues.length > 0 && (
-                    <Alert className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/10 dark:border-blue-800">
-                      <Info className="h-4 w-4 text-blue-600" />
-                      <AlertTitle className="text-blue-900 dark:text-blue-300">Live data temporarily unavailable</AlertTitle>
+                    <Alert className="border-border bg-card">
+                      <Info className="h-4 w-4 text-[#2B46C0]" />
+                      <AlertTitle className="text-foreground">Live data temporarily unavailable</AlertTitle>
                       <AlertDescription>
-                        <p className="text-sm text-blue-800 dark:text-blue-400 mb-1">
+                        <p className="text-sm text-muted-foreground mb-1">
                           {transientIssues.length} material{transientIssues.length > 1 ? 's' : ''} had a live OpenLCA
                           factor assigned but the calculation could not complete this time. {transientIssues.length > 1 ? 'They were' : 'It was'} resolved
                           using verified generic factors, so your results are valid. Re-running the calculation later may pull
                           the higher-quality live data.
                         </p>
-                        <details className="text-xs text-blue-700 dark:text-blue-500">
+                        <details className="text-xs text-muted-foreground">
                           <summary className="cursor-pointer hover:underline">Show affected materials</summary>
                           <ul className="mt-1 space-y-0.5 ml-4">
                             {transientIssues.map((fw, i) => (
@@ -607,7 +607,7 @@ export function SummaryStep() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="mt-2 border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/30"
+                          className="mt-2 border-border text-[#2B46C0] hover:bg-secondary"
                           onClick={() => goToStep(calculationStep)}
                         >
                           <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
@@ -755,7 +755,7 @@ export function SummaryStep() {
               <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                 {['Cover page', 'Executive summary', 'Methodology', 'Climate impact', 'Water footprint', 'Circularity & waste', 'Land use', 'Supply chain'].map(item => (
                   <div key={item} className="flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-[#047857]" />
                     {item}
                   </div>
                 ))}
@@ -764,7 +764,7 @@ export function SummaryStep() {
 
             {/* Generate button */}
             <Button
-              className="w-full gap-2 h-12 text-base bg-[#ccff00] hover:bg-[#b8e600] text-black font-semibold"
+              className="w-full gap-2 h-12 text-base bg-primary text-primary-foreground hover:bg-primary/90 font-semibold"
               onClick={generatePdf}
             >
               <FileText className="h-5 w-5" />
@@ -778,7 +778,7 @@ export function SummaryStep() {
           <CardContent className="py-12">
             <div className="max-w-md mx-auto space-y-6">
               <div className="text-center">
-                <Loader2 className="h-10 w-10 animate-spin mx-auto text-primary mb-4" />
+                <Loader2 className="h-10 w-10 mx-auto text-primary mb-4" />
                 <h3 className="text-lg font-semibold mb-1">Generating Report</h3>
                 <p className="text-sm text-muted-foreground">
                   {STEP_LABELS[generationStep]}
@@ -799,15 +799,15 @@ export function SummaryStep() {
                       key={step}
                       className={cn(
                         'flex items-center gap-3 px-3 py-2 rounded-lg text-sm',
-                        isActive && 'bg-[#ccff00]/10 text-foreground font-medium',
+                        isActive && 'bg-secondary text-foreground font-medium',
                         isPast && 'text-muted-foreground',
                         !isActive && !isPast && 'text-muted-foreground/50',
                       )}
                     >
                       {isPast ? (
-                        <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+                        <CheckCircle2 className="h-4 w-4 text-[#047857] flex-shrink-0" />
                       ) : isActive ? (
-                        <Loader2 className="h-4 w-4 animate-spin text-primary flex-shrink-0" />
+                        <Loader2 className="h-4 w-4 text-primary flex-shrink-0" />
                       ) : (
                         <div className="h-4 w-4 rounded-full border border-muted-foreground/30 flex-shrink-0" />
                       )}
@@ -822,14 +822,14 @@ export function SummaryStep() {
       ) : pdfState === 'preview' && pdfUrl ? (
         /* Preview state */
         <div className="space-y-4">
-          <Card className="border-green-200 bg-green-50/50 dark:bg-green-950/10 dark:border-green-900">
+          <Card className="border-border bg-card">
             <CardContent className="flex items-center justify-between py-4">
               <div className="flex items-center gap-3">
-                <CheckCircle2 className="h-6 w-6 text-green-600" />
+                <CheckCircle2 className="h-6 w-6 text-[#047857]" />
                 <div>
-                  <div className="font-semibold text-green-900 dark:text-green-300">Report Generated Successfully</div>
-                  <div className="text-sm text-green-700 dark:text-green-400">
-                    {pdfBlob ? `${(pdfBlob.size / 1024).toFixed(0)} KB` : ''} — Ready for download
+                  <div className="font-semibold text-foreground">Report Generated Successfully</div>
+                  <div className="text-sm text-muted-foreground">
+                    {pdfBlob ? `${(pdfBlob.size / 1024).toFixed(0)} KB` : ''} · Ready for download
                   </div>
                 </div>
               </div>
@@ -841,7 +841,7 @@ export function SummaryStep() {
                 <Button
                   size="sm"
                   onClick={downloadPdf}
-                  className="gap-1.5 bg-[#ccff00] hover:bg-[#b8e600] text-black font-semibold"
+                  className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 font-semibold"
                 >
                   <Download className="h-4 w-4" />
                   Download PDF

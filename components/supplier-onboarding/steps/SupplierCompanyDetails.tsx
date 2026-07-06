@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { GoogleAddressInput } from '@/components/ui/google-address-input'
-import { ArrowLeft, ArrowRight, MapPin, SkipForward, Upload, FileText, X, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, MapPin, SkipForward, Upload, FileText, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 const ACCEPTED_FILE_TYPES = '.pdf,.xlsx,.xls,.csv'
@@ -193,7 +193,7 @@ export function SupplierCompanyDetails() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-6 h-6 text-[#ccff00] animate-spin" />
+        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">Loading&hellip;</p>
       </div>
     )
   }
@@ -202,28 +202,28 @@ export function SupplierCompanyDetails() {
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 animate-in fade-in duration-300">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-3">
-          <div className="mx-auto w-16 h-16 bg-[#ccff00]/20 backdrop-blur-md border border-[#ccff00]/30 rounded-2xl flex items-center justify-center">
-            <MapPin className="w-8 h-8 text-[#ccff00]" />
+          <div className="mx-auto w-16 h-16 rounded-[6px] bg-card border border-border flex items-center justify-center">
+            <MapPin className="w-8 h-8 text-studio-forest" />
           </div>
-          <h3 className="text-xl font-serif font-bold text-white">
-            Company Details
+          <h3 className="text-xl font-display font-bold tracking-tight text-foreground">
+            Company details.
           </h3>
-          <p className="text-sm text-white/50">
+          <p className="text-sm text-muted-foreground">
             Add your address, contact details, and product catalogue.
           </p>
         </div>
 
-        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 space-y-4">
+        <div className="rounded-[6px] border border-border bg-card p-6 space-y-4">
           {/* Address - full width */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="sup-address" className="text-sm font-medium text-white/70">
+              <Label htmlFor="sup-address" className="text-sm font-medium text-foreground">
                 Address
               </Label>
               <button
                 type="button"
                 onClick={() => setManualAddress(v => !v)}
-                className="text-xs text-white/30 hover:text-white/60 underline underline-offset-2"
+                className="text-xs text-studio-dim hover:text-foreground underline underline-offset-2"
               >
                 {manualAddress ? 'Search by address' : "Can't find your address?"}
               </button>
@@ -234,7 +234,7 @@ export function SupplierCompanyDetails() {
                 onChange={(e) => setAddress(e.target.value)}
                 placeholder="e.g., 37 Crane Boulevard, Ipswich, IP3 9SQ"
                 disabled={isSaving}
-                className="w-full rounded-md px-3 py-2 text-sm bg-white/5 border border-white/10 text-white placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-[#ccff00]/50"
+                className="w-full rounded-md px-3 py-2 text-sm bg-background border border-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
               />
             ) : (
               <GoogleAddressInput
@@ -248,7 +248,6 @@ export function SupplierCompanyDetails() {
                   setCountry(details.country || '')
                 }}
                 placeholder="Start typing your address..."
-                className="bg-white/5 border-white/10 text-white placeholder:text-white/20"
               />
             )}
           </div>
@@ -256,7 +255,7 @@ export function SupplierCompanyDetails() {
           {/* Industry Sector + Phone - half width */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="sup-industry" className="text-sm font-medium text-white/70">
+              <Label htmlFor="sup-industry" className="text-sm font-medium text-foreground">
                 Industry Sector
               </Label>
               <Input
@@ -265,11 +264,10 @@ export function SupplierCompanyDetails() {
                 value={industrySector}
                 onChange={e => setIndustrySector(e.target.value)}
                 disabled={isSaving}
-                className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="sup-phone" className="text-sm font-medium text-white/70">
+              <Label htmlFor="sup-phone" className="text-sm font-medium text-foreground">
                 Phone
               </Label>
               <Input
@@ -279,7 +277,6 @@ export function SupplierCompanyDetails() {
                 value={phone}
                 onChange={e => setPhone(e.target.value)}
                 disabled={isSaving}
-                className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
               />
             </div>
           </div>
@@ -287,7 +284,7 @@ export function SupplierCompanyDetails() {
           {/* Contact Name + Contact Email - half width */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="sup-contact-name" className="text-sm font-medium text-white/70">
+              <Label htmlFor="sup-contact-name" className="text-sm font-medium text-foreground">
                 Contact Name
               </Label>
               <Input
@@ -296,11 +293,10 @@ export function SupplierCompanyDetails() {
                 value={contactName}
                 onChange={e => setContactName(e.target.value)}
                 disabled={isSaving}
-                className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="sup-contact-email" className="text-sm font-medium text-white/70">
+              <Label htmlFor="sup-contact-email" className="text-sm font-medium text-foreground">
                 Contact Email
               </Label>
               <Input
@@ -310,26 +306,25 @@ export function SupplierCompanyDetails() {
                 value={contactEmail}
                 onChange={e => setContactEmail(e.target.value)}
                 disabled={isSaving}
-                className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
               />
             </div>
           </div>
 
           {/* Catalogue Upload - full width */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium text-white/70">
+            <Label className="text-sm font-medium text-foreground">
               Product Catalogue
             </Label>
             {catalogueUrl && catalogueFilename ? (
-              <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
-                <FileText className="w-4 h-4 text-[#ccff00] shrink-0" />
-                <span className="text-sm text-white/70 truncate flex-1">
+              <div className="flex items-center gap-2 rounded-[6px] border border-border bg-secondary/50 px-3 py-2">
+                <FileText className="w-4 h-4 text-studio-forest shrink-0" />
+                <span className="text-sm text-foreground truncate flex-1">
                   {catalogueFilename}
                 </span>
                 <button
                   type="button"
                   onClick={handleRemoveCatalogue}
-                  className="text-white/40 hover:text-red-400 transition-colors shrink-0"
+                  className="text-muted-foreground hover:text-studio-stale transition-colors shrink-0"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -348,17 +343,14 @@ export function SupplierCompanyDetails() {
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploading || isSaving}
-                  className="w-full flex items-center justify-center gap-2 bg-white/5 border border-dashed border-white/20 rounded-xl px-4 py-3 text-sm text-white/50 hover:text-white/70 hover:border-white/30 transition-colors disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2 rounded-[6px] border border-dashed border-border bg-secondary/50 px-4 py-3 text-sm text-muted-foreground hover:text-foreground hover:border-studio-forest/50 transition-colors disabled:opacity-50"
                 >
                   {isUploading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Uploading...
-                    </>
+                    'Uploading...'
                   ) : (
                     <>
                       <Upload className="w-4 h-4" />
-                      Upload catalogue (PDF, XLSX, XLS, CSV - max 10MB)
+                      Upload catalogue (PDF, XLSX, XLS, CSV, max 10MB)
                     </>
                   )}
                 </button>
@@ -367,30 +359,27 @@ export function SupplierCompanyDetails() {
           </div>
         </div>
 
-        <p className="text-xs text-white/30 text-center">
+        <p className="text-xs text-studio-dim text-center">
           You can update these details anytime from your profile page.
         </p>
 
         <div className="flex items-center justify-between pt-2">
-          <Button variant="ghost" onClick={previousStep} className="text-white/40 hover:text-white hover:bg-white/10">
+          <Button variant="ghost" onClick={previousStep} className="text-muted-foreground hover:text-foreground hover:bg-secondary">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" onClick={skipStep} className="text-white/40 hover:text-white hover:bg-white/10 text-sm">
+            <Button variant="ghost" onClick={skipStep} className="text-muted-foreground hover:text-foreground hover:bg-secondary text-sm">
               <SkipForward className="w-4 h-4 mr-1" />
               Skip
             </Button>
             <Button
               onClick={handleSave}
               disabled={isSaving || isUploading}
-              className="bg-[#ccff00] text-black hover:bg-[#ccff00]/90 font-medium rounded-xl"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full"
             >
               {isSaving ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
-                </>
+                'Saving...'
               ) : (
                 <>
                   Save & Continue

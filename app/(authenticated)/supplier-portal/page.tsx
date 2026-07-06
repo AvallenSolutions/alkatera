@@ -2,18 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
-import {
-  ClipboardList,
-  Package,
-  ArrowRight,
-  Leaf,
-  Sparkles,
-  Shield,
-  ShieldCheck,
-  Clock,
-  CheckCircle2,
-} from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import { Statement, StateChip } from '@/components/studio';
 import { useSupplierOnboarding } from '@/lib/supplier-onboarding';
 import { DataCompletenessCard } from '@/components/suppliers/DataCompletenessCard';
 import { SupplierActionItems } from '@/components/suppliers/SupplierActionItems';
@@ -197,15 +188,14 @@ export default function SupplierPortalDashboard() {
 
   if (loading) {
     return (
-      <div className="space-y-8 animate-pulse">
+      <div className="space-y-8">
         <div className="space-y-2">
           <div className="h-8 w-64 bg-muted rounded" />
           <div className="h-4 w-96 bg-muted rounded" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map(i => (
-            <div key={i} className="p-5 rounded-xl border border-border bg-card">
-              <div className="h-10 w-10 bg-muted rounded-lg mb-3" />
+            <div key={i} className="p-5 rounded-[6px] border border-border bg-card">
               <div className="h-8 w-12 bg-muted rounded mb-1" />
               <div className="h-4 w-24 bg-muted rounded" />
             </div>
@@ -218,17 +208,18 @@ export default function SupplierPortalDashboard() {
   return (
     <div className="space-y-8">
       {fetchError && (
-        <div className="p-4 rounded-xl border border-destructive/30 bg-destructive/10 text-destructive text-sm">
+        <div className="p-4 rounded-[6px] border border-studio-stale/40 bg-card text-studio-stale text-sm">
           {fetchError}
         </div>
       )}
 
       {/* Welcome */}
       <div>
-        <h1 className="text-2xl font-serif text-foreground">
-          Welcome{supplier?.contact_name ? `, ${supplier.contact_name}` : ''}
-        </h1>
-        <p className="text-muted-foreground mt-1">
+        <Statement
+          eyebrow="SUPPLIER PORTAL"
+          headline={<>Welcome{supplier?.contact_name ? `, ${supplier.contact_name}` : ''}.</>}
+        />
+        <p className="text-muted-foreground mt-3 text-sm">
           Manage your sustainability data and respond to data requests from your customers.
         </p>
       </div>
@@ -238,41 +229,37 @@ export default function SupplierPortalDashboard() {
         {/* Data Requests */}
         <Link
           href="/supplier-portal/requests"
-          className="group p-5 rounded-xl border border-border bg-card hover:border-[#ccff00]/30 hover:bg-[#ccff00]/5 transition-all"
+          className="group p-5 rounded-[6px] border border-border bg-card hover:border-foreground/30 transition-colors"
         >
-          <div className="flex items-center justify-between mb-3">
-            <div className="p-2 rounded-lg bg-blue-500/10">
-              <ClipboardList className="h-5 w-5 text-blue-400" />
-            </div>
-            <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-[#ccff00] transition-colors" />
+          <div className="flex items-start justify-between">
+            <p className="font-display text-[1.75rem] font-bold leading-none tabular-nums text-foreground">
+              {pendingRequests.length}
+            </p>
+            <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
           </div>
-          <p className="text-2xl font-bold text-foreground">{pendingRequests.length}</p>
-          <p className="text-sm text-muted-foreground">
-            {pendingRequests.length === 1 ? 'Request Awaiting Response' : 'Requests Awaiting Response'}
+          <p className="mt-1.5 font-mono text-[9.5px] uppercase tracking-[0.2em] text-foreground opacity-70">
+            {pendingRequests.length === 1 ? 'Request awaiting response' : 'Requests awaiting response'}
           </p>
         </Link>
 
         {/* Verified Products (replaced "Company Profile: 1") */}
         <Link
           href="/supplier-portal/products"
-          className="group p-5 rounded-xl border border-border bg-card hover:border-[#ccff00]/30 hover:bg-[#ccff00]/5 transition-all"
+          className="group p-5 rounded-[6px] border border-border bg-card hover:border-foreground/30 transition-colors"
         >
-          <div className="flex items-center justify-between mb-3">
-            <div className="p-2 rounded-lg bg-emerald-500/10">
-              <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+          <div className="flex items-start justify-between">
+            <div className="flex items-baseline gap-1.5">
+              <p className="font-display text-[1.75rem] font-bold leading-none tabular-nums text-foreground">{verifiedCount}</p>
+              <p className="text-sm tabular-nums text-muted-foreground">/ {productsCount}</p>
             </div>
-            <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-[#ccff00] transition-colors" />
+            <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
           </div>
-          <div className="flex items-baseline gap-1.5">
-            <p className="text-2xl font-bold text-foreground">{verifiedCount}</p>
-            <p className="text-sm text-muted-foreground">/ {productsCount}</p>
-          </div>
-          <p className="text-sm text-muted-foreground">Verified Products</p>
+          <p className="mt-1.5 font-mono text-[9.5px] uppercase tracking-[0.2em] text-foreground opacity-70">Verified products</p>
           {/* Micro progress bar */}
           {productsCount > 0 && (
             <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
               <div
-                className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                className="h-full rounded-full bg-studio-good transition-all duration-500"
                 style={{ width: `${Math.round((verifiedCount / productsCount) * 100)}%` }}
               />
             </div>
@@ -282,73 +269,72 @@ export default function SupplierPortalDashboard() {
         {/* Products */}
         <Link
           href="/supplier-portal/products"
-          className="group p-5 rounded-xl border border-border bg-card hover:border-[#ccff00]/30 hover:bg-[#ccff00]/5 transition-all"
+          className="group p-5 rounded-[6px] border border-border bg-card hover:border-foreground/30 transition-colors"
         >
-          <div className="flex items-center justify-between mb-3">
-            <div className="p-2 rounded-lg bg-purple-500/10">
-              <Package className="h-5 w-5 text-purple-400" />
-            </div>
-            <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-[#ccff00] transition-colors" />
+          <div className="flex items-start justify-between">
+            <p className="font-display text-[1.75rem] font-bold leading-none tabular-nums text-foreground">{productsCount}</p>
+            <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
           </div>
-          <p className="text-2xl font-bold text-foreground">{productsCount}</p>
-          <p className="text-sm text-muted-foreground">Products</p>
+          <p className="mt-1.5 font-mono text-[9.5px] uppercase tracking-[0.2em] text-foreground opacity-70">Products</p>
         </Link>
 
         {/* ESG Assessment Status */}
         <Link
           href="/supplier-portal/esg-assessment"
-          className="group p-5 rounded-xl border border-border bg-card hover:border-[#ccff00]/30 hover:bg-[#ccff00]/5 transition-all"
+          className="group p-5 rounded-[6px] border border-border bg-card hover:border-foreground/30 transition-colors"
         >
-          <div className="flex items-center justify-between mb-3">
-            <div className="p-2 rounded-lg bg-amber-500/10">
-              {esgStatus.isVerified ? (
-                <ShieldCheck className="h-5 w-5 text-emerald-400" />
-              ) : esgStatus.submitted ? (
-                <Clock className="h-5 w-5 text-amber-400" />
-              ) : (
-                <Shield className="h-5 w-5 text-amber-400" />
-              )}
-            </div>
-            <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-[#ccff00] transition-colors" />
-          </div>
           {esgStatus.isVerified ? (
             <>
-              <div className="flex items-baseline gap-1.5">
-                <p className="text-2xl font-bold text-foreground">{esgStatus.scoreTotal ?? 'N/A'}</p>
-                {esgStatus.scoreRating && (
-                  <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
-                    esgStatus.scoreRating === 'leader'
-                      ? 'bg-emerald-500/20 text-emerald-400'
-                      : esgStatus.scoreRating === 'progressing'
-                        ? 'bg-amber-500/20 text-amber-400'
-                        : 'bg-red-500/20 text-red-400'
-                  }`}>
-                    {getRatingLabel(esgStatus.scoreRating as any)}
-                  </span>
-                )}
+              <div className="flex items-start justify-between">
+                <div className="flex items-baseline gap-2">
+                  <p className="font-display text-[1.75rem] font-bold leading-none tabular-nums text-foreground">{esgStatus.scoreTotal ?? 'N/A'}</p>
+                  {esgStatus.scoreRating && (
+                    <StateChip
+                      tone={
+                        esgStatus.scoreRating === 'leader'
+                          ? 'good'
+                          : esgStatus.scoreRating === 'progressing'
+                            ? 'attention'
+                            : 'stale'
+                      }
+                    >
+                      {getRatingLabel(esgStatus.scoreRating as any)}
+                    </StateChip>
+                  )}
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
               </div>
-              <p className="text-sm text-muted-foreground">ESG Score</p>
+              <p className="mt-1.5 font-mono text-[9.5px] uppercase tracking-[0.2em] text-foreground opacity-70">ESG score</p>
             </>
           ) : esgStatus.submitted ? (
             <>
-              <p className="text-2xl font-bold text-foreground">Pending</p>
-              <p className="text-sm text-muted-foreground">ESG Verification</p>
+              <div className="flex items-start justify-between">
+                <p className="font-display text-[1.75rem] font-bold leading-none text-foreground">Pending</p>
+                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              </div>
+              <p className="mt-1.5 font-mono text-[9.5px] uppercase tracking-[0.2em] text-foreground opacity-70">ESG verification</p>
             </>
           ) : esgStatus.exists ? (
             <>
-              <p className="text-2xl font-bold text-foreground">{esgStatus.completionPercent}%</p>
-              <p className="text-sm text-muted-foreground">ESG Assessment</p>
+              <div className="flex items-start justify-between">
+                <p className="font-display text-[1.75rem] font-bold leading-none tabular-nums text-foreground">{esgStatus.completionPercent}%</p>
+                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              </div>
+              <p className="mt-1.5 font-mono text-[9.5px] uppercase tracking-[0.2em] text-foreground opacity-70">ESG assessment</p>
               <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-amber-500 transition-all duration-500"
+                  className="h-full rounded-full bg-studio-attention transition-all duration-500"
                   style={{ width: `${esgStatus.completionPercent}%` }}
                 />
               </div>
             </>
           ) : (
             <>
-              <p className="text-2xl font-bold text-foreground">Not Started</p>
-              <p className="text-sm text-muted-foreground">ESG Assessment</p>
+              <div className="flex items-start justify-between">
+                <p className="font-display text-[1.75rem] font-bold leading-none text-foreground">Not started</p>
+                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              </div>
+              <p className="mt-1.5 font-mono text-[9.5px] uppercase tracking-[0.2em] text-foreground opacity-70">ESG assessment</p>
             </>
           )}
         </Link>
@@ -372,29 +358,26 @@ export default function SupplierPortalDashboard() {
       {/* Pending requests */}
       {pendingRequests.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-lg font-semibold text-foreground">Recent Data Requests</h2>
+          <h2 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-forest">
+            Recent data requests
+          </h2>
           <div className="space-y-2">
             {pendingRequests.slice(0, 5).map((req) => (
               <div
                 key={req.id}
-                className="flex items-center justify-between p-4 rounded-xl border border-border bg-card"
+                className="flex items-center justify-between p-4 rounded-[6px] border border-border bg-card"
               >
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-blue-500/10">
-                    <Package className="h-4 w-4 text-blue-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{req.material_name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {req.material_type !== 'general' && (
-                        <span className="capitalize">{req.material_type}</span>
-                      )}
-                      {req.material_type !== 'general' && req.organization_name && ' \u00b7 '}
-                      {req.organization_name}
-                    </p>
-                  </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">{req.material_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {req.material_type !== 'general' && (
+                      <span className="capitalize">{req.material_type}</span>
+                    )}
+                    {req.material_type !== 'general' && req.organization_name && ' \u00b7 '}
+                    {req.organization_name}
+                  </p>
                 </div>
-                <span className="text-xs text-muted-foreground">
+                <span className="font-mono text-[10px] text-muted-foreground">
                   {new Date(req.invited_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </span>
               </div>
@@ -411,24 +394,15 @@ export default function SupplierPortalDashboard() {
 
       {/* Getting started / Resume Setup - shown below action items, hidden once completed */}
       {!onboardingState.completed && (
-        <div className="p-6 rounded-xl border border-[#ccff00]/20 bg-[#ccff00]/5">
-          <div className="flex items-start gap-3">
-            {onboardingState.dismissed ? (
-              <Sparkles className="h-5 w-5 text-[#ccff00] flex-shrink-0 mt-0.5" />
-            ) : (
-              <Leaf className="h-5 w-5 text-[#ccff00] flex-shrink-0 mt-0.5" />
-            )}
-            <div>
-              <h3 className="font-semibold text-foreground mb-1">
-                {onboardingState.dismissed ? 'Resume Setup' : 'Getting Started'}
-              </h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {onboardingState.dismissed
-                  ? 'You skipped the setup wizard earlier. Complete it to get the most out of your supplier portal.'
-                  : 'Complete your company profile to let your customers know more about your sustainability practices. Then, add your products with verified environmental data to respond to data requests.'}
-              </p>
-            </div>
+        <div className="p-6 rounded-[6px] border border-border bg-card">
+          <div className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-forest mb-2">
+            {onboardingState.dismissed ? 'Resume setup' : 'Getting started'}
           </div>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {onboardingState.dismissed
+              ? 'You skipped the setup wizard earlier. Complete it to get the most out of your supplier portal.'
+              : 'Complete your company profile to let your customers know more about your sustainability practices. Then, add your products with verified environmental data to respond to data requests.'}
+          </p>
         </div>
       )}
     </div>

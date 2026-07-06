@@ -51,23 +51,23 @@ export function MaterialityMatrix({ topics, activeTopicId, onTopicClick, classNa
           <svg viewBox="0 0 400 360" className="w-full">
             {/* Quadrant backgrounds */}
             {/* Bottom-left: Low-Low */}
-            <rect x={0} y={180} width={200} height={180} fill="#f5f5f4" />
+            <rect x={0} y={180} width={200} height={180} fill="#F2F1EA" />
             {/* Bottom-right: Financial material only */}
-            <rect x={200} y={180} width={200} height={180} fill="#fef3c7" opacity="0.5" />
+            <rect x={200} y={180} width={200} height={180} fill="#D9D6CB" opacity="0.35" />
             {/* Top-left: Impact material only */}
-            <rect x={0} y={0} width={200} height={180} fill="#dcfce7" opacity="0.5" />
-            {/* Top-right: Double material — both high */}
-            <rect x={200} y={0} width={200} height={180} fill="#ccff00" opacity="0.25" />
+            <rect x={0} y={0} width={200} height={180} fill="#D9D6CB" opacity="0.35" />
+            {/* Top-right: Double material, both high */}
+            <rect x={200} y={0} width={200} height={180} fill="#2B46C0" opacity="0.12" />
 
             {/* Quadrant labels */}
-            <text x={100} y={350} textAnchor="middle" fontSize={9} fill="#a8a29e" fontFamily="ui-monospace,monospace">LOW PRIORITY</text>
-            <text x={300} y={350} textAnchor="middle" fontSize={9} fill="#92400e" fontFamily="ui-monospace,monospace">FINANCIAL RISK</text>
-            <text x={100} y={16} textAnchor="middle" fontSize={9} fill="#166534" fontFamily="ui-monospace,monospace">IMPACT MATERIAL</text>
-            <text x={300} y={16} textAnchor="middle" fontSize={9} fill="#1c1917" fontFamily="ui-monospace,monospace" fontWeight="700">DOUBLE MATERIAL</text>
+            <text x={100} y={350} textAnchor="middle" fontSize={9} fill="#6F6F68" fontFamily="ui-monospace,monospace">LOW PRIORITY</text>
+            <text x={300} y={350} textAnchor="middle" fontSize={9} fill="#6F6F68" fontFamily="ui-monospace,monospace">FINANCIAL RISK</text>
+            <text x={100} y={16} textAnchor="middle" fontSize={9} fill="#6F6F68" fontFamily="ui-monospace,monospace">IMPACT MATERIAL</text>
+            <text x={300} y={16} textAnchor="middle" fontSize={9} fill="#2B46C0" fontFamily="ui-monospace,monospace" fontWeight="700">DOUBLE MATERIAL</text>
 
             {/* Axis lines */}
-            <line x1={200} y1={0} x2={200} y2={360} stroke="#e7e5e4" strokeWidth={1} strokeDasharray="4 2" />
-            <line x1={0} y1={180} x2={400} y2={180} stroke="#e7e5e4" strokeWidth={1} strokeDasharray="4 2" />
+            <line x1={200} y1={0} x2={200} y2={360} stroke="#D9D6CB" strokeWidth={1} strokeDasharray="4 2" />
+            <line x1={0} y1={180} x2={400} y2={180} stroke="#D9D6CB" strokeWidth={1} strokeDasharray="4 2" />
 
             {/* Grid ticks */}
             {[1, 2, 3, 4, 5].map(tick => {
@@ -75,8 +75,8 @@ export function MaterialityMatrix({ topics, activeTopicId, onTopicClick, classNa
               const y = 360 - ((tick / 5) * 360 - 36)
               return (
                 <g key={tick}>
-                  <text x={x} y={355} textAnchor="middle" fontSize={8} fill="#d6d3d1" fontFamily="ui-monospace,monospace">{tick}</text>
-                  <text x={4} y={y + 3} textAnchor="start" fontSize={8} fill="#d6d3d1" fontFamily="ui-monospace,monospace">{6 - tick}</text>
+                  <text x={x} y={355} textAnchor="middle" fontSize={8} fill="#D9D6CB" fontFamily="ui-monospace,monospace">{tick}</text>
+                  <text x={4} y={y + 3} textAnchor="start" fontSize={8} fill="#D9D6CB" fontFamily="ui-monospace,monospace">{6 - tick}</text>
                 </g>
               )
             })}

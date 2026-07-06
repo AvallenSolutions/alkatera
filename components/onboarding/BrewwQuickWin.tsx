@@ -58,18 +58,18 @@ export function BrewwQuickWin() {
     <div className="flex items-center justify-between gap-3 text-sm">
       <div className="flex items-center gap-2">
         {done ? (
-          <CheckCircle2 className="h-4 w-4 text-emerald-400 flex-shrink-0" />
+          <CheckCircle2 className="h-4 w-4 text-studio-good flex-shrink-0" />
         ) : (
-          <Circle className="h-4 w-4 text-white/30 flex-shrink-0" />
+          <Circle className="h-4 w-4 text-muted-foreground/40 flex-shrink-0" />
         )}
-        <span className={done ? 'text-white/70' : 'text-white'}>{label}</span>
+        <span className={done ? 'text-muted-foreground' : 'text-foreground'}>{label}</span>
       </div>
       {cta && onClick && !done && (
         <Button
           size="sm"
           variant="outline"
           onClick={onClick}
-          className="h-7 text-xs gap-1 bg-white/5 border-[#ccff00]/40 hover:bg-[#ccff00]/10 text-white"
+          className="h-7 text-xs gap-1"
         >
           {cta}
           <ExternalLink className="h-3 w-3" />
@@ -79,8 +79,8 @@ export function BrewwQuickWin() {
   )
 
   return (
-    <div className="bg-[#ccff00]/5 backdrop-blur-md border border-[#ccff00]/30 rounded-xl p-4 space-y-3">
-      <p className="text-[11px] font-semibold tracking-widest text-[#ccff00] uppercase">
+    <div className="rounded-[6px] border border-border bg-card p-4 space-y-3">
+      <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-forest">
         Breww · quick wins
       </p>
       <div className="space-y-2">

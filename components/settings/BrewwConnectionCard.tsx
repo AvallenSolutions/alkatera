@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useOrganization } from '@/lib/organizationContext'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,10 +23,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
+import { StateChip } from '@/components/studio/state-chip'
 import {
   Link2,
   Link2Off,
-  Loader2,
   CheckCircle2,
   AlertTriangle,
   RefreshCcw,
@@ -245,31 +244,22 @@ export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCa
 
   return (
     <>
-      <Card className={inError ? 'border-amber-500/40' : undefined}>
+      <Card className={inError ? 'border-studio-attention/40' : undefined}>
         <CardContent className="p-5 flex flex-col sm:flex-row items-start gap-4">
-          <div className="h-10 w-10 rounded-lg bg-[#ccff00]/15 flex items-center justify-center flex-shrink-0">
-            <Link2 className="h-5 w-5 text-[#8da300] dark:text-[#ccff00]" />
+          <div className="h-10 w-10 rounded-[6px] bg-secondary flex items-center justify-center flex-shrink-0">
+            <Link2 className="h-5 w-5 text-foreground" />
           </div>
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <p className="font-semibold text-sm">Breww</p>
-              <Badge
-                variant="outline"
-                className={
-                  isConnected
-                    ? 'border-emerald-500/40 text-emerald-700 dark:text-emerald-300 text-[10px]'
-                    : inError
-                      ? 'border-amber-500/40 text-amber-700 dark:text-amber-300 text-[10px]'
-                      : 'text-[10px]'
-                }
-              >
+              <StateChip tone={isConnected ? 'good' : inError ? 'attention' : 'quiet'}>
                 {isConnected ? 'Connected' : inError ? 'Error' : 'Available'}
-              </Badge>
-              <Badge variant="outline" className="text-[10px] gap-1">
+              </StateChip>
+              <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
                 <ShieldCheck className="h-2.5 w-2.5" />
                 OAuth
-              </Badge>
+              </span>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Syncs production volumes, batch ingredients and packaging types directly from your Breww account. Click connect, approve in Breww, and we&apos;ll keep your recipes and footprints up to date.
@@ -277,13 +267,13 @@ export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCa
             {isConnected && connection?.last_sync_at && (
               <div className="mt-2 flex items-center gap-3 flex-wrap">
                 <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
-                  <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                  <CheckCircle2 className="h-3 w-3 text-studio-good" />
                   Last synced {new Date(connection.last_sync_at).toLocaleString()}
                 </p>
                 <button
                   type="button"
                   onClick={() => router.push('/settings/integrations/breww')}
-                  className="text-[11px] text-[#8da300] dark:text-[#ccff00] flex items-center gap-1 hover:underline"
+                  className="text-[11px] text-foreground flex items-center gap-1 hover:underline"
                 >
                   View synced data
                   <ExternalLink className="h-2.5 w-2.5" />
@@ -292,7 +282,7 @@ export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCa
             )}
             {inError && connection?.sync_error && (
               <div className="mt-2">
-                <div className="text-[11px] text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
+                <div className="text-[11px] text-studio-attention flex items-center gap-1.5">
                   <AlertTriangle className="h-3 w-3 flex-shrink-0" />
                   <span>
                     {connection.sync_error.toLowerCase().includes('refresh') ||
@@ -344,7 +334,7 @@ export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCa
                   disabled={syncing}
                   className="gap-1.5"
                 >
-                  {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5" />}
+                  <RefreshCcw className="h-3.5 w-3.5" />
                   {syncing && syncPhase
                     ? `${syncPhase.label} (${syncPhase.index + 1}/${syncPhase.total})`
                     : 'Sync now'}
@@ -364,17 +354,13 @@ export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCa
                       onClick={handleRebuildPackaging}
                       disabled={rebuilding}
                     >
-                      {rebuilding ? (
-                        <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
-                      ) : (
-                        <RefreshCcw className="h-3.5 w-3.5 mr-2" />
-                      )}
+                      <RefreshCcw className="h-3.5 w-3.5 mr-2" />
                       Rebuild packaging
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onClick={() => setConfirmDisconnect(true)}
-                      className="text-red-600 focus:text-red-600"
+                      className="text-studio-stale focus:text-studio-stale"
                     >
                       <Link2Off className="h-3.5 w-3.5 mr-2" />
                       Disconnect
@@ -401,10 +387,9 @@ export function BrewwConnectionCard({ connection, onChanged }: BrewwConnectionCa
             <AlertDialogAction
               onClick={(e) => { e.preventDefault(); handleDisconnect() }}
               disabled={disconnecting}
-              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+              className="bg-studio-stale text-white hover:bg-studio-stale/90 focus:ring-studio-stale"
             >
-              {disconnecting && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
-              Disconnect
+              {disconnecting ? 'Disconnecting' : 'Disconnect'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

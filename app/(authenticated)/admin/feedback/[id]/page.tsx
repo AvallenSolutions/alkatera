@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { StateChip } from "@/components/studio/state-chip";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -23,7 +23,6 @@ import {
   MessageSquare,
   Clock,
   Send,
-  Loader2,
   CheckCircle,
   AlertCircle,
   Circle,
@@ -243,7 +242,7 @@ export default function AdminTicketDetailPage() {
     return (
       <div className="container mx-auto py-8 px-4">
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground">Loading.</p>
         </div>
       </div>
     );
@@ -252,7 +251,7 @@ export default function AdminTicketDetailPage() {
   if (!isAlkateraAdmin) {
     return (
       <div className="container mx-auto py-8 px-4">
-        <Card>
+        <Card className="rounded-[6px]">
           <CardContent className="py-12 text-center">
             <h3 className="text-lg font-medium mb-2">Access Denied</h3>
             <p className="text-muted-foreground">
@@ -267,7 +266,7 @@ export default function AdminTicketDetailPage() {
   if (!ticket) {
     return (
       <div className="container mx-auto py-8 px-4">
-        <Card>
+        <Card className="rounded-[6px]">
           <CardContent className="py-12 text-center">
             <h3 className="text-lg font-medium mb-2">Ticket not found</h3>
             <Link href="/admin/feedback">
@@ -298,7 +297,7 @@ export default function AdminTicketDetailPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Ticket Info */}
-          <Card className="lg:col-span-2">
+          <Card className="lg:col-span-2 rounded-[6px]">
             <CardHeader>
               <div className="flex items-start gap-4">
                 <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
@@ -307,7 +306,9 @@ export default function AdminTicketDetailPage() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
                     <CardTitle className="text-xl">{ticket.title}</CardTitle>
-                    <Badge variant="outline">{categoryLabels[ticket.category]}</Badge>
+                    <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                      {categoryLabels[ticket.category]}
+                    </span>
                   </div>
                   <p className="text-sm text-muted-foreground flex items-center gap-1">
                     <Clock className="h-3 w-3" />
@@ -367,7 +368,7 @@ export default function AdminTicketDetailPage() {
           {/* Sidebar */}
           <div className="space-y-4">
             {/* User Info */}
-            <Card>
+            <Card className="rounded-[6px]">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm">Submitted By</CardTitle>
               </CardHeader>
@@ -394,7 +395,7 @@ export default function AdminTicketDetailPage() {
             </Card>
 
             {/* Status & Priority */}
-            <Card>
+            <Card className="rounded-[6px]">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm">Ticket Management</CardTitle>
               </CardHeader>
@@ -412,25 +413,25 @@ export default function AdminTicketDetailPage() {
                     <SelectContent>
                       <SelectItem value="open">
                         <div className="flex items-center gap-2">
-                          <Circle className="h-3 w-3 text-blue-500" />
+                          <Circle className="h-3 w-3 text-studio-attention" />
                           Open
                         </div>
                       </SelectItem>
                       <SelectItem value="in_progress">
                         <div className="flex items-center gap-2">
-                          <AlertCircle className="h-3 w-3 text-amber-500" />
+                          <AlertCircle className="h-3 w-3 text-studio-hold" />
                           In Progress
                         </div>
                       </SelectItem>
                       <SelectItem value="resolved">
                         <div className="flex items-center gap-2">
-                          <CheckCircle className="h-3 w-3 text-green-500" />
+                          <CheckCircle className="h-3 w-3 text-studio-good" />
                           Resolved
                         </div>
                       </SelectItem>
                       <SelectItem value="closed">
                         <div className="flex items-center gap-2">
-                          <CheckCircle className="h-3 w-3 text-slate-500" />
+                          <CheckCircle className="h-3 w-3 text-muted-foreground" />
                           Closed
                         </div>
                       </SelectItem>
@@ -466,7 +467,7 @@ export default function AdminTicketDetailPage() {
         <h3 className="text-lg font-semibold">Conversation</h3>
 
         {messages.length === 0 ? (
-          <Card>
+          <Card className="rounded-[6px]">
             <CardContent className="py-8 text-center text-muted-foreground">
               <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
               <p>No messages yet. Send a reply below.</p>
@@ -486,7 +487,7 @@ export default function AdminTicketDetailPage() {
         )}
 
         {/* Reply Form */}
-        <Card>
+        <Card className="rounded-[6px]">
           <CardContent className="p-4">
             <form onSubmit={handleSendMessage} className="space-y-3">
               <Textarea
@@ -497,12 +498,8 @@ export default function AdminTicketDetailPage() {
               />
               <div className="flex justify-end">
                 <Button type="submit" disabled={isSending || !newMessage.trim()}>
-                  {isSending ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4 mr-2" />
-                  )}
-                  Send Reply
+                  <Send className="h-4 w-4 mr-2" />
+                  {isSending ? 'Sending...' : 'Send Reply'}
                 </Button>
               </div>
             </form>
@@ -546,9 +543,7 @@ function MessageBubble({
                 {isAdmin ? "You (Support)" : message.sender_name || "User"}
               </span>
               {!isAdmin && !message.is_read && (
-                <Badge variant="secondary" className="text-xs">
-                  New
-                </Badge>
+                <StateChip tone="attention">New</StateChip>
               )}
             </div>
             <p className="text-sm whitespace-pre-wrap">{message.message}</p>
@@ -581,9 +576,7 @@ function AttachmentPreview({ attachment }: { attachment: any }) {
 
   if (!url) {
     return (
-      <div className="w-20 h-20 rounded-lg bg-muted flex items-center justify-center">
-        <Loader2 className="h-4 w-4 animate-spin" />
-      </div>
+      <div className="w-20 h-20 rounded-[6px] border border-border bg-secondary" />
     );
   }
 

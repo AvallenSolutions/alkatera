@@ -287,8 +287,8 @@ export default function ArableFieldDetailPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-[#ccff00]/10 p-2.5">
-              <Wheat className="h-6 w-6 text-[#ccff00]" />
+            <div className="rounded-lg bg-secondary p-2.5">
+              <Wheat className="h-6 w-6 text-studio-forest" />
             </div>
             <div>
               <h1 className="text-3xl font-bold tracking-tight">{field.name}</h1>
@@ -321,7 +321,7 @@ export default function ArableFieldDetailPage() {
             )}
             <Button
               size="sm"
-              className="gap-1.5 bg-[#ccff00] text-black hover:bg-[#ccff00]/90"
+              className="gap-1.5 bg-primary text-primary-foreground"
               onClick={handleAddHarvest}
             >
               <Plus className="h-4 w-4" />
@@ -366,8 +366,8 @@ export default function ArableFieldDetailPage() {
         ) : (
           <Card className="border-2 border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <div className="h-14 w-14 rounded-full bg-[#ccff00]/20 flex items-center justify-center mb-4">
-                <Wheat className="h-7 w-7 text-[#ccff00]" />
+              <div className="h-14 w-14 rounded-full bg-secondary flex items-center justify-center mb-4">
+                <Wheat className="h-7 w-7 text-studio-forest" />
               </div>
               <h3 className="text-xl font-semibold mb-2">No Growing Data Yet</h3>
               <p className="text-muted-foreground text-center max-w-md mb-6">
@@ -376,7 +376,7 @@ export default function ArableFieldDetailPage() {
               <Button
                 onClick={handleAddHarvest}
                 size="lg"
-                className="gap-2 bg-[#ccff00] text-black hover:bg-[#ccff00]/90"
+                className="gap-2 bg-primary text-primary-foreground"
               >
                 <Plus className="h-5 w-5" />
                 Add harvest year

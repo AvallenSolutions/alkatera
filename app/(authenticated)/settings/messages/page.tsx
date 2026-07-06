@@ -3,18 +3,13 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  MessageSquare,
-  Plus,
-  Loader2,
   Clock,
   ChevronRight,
-  Users,
   Inbox,
 } from "lucide-react";
+import { Statement, BigNumber } from "@/components/studio";
 import { useOrganization } from "@/lib/organizationContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -91,26 +86,20 @@ export default function MessagesPage() {
   return (
     <div className="container mx-auto py-8 px-4 max-w-4xl">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Users className="h-6 w-6" />
-            Advisor Messages
-            {totalUnread > 0 && (
-              <Badge className="bg-red-500 text-white text-xs px-1.5 py-0">
-                {totalUnread} unread
-              </Badge>
-            )}
-          </h1>
-          <p className="text-muted-foreground">
-            Communicate with your sustainability advisors
-          </p>
-        </div>
+      <div className="mb-8 space-y-3">
+        <Statement eyebrow="THE POST · MESSAGES" headline="The messages.">
+          {totalUnread > 0 && (
+            <BigNumber value={totalUnread} label="UNREAD" size="display" tone="room" />
+          )}
+        </Statement>
+        <p className="text-sm text-studio-dim">
+          Communicate with your sustainability advisors
+        </p>
       </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">Loading</span>
         </div>
       ) : conversations.length === 0 ? (
         <Card>
@@ -124,7 +113,7 @@ export default function MessagesPage() {
               Invite an advisor from{" "}
               <Link
                 href="/settings/"
-                className="text-primary hover:underline"
+                className="text-studio-ochre-ink hover:underline"
               >
                 Settings → Team
               </Link>{" "}
@@ -167,34 +156,27 @@ function ConversationCard({
     <Link href={`/settings/messages/${conversation.id}`}>
       <Card
         className={cn(
-          "hover:bg-muted/50 transition-colors cursor-pointer",
-          conversation.unread_count > 0 && "ring-1 ring-lime-500/30 bg-lime-500/5"
+          "hover:bg-secondary transition-colors cursor-pointer",
+          conversation.unread_count > 0 && "border-studio-ochre-ink"
         )}
       >
         <CardContent className="p-4">
           <div className="flex items-start gap-4">
-            <div className="relative">
-              <Avatar className="h-10 w-10">
-                <AvatarImage src={conversation.advisor_avatar_url || undefined} />
-                <AvatarFallback>
-                  {conversation.advisor_name?.charAt(0) || "A"}
-                </AvatarFallback>
-              </Avatar>
-              {conversation.unread_count > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
-                  {conversation.unread_count}
-                </span>
-              )}
-            </div>
+            <Avatar className="h-10 w-10">
+              <AvatarImage src={conversation.advisor_avatar_url || undefined} />
+              <AvatarFallback>
+                {conversation.advisor_name?.charAt(0) || "A"}
+              </AvatarFallback>
+            </Avatar>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <h3 className="font-medium truncate">
                   {conversation.advisor_name}
                 </h3>
                 {conversation.unread_count > 0 && (
-                  <Badge className="bg-lime-500 text-black text-[10px] px-1.5 py-0">
-                    New
-                  </Badge>
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-ochre-ink">
+                    {conversation.unread_count} new
+                  </span>
                 )}
               </div>
               {conversation.subject && (

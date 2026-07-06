@@ -3,12 +3,12 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  Loader2,
   AlertTriangle,
   CheckCircle2,
   Combine,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { StateChip } from '@/components/studio/state-chip';
 
 interface DupeGroup {
   canonical_id: string;
@@ -77,10 +77,10 @@ export function BrandProductDedupControl({ brandId, productCount }: Props) {
     : 0;
 
   return (
-    <div className="rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-500/5 via-card/40 to-card/40 p-5 space-y-4">
+    <div className="rounded-[6px] border border-border bg-card p-5 space-y-4">
       <div>
         <div className="text-sm font-semibold flex items-center gap-2">
-          <Combine className="h-4 w-4 text-amber-300" />
+          <Combine className="h-4 w-4 text-muted-foreground" />
           Dedup products
         </div>
         <p className="text-xs text-muted-foreground mt-1">
@@ -94,12 +94,10 @@ export function BrandProductDedupControl({ brandId, productCount }: Props) {
       <Button
         onClick={run}
         disabled={busy}
-        className="bg-amber-300 hover:bg-amber-300/90 text-black font-semibold"
+        className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold"
       >
         {busy ? (
-          <>
-            <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Sweeping…
-          </>
+          'Sweeping…'
         ) : (
           <>
             <Combine className="h-4 w-4 mr-1.5" /> Dedup products
@@ -108,16 +106,16 @@ export function BrandProductDedupControl({ brandId, productCount }: Props) {
       </Button>
 
       {error && (
-        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs flex items-start gap-2">
-          <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+        <div className="rounded-[6px] border border-border bg-secondary px-3 py-2 text-xs flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 text-studio-stale shrink-0 mt-0.5" />
           <div>{error}</div>
         </div>
       )}
 
       {result && (
         <div className="space-y-3">
-          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-sm flex items-start gap-2">
-            <CheckCircle2 className="h-4 w-4 text-emerald-300 shrink-0 mt-0.5" />
+          <div className="rounded-[6px] border border-border bg-secondary px-4 py-3 text-sm flex items-start gap-2">
+            <CheckCircle2 className="h-4 w-4 text-studio-good shrink-0 mt-0.5" />
             <div className="space-y-0.5">
               <div className="font-semibold">
                 {autoMerged} duplicate{autoMerged === 1 ? '' : 's'} auto-merged
@@ -140,17 +138,15 @@ export function BrandProductDedupControl({ brandId, productCount }: Props) {
               {result.merged_groups.map((g, i) => (
                 <li
                   key={i}
-                  className="rounded-md border border-emerald-500/20 bg-emerald-500/5 px-3 py-1.5 flex flex-col gap-0.5"
+                  className="rounded-[6px] border border-border bg-secondary px-3 py-1.5 flex flex-col gap-0.5"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-emerald-300 text-[10px] uppercase tracking-wider font-semibold">
-                      merged
-                    </span>
+                    <StateChip tone="good">merged</StateChip>
                     <span className="text-[11px] text-muted-foreground">
                       {Math.round(g.confidence * 100)}% confidence
                     </span>
                     {g.errors.length > 0 && (
-                      <span className="text-[10px] text-amber-300">
+                      <span className="text-[10px] text-studio-attention">
                         {g.errors.length} failed
                       </span>
                     )}
@@ -166,12 +162,10 @@ export function BrandProductDedupControl({ brandId, productCount }: Props) {
               {result.review_groups.map((g, i) => (
                 <li
                   key={i}
-                  className="rounded-md border border-amber-300/30 bg-amber-300/5 px-3 py-1.5 flex flex-col gap-0.5"
+                  className="rounded-[6px] border border-border bg-secondary px-3 py-1.5 flex flex-col gap-0.5"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-amber-300 text-[10px] uppercase tracking-wider font-semibold">
-                      review
-                    </span>
+                    <StateChip tone="attention">review</StateChip>
                     <span className="text-[11px] text-muted-foreground">
                       {Math.round(g.confidence * 100)}% confidence ·{' '}
                       {g.duplicate_ids.length + 1} rows

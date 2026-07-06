@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Badge } from "@/components/ui/badge";
+import { StateChip } from "@/components/studio/state-chip";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -148,7 +148,7 @@ export function SuppliersTable({ suppliers, loading }: SuppliersTableProps) {
         </p>
         <Link
           href="/admin/suppliers"
-          className="text-sm text-[#ccff00] hover:underline flex items-center gap-1"
+          className="text-sm text-foreground hover:underline flex items-center gap-1"
         >
           Manage Suppliers
           <ExternalLink className="h-3 w-3" />
@@ -158,7 +158,7 @@ export function SuppliersTable({ suppliers, loading }: SuppliersTableProps) {
       {/* Search and filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search by name, sector, or country..."
             value={searchQuery}
@@ -194,7 +194,7 @@ export function SuppliersTable({ suppliers, loading }: SuppliersTableProps) {
         <TableBody>
           {filteredAndSorted.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-center text-gray-500 py-8">
+              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                 {searchQuery || filterVerified !== "all"
                   ? "No suppliers match your filters"
                   : "No suppliers registered yet"}
@@ -210,30 +210,27 @@ export function SuppliersTable({ suppliers, loading }: SuppliersTableProps) {
                 >
                   <TableCell className="w-8 pr-0">
                     {expandedSuppliers.has(supplier.id) ? (
-                      <ChevronDown className="h-4 w-4 text-gray-400" />
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
                     ) : (
-                      <ChevronRight className="h-4 w-4 text-gray-400" />
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     )}
                   </TableCell>
                   <TableCell className="font-medium">{supplier.name}</TableCell>
-                  <TableCell className="text-sm text-gray-500">
-                    {supplier.industry_sector || "—"}
+                  <TableCell className="text-sm text-muted-foreground">
+                    {supplier.industry_sector || "·"}
                   </TableCell>
-                  <TableCell className="text-sm text-gray-500">
-                    {supplier.country || "—"}
+                  <TableCell className="text-sm text-muted-foreground">
+                    {supplier.country || "·"}
                   </TableCell>
-                  <TableCell className="text-sm text-gray-500">
-                    {supplier.contact_email || "—"}
+                  <TableCell className="text-sm text-muted-foreground">
+                    {supplier.contact_email || "·"}
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      variant={supplier.is_verified ? "default" : "outline"}
-                      className={supplier.is_verified ? "bg-green-600" : ""}
-                    >
+                    <StateChip tone={supplier.is_verified ? "good" : "quiet"}>
                       {supplier.is_verified ? "Verified" : "Pending"}
-                    </Badge>
+                    </StateChip>
                   </TableCell>
-                  <TableCell className="text-right text-gray-500 text-sm">
+                  <TableCell className="text-right text-muted-foreground text-sm">
                     {formatDistanceToNow(new Date(supplier.created_at), { addSuffix: true })}
                   </TableCell>
                 </TableRow>
@@ -245,54 +242,54 @@ export function SuppliersTable({ suppliers, loading }: SuppliersTableProps) {
                       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 px-4">
                         {supplier.website && (
                           <div className="flex items-start gap-2">
-                            <Globe className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
+                            <Globe className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
                             <div>
                               <a
                                 href={supplier.website}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-sm font-medium text-blue-500 hover:underline"
+                                className="text-sm font-medium text-foreground hover:underline"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 {supplier.website.replace(/^https?:\/\//, "")}
                               </a>
-                              <p className="text-xs text-gray-500">Website</p>
+                              <p className="text-xs text-muted-foreground">Website</p>
                             </div>
                           </div>
                         )}
                         <div className="flex items-start gap-2">
-                          <User className="h-4 w-4 text-purple-500 mt-0.5 shrink-0" />
+                          <User className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
                           <div>
                             <p className="text-sm font-medium">
-                              {supplier.contact_name || "—"}
+                              {supplier.contact_name || "·"}
                             </p>
-                            <p className="text-xs text-gray-500">Contact Name</p>
+                            <p className="text-xs text-muted-foreground">Contact Name</p>
                           </div>
                         </div>
                         <div className="flex items-start gap-2">
-                          <Mail className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                          <Mail className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
                           <div>
                             <p className="text-sm font-medium">
-                              {supplier.contact_email || "—"}
+                              {supplier.contact_email || "·"}
                             </p>
-                            <p className="text-xs text-gray-500">Email</p>
+                            <p className="text-xs text-muted-foreground">Email</p>
                           </div>
                         </div>
                         <div className="flex items-start gap-2">
-                          <Calendar className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+                          <Calendar className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
                           <div>
                             <p className="text-sm font-medium">
                               {supplier.verification_date
-                                ? format(new Date(supplier.verification_date), "MMM d, yyyy")
+                                ? format(new Date(supplier.verification_date), "d MMM yyyy")
                                 : "Not yet verified"}
                             </p>
-                            <p className="text-xs text-gray-500">Verification Date</p>
+                            <p className="text-xs text-muted-foreground">Verification Date</p>
                           </div>
                         </div>
                         {supplier.description && (
                           <div className="col-span-full flex items-start gap-2">
                             <div>
-                              <p className="text-sm text-gray-400">{supplier.description}</p>
+                              <p className="text-sm text-muted-foreground">{supplier.description}</p>
                             </div>
                           </div>
                         )}

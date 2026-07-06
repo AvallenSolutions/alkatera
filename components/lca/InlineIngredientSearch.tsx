@@ -475,97 +475,99 @@ export function InlineIngredientSearch({
     const sourceType = result.source_type;
     const source = result.source || '';
 
+    const chipClass = 'inline-flex items-center font-mono text-[10px] font-bold uppercase tracking-[0.14em] shrink-0';
+
     switch (sourceType) {
       case 'primary':
         return (
-          <Badge className="bg-emerald-600 text-white text-xs shrink-0">
+          <span className={`${chipClass} text-[#047857]`}>
             <CheckCircle2 className="h-3 w-3 mr-1" />
             Primary
-          </Badge>
+          </span>
         );
       case 'global_library': {
         const grade = result.data_quality_grade || result.metadata?.data_quality_grade;
         if (grade === 'HIGH') {
           return (
-            <Badge className="bg-emerald-600 text-white text-xs shrink-0">
+            <span className={`${chipClass} text-[#047857]`}>
               <BookOpen className="h-3 w-3 mr-1" />
               Peer-Reviewed
-            </Badge>
+            </span>
           );
         }
         if (grade === 'MEDIUM') {
           return (
-            <Badge className="bg-amber-600 text-white text-xs shrink-0">
+            <span className={`${chipClass} text-[#B45309]`}>
               <FlaskConical className="h-3 w-3 mr-1" />
               Literature-Based
-            </Badge>
+            </span>
           );
         }
         return (
-          <Badge className="bg-slate-500 text-white text-xs shrink-0">
+          <span className={`${chipClass} text-muted-foreground`}>
             <Info className="h-3 w-3 mr-1" />
             Proxy Estimate
-          </Badge>
+          </span>
         );
       }
       case 'staging':
         return (
-          <Badge className="bg-blue-600 text-white text-xs shrink-0">
+          <span className={`${chipClass} text-[#2B46C0]`}>
             <Database className="h-3 w-3 mr-1" />
             Internal
-          </Badge>
+          </span>
         );
       case 'ecoinvent_proxy':
         return (
-          <Badge className="bg-purple-600 text-white text-xs shrink-0">
+          <span className={`${chipClass} text-muted-foreground`}>
             <Layers className="h-3 w-3 mr-1" />
             ecoInvent
-          </Badge>
+          </span>
         );
       case 'ecoinvent_live':
         return (
-          <Badge className="bg-green-600 text-white text-xs shrink-0">
+          <span className={`${chipClass} text-[#047857]`}>
             <Leaf className="h-3 w-3 mr-1" />
             ecoInvent Live
-          </Badge>
+          </span>
         );
       case 'agribalyse_live':
         return (
-          <Badge className="bg-teal-600 text-white text-xs shrink-0">
+          <span className={`${chipClass} text-[#047857]`}>
             <Sprout className="h-3 w-3 mr-1" />
             Agribalyse
-          </Badge>
+          </span>
         );
       case 'defra':
         return (
-          <Badge className="bg-orange-600 text-white text-xs shrink-0">
+          <span className={`${chipClass} text-[#2B46C0]`}>
             <Shield className="h-3 w-3 mr-1" />
             DEFRA
-          </Badge>
+          </span>
         );
       default:
         // Fallback based on source string
         if (source.toLowerCase().includes('primary') || source.toLowerCase().includes('verified')) {
           return (
-            <Badge className="bg-emerald-600 text-white text-xs shrink-0">
+            <span className={`${chipClass} text-[#047857]`}>
               <CheckCircle2 className="h-3 w-3 mr-1" />
               Primary
-            </Badge>
+            </span>
           );
         }
         if (source.toLowerCase().includes('ecoinvent')) {
           return (
-            <Badge className="bg-green-600 text-white text-xs shrink-0">
+            <span className={`${chipClass} text-[#047857]`}>
               <Leaf className="h-3 w-3 mr-1" />
               ecoInvent
-            </Badge>
+            </span>
           );
         }
         return (
-          <Badge variant="secondary" className="text-xs shrink-0">
+          <span className={`${chipClass} text-muted-foreground`}>
             <Database className="h-3 w-3 mr-1" />
             Secondary
-          </Badge>
+          </span>
         );
     }
   };
@@ -610,14 +612,14 @@ export function InlineIngredientSearch({
         />
         {isSearching && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            <Loader2 className="h-4 w-4 text-muted-foreground" />
           </div>
         )}
       </div>
 
       {isSearching && (
         <div className="mt-1.5 text-xs text-muted-foreground flex items-center gap-1.5 animate-in fade-in duration-300">
-          <Loader2 className="h-3 w-3 animate-spin shrink-0" />
+          <Loader2 className="h-3 w-3 shrink-0" />
           <span>
             {searchDuration < 3
               ? 'Searching suppliers and databases...'
@@ -629,19 +631,19 @@ export function InlineIngredientSearch({
       )}
 
       {brandMatch && !showResults && (
-        <div className="mt-1.5 rounded-md border border-[#ccff00]/30 bg-[#ccff00]/5 px-3 py-2 text-xs animate-in fade-in slide-in-from-top-1 duration-200">
+        <div className="mt-1.5 rounded-[6px] border border-border bg-card px-3 py-2 text-xs animate-in fade-in slide-in-from-top-1 duration-200">
           <div className="flex items-start gap-2">
-            <Lightbulb className="h-3.5 w-3.5 text-[#ccff00] mt-0.5 shrink-0" />
+            <Lightbulb className="h-3.5 w-3.5 text-[#2B46C0] mt-0.5 shrink-0" />
             <div className="flex-1">
               <p className="text-muted-foreground">
-                <span className="font-medium text-foreground">&quot;{query}&quot;</span> is a brand/variety name — {brandMatch.explanation.toLowerCase()}
+                <span className="font-medium text-foreground">&quot;{query}&quot;</span> is a brand/variety name: {brandMatch.explanation.toLowerCase()}
               </p>
               <div className="flex items-center gap-2 mt-1.5">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-6 px-2 text-[10px] border-[#ccff00]/40 hover:bg-[#ccff00]/10"
+                  className="h-6 px-2 text-[10px] border-border hover:bg-secondary"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -671,7 +673,7 @@ export function InlineIngredientSearch({
       )}
 
       {error && (
-        <div className="mt-2 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+        <div className="mt-2 text-xs text-[#B45309] flex items-center gap-1">
           <AlertCircle className="h-3 w-3" />
           {error}
         </div>
@@ -688,29 +690,29 @@ export function InlineIngredientSearch({
               </span>
               <div className="flex flex-wrap gap-1">
                 {(sourceCounts?.primary ?? 0) > 0 && (
-                  <Badge variant="outline" className="text-xs bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-[#047857]">
                     {sourceCounts!.primary} Primary
-                  </Badge>
+                  </span>
                 )}
                 {(sourceCounts?.ecoinvent_live ?? 0) > 0 && (
-                  <Badge variant="outline" className="text-xs bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300">
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-[#047857]">
                     {sourceCounts!.ecoinvent_live} ecoInvent
-                  </Badge>
+                  </span>
                 )}
                 {(sourceCounts?.agribalyse_live ?? 0) > 0 && (
-                  <Badge variant="outline" className="text-xs bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-300">
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-[#047857]">
                     {sourceCounts!.agribalyse_live} Agribalyse
-                  </Badge>
+                  </span>
                 )}
                 {(sourceCounts?.global_library ?? 0) > 0 && (
-                  <Badge variant="outline" className="text-xs bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300">
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-[#B45309]">
                     {sourceCounts!.global_library} Library
-                  </Badge>
+                  </span>
                 )}
                 {(sourceCounts?.staging ?? 0) > 0 && (
-                  <Badge variant="outline" className="text-xs">
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                     {sourceCounts!.staging} Internal
-                  </Badge>
+                  </span>
                 )}
               </div>
             </div>
@@ -787,13 +789,13 @@ export function InlineIngredientSearch({
                       )}
                       {(result.recycled_content_pct || result.metadata?.recycled_content_pct) &&
                        (result.recycled_content_pct || result.metadata?.recycled_content_pct) > 0 && (
-                        <Badge className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 text-xs">
+                        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-[#047857]">
                           {result.recycled_content_pct || result.metadata?.recycled_content_pct}% recycled
-                        </Badge>
+                        </span>
                       )}
                     </div>
                     {result.commodity_type && result.commodity_type !== 'none' && !result.deforestation_commitment_verified && (
-                      <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5 flex items-center gap-1">
+                      <p className="text-[11px] text-[#B45309] mt-0.5 flex items-center gap-1">
                         <AlertTriangle className="h-3 w-3 shrink-0" />
                         No deforestation commitment on record for this {result.commodity_type.replace('_', ' ')} ingredient
                       </p>
@@ -827,13 +829,13 @@ export function InlineIngredientSearch({
                       return (
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-[10px] text-muted-foreground/60">
                           {water != null && water > 0 && (
-                            <span className="inline-flex items-center gap-0.5 text-blue-500 dark:text-blue-400">
+                            <span className="inline-flex items-center gap-0.5 text-[#2B46C0]">
                               <Droplets className="h-2.5 w-2.5" />
                               {water.toFixed(1)}
                             </span>
                           )}
                           {landVal != null && landVal > 0 && (
-                            <span className="inline-flex items-center gap-0.5 text-green-600 dark:text-green-400">
+                            <span className="inline-flex items-center gap-0.5 text-[#047857]">
                               <TreePine className="h-2.5 w-2.5" />
                               {landVal.toFixed(1)}
                             </span>
@@ -841,9 +843,9 @@ export function InlineIngredientSearch({
                           {showGrade && (
                             <span className="inline-flex items-center gap-1">
                               <span className={`h-1.5 w-1.5 rounded-full ${
-                                grade === 'HIGH' ? 'bg-emerald-500' :
-                                grade === 'MEDIUM' ? 'bg-amber-500' :
-                                'bg-red-500'
+                                grade === 'HIGH' ? 'bg-[#047857]' :
+                                grade === 'MEDIUM' ? 'bg-[#B45309]' :
+                                'bg-[#BE123C]'
                               }`} />
                               {grade === 'HIGH' ? 'High' : grade === 'MEDIUM' ? 'Med' : 'Low'}
                             </span>
@@ -907,7 +909,7 @@ export function InlineIngredientSearch({
             {/* Live reference databases unreachable: explain the degraded state
                 so users don't read an outage as "this ingredient doesn't exist". */}
             {liveDbDegraded && (
-              <div className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
+              <div className="mt-3 rounded-[6px] border border-border bg-card px-3 py-2 text-xs text-[#B45309]">
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                   <div>
@@ -927,9 +929,9 @@ export function InlineIngredientSearch({
               const zeroResultBrand = findBrandNameMatch(query);
               if (zeroResultBrand) {
                 return (
-                  <div className="mt-3 rounded-md border border-[#ccff00]/30 bg-[#ccff00]/5 px-3 py-2 text-xs">
+                  <div className="mt-3 rounded-[6px] border border-border bg-card px-3 py-2 text-xs">
                     <div className="flex items-start gap-2">
-                      <Lightbulb className="h-3.5 w-3.5 text-[#ccff00] mt-0.5 shrink-0" />
+                      <Lightbulb className="h-3.5 w-3.5 text-[#2B46C0] mt-0.5 shrink-0" />
                       <div>
                         <p>
                           Did you mean <span className="font-medium text-foreground">&quot;{zeroResultBrand.genericTerm}&quot;</span>?
@@ -939,7 +941,7 @@ export function InlineIngredientSearch({
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="h-6 px-2 text-[10px] mt-1.5 border-[#ccff00]/40 hover:bg-[#ccff00]/10"
+                          className="h-6 px-2 text-[10px] mt-1.5 border-border hover:bg-secondary"
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -982,25 +984,25 @@ export function InlineIngredientSearch({
 // ── Carbon Intensity Labels ───────────────────────────────────────────
 
 function getIntensityLabel(co2Factor: number): { label: string; className: string } {
-  if (co2Factor < 0.5) return { label: 'Low impact', className: 'text-green-600 dark:text-green-400' };
-  if (co2Factor <= 2.0) return { label: 'Moderate impact', className: 'text-amber-600 dark:text-amber-400' };
-  if (co2Factor <= 5.0) return { label: 'High impact', className: 'text-orange-600 dark:text-orange-400' };
-  return { label: 'Very high — verify match', className: 'text-red-600 dark:text-red-400' };
+  if (co2Factor < 0.5) return { label: 'Low impact', className: 'text-[#047857]' };
+  if (co2Factor <= 2.0) return { label: 'Moderate impact', className: 'text-[#B45309]' };
+  if (co2Factor <= 5.0) return { label: 'High impact', className: 'text-[#B45309]' };
+  return { label: 'Very high, verify match', className: 'text-[#BE123C]' };
 }
 
 function getIntensityDot(co2Factor: number): string {
-  if (co2Factor < 0.5) return 'bg-green-500';
-  if (co2Factor <= 2.0) return 'bg-amber-500';
-  if (co2Factor <= 5.0) return 'bg-orange-500';
-  return 'bg-red-500';
+  if (co2Factor < 0.5) return 'bg-[#047857]';
+  if (co2Factor <= 2.0) return 'bg-[#B45309]';
+  if (co2Factor <= 5.0) return 'bg-[#B45309]';
+  return 'bg-[#BE123C]';
 }
 
 // ── AI Proxy Suggestion Panel ─────────────────────────────────────────
 
 function confidenceBadgeColor(note: 'high' | 'medium' | 'low'): string {
-  if (note === 'high') return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-  if (note === 'medium') return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200';
-  return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+  if (note === 'high') return 'text-[#047857]';
+  if (note === 'medium') return 'text-[#B45309]';
+  return 'text-[#BE123C]';
 }
 
 function ProxySuggestionPanel({
@@ -1049,7 +1051,7 @@ function ProxySuggestionPanel({
       >
         {loadingProxy ? (
           <>
-            <Loader2 className="h-3 w-3 animate-spin" />
+            <Loader2 className="h-3 w-3" />
             Finding proxy suggestions...
           </>
         ) : (
@@ -1061,14 +1063,14 @@ function ProxySuggestionPanel({
       </Button>
 
       {proxyAllFailed && proxySuggestions.length === 0 && (
-        <div className="mt-1.5 rounded-md border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950 px-2.5 py-2 text-xs">
+        <div className="mt-1.5 rounded-[6px] border border-border bg-card px-2.5 py-2 text-xs">
           <div className="flex items-start gap-1.5">
-            <AlertCircle className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
+            <AlertCircle className="h-3.5 w-3.5 text-[#B45309] mt-0.5 shrink-0" />
             <div>
-              <p className="font-medium text-amber-800 dark:text-amber-200">
+              <p className="font-medium text-foreground">
                 No matching materials found
               </p>
-              <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">
+              <p className="text-[10px] text-muted-foreground mt-0.5">
                 AI suggestions could not be matched to entries in our emission factor databases. Try searching with different terms or a broader category name.
               </p>
             </div>
@@ -1088,11 +1090,11 @@ function ProxySuggestionPanel({
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="font-medium truncate">{suggestion.proxy_name}</span>
-                <Badge
-                  className={`text-[9px] px-1.5 py-0 flex-shrink-0 ${confidenceBadgeColor(suggestion.confidence_note)}`}
+                <span
+                  className={`font-mono text-[9px] font-bold uppercase tracking-[0.14em] flex-shrink-0 ${confidenceBadgeColor(suggestion.confidence_note)}`}
                 >
                   {suggestion.confidence_note}
-                </Badge>
+                </span>
               </div>
               <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">
                 {suggestion.reasoning}
@@ -1115,7 +1117,7 @@ function ProxySuggestionPanel({
               >
                 {proxySearching === suggestion.search_query ? (
                   <>
-                    <Loader2 className="h-2.5 w-2.5 animate-spin mr-1" />
+                    <Loader2 className="h-2.5 w-2.5 mr-1" />
                     Searching...
                   </>
                 ) : (

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -20,15 +19,14 @@ import {
   Edit2,
   Trash2,
   Eye,
-  Calendar,
-  Tag as TagIcon,
-  TrendingUp,
   AlertTriangle,
-  CheckCircle2,
   ArrowUp,
   ArrowDown,
   GripVertical,
 } from "lucide-react";
+import { Eyebrow } from "@/components/studio/eyebrow";
+import { BigNumber } from "@/components/studio/big-number";
+import { StateChip } from "@/components/studio/state-chip";
 import { useIsAlkateraAdmin } from "@/hooks/usePermissions";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
@@ -229,23 +227,26 @@ export default function BlogDashboard() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'published':
-        return <Badge variant="default" className="bg-green-500"><CheckCircle2 className="w-3 h-3 mr-1" />Published</Badge>;
+        return <StateChip tone="good">Published</StateChip>;
       case 'draft':
-        return <Badge variant="secondary"><Edit2 className="w-3 h-3 mr-1" />Draft</Badge>;
+        return <StateChip tone="attention">Draft</StateChip>;
       case 'archived':
-        return <Badge variant="outline">Archived</Badge>;
+        return <StateChip>Archived</StateChip>;
       default:
-        return <Badge>{status}</Badge>;
+        return <StateChip>{status}</StateChip>;
     }
   };
 
   return (
     <div className="p-8 space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Blog Management</h1>
-          <p className="text-muted-foreground">Manage blog posts for the alkatera Knowledge Hub</p>
+          <Eyebrow className="mb-3">THE WIRING · BLOG</Eyebrow>
+          <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+            The blog.
+          </h1>
+          <p className="text-muted-foreground mt-2 text-sm">Manage blog posts for the alkatera Knowledge Hub</p>
         </div>
         <Button asChild>
           <Link href="/admin/blog/new">
@@ -253,49 +254,16 @@ export default function BlogDashboard() {
             New Post
           </Link>
         </Button>
-      </div>
+      </header>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Posts</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Published</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.published}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Drafts</CardTitle>
-            <Edit2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.drafts}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Views</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total_views.toLocaleString()}</div>
-          </CardContent>
-        </Card>
+      {/* Stats */}
+      <div className="rounded-[6px] border border-border bg-card p-6">
+        <div className="flex flex-wrap gap-x-12 gap-y-6">
+          <BigNumber value={stats.total} label="TOTAL POSTS" />
+          <BigNumber value={stats.published} label="PUBLISHED" tone="good" />
+          <BigNumber value={stats.drafts} label="DRAFTS" />
+          <BigNumber value={stats.total_views.toLocaleString()} label="TOTAL VIEWS" />
+        </div>
       </div>
 
       {/* Error Alert */}
@@ -307,7 +275,7 @@ export default function BlogDashboard() {
       )}
 
       {/* Posts Table */}
-      <Card>
+      <Card className="rounded-[6px]">
         <CardHeader>
           <CardTitle>All Posts</CardTitle>
           <CardDescription>Manage and edit your blog posts</CardDescription>
@@ -386,16 +354,16 @@ export default function BlogDashboard() {
                     <TableCell>{getStatusBadge(post.status)}</TableCell>
                     <TableCell className="capitalize">{post.content_type}</TableCell>
                     <TableCell>
-                      <div className="flex flex-wrap gap-1">
+                      <div className="flex flex-wrap gap-x-2 gap-y-1">
                         {post.tags.slice(0, 2).map((tag, i) => (
-                          <Badge key={i} variant="outline" className="text-xs">
+                          <span key={i} className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
                             {tag}
-                          </Badge>
+                          </span>
                         ))}
                         {post.tags.length > 2 && (
-                          <Badge variant="outline" className="text-xs">
+                          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
                             +{post.tags.length - 2}
-                          </Badge>
+                          </span>
                         )}
                       </div>
                     </TableCell>

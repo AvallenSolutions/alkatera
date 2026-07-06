@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useOnboarding } from '@/lib/onboarding'
 import type { PrimaryGoal } from '@/lib/onboarding'
 import { Button } from '@/components/ui/button'
-import { ArrowRight, Target, Loader2 } from 'lucide-react'
+import { ArrowRight, Target } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Eyebrow } from '@/components/studio'
 
 const REDUCTION_OPTIONS = [10, 20, 25, 30, 50] as const
 const YEAR_OPTIONS = [2027, 2030, 2035, 2040] as const
@@ -62,11 +63,11 @@ export function FastTrackTargetStep() {
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 animate-in fade-in duration-300">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-2">
-          <div className="mx-auto h-12 w-12 rounded-xl bg-[#ccff00]/15 flex items-center justify-center">
-            <Target className="w-6 h-6 text-[#ccff00]" />
+          <div className="mx-auto h-12 w-12 rounded-[6px] bg-card border border-border flex items-center justify-center">
+            <Target className="w-6 h-6 text-studio-forest" />
           </div>
-          <h3 className="text-2xl font-serif font-bold text-white">Set your first target</h3>
-          <p className="text-sm text-white/50">
+          <h3 className="text-2xl font-display font-bold tracking-tight text-foreground">Set your first target.</h3>
+          <p className="text-sm text-muted-foreground">
             {baseline
               ? `Your baseline is ~${baseline.toLocaleString()} tonnes CO₂e/year. Rosa will track progress against this.`
               : 'Rosa will track your reduction journey against this target.'}
@@ -75,20 +76,20 @@ export function FastTrackTargetStep() {
 
         {/* Reduction % buttons */}
         <div className="space-y-2">
-          <p className="text-xs font-medium text-white/60 uppercase tracking-wide">Reduce by</p>
+          <Eyebrow tone="dim">Reduce by</Eyebrow>
           <div className="grid grid-cols-5 gap-2">
             {REDUCTION_OPTIONS.map((option) => (
               <button
                 key={option}
                 onClick={() => setPct(option)}
                 className={cn(
-                  'rounded-xl border py-3 text-center transition-all',
+                  'rounded-[6px] border py-3 text-center transition-colors',
                   pct === option
-                    ? 'bg-[#ccff00]/15 border-[#ccff00]/50 text-[#ccff00]'
-                    : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:border-white/20',
+                    ? 'bg-secondary border-studio-forest text-studio-forest'
+                    : 'bg-card border-border text-muted-foreground hover:bg-secondary hover:border-studio-ink/25',
                 )}
               >
-                <span className="text-sm font-semibold">{option}%</span>
+                <span className="text-sm font-semibold tabular-nums">{option}%</span>
               </button>
             ))}
           </div>
@@ -96,20 +97,20 @@ export function FastTrackTargetStep() {
 
         {/* Year buttons */}
         <div className="space-y-2">
-          <p className="text-xs font-medium text-white/60 uppercase tracking-wide">By</p>
+          <Eyebrow tone="dim">By</Eyebrow>
           <div className="grid grid-cols-4 gap-2">
             {YEAR_OPTIONS.map((option) => (
               <button
                 key={option}
                 onClick={() => setYear(option)}
                 className={cn(
-                  'rounded-xl border py-3 text-center transition-all',
+                  'rounded-[6px] border py-3 text-center transition-colors',
                   year === option
-                    ? 'bg-[#ccff00]/15 border-[#ccff00]/50 text-[#ccff00]'
-                    : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:border-white/20',
+                    ? 'bg-secondary border-studio-forest text-studio-forest'
+                    : 'bg-card border-border text-muted-foreground hover:bg-secondary hover:border-studio-ink/25',
                 )}
               >
-                <span className="text-sm font-semibold">{option}</span>
+                <span className="text-sm font-semibold tabular-nums">{option}</span>
               </button>
             ))}
           </div>
@@ -117,15 +118,15 @@ export function FastTrackTargetStep() {
 
         {/* Live preview of what the target means */}
         {targetTonnes !== null && reductionTonnes !== null && (
-          <div className="rounded-2xl border border-[#ccff00]/30 bg-[#ccff00]/10 p-4 space-y-2">
-            <p className="text-xs uppercase tracking-wide text-[#ccff00]/70">Your target</p>
-            <p className="text-base text-white">
-              Cut <span className="font-semibold text-[#ccff00]">{reductionTonnes.toLocaleString()} t CO&#8322;e</span>{' '}
-              to reach <span className="font-semibold text-[#ccff00]">{targetTonnes.toLocaleString()} t CO&#8322;e</span>{' '}
+          <div className="rounded-[6px] border border-border bg-card p-4 space-y-2">
+            <Eyebrow tone="inherit" className="text-studio-forest">Your target</Eyebrow>
+            <p className="text-base text-foreground">
+              Cut <span className="font-semibold text-studio-forest tabular-nums">{reductionTonnes.toLocaleString()} t CO&#8322;e</span>{' '}
+              to reach <span className="font-semibold text-studio-forest tabular-nums">{targetTonnes.toLocaleString()} t CO&#8322;e</span>{' '}
               by {year}.
             </p>
             {perYearTonnes !== null && yearsToGo > 0 && (
-              <p className="text-xs text-white/50">
+              <p className="text-xs text-muted-foreground">
                 ~{perYearTonnes.toLocaleString()} t CO&#8322;e per year, over {yearsToGo} year{yearsToGo === 1 ? '' : 's'}.
               </p>
             )}
@@ -135,17 +136,17 @@ export function FastTrackTargetStep() {
         <div className="flex flex-col sm:flex-row gap-2 pt-2">
           <button
             onClick={skipStep}
-            className="flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border border-white/10 bg-white/3 hover:bg-white/5 transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 p-3 rounded-full border border-border bg-transparent hover:bg-secondary transition-colors"
           >
-            <span className="text-sm text-white/60">Skip for now</span>
+            <span className="text-sm text-muted-foreground">Skip for now</span>
           </button>
           <Button
             onClick={handleContinue}
             disabled={isSaving}
-            className="flex-1 bg-[#ccff00] text-black hover:bg-[#ccff00]/90 font-medium rounded-xl"
+            className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full"
           >
             {isSaving ? (
-              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</>
+              <>Saving...</>
             ) : (
               <>Lock in target <ArrowRight className="w-4 h-4 ml-2" /></>
             )}

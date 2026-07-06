@@ -8,6 +8,8 @@ import { toast } from 'sonner';
 import { useOrganization } from '@/lib/organizationContext';
 import { PageLoader } from '@/components/ui/page-loader';
 import { FeatureGate } from '@/components/subscription/FeatureGate';
+import { Eyebrow } from '@/components/studio/eyebrow';
+import { BigNumber } from '@/components/studio/big-number';
 import { VineyardCard } from '@/components/vineyards/VineyardCard';
 import { AddVineyardDialog } from '@/components/vineyards/AddVineyardDialog';
 import { VineyardGrowingQuestionnaire } from '@/components/vineyards/VineyardGrowingQuestionnaire';
@@ -156,47 +158,51 @@ export default function VineyardsPage() {
   return (
     <FeatureGate feature="viticulture_beta">
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Vineyards</h1>
-            <p className="text-muted-foreground mt-2">
+        <header className="flex flex-wrap items-end justify-between gap-x-12 gap-y-6">
+          <div className="min-w-0">
+            <Eyebrow className="mb-3">THE MEASURES · VINEYARDS</Eyebrow>
+            <h1 className="font-display text-4xl font-bold leading-[0.95] tracking-[-0.035em] text-foreground">
+              The vineyards.
+            </h1>
+            <p className="mt-3 max-w-xl text-sm text-muted-foreground">
               Manage your vineyards and growing operations. Link vineyards to
               products to calculate the environmental impact of self-grown grapes.
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="lg"
-              className="gap-2"
-              onClick={() => {
-                import('@/lib/bulk-import/viticulture-template-generator').then(
-                  ({ downloadViticultureTemplateAsXLSX }) => downloadViticultureTemplateAsXLSX()
-                );
-              }}
-            >
-              <Download className="h-5 w-5" />
-              Download Template
-            </Button>
-            <Button
-              onClick={() => {
-                setEditVineyard(null);
-                setDialogOpen(true);
-              }}
-              size="lg"
-              className="gap-2 bg-[#ccff00] text-black hover:bg-[#ccff00]/90"
-            >
-              <Plus className="h-5 w-5" />
-              Add Vineyard
-            </Button>
+          <div className="flex shrink-0 items-end gap-8 pb-1">
+            <BigNumber size="display" value={vineyards.length} label="Vineyards" />
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={() => {
+                  import('@/lib/bulk-import/viticulture-template-generator').then(
+                    ({ downloadViticultureTemplateAsXLSX }) => downloadViticultureTemplateAsXLSX()
+                  );
+                }}
+              >
+                <Download className="h-4 w-4" />
+                Download Template
+              </Button>
+              <Button
+                onClick={() => {
+                  setEditVineyard(null);
+                  setDialogOpen(true);
+                }}
+                className="gap-2 bg-primary text-primary-foreground"
+              >
+                <Plus className="h-4 w-4" />
+                Add Vineyard
+              </Button>
+            </div>
           </div>
-        </div>
+        </header>
 
         {vineyards.length === 0 ? (
           <Card className="border-2 border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <div className="h-14 w-14 rounded-full bg-[#ccff00]/20 flex items-center justify-center mb-4">
-                <Leaf className="h-7 w-7 text-[#ccff00]" />
+              <div className="h-14 w-14 rounded-full bg-secondary flex items-center justify-center mb-4">
+                <Leaf className="h-7 w-7 text-studio-forest" />
               </div>
               <h3 className="text-xl font-semibold mb-2">Add Your First Vineyard</h3>
               <p className="text-muted-foreground text-center max-w-md mb-6">
@@ -210,7 +216,7 @@ export default function VineyardsPage() {
                   setDialogOpen(true);
                 }}
                 size="lg"
-                className="gap-2 bg-[#ccff00] text-black hover:bg-[#ccff00]/90"
+                className="gap-2 bg-primary text-primary-foreground"
               >
                 <Plus className="h-5 w-5" />
                 Add Vineyard

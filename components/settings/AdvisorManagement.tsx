@@ -36,15 +36,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
+import { StateChip } from '@/components/studio/state-chip';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Briefcase,
-  Loader2,
   UserPlus,
   Trash2,
-  AlertCircle,
-  Clock,
-  CheckCircle2,
   XCircle,
   Mail,
 } from 'lucide-react';
@@ -268,13 +265,9 @@ export function AdvisorManagement() {
 
   const accessBadge = (level: AdvisorAccessLevel) =>
     level === 'read_only' ? (
-      <Badge variant="outline" className="text-sky-600 border-sky-600">
-        Read only
-      </Badge>
+      <StateChip tone="quiet">Read only</StateChip>
     ) : (
-      <Badge variant="outline" className="text-emerald-600 border-emerald-600">
-        Read &amp; write
-      </Badge>
+      <StateChip tone="good">Read &amp; write</StateChip>
     );
 
   const handleCancelInvitation = async (invitationId: string) => {
@@ -305,28 +298,13 @@ export function AdvisorManagement() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
-        return (
-          <Badge variant="outline" className="text-yellow-600 border-yellow-600">
-            <Clock className="mr-1 h-3 w-3" />
-            Pending
-          </Badge>
-        );
+        return <StateChip tone="attention">Pending</StateChip>;
       case 'accepted':
-        return (
-          <Badge variant="outline" className="text-green-600 border-green-600">
-            <CheckCircle2 className="mr-1 h-3 w-3" />
-            Accepted
-          </Badge>
-        );
+        return <StateChip tone="good">Accepted</StateChip>;
       case 'expired':
-        return (
-          <Badge variant="outline" className="text-slate-500 border-slate-500">
-            <XCircle className="mr-1 h-3 w-3" />
-            Expired
-          </Badge>
-        );
+        return <StateChip tone="stale">Expired</StateChip>;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <StateChip tone="quiet">{status}</StateChip>;
     }
   };
 
@@ -337,7 +315,9 @@ export function AdvisorManagement() {
   if (!currentOrganization) {
     return (
       <div className="flex items-center justify-center h-48">
-        <Loader2 className="h-8 w-8 animate-spin text-slate-500" />
+        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
+          Loading
+        </span>
       </div>
     );
   }
@@ -423,9 +403,9 @@ export function AdvisorManagement() {
                           onClick={() => setAccessLevel(opt.value)}
                           disabled={isInviting}
                           aria-pressed={accessLevel === opt.value}
-                          className={`rounded-lg border p-3 text-left transition-colors disabled:opacity-50 ${
+                          className={`rounded-[6px] border p-3 text-left transition-colors disabled:opacity-50 ${
                             accessLevel === opt.value
-                              ? 'border-primary ring-1 ring-primary bg-primary/5'
+                              ? 'border-primary ring-1 ring-primary bg-secondary'
                               : 'border-input hover:border-primary/50'
                           }`}
                         >
@@ -452,10 +432,7 @@ export function AdvisorManagement() {
                   </Button>
                   <Button type="submit" disabled={isInviting}>
                     {isInviting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Sending...
-                      </>
+                      'Sending...'
                     ) : (
                       <>
                         <Mail className="mr-2 h-4 w-4" />
@@ -472,13 +449,15 @@ export function AdvisorManagement() {
       <CardContent>
         {isLoading ? (
           <div className="flex items-center justify-center h-48">
-            <Loader2 className="h-8 w-8 animate-spin text-slate-500" />
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
+              Loading
+            </span>
           </div>
         ) : activeAdvisors.length === 0 && pendingInvitations.length === 0 ? (
           <div className="text-center py-12">
-            <Briefcase className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-            <p className="text-slate-500 text-lg mb-2">No advisors yet</p>
-            <p className="text-slate-400 text-sm">
+            <Briefcase className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-foreground text-lg mb-2">No advisors yet.</p>
+            <p className="text-muted-foreground text-sm">
               Invite a sustainability advisor to help with your carbon accounting and reporting.
             </p>
           </div>
@@ -500,11 +479,11 @@ export function AdvisorManagement() {
 
             <TabsContent value="active" className="mt-4">
               {activeAdvisors.length === 0 ? (
-                <div className="text-center py-8 text-slate-500">
+                <div className="text-center py-8 text-muted-foreground">
                   No active advisors
                 </div>
               ) : (
-                <div className="rounded-lg border">
+                <div className="rounded-[6px] border border-border">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -574,7 +553,7 @@ export function AdvisorManagement() {
                                 size="sm"
                                 onClick={() => setAdvisorToRevoke(advisor)}
                               >
-                                <Trash2 className="h-4 w-4 text-red-500" />
+                                <Trash2 className="h-4 w-4 text-studio-stale" />
                               </Button>
                             </TableCell>
                           )}
@@ -588,11 +567,11 @@ export function AdvisorManagement() {
 
             <TabsContent value="pending" className="mt-4">
               {pendingInvitations.length === 0 ? (
-                <div className="text-center py-8 text-slate-500">
+                <div className="text-center py-8 text-muted-foreground">
                   No pending invitations
                 </div>
               ) : (
-                <div className="rounded-lg border">
+                <div className="rounded-[6px] border border-border">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -625,7 +604,7 @@ export function AdvisorManagement() {
                                 size="sm"
                                 onClick={() => handleCancelInvitation(invitation.id)}
                               >
-                                <XCircle className="h-4 w-4 text-red-500" />
+                                <XCircle className="h-4 w-4 text-studio-stale" />
                               </Button>
                             </TableCell>
                           )}
@@ -639,7 +618,7 @@ export function AdvisorManagement() {
 
             {revokedAdvisors.length > 0 && (
               <TabsContent value="revoked" className="mt-4">
-                <div className="rounded-lg border">
+                <div className="rounded-[6px] border border-border">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -684,16 +663,9 @@ export function AdvisorManagement() {
             <AlertDialogAction
               onClick={handleRevokeAccess}
               disabled={isRevoking}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-studio-stale text-white hover:bg-studio-stale/90"
             >
-              {isRevoking ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Revoking...
-                </>
-              ) : (
-                'Revoke Access'
-              )}
+              {isRevoking ? 'Revoking...' : 'Revoke Access'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

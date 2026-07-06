@@ -20,8 +20,8 @@ import type { VintageImpactSummary } from '@/lib/types/viticulture';
 
 // Colour palette
 const COLOURS = {
-  primary: '#ccff00',
-  green: '#22c55e',
+  primary: '#2B46C0',
+  green: '#205E40',
   blue: '#3b82f6',
   amber: '#f59e0b',
   red: '#ef4444',
@@ -347,7 +347,7 @@ export function VineyardTrendCharts({ vintageImpacts }: VineyardTrendChartsProps
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-sm">
-            <Droplets className="h-4 w-4 text-purple-500" />
+            <Droplets className="h-4 w-4 text-studio-dim" />
             Freshwater Eutrophication (per ha)
           </CardTitle>
         </CardHeader>

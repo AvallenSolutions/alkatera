@@ -25,7 +25,6 @@ import { SupplierProductEvidenceTab } from '@/components/suppliers/SupplierProdu
 import {
   ArrowLeft,
   Save,
-  Loader2,
   CheckCircle2,
   Package,
   Cloud,
@@ -524,7 +523,7 @@ export default function SupplierProductDetailPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6 animate-pulse">
+      <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="h-9 w-24 bg-muted rounded" />
@@ -534,7 +533,7 @@ export default function SupplierProductDetailPage() {
           <div className="h-10 w-36 bg-muted rounded" />
         </div>
         <div className="h-10 w-full bg-muted rounded" />
-        <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+        <div className="rounded-[6px] border border-border bg-card p-6 space-y-4">
           <div className="h-4 w-32 bg-muted rounded" />
           <div className="flex items-start gap-6">
             <div className="w-32 h-32 bg-muted rounded-lg" />
@@ -544,7 +543,7 @@ export default function SupplierProductDetailPage() {
             </div>
           </div>
         </div>
-        <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+        <div className="rounded-[6px] border border-border bg-card p-6 space-y-4">
           <div className="h-4 w-32 bg-muted rounded" />
           <div className="grid grid-cols-2 gap-4">
             <div className="h-10 bg-muted rounded" />
@@ -566,24 +565,24 @@ export default function SupplierProductDetailPage() {
             Products
           </Button>
           <div className="h-6 w-px bg-border" />
-          <h1 className="text-xl font-serif text-foreground">{name || 'Product Details'}</h1>
+          <h1 className="font-display text-xl font-bold tracking-[-0.02em] text-foreground">{name || 'Product Details'}</h1>
           {productType === 'packaging' ? (
-            <Badge variant="secondary" className="text-xs bg-purple-500/10 text-purple-400 border-purple-500/20">
-              <Box className="h-3 w-3 mr-1" />
+            <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+              <Box className="h-3 w-3" />
               Packaging
-            </Badge>
+            </span>
           ) : (
-            <Badge variant="secondary" className="text-xs bg-amber-500/10 text-amber-400 border-amber-500/20">
-              <Wheat className="h-3 w-3 mr-1" />
+            <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-dim">
+              <Wheat className="h-3 w-3" />
               Ingredient
-            </Badge>
+            </span>
           )}
         </div>
         <div className="flex items-center gap-2">
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10" disabled={deleting}>
-                {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                {!deleting && <Trash2 className="mr-2 h-4 w-4" />}
                 {deleting ? 'Deleting...' : 'Delete'}
               </Button>
             </AlertDialogTrigger>
@@ -604,13 +603,10 @@ export default function SupplierProductDetailPage() {
           </AlertDialog>
           <Button onClick={handleSave} disabled={saving}>
             {saving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving...
-              </>
+              'Saving...'
             ) : saveSuccess ? (
               <>
-                <CheckCircle2 className="mr-2 h-4 w-4 text-green-500" />
+                <CheckCircle2 className="mr-2 h-4 w-4 text-studio-good" />
                 Saved
               </>
             ) : (
@@ -631,9 +627,9 @@ export default function SupplierProductDetailPage() {
       )}
 
       {saveSuccess && (
-        <Alert className="border-green-500/30 bg-green-500/10">
-          <CheckCircle2 className="h-4 w-4 text-green-500" />
-          <AlertDescription className="text-green-400">All changes saved successfully</AlertDescription>
+        <Alert className="border-studio-good/40 bg-card">
+          <CheckCircle2 className="h-4 w-4 text-studio-good" />
+          <AlertDescription className="text-studio-good">All changes saved successfully</AlertDescription>
         </Alert>
       )}
 
@@ -666,8 +662,8 @@ export default function SupplierProductDetailPage() {
         {/* ============================================================ */}
         <TabsContent value="info" className="space-y-6 mt-6">
           {/* Product Image */}
-          <div className="rounded-xl border border-border bg-card p-6 space-y-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="rounded-[6px] border border-border bg-card p-6 space-y-4">
+            <h2 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-forest">
               Product Image
             </h2>
             <div className="flex items-start gap-6">
@@ -708,7 +704,7 @@ export default function SupplierProductDetailPage() {
                   disabled={uploadingImage}
                 >
                   {uploadingImage ? (
-                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Uploading...</>
+                    'Uploading...'
                   ) : (
                     <><Upload className="mr-2 h-4 w-4" />{productImageUrl ? 'Replace Image' : 'Upload Image'}</>
                   )}
@@ -726,8 +722,8 @@ export default function SupplierProductDetailPage() {
           </div>
 
           {/* Basic Details */}
-          <div className="rounded-xl border border-border bg-card p-6 space-y-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="rounded-[6px] border border-border bg-card p-6 space-y-4">
+            <h2 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-forest">
               Basic Details
             </h2>
 
@@ -849,7 +845,7 @@ export default function SupplierProductDetailPage() {
                       required
                     />
                     <p className="text-xs text-muted-foreground">
-                      Weight of a single unit in grams. Required for packaging — buyers use this for LCA and EPR reporting.
+                      Weight of a single unit in grams. Required for packaging: buyers use this for LCA and EPR reporting.
                     </p>
                   </div>
                 </div>
@@ -882,19 +878,19 @@ export default function SupplierProductDetailPage() {
         {/* TAB 2: Environmental Impact Data */}
         {/* ============================================================ */}
         <TabsContent value="impact" className="space-y-6 mt-6">
-          <div className="p-4 rounded-lg bg-blue-500/5 border border-blue-500/20">
-            <p className="text-sm text-blue-300">
+          <div className="p-4 rounded-[6px] bg-secondary border border-border">
+            <p className="text-sm text-muted-foreground">
               Enter your product&apos;s environmental impact data across the 4 sustainability pillars. Upload supporting evidence (LCA reports, EPDs) in the Evidence tab.
             </p>
           </div>
 
           {/* Climate */}
-          <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+          <div className="rounded-[6px] border border-border bg-card p-6 space-y-4">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-md bg-blue-500/10">
-                <Cloud className="h-4 w-4 text-blue-400" />
+              <div className="p-1.5 rounded-md bg-secondary">
+                <Cloud className="h-4 w-4 text-studio-dim" />
               </div>
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Climate</h2>
+              <h2 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-forest">Climate</h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -915,12 +911,12 @@ export default function SupplierProductDetailPage() {
           </div>
 
           {/* Water */}
-          <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+          <div className="rounded-[6px] border border-border bg-card p-6 space-y-4">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-md bg-cyan-500/10">
-                <Droplets className="h-4 w-4 text-cyan-400" />
+              <div className="p-1.5 rounded-md bg-secondary">
+                <Droplets className="h-4 w-4 text-studio-dim" />
               </div>
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Water</h2>
+              <h2 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-forest">Water</h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -958,12 +954,12 @@ export default function SupplierProductDetailPage() {
           </div>
 
           {/* Circularity */}
-          <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+          <div className="rounded-[6px] border border-border bg-card p-6 space-y-4">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-md bg-amber-500/10">
-                <Recycle className="h-4 w-4 text-amber-400" />
+              <div className="p-1.5 rounded-md bg-secondary">
+                <Recycle className="h-4 w-4 text-studio-dim" />
               </div>
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Circularity</h2>
+              <h2 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-forest">Circularity</h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -1027,12 +1023,12 @@ export default function SupplierProductDetailPage() {
 
           {/* Nature — ingredient products only */}
           {productType === 'ingredient' && (
-            <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+            <div className="rounded-[6px] border border-border bg-card p-6 space-y-4">
               <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-md bg-green-500/10">
-                  <Leaf className="h-4 w-4 text-green-400" />
+                <div className="p-1.5 rounded-md bg-secondary">
+                  <Leaf className="h-4 w-4 text-studio-dim" />
                 </div>
-                <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Nature &amp; Biodiversity</h2>
+                <h2 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-forest">Nature &amp; Biodiversity</h2>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -1053,16 +1049,16 @@ export default function SupplierProductDetailPage() {
 
           {/* Material Composition — packaging only */}
           {productType === 'packaging' && (
-            <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+            <div className="rounded-[6px] border border-border bg-card p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-md bg-purple-500/10">
-                    <Box className="h-4 w-4 text-purple-400" />
+                  <div className="p-1.5 rounded-md bg-secondary">
+                    <Box className="h-4 w-4 text-studio-dim" />
                   </div>
-                  <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Material Composition</h2>
+                  <h2 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-forest">Material Composition</h2>
                 </div>
                 <Button variant="outline" size="sm" onClick={addComponent} disabled={savingComponents}>
-                  {savingComponents ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Plus className="h-4 w-4 mr-1" />Add Component</>}
+                  {savingComponents ? 'Adding...' : <><Plus className="h-4 w-4 mr-1" />Add Component</>}
                 </Button>
               </div>
               <p className="text-sm text-muted-foreground">
@@ -1141,7 +1137,7 @@ export default function SupplierProductDetailPage() {
                       Total component weight: <strong className="text-foreground">{totalComponentWeight.toFixed(1)}g</strong>
                     </span>
                     {weightG && Math.abs(totalComponentWeight - parseFloat(weightG)) > 0.5 && (
-                      <span className="flex items-center gap-1 text-xs text-amber-400">
+                      <span className="flex items-center gap-1 text-xs text-studio-attention">
                         <AlertTriangle className="h-3 w-3" />
                         Differs from unit weight ({weightG}g)
                       </span>
@@ -1158,16 +1154,16 @@ export default function SupplierProductDetailPage() {
 
           {/* EPR Data — packaging only */}
           {productType === 'packaging' && (
-            <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+            <div className="rounded-[6px] border border-border bg-card p-6 space-y-4">
               <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-md bg-blue-500/10">
-                  <FileText className="h-4 w-4 text-blue-400" />
+                <div className="p-1.5 rounded-md bg-secondary">
+                  <FileText className="h-4 w-4 text-studio-dim" />
                 </div>
-                <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">EPR Data</h2>
+                <h2 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-forest">EPR Data</h2>
               </div>
-              <div className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/20 flex items-start gap-2">
-                <Info className="h-4 w-4 text-blue-400 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-blue-300">
+              <div className="p-3 rounded-[6px] bg-secondary border border-border flex items-start gap-2">
+                <Info className="h-4 w-4 text-studio-dim flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-muted-foreground">
                   Extended Producer Responsibility (EPR) data helps your customers comply with UK packaging regulations and the Report Packaging Data (RPD) requirements.
                 </p>
               </div>
@@ -1183,7 +1179,7 @@ export default function SupplierProductDetailPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {(Object.entries(EPR_MATERIAL_CODE_LABELS) as Array<[EPRMaterialCode, string]>).map(([code, label]) => (
-                        <SelectItem key={code} value={code}>{code} — {label}</SelectItem>
+                        <SelectItem key={code} value={code}>{code} · {label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -1196,7 +1192,7 @@ export default function SupplierProductDetailPage() {
                       type="button"
                       onClick={() => setEprIsDrinksContainer(!eprIsDrinksContainer)}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        eprIsDrinksContainer ? 'bg-[#ccff00]' : 'bg-muted'
+                        eprIsDrinksContainer ? 'bg-primary' : 'bg-muted'
                       }`}
                     >
                       <span
@@ -1217,7 +1213,7 @@ export default function SupplierProductDetailPage() {
 
           <div className="flex justify-end">
             <Button onClick={handleSave} disabled={saving}>
-              {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : <><Save className="mr-2 h-4 w-4" />Save Impact Data</>}
+              {saving ? 'Saving...' : <><Save className="mr-2 h-4 w-4" />Save Impact Data</>}
             </Button>
           </div>
         </TabsContent>
@@ -1245,12 +1241,12 @@ export default function SupplierProductDetailPage() {
         {/* TAB 4: Certifications */}
         {/* ============================================================ */}
         <TabsContent value="certifications" className="space-y-6 mt-6">
-          <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+          <div className="rounded-[6px] border border-border bg-card p-6 space-y-4">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-md bg-[#ccff00]/10">
-                <Shield className="h-4 w-4 text-[#ccff00]" />
+              <div className="p-1.5 rounded-md bg-secondary">
+                <Shield className="h-4 w-4 text-studio-forest" />
               </div>
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Certifications &amp; Eco-Labels</h2>
+              <h2 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-forest">Certifications &amp; Eco-Labels</h2>
             </div>
             <p className="text-sm text-muted-foreground">
               Add any certifications that apply to this product. Upload supporting certificates in the Evidence tab.
@@ -1285,7 +1281,7 @@ export default function SupplierProductDetailPage() {
                   <button
                     key={cert}
                     onClick={() => addCertification(cert)}
-                    className="px-3 py-1.5 rounded-md border border-border text-xs text-muted-foreground hover:border-[#ccff00]/50 hover:text-foreground transition-colors"
+                    className="px-3 py-1.5 rounded-md border border-border text-xs text-muted-foreground hover:border-foreground/40 hover:text-foreground transition-colors"
                   >
                     <Plus className="h-3 w-3 inline mr-1" />
                     {cert}
@@ -1323,7 +1319,7 @@ export default function SupplierProductDetailPage() {
 
           <div className="flex justify-end">
             <Button onClick={handleSave} disabled={saving}>
-              {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : <><Save className="mr-2 h-4 w-4" />Save Certifications</>}
+              {saving ? 'Saving...' : <><Save className="mr-2 h-4 w-4" />Save Certifications</>}
             </Button>
           </div>
         </TabsContent>

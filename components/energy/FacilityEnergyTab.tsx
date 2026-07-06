@@ -11,7 +11,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ResponsiveContainer, AreaChart, Area, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ReferenceLine, Legend } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { StateChip } from '@/components/studio/state-chip';
+import type { WorkingTone } from '@/components/studio/theme';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Zap, Upload, Leaf, AlertTriangle, Clock } from 'lucide-react';
@@ -49,23 +50,22 @@ interface ConsumptionData {
   weightedAvgIntensityG: number | null;
 }
 
-function statusOf(g: number) {
-  if (g < 150) return { label: 'Clean', cls: 'bg-green-100 text-green-700 border-green-200', color: '#22c55e' };
-  if (g < 300) return { label: 'Mixed', cls: 'bg-amber-100 text-amber-700 border-amber-200', color: '#f59e0b' };
-  return { label: 'Dirty', cls: 'bg-red-100 text-red-700 border-red-200', color: '#ef4444' };
+function statusOf(g: number): { label: string; tone: WorkingTone } {
+  if (g < 150) return { label: 'Clean', tone: 'good' };
+  if (g < 300) return { label: 'Mixed', tone: 'attention' };
+  return { label: 'Dirty', tone: 'stale' };
 }
 
-// Dark, always-legible tooltip (the recharts default is white, on which the lime
-// consumption series is unreadable). Series colours stay readable on the dark bg.
+// Cream-panel tooltip in the studio language: hairline border, ink text.
 const TOOLTIP_PROPS = {
   contentStyle: {
-    background: 'rgba(15, 23, 42, 0.96)',
-    border: '1px solid rgba(148, 163, 184, 0.3)',
-    borderRadius: 8,
+    background: '#F2F1EA',
+    border: '1px solid #D9D6CB',
+    borderRadius: 6,
     fontSize: 12,
-    color: '#e5e7eb',
+    color: '#1A1B1D',
   } as React.CSSProperties,
-  labelStyle: { color: '#cbd5e1', marginBottom: 2 } as React.CSSProperties,
+  labelStyle: { color: '#6F6F68', marginBottom: 2 } as React.CSSProperties,
 };
 
 export function FacilityEnergyTab({ facilityId }: { facilityId: string }) {
@@ -160,23 +160,23 @@ export function FacilityEnergyTab({ facilityId }: { facilityId: string }) {
           <CardContent className="space-y-1 p-4">
             <div className="text-xs text-muted-foreground">Grid carbon now · {data.regionName}</div>
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-semibold">{current != null ? Math.round(current) : '—'}</span>
+              <span className="text-2xl font-semibold tabular-nums">{current != null ? Math.round(current) : '--'}</span>
               <span className="text-sm text-muted-foreground">g CO2/kWh</span>
             </div>
-            {st && <Badge variant="outline" className={st.cls}>{st.label}</Badge>}
+            {st && <StateChip tone={st.tone}>{st.label}</StateChip>}
           </CardContent>
         </Card>
         <Card>
           <CardContent className="space-y-1 p-4">
             <div className="flex items-center gap-1 text-xs text-muted-foreground"><Leaf className="h-3.5 w-3.5" /> Cleanest window today</div>
-            <div className="text-2xl font-semibold">{timing?.cleanest?.label ?? '—'}</div>
+            <div className="text-2xl font-semibold">{timing?.cleanest?.label ?? '--'}</div>
             {timing?.cleanest && <div className="text-xs text-muted-foreground">≈{Math.round(timing.cleanest.avgG)} g/kWh</div>}
           </CardContent>
         </Card>
         <Card>
           <CardContent className="space-y-1 p-4">
             <div className="flex items-center gap-1 text-xs text-muted-foreground"><AlertTriangle className="h-3.5 w-3.5" /> Dirtiest window today</div>
-            <div className="text-2xl font-semibold">{timing?.dirtiest?.label ?? '—'}</div>
+            <div className="text-2xl font-semibold">{timing?.dirtiest?.label ?? '--'}</div>
             {timing?.dirtiest && <div className="text-xs text-muted-foreground">≈{Math.round(timing.dirtiest.avgG)} g/kWh</div>}
           </CardContent>
         </Card>
@@ -193,16 +193,16 @@ export function FacilityEnergyTab({ facilityId }: { facilityId: string }) {
               <AreaChart data={chartData} margin={{ top: 5, right: 8, bottom: 0, left: -10 }}>
                 <defs>
                   <linearGradient id="gridGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#ccff00" stopOpacity={0.5} />
-                    <stop offset="100%" stopColor="#ccff00" stopOpacity={0.05} />
+                    <stop offset="0%" stopColor="#2B46C0" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="#2B46C0" stopOpacity={0.04} />
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="t" tick={{ fontSize: 11 }} interval={7} />
                 <YAxis tick={{ fontSize: 11 }} width={40} />
                 <Tooltip {...TOOLTIP_PROPS} formatter={(v) => [`${v} g/kWh`, 'Intensity']} labelFormatter={(l) => `at ${l}`} />
-                <ReferenceLine y={150} stroke="#22c55e" strokeDasharray="3 3" />
-                <ReferenceLine y={300} stroke="#ef4444" strokeDasharray="3 3" />
-                <Area type="monotone" dataKey="g" stroke="#ccff00" strokeWidth={2} fill="url(#gridGrad)" isAnimationActive={false} />
+                <ReferenceLine y={150} stroke="#047857" strokeDasharray="3 3" />
+                <ReferenceLine y={300} stroke="#BE123C" strokeDasharray="3 3" />
+                <Area type="monotone" dataKey="g" stroke="#2B46C0" strokeWidth={2} fill="url(#gridGrad)" isAnimationActive={false} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -240,23 +240,23 @@ export function FacilityEnergyTab({ facilityId }: { facilityId: string }) {
                     <YAxis yAxisId="g" orientation="right" tick={{ fontSize: 11 }} width={42} />
                     <Tooltip {...TOOLTIP_PROPS} />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Bar yAxisId="kwh" dataKey="kwh" name="Avg consumption (kWh)" fill="#ccff00" radius={[2, 2, 0, 0]} isAnimationActive={false} />
-                    <Line yAxisId="g" type="monotone" dataKey="g" name="Grid intensity (g/kWh)" stroke="#ef4444" strokeWidth={2} dot={false} isAnimationActive={false} />
+                    <Bar yAxisId="kwh" dataKey="kwh" name="Avg consumption (kWh)" fill="#2B46C0" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                    <Line yAxisId="g" type="monotone" dataKey="g" name="Grid intensity (g/kWh)" stroke="#BE123C" strokeWidth={2} dot={false} isAnimationActive={false} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                Average day across the uploaded period. Bars = your consumption; red line = grid carbon intensity for {data.regionName}.
+                Average day across the uploaded period. Bars = your consumption; the line = grid carbon intensity for {data.regionName}.
               </p>
               {pct != null && Math.abs(pct) >= 1 && (
                 <p className="mt-2 text-sm">
                   Your electricity falls in periods averaging{' '}
                   <span className="font-medium">{Math.round(wt as number)} g/kWh</span> vs{' '}
-                  <span className="font-medium">{Math.round(flat as number)} g/kWh</span> if spread evenly —{' '}
+                  <span className="font-medium">{Math.round(flat as number)} g/kWh</span> if spread evenly:{' '}
                   {pct > 0 ? (
-                    <span className="text-amber-600">about {Math.round(pct)}% higher-carbon-timed, so there&apos;s room to shift load.</span>
+                    <span className="text-studio-attention">about {Math.round(pct)}% higher-carbon-timed, so there&apos;s room to shift load.</span>
                   ) : (
-                    <span className="text-green-600">about {Math.round(Math.abs(pct))}% lower-carbon-timed already.</span>
+                    <span className="text-studio-good">about {Math.round(Math.abs(pct))}% lower-carbon-timed already.</span>
                   )}
                 </p>
               )}
@@ -286,13 +286,13 @@ export function FacilityEnergyTab({ facilityId }: { facilityId: string }) {
                     <XAxis dataKey="t" tick={{ fontSize: 11 }} interval={7} />
                     <YAxis tick={{ fontSize: 11 }} width={42} />
                     <Tooltip {...TOOLTIP_PROPS} />
-                    <Bar dataKey="kwh" name="Avg gas (kWh)" fill="#60a5fa" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                    <Bar dataKey="kwh" name="Avg gas (kWh)" fill="#6F6F68" radius={[2, 2, 0, 0]} isAnimationActive={false} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
                 Average day across the uploaded period. Gas carbon is the same at any time of day, so there&apos;s no
-                timing benefit — this is for visibility.
+                timing benefit. This is for visibility.
               </p>
             </CardContent>
           </Card>
@@ -320,8 +320,8 @@ export function FacilityEnergyTab({ facilityId }: { facilityId: string }) {
               <div className="text-sm font-medium">Half-hourly meter data</div>
               <p className="text-xs text-muted-foreground">
                 {data.hasHalfHourlyData
-                  ? 'Half-hourly data is loaded — your monthly totals are derived from it, so no separate bill is needed for these months.'
-                  : 'Got a smart meter? Upload your half-hourly export instead of a bill — we work out your monthly totals from it.'}
+                  ? 'Half-hourly data is loaded: your monthly totals are derived from it, so no separate bill is needed for these months.'
+                  : 'Got a smart meter? Upload your half-hourly export instead of a bill, and we work out your monthly totals from it.'}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -352,11 +352,11 @@ export function FacilityEnergyTab({ facilityId }: { facilityId: string }) {
           </div>
 
           {conflict && (
-            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
-              <div className="flex items-center gap-2 font-medium text-amber-800">
+            <div className="rounded-[6px] border border-border bg-card p-3 text-sm">
+              <div className="flex items-center gap-2 font-medium text-studio-attention">
                 <AlertTriangle className="h-4 w-4" /> You already have {conflict.fuel} bill data for these months
               </div>
-              <p className="mt-1 text-xs text-amber-800/90">
+              <p className="mt-1 text-xs text-muted-foreground">
                 This upload covers {conflict.span.from} → {conflict.span.to} ({conflict.summary.months} month(s),{' '}
                 {conflict.summary.totalKwh.toLocaleString('en-GB')} kWh), which overlaps{' '}
                 {conflict.existing.length} existing entr{conflict.existing.length === 1 ? 'y' : 'ies'}. To avoid counting

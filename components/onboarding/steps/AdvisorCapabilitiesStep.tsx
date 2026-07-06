@@ -6,7 +6,8 @@ import { useOrganization } from '@/lib/organizationContext'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabaseClient'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, ArrowRight, CheckCircle2, Eye, Pencil, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle2, Eye, Pencil } from 'lucide-react'
+import { Eyebrow } from '@/components/studio'
 
 type AccessLevel = 'read_only' | 'read_write'
 
@@ -68,31 +69,29 @@ export function AdvisorCapabilitiesStep() {
     <div className="flex flex-col items-center min-h-[60vh] px-4 animate-in fade-in duration-300">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-2">
-          <div className="text-3xl">&#128274;</div>
-          <h3 className="text-xl font-serif font-bold text-white">Your access</h3>
-          <p className="text-sm text-white/50">
+          <Eyebrow tone="inherit" className="text-studio-forest">Access level</Eyebrow>
+          <h3 className="text-xl font-display font-bold tracking-tight text-foreground">Your access.</h3>
+          <p className="text-sm text-muted-foreground">
             What you can do inside {orgName}
           </p>
         </div>
 
-        {/* Access level badge */}
-        <div className="flex items-center gap-3 p-4 rounded-2xl bg-[#ccff00]/5 border border-[#ccff00]/20">
-          <div className="w-10 h-10 rounded-xl bg-[#ccff00]/10 flex items-center justify-center flex-shrink-0">
+        {/* Access level panel */}
+        <div className="flex items-center gap-3 p-4 rounded-[6px] bg-card border border-border">
+          <div className="w-10 h-10 rounded-[6px] bg-secondary flex items-center justify-center flex-shrink-0">
             {isReadOnly ? (
-              <Eye className="w-5 h-5 text-[#ccff00]" />
+              <Eye className="w-5 h-5 text-studio-forest" />
             ) : (
-              <Pencil className="w-5 h-5 text-[#ccff00]" />
+              <Pencil className="w-5 h-5 text-studio-forest" />
             )}
           </div>
           <div>
-            <p className="text-xs text-white/40 uppercase tracking-widest font-mono">
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim">
               Access level
             </p>
-            <p className="text-sm font-medium text-white">
+            <p className="text-sm font-medium text-foreground">
               {isLoading ? (
-                <span className="inline-flex items-center gap-2 text-white/50">
-                  <Loader2 className="w-3 h-3 animate-spin" /> Checking…
-                </span>
+                <span className="text-muted-foreground">Checking&hellip;</span>
               ) : isReadOnly ? (
                 'Read-only advisor'
               ) : (
@@ -103,30 +102,30 @@ export function AdvisorCapabilitiesStep() {
         </div>
 
         {/* Capabilities list */}
-        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 space-y-3">
-          <p className="text-sm font-medium text-white">You&apos;ll be able to:</p>
+        <div className="bg-card border border-border rounded-[6px] p-6 space-y-3">
+          <p className="text-sm font-medium text-foreground">You&apos;ll be able to:</p>
           {capabilities.map((item) => (
             <div key={item} className="flex items-start gap-3">
-              <CheckCircle2 className="w-4 h-4 text-[#ccff00] flex-shrink-0 mt-0.5" />
-              <span className="text-sm text-white/80">{item}</span>
+              <CheckCircle2 className="w-4 h-4 text-studio-good flex-shrink-0 mt-0.5" />
+              <span className="text-sm text-foreground">{item}</span>
             </div>
           ))}
         </div>
 
-        <p className="text-xs text-white/30 text-center">
+        <p className="text-xs text-studio-dim text-center">
           You work directly in {orgName}&apos;s account. The organisation owner keeps
           control of billing, team members and overall settings.
         </p>
 
         {/* Navigation */}
         <div className="flex items-center justify-between pt-4">
-          <Button variant="ghost" onClick={previousStep} className="text-white/40 hover:text-white hover:bg-white/10">
+          <Button variant="ghost" onClick={previousStep} className="text-muted-foreground hover:text-foreground hover:bg-secondary">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
           <Button
             onClick={completeStep}
-            className="bg-[#ccff00] text-black hover:bg-[#ccff00]/90 font-medium rounded-xl"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full"
           >
             Continue
             <ArrowRight className="w-4 h-4 ml-2" />

@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ArrowRight, Loader2, Plus, X, Sparkles, SkipForward, CheckCircle2, Pencil } from 'lucide-react'
+import { ArrowRight, Plus, X, Sparkles, SkipForward, CheckCircle2, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   getTemplatesForBeverageType,
@@ -164,10 +164,10 @@ export function FastTrackProductsStep() {
       <div className="w-full max-w-2xl space-y-5">
 
         <div className="text-center space-y-2">
-          <h3 className="text-2xl font-serif font-bold text-white">
-            {showExistingNudge ? 'Add more products' : 'Pick your products'}
+          <h3 className="text-2xl font-display font-bold tracking-tight text-foreground">
+            {showExistingNudge ? 'Add more products.' : 'Pick your products.'}
           </h3>
-          <p className="text-sm text-white/50">
+          <p className="text-sm text-muted-foreground">
             {showExistingNudge
               ? `You've already got ${existingCount} product${existingCount === 1 ? '' : 's'} on the platform. Add more from templates below or continue.`
               : 'Tap one or two to start. You can edit names and sizes, or add a custom one.'}
@@ -183,20 +183,20 @@ export function FastTrackProductsStep() {
                 key={t.id}
                 onClick={() => toggleTemplate(t)}
                 className={cn(
-                  'group relative flex flex-col items-start gap-1.5 p-3 rounded-xl border text-left transition-all',
+                  'group relative flex flex-col items-start gap-1.5 p-3 rounded-[6px] border text-left transition-colors',
                   picked
-                    ? 'bg-[#ccff00]/15 border-[#ccff00]/50'
-                    : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20',
+                    ? 'bg-secondary border-studio-forest'
+                    : 'bg-card border-border hover:bg-secondary hover:border-studio-ink/25',
                 )}
               >
                 <div className="flex items-start justify-between w-full">
                   <span className="text-2xl leading-none">{t.icon}</span>
-                  {picked && <CheckCircle2 className="w-4 h-4 text-[#ccff00]" />}
+                  {picked && <CheckCircle2 className="w-4 h-4 text-studio-forest" />}
                 </div>
-                <p className={cn('text-xs font-medium leading-tight line-clamp-2', picked ? 'text-[#ccff00]' : 'text-white')}>
+                <p className={cn('text-xs font-medium leading-tight line-clamp-2', picked ? 'text-studio-forest' : 'text-foreground')}>
                   {t.subcategory} {t.unit_size_value}{t.unit_size_unit}
                 </p>
-                <p className="text-[10px] text-white/40">
+                <p className="text-[10px] text-studio-dim">
                   {t.abv ? `${t.abv}% ABV` : 'Non-alcoholic'}
                 </p>
               </button>
@@ -207,18 +207,18 @@ export function FastTrackProductsStep() {
         {/* Custom add */}
         <button
           onClick={addCustom}
-          className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-white/15 bg-white/3 hover:bg-white/5 hover:border-white/25 transition-colors"
+          className="w-full flex items-center justify-center gap-2 p-3 rounded-[6px] border border-dashed border-border bg-transparent hover:bg-secondary hover:border-studio-ink/25 transition-colors"
         >
-          <Plus className="w-4 h-4 text-white/40" />
-          <span className="text-sm text-white/60">Add a custom product</span>
+          <Plus className="w-4 h-4 text-studio-dim" />
+          <span className="text-sm text-muted-foreground">Add a custom product</span>
         </button>
 
         {/* Selected basket */}
         {selected.length > 0 && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-wide text-white/50">
-                <Sparkles className="inline w-3 h-3 text-[#ccff00] mr-1" />
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-studio-forest">
+                <Sparkles className="inline w-3 h-3 mr-1" />
                 {totalToAdd} product{totalToAdd === 1 ? '' : 's'} ready to add
               </p>
             </div>
@@ -228,7 +228,7 @@ export function FastTrackProductsStep() {
                 return (
                   <div
                     key={item.id}
-                    className="bg-white/5 border border-white/10 rounded-xl p-3"
+                    className="bg-card border border-border rounded-[6px] p-3"
                   >
                     {isEditing ? (
                       <div className="flex flex-col gap-2">
@@ -237,7 +237,7 @@ export function FastTrackProductsStep() {
                           placeholder="Product name (e.g. Avallen Calvados)"
                           value={item.name}
                           onChange={e => updateSelected(item.id, { name: e.target.value })}
-                          className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:ring-[#ccff00]/50 text-sm"
+                          className="text-sm"
                         />
                         <div className="flex gap-2">
                           <Input
@@ -246,13 +246,13 @@ export function FastTrackProductsStep() {
                             placeholder="Size"
                             value={item.unitSize}
                             onChange={e => updateSelected(item.id, { unitSize: parseFloat(e.target.value) || 0 })}
-                            className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:ring-[#ccff00]/50 text-sm flex-1 min-w-0"
+                            className="text-sm flex-1 min-w-0"
                           />
                           <Select
                             value={item.unitSizeUnit}
                             onValueChange={v => updateSelected(item.id, { unitSizeUnit: v as Unit })}
                           >
-                            <SelectTrigger className="w-24 bg-white/5 border-white/10 text-white text-sm">
+                            <SelectTrigger className="w-24 text-sm">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -265,10 +265,10 @@ export function FastTrackProductsStep() {
                             onClick={() => setEditingId(null)}
                             disabled={!item.name.trim()}
                             className={cn(
-                              'px-3 rounded-md text-xs font-medium transition-colors',
+                              'px-3 rounded-full text-xs font-medium transition-colors',
                               item.name.trim()
-                                ? 'bg-[#ccff00]/20 text-[#ccff00] hover:bg-[#ccff00]/30'
-                                : 'bg-white/5 text-white/30 cursor-not-allowed',
+                                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                                : 'bg-secondary text-muted-foreground cursor-not-allowed',
                             )}
                           >
                             Done
@@ -278,24 +278,24 @@ export function FastTrackProductsStep() {
                     ) : (
                       <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-white truncate">{item.name}</p>
-                          <p className="text-xs text-white/40">
+                          <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
+                          <p className="text-xs text-muted-foreground">
                             {item.unitSize}{item.unitSizeUnit}
-                            {item.abv ? ` • ${item.abv}% ABV` : ''}
-                            {' • '}{item.subcategory}
+                            {item.abv ? ` · ${item.abv}% ABV` : ''}
+                            {' · '}{item.subcategory}
                           </p>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
                           <button
                             onClick={() => setEditingId(item.id)}
-                            className="p-1.5 rounded-md text-white/40 hover:text-white hover:bg-white/10"
+                            className="p-1.5 rounded-[6px] text-studio-dim hover:text-foreground hover:bg-secondary"
                             aria-label="Edit"
                           >
                             <Pencil className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => removeSelected(item.id)}
-                            className="p-1.5 rounded-md text-white/40 hover:text-red-300 hover:bg-white/10"
+                            className="p-1.5 rounded-[6px] text-studio-dim hover:text-studio-stale hover:bg-secondary"
                             aria-label="Remove"
                           >
                             <X className="w-3.5 h-3.5" />
@@ -313,18 +313,18 @@ export function FastTrackProductsStep() {
         <div className="flex flex-col sm:flex-row gap-2 pt-2">
           <button
             onClick={skipStep}
-            className="flex-1 flex items-center justify-center gap-2 p-3 rounded-xl border border-white/10 bg-white/3 hover:bg-white/5 transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 p-3 rounded-full border border-border bg-transparent hover:bg-secondary transition-colors"
           >
-            <SkipForward className="w-4 h-4 text-white/40" />
-            <span className="text-sm text-white/60">Skip for now</span>
+            <SkipForward className="w-4 h-4 text-studio-dim" />
+            <span className="text-sm text-muted-foreground">Skip for now</span>
           </button>
           <Button
             onClick={handleContinue}
             disabled={isSaving}
-            className="flex-1 bg-[#ccff00] text-black hover:bg-[#ccff00]/90 font-medium rounded-xl"
+            className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full"
           >
             {isSaving ? (
-              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</>
+              <>Saving...</>
             ) : (
               <>
                 {totalToAdd > 0 ? `Add ${totalToAdd} & continue` : 'Continue'}

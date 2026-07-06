@@ -63,9 +63,9 @@ const categoryIcons: Record<string, LucideIcon> = {
 };
 
 const priorityPill: Record<ActionPriority, { label: string; cls: string }> = {
-  high:   { label: "Urgent", cls: "bg-red-500/15 text-red-600 dark:text-red-400" },
-  medium: { label: "Medium", cls: "bg-amber-500/15 text-amber-600 dark:text-amber-400" },
-  low:    { label: "Low",    cls: "bg-blue-500/15 text-blue-600 dark:text-blue-400" },
+  high:   { label: "Urgent", cls: "text-studio-stale" },
+  medium: { label: "Medium", cls: "text-studio-attention" },
+  low:    { label: "Low",    cls: "text-studio-dim" },
 };
 
 export function ThreeThingsTodayHero({
@@ -111,15 +111,15 @@ export function ThreeThingsTodayHero({
 
   if (top.length === 0) {
     return (
-      <Card className={cn("border-emerald-400/20 bg-emerald-500/5", className)}>
+      <Card className={cn("rounded-[6px] border-border bg-card", className)}>
         <div className="flex items-center justify-between gap-3 px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-full bg-emerald-500/20 flex items-center justify-center">
-              <Sparkles className="h-4 w-4 text-emerald-500" />
+            <div className="h-9 w-9 rounded-full bg-secondary flex items-center justify-center">
+              <Sparkles className="h-4 w-4 text-studio-good" />
             </div>
             <div>
               <p className="text-sm font-medium">All caught up for today.</p>
-              <p className="text-xs text-muted-foreground">No priority actions right now — explore your reports for deeper insights.</p>
+              <p className="text-xs text-muted-foreground">No priority actions right now. Explore your reports for deeper insights.</p>
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -137,11 +137,11 @@ export function ThreeThingsTodayHero({
   }
 
   return (
-    <Card className={cn("overflow-hidden border-[#ccff00]/20 bg-gradient-to-br from-[#ccff00]/5 via-transparent to-transparent", className)}>
+    <Card className={cn("overflow-hidden rounded-[6px] border-border bg-card", className)}>
       <div className="px-5 pt-4 pb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#ccff00]/20">
-            <Sparkles className="h-3.5 w-3.5 text-[#8da300] dark:text-[#ccff00]" />
+          <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-secondary">
+            <Sparkles className="h-3.5 w-3.5 text-room-accent" />
           </span>
           <div>
             <h2 className="text-base font-semibold leading-tight">Three things today</h2>
@@ -166,13 +166,13 @@ export function ThreeThingsTodayHero({
           return (
             <div
               key={action.id}
-              className="group relative flex h-full flex-col gap-2 rounded-xl border border-border/60 bg-background/60 p-4 transition-shadow hover:shadow-md"
+              className="group relative flex h-full flex-col gap-2 rounded-[6px] border border-border/60 bg-background/60 p-4 transition-shadow hover:shadow-md"
             >
               <div className="flex items-center justify-between">
                 <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-muted text-muted-foreground text-xs font-semibold">
                   {idx + 1}
                 </span>
-                <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", pill.cls)}>
+                <span className={cn("font-mono text-[10px] font-bold uppercase tracking-[0.18em]", pill.cls)}>
                   {pill.label}
                 </span>
               </div>
@@ -190,7 +190,7 @@ export function ThreeThingsTodayHero({
               </div>
 
               {action.impactValue && (
-                <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                <p className="text-xs font-medium text-studio-good">
                   {action.impactValue}
                 </p>
               )}
@@ -214,7 +214,7 @@ export function ThreeThingsTodayHero({
                   variant="ghost"
                   className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
                   onClick={() => dismiss(action.id)}
-                  title="Mark this as done — hides it from the dashboard"
+                  title="Mark this as done. Hides it from the dashboard."
                 >
                   <Check className="h-3.5 w-3.5" />
                   Done

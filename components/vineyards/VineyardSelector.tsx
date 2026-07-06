@@ -100,7 +100,7 @@ export function VineyardSelector({
           {vineyards.map((v) => (
             <SelectItem key={v.id} value={v.id}>
               <span className="flex items-center gap-2">
-                <Leaf className="h-3 w-3 text-[#ccff00]" />
+                <Leaf className="h-3 w-3 text-studio-forest" />
                 {v.name}
                 <span className="text-xs text-muted-foreground">
                   ({v.hectares} ha)

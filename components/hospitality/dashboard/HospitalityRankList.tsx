@@ -20,7 +20,7 @@ export interface RankListRow {
 export function HospitalityRankList({
   rows,
   formatValue,
-  barClassName = 'bg-[#ccff00]',
+  barClassName = 'bg-studio-cobalt',
   emptyLabel = 'No data yet.',
 }: {
   rows: RankListRow[];

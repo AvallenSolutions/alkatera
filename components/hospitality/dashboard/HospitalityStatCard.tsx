@@ -14,10 +14,10 @@ import { cn } from '@/lib/utils';
 export type StatTone = 'good' | 'warn' | 'bad' | 'neutral';
 
 const TONE_CLASSES: Record<StatTone, string> = {
-  good: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30',
-  warn: 'bg-amber-500/10 text-amber-500 border-amber-500/30',
-  bad: 'bg-red-500/10 text-red-500 border-red-500/30',
-  neutral: 'bg-muted text-muted-foreground border-border/60',
+  good: 'text-studio-good',
+  warn: 'text-studio-attention',
+  bad: 'text-studio-stale',
+  neutral: 'text-muted-foreground',
 };
 
 export function HospitalityStatCard({
@@ -42,17 +42,17 @@ export function HospitalityStatCard({
   const body = (
     <div
       className={cn(
-        'group relative flex h-full w-full flex-col overflow-hidden rounded-xl border border-border/60 bg-card/40 p-4 transition',
-        href && 'cursor-pointer hover:-translate-y-0.5 hover:border-[#ccff00]/50 hover:bg-card/60 hover:shadow-[0_4px_20px_-8px_rgba(204,255,0,0.25)]',
+        'group relative flex h-full w-full flex-col overflow-hidden rounded-[6px] border border-border bg-card p-4 transition',
+        href && 'cursor-pointer hover:-translate-y-0.5 hover:border-studio-cobalt/50',
       )}
     >
       <div className="flex items-center gap-2">
-        <Icon className="h-3.5 w-3.5 flex-shrink-0 text-[#ccff00]" />
+        <Icon className="h-3.5 w-3.5 flex-shrink-0 text-studio-cobalt" />
         <span className="truncate text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
         {status && (
           <span
             className={cn(
-              'ml-auto rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider',
+              'ml-auto font-mono text-[9px] font-bold uppercase tracking-[0.18em]',
               TONE_CLASSES[status.tone],
             )}
           >

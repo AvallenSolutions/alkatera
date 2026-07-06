@@ -21,15 +21,15 @@ interface RisksOpportunitiesEditorProps {
 }
 
 const LIKELIHOOD_COLOURS: Record<RiskOpportunity['likelihood'], string> = {
-  low: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400',
-  medium: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
-  high: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
+  low: 'text-[#047857]',
+  medium: 'text-[#B45309]',
+  high: 'text-[#BE123C]',
 }
 
 const IMPACT_COLOURS: Record<RiskOpportunity['impact'], string> = {
-  low: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400',
-  medium: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
-  high: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
+  low: 'text-[#047857]',
+  medium: 'text-[#B45309]',
+  high: 'text-[#BE123C]',
 }
 
 export function RisksOpportunitiesEditor({
@@ -52,8 +52,8 @@ export function RisksOpportunitiesEditor({
   if (isGenerating) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
-        <div className="w-12 h-12 rounded-full bg-[#ccff00]/20 flex items-center justify-center animate-pulse">
-          <Sparkles className="w-6 h-6 text-[#84cc16]" />
+        <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center">
+          <Sparkles className="w-6 h-6 text-[#2B46C0]" />
         </div>
         <div>
           <p className="text-sm font-medium">Claude is analysing your plan</p>
@@ -65,7 +65,7 @@ export function RisksOpportunitiesEditor({
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-4 text-center border border-dashed border-border rounded-xl">
+      <div className="flex flex-col items-center justify-center py-16 gap-4 text-center border border-dashed border-border rounded-[6px]">
         <Sparkles className="w-8 h-8 text-muted-foreground" />
         <div>
           <p className="text-sm font-medium">No risks or opportunities yet</p>
@@ -100,7 +100,7 @@ export function RisksOpportunitiesEditor({
         {/* Risks column */}
         <div className="space-y-3">
           <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle className="w-4 h-4 text-red-400" />
+            <AlertTriangle className="w-4 h-4 text-[#BE123C]" />
             <h3 className="text-sm font-semibold">Risks ({risks.length})</h3>
           </div>
           {risks.map(item => (
@@ -119,7 +119,7 @@ export function RisksOpportunitiesEditor({
         {/* Opportunities column */}
         <div className="space-y-3">
           <div className="flex items-center gap-2 mb-2">
-            <TrendingUp className="w-4 h-4 text-green-500" />
+            <TrendingUp className="w-4 h-4 text-[#047857]" />
             <h3 className="text-sm font-semibold">Opportunities ({opportunities.length})</h3>
           </div>
           {opportunities.map(item => (
@@ -149,23 +149,23 @@ function RoCard({
   onRemove: () => void
 }) {
   const isRisk = item.type === 'risk'
-  const accentColour = isRisk ? 'border-l-red-300' : 'border-l-green-400'
+  const accentColour = isRisk ? 'border-l-[#BE123C]' : 'border-l-[#047857]'
 
   return (
-    <div className={`border border-border border-l-4 ${accentColour} rounded-xl p-4 bg-card space-y-3`}>
+    <div className={`border border-border border-l-4 ${accentColour} rounded-[6px] p-4 bg-card space-y-3`}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-wrap gap-1.5 flex-1">
           <Badge variant="outline" className="text-xs">
             {CATEGORY_LABELS[item.category]}
           </Badge>
-          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${LIKELIHOOD_COLOURS[item.likelihood]}`}>
+          <span className={`inline-flex items-center font-mono text-[10px] font-bold uppercase tracking-[0.18em] ${LIKELIHOOD_COLOURS[item.likelihood]}`}>
             {LIKELIHOOD_LABELS[item.likelihood]} likelihood
           </span>
-          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${IMPACT_COLOURS[item.impact]}`}>
+          <span className={`inline-flex items-center font-mono text-[10px] font-bold uppercase tracking-[0.18em] ${IMPACT_COLOURS[item.impact]}`}>
             {IMPACT_LABELS[item.impact]} impact
           </span>
           {item.aiGenerated && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-[#ccff00]/20 text-foreground">
+            <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#2B46C0]">
               <Sparkles className="w-3 h-3" />
               AI
             </span>
@@ -174,7 +174,7 @@ function RoCard({
         <button
           type="button"
           onClick={onRemove}
-          className="text-muted-foreground hover:text-red-400 transition-colors flex-shrink-0"
+          className="text-muted-foreground hover:text-[#BE123C] transition-colors flex-shrink-0"
           aria-label="Remove"
         >
           <Trash2 className="w-4 h-4" />

@@ -280,7 +280,7 @@ export default function ProductLcaReportPage() {
     const { data: { session } } = await supabaseClient.auth.getSession();
 
     if (!session?.access_token) {
-      throw new Error('Not authenticated — please sign in again.');
+      throw new Error('Not authenticated, please sign in again.');
     }
 
     const response = await fetch(`/api/lca/${lcaData.id}/generate-pdf`, {
@@ -370,7 +370,7 @@ export default function ProductLcaReportPage() {
   return (
     <div className="container mx-auto py-8 space-y-8">
       {/* Banner directing to new LCA Report Generator */}
-      <div className="p-4 rounded-lg bg-[#ccff00]/10 border border-[#ccff00]/30 flex items-center justify-between">
+      <div className="p-4 rounded-[6px] bg-card border border-border flex items-center justify-between">
         <div>
           <p className="font-semibold text-sm">New: Generate Beautiful PDF Reports</p>
           <p className="text-xs text-muted-foreground">
@@ -378,7 +378,7 @@ export default function ProductLcaReportPage() {
           </p>
         </div>
         <Link href={`/products/${productId}/compliance-wizard`}>
-          <Button size="sm" className="bg-[#ccff00] hover:bg-[#b8e600] text-black font-semibold gap-1.5">
+          <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 font-semibold gap-1.5">
             <FileText className="h-4 w-4" />
             Generate PDF Report
           </Button>
@@ -403,7 +403,7 @@ export default function ProductLcaReportPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1">
           {productImageUrl ? (
-            <div className="relative rounded-2xl overflow-hidden shadow-lg h-80 bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-900 dark:to-slate-800">
+            <div className="relative rounded-[6px] overflow-hidden border border-border bg-card h-80">
               <img
                 src={productImageUrl}
                 alt={displayProductName}
@@ -411,7 +411,7 @@ export default function ProductLcaReportPage() {
               />
             </div>
           ) : (
-            <div className="relative rounded-2xl overflow-hidden shadow-lg h-80 bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
+            <div className="relative rounded-[6px] overflow-hidden border border-border bg-card h-80 flex items-center justify-center">
               <div className="text-center">
                 <FileText className="h-16 w-16 text-slate-300 mx-auto mb-3" />
                 <p className="text-sm text-muted-foreground">No image available</p>
@@ -439,9 +439,9 @@ export default function ProductLcaReportPage() {
                 <p className="text-xl text-muted-foreground">{displayProductName}</p>
               </div>
               <div className="flex gap-2">
-                <Badge className="bg-emerald-600 hover:bg-emerald-700">
+                <span className="inline-flex items-center font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#047857]">
                   {displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
-                </Badge>
+                </span>
                 <Badge variant="outline">v{displayVersion}</Badge>
               </div>
             </div>
@@ -451,13 +451,13 @@ export default function ProductLcaReportPage() {
           </div>
 
           {/* Functional Unit - Prominent Display */}
-          <div className="p-4 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-2 border-blue-200 dark:border-blue-800">
+          <div className="p-4 rounded-[6px] bg-card border border-border">
             <div className="flex items-start gap-3">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
-                <Info className="h-5 w-5 text-blue-700 dark:text-blue-400" />
+              <div className="p-2 bg-secondary rounded-[6px]">
+                <Info className="h-5 w-5 text-[#2B46C0]" />
               </div>
               <div>
-                <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 mb-1">Functional Unit</p>
+                <p className="text-xs font-semibold text-[#2B46C0] mb-1">Functional Unit</p>
                 <p className="text-lg font-bold mb-1">{displayFunctionalUnit}</p>
                 <p className="text-xs text-muted-foreground">
                   All environmental impacts in this report are calculated per functional unit. This ensures fair comparison across different products and brands.
@@ -467,8 +467,8 @@ export default function ProductLcaReportPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800">
-              <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-1">Assessment Period</p>
+            <div className="p-4 rounded-[6px] bg-card border border-border">
+              <p className="text-xs font-semibold text-muted-foreground mb-1">Assessment Period</p>
               <p className="text-sm font-medium">{displayPeriod}</p>
             </div>
 
@@ -481,14 +481,14 @@ export default function ProductLcaReportPage() {
                 <p className="text-xs font-semibold text-slate-700 dark:text-slate-400">Data Quality</p>
                 {expandedCard === 'dqi' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
               </div>
-              <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">{displayDqi}%</p>
+              <p className="text-2xl font-bold text-[#2B46C0]">{displayDqi}%</p>
               <p className="text-xs text-muted-foreground">Click for details</p>
             </div>
           </div>
 
           {/* Expanded Data Quality Explanation */}
           {expandedCard === 'dqi' && (
-            <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 space-y-3">
+            <div className="p-4 rounded-[6px] bg-card border border-border space-y-3">
               <h4 className="font-semibold text-sm flex items-center gap-2">
                 <Activity className="h-4 w-4" />
                 Understanding Data Quality
@@ -498,21 +498,21 @@ export default function ProductLcaReportPage() {
               </p>
               <div className="space-y-2">
                 <div className="flex items-start gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                  <CheckCircle2 className="h-4 w-4 text-[#047857] flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="text-xs font-semibold">90-100%: Excellent</p>
                     <p className="text-xs text-muted-foreground">Primary data from verified suppliers with full traceability</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-2">
-                  <Minus className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <Minus className="h-4 w-4 text-[#B45309] flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="text-xs font-semibold">70-89%: Good</p>
                     <p className="text-xs text-muted-foreground">Mix of primary and secondary data from reliable databases</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-2">
-                  <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+                  <AlertCircle className="h-4 w-4 text-[#BE123C] flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="text-xs font-semibold">Below 70%: Needs Improvement</p>
                     <p className="text-xs text-muted-foreground">Significant use of industry averages or estimates</p>
@@ -533,7 +533,7 @@ export default function ProductLcaReportPage() {
 
           <div className="flex gap-3 pt-2">
             <Button
-              className="gap-2 bg-blue-600 hover:bg-blue-700"
+              className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
               onClick={handleDownloadPdf}
               disabled={isGeneratingPdf}
             >
@@ -661,14 +661,14 @@ export default function ProductLcaReportPage() {
           {/* Climate Impact - Comprehensive Expandable */}
           <div className={`${expandedCard === 'climate' ? 'md:col-span-4' : 'col-span-1'} transition-all duration-300`}>
             <Card
-              className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800/50 hover:shadow-lg transition-all duration-200 cursor-pointer"
+              className="rounded-[6px] border border-border bg-card hover:shadow-lg transition-all duration-200 cursor-pointer"
               onClick={() => setExpandedCard(expandedCard === 'climate' ? null : 'climate')}
             >
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-semibold flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 bg-green-100 dark:bg-green-900/50 rounded-lg">
-                      <Cloud className="h-4 w-4 text-green-700 dark:text-green-400" />
+                    <div className="p-2 bg-secondary rounded-[6px]">
+                      <Cloud className="h-4 w-4 text-[#2B46C0]" />
                     </div>
                     Climate Impact (GHG Protocol)
                   </div>
@@ -678,7 +678,7 @@ export default function ProductLcaReportPage() {
               <CardContent>
                 <div className="space-y-4">
                   <div>
-                    <div className="text-3xl font-bold text-green-700 dark:text-green-400">
+                    <div className="text-3xl font-bold text-foreground tabular-nums">
                       {totalEmissions.toFixed(3)}
                     </div>
                     <div className="text-xs text-muted-foreground">kg CO₂eq per unit</div>
@@ -701,12 +701,12 @@ export default function ProductLcaReportPage() {
 
                         {/* Warning: No production site data at all */}
                         {!hasFacilityData && totalEmissions > 0 && (
-                          <div className="mb-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+                          <div className="mb-3 p-3 rounded-[6px] bg-card border border-border">
                             <div className="flex items-start gap-2">
-                              <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                              <AlertCircle className="h-4 w-4 text-[#B45309] flex-shrink-0 mt-0.5" />
                               <div>
-                                <p className="text-xs font-semibold text-amber-900 dark:text-amber-100 mb-1">Production Site Data Missing</p>
-                                <p className="text-xs text-amber-800 dark:text-amber-200">
+                                <p className="text-xs font-semibold text-foreground mb-1">Production Site Data Missing</p>
+                                <p className="text-xs text-muted-foreground">
                                   Scope 1 & 2 emissions require facility allocation. Visit the <strong>Facilities</strong> tab to link facilities and calculate manufacturing emissions.
                                 </p>
                               </div>
@@ -716,12 +716,12 @@ export default function ProductLcaReportPage() {
 
                         {/* Info: Contract manufacturer data exists - explain why Scope 1/2 are zero */}
                         {hasContractMfgData && !hasOwnedFacilityData && (
-                          <div className="mb-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+                          <div className="mb-3 p-3 rounded-[6px] bg-card border border-border">
                             <div className="flex items-start gap-2">
-                              <Info className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                              <Info className="h-4 w-4 text-[#2B46C0] flex-shrink-0 mt-0.5" />
                               <div>
-                                <p className="text-xs font-semibold text-blue-900 dark:text-blue-100 mb-1">Contract Manufacturer Emissions</p>
-                                <p className="text-xs text-blue-800 dark:text-blue-200">
+                                <p className="text-xs font-semibold text-foreground mb-1">Contract Manufacturer Emissions</p>
+                                <p className="text-xs text-muted-foreground">
                                   Your production site emissions ({processingEmissions.toFixed(3)} kg CO₂e) appear in <strong>Scope 3</strong> because the facility is a contract manufacturer. Per GHG Protocol, third-party manufacturing emissions are categorized as Scope 3 Category 1 (Purchased Goods & Services).
                                 </p>
                               </div>
@@ -742,7 +742,7 @@ export default function ProductLcaReportPage() {
                               </div>
                             </div>
                             <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
-                              <div className="bg-red-500 h-2 rounded-full" style={{ width: `${(scope1 / totalEmissions) * 100}%` }}></div>
+                              <div className="bg-[#2B46C0] h-2 rounded-full" style={{ width: `${(scope1 / totalEmissions) * 100}%` }}></div>
                             </div>
                           </div>
 
@@ -758,7 +758,7 @@ export default function ProductLcaReportPage() {
                               </div>
                             </div>
                             <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
-                              <div className="bg-orange-500 h-2 rounded-full" style={{ width: `${(scope2 / totalEmissions) * 100}%` }}></div>
+                              <div className="bg-[#2B46C0]/70 h-2 rounded-full" style={{ width: `${(scope2 / totalEmissions) * 100}%` }}></div>
                             </div>
                           </div>
 
@@ -774,7 +774,7 @@ export default function ProductLcaReportPage() {
                               </div>
                             </div>
                             <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
-                              <div className="bg-amber-500 h-2 rounded-full" style={{ width: `${(scope3 / totalEmissions) * 100}%` }}></div>
+                              <div className="bg-[#2B46C0]/45 h-2 rounded-full" style={{ width: `${(scope3 / totalEmissions) * 100}%` }}></div>
                             </div>
                           </div>
                         </div>
@@ -795,7 +795,7 @@ export default function ProductLcaReportPage() {
 
                         <div className="grid md:grid-cols-2 gap-3">
                           {lifecycleStages.map((stage, idx) => {
-                            const colors = ['bg-green-600', 'bg-blue-600', 'bg-amber-600', 'bg-orange-600', 'bg-red-600'];
+                            const colors = ['bg-[#2B46C0]', 'bg-[#2B46C0]/75', 'bg-[#2B46C0]/55', 'bg-[#2B46C0]/40', 'bg-[#2B46C0]/25'];
                             const colorClass = colors[idx % colors.length];
 
                             return (
@@ -853,12 +853,12 @@ export default function ProductLcaReportPage() {
                         </div>
                       )}
 
-                      <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+                      <div className="p-3 rounded-[6px] bg-card border border-border">
                         <div className="flex items-start gap-2">
-                          <Info className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                          <Info className="h-4 w-4 text-[#2B46C0] flex-shrink-0 mt-0.5" />
                           <div>
-                            <p className="text-xs font-semibold text-blue-900 dark:text-blue-100 mb-1">What is CO₂eq?</p>
-                            <p className="text-xs text-blue-800 dark:text-blue-200">
+                            <p className="text-xs font-semibold text-foreground mb-1">What is CO₂eq?</p>
+                            <p className="text-xs text-muted-foreground">
                               CO₂ equivalent (CO₂eq) converts all greenhouse gases into a common unit based on their global warming potential over 100 years. This allows us to compare the climate impact of different gases on a level playing field.
                             </p>
                           </div>
@@ -874,14 +874,14 @@ export default function ProductLcaReportPage() {
           {/* Water Impact - Comprehensive Expandable */}
           <div className={`${expandedCard === 'water' ? 'md:col-span-4' : 'col-span-1'} transition-all duration-300`}>
             <Card
-              className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/30 border-blue-200 dark:border-blue-800/50 hover:shadow-lg transition-all duration-200 cursor-pointer"
+              className="rounded-[6px] border border-border bg-card hover:shadow-lg transition-all duration-200 cursor-pointer"
               onClick={() => setExpandedCard(expandedCard === 'water' ? null : 'water')}
             >
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-semibold flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
-                      <Droplets className="h-4 w-4 text-blue-700 dark:text-blue-400" />
+                    <div className="p-2 bg-secondary rounded-[6px]">
+                      <Droplets className="h-4 w-4 text-[#2B46C0]" />
                     </div>
                     Water Footprint
                   </div>
@@ -891,7 +891,7 @@ export default function ProductLcaReportPage() {
               <CardContent>
                 <div className="space-y-4">
                   <div>
-                    <div className="text-3xl font-bold text-blue-700 dark:text-blue-400">
+                    <div className="text-3xl font-bold text-foreground tabular-nums">
                       {waterConsumption.toFixed(3)}
                     </div>
                     <div className="text-xs text-muted-foreground">Litres consumed</div>
@@ -928,9 +928,9 @@ export default function ProductLcaReportPage() {
                               <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
                                 <div
                                   className={`h-2 rounded-full ${
-                                    item.riskLevel === 'high' ? 'bg-red-500' :
-                                    item.riskLevel === 'medium' ? 'bg-amber-500' :
-                                    'bg-green-500'
+                                    item.riskLevel === 'high' ? 'bg-[#BE123C]' :
+                                    item.riskLevel === 'medium' ? 'bg-[#B45309]' :
+                                    'bg-[#047857]'
                                   }`}
                                   style={{ width: `${(item.consumption / totalWaterConsumption) * 100}%` }}
                                 ></div>
@@ -940,12 +940,12 @@ export default function ProductLcaReportPage() {
                         </div>
                       </div>
 
-                      <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+                      <div className="p-3 rounded-[6px] bg-card border border-border">
                         <div className="flex items-start gap-2">
-                          <Info className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                          <Info className="h-4 w-4 text-[#2B46C0] flex-shrink-0 mt-0.5" />
                           <div>
-                            <p className="text-xs font-semibold text-blue-900 dark:text-blue-100 mb-1">Understanding Water Scarcity</p>
-                            <p className="text-xs text-blue-800 dark:text-blue-200">
+                            <p className="text-xs font-semibold text-foreground mb-1">Understanding Water Scarcity</p>
+                            <p className="text-xs text-muted-foreground">
                               Water scarcity measures the impact of water use in water-stressed regions. A litre used in a water-scarce region (like Spain) has a much higher environmental impact than the same litre used in a water-abundant region (like the UK).
                             </p>
                           </div>
@@ -961,14 +961,14 @@ export default function ProductLcaReportPage() {
           {/* Circularity - Comprehensive Expandable */}
           <div className={`${expandedCard === 'circularity' ? 'md:col-span-4' : 'col-span-1'} transition-all duration-300`}>
             <Card
-              className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-200 dark:border-amber-800/50 hover:shadow-lg transition-all duration-200 cursor-pointer"
+              className="rounded-[6px] border border-border bg-card hover:shadow-lg transition-all duration-200 cursor-pointer"
               onClick={() => setExpandedCard(expandedCard === 'circularity' ? null : 'circularity')}
             >
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-semibold flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-lg">
-                      <Recycle className="h-4 w-4 text-amber-700 dark:text-amber-400" />
+                    <div className="p-2 bg-secondary rounded-[6px]">
+                      <Recycle className="h-4 w-4 text-[#2B46C0]" />
                     </div>
                     Circularity & Waste
                   </div>
@@ -978,7 +978,7 @@ export default function ProductLcaReportPage() {
               <CardContent>
                 <div className="space-y-4">
                   <div>
-                    <div className="text-3xl font-bold text-amber-700 dark:text-amber-400">
+                    <div className="text-3xl font-bold text-foreground tabular-nums">
                       {circularityPercentage}%
                     </div>
                     <div className="text-xs text-muted-foreground">Recovery rate</div>
@@ -1014,7 +1014,7 @@ export default function ProductLcaReportPage() {
                               </div>
                               <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
                                 <div
-                                  className={`h-2 rounded-full ${item.circularityScore === 100 ? 'bg-green-500' : 'bg-red-500'}`}
+                                  className={`h-2 rounded-full ${item.circularityScore === 100 ? 'bg-[#047857]' : 'bg-[#BE123C]'}`}
                                   style={{ width: `${(item.mass / (totalWaste * 1000)) * 100}%` }}
                                 ></div>
                               </div>
@@ -1023,12 +1023,12 @@ export default function ProductLcaReportPage() {
                         </div>
                       </div>
 
-                      <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+                      <div className="p-3 rounded-[6px] bg-card border border-border">
                         <div className="flex items-start gap-2">
-                          <Info className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                          <Info className="h-4 w-4 text-[#2B46C0] flex-shrink-0 mt-0.5" />
                           <div>
-                            <p className="text-xs font-semibold text-amber-900 dark:text-amber-100 mb-1">Improving Circularity</p>
-                            <p className="text-xs text-amber-800 dark:text-amber-200">
+                            <p className="text-xs font-semibold text-foreground mb-1">Improving Circularity</p>
+                            <p className="text-xs text-muted-foreground">
                               To improve circularity: design for disassembly, use mono-materials where possible, increase recycled content, and support infrastructure for collection and recycling.
                             </p>
                           </div>
@@ -1044,14 +1044,14 @@ export default function ProductLcaReportPage() {
           {/* Land Use - Comprehensive Expandable */}
           <div className={`${expandedCard === 'land' ? 'md:col-span-4' : 'col-span-1'} transition-all duration-300`}>
             <Card
-              className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-200 dark:border-emerald-800/50 hover:shadow-lg transition-all duration-200 cursor-pointer"
+              className="rounded-[6px] border border-border bg-card hover:shadow-lg transition-all duration-200 cursor-pointer"
               onClick={() => setExpandedCard(expandedCard === 'land' ? null : 'land')}
             >
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-semibold flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg">
-                      <MapPin className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
+                    <div className="p-2 bg-secondary rounded-[6px]">
+                      <MapPin className="h-4 w-4 text-[#2B46C0]" />
                     </div>
                     Land Use Impact
                   </div>
@@ -1061,7 +1061,7 @@ export default function ProductLcaReportPage() {
               <CardContent>
                 <div className="space-y-4">
                   <div>
-                    <div className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">
+                    <div className="text-3xl font-bold text-foreground tabular-nums">
                       {totalLandUse.toFixed(3)}
                     </div>
                     <div className="text-xs text-muted-foreground">m² per unit</div>
@@ -1092,7 +1092,7 @@ export default function ProductLcaReportPage() {
                               </div>
                               <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
                                 <div
-                                  className="bg-emerald-600 h-2 rounded-full"
+                                  className="bg-[#2B46C0] h-2 rounded-full"
                                   style={{ width: `${(item.totalFootprint / totalLandUseSum) * 100}%` }}
                                 ></div>
                               </div>
@@ -1101,12 +1101,12 @@ export default function ProductLcaReportPage() {
                         </div>
                       </div>
 
-                      <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800">
+                      <div className="p-3 rounded-[6px] bg-card border border-border">
                         <div className="flex items-start gap-2">
-                          <Info className="h-4 w-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                          <Info className="h-4 w-4 text-[#2B46C0] flex-shrink-0 mt-0.5" />
                           <div>
-                            <p className="text-xs font-semibold text-emerald-900 dark:text-emerald-100 mb-1">Why Land Use Matters</p>
-                            <p className="text-xs text-emerald-800 dark:text-emerald-200">
+                            <p className="text-xs font-semibold text-foreground mb-1">Why Land Use Matters</p>
+                            <p className="text-xs text-muted-foreground">
                               Land use affects biodiversity, carbon storage, and ecosystem services. Intensive agriculture can lead to habitat loss, while sustainable practices can support wildlife and soil health.
                             </p>
                           </div>
@@ -1120,11 +1120,11 @@ export default function ProductLcaReportPage() {
           </div>
 
           {/* Resource Scarcity - Non-expandable */}
-          <Card className="col-span-1 bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30 border-orange-200 dark:border-orange-800/50 hover:shadow-lg hover:scale-105 transition-all duration-200">
+          <Card className="col-span-1 rounded-[6px] border border-border bg-card hover:shadow-lg transition-all duration-200">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <div className="p-2 bg-orange-100 dark:bg-orange-900/50 rounded-lg">
-                  <ThermometerSun className="h-4 w-4 text-orange-700 dark:text-orange-400" />
+                <div className="p-2 bg-secondary rounded-[6px]">
+                  <ThermometerSun className="h-4 w-4 text-[#2B46C0]" />
                 </div>
                 Resources
               </CardTitle>
@@ -1132,7 +1132,7 @@ export default function ProductLcaReportPage() {
             <CardContent>
               <div className="space-y-2">
                 <div>
-                  <div className="text-3xl font-bold text-orange-700 dark:text-orange-400">
+                  <div className="text-3xl font-bold text-foreground tabular-nums">
                     {Number(impacts.fossil_resource_scarcity || 0).toFixed(3)}
                   </div>
                   <div className="text-xs text-muted-foreground">kg oil equivalent</div>
@@ -1148,7 +1148,7 @@ export default function ProductLcaReportPage() {
         {/* Compliance Information */}
         <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 mt-6">
           {/* System Boundary */}
-          <Card className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900/30 dark:to-slate-800/30 border-slate-200 dark:border-slate-800/50">
+          <Card className="rounded-[6px] border border-border bg-card">
             <CardHeader>
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Eye className="h-4 w-4 text-slate-600 dark:text-slate-400" />
@@ -1157,8 +1157,8 @@ export default function ProductLcaReportPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800/50">
-                  <h5 className="font-semibold text-xs mb-2 flex items-center gap-2 text-green-700 dark:text-green-400">
+                <div className="p-3 rounded-[6px] bg-secondary border border-border">
+                  <h5 className="font-semibold text-xs mb-2 flex items-center gap-2 text-[#047857]">
                     <CheckCircle2 className="h-4 w-4" />
                     Included
                   </h5>
@@ -1169,8 +1169,8 @@ export default function ProductLcaReportPage() {
                     <li>• Factory operations</li>
                   </ul>
                 </div>
-                <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/50">
-                  <h5 className="font-semibold text-xs mb-2 flex items-center gap-2 text-red-700 dark:text-red-400">
+                <div className="p-3 rounded-[6px] bg-secondary border border-border">
+                  <h5 className="font-semibold text-xs mb-2 flex items-center gap-2 text-[#BE123C]">
                     <AlertCircle className="h-4 w-4" />
                     Excluded
                   </h5>
@@ -1242,12 +1242,12 @@ export default function ProductLcaReportPage() {
                 </div>
               ))}
             </div>
-            <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+            <div className="mt-4 p-3 bg-secondary border border-border rounded-[6px]">
               <div className="flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                <AlertCircle className="h-4 w-4 text-[#B45309] flex-shrink-0 mt-0.5" />
                 <div>
-                  <h5 className="text-xs font-semibold text-amber-900 dark:text-amber-100 mb-1">Cut-off Criteria</h5>
-                  <p className="text-xs text-amber-800 dark:text-amber-200">
+                  <h5 className="text-xs font-semibold text-foreground mb-1">Cut-off Criteria</h5>
+                  <p className="text-xs text-muted-foreground">
                     Processes contributing less than 1% to total impact and cumulatively less than 5% were excluded per ISO 14044 requirements.
                   </p>
                 </div>

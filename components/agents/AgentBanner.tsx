@@ -59,9 +59,9 @@ export function AgentBanner({ kinds, formName }: Props) {
   if (!enabled) return null
 
   return (
-    <div className="rounded-lg border border-[#ccff00]/40 bg-[#ccff00]/[0.06] p-3 mb-4">
+    <div className="rounded-[6px] border border-border bg-card p-3 mb-4">
       <div className="flex items-start gap-3">
-        <Dog className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#ccff00]" />
+        <Dog className="mt-0.5 h-5 w-5 flex-shrink-0 text-room-accent" />
         <div className="flex-1 text-sm">
           <p className="font-medium">Rosa handles {formName}</p>
           <p className="text-muted-foreground mt-0.5">
@@ -72,7 +72,7 @@ export function AgentBanner({ kinds, formName }: Props) {
         </div>
         <Link
           href="/rosa/?tab=queue"
-          className="flex flex-shrink-0 items-center gap-1 rounded-md bg-[#ccff00] px-3 py-1.5 text-xs font-medium text-black hover:bg-[#b8e600]"
+          className="flex flex-shrink-0 items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
         >
           {openCount > 0 ? `${openCount} in queue` : 'Open queue'}
           <ArrowRight className="h-3 w-3" />

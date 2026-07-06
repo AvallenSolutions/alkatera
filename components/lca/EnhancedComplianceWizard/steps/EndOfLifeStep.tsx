@@ -420,7 +420,7 @@ export function EndOfLifeStep() {
                           {row.name}
                           {row.fromCircularity && (
                             <span
-                              className="inline-flex items-center gap-1 rounded-full border border-[#ccff00]/40 bg-[#ccff00]/10 px-1.5 py-0.5 text-[9px] font-medium text-[#8da300] dark:text-[#ccff00]"
+                              className="inline-flex items-center gap-1 font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-[#2B46C0]"
                               title={row.circularityLabel || 'Seeded from packaging circularity'}
                             >
                               <Recycle className="h-2.5 w-2.5" />
@@ -588,7 +588,7 @@ export function EndOfLifeStep() {
               <p
                 className={`font-semibold ${
                   preview.net < 0
-                    ? 'text-green-600 dark:text-green-400'
+                    ? 'text-[#047857]'
                     : 'text-primary'
                 }`}
               >
@@ -597,8 +597,8 @@ export function EndOfLifeStep() {
             </div>
           </div>
           {preview.net < 0 && (
-            <p className="text-xs text-green-600 dark:text-green-400">
-              Net negative — recycling credits exceed disposal emissions
+            <p className="text-xs text-[#047857]">
+              Net negative: recycling credits exceed disposal emissions
             </p>
           )}
         </div>
