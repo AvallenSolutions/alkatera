@@ -88,42 +88,39 @@ function renderCoverPage(data: LCAReportData): string {
       </div>`
     : '';
 
+  const metaCell = (label: string, value: string) => `
+    <div style="flex: 1; padding-top: 14px; border-top: 1px solid rgba(26,27,29,0.18);">
+      <div class="lead-label" style="color: #205E40;">${escapeHtml(label)}</div>
+      <div class="card-title" style="font-size: 16px; margin-top: 6px;">${escapeHtml(value)}</div>
+    </div>`;
+
   return `
     <div class="page dark-page" style="justify-content: space-between; overflow: hidden; position: relative;">
-      <div style="position: absolute; inset: 0; ${heroStyle} opacity: 0.6;"></div>
-      <div style="position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(242,241,234,0.5), transparent, rgba(242,241,234,0.85));"></div>
+      <div style="position: absolute; inset: 0; ${heroStyle} opacity: 0.55;"></div>
+      <div style="position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(242,241,234,0.55), rgba(242,241,234,0.25), rgba(242,241,234,0.9));"></div>
 
       ${productImageHtml}
 
       <div style="position: relative; z-index: 10; padding-top: 48px;">
-        ${alkateraLogo(44, false)}
+        ${alkateraLogo(40, false)}
       </div>
 
-      <div style="position: relative; z-index: 10; width: 100%; max-width: 500px;">
-        <div style="background: #1A1B1D; color: #F2F1EA; padding: 24px 32px; border-radius: 12px; margin-bottom: 80px; transform: rotate(-1deg);">
-          <h2 style="font-family: 'Fira Code', monospace; font-weight: 700; font-style: italic; font-size: 22px; letter-spacing: -0.5px;">LIFE CYCLE ASSESSMENT</h2>
-          <p style="font-size: 11px; margin-top: 4px; opacity: 0.7;">Prepared in accordance with ISO 14067:2018 &amp; ISO 14044:2006</p>
+      <div style="position: relative; z-index: 10; width: 100%; max-width: 560px;">
+        <div style="display: inline-block; background: #1A1B1D; color: #F2F1EA; padding: 14px 22px; border-radius: 6px; margin-bottom: 44px;">
+          <div style="font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 12px; letter-spacing: 0.22em;">LIFE CYCLE ASSESSMENT</div>
+          <div style="font-size: 10px; margin-top: 5px; opacity: 0.7; font-family: 'JetBrains Mono', monospace; letter-spacing: 0.1em;">ISO 14067:2018 &middot; ISO 14044:2006</div>
         </div>
-        <h1 style="font-size: 64px; font-family: 'Playfair Display', serif; font-weight: 300; line-height: 1.1; margin-bottom: 16px; color: #1A1B1D;">
+        <h1 class="statement" style="font-size: 64px; line-height: 0.95; margin-bottom: 18px;">
           ${escapeHtml(data.meta.productName)}
         </h1>
-        <p style="font-size: 22px; color: #6F6F68; font-weight: 300; margin-bottom: 32px;">${escapeHtml(data.meta.organization)}</p>
-        ${data.meta.productDescription ? `<p style="font-size: 13px; color: #6F6F68; max-width: 420px; line-height: 1.6;">${escapeHtml(data.meta.productDescription)}</p>` : ''}
+        <p class="card-title" style="font-size: 18px; color: #6F6F68; font-weight: 500;">${escapeHtml(data.meta.organization)}</p>
+        ${data.meta.productDescription ? `<p class="body" style="max-width: 440px; margin-top: 18px;">${escapeHtml(data.meta.productDescription)}</p>` : ''}
       </div>
 
-      <div style="position: relative; z-index: 10; display: flex; gap: 16px; margin-bottom: 80px;">
-        <div style="border: 1px solid rgba(26,27,29,0.15); border-radius: 16px; padding: 20px 24px; background: rgba(242,241,234,0.7); flex: 1;">
-          <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #205E40; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 6px;">Functional Unit</div>
-          <div style="font-size: 16px; font-family: 'Playfair Display', serif; color: #1A1B1D;">${escapeHtml(data.functionalUnit.value)}</div>
-        </div>
-        <div style="border: 1px solid rgba(26,27,29,0.15); border-radius: 16px; padding: 20px 24px; background: rgba(242,241,234,0.7);">
-          <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #205E40; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 6px;">System Boundary</div>
-          <div style="font-size: 16px; font-family: 'Playfair Display', serif; color: #1A1B1D;">${escapeHtml(data.meta.lcaScopeType || 'Cradle-to-Gate')}</div>
-        </div>
-        <div style="border: 1px solid rgba(26,27,29,0.15); border-radius: 16px; padding: 20px 24px; background: rgba(242,241,234,0.7);">
-          <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #205E40; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 6px;">Reference Year</div>
-          <div style="font-size: 16px; font-family: 'Playfair Display', serif; color: #1A1B1D;">${data.meta.referenceYear || new Date().getFullYear()}</div>
-        </div>
+      <div style="position: relative; z-index: 10; display: flex; gap: 28px; margin-bottom: 84px;">
+        ${metaCell('Functional unit', data.functionalUnit.value)}
+        ${metaCell('System boundary', data.meta.lcaScopeType || 'Cradle-to-Gate')}
+        ${metaCell('Reference year', String(data.meta.referenceYear || new Date().getFullYear()))}
       </div>
 
       ${renderPageFooter(undefined, true)}
@@ -134,47 +131,44 @@ function renderExecSummaryPage(data: LCAReportData): string {
   const dqColor = data.executiveSummary.dataQualityScore >= 80 ? '#047857' :
     data.executiveSummary.dataQualityScore >= 50 ? '#B45309' : '#BE123C';
 
+  const dqTone = data.executiveSummary.dataQualityScore >= 80 ? 'good'
+    : data.executiveSummary.dataQualityScore >= 50 ? 'attention' : 'stale';
+
+  const bigStat = (value: string, unit: string, label: string) => `
+    <div style="flex: 1;">
+      <div class="lead-number" style="font-size: 40px; color: #1A1B1D;">${escapeHtml(value)}<span style="font-size: 13px; font-weight: 600; color: #6F6F68; margin-left: 6px;">${unit}</span></div>
+      <div class="lead-label" style="margin-top: 8px;">${escapeHtml(label)}</div>
+    </div>`;
+
   return `
-    <div class="page light-page">
-      ${renderSectionHeader('01', 'Executive Summary')}
+    <div class="page light-page" style="position: relative;">
+      ${mark('circle', 'br')}
+      <div style="position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%;">
+        ${renderSectionLead({
+          number: '01',
+          section: 'Executive summary',
+          value: data.executiveSummary.keyHighlight.value,
+          label: data.executiveSummary.keyHighlight.label,
+          statement: data.executiveSummary.keyHighlight.subtext || 'The footprint, in one number.',
+        })}
 
-      <div style="display: flex; gap: 24px; margin-bottom: 32px;">
-        <div style="flex: 1; background: #F2F1EA; border-radius: 16px; padding: 32px; color: #1A1B1D;">
-          <div style="font-size: 12px; font-family: 'Fira Code', monospace; color: #205E40; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Key Insight</div>
-          <div style="font-size: 48px; font-family: 'Playfair Display', serif; font-weight: 700; color: #205E40;">${escapeHtml(data.executiveSummary.keyHighlight.value)}</div>
-          <div style="font-size: 16px; color: #6F6F68; margin-top: 4px;">${escapeHtml(data.executiveSummary.keyHighlight.label)}</div>
-          <div style="font-size: 12px; color: #6F6F68; margin-top: 4px;">${escapeHtml(data.executiveSummary.keyHighlight.subtext)}</div>
-        </div>
-
-        <div style="width: 200px; background: white; border: 1px solid #D9D6CB; border-radius: 16px; padding: 24px; text-align: center;">
-          <div style="font-size: 11px; font-family: 'Fira Code', monospace; text-transform: uppercase; letter-spacing: 2px; color: #6F6F68; margin-bottom: 16px;">Data Quality</div>
-          <div style="width: 120px; height: 120px; border-radius: 50%; margin: 0 auto 12px; position: relative; background: conic-gradient(${dqColor} ${data.executiveSummary.dataQualityScore * 3.6}deg, #D9D6CB 0deg);">
-            <div style="position: absolute; inset: 12px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-              <span style="font-size: 32px; font-weight: 700; font-family: 'Playfair Display', serif; color: ${dqColor};">${data.executiveSummary.dataQualityScore}%</span>
+        <div style="display: flex; gap: 40px; margin-bottom: 28px;">
+          ${bigStat(data.climateImpact.totalCarbon, 'kg CO₂e', 'Carbon footprint, fossil')}
+          ${bigStat(data.waterFootprint.totalConsumption, 'litres', 'Water footprint')}
+          ${bigStat(String(data.circularity.recyclingRate), '%', 'Recycling rate')}
+          <div style="width: 118px; text-align: center;">
+            <div style="width: 92px; height: 92px; border-radius: 50%; margin: 0 auto; background: conic-gradient(${dqColor} ${data.executiveSummary.dataQualityScore * 3.6}deg, #D9D6CB 0deg); position: relative;">
+              <div style="position: absolute; inset: 10px; background: #ECEAE3; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                <span class="lead-number" style="font-size: 24px; color: #1A1B1D;">${data.executiveSummary.dataQualityScore}<span style="font-size: 11px;">%</span></span>
+              </div>
             </div>
+            <div class="state state-${dqTone}" style="margin-top: 10px;">Data quality</div>
           </div>
         </div>
-      </div>
 
-      <div style="background: white; border: 1px solid #D9D6CB; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
-        <p style="font-size: 13px; line-height: 1.8; color: #6F6F68;">${escapeHtml(data.executiveSummary.content)}</p>
-      </div>
-
-      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
-        <div class="metric-card">
-          <div class="metric-label">Carbon Footprint (fossil)</div>
-          <div class="metric-value">${escapeHtml(data.climateImpact.totalCarbon)}</div>
-          <div class="metric-unit">kg CO&#8322;e</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-label">Water Footprint</div>
-          <div class="metric-value">${escapeHtml(data.waterFootprint.totalConsumption)}</div>
-          <div class="metric-unit">litres</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-label">Circularity</div>
-          <div class="metric-value">${data.circularity.recyclingRate}%</div>
-          <div class="metric-unit">recycling rate</div>
+        <div class="rule" style="padding-top: 20px;">
+          <div class="eyebrow dim" style="margin-bottom: 10px;">The study in brief</div>
+          <p class="body" style="font-size: 13.5px; line-height: 1.7;">${escapeHtml(data.executiveSummary.content)}</p>
         </div>
       </div>
 
@@ -227,11 +221,12 @@ function renderEolMethodologySection(data: LCAReportData): string {
 }
 
 function renderGoalAndScopePage(data: LCAReportData): string {
+  const A = '#2B46C0';
   const allAssumptions = data.goalAndScope.assumptionsAndLimitations;
   const renderAssumption = (al: { type: string; text: string }) =>
-    `<div style="display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid #D9D6CB;">
-      <span class="badge ${al.type === 'Assumption' ? 'badge-low' : 'badge-medium'}" style="flex-shrink: 0; align-self: flex-start; margin-top: 2px;">${escapeHtml(al.type)}</span>
-      <span style="font-size: 11px; color: #6F6F68; line-height: 1.4;">${escapeHtml(al.text)}</span>
+    `<div style="display: flex; gap: 14px; padding: 10px 0; border-bottom: 1px solid #D9D6CB;">
+      <span class="state state-quiet" style="flex-shrink: 0; align-self: flex-start; margin-top: 2px; width: 88px;">${escapeHtml(al.type)}</span>
+      <span class="body" style="font-size: 11.5px; line-height: 1.5;">${escapeHtml(al.text)}</span>
     </div>`;
 
   // Split assumptions: first 4 on page 1, rest on continuation page
@@ -240,77 +235,78 @@ function renderGoalAndScopePage(data: LCAReportData): string {
   const overflowAssumptions = allAssumptions.slice(PAGE1_MAX);
 
   const audience = data.goalAndScope.intendedAudience.map(a =>
-    `<span style="display: inline-block; padding: 3px 10px; background: #f0fdf4; color: #166534; border-radius: 8px; font-size: 11px; margin-right: 6px; margin-bottom: 4px;">${escapeHtml(a)}</span>`
+    `<span class="state" style="color: ${A}; margin-right: 16px; white-space: nowrap;">${escapeHtml(a)}</span>`
   ).join('');
 
+  // A definition row: mono label, then the prose beneath it, hairline-separated.
+  const defRow = (label: string, body: string, isHtml = false) => `
+    <div>
+      <div class="lead-label" style="margin-bottom: 8px;">${escapeHtml(label)}</div>
+      <p class="body" style="font-size: 12px; line-height: 1.6;">${isHtml ? body : escapeHtml(body)}</p>
+    </div>`;
+
   const page1 = `
-    <div class="page light-page">
-      ${renderSectionHeader('02', 'Goal & Scope Definition')}
+    <div class="page light-page" style="position: relative;">
+      ${mark('triangle', 'br', A)}
+      <div style="position: relative; z-index: 1;">
+        ${renderSectionHeader('02', 'Goal & Scope Definition', false, false, A)}
 
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-        <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #6F6F68; text-transform: uppercase; letter-spacing: 2px;">ISO 14044:2006 &sect;4.2</div>
-        ${/* ISSUE E FIX: Display report version identifier (ISO 14044 §4.2.1). */ ''}
-        <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #6F6F68; letter-spacing: 1px;">Report Version ${escapeHtml(data.meta.version)}</div>
-      </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px;">
+          <div class="eyebrow" style="color: ${A};">ISO 14044:2006 &sect;4.2</div>
+          ${/* ISSUE E FIX: Display report version identifier (ISO 14044 §4.2.1). */ ''}
+          <div class="lead-label">Report Version ${escapeHtml(data.meta.version)}</div>
+        </div>
 
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
-        <div style="background: white; border: 1px solid #D9D6CB; border-radius: 12px; padding: 16px;">
-          <div style="font-size: 11px; font-weight: 600; color: #1A1B1D; margin-bottom: 8px;">Intended Application</div>
-          <p style="font-size: 12px; color: #6F6F68; line-height: 1.6;">${escapeHtml(data.goalAndScope.intendedApplication)}</p>
-        </div>
-        <div style="background: white; border: 1px solid #D9D6CB; border-radius: 12px; padding: 16px;">
-          <div style="font-size: 11px; font-weight: 600; color: #1A1B1D; margin-bottom: 8px;">Reasons for Study</div>
-          <p style="font-size: 12px; color: #6F6F68; line-height: 1.6;">${escapeHtml(data.goalAndScope.reasonsForStudy)}</p>
-        </div>
-      </div>
-
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
-        <div style="background: white; border: 1px solid #D9D6CB; border-radius: 12px; padding: 16px;">
-          <div style="font-size: 11px; font-weight: 600; color: #1A1B1D; margin-bottom: 8px;">Intended Audience</div>
-          <div>${audience}</div>
-        </div>
-        <div style="background: white; border: 1px solid #D9D6CB; border-radius: 12px; padding: 16px;">
-          <div style="font-size: 11px; font-weight: 600; color: #1A1B1D; margin-bottom: 8px;">Comparative Assertion</div>
-          <p style="font-size: 12px; color: #6F6F68;">${data.goalAndScope.isComparativeAssertion ? 'Yes — this study supports comparative assertions intended for public disclosure. A critical review panel is required per ISO 14044 §6.3.' : 'No — this study does not support comparative assertions disclosed to the public.'}</p>
-        </div>
-      </div>
-
-      <div style="background: white; border: 1px solid #D9D6CB; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
-        <div style="font-size: 11px; font-weight: 600; color: #1A1B1D; margin-bottom: 8px;">System Boundary — ${escapeHtml(data.goalAndScope.systemBoundary)}</div>
-        <p style="font-size: 12px; color: #6F6F68; line-height: 1.6; margin-bottom: 12px;">${escapeHtml(data.goalAndScope.systemBoundaryDescription)}</p>
-        <div style="display: flex; gap: 16px;">
-          <div style="flex: 1; font-size: 11px;">
-            <div style="font-weight: 600; color: #166534; margin-bottom: 6px;">Cut-off Criteria</div>
-            <p style="color: #6F6F68; line-height: 1.5;">${escapeHtml(data.goalAndScope.cutOffCriteria)}</p>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px 40px; margin-bottom: 24px;">
+          ${defRow('Intended application', data.goalAndScope.intendedApplication)}
+          ${defRow('Reasons for study', data.goalAndScope.reasonsForStudy)}
+          <div>
+            <div class="lead-label" style="margin-bottom: 10px;">Intended audience</div>
+            <div>${audience}</div>
           </div>
-          <div style="flex: 1; font-size: 11px;">
-            <div style="font-weight: 600; color: #1e40af; margin-bottom: 6px;">Allocation Procedure</div>
-            <p style="color: #6F6F68; line-height: 1.5;">${escapeHtml(data.goalAndScope.allocationProcedure)}</p>
+          ${defRow('Comparative assertion', data.goalAndScope.isComparativeAssertion ? 'Yes: this study supports comparative assertions intended for public disclosure. A critical review panel is required per ISO 14044 §6.3.' : 'No: this study does not support comparative assertions disclosed to the public.')}
+        </div>
+
+        <div class="panel" style="margin-bottom: 24px;">
+          <div class="lead-label" style="color: ${A}; margin-bottom: 8px;">System boundary &middot; ${escapeHtml(data.goalAndScope.systemBoundary)}</div>
+          <p class="body" style="font-size: 12px; line-height: 1.6; margin-bottom: 16px;">${escapeHtml(data.goalAndScope.systemBoundaryDescription)}</p>
+          <div style="display: flex; gap: 32px;">
+            <div style="flex: 1;">
+              <div class="lead-label" style="margin-bottom: 6px;">Cut-off criteria</div>
+              <p class="body" style="font-size: 11px; line-height: 1.5;">${escapeHtml(data.goalAndScope.cutOffCriteria)}</p>
+            </div>
+            <div style="flex: 1;">
+              <div class="lead-label" style="margin-bottom: 6px;">Allocation procedure</div>
+              <p class="body" style="font-size: 11px; line-height: 1.5;">${escapeHtml(data.goalAndScope.allocationProcedure)}</p>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div style="margin-bottom: 20px;">
-        <div style="font-size: 11px; font-weight: 600; color: #1A1B1D; margin-bottom: 8px;">Assumptions &amp; Limitations</div>
-        ${page1Assumptions.map(renderAssumption).join('')}
-      </div>
+        <div style="margin-bottom: 20px;">
+          <div class="lead-label" style="margin-bottom: 8px;">Assumptions &amp; limitations</div>
+          ${page1Assumptions.map(renderAssumption).join('')}
+        </div>
 
-      ${overflowAssumptions.length === 0 ? renderEolMethodologySection(data) : ''}
+        ${overflowAssumptions.length === 0 ? renderEolMethodologySection(data) : ''}
+      </div>
 
       ${renderPageFooter(2)}
     </div>`;
 
   // Continuation page for remaining assumptions + EoL methodology
   const page2 = overflowAssumptions.length > 0 ? `
-    <div class="page light-page">
-      ${renderSectionHeader('02', 'Goal & Scope Definition (cont.)')}
+    <div class="page light-page" style="position: relative;">
+      ${mark('triangle', 'br', A)}
+      <div style="position: relative; z-index: 1;">
+        ${renderSectionHeader('02', 'Goal & Scope Definition', false, true, A)}
 
-      <div style="margin-bottom: 20px;">
-        <div style="font-size: 11px; font-weight: 600; color: #1A1B1D; margin-bottom: 8px;">Assumptions &amp; Limitations (continued)</div>
-        ${overflowAssumptions.map(renderAssumption).join('')}
+        <div style="margin-bottom: 20px;">
+          <div class="lead-label" style="margin-bottom: 8px;">Assumptions &amp; limitations (continued)</div>
+          ${overflowAssumptions.map(renderAssumption).join('')}
+        </div>
+
+        ${renderEolMethodologySection(data)}
       </div>
-
-      ${renderEolMethodologySection(data)}
 
       ${renderPageFooter()}
     </div>` : '';
@@ -319,100 +315,98 @@ function renderGoalAndScopePage(data: LCAReportData): string {
 }
 
 function renderMethodologyPage(data: LCAReportData): string {
-  const included = data.methodology.includedStages.map(s =>
-    `<div style="display: flex; align-items: center; gap: 8px; padding: 6px 0;">
-      <div style="width: 18px; height: 18px; background: #047857; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-        <span style="color: white; font-size: 10px;">&#10003;</span>
-      </div>
-      <span style="font-size: 12px; color: #6F6F68;">${escapeHtml(s)}</span>
-    </div>`
-  ).join('');
+  const A = '#2B46C0';
+  const stageRow = (s: string, tone: 'good' | 'stale', symbol: string) =>
+    `<div style="display: flex; align-items: baseline; gap: 12px; padding: 7px 0; border-bottom: 1px solid #D9D6CB;">
+      <span class="state state-${tone}" style="width: 14px; flex-shrink: 0;">${symbol}</span>
+      <span class="body" style="font-size: 12px; color: #1A1B1D;">${escapeHtml(s)}</span>
+    </div>`;
 
-  const excluded = data.methodology.excludedStages.map(s =>
-    `<div style="display: flex; align-items: center; gap: 8px; padding: 6px 0;">
-      <div style="width: 18px; height: 18px; background: #BE123C; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-        <span style="color: white; font-size: 10px;">&#10007;</span>
-      </div>
-      <span style="font-size: 12px; color: #6F6F68;">${escapeHtml(s)}</span>
-    </div>`
-  ).join('');
+  const included = data.methodology.includedStages.map(s => stageRow(s, 'good', '&#10003;')).join('');
+  const excluded = data.methodology.excludedStages.map(s => stageRow(s, 'stale', '&#10007;')).join('');
 
   const dataSources = data.methodology.dataSources.map(ds =>
-    `<div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #F2F1EA; border-radius: 8px; margin-bottom: 6px;">
+    `<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 10px 0; border-bottom: 1px solid #D9D6CB;">
       <div>
-        <span style="font-size: 13px; font-weight: 500;">${escapeHtml(ds.name)}</span>
-        ${ds.version ? `<span style="font-size: 10px; color: #6F6F68; margin-left: 6px;">v${escapeHtml(ds.version)}</span>` : ''}
-        ${ds.description ? `<div style="font-size: 10px; color: #6F6F68; margin-top: 2px;">${escapeHtml(ds.description)}</div>` : ''}
+        <span class="card-title" style="font-size: 13px;">${escapeHtml(ds.name)}</span>
+        ${ds.version ? `<span class="lead-label" style="margin-left: 8px;">v${escapeHtml(ds.version)}</span>` : ''}
+        ${ds.description ? `<div class="body" style="font-size: 10px; margin-top: 2px;">${escapeHtml(ds.description)}</div>` : ''}
       </div>
-      <span style="font-size: 13px; color: #6F6F68; font-weight: 500;">${ds.count} factors</span>
+      <span style="font-size: 13px; color: #6F6F68; font-variant-numeric: tabular-nums; white-space: nowrap;">${ds.count} factors</span>
     </div>`
   ).join('');
 
   const charModels = data.methodology.characterizationModels.map(cm =>
     `<tr>
-      <td style="font-weight: 500;">${escapeHtml(cm.category)}</td>
+      <td>${escapeHtml(cm.category)}</td>
       <td>${escapeHtml(cm.model)}</td>
-      <td style="font-size: 11px; color: #6F6F68;">${escapeHtml(cm.reference)}</td>
+      <td style="color: #6F6F68;">${escapeHtml(cm.reference)}</td>
     </tr>`
   ).join('');
 
   const software = data.methodology.softwareAndDatabases.map(s =>
-    `<div style="display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #D9D6CB;">
-      <span style="font-size: 12px; font-weight: 500; width: 140px;">${/^alkatera$/i.test(s.name) ? alkateraName() : escapeHtml(s.name)} <span style="color: #6F6F68; font-weight: 400;">v${escapeHtml(s.version)}</span></span>
-      <span style="font-size: 11px; color: #6F6F68;">${escapeHtml(s.purpose)}</span>
+    `<div style="display: flex; align-items: baseline; gap: 12px; padding: 8px 0; border-bottom: 1px solid #D9D6CB;">
+      <span class="card-title" style="font-size: 12px; width: 140px; flex-shrink: 0;">${/^alkatera$/i.test(s.name) ? alkateraName() : escapeHtml(s.name)} <span class="lead-label" style="letter-spacing: 0.12em;">v${escapeHtml(s.version)}</span></span>
+      <span class="body" style="font-size: 11px;">${escapeHtml(s.purpose)}</span>
     </div>`
   ).join('');
 
   return `
-    <div class="page light-page">
-      ${renderSectionHeader('03', 'Methodology')}
+    <div class="page light-page" style="position: relative;">
+      ${mark('triangle', 'br', A)}
+      <div style="position: relative; z-index: 1;">
+        ${renderSectionHeader('03', 'Methodology', false, false, A)}
 
-      <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #6F6F68; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">ISO 14044:2006 &sect;4.3 &amp; &sect;4.4</div>
+        <div class="eyebrow" style="color: ${A}; margin-bottom: 20px;">ISO 14044:2006 &sect;4.3 &amp; &sect;4.4</div>
 
-      <div style="display: flex; gap: 20px; margin-bottom: 20px;">
-        <div style="flex: 1;">
-          <h3 style="font-size: 13px; font-weight: 600; margin-bottom: 10px; color: #1A1B1D;">Included Stages</h3>
-          ${included}
+        <div style="display: flex; gap: 40px; margin-bottom: 24px;">
+          <div style="flex: 1;">
+            <div class="lead-label" style="margin-bottom: 10px;">Included stages</div>
+            ${included}
+          </div>
+          <div style="flex: 1;">
+            <div class="lead-label" style="margin-bottom: 10px;">Excluded stages</div>
+            ${excluded}
+          </div>
         </div>
-        <div style="flex: 1;">
-          <h3 style="font-size: 13px; font-weight: 600; margin-bottom: 10px; color: #1A1B1D;">Excluded Stages</h3>
-          ${excluded}
+
+        <div class="panel" style="margin-bottom: 24px;">
+          <div class="lead-label" style="color: ${A}; margin-bottom: 6px;">LCIA method &middot; ${escapeHtml(data.methodology.lciaMethod)}</div>
+          <p class="body" style="font-size: 11px; line-height: 1.6;">${escapeHtml(data.methodology.lciaMethodDescription)}</p>
         </div>
-      </div>
 
-      <div style="background: white; border: 1px solid #D9D6CB; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
-        <div style="font-size: 11px; font-weight: 600; margin-bottom: 4px;">LCIA Method: ${escapeHtml(data.methodology.lciaMethod)}</div>
-        <p style="font-size: 11px; color: #6F6F68; line-height: 1.6;">${escapeHtml(data.methodology.lciaMethodDescription)}</p>
-      </div>
+        <div style="margin-bottom: 20px;">
+          <div class="lead-label" style="margin-bottom: 10px;">Data sources &amp; databases</div>
+          ${dataSources}
+        </div>
 
-      <div style="margin-bottom: 16px;">
-        <h3 style="font-size: 13px; font-weight: 600; margin-bottom: 10px; color: #1A1B1D;">Data Sources &amp; Databases</h3>
-        ${dataSources}
-      </div>
-
-      <div>
-        <h3 style="font-size: 13px; font-weight: 600; margin-bottom: 10px; color: #1A1B1D;">Software &amp; Tools</h3>
-        ${software}
+        <div>
+          <div class="lead-label" style="margin-bottom: 10px;">Software &amp; tools</div>
+          ${software}
+        </div>
       </div>
 
       ${renderPageFooter(3)}
     </div>
 
-    <div class="page light-page">
-      ${renderSectionHeader('03', 'Methodology — Characterization Models', false, true)}
+    <div class="page light-page" style="position: relative;">
+      ${mark('triangle', 'br', A)}
+      <div style="position: relative; z-index: 1;">
+        ${renderSectionHeader('03', 'Methodology, Characterisation Models', false, true, A)}
 
-      <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #6F6F68; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">LCIA CHARACTERIZATION FACTORS</div>
+        <div class="eyebrow" style="color: ${A}; margin-bottom: 20px;">LCIA characterisation factors</div>
 
-      <table class="data-table" style="margin-bottom: 24px;">
-        <thead><tr><th>Impact Category</th><th>Characterization Model</th><th>Reference</th></tr></thead>
-        <tbody>${charModels}</tbody>
-      </table>
+        <table class="studio-table" style="margin-bottom: 28px;">
+          <thead><tr><th>Impact Category</th><th>Characterisation Model</th><th>Reference</th></tr></thead>
+          <tbody>${charModels}</tbody>
+        </table>
 
-      <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
-        <div style="font-size: 11px; font-weight: 600; color: #92400e; margin-bottom: 6px;">Reference Standards</div>
-        ${data.goalAndScope.referenceStandards.map(s =>
-          `<div style="font-size: 11px; color: #6F6F68; padding: 3px 0;">&#8226; ${escapeHtml(s)}</div>`
-        ).join('')}
+        <div class="panel" style="border-left: 2px solid ${A};">
+          <div class="lead-label" style="color: ${A}; margin-bottom: 8px;">Reference standards</div>
+          ${data.goalAndScope.referenceStandards.map(s =>
+            `<div class="body" style="font-size: 11px; padding: 3px 0;">&#8226; ${escapeHtml(s)}</div>`
+          ).join('')}
+        </div>
       </div>
 
       ${renderPageFooter(4)}
@@ -429,12 +423,16 @@ function renderDataQualityPage(data: LCAReportData): string {
     { label: 'Technological', score: pm.technologicalRepresentativeness, desc: 'Match of data technology to actual processes' },
   ];
 
-  const dqColor = data.dataQuality.overallScore >= 80 ? '#047857' :
-    data.dataQuality.overallScore >= 50 ? '#B45309' : '#BE123C';
+  const A = '#2B46C0';
+  const dqTone = data.dataQuality.overallScore >= 80 ? 'good' :
+    data.dataQuality.overallScore >= 50 ? 'attention' : 'stale';
+  const dqStatement = data.dataQuality.overallScore >= 80 ? 'The data is strong.'
+    : data.dataQuality.overallScore >= 50 ? 'The data is workable.' : 'The data needs strengthening.';
 
   const cs = data.dataQuality.coverageSummary;
 
-  // Pedigree bar helper (1=best, 5=worst)
+  // Pedigree bar helper (1=best, 5=worst). Track is #D9D6CB; fill keeps its
+  // semantic working tone; the score is tabular.
   const pedigreeBar = (score: number) => {
     const pct = ((6 - score) / 5) * 100;
     const color = score <= 2 ? '#047857' : score <= 3 ? '#B45309' : '#BE123C';
@@ -442,120 +440,117 @@ function renderDataQualityPage(data: LCAReportData): string {
       <div style="flex: 1; height: 8px; background: #D9D6CB; border-radius: 4px; overflow: hidden;">
         <div style="height: 100%; width: ${pct}%; background: ${color}; border-radius: 4px;"></div>
       </div>
-      <span style="font-size: 12px; font-weight: 600; width: 20px; text-align: center;">${score}</span>
+      <span style="font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; width: 20px; text-align: center;">${score}</span>
     </div>`;
   };
 
+  // Source → state: Primary is good, Proxy is stale, secondary attention.
+  const sourceTone = (source: string) => source.includes('Primary') ? 'good' : source.includes('Proxy') ? 'stale' : 'attention';
+
   const materialQualityRows = data.dataQuality.materialQuality.slice(0, 12).map(m =>
     `<tr>
-      <td style="font-weight: 500; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(m.name)}</td>
-      <td><span class="badge ${m.source.includes('Primary') ? 'badge-low' : m.source.includes('Proxy') ? 'badge-high' : 'badge-medium'}">${escapeHtml(m.source.split(' (')[0])}</span></td>
+      <td style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(m.name)}</td>
+      <td><span class="state state-${sourceTone(m.source)}">${escapeHtml(m.source.split(' (')[0])}</span></td>
       <td>${escapeHtml(m.grade)}</td>
-      <td>${m.confidence > 0 ? `${m.confidence}%` : '—'}</td>
-      <td style="font-size: 11px;">${escapeHtml(m.geographicCoverage)}</td>
+      <td><span class="num">${m.confidence > 0 ? `${m.confidence}%` : '&#8212;'}</span></td>
+      <td>${escapeHtml(m.geographicCoverage)}</td>
     </tr>`
   ).join('');
 
+  // Coverage figures as hairline-separated lead numbers, not boxed cards.
+  const coverageStat = (value: string, label: string, sub: string, colour: string) => `
+    <div style="flex: 1;">
+      <div class="lead-number" style="font-size: 30px; color: ${colour};">${value}</div>
+      <div class="lead-label" style="margin-top: 8px;">${escapeHtml(label)}</div>
+      <div class="body" style="font-size: 10px; margin-top: 3px;">${escapeHtml(sub)}</div>
+    </div>`;
+
   return `
-    <div class="page light-page">
-      ${renderSectionHeader('04', 'Data Quality Assessment')}
+    <div class="page light-page" style="position: relative;">
+      ${mark('triangle', 'br', A)}
+      <div style="position: relative; z-index: 1;">
+        ${renderSectionLead({
+          number: '04',
+          section: 'Data quality assessment',
+          value: `${data.dataQuality.overallScore}%`,
+          label: `Data quality · ${data.dataQuality.overallRating}`,
+          statement: dqStatement,
+          accent: A,
+        })}
 
-      <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #6F6F68; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">ISO 14044:2006 &sect;4.2.3.6 — DATA QUALITY REQUIREMENTS</div>
+        <div class="eyebrow" style="color: ${A}; margin-bottom: 20px;">ISO 14044:2006 &sect;4.2.3.6 &middot; Data quality requirements</div>
 
-      <div style="display: flex; gap: 20px; margin-bottom: 24px;">
-        <div style="width: 180px; background: white; border: 1px solid #D9D6CB; border-radius: 16px; padding: 24px; text-align: center;">
-          <div style="width: 100px; height: 100px; border-radius: 50%; margin: 0 auto 12px; position: relative; background: conic-gradient(${dqColor} ${data.dataQuality.overallScore * 3.6}deg, #D9D6CB 0deg);">
-            <div style="position: absolute; inset: 10px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column;">
-              <span style="font-size: 28px; font-weight: 700; font-family: 'Playfair Display', serif; color: ${dqColor};">${data.dataQuality.overallScore}%</span>
-            </div>
-          </div>
-          <div style="font-size: 13px; font-weight: 600; color: ${dqColor};">${escapeHtml(data.dataQuality.overallRating)}</div>
-        </div>
-
-        <div style="flex: 1;">
-          <div style="font-size: 12px; font-weight: 600; margin-bottom: 12px;">Pedigree Matrix (ISO 14044 §4.2.3.6)</div>
+        <div style="margin-bottom: 24px;">
+          <div class="lead-label" style="margin-bottom: 12px;">Pedigree matrix (ISO 14044 &sect;4.2.3.6)</div>
           ${pedigreeRows.map(r =>
             `<div style="display: grid; grid-template-columns: 100px 1fr 180px; gap: 8px; align-items: center; margin-bottom: 8px;">
-              <span style="font-size: 11px; font-weight: 500;">${r.label}</span>
+              <span class="card-title" style="font-size: 11px;">${r.label}</span>
               ${pedigreeBar(r.score)}
-              <span style="font-size: 10px; color: #6F6F68;">${r.desc}</span>
+              <span class="body" style="font-size: 10px;">${r.desc}</span>
             </div>`
           ).join('')}
-          <div style="font-size: 9px; color: #6F6F68; margin-top: 4px;">Scale: 1 (best) to 5 (worst) per ecoinvent pedigree approach</div>
+          <div class="body" style="font-size: 9px; margin-top: 6px;">Scale: 1 (best) to 5 (worst) per ecoinvent pedigree approach</div>
         </div>
-      </div>
 
-      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px;">
-        <div class="metric-card" style="text-align: center;">
-          <div class="metric-label">Primary Data</div>
-          <div style="font-size: 24px; font-weight: 700; color: #047857;">${cs.primaryDataShare}%</div>
-          <div class="metric-unit">${cs.primaryCount} of ${cs.totalMaterials} materials</div>
+        <div class="rule" style="padding-top: 20px; margin-bottom: 24px; display: flex; gap: 32px;">
+          ${coverageStat(`${cs.primaryDataShare}%`, 'Primary data', `${cs.primaryCount} of ${cs.totalMaterials} materials`, '#047857')}
+          ${coverageStat(`${cs.secondaryDataShare}%`, 'Secondary data', `${cs.secondaryCount} materials`, A)}
+          ${coverageStat(`${cs.proxyDataShare}%`, 'Proxy data', `${cs.proxyCount} materials`, '#B45309')}
+          ${coverageStat(String(cs.totalMaterials), 'Total materials', 'in inventory', '#1A1B1D')}
         </div>
-        <div class="metric-card" style="text-align: center;">
-          <div class="metric-label">Secondary Data</div>
-          <div style="font-size: 24px; font-weight: 700; color: #2B46C0;">${cs.secondaryDataShare}%</div>
-          <div class="metric-unit">${cs.secondaryCount} materials</div>
-        </div>
-        <div class="metric-card" style="text-align: center;">
-          <div class="metric-label">Proxy Data</div>
-          <div style="font-size: 24px; font-weight: 700; color: #B45309;">${cs.proxyDataShare}%</div>
-          <div class="metric-unit">${cs.proxyCount} materials</div>
-        </div>
-        <div class="metric-card" style="text-align: center;">
-          <div class="metric-label">Total Materials</div>
-          <div style="font-size: 24px; font-weight: 700; color: #1A1B1D;">${cs.totalMaterials}</div>
-          <div class="metric-unit">in inventory</div>
-        </div>
-      </div>
 
-      <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px;">Material-Level Data Quality</div>
-      <table class="data-table" style="font-size: 11px;">
-        <thead><tr><th>Material</th><th>Source</th><th>Grade</th><th>Confidence</th><th>Geography</th></tr></thead>
-        <tbody>${materialQualityRows}</tbody>
-      </table>
+        <div class="lead-label" style="margin-bottom: 10px;">Material-level data quality</div>
+        <table class="studio-table">
+          <thead><tr><th>Material</th><th>Source</th><th>Grade</th><th>Confidence</th><th>Geography</th></tr></thead>
+          <tbody>${materialQualityRows}</tbody>
+        </table>
+      </div>
 
       ${renderPageFooter(5)}
     </div>
 
-    <div class="page light-page">
-      ${renderSectionHeader('04', 'Data Quality — Notes', false, true)}
+    <div class="page light-page" style="position: relative;">
+      ${mark('triangle', 'br', A)}
+      <div style="position: relative; z-index: 1;">
+        ${renderSectionHeader('04', 'Data Quality, Notes', false, true, A)}
 
-      <div style="background: white; border: 1px solid #D9D6CB; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
-        <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px;">Missing Data Treatment (ISO 14044 §4.2.3.6.3)</div>
-        <p style="font-size: 12px; color: #6F6F68; line-height: 1.7;">${escapeHtml(data.dataQuality.missingDataTreatment)}</p>
-      </div>
-
-      <div style="background: white; border: 1px solid #D9D6CB; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
-        <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px;">Uncertainty Assessment</div>
-        <p style="font-size: 12px; color: #6F6F68; line-height: 1.7;">${escapeHtml(data.dataQuality.uncertaintyNote)}</p>
-      </div>
-
-      <div style="background: white; border: 1px solid #D9D6CB; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
-        <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px;">Data Quality Improvement Roadmap</div>
-        <div style="display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; font-size: 12px; color: #6F6F68; line-height: 1.6;">
-          <div style="font-weight: 600; color: #BE123C;">Priority 1</div>
-          <div>Collect primary data from top 3 impact contributors — this typically addresses &gt;60% of total climate impact uncertainty.</div>
-          <div style="font-weight: 600; color: #B45309;">Priority 2</div>
-          <div>Replace proxy emission factors with material-specific secondary data from ecoinvent or AGRIBALYSE for improved geographic and technological representativeness.</div>
-          <div style="font-weight: 600; color: #B45309;">Priority 3</div>
-          <div>Verify transport distances and modes with suppliers to refine distribution stage estimates currently based on distance × freight factor calculations.</div>
-          <div style="font-weight: 600; color: #047857;">Ongoing</div>
-          <div>Annual data refresh with updated DEFRA emission factors and database versions. Re-assess data quality scores after each improvement cycle.</div>
+        <div class="panel" style="margin-bottom: 16px;">
+          <div class="lead-label" style="margin-bottom: 8px;">Missing data treatment (ISO 14044 &sect;4.2.3.6.3)</div>
+          <p class="body" style="font-size: 12px; line-height: 1.7;">${escapeHtml(data.dataQuality.missingDataTreatment)}</p>
         </div>
-      </div>
 
-      <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px; padding: 20px;">
-        <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px; color: #0c4a6e;">Data Source Distribution</div>
-        <div style="display: flex; gap: 24px; align-items: center;">
-          <div style="flex: 1; height: 24px; border-radius: 6px; overflow: hidden; display: flex;">
-            <div style="width: ${cs.primaryDataShare}%; background: #047857; min-width: ${cs.primaryDataShare > 0 ? '2px' : '0'};"></div>
-            <div style="width: ${cs.secondaryDataShare}%; background: #2B46C0;"></div>
-            <div style="width: ${cs.proxyDataShare}%; background: #B45309;"></div>
+        <div class="panel" style="margin-bottom: 16px;">
+          <div class="lead-label" style="margin-bottom: 8px;">Uncertainty assessment</div>
+          <p class="body" style="font-size: 12px; line-height: 1.7;">${escapeHtml(data.dataQuality.uncertaintyNote)}</p>
+        </div>
+
+        <div class="panel" style="margin-bottom: 16px;">
+          <div class="lead-label" style="margin-bottom: 12px;">Data quality improvement roadmap</div>
+          <div style="display: grid; grid-template-columns: auto 1fr; gap: 10px 16px; align-items: baseline;">
+            <div class="state state-stale">Priority 1</div>
+            <div class="body" style="font-size: 12px; line-height: 1.6;">Collect primary data from the top 3 impact contributors: this typically addresses &gt;60% of total climate impact uncertainty.</div>
+            <div class="state state-attention">Priority 2</div>
+            <div class="body" style="font-size: 12px; line-height: 1.6;">Replace proxy emission factors with material-specific secondary data from ecoinvent or AGRIBALYSE for improved geographic and technological representativeness.</div>
+            <div class="state state-attention">Priority 3</div>
+            <div class="body" style="font-size: 12px; line-height: 1.6;">Verify transport distances and modes with suppliers to refine distribution stage estimates currently based on distance &times; freight factor calculations.</div>
+            <div class="state state-good">Ongoing</div>
+            <div class="body" style="font-size: 12px; line-height: 1.6;">Annual data refresh with updated DEFRA emission factors and database versions. Re-assess data quality scores after each improvement cycle.</div>
           </div>
-          <div style="font-size: 11px; color: #6F6F68; white-space: nowrap;">
-            <span style="display: inline-block; width: 8px; height: 8px; background: #047857; border-radius: 2px; margin-right: 4px;"></span>Primary ${cs.primaryDataShare}%
-            <span style="display: inline-block; width: 8px; height: 8px; background: #2B46C0; border-radius: 2px; margin-left: 12px; margin-right: 4px;"></span>Secondary ${cs.secondaryDataShare}%
-            <span style="display: inline-block; width: 8px; height: 8px; background: #B45309; border-radius: 2px; margin-left: 12px; margin-right: 4px;"></span>Proxy ${cs.proxyDataShare}%
+        </div>
+
+        <div class="panel" style="border-left: 2px solid ${A};">
+          <div class="lead-label" style="color: ${A}; margin-bottom: 12px;">Data source distribution</div>
+          <div style="display: flex; gap: 24px; align-items: center;">
+            <div style="flex: 1; height: 24px; border-radius: 6px; overflow: hidden; display: flex; background: #D9D6CB;">
+              <div style="width: ${cs.primaryDataShare}%; background: #047857; min-width: ${cs.primaryDataShare > 0 ? '2px' : '0'};"></div>
+              <div style="width: ${cs.secondaryDataShare}%; background: ${A};"></div>
+              <div style="width: ${cs.proxyDataShare}%; background: #B45309;"></div>
+            </div>
+            <div class="lead-label" style="white-space: nowrap; letter-spacing: 0.12em;">
+              <span style="display: inline-block; width: 8px; height: 8px; background: #047857; border-radius: 2px; margin-right: 4px;"></span>Primary ${cs.primaryDataShare}%
+              <span style="display: inline-block; width: 8px; height: 8px; background: ${A}; border-radius: 2px; margin-left: 12px; margin-right: 4px;"></span>Secondary ${cs.secondaryDataShare}%
+              <span style="display: inline-block; width: 8px; height: 8px; background: #B45309; border-radius: 2px; margin-left: 12px; margin-right: 4px;"></span>Proxy ${cs.proxyDataShare}%
+            </div>
           </div>
         </div>
       </div>
@@ -579,69 +574,80 @@ function renderClimatePage(data: LCAReportData): string {
     : '';
 
   const stagesBars = data.climateImpact.stages.map(stage =>
-    `<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-      <div style="width: 120px; font-size: 12px; color: #6F6F68; text-align: right; flex-shrink: 0;">${escapeHtml(stage.label)}</div>
-      <div style="flex: 1; height: 28px; background: #D9D6CB; border-radius: 6px; overflow: hidden;">
+    `<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 11px;">
+      <div class="lead-label" style="width: 108px; text-align: right; flex-shrink: 0; color: #6F6F68;">${escapeHtml(stage.label)}</div>
+      <div style="flex: 1; height: 16px; background: #D9D6CB; border-radius: 6px; overflow: hidden;">
         <div style="height: 100%; width: ${Math.max((stage.value / maxStageValue) * 100, 1)}%; background: ${stage.color}; border-radius: 6px;"></div>
       </div>
-      <div style="width: 90px; font-size: 12px; color: #6F6F68; flex-shrink: 0;">${stage.value.toFixed(4)} ${escapeHtml(stage.unit)}</div>
-      <div style="width: 50px; font-size: 11px; color: #205E40; text-align: right; flex-shrink: 0;">${escapeHtml(stage.percentage)}%</div>
+      <div style="width: 96px; font-size: 11px; font-variant-numeric: tabular-nums; color: #6F6F68; flex-shrink: 0;">${stage.value.toFixed(4)} ${escapeHtml(stage.unit)}</div>
+      <div class="lead-number" style="width: 46px; font-size: 14px; text-align: right; flex-shrink: 0; color: ${CHAPTERS.footprint.accent};">${escapeHtml(stage.percentage)}<span style="font-size: 9px;">%</span></div>
     </div>`
   ).join('');
 
   const donutStyle = donutGradient(data.climateImpact.breakdown);
 
+  // Say the number, then name the hotspot: the dominant lifecycle stage.
+  const topStage = [...data.climateImpact.stages].sort((a, b) => b.value - a.value)[0];
+  const hotspot = topStage
+    ? `The ${topStage.label.toLowerCase()} is the hotspot.`
+    : 'Where the carbon sits.';
+
+  const A = CHAPTERS.footprint.accent;
+
   return `
-    <div class="page dark-page">
-      ${renderSectionHeader('05', 'Climate Impact', true)}
+    <div class="page dark-page" style="position: relative;">
+      ${mark(CHAPTERS.footprint.mark, 'br', A)}
+      <div style="position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%;">
+        ${renderSectionLead({
+          number: '05',
+          section: 'Climate impact',
+          value: data.climateImpact.totalCarbon,
+          unit: 'kg CO₂e',
+          label: `Fossil carbon footprint, GWP-100 · per ${data.functionalUnit.value}`,
+          statement: hotspot,
+          dark: true,
+          accent: A,
+        })}
 
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px;">
-        <div>
-          <div style="font-size: 10px; font-family: 'Fira Code', monospace; color: #6F6F68; margin-bottom: 8px;">FOSSIL CARBON FOOTPRINT (GWP-100)</div>
-          <div style="font-size: 64px; font-family: 'Playfair Display', serif; color: #205E40; line-height: 1;">
-            ${escapeHtml(data.climateImpact.totalCarbon)}
-            <span style="font-size: 18px; color: #6F6F68; font-family: 'Inter', sans-serif; margin-left: 8px;">kg CO&#8322;e</span>
+        <div style="display: flex; gap: 32px; align-items: flex-start;">
+          <div style="flex: 1;">
+            <div class="eyebrow dim" style="margin-bottom: 16px;">Lifecycle stage breakdown</div>
+            ${stagesBars}
+            ${biogenicHeadlineNote}
           </div>
-          <div style="font-size: 11px; color: #6F6F68; margin-top: 6px;">per ${escapeHtml(data.functionalUnit.value)}</div>
-          ${biogenicHeadlineNote}
-        </div>
-        <div style="width: 180px; height: 180px; border-radius: 50%; ${donutStyle} position: relative;">
-          <div style="position: absolute; inset: 45px; background: #F2F1EA; border-radius: 50%;"></div>
-        </div>
-      </div>
-
-      <div style="margin-bottom: 16px;">
-        <h3 style="font-size: 13px; font-family: 'Fira Code', monospace; color: #6F6F68; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">Lifecycle Stage Breakdown</h3>
-        ${stagesBars}
-      </div>
-
-      <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; margin-bottom: 16px;">
-        ${data.climateImpact.breakdown.map(b =>
-          `<div style="display: flex; align-items: center; gap: 6px; padding: 4px 12px; background: rgba(26,27,29,0.05); border-radius: 6px;">
-            <div style="width: 10px; height: 10px; border-radius: 50%; background: ${b.color};"></div>
-            <span style="font-size: 11px; color: #6F6F68;">${escapeHtml(b.name)}</span>
-          </div>`
-        ).join('')}
-      </div>
-
-      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
-        ${data.climateImpact.scopes.map(s =>
-          `<div style="background: rgba(26,27,29,0.05); border-radius: 8px; padding: 12px; text-align: center;">
-            <div style="font-size: 10px; color: #6F6F68; margin-bottom: 4px;">${escapeHtml(s.name)}</div>
-            <div style="font-size: 20px; font-weight: 700; color: #205E40;">${escapeHtml(s.value)}%</div>
-          </div>`
-        ).join('')}
-      </div>
-
-      ${data.contractManufacturingNote ? `
-        <div style="margin-top: 20px; padding: 14px 16px; background: rgba(32, 94, 64, 0.08); border-left: 3px solid #205E40; border-radius: 6px;">
-          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-            <span style="font-size: 9px; font-family: 'Fira Code', monospace; color: #205E40; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600;">Scope Attribution Note</span>
-            <span style="font-size: 9px; padding: 2px 8px; background: #1A1B1D; color: #F2F1EA; border-radius: 10px; font-weight: 700;">CORRECT</span>
+          <div style="width: 168px; height: 168px; border-radius: 50%; ${donutStyle} position: relative; flex-shrink: 0;">
+            <div style="position: absolute; inset: 42px; background: #F2F1EA; border-radius: 50%;"></div>
           </div>
-          <div style="font-size: 11px; color: #6F6F68; line-height: 1.55;">${escapeHtml(data.contractManufacturingNote.explanation)}</div>
         </div>
-      ` : ''}
+
+        <div style="display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 18px;">
+          ${data.climateImpact.breakdown.map(b =>
+            `<div style="display: flex; align-items: center; gap: 7px;">
+              <div style="width: 9px; height: 9px; border-radius: 50%; background: ${b.color};"></div>
+              <span class="lead-label" style="color: #6F6F68;">${escapeHtml(b.name)}</span>
+            </div>`
+          ).join('')}
+        </div>
+
+        <div class="rule" style="margin-top: 22px; padding-top: 20px; display: flex; gap: 40px;">
+          ${data.climateImpact.scopes.map(s =>
+            `<div>
+              <div class="lead-number" style="font-size: 30px; color: #1A1B1D;">${escapeHtml(s.value)}<span style="font-size: 13px;">%</span></div>
+              <div class="lead-label" style="margin-top: 6px;">${escapeHtml(s.name)}</div>
+            </div>`
+          ).join('')}
+        </div>
+
+        ${data.contractManufacturingNote ? `
+          <div class="panel" style="margin-top: 22px; border-left: 2px solid ${CHAPTERS.footprint.accent};">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+              <span class="eyebrow" style="color: ${CHAPTERS.footprint.accent};">Scope attribution</span>
+              <span class="state state-good">Correct</span>
+            </div>
+            <div class="body" style="font-size: 11.5px;">${escapeHtml(data.contractManufacturingNote.explanation)}</div>
+          </div>
+        ` : ''}
+      </div>
 
       ${renderPageFooter(7, true)}
     </div>`;
@@ -650,7 +656,9 @@ function renderClimatePage(data: LCAReportData): string {
 function renderViticulturePage(data: LCAReportData): string {
   const viti = data.viticultureDetail;
   const removals = data.flagRemovals;
-  if (!viti) return ''; // No viticulture data — skip this page entirely
+  if (!viti) return ''; // No viticulture data - skip this page entirely
+
+  const A = CHAPTERS.footprint.accent;
 
   // Extended impact rows (only non-zero)
   const extImpacts = [
@@ -667,94 +675,90 @@ function renderViticulturePage(data: LCAReportData): string {
 
   const fmtNum = (n: number, d = 4) => n < 0.001 && n > 0 ? n.toExponential(2) : n.toFixed(d);
 
+  // Data quality grade → typographic state chip.
+  const grade = (viti.dataQualityGrade || '').toString().toUpperCase();
+  const gradeTone = grade.startsWith('HIGH') ? 'state-good' : grade.startsWith('MEDIUM') ? 'state-attention' : grade.startsWith('LOW') ? 'state-stale' : 'state-quiet';
+
   return `
-    <div class="page light-page">
-      ${renderSectionHeader('05b', 'Viticulture & Land Stewardship')}
+    <div class="page light-page" style="position: relative;">
+      ${mark(CHAPTERS.footprint.mark, 'br', A)}
+      <div style="position: relative; z-index: 1;">
+        ${renderSectionLead({
+          number: '05b',
+          section: 'Viticulture & land stewardship',
+          value: fmtNum(viti.emissionsTotal),
+          unit: 'kg CO₂e',
+          label: `Viticulture emissions · ${viti.percentOfTotal}% of the product footprint`,
+          statement: 'What the vineyard carries.',
+          accent: A,
+        })}
 
-      <!-- Primary data badge -->
-      <div style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; margin-bottom: 20px;">
-        <div style="width: 8px; height: 8px; border-radius: 50%; background: #047857;"></div>
-        <span style="font-size: 11px; font-weight: 600; color: #166534;">Primary Data (Vineyard)</span>
-        <span style="font-size: 10px; color: #6F6F68; margin-left: 4px;">Quality: ${viti.dataQualityGrade}</span>
-      </div>
+        <div class="rule" style="padding-top: 18px; margin-bottom: 26px; display: flex; gap: 48px; align-items: baseline;">
+          <div>
+            <div class="lead-number" style="font-size: 34px; color: ${A};">${viti.percentOfTotal}<span style="font-size: 15px;">%</span></div>
+            <div class="lead-label" style="margin-top: 6px;">Share of product footprint</div>
+          </div>
+          <div>
+            <div class="lead-number" style="font-size: 34px; color: ${A};">${viti.primaryDataPercent}<span style="font-size: 15px;">%</span></div>
+            <div class="lead-label" style="margin-top: 6px;">From primary vineyard data</div>
+          </div>
+          <div style="margin-left: auto;">
+            <span class="eyebrow" style="color: ${A};">Data quality</span>
+            <span class="state ${gradeTone}" style="margin-left: 8px;">${escapeHtml(grade || 'N/A')}</span>
+          </div>
+        </div>
 
-      <!-- Headline metrics -->
-      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;">
-        <div class="metric-card" style="text-align: center;">
-          <div class="metric-label">Viticulture Emissions</div>
-          <div class="metric-value" style="font-size: 28px;">${fmtNum(viti.emissionsTotal)}</div>
-          <div class="metric-unit">kg CO&#8322;e per functional unit</div>
+        ${removals && removals.soilCarbonCo2e > 0 ? `
+        <div class="rule" style="padding-top: 18px; margin-bottom: 18px; display: flex; gap: 48px;">
+          <div>
+            <div class="eyebrow" style="color: ${A}; margin-bottom: 8px;">Emissions (FLAG)</div>
+            <div class="lead-number" style="font-size: 30px; color: #1A1B1D;">${fmtNum(viti.emissionsTotal)} <span style="font-size: 12px; color: #6F6F68;">kg CO&#8322;e</span></div>
+            <div class="body" style="font-size: 11px; margin-top: 8px; max-width: 240px;">Includes N&#8322;O from soils, fuel combustion, pesticide production, and irrigation energy.</div>
+          </div>
+          <div>
+            <div class="eyebrow" style="color: #047857; margin-bottom: 8px;">Removals (FLAG)</div>
+            <div class="lead-number" style="font-size: 30px; color: #047857;">${fmtNum(removals.soilCarbonCo2e)} <span style="font-size: 12px; color: #047857;">kg CO&#8322;e</span></div>
+            <div class="body" style="font-size: 11px; margin-top: 8px; max-width: 240px; color: #047857;">Soil carbon sequestration (${removals.isVerified ? 'verified measurement' : 'practice-based default'}).</div>
+          </div>
         </div>
-        <div class="metric-card" style="text-align: center;">
-          <div class="metric-label">Share of Product Footprint</div>
-          <div class="metric-value" style="font-size: 28px;">${viti.percentOfTotal}%</div>
-          <div class="metric-unit">of total lifecycle emissions</div>
+        ${removals.removalWarning ? `
+        <div class="panel" style="margin-bottom: 14px; border-left: 2px solid #B45309; padding: 12px 16px;">
+          <div class="body" style="font-size: 10.5px;"><span class="state state-attention">Verification note</span> &nbsp;${escapeHtml(removals.removalWarning)}</div>
         </div>
-        <div class="metric-card" style="text-align: center;">
-          <div class="metric-label">Primary Data</div>
-          <div class="metric-value" style="font-size: 28px;">${viti.primaryDataPercent}%</div>
-          <div class="metric-unit">of emissions from primary data</div>
+        ` : ''}
+        <div class="panel" style="margin-bottom: 22px; border-left: 2px solid ${A};">
+          <div class="eyebrow" style="color: ${A}; margin-bottom: 8px;">SBTi FLAG compliance</div>
+          <div class="body" style="font-size: 11px;">Emissions and removals are reported separately and never netted, in accordance with SBTi Forest, Land and Agriculture (FLAG) Guidance v1.2 and the GHG Protocol Land Sector and Removals Standard V1.0. Removals represent soil organic carbon sequestration using the carbon stock change approach and are reported as positive values.</div>
         </div>
-      </div>
+        ` : ''}
 
-      ${removals && removals.soilCarbonCo2e > 0 ? `
-      <!-- FLAG Removals section -->
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;">
-        <div style="background: #F2F1EA; border-radius: 12px; padding: 20px; color: #1A1B1D;">
-          <div style="font-size: 10px; font-family: 'Fira Code', monospace; color: #205E40; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Emissions (FLAG)</div>
-          <div style="font-size: 24px; font-family: 'Playfair Display', serif; font-weight: 700; margin-bottom: 12px;">${fmtNum(viti.emissionsTotal)} <span style="font-size: 12px; color: #6F6F68;">kg CO&#8322;e</span></div>
-          <div style="font-size: 11px; color: #6F6F68;">Includes N&#8322;O from soils, fuel combustion, pesticide production, and irrigation energy</div>
-        </div>
-        <div style="background: #F2F1EA; border-radius: 12px; padding: 20px; color: #1A1B1D;">
-          <div style="font-size: 10px; font-family: 'Fira Code', monospace; color: #047857; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Removals (FLAG)</div>
-          <div style="font-size: 24px; font-family: 'Playfair Display', serif; font-weight: 700; color: #047857; margin-bottom: 12px;">${fmtNum(removals.soilCarbonCo2e)} <span style="font-size: 12px; color: #047857;">kg CO&#8322;e</span></div>
-          <div style="font-size: 11px; color: #047857;">Soil carbon sequestration (${removals.isVerified ? 'verified measurement' : 'practice-based default'})</div>
-        </div>
-      </div>
-      ${removals.removalWarning ? `
-      <div style="font-size: 10px; color: #92400e; margin-bottom: 12px; padding: 10px; background: #fffbeb; border-radius: 6px; border-left: 3px solid #B45309;">
-        <strong>Verification note:</strong> ${removals.removalWarning}
-      </div>
-      ` : ''}
-      <div style="font-size: 10px; color: #6F6F68; margin-bottom: 20px; padding: 10px; background: #F2F1EA; border-radius: 6px; border-left: 3px solid #205E40;">
-        <strong>SBTi FLAG Compliance:</strong> Emissions and removals are reported separately and never netted, in accordance with SBTi Forest, Land and Agriculture (FLAG) Guidance v1.2 and the GHG Protocol Land Sector and Removals Standard V1.0. Removals represent soil organic carbon sequestration using the carbon stock change approach and are reported as positive values.
-      </div>
-      ` : ''}
-
-      ${extImpacts.length > 0 ? `
-      <!-- Extended impact categories -->
-      <div style="margin-bottom: 20px;">
-        <div style="font-size: 12px; font-weight: 600; margin-bottom: 10px;">Extended Environmental Impact Categories</div>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Impact Category</th>
-              <th style="text-align: right;">Value</th>
-              <th>Unit</th>
-            </tr>
-          </thead>
+        ${extImpacts.length > 0 ? `
+        <div class="eyebrow" style="color: ${A}; margin-bottom: 12px;">Extended environmental impact categories</div>
+        <table class="studio-table" style="margin-bottom: 6px;">
+          <thead><tr>
+            <th>Impact category</th>
+            <th style="text-align: right;">Value</th>
+            <th>Unit</th>
+          </tr></thead>
           <tbody>
             ${extImpacts.map(i => `
               <tr>
-                <td>${i.label}</td>
-                <td style="text-align: right; font-family: 'Fira Code', monospace; font-size: 11px;">${fmtNum(i.value)}</td>
-                <td style="font-size: 11px; color: #6F6F68;">${i.unit}</td>
+                <td style="font-weight: 500;">${escapeHtml(i.label)}</td>
+                <td style="text-align: right;"><span class="num">${fmtNum(i.value)}</span></td>
+                <td style="color: #6F6F68;">${escapeHtml(i.unit)}</td>
               </tr>
             `).join('')}
           </tbody>
         </table>
-        <div style="font-size: 10px; color: #6F6F68; margin-top: 6px;">
-          Ecotoxicity characterisation: USEtox 2.0 (UNEP-SETAC consensus model). Water scarcity: AWARE method (ISO 14046).
-        </div>
-      </div>
-      ` : ''}
+        <div class="lead-label" style="margin-bottom: 22px; text-transform: none; letter-spacing: 0.02em; color: #6F6F68; font-size: 9px;">Ecotoxicity characterisation: USEtox 2.0 (UNEP-SETAC consensus model). Water scarcity: AWARE method (ISO 14046).</div>
+        ` : ''}
 
-      <!-- Data provenance -->
-      <div style="background: #F2F1EA; border-radius: 8px; padding: 14px; font-size: 11px; color: #6F6F68;">
-        <div style="font-weight: 600; margin-bottom: 6px; color: #1A1B1D;">Data Provenance</div>
-        ${vintageText ? `<div style="margin-bottom: 4px;">${vintageText}</div>` : ''}
-        <div style="margin-bottom: 4px;"><strong>Primary data collected:</strong> Fertiliser type, quantity, and N content; pesticide applications and type; diesel and petrol consumption; irrigation volume and energy source; grape yield; soil management practice.</div>
-        <div><strong>Secondary emission factors:</strong> IPCC 2019 Refinement Tier 1 (N&#8322;O); DEFRA 2025 (fuel combustion); USEtox 2.0 (ecotoxicity); AWARE (water scarcity); ecoinvent 3.12 (grid electricity).</div>
+        <div class="panel">
+          <div class="eyebrow" style="color: ${A}; margin-bottom: 10px;">Data provenance</div>
+          ${vintageText ? `<div class="body" style="font-size: 11px; margin-bottom: 8px;">${escapeHtml(vintageText)}</div>` : ''}
+          <div class="body" style="font-size: 11px; margin-bottom: 8px;"><strong style="color: #1A1B1D;">Primary data collected:</strong> Fertiliser type, quantity, and N content; pesticide applications and type; diesel and petrol consumption; irrigation volume and energy source; grape yield; soil management practice.</div>
+          <div class="body" style="font-size: 11px;"><strong style="color: #1A1B1D;">Secondary emission factors:</strong> IPCC 2019 Refinement Tier 1 (N&#8322;O); DEFRA 2025 (fuel combustion); USEtox 2.0 (ecotoxicity); AWARE (water scarcity); ecoinvent 3.12 (grid electricity).</div>
+        </div>
       </div>
 
       ${renderPageFooter(8, true)}
@@ -763,7 +767,9 @@ function renderViticulturePage(data: LCAReportData): string {
 
 function renderProcessingPage(data: LCAReportData): string {
   const pd = data.processingDetail;
-  if (!pd || pd.facilities.length === 0) return ''; // No processing data — skip page
+  if (!pd || pd.facilities.length === 0) return ''; // No processing data - skip page
+
+  const A = CHAPTERS.footprint.accent;
 
   const fmtNum = (s: string) => {
     const n = parseFloat(s);
@@ -775,73 +781,64 @@ function renderProcessingPage(data: LCAReportData): string {
   const cmCount = pd.facilities.filter(f => f.isContractManufacturer).length;
 
   const renderFacilityCard = (facility: typeof pd.facilities[0]) => `
-        <div style="background: ${facility.isContractManufacturer ? '#fefce8' : '#f0fdf4'}; border: 1px solid ${facility.isContractManufacturer ? '#fde68a' : '#bbf7d0'}; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+        <div class="panel" style="margin-bottom: 18px; border-left: 2px solid ${facility.isContractManufacturer ? '#B45309' : A};">
 
           <!-- Facility header -->
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 16px;">
             <div>
-              <span style="font-size: 14px; font-weight: 700; color: #1A1B1D;">${escapeHtml(facility.name)}</span>
-              ${facility.countryCode ? `<span style="font-size: 11px; color: #6F6F68; margin-left: 8px;">(${facility.countryCode})</span>` : ''}
+              <span class="card-title" style="font-size: 16px;">${escapeHtml(facility.name)}</span>
+              ${facility.countryCode ? `<span class="lead-label" style="margin-left: 8px;">${escapeHtml(facility.countryCode)}</span>` : ''}
             </div>
-            <div style="display: flex; gap: 8px;">
-              <span style="font-size: 10px; padding: 3px 10px; border-radius: 12px; font-weight: 600; background: ${facility.isContractManufacturer ? '#fef9c3; color: #854d0e' : '#dcfce7; color: #166534'};">${facility.isContractManufacturer ? 'Contract Manufacturer (Scope 3)' : 'Owned Facility (Scope 1 & 2)'}</span>
-              <span style="font-size: 10px; padding: 3px 10px; border-radius: 12px; background: #F2F1EA; color: #6F6F68; font-weight: 500;">${facility.dataSource}</span>
+            <div style="display: flex; gap: 14px; align-items: baseline;">
+              <span class="state ${facility.isContractManufacturer ? 'state-attention' : 'state-good'}">${facility.isContractManufacturer ? 'Contract manufacturer · Scope 3' : 'Owned facility · Scope 1 & 2'}</span>
+              <span class="state state-quiet">${escapeHtml(facility.dataSource)}</span>
             </div>
           </div>
 
-          <!-- Emissions grid -->
+          <!-- Emissions row: hairline stats -->
           ${facility.isContractManufacturer ? `
-          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px;">
-            <div style="background: white; border-radius: 8px; padding: 10px; text-align: center;">
-              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #6F6F68; margin-bottom: 4px;">Scope 3 Total</div>
-              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #1A1B1D;">${fmtNum(facility.totalEmissions)}</div>
-              <div style="font-size: 9px; color: #6F6F68;">kg CO&#8322;e/unit</div>
+          <div class="rule" style="padding-top: 14px; margin-bottom: 14px; display: flex; gap: 36px;">
+            <div>
+              <div class="lead-number" style="font-size: 26px; color: #1A1B1D;">${fmtNum(facility.totalEmissions)}</div>
+              <div class="lead-label" style="margin-top: 5px;">Scope 3 total <span class="state state-quiet">kg CO&#8322;e/unit</span></div>
             </div>
-            <div style="background: white; border-radius: 8px; padding: 10px; text-align: center;">
-              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #6F6F68; margin-bottom: 4px;">Combustion</div>
-              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #BE123C;">${fmtNum(facility.scope1Emissions)}</div>
-              <div style="font-size: 9px; color: #6F6F68;">kg CO&#8322;e/unit</div>
+            <div>
+              <div class="lead-number" style="font-size: 26px; color: #BE123C;">${fmtNum(facility.scope1Emissions)}</div>
+              <div class="lead-label" style="margin-top: 5px;">Combustion <span class="state state-quiet">kg CO&#8322;e/unit</span></div>
             </div>
-            <div style="background: white; border-radius: 8px; padding: 10px; text-align: center;">
-              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #6F6F68; margin-bottom: 4px;">Electricity</div>
-              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #2B46C0;">${fmtNum(facility.scope2Emissions)}</div>
-              <div style="font-size: 9px; color: #6F6F68;">kg CO&#8322;e/unit</div>
+            <div>
+              <div class="lead-number" style="font-size: 26px; color: #2B46C0;">${fmtNum(facility.scope2Emissions)}</div>
+              <div class="lead-label" style="margin-top: 5px;">Electricity <span class="state state-quiet">kg CO&#8322;e/unit</span></div>
             </div>
           </div>
-          <div style="font-size: 10px; color: #92400e; background: #fffbeb; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; border-left: 3px solid #B45309;">
-            All emissions from this contract manufacturer are classified as <strong>Scope 3 Category 1</strong> (Purchased Goods and Services) in the product footprint. The combustion/electricity split shows the emission source at the facility level.
-          </div>
+          <div class="body" style="font-size: 10.5px; margin-bottom: 14px;"><span class="state state-attention">Scope 3 Cat. 1</span> &nbsp;All emissions from this contract manufacturer are classified as Scope 3 Category 1 (Purchased Goods and Services) in the product footprint. The combustion/electricity split shows the emission source at the facility level.</div>
           ` : `
-          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px;">
-            <div style="background: white; border-radius: 8px; padding: 10px; text-align: center;">
-              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #6F6F68; margin-bottom: 4px;">Total</div>
-              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #1A1B1D;">${fmtNum(facility.totalEmissions)}</div>
-              <div style="font-size: 9px; color: #6F6F68;">kg CO&#8322;e/unit</div>
+          <div class="rule" style="padding-top: 14px; margin-bottom: 14px; display: flex; gap: 36px;">
+            <div>
+              <div class="lead-number" style="font-size: 26px; color: #1A1B1D;">${fmtNum(facility.totalEmissions)}</div>
+              <div class="lead-label" style="margin-top: 5px;">Total <span class="state state-quiet">kg CO&#8322;e/unit</span></div>
             </div>
-            <div style="background: white; border-radius: 8px; padding: 10px; text-align: center;">
-              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #6F6F68; margin-bottom: 4px;">Scope 1</div>
-              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #BE123C;">${fmtNum(facility.scope1Emissions)}</div>
-              <div style="font-size: 9px; color: #6F6F68;">kg CO&#8322;e/unit</div>
+            <div>
+              <div class="lead-number" style="font-size: 26px; color: #BE123C;">${fmtNum(facility.scope1Emissions)}</div>
+              <div class="lead-label" style="margin-top: 5px;">Scope 1 <span class="state state-quiet">kg CO&#8322;e/unit</span></div>
             </div>
-            <div style="background: white; border-radius: 8px; padding: 10px; text-align: center;">
-              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #6F6F68; margin-bottom: 4px;">Scope 2</div>
-              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #2B46C0;">${fmtNum(facility.scope2Emissions)}</div>
-              <div style="font-size: 9px; color: #6F6F68;">kg CO&#8322;e/unit</div>
+            <div>
+              <div class="lead-number" style="font-size: 26px; color: #2B46C0;">${fmtNum(facility.scope2Emissions)}</div>
+              <div class="lead-label" style="margin-top: 5px;">Scope 2 <span class="state state-quiet">kg CO&#8322;e/unit</span></div>
             </div>
-            <div style="background: white; border-radius: 8px; padding: 10px; text-align: center;">
-              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #6F6F68; margin-bottom: 4px;">Water</div>
-              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #2B46C0;">${facility.waterLitres}</div>
-              <div style="font-size: 9px; color: #6F6F68;">litres/unit</div>
+            <div>
+              <div class="lead-number" style="font-size: 26px; color: #2B46C0;">${facility.waterLitres}</div>
+              <div class="lead-label" style="margin-top: 5px;">Water <span class="state state-quiet">litres/unit</span></div>
             </div>
           </div>
           `}
 
           ${facility.energyBreakdown.length > 0 ? `
           <!-- Energy breakdown table -->
-          <table class="data-table" style="margin-bottom: 8px;">
+          <table class="studio-table" style="margin-bottom: 8px;">
             <thead>
               <tr>
-                <th>Energy Source</th>
+                <th>Energy source</th>
                 <th style="text-align: right;">Quantity</th>
                 <th>Unit</th>
                 <th style="text-align: right;">Emissions (kg CO&#8322;e)</th>
@@ -855,11 +852,11 @@ function renderProcessingPage(data: LCAReportData): string {
                   : e.scope;
                 return `
                 <tr>
-                  <td>${escapeHtml(e.type)}</td>
-                  <td style="text-align: right; font-family: 'Fira Code', monospace; font-size: 11px;">${e.quantity}</td>
-                  <td style="font-size: 11px; color: #6F6F68;">${e.unit}</td>
-                  <td style="text-align: right; font-family: 'Fira Code', monospace; font-size: 11px;">${e.emissions}</td>
-                  <td style="font-size: 11px; color: ${e.scope === 'Scope 1' ? '#BE123C' : '#2B46C0'};">${scopeLabel}</td>
+                  <td style="font-weight: 500;">${escapeHtml(e.type)}</td>
+                  <td style="text-align: right;"><span class="num">${e.quantity}</span></td>
+                  <td style="color: #6F6F68;">${e.unit}</td>
+                  <td style="text-align: right;"><span class="num">${e.emissions}</span></td>
+                  <td style="color: ${e.scope === 'Scope 1' ? '#BE123C' : '#2B46C0'};">${scopeLabel}</td>
                 </tr>`;
               }).join('')}
             </tbody>
@@ -867,7 +864,7 @@ function renderProcessingPage(data: LCAReportData): string {
           ` : ''}
 
           <!-- Attribution info -->
-          <div style="font-size: 10px; color: #6F6F68; display: flex; gap: 16px; flex-wrap: wrap;">
+          <div class="lead-label" style="text-transform: none; letter-spacing: 0.02em; color: #6F6F68; font-size: 9px; display: flex; gap: 16px; flex-wrap: wrap;">
             <span>Attribution: ${facility.attributionRatio}% of facility output</span>
             <span>Production volume: ${facility.productionVolume.toLocaleString()} units</span>
             ${facility.gridEmissionFactor ? `<span>Grid factor: ${facility.gridEmissionFactor}</span>` : ''}
@@ -876,27 +873,27 @@ function renderProcessingPage(data: LCAReportData): string {
 
           ${facility.dataCollectionMode && facility.dataCollectionMode !== 'primary' ? `
           <!-- Data Quality Declaration (ISO 14044 §4.2.3.6 / ISO 14067 §6.3.5) -->
-          <div style="margin-top: 12px; background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #B45309; border-radius: 8px; padding: 12px;">
-            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
-              <div style="font-size: 11px; font-weight: 700; color: #92400e; text-transform: uppercase; letter-spacing: 1px;">Secondary data &mdash; ${facility.dataCollectionMode === 'archetype_proxy' ? 'Archetype proxy' : 'Hybrid (archetype + primary)'}</div>
-              ${facility.proxyUncertaintyPct ? `<div style="font-size: 10px; color: #92400e;">Uncertainty: &plusmn;${facility.proxyUncertaintyPct}%</div>` : ''}
+          <div class="panel" style="margin-top: 14px; border-left: 2px solid #B45309; background: #ECEAE3;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px;">
+              <div class="eyebrow" style="color: #B45309;">Secondary data &mdash; ${facility.dataCollectionMode === 'archetype_proxy' ? 'Archetype proxy' : 'Hybrid (archetype + primary)'}</div>
+              ${facility.proxyUncertaintyPct ? `<span class="state state-attention">Uncertainty &plusmn;${facility.proxyUncertaintyPct}%</span>` : ''}
             </div>
-            ${facility.archetypeName ? `<div style="font-size: 11px; margin-bottom: 6px;"><strong>Archetype:</strong> ${escapeHtml(facility.archetypeName)}</div>` : ''}
-            ${facility.proxyJustification ? `<div style="font-size: 11px; margin-bottom: 8px; color: #6F6F68;"><strong>Justification:</strong> ${escapeHtml(facility.proxyJustification)}</div>` : ''}
+            ${facility.archetypeName ? `<div class="body" style="font-size: 11px; margin-bottom: 6px;"><strong style="color: #1A1B1D;">Archetype:</strong> ${escapeHtml(facility.archetypeName)}</div>` : ''}
+            ${facility.proxyJustification ? `<div class="body" style="font-size: 11px; margin-bottom: 8px;"><strong style="color: #1A1B1D;">Justification:</strong> ${escapeHtml(facility.proxyJustification)}</div>` : ''}
             ${facility.proxyPedigree ? `
-              <div style="font-size: 10px; color: #6F6F68; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 8px;">
-                <div><strong>R:</strong> ${facility.proxyPedigree.reliability}</div>
-                <div><strong>C:</strong> ${facility.proxyPedigree.completeness}</div>
-                <div><strong>T:</strong> ${facility.proxyPedigree.temporal}</div>
-                <div><strong>G:</strong> ${facility.proxyPedigree.geographical}</div>
-                <div><strong>Tech:</strong> ${facility.proxyPedigree.technological}</div>
+              <div class="body" style="font-size: 10px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 8px;">
+                <div><strong style="color: #1A1B1D;">R:</strong> ${facility.proxyPedigree.reliability}</div>
+                <div><strong style="color: #1A1B1D;">C:</strong> ${facility.proxyPedigree.completeness}</div>
+                <div><strong style="color: #1A1B1D;">T:</strong> ${facility.proxyPedigree.temporal}</div>
+                <div><strong style="color: #1A1B1D;">G:</strong> ${facility.proxyPedigree.geographical}</div>
+                <div><strong style="color: #1A1B1D;">Tech:</strong> ${facility.proxyPedigree.technological}</div>
               </div>
-              <div style="font-size: 9px; color: #6F6F68; margin-bottom: 8px;">Pedigree matrix (1 best &ndash; 5 worst): Reliability, Completeness, Temporal, Geographical, Technological</div>
+              <div class="lead-label" style="text-transform: none; letter-spacing: 0.02em; font-size: 9px; margin-bottom: 8px;">Pedigree matrix (1 best &ndash; 5 worst): Reliability, Completeness, Temporal, Geographical, Technological</div>
             ` : ''}
-            ${facility.proxySourceCitation ? `<div style="font-size: 10px; color: #6F6F68; margin-bottom: 8px;"><strong>Source:</strong> ${escapeHtml(facility.proxySourceCitation)}</div>` : ''}
+            ${facility.proxySourceCitation ? `<div class="body" style="font-size: 10px; margin-bottom: 8px;"><strong style="color: #1A1B1D;">Source:</strong> ${escapeHtml(facility.proxySourceCitation)}</div>` : ''}
             ${facility.upgradeActions && facility.upgradeActions.length > 0 ? `
-              <div style="font-size: 11px; font-weight: 600; color: #92400e; margin-top: 8px; margin-bottom: 4px;">Data Improvement Plan</div>
-              <ul style="font-size: 10px; color: #6F6F68; padding-left: 16px; margin: 0;">
+              <div class="eyebrow" style="color: #B45309; margin-top: 8px; margin-bottom: 6px;">Data improvement plan</div>
+              <ul class="body" style="font-size: 10px; padding-left: 16px; margin: 0;">
                 ${facility.upgradeActions.map(a => `<li style="margin-bottom: 2px;">${escapeHtml(a)}</li>`).join('')}
               </ul>
             ` : ''}
@@ -905,39 +902,31 @@ function renderProcessingPage(data: LCAReportData): string {
         </div>`;
 
   const methodologyNote = `
-      <div style="background: #F2F1EA; border-radius: 8px; padding: 14px; font-size: 11px; color: #6F6F68;">
-        <div style="font-weight: 600; margin-bottom: 6px; color: #1A1B1D;">Methodology</div>
-        <div style="margin-bottom: 4px;">Processing emissions are allocated to the product using physical allocation by production volume (ISO 14044 Clause 4.3.4). Scope 1 factors from DEFRA 2025 GHG Conversion Factors; Scope 2 electricity from IEA/DEFRA 2023 country-specific grid emission factors.</div>
-        <div>Contract manufacturer emissions are classified as Scope 3 Category 1 (Purchased Goods and Services) per GHG Protocol Product Standard &sect;6.3.3. Owned facility emissions are classified as Scope 1 (direct combustion) and Scope 2 (purchased electricity/heat).</div>
+      <div class="panel" style="border-left: 2px solid ${A};">
+        <div class="eyebrow" style="color: ${A}; margin-bottom: 8px;">Methodology</div>
+        <div class="body" style="font-size: 11px; margin-bottom: 6px;">Processing emissions are allocated to the product using physical allocation by production volume (ISO 14044 Clause 4.3.4). Scope 1 factors from DEFRA 2025 GHG Conversion Factors; Scope 2 electricity from IEA/DEFRA 2023 country-specific grid emission factors.</div>
+        <div class="body" style="font-size: 11px;">Contract manufacturer emissions are classified as Scope 3 Category 1 (Purchased Goods and Services) per GHG Protocol Product Standard &sect;6.3.3. Owned facility emissions are classified as Scope 1 (direct combustion) and Scope 2 (purchased electricity/heat).</div>
       </div>`;
 
-  // Page 1: headline metrics + first facility
+  // Page 1: headline lead + first facility
   const page1 = `
-    <div class="page light-page">
-      ${renderSectionHeader('05c', 'Processing & Manufacturing')}
+    <div class="page light-page" style="position: relative;">
+      ${mark(CHAPTERS.footprint.mark, 'br', A)}
+      <div style="position: relative; z-index: 1;">
+        ${renderSectionLead({
+          number: '05c',
+          section: 'Processing & manufacturing',
+          value: fmtNum(pd.totalProcessingEmissions),
+          unit: 'kg CO₂e',
+          label: `Processing emissions · ${pd.percentOfTotal}% of the product footprint · ${pd.facilities.length} facilit${pd.facilities.length === 1 ? 'y' : 'ies'}${ownedCount > 0 || cmCount > 0 ? ` (${[ownedCount > 0 ? `${ownedCount} owned` : '', cmCount > 0 ? `${cmCount} contract` : ''].filter(Boolean).join(', ')})` : ''}`,
+          statement: 'Where the product is made.',
+          accent: A,
+        })}
 
-      <!-- Headline metrics -->
-      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;">
-        <div class="metric-card" style="text-align: center;">
-          <div class="metric-label">Processing Emissions</div>
-          <div class="metric-value" style="font-size: 28px;">${fmtNum(pd.totalProcessingEmissions)}</div>
-          <div class="metric-unit">kg CO&#8322;e per functional unit</div>
-        </div>
-        <div class="metric-card" style="text-align: center;">
-          <div class="metric-label">Share of Product Footprint</div>
-          <div class="metric-value" style="font-size: 28px;">${pd.percentOfTotal}%</div>
-          <div class="metric-unit">of total lifecycle emissions</div>
-        </div>
-        <div class="metric-card" style="text-align: center;">
-          <div class="metric-label">Manufacturing Facilities</div>
-          <div class="metric-value" style="font-size: 28px;">${pd.facilities.length}</div>
-          <div class="metric-unit">${ownedCount > 0 ? `${ownedCount} owned` : ''}${ownedCount > 0 && cmCount > 0 ? ', ' : ''}${cmCount > 0 ? `${cmCount} contract` : ''}</div>
-        </div>
+        ${renderFacilityCard(pd.facilities[0])}
+
+        ${pd.facilities.length === 1 ? methodologyNote : ''}
       </div>
-
-      ${renderFacilityCard(pd.facilities[0])}
-
-      ${pd.facilities.length === 1 ? methodologyNote : ''}
 
       ${renderPageFooter(undefined, true)}
     </div>`;
@@ -947,12 +936,15 @@ function renderProcessingPage(data: LCAReportData): string {
   const continuationPages = remainingFacilities.map((facility, idx) => {
     const isLastFacility = idx === remainingFacilities.length - 1;
     return `
-    <div class="page light-page">
-      ${renderSectionHeader('05c', 'Processing & Manufacturing (cont.)')}
+    <div class="page light-page" style="position: relative;">
+      ${mark(CHAPTERS.footprint.mark, 'br', A)}
+      <div style="position: relative; z-index: 1;">
+        ${renderSectionHeader('05c', 'Processing & Manufacturing', false, true, A)}
 
-      ${renderFacilityCard(facility)}
+        ${renderFacilityCard(facility)}
 
-      ${isLastFacility ? methodologyNote : ''}
+        ${isLastFacility ? methodologyNote : ''}
+      </div>
 
       ${renderPageFooter(undefined, true)}
     </div>`;
@@ -963,101 +955,111 @@ function renderProcessingPage(data: LCAReportData): string {
 
 function renderGhgDetailedPage(data: LCAReportData): string {
   const ghg = data.ghgDetailed;
+  const A = CHAPTERS.footprint.accent;
+
+  // The three CO2 species, as a hairline-separated big-number row rather than
+  // boxed cards. Each keeps its working tone.
+  const species = [
+    { label: 'Fossil CO₂', value: ghg.fossilCo2, tone: '#BE123C' },
+    { label: 'Biogenic CO₂', value: ghg.biogenicCo2, tone: '#047857' },
+    { label: 'LULUC CO₂', value: ghg.dlucCo2, tone: '#B45309' },
+  ];
 
   return `
-    <div class="page light-page">
-      ${renderSectionHeader('06', 'Detailed GHG Reporting')}
+    <div class="page light-page" style="position: relative;">
+      ${mark(CHAPTERS.footprint.mark, 'br', A)}
+      <div style="position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%;">
+        ${renderSectionLead({
+          number: '06',
+          section: 'Detailed GHG reporting',
+          value: ghg.totalGwp100,
+          unit: 'kg CO₂e',
+          label: 'Total GWP-100, all species · ISO 14067:2018',
+          statement: 'The gases behind the number, itemised.',
+          accent: A,
+        })}
 
-      <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #6F6F68; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">ISO 14067:2018 &mdash; GREENHOUSE GAS BREAKDOWN</div>
-
-      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px;">
-        <div class="metric-card" style="text-align: center; border-left: 3px solid #BE123C;">
-          <div class="metric-label">Fossil CO&#8322;</div>
-          <div style="font-size: 24px; font-weight: 700; color: #BE123C;">${escapeHtml(ghg.fossilCo2)}</div>
-          <div class="metric-unit">kg CO&#8322;e</div>
+        <div style="display: flex; gap: 40px; margin-bottom: 26px;">
+          ${species.map(s =>
+            `<div style="flex: 1;">
+              <div class="lead-number" style="font-size: 34px; color: ${s.tone};">${escapeHtml(s.value)}</div>
+              <div class="lead-label" style="margin-top: 8px;">${escapeHtml(s.label)}</div>
+              <div class="lead-label" style="margin-top: 3px; letter-spacing: 0.14em; opacity: 0.7;">kg CO₂e</div>
+            </div>`
+          ).join('')}
         </div>
-        <div class="metric-card" style="text-align: center; border-left: 3px solid #047857;">
-          <div class="metric-label">Biogenic CO&#8322;</div>
-          <div style="font-size: 24px; font-weight: 700; color: #047857;">${escapeHtml(ghg.biogenicCo2)}</div>
-          <div class="metric-unit">kg CO&#8322;e</div>
+
+        <table class="studio-table" style="margin-bottom: 22px;">
+          <thead><tr><th>GHG species</th><th>Mass (kg)</th><th>CO₂e (kg)</th><th>GWP-100</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>CO₂ (fossil)</td>
+              <td class="num">${escapeHtml(ghg.fossilCo2)}</td>
+              <td class="num">${escapeHtml(ghg.fossilCo2)}</td>
+              <td class="num">1</td>
+            </tr>
+            <tr>
+              <td>CO₂ (biogenic)</td>
+              <td class="num">${escapeHtml(ghg.biogenicCo2)}</td>
+              <td class="num">${escapeHtml(ghg.biogenicCo2)}</td>
+              <td class="num">1*</td>
+            </tr>
+            <tr>
+              <td>CO₂ (LULUC)</td>
+              <td class="num">${escapeHtml(ghg.dlucCo2)}</td>
+              <td class="num">${escapeHtml(ghg.dlucCo2)}</td>
+              <td class="num">1</td>
+            </tr>
+            <tr>
+              <td>CH₄ (fossil)</td>
+              <td class="num">${escapeHtml(ghg.ch4Fossil)}</td>
+              <td class="num">${escapeHtml(ghg.ch4FossilKgCo2e)}</td>
+              <td class="num">29.8</td>
+            </tr>
+            <tr>
+              <td>CH₄ (biogenic)</td>
+              <td class="num">${escapeHtml(ghg.ch4Biogenic)}</td>
+              <td class="num">${escapeHtml(ghg.ch4BiogenicKgCo2e)}</td>
+              <td class="num">27.0</td>
+            </tr>
+            <tr>
+              <td>N₂O</td>
+              <td class="num">${escapeHtml(ghg.n2o)}</td>
+              <td class="num">${escapeHtml(ghg.n2oKgCo2e)}</td>
+              <td class="num">273</td>
+            </tr>
+            <tr>
+              <td>HFCs / PFCs</td>
+              <td class="num">·</td>
+              <td class="num">${escapeHtml(ghg.hfcPfc)}</td>
+              <td class="num">Variable</td>
+            </tr>
+            <tr>
+              <td style="font-weight: 700;">Total GWP-100 (all species)</td>
+              <td></td>
+              <td class="num" style="font-weight: 700; color: ${A};">${escapeHtml(ghg.totalGwp100)}</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td style="font-weight: 700;">Fossil carbon footprint (excl. biogenic)</td>
+              <td></td>
+              <td class="num" style="font-weight: 700; color: #1A1B1D;">${escapeHtml(ghg.fossilOnlyTotal || ghg.totalGwp100)}</td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="panel" style="margin-bottom: 16px; border-left: 2px solid ${A};">
+          <div class="eyebrow" style="color: ${A}; margin-bottom: 8px;">Biogenic carbon note · ISO 14067:2018</div>
+          <p class="body" style="font-size: 11.5px;">${escapeHtml(ghg.biogenicNote)}</p>
         </div>
-        <div class="metric-card" style="text-align: center; border-left: 3px solid #B45309;">
-          <div class="metric-label">LULUC CO&#8322;</div>
-          <div style="font-size: 24px; font-weight: 700; color: #B45309;">${escapeHtml(ghg.dlucCo2)}</div>
-          <div class="metric-unit">kg CO&#8322;e</div>
+
+        <div class="body" style="font-size: 11px; margin-bottom: 8px;">
+          <strong style="color: #1A1B1D;">GWP method:</strong> ${escapeHtml(ghg.gwpMethod)} · all GWP-100 values from IPCC Sixth Assessment Report (AR6, 2021).
         </div>
-      </div>
-
-      <table class="data-table" style="margin-bottom: 20px;">
-        <thead><tr><th>GHG Species</th><th>Mass (kg)</th><th>CO&#8322;e (kg)</th><th>GWP-100</th></tr></thead>
-        <tbody>
-          <tr>
-            <td style="font-weight: 500;">CO&#8322; (fossil)</td>
-            <td>${escapeHtml(ghg.fossilCo2)}</td>
-            <td>${escapeHtml(ghg.fossilCo2)}</td>
-            <td>1</td>
-          </tr>
-          <tr>
-            <td style="font-weight: 500;">CO&#8322; (biogenic)</td>
-            <td>${escapeHtml(ghg.biogenicCo2)}</td>
-            <td>${escapeHtml(ghg.biogenicCo2)}</td>
-            <td>1*</td>
-          </tr>
-          <tr>
-            <td style="font-weight: 500;">CO&#8322; (LULUC)</td>
-            <td>${escapeHtml(ghg.dlucCo2)}</td>
-            <td>${escapeHtml(ghg.dlucCo2)}</td>
-            <td>1</td>
-          </tr>
-          <tr>
-            <td style="font-weight: 500;">CH&#8324; (fossil)</td>
-            <td>${escapeHtml(ghg.ch4Fossil)}</td>
-            <td>${escapeHtml(ghg.ch4FossilKgCo2e)}</td>
-            <td>29.8</td>
-          </tr>
-          <tr>
-            <td style="font-weight: 500;">CH&#8324; (biogenic)</td>
-            <td>${escapeHtml(ghg.ch4Biogenic)}</td>
-            <td>${escapeHtml(ghg.ch4BiogenicKgCo2e)}</td>
-            <td>27.0</td>
-          </tr>
-          <tr>
-            <td style="font-weight: 500;">N&#8322;O</td>
-            <td>${escapeHtml(ghg.n2o)}</td>
-            <td>${escapeHtml(ghg.n2oKgCo2e)}</td>
-            <td>273</td>
-          </tr>
-          <tr>
-            <td style="font-weight: 500;">HFCs / PFCs</td>
-            <td>—</td>
-            <td>${escapeHtml(ghg.hfcPfc)}</td>
-            <td>Variable</td>
-          </tr>
-          <tr style="font-weight: 600; background: #f0fdf4;">
-            <td>Total GWP-100 (all species)</td>
-            <td></td>
-            <td style="color: #166534;">${escapeHtml(ghg.totalGwp100)} kg CO&#8322;e</td>
-            <td></td>
-          </tr>
-          <tr style="font-weight: 600; background: #fef3c7;">
-            <td>Fossil Carbon Footprint (excl. biogenic)</td>
-            <td></td>
-            <td style="color: #92400e;">${escapeHtml(ghg.fossilOnlyTotal || ghg.totalGwp100)} kg CO&#8322;e</td>
-            <td></td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
-        <div style="font-size: 11px; font-weight: 600; color: #166534; margin-bottom: 6px;">Biogenic Carbon Note (ISO 14067:2018)</div>
-        <p style="font-size: 11px; color: #6F6F68; line-height: 1.6;">${escapeHtml(ghg.biogenicNote)}</p>
-      </div>
-
-      <div style="font-size: 11px; color: #6F6F68; margin-bottom: 8px;">
-        <strong>GWP Method:</strong> ${escapeHtml(ghg.gwpMethod)} — All GWP-100 values from IPCC Sixth Assessment Report (AR6, 2021)
-      </div>
-      <div style="font-size: 10px; color: #6F6F68;">
-        * Per ISO 14067:2018 §6.4.9.3, biogenic CO&#8322; is characterised at GWP=1 for the species inventory but reported separately from the fossil carbon footprint. The net biogenic carbon balance (uptake minus end-of-life release) is excluded from the headline fossil footprint figure.
+        <div class="body" style="font-size: 10px;">
+          * Per ISO 14067:2018 §6.4.9.3, biogenic CO₂ is characterised at GWP=1 for the species inventory but reported separately from the fossil carbon footprint. The net biogenic carbon balance (uptake minus end-of-life release) is excluded from the headline fossil footprint figure.
+        </div>
       </div>
 
       ${renderPageFooter(8)}
@@ -1077,55 +1079,58 @@ function renderEnvironmentalImpactsPages(data: LCAReportData): string {
     const isFirstPage = i === 0;
     const pageNum = 9 + Math.floor(i / perPage);
 
-    const categoryCards = pageCategories.map(cat => {
-      const topContribs = cat.topContributors.map(tc =>
-        `<div style="display: flex; justify-content: space-between; font-size: 10px; padding: 2px 0;">
-          <span style="color: #6F6F68; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(tc.name)}</span>
-          <span style="color: #6F6F68;">${escapeHtml(tc.percentage)}</span>
-        </div>`
-      ).join('');
+    const A = CHAPTERS.footprint.accent;
+
+    // Each category is a hairline big-number row: name and indicator on the
+    // left, the figure on the right, then the description and any top
+    // contributors as a mono middot list. No boxes.
+    const categoryRows = pageCategories.map((cat, idx) => {
+      const topContribs = cat.topContributors.length > 0
+        ? `<div class="lead-label" style="margin-top: 8px; letter-spacing: 0.14em; opacity: 0.7;">Top contributors</div>
+           <div style="display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 5px;">
+             ${cat.topContributors.map(tc =>
+               `<span class="body" style="font-size: 10px;">${escapeHtml(tc.name)} <span style="color: ${A}; font-variant-numeric: tabular-nums;">${escapeHtml(tc.percentage)}</span></span>`
+             ).join('')}
+           </div>`
+        : '';
 
       return `
-        <div style="background: white; border: 1px solid #D9D6CB; border-radius: 12px; padding: 16px;">
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+        <div class="${idx === 0 ? '' : 'rule'}" style="padding: ${idx === 0 ? '0' : '18px'} 0 18px 0;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 24px;">
             <div>
-              <div style="font-size: 13px; font-weight: 600; color: #1A1B1D;">${escapeHtml(cat.name)}</div>
-              <div style="font-size: 10px; color: #6F6F68;">${escapeHtml(cat.indicator)}</div>
+              <div class="card-title" style="font-size: 15px;">${escapeHtml(cat.name)}</div>
+              <div class="lead-label" style="margin-top: 4px;">${escapeHtml(cat.indicator)}</div>
             </div>
-            <div style="text-align: right;">
-              <div style="font-size: 16px; font-weight: 700; color: #1A1B1D;">${escapeHtml(cat.totalValue)}</div>
-              <div style="font-size: 10px; color: #6F6F68;">${escapeHtml(cat.unit)}</div>
+            <div style="text-align: right; flex-shrink: 0;">
+              <span class="lead-number" style="font-size: 26px; color: #1A1B1D;">${escapeHtml(cat.totalValue)}</span>
+              <span class="lead-label" style="margin-left: 8px;">${escapeHtml(cat.unit)}</span>
             </div>
           </div>
-          <p style="font-size: 10px; color: #6F6F68; line-height: 1.5; margin-bottom: 8px;">${escapeHtml(cat.description)}</p>
-          ${cat.topContributors.length > 0 ? `
-            <div style="border-top: 1px solid #D9D6CB; padding-top: 6px;">
-              <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #6F6F68; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Top Contributors</div>
-              ${topContribs}
-            </div>
-          ` : ''}
+          <p class="body" style="font-size: 11px; margin-top: 8px;">${escapeHtml(cat.description)}</p>
+          ${topContribs}
         </div>`;
     }).join('');
 
     pages.push(`
-      <div class="page light-page">
-        ${isFirstPage
-          ? renderSectionHeader('07', 'Environmental Impact Categories')
-          : renderSectionHeader('07', 'Environmental Impact Categories', false, true)
-        }
+      <div class="page light-page" style="position: relative;">
+        ${mark(CHAPTERS.footprint.mark, 'br', A)}
+        <div style="position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%;">
+          ${isFirstPage
+            ? renderSectionHeader('07', 'Environmental Impact Categories', false, false, A)
+            : renderSectionHeader('07', 'Environmental Impact Categories', false, true, A)
+          }
 
-        ${isFirstPage ? `
-          <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #6F6F68; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px;">ISO 14044:2006 &sect;4.4 — LIFE CYCLE IMPACT ASSESSMENT</div>
-          <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px;">
-            <p style="font-size: 11px; color: #92400e; line-height: 1.5;"><strong>Method:</strong> ${escapeHtml(data.environmentalImpacts.referenceMethod)} — ${escapeHtml(data.environmentalImpacts.normalisationNote)}</p>
-          </div>
-        ` : ''}
+          ${isFirstPage ? `
+            <div class="eyebrow" style="color: ${A}; margin-bottom: 10px;">ISO 14044:2006 §4.4 · life cycle impact assessment</div>
+            <div class="panel" style="margin-bottom: 22px; border-left: 2px solid ${A};">
+              <p class="body" style="font-size: 11.5px;"><strong style="color: #1A1B1D;">Method:</strong> ${escapeHtml(data.environmentalImpacts.referenceMethod)} · ${escapeHtml(data.environmentalImpacts.normalisationNote)}</p>
+            </div>
+          ` : ''}
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
-          ${categoryCards}
+          ${categoryRows}
+
+          ${renderPageFooter(pageNum)}
         </div>
-
-        ${renderPageFooter(pageNum)}
       </div>`);
   }
 
@@ -1137,6 +1142,7 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
   if (ingredients.length === 0) return '';
 
   const hasProxies = data.ingredientBreakdown.hasProxies;
+  const A = CHAPTERS.sources.accent; // #A97C14 -- ochre's ink form, legible on paper
 
   // Split into pages of 10 rows
   const perPage = 10;
@@ -1144,7 +1150,7 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
 
   // ── Reconciliation (#3) ────────────────────────────────────────────────────
   // The rows below are material-production only, so the "% Climate" column would
-  // otherwise sum to ~90% with no explanation — the remainder is inbound
+  // otherwise sum to ~90% with no explanation -- the remainder is inbound
   // transport plus the non-material lifecycle stages (processing, distribution,
   // use, end-of-life). Add an explicit "Other lifecycle stages" residual row and
   // a Total row on the final page so the column sums to 100% and the GWP column
@@ -1156,35 +1162,37 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
   const materialsPct = reconcileTotal > 0 ? (materialsSubtotal / reconcileTotal) * 100 : 0;
   const otherPct = Math.max(100 - materialsPct, 0);
 
+  // Say the number, then name the hotspot: the top ingredient by climate impact.
+  const topIngredient = [...ingredients]
+    .sort((a, b) => (parseFloat(b.climateImpact) || 0) - (parseFloat(a.climateImpact) || 0))[0];
+  const leadStatement = topIngredient
+    ? `${escapeHtml(topIngredient.name)} carries the most.`
+    : 'Where the impact sits.';
+
   for (let i = 0; i < ingredients.length; i += perPage) {
     const pageIngredients = ingredients.slice(i, i + perPage);
     const isFirstPage = i === 0;
     const isLastPage = i + perPage >= ingredients.length;
     const pageNum = 10 + Math.floor(i / perPage);
 
-    // First page uses the dark table style, later pages the light one — pick
-    // residual/total row colours that read on whichever background applies.
-    const subtleColor = isFirstPage ? '#6F6F68' : '#6F6F68';
-    const strongColor = isFirstPage ? '#1A1B1D' : '#1A1B1D';
-    const ruleColor = isFirstPage ? 'rgba(26,27,29,0.25)' : 'rgba(0,0,0,0.2)';
-
     // Residual + Total rows close the table out on the final page so the
-    // "% Climate" column sums to 100% (see reconciliation note above).
+    // "% Climate" column sums to 100% (see reconciliation note above). Both are
+    // hairline rows in the studio table; the Total carries a heavier top rule.
     const summaryRows = isLastPage
-      ? `${otherStages > 0.0005 ? `<tr style="color: ${subtleColor}; font-style: italic;">
-            <td style="font-weight: 500;">Other lifecycle stages
-              <div style="font-size: 7.5px; margin-top: 2px;">Inbound transport, processing, distribution, use &amp; end-of-life</div>
+      ? `${otherStages > 0.0005 ? `<tr>
+            <td>Other lifecycle stages
+              <div style="font-size: 8.5px; color: #6F6F68; margin-top: 2px;">Inbound transport, processing, distribution, use &amp; end-of-life</div>
             </td>
             <td></td><td></td>
-            <td style="font-weight: 500;">${otherStages.toFixed(4)}</td>
-            <td><span style="color: #205E40;">${otherPct.toFixed(1)}%</span></td>
+            <td class="num">${otherStages.toFixed(4)}</td>
+            <td class="num" style="color: ${A};">${otherPct.toFixed(1)}%</td>
             <td></td><td></td><td></td>
           </tr>` : ''}
-          <tr style="font-weight: 700; color: ${strongColor}; border-top: 2px solid ${ruleColor};">
-            <td>Total carbon footprint</td>
+          <tr style="border-top: 2px solid #D9D6CB;">
+            <td class="card-title" style="font-size: 12px;">Total carbon footprint</td>
             <td></td><td></td>
-            <td>${reconcileTotal.toFixed(3)}</td>
-            <td><span style="color: #205E40;">100%</span></td>
+            <td class="num" style="font-weight: 700; color: #1A1B1D;">${reconcileTotal.toFixed(3)}</td>
+            <td class="num" style="font-weight: 700; color: ${A};">100%</td>
             <td></td><td></td><td></td>
           </tr>`
       : '';
@@ -1193,82 +1201,90 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
       // Ingredient cell: show real name, then proxy factor below if different
       const ingredientCell = ing.isProxy
         ? `<td style="min-width: 160px; max-width: 220px;">
-            <div style="font-weight: 500; word-wrap: break-word;">${escapeHtml(ing.name)}</div>
-            <div style="font-size: 8px; color: #B45309; margin-top: 2px; word-wrap: break-word;">
+            <div class="card-title" style="font-size: 11.5px; word-wrap: break-word;">${escapeHtml(ing.name)}</div>
+            <div class="state state-attention" style="font-size: 8.5px; letter-spacing: 0.05em; margin-top: 3px; text-transform: none; word-wrap: break-word;">
               &#8627; Proxy: ${escapeHtml(ing.calculationFactor)}
             </div>
-            <div style="font-size: 7.5px; color: #6F6F68;">${escapeHtml(ing.factorDatabase)}</div>
+            <div style="font-size: 8.5px; color: #6F6F68; margin-top: 1px;">${escapeHtml(ing.factorDatabase)}</div>
            </td>`
-        : `<td style="font-weight: 500; min-width: 160px; max-width: 220px; word-wrap: break-word;">
-            ${escapeHtml(ing.name)}
-            <div style="font-size: 7.5px; color: #6F6F68; margin-top: 2px;">${escapeHtml(ing.factorDatabase)}</div>
+        : `<td style="min-width: 160px; max-width: 220px; word-wrap: break-word;">
+            <div class="card-title" style="font-size: 11.5px;">${escapeHtml(ing.name)}</div>
+            <div style="font-size: 8.5px; color: #6F6F68; margin-top: 2px;">${escapeHtml(ing.factorDatabase)}</div>
            </td>`;
 
-      const dataSourceBadge = ing.isProxy
-        ? `<span class="badge badge-high">Proxy</span>`
+      // Data source -> typographic state chip (Primary/good, Secondary/attention, Proxy/stale).
+      const sourceState = ing.isProxy
+        ? `<span class="state state-stale">Proxy</span>`
         : ing.dataSource === 'Primary'
-          ? `<span class="badge badge-low">Primary</span>`
-          : `<span class="badge badge-medium">Secondary</span>`;
+          ? `<span class="state state-good">Primary</span>`
+          : `<span class="state state-attention">Secondary</span>`;
 
-      // Quality grade chip (ISO 14044 §4.2.3.6 data quality transparency).
-      // badge-low is the green style, badge-high the red one — the classes
-      // are named after risk, so the mapping is inverted on purpose.
+      // Quality grade -> state chip. High/good, Medium/attention, Low/stale.
       const grade = (ing.dataQualityGrade || '').toUpperCase();
-      const gradeChip = ['HIGH', 'MEDIUM', 'LOW'].includes(grade)
-        ? `<span class="badge ${grade === 'HIGH' ? 'badge-low' : grade === 'MEDIUM' ? 'badge-medium' : 'badge-high'}" style="margin-left: 3px;">${escapeHtml(grade.charAt(0) + grade.slice(1).toLowerCase())}</span>`
+      const gradeState = ['HIGH', 'MEDIUM', 'LOW'].includes(grade)
+        ? `<span class="state ${grade === 'HIGH' ? 'state-good' : grade === 'MEDIUM' ? 'state-attention' : 'state-stale'}" style="margin-left: 8px;">${escapeHtml(grade.charAt(0) + grade.slice(1).toLowerCase())}</span>`
         : '';
 
       const containerNote = (ing as any).containerCO2
-        ? `<div style="font-size: 8px; color: #6F6F68; margin-top: 2px;">incl. ${escapeHtml((ing as any).containerCO2)} kg CO₂e inbound container (${escapeHtml((ing as any).containerType || '')})</div>`
+        ? `<div style="font-size: 8.5px; color: #6F6F68; margin-top: 2px;">incl. ${escapeHtml((ing as any).containerCO2)} kg CO₂e inbound container (${escapeHtml((ing as any).containerType || '')})</div>`
         : '';
 
-      // Inbound freight transport sub-line — makes embedded transport emissions
+      // Inbound freight transport sub-line -- makes embedded transport emissions
       // visible so the ingredient table reconciles against the lifecycle stage totals.
       const transportNote = (ing as any).transportCO2
-        ? `<div style="font-size: 8px; color: #6F6F68; margin-top: 2px;">incl. ${escapeHtml((ing as any).transportCO2)} kg CO₂e inbound transport${(ing as any).transportMode ? ` · ${escapeHtml((ing as any).transportMode)}` : ''}${(ing as any).transportDistance ? ` · ${escapeHtml((ing as any).transportDistance)} km` : ''}</div>`
+        ? `<div style="font-size: 8.5px; color: #6F6F68; margin-top: 2px;">incl. ${escapeHtml((ing as any).transportCO2)} kg CO₂e inbound transport${(ing as any).transportMode ? ` · ${escapeHtml((ing as any).transportMode)}` : ''}${(ing as any).transportDistance ? ` · ${escapeHtml((ing as any).transportDistance)} km` : ''}</div>`
         : '';
 
-      // Implausibility warning — e.g. "Road freight from Lima, Peru at 10,113 km".
+      // Implausibility warning -- e.g. "Road freight from Lima, Peru at 10,113 km".
       // Shown in the Origin cell so the user connects the origin to the transport choice.
       const originWarning = (ing as any).transportWarning
-        ? `<div style="font-size: 8px; color: #b45309; margin-top: 2px; line-height: 1.3;">&#x26A0; ${escapeHtml((ing as any).transportWarning)}</div>`
+        ? `<div class="state state-attention" style="font-size: 8.5px; letter-spacing: 0.05em; text-transform: none; margin-top: 2px; line-height: 1.3;">&#x26A0; ${escapeHtml((ing as any).transportWarning)}</div>`
         : '';
 
       return `<tr>
         ${ingredientCell}
-        <td>${escapeHtml(ing.quantity)} ${escapeHtml(ing.unit)}</td>
+        <td class="num">${escapeHtml(ing.quantity)} ${escapeHtml(ing.unit)}</td>
         <td>${escapeHtml(ing.origin)}${originWarning}</td>
-        <td style="font-weight: 500;">${escapeHtml(ing.climateImpact)}${containerNote}${transportNote}</td>
-        <td><span style="color: #205E40;">${escapeHtml(ing.climatePercentage)}</span></td>
-        <td>${escapeHtml(ing.acidification)}</td>
-        <td>${escapeHtml(ing.eutrophication)}</td>
-        <td>${dataSourceBadge}${gradeChip}${ing.confidenceScore > 0 ? `<div style="font-size: 7.5px; color: #6F6F68; margin-top: 2px;">${ing.confidenceScore}% confidence</div>` : ''}</td>
+        <td class="num">${escapeHtml(ing.climateImpact)}${containerNote}${transportNote}</td>
+        <td class="num" style="color: ${A};">${escapeHtml(ing.climatePercentage)}</td>
+        <td class="num">${escapeHtml(ing.acidification)}</td>
+        <td class="num">${escapeHtml(ing.eutrophication)}</td>
+        <td>${sourceState}${gradeState}${ing.confidenceScore > 0 ? `<div style="font-size: 8.5px; color: #6F6F68; margin-top: 3px;">${ing.confidenceScore}% confidence</div>` : ''}</td>
       </tr>`;
     }).join('');
 
     pages.push(`
-      <div class="page ${isFirstPage ? 'dark-page' : 'light-page'}">
+      <div class="page light-page" style="position: relative;">
+        ${mark(CHAPTERS.sources.mark, 'br', A)}
+        <div style="position: relative; z-index: 1;">
         ${isFirstPage
-          ? renderSectionHeader('08', 'Ingredient Impact Breakdown', true)
-          : renderSectionHeader('08', 'Ingredient Impact Breakdown', false, true)
+          ? renderSectionLead({
+              number: '08',
+              section: 'Ingredient breakdown',
+              value: data.ingredientBreakdown.totalClimateImpact,
+              unit: 'kg CO₂e',
+              label: `Per-ingredient contribution · per ${data.functionalUnit.value}`,
+              statement: leadStatement,
+              accent: A,
+            })
+          : renderSectionHeader('08', 'Ingredient Impact Breakdown', false, true, A)
         }
 
         ${isFirstPage ? `
-          <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #6F6F68; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">PER-INGREDIENT ENVIRONMENTAL CONTRIBUTION · REAL INGREDIENT &amp; CALCULATION FACTOR</div>
-          <div style="margin-bottom: 16px; font-size: 9px; color: #6F6F68; line-height: 1.5;">
-            The <strong>GWP (kg CO&#8322;e)</strong> column shows each ingredient's material production impact. Inbound transport is itemised separately on a sub-line beneath the ingredient where present, and is included in the product total. The most significant ingredients shown here are restated in the Interpretation hotspots (Section 13) using these same production figures.
+          <div class="body" style="font-size: 11.5px; margin-bottom: 18px; max-width: 640px;">
+            The <strong style="color: #1A1B1D;">GWP (kg CO&#8322;e)</strong> column shows each ingredient's material production impact. Inbound transport is itemised separately on a sub-line beneath the ingredient where present, and is included in the product total. The most significant ingredients shown here are restated in the Interpretation hotspots (Section 13) using these same production figures.
           </div>
         ` : ''}
 
         ${isFirstPage && hasProxies ? `
-          <div style="margin-bottom: 12px; padding: 10px 14px; background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.3); border-radius: 8px; font-size: 9px; color: #b45309; line-height: 1.5;">
-            <strong>Proxy factors in use:</strong> One or more ingredients are calculated using the closest matching dataset from ecoinvent, AGRIBALYSE, or DEFRA.
-            The user's actual ingredient name is shown first; the proxy factor and database are shown beneath it in amber.
-            All proxy selections are documented per ISO 14044 §4.2.3.6.3.
+          <div class="panel" style="margin-bottom: 18px; border-left: 2px solid ${A}; padding: 14px 16px;">
+            <div class="body" style="font-size: 11px;">
+              <span class="state state-attention">Proxy factors in use</span>&nbsp; One or more ingredients are calculated using the closest matching dataset from ecoinvent, AGRIBALYSE, or DEFRA. The user's actual ingredient name is shown first; the proxy factor and database are shown beneath it. All proxy selections are documented per ISO 14044 §4.2.3.6.3.
+            </div>
           </div>
         ` : ''}
 
-        <table class="${isFirstPage ? 'data-table-dark' : 'data-table'}" style="font-size: 10px;">
+        <table class="studio-table">
           <thead><tr>
             <th>Ingredient / Calc. Factor</th>
             <th>Qty</th>
@@ -1283,16 +1299,16 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
         </table>
 
         ${isLastPage ? `
-          <div style="margin-top: 20px; padding: 14px; background: ${isFirstPage ? 'rgba(26,27,29,0.05)' : '#F2F1EA'}; border-radius: 8px; border: 1px solid ${isFirstPage ? 'rgba(26,27,29,0.1)' : '#D9D6CB'};">
-            <div style="font-size: 10px; color: ${isFirstPage ? '#6F6F68' : '#6F6F68'}; line-height: 1.6;">
-              <strong style="color: ${isFirstPage ? '#205E40' : '#1A1B1D'};">Coverage:</strong> The ingredients and packaging listed above are material-production impacts and account for ${materialsPct.toFixed(1)}% of the ${escapeHtml(data.ingredientBreakdown.totalClimateImpact)} kg CO&#8322;e total per functional unit. The remaining ${otherPct.toFixed(1)}% comes from inbound transport and the non-material lifecycle stages (processing, distribution, use and end-of-life), shown in the "Other lifecycle stages" row and detailed in Sections 05 to 07.
-              Acidification values in kg SO&#8322;-eq (terrestrial); eutrophication in kg P-eq (freshwater); values below detection shown as 0.000e+0.
-              ${hasProxies ? '&#x26A0; Proxy factors are used where a direct dataset match was not available (see the Data Quality section).' : ''}
+          <div class="panel" style="margin-top: 22px;">
+            <div class="body" style="font-size: 11px;">
+              <span class="eyebrow" style="color: ${A};">Coverage</span>&nbsp; The ingredients and packaging listed above are material-production impacts and account for ${materialsPct.toFixed(1)}% of the ${escapeHtml(data.ingredientBreakdown.totalClimateImpact)} kg CO&#8322;e total per functional unit. The remaining ${otherPct.toFixed(1)}% comes from inbound transport and the non-material lifecycle stages (processing, distribution, use and end-of-life), shown in the "Other lifecycle stages" row and detailed in Sections 05 to 07. Acidification values in kg SO&#8322;-eq (terrestrial); eutrophication in kg P-eq (freshwater); values below detection shown as 0.000e+0.
+              ${hasProxies ? ' &#x26A0; Proxy factors are used where a direct dataset match was not available (see the Data Quality section).' : ''}
             </div>
           </div>
         ` : ''}
+        </div>
 
-        ${renderPageFooter(pageNum, isFirstPage)}
+        ${renderPageFooter(pageNum, false)}
       </div>`);
   }
 
@@ -1300,39 +1316,59 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
 }
 
 function renderWaterPage(data: LCAReportData): string {
+  const A = CHAPTERS.footprint.accent;
+
+  // Risk level reads as a typographic state chip, not a coloured pill.
+  const riskState = (risk: string): string => {
+    const r = risk.toLowerCase();
+    if (r === 'high') return 'state-stale';
+    if (r === 'medium') return 'state-attention';
+    if (r === 'low') return 'state-good';
+    return 'state-quiet';
+  };
+
   return `
-    <div class="page light-page">
-      ${renderSectionHeader('09', 'Water Footprint')}
+    <div class="page light-page" style="position: relative;">
+      ${mark(CHAPTERS.footprint.mark, 'br', A)}
+      <div style="position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%;">
+        ${renderSectionLead({
+          number: '09',
+          section: 'Water footprint',
+          value: data.waterFootprint.totalConsumption,
+          unit: 'litres',
+          label: 'Total consumption · per functional unit',
+          statement: 'The water behind the product, and where it is scarce.',
+          accent: A,
+        })}
 
-      <div style="display: flex; gap: 24px; margin-bottom: 32px;">
-        <div style="flex: 1; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 16px; padding: 24px; text-align: center;">
-          <div style="font-size: 11px; font-family: 'Fira Code', monospace; color: #2B46C0; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Total Consumption</div>
-          <div style="font-size: 48px; font-weight: 700; font-family: 'Playfair Display', serif; color: #1e40af;">${escapeHtml(data.waterFootprint.totalConsumption)}</div>
-          <div style="font-size: 14px; color: #2B46C0;">litres</div>
+        <div class="rule" style="padding-top: 22px; margin-bottom: 28px; display: flex; gap: 56px;">
+          <div>
+            <div class="lead-number" style="font-size: 40px; color: ${A};">${escapeHtml(data.waterFootprint.totalConsumption)}</div>
+            <div class="lead-label" style="margin-top: 8px;">Consumption · litres</div>
+          </div>
+          <div>
+            <div class="lead-number" style="font-size: 40px; color: #1A1B1D;">${escapeHtml(data.waterFootprint.scarcityWeighted)}</div>
+            <div class="lead-label" style="margin-top: 8px;">Scarcity-weighted · litres eq.</div>
+          </div>
         </div>
-        <div style="flex: 1; background: #fef3c7; border: 1px solid #fde68a; border-radius: 16px; padding: 24px; text-align: center;">
-          <div style="font-size: 11px; font-family: 'Fira Code', monospace; color: #B45309; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Scarcity-Weighted</div>
-          <div style="font-size: 48px; font-weight: 700; font-family: 'Playfair Display', serif; color: #92400e;">${escapeHtml(data.waterFootprint.scarcityWeighted)}</div>
-          <div style="font-size: 14px; color: #B45309;">litres eq.</div>
-        </div>
+
+        ${data.waterFootprint.sources.length > 0 ? `
+          <div class="eyebrow" style="color: ${A}; margin-bottom: 14px;">Water sources</div>
+          <table class="studio-table">
+            <thead><tr><th>Source</th><th>Location</th><th>Volume</th><th>Risk level</th></tr></thead>
+            <tbody>
+              ${data.waterFootprint.sources.map(s => `
+                <tr>
+                  <td>${escapeHtml(s.source)}</td>
+                  <td>${escapeHtml(s.location)}</td>
+                  <td class="num">${escapeHtml(s.volume)}</td>
+                  <td>${s.risk ? `<span class="state ${riskState(s.risk)}">${escapeHtml(s.risk)}</span>` : ''}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        ` : ''}
       </div>
-
-      ${data.waterFootprint.sources.length > 0 ? `
-        <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px;">Water Sources</h3>
-        <table class="data-table">
-          <thead><tr><th>Source</th><th>Location</th><th>Volume</th><th>Risk Level</th></tr></thead>
-          <tbody>
-            ${data.waterFootprint.sources.map(s => `
-              <tr>
-                <td>${escapeHtml(s.source)}</td>
-                <td>${escapeHtml(s.location)}</td>
-                <td>${escapeHtml(s.volume)}</td>
-                <td>${s.risk ? `<span class="badge badge-${s.risk.toLowerCase()}">${escapeHtml(s.risk)}</span>` : ''}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      ` : ''}
 
       ${renderPageFooter(11)}
     </div>`;
@@ -1351,62 +1387,71 @@ function renderCircularityPage(data: LCAReportData): string {
   const totalNet = hasEolBreakdown
     ? data.circularity.eolBreakdown.reduce((s, m) => s + m.netEmissions, 0) : 0;
 
-  return `
-    <div class="page light-page">
-      ${renderSectionHeader('10', 'Circularity & Waste')}
+  const A = CHAPTERS.footprint.accent;
 
-      <div style="display: flex; gap: 16px; margin-bottom: 24px;">
-        <div style="flex: 1; text-align: center; background: white; border: 1px solid #D9D6CB; border-radius: 16px; padding: 20px;">
-          <div style="width: 120px; height: 120px; border-radius: 50%; margin: 0 auto 12px; position: relative; background: conic-gradient(#047857 ${recycledContentRate * 3.6}deg, #D9D6CB 0deg);">
-            <div style="position: absolute; inset: 12px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-              <span style="font-size: 28px; font-weight: 700; font-family: 'Playfair Display', serif; color: #047857;">${recycledContentRate}%</span>
+  // Lead with the circularity score; where absent, the recycled-content rate is
+  // the closest single figure to headline.
+  const leadValue = data.circularity.circularityScore || `${recycledContentRate}`;
+
+  return `
+    <div class="page light-page" style="position: relative;">
+      ${mark(CHAPTERS.footprint.mark, 'br', A)}
+      <div style="position: relative; z-index: 1;">
+        ${renderSectionLead({
+          number: '10',
+          section: 'Circularity & waste',
+          value: escapeHtml(leadValue),
+          label: 'Circularity score · input reuse and end-of-life recovery',
+          statement: `${eolRecyclingRate}% of packaging is recovered at disposal.`,
+          accent: A,
+        })}
+
+        <div style="display: flex; gap: 32px; align-items: center; margin-bottom: 26px;">
+          <div style="display: flex; gap: 28px; flex-shrink: 0;">
+            <div style="text-align: center;">
+              <div style="width: 116px; height: 116px; border-radius: 50%; ${donutGradient([{ value: recycledContentRate, color: '#047857' }, { value: Math.max(100 - recycledContentRate, 0), color: '#D9D6CB' }])} position: relative;">
+                <div style="position: absolute; inset: 13px; background: #F2F1EA; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                  <span class="lead-number" style="font-size: 26px; color: #047857;">${recycledContentRate}<span style="font-size: 12px;">%</span></span>
+                </div>
+              </div>
+              <div class="lead-label" style="margin-top: 12px;">Recycled content</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="width: 116px; height: 116px; border-radius: 50%; ${donutGradient([{ value: eolRecyclingRate, color: '#2B46C0' }, { value: Math.max(100 - eolRecyclingRate, 0), color: '#D9D6CB' }])} position: relative;">
+                <div style="position: absolute; inset: 13px; background: #F2F1EA; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                  <span class="lead-number" style="font-size: 26px; color: #2B46C0;">${eolRecyclingRate}<span style="font-size: 12px;">%</span></span>
+                </div>
+              </div>
+              <div class="lead-label" style="margin-top: 12px;">EoL recycling rate</div>
             </div>
           </div>
-          <div style="font-size: 12px; font-weight: 600; color: #1A1B1D;">Recycled Content</div>
-          <div style="font-size: 9px; color: #6F6F68;">Input: recycled material used</div>
-        </div>
-        <div style="flex: 1; text-align: center; background: white; border: 1px solid #D9D6CB; border-radius: 16px; padding: 20px;">
-          <div style="width: 120px; height: 120px; border-radius: 50%; margin: 0 auto 12px; position: relative; background: conic-gradient(#2B46C0 ${eolRecyclingRate * 3.6}deg, #D9D6CB 0deg);">
-            <div style="position: absolute; inset: 12px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-              <span style="font-size: 28px; font-weight: 700; font-family: 'Playfair Display', serif; color: #2B46C0;">${eolRecyclingRate}%</span>
+          <div style="flex: 1;">
+            <div class="body" style="font-size: 12px; margin-bottom: 14px;">Recycled content is the circular input, the recycled material used in production. The recycling rate is the circular output, the packaging recovered at end of life.</div>
+            <div class="rule" style="padding-top: 14px;">
+              <div class="lead-number" style="font-size: 34px; color: ${A};">${escapeHtml(data.circularity.totalWaste)}</div>
+              <div class="lead-label" style="margin-top: 6px;">Total packaging waste</div>
             </div>
           </div>
-          <div style="font-size: 12px; font-weight: 600; color: #1A1B1D;">EoL Recycling Rate</div>
-          <div style="font-size: 9px; color: #6F6F68;">Output: packaging recycled at disposal</div>
         </div>
-        <div style="flex: 1;">
-          <div class="metric-card" style="margin-bottom: 12px;">
-            <div class="metric-label">Total Packaging Waste</div>
-            <div class="metric-value">${escapeHtml(data.circularity.totalWaste)}</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Circularity Score</div>
-            <div class="metric-value">${escapeHtml(data.circularity.circularityScore)}</div>
-          </div>
-        </div>
-      </div>
 
       ${hasEolBreakdown ? `
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px;">
-          <div class="metric-card" style="text-align: center; border-left: 3px solid #BE123C;">
-            <div class="metric-label">Gross EoL Emissions</div>
-            <div style="font-size: 18px; font-weight: 700; color: #BE123C;">${totalGross.toFixed(4)}</div>
-            <div class="metric-unit">kg CO&#8322;e</div>
+        <div class="rule" style="padding-top: 20px; margin-bottom: 22px; display: flex; gap: 44px;">
+          <div>
+            <div class="lead-number" style="font-size: 30px; color: #BE123C;">${totalGross.toFixed(4)}</div>
+            <div class="lead-label" style="margin-top: 6px;">Gross EoL emissions <span class="state state-quiet">kg CO&#8322;e</span></div>
           </div>
-          <div class="metric-card" style="text-align: center; border-left: 3px solid #047857;">
-            <div class="metric-label">Recycling Credits</div>
-            <div style="font-size: 18px; font-weight: 700; color: #047857;">${totalAvoided.toFixed(4)}</div>
-            <div class="metric-unit">kg CO&#8322;e (avoided)</div>
+          <div>
+            <div class="lead-number" style="font-size: 30px; color: #047857;">${totalAvoided.toFixed(4)}</div>
+            <div class="lead-label" style="margin-top: 6px;">Recycling credits <span class="state state-good">avoided</span></div>
           </div>
-          <div class="metric-card" style="text-align: center; border-left: 3px solid ${totalNet < 0 ? '#047857' : '#B45309'};">
-            <div class="metric-label">Net EoL Impact</div>
-            <div style="font-size: 18px; font-weight: 700; color: ${totalNet < 0 ? '#047857' : '#B45309'};">${totalNet.toFixed(4)}</div>
-            <div class="metric-unit">kg CO&#8322;e</div>
+          <div>
+            <div class="lead-number" style="font-size: 30px; color: ${totalNet < 0 ? '#047857' : '#B45309'};">${totalNet.toFixed(4)}</div>
+            <div class="lead-label" style="margin-top: 6px;">Net EoL impact <span class="state ${totalNet < 0 ? 'state-good' : 'state-attention'}">kg CO&#8322;e</span></div>
           </div>
         </div>
 
-        <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 10px;">Per-Material Disposal Pathways</h3>
-        <table class="data-table" style="font-size: 10px;">
+        <div class="eyebrow" style="color: ${A}; margin-bottom: 12px;">Per-material disposal pathways</div>
+        <table class="studio-table" style="margin-bottom: 4px;">
           <thead><tr>
             <th>Material</th>
             <th>Mass</th>
@@ -1421,30 +1466,30 @@ function renderCircularityPage(data: LCAReportData): string {
             ${data.circularity.eolBreakdown.map(m => `
               <tr>
                 <td style="font-weight: 500;">${escapeHtml(m.material)}</td>
-                <td>${m.massKg.toFixed(3)} kg</td>
-                <td style="text-align: center;">${m.recyclingPct}%</td>
-                <td style="text-align: center;">${m.landfillPct}%</td>
-                <td style="text-align: center;">${m.incinerationPct}%</td>
-                <td style="text-align: center;">${m.compostingPct}%</td>
-                <td style="text-align: center;">${m.adPct}%</td>
-                <td style="text-align: right; color: ${m.netEmissions < 0 ? '#047857' : '#6F6F68'};">${m.netEmissions.toFixed(4)}</td>
+                <td><span class="num">${m.massKg.toFixed(3)}</span> kg</td>
+                <td style="text-align: center;"><span class="num">${m.recyclingPct}</span>%</td>
+                <td style="text-align: center;"><span class="num">${m.landfillPct}</span>%</td>
+                <td style="text-align: center;"><span class="num">${m.incinerationPct}</span>%</td>
+                <td style="text-align: center;"><span class="num">${m.compostingPct}</span>%</td>
+                <td style="text-align: center;"><span class="num">${m.adPct}</span>%</td>
+                <td style="text-align: right; color: ${m.netEmissions < 0 ? '#047857' : '#6F6F68'};"><span class="num">${m.netEmissions.toFixed(4)}</span></td>
               </tr>
             `).join('')}
           </tbody>
         </table>
       ` : `
         ${data.circularity.wasteStream.length > 0 ? `
-          <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px;">Waste Streams</h3>
-          <table class="data-table">
-            <thead><tr><th>Stream</th><th>Volume</th><th>Status</th></tr></thead>
+          <div class="eyebrow" style="color: ${A}; margin-bottom: 12px;">Waste streams</div>
+          <table class="studio-table">
+            <thead><tr><th>Stream</th><th>Volume</th><th style="text-align: right;">Status</th></tr></thead>
             <tbody>
               ${data.circularity.wasteStream.map(ws => `
                 <tr>
                   <td>${escapeHtml(ws.label)}</td>
-                  <td>${escapeHtml(ws.value)}</td>
-                  <td>${ws.recycled
-                    ? '<span class="badge badge-low">Recycled</span>'
-                    : '<span class="badge badge-medium">Waste</span>'
+                  <td><span class="num">${escapeHtml(ws.value)}</span></td>
+                  <td style="text-align: right;">${ws.recycled
+                    ? '<span class="state state-good">Recycled</span>'
+                    : '<span class="state state-attention">Waste</span>'
                   }</td>
                 </tr>
               `).join('')}
@@ -1454,75 +1499,87 @@ function renderCircularityPage(data: LCAReportData): string {
       `}
 
       ${data.circularityMethodology ? `
-        <div style="margin-top: 16px; padding: 10px 14px; background: #f0f9ff; border-radius: 8px; border: 1px solid #bae6fd;">
-          <p style="font-size: 10px; line-height: 1.5; color: #0c4a6e;">
-            <strong>Note:</strong> Recycled Content measures circular input (recycled material used in production).
-            EoL Recycling Rate measures circular output (packaging recycled at end-of-life, based on regional defaults).
-            These are independent metrics per ISO 14044 &sect;4.4.5.
-            ${data.circularityMethodology.reference ? ` ${escapeHtml(data.circularityMethodology.reference)}` : ''}
-          </p>
+        <div class="panel" style="margin-top: 20px; border-left: 2px solid ${A};">
+          <div class="eyebrow" style="color: ${A}; margin-bottom: 8px;">Method</div>
+          <div class="body" style="font-size: 11.5px;">Recycled content measures circular input (recycled material used in production). EoL recycling rate measures circular output (packaging recycled at end of life, based on regional defaults). These are independent metrics per ISO 14044 &sect;4.4.5.${data.circularityMethodology.reference ? ` ${escapeHtml(data.circularityMethodology.reference)}` : ''}</div>
         </div>
       ` : ''}
+      </div>
 
       ${renderPageFooter(12)}
     </div>`;
 }
 
 function renderLandUsePage(data: LCAReportData): string {
+  const A = CHAPTERS.footprint.accent;
+
   return `
-    <div class="page light-page">
-      ${renderSectionHeader('11', 'Land Use')}
+    <div class="page light-page" style="position: relative;">
+      ${mark(CHAPTERS.footprint.mark, 'br', A)}
+      <div style="position: relative; z-index: 1;">
+        ${renderSectionLead({
+          number: '11',
+          section: 'Land use',
+          value: escapeHtml(data.landUse.totalLandUse),
+          unit: 'm² per year',
+          label: 'Total land occupation across the product',
+          statement: 'The land the product asks of the earth.',
+          accent: A,
+        })}
 
-      <div class="metric-card" style="margin-bottom: 24px; text-align: center; padding: 32px;">
-        <div class="metric-label">Total Land Use</div>
-        <div style="font-size: 48px; font-family: 'Playfair Display', serif; font-weight: 700; color: #166534;">${escapeHtml(data.landUse.totalLandUse)}</div>
-        <div class="metric-unit">m&#178; per year</div>
+        ${data.landUse.breakdown.length > 0 ? `
+          <div class="eyebrow" style="color: ${A}; margin-bottom: 12px;">Material breakdown</div>
+          <table class="studio-table">
+            <thead><tr>
+              <th>Material</th>
+              <th>Origin</th>
+              <th style="text-align: right;">Mass</th>
+              <th style="text-align: right;">Intensity</th>
+              <th style="text-align: right;">Footprint</th>
+            </tr></thead>
+            <tbody>
+              ${data.landUse.breakdown.map(item => `
+                <tr>
+                  <td style="font-weight: 500;">${escapeHtml(item.material)}</td>
+                  <td>${escapeHtml(item.origin)}</td>
+                  <td style="text-align: right;"><span class="num">${escapeHtml(item.mass)}</span></td>
+                  <td style="text-align: right;"><span class="num">${item.intensity.toFixed(2)}</span></td>
+                  <td style="text-align: right;"><span class="num">${escapeHtml(item.footprint)}</span></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        ` : ''}
       </div>
-
-      ${data.landUse.breakdown.length > 0 ? `
-        <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px;">Material Breakdown</h3>
-        <table class="data-table">
-          <thead><tr><th>Material</th><th>Origin</th><th>Mass</th><th>Intensity</th><th>Footprint</th></tr></thead>
-          <tbody>
-            ${data.landUse.breakdown.map(item => `
-              <tr>
-                <td style="font-weight: 500;">${escapeHtml(item.material)}</td>
-                <td>${escapeHtml(item.origin)}</td>
-                <td>${escapeHtml(item.mass)}</td>
-                <td>${item.intensity.toFixed(2)}</td>
-                <td>${escapeHtml(item.footprint)}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      ` : ''}
 
       ${renderPageFooter(13)}
     </div>`;
 }
 
 function renderSupplyChainPage(data: LCAReportData): string {
+  const A = CHAPTERS.sources.accent; // #A97C14 -- ochre's ink form, legible on paper
+
   const networkHtml = data.supplyChain.network.map(category => `
-    <div style="margin-bottom: 24px;">
-      <h3 style="font-size: 14px; font-weight: 600; color: #1A1B1D; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #D9D6CB;">${escapeHtml(category.category)}</h3>
+    <div style="margin-bottom: 26px;">
+      <div class="eyebrow" style="color: ${A}; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #D9D6CB;">${escapeHtml(category.category)}</div>
       ${category.items.map(item => {
         const modeLabel = item.mode ? escapeHtml(item.mode) : 'Mode not specified';
         const warningHtml = item.warning ? `
-          <div style="margin-top: 6px; padding: 6px 8px; background: #fef3c7; border-left: 3px solid #B45309; border-radius: 3px; font-size: 11px; color: #92400e;">
+          <div class="state state-attention" style="margin-top: 6px; font-size: 10px; letter-spacing: 0.05em; text-transform: none; line-height: 1.4;">
             &#9888; ${escapeHtml(item.warning)}
           </div>
         ` : '';
         return `
-        <div style="padding: 8px 0; border-bottom: 1px solid #D9D6CB;">
-          <div style="display: flex; justify-content: space-between;">
+        <div style="padding: 12px 0; border-top: 1px solid #D9D6CB;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 20px;">
             <div>
-              <div style="font-size: 14px; font-weight: 500;">${escapeHtml(item.name)}</div>
-              <div style="font-size: 12px; color: #6F6F68;">${escapeHtml(item.location)}</div>
-              <div style="font-size: 11px; color: #6F6F68; margin-top: 2px;">Transport: ${modeLabel}</div>
+              <div class="card-title" style="font-size: 13px;">${escapeHtml(item.name)}</div>
+              <div class="body" style="font-size: 11.5px; margin-top: 2px;">${escapeHtml(item.location)}</div>
+              <div class="lead-label" style="margin-top: 5px;">Transport &middot; ${modeLabel}</div>
             </div>
-            <div style="text-align: right;">
-              <div style="font-size: 14px; color: #6F6F68;">${escapeHtml(item.distance)}</div>
-              <div style="font-size: 12px; color: #6F6F68;">${escapeHtml(item.co2)}</div>
+            <div style="text-align: right; flex-shrink: 0;">
+              <div class="lead-number" style="font-size: 16px; color: #1A1B1D;">${escapeHtml(item.distance)}</div>
+              <div class="body" style="font-size: 11px; margin-top: 3px; font-variant-numeric: tabular-nums;">${escapeHtml(item.co2)}</div>
             </div>
           </div>
           ${warningHtml}
@@ -1531,22 +1588,25 @@ function renderSupplyChainPage(data: LCAReportData): string {
     </div>
   `).join('');
 
+  const suppliers = (data.supplyChain.verifiedSuppliers || '').trim();
+  // renderSectionLead escapeHtml's the label, so pass the raw value here.
+  const suppliersLabel = `Total transport distance · ${suppliers} verified supplier${suppliers === '1' ? '' : 's'}`;
+
   return `
-    <div class="page light-page">
-      ${renderSectionHeader('12', 'Supply Chain')}
+    <div class="page light-page" style="position: relative;">
+      ${mark(CHAPTERS.sources.mark, 'br', A)}
+      <div style="position: relative; z-index: 1;">
+        ${renderSectionLead({
+          number: '12',
+          section: 'Supply chain',
+          value: data.supplyChain.totalDistance,
+          label: suppliersLabel,
+          statement: 'Where it comes from.',
+          accent: A,
+        })}
 
-      <div style="display: flex; gap: 24px; margin-bottom: 32px;">
-        <div class="metric-card" style="flex: 1; text-align: center;">
-          <div class="metric-label">Total Distance</div>
-          <div class="metric-value">${escapeHtml(data.supplyChain.totalDistance)}</div>
-        </div>
-        <div class="metric-card" style="flex: 1; text-align: center;">
-          <div class="metric-label">Verified Suppliers</div>
-          <div class="metric-value">${escapeHtml(data.supplyChain.verifiedSuppliers)}</div>
-        </div>
+        ${networkHtml}
       </div>
-
-      ${networkHtml}
 
       ${renderPageFooter(14)}
     </div>`;
@@ -1554,24 +1614,23 @@ function renderSupplyChainPage(data: LCAReportData): string {
 
 function renderCommitmentPage(data: LCAReportData): string {
   return `
-    <div class="page dark-page" style="justify-content: center; text-align: center;">
-      <div style="max-width: 500px; margin: 0 auto;">
-        <div style="margin: 0 auto 32px;">
-          ${alkateraLogo(56, false)}
+    <div class="page dark-page" style="justify-content: center; text-align: center; position: relative;">
+      ${mark('ring', 'br')}
+      <div style="position: relative; z-index: 1; max-width: 520px; margin: 0 auto;">
+        <div style="margin: 0 auto 36px;">
+          ${alkateraLogo(52, false)}
         </div>
-        <h2 style="font-size: 36px; font-family: 'Playfair Display', serif; font-weight: 300; margin-bottom: 24px; color: #1A1B1D;">Our Commitment</h2>
-        <p style="font-size: 16px; line-height: 1.8; color: #6F6F68;">${escapeHtml(data.commitment.text)}</p>
+        <div class="eyebrow" style="margin-bottom: 16px;">The commitment</div>
+        <h2 class="statement" style="font-size: 40px; margin-bottom: 24px;">Our commitment.</h2>
+        <p class="body" style="font-size: 15px; line-height: 1.75;">${escapeHtml(data.commitment.text)}</p>
 
-        <div style="margin-top: 64px; padding-top: 32px; border-top: 1px solid rgba(26,27,29,0.1);">
-          <div style="margin-bottom: 20px;">
-            ${alkateraLogo(32, false)}
-          </div>
-          <p style="font-size: 12px; color: #6F6F68; font-family: 'Fira Code', monospace;">
-            Report generated by alka<span style="font-weight: 700;">tera</span><br />
+        <div class="rule" style="margin-top: 60px; padding-top: 32px;">
+          <p class="lead-label" style="line-height: 1.8;">
+            Report generated by ${alkateraName()}<br />
             ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
-          <a href="https://alkatera.com" style="display: inline-block; margin-top: 16px; color: #205E40; font-size: 12px; font-family: 'Fira Code', monospace; text-decoration: none; letter-spacing: 1px; padding: 8px 20px; border: 1px solid rgba(32,94,64,0.3); border-radius: 6px;">
-            alkatera.com
+          <a href="https://alkatera.com" style="display: inline-block; margin-top: 18px; background: #1A1B1D; color: #F2F1EA; font-size: 11px; font-family: 'JetBrains Mono', monospace; font-weight: 700; text-decoration: none; letter-spacing: 0.15em; padding: 10px 22px; border-radius: 999px;">
+            ALKATERA.COM
           </a>
         </div>
       </div>
@@ -1588,32 +1647,35 @@ function renderInterpretationPage(data: LCAReportData): string {
   const interp = data.interpretation;
   if (!interp) return '';
 
+  const A = CHAPTERS.evidence.accent;
+
   const hotspotsHtml = interp.significant_issues.hotspots.length > 0
-    ? `<table class="data-table">
-        <thead><tr><th>Material</th><th>GWP (kg CO₂e)</th><th>Contribution</th></tr></thead>
+    ? `<table class="studio-table">
+        <thead><tr><th>Material</th><th style="text-align: right;">GWP (kg CO&#8322;e)</th><th style="text-align: right;">Contribution</th></tr></thead>
         <tbody>
           ${interp.significant_issues.hotspots.map(h => `
             <tr>
               <td style="font-weight: 500;">${escapeHtml(h.name)}</td>
-              <td>${h.impact_kg_co2e.toFixed(4)}</td>
-              <td>${h.contribution_pct.toFixed(1)}%</td>
+              <td class="num" style="text-align: right;">${h.impact_kg_co2e.toFixed(4)}</td>
+              <td class="num" style="text-align: right;">${h.contribution_pct.toFixed(1)}%</td>
             </tr>
           `).join('')}
         </tbody>
       </table>
-      <p style="font-size: 9px; color: #6F6F68; line-height: 1.5; margin-top: 6px;">
+      <p class="body" style="font-size: 10px; margin-top: 8px;">
         Hotspots restate the most significant ingredients from Section 08 using the same material-production GWP and contribution share, so the two sections reconcile. Inbound transport is itemised separately in Section 08 and is included in the product total.
       </p>`
-    : '<p style="font-size: 12px; color: #6F6F68;">No individual material exceeds the 5% significance threshold.</p>';
+    : '<p class="body">No individual material exceeds the 5% significance threshold.</p>';
 
   // FIX #5: Always explain EoL recycling credits in interpretation, not just when >100%.
   // Users need to understand avoided burden credits regardless of hotspot sum.
   const hotspotSum = interp.significant_issues.hotspots.reduce((s, h) => s + h.contribution_pct, 0);
   const hasEolCredits = data.eolMethodology && data.eolMethodology.totalAvoidedEmissions < 0;
   const eolCreditNote = hasEolCredits
-    ? `<div style="margin-top: 10px; padding: 10px 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
-        <p style="font-size: 10px; color: #166534; line-height: 1.5; margin: 0;">
-          <strong>Recycling Credits (Avoided Burden):</strong> End-of-life recycling generates
+    ? `<div class="panel" style="margin-top: 14px; padding: 14px 16px; border-left: 2px solid ${A};">
+        <span class="eyebrow" style="color: ${A};">Recycling credits &middot; avoided burden</span>
+        <p class="body" style="font-size: 11px; margin-top: 8px;">
+          End-of-life recycling generates
           ${Math.abs(data.eolMethodology!.totalAvoidedEmissions).toFixed(4)} kg CO&#8322;e in avoided emissions
           by displacing virgin material production. Gross disposal emissions are
           ${data.eolMethodology!.totalGrossEmissions.toFixed(4)} kg CO&#8322;e, giving a net EoL impact of
@@ -1622,61 +1684,74 @@ function renderInterpretationPage(data: LCAReportData): string {
         </p>
       </div>`
     : (hotspotSum > 100
-      ? `<p style="font-size: 10px; font-style: italic; color: #6F6F68; margin-top: 6px;">
-          * Contributions sum to ${hotspotSum.toFixed(1)}% because end-of-life avoided-burden credits
+      ? `<p class="body" style="font-size: 10px; font-style: italic; margin-top: 8px;">
+          Contributions sum to ${hotspotSum.toFixed(1)}% because end-of-life avoided-burden credits
           reduce the net total carbon footprint, against which individual percentages are calculated.
         </p>`
       : '');
   const exceedsNote = eolCreditNote;
 
   // Split across two pages when there are many bullet points to avoid footer overflow.
-  // Page 1: Significant issues, hotspots table, metric cards, key findings
+  // Page 1: Significant issues, hotspots table, dominant stats, key findings
   // Page 2: Limitations and recommendations
   const totalBullets = interp.conclusions.key_findings.length +
     interp.conclusions.limitations.length +
     interp.conclusions.recommendations.length;
   const needsSplit = totalBullets > 8 || interp.significant_issues.hotspots.length > 3;
 
+  // Clean bullet list on paper, no boxes.
+  const bulletList = (items: string[]) =>
+    `<ul class="body" style="font-size: 12px; padding-left: 18px; margin-bottom: 14px;">
+      ${items.map(i => `<li style="margin-bottom: 5px;">${escapeHtml(i)}</li>`).join('')}
+    </ul>`;
+
+  // Say the number, then name the hotspot: the dominant lifecycle stage.
+  const dominantStage = interp.significant_issues.dominant_lifecycle_stage;
+  const statement = dominantStage
+    ? `${dominantStage} carries the study.`
+    : 'Where the significance sits.';
+
   const page1 = `
-    <div class="page light-page">
-      ${renderSectionHeader('13', 'Interpretation (ISO 14044 §4.5)')}
+    <div class="page light-page" style="position: relative; overflow: hidden;">
+      ${mark(CHAPTERS.evidence.mark, 'br', A)}
+      <div style="position: relative; z-index: 1;">
+        ${renderSectionLead({
+          number: '13',
+          section: 'Interpretation · ISO 14044 §4.5',
+          value: `${interp.significant_issues.dominant_stage_pct}`,
+          unit: '%',
+          label: `Dominant lifecycle stage · ${dominantStage}`,
+          statement,
+          accent: A,
+        })}
 
-      <h3 style="font-size: 15px; font-weight: 600; margin-bottom: 10px;">Significant Issues</h3>
-      <p style="font-size: 12px; line-height: 1.5; margin-bottom: 12px; color: #6F6F68;">
-        ${escapeHtml(interp.significant_issues.summary)}
-      </p>
-      ${hotspotsHtml}
-      ${exceedsNote}
+        <div class="eyebrow" style="color: ${A}; margin-bottom: 10px;">Significant issues</div>
+        <p class="body" style="margin-bottom: 14px;">${escapeHtml(interp.significant_issues.summary)}</p>
+        ${hotspotsHtml}
+        ${exceedsNote}
 
-      <div style="display: flex; gap: 16px; margin: 16px 0;">
-        <div class="metric-card" style="flex: 1; text-align: center;">
-          <div class="metric-label">Dominant Stage</div>
-          <div style="font-size: 18px; font-weight: 700;">${escapeHtml(interp.significant_issues.dominant_lifecycle_stage)}</div>
-          <div style="font-size: 12px; color: #6F6F68;">${interp.significant_issues.dominant_stage_pct}% of total</div>
+        <div class="rule" style="margin-top: 22px; padding-top: 20px; display: flex; gap: 48px;">
+          <div>
+            <div class="lead-number" style="font-size: 30px; color: ${A};">${interp.significant_issues.dominant_stage_pct}<span style="font-size: 13px;">%</span></div>
+            <div class="lead-label" style="margin-top: 6px;">Dominant stage · ${escapeHtml(interp.significant_issues.dominant_lifecycle_stage)}</div>
+          </div>
+          <div>
+            <div class="lead-number" style="font-size: 30px; color: ${A};">${interp.significant_issues.dominant_scope_pct}<span style="font-size: 13px;">%</span></div>
+            <div class="lead-label" style="margin-top: 6px;">Dominant scope · ${escapeHtml(interp.significant_issues.dominant_scope)}</div>
+          </div>
         </div>
-        <div class="metric-card" style="flex: 1; text-align: center;">
-          <div class="metric-label">Dominant Scope</div>
-          <div style="font-size: 18px; font-weight: 700;">${escapeHtml(interp.significant_issues.dominant_scope)}</div>
-          <div style="font-size: 12px; color: #6F6F68;">${interp.significant_issues.dominant_scope_pct}% of total</div>
-        </div>
+
+        <div class="eyebrow" style="color: ${A}; margin: 24px 0 10px;">Key findings</div>
+        ${bulletList(interp.conclusions.key_findings)}
+
+        ${!needsSplit ? `
+          <div class="eyebrow" style="color: ${A}; margin-bottom: 10px;">Limitations</div>
+          ${bulletList(interp.conclusions.limitations)}
+
+          <div class="eyebrow" style="color: ${A}; margin-bottom: 10px;">Recommendations</div>
+          ${bulletList(interp.conclusions.recommendations)}
+        ` : ''}
       </div>
-
-      <h3 style="font-size: 15px; font-weight: 600; margin: 16px 0 10px;">Key Findings</h3>
-      <ul style="font-size: 12px; line-height: 1.5; color: #6F6F68; padding-left: 20px; margin-bottom: 12px;">
-        ${interp.conclusions.key_findings.map(f => `<li style="margin-bottom: 4px;">${escapeHtml(f)}</li>`).join('')}
-      </ul>
-
-      ${!needsSplit ? `
-        <h3 style="font-size: 15px; font-weight: 600; margin-bottom: 10px;">Limitations</h3>
-        <ul style="font-size: 12px; line-height: 1.5; color: #6F6F68; padding-left: 20px; margin-bottom: 12px;">
-          ${interp.conclusions.limitations.map(l => `<li style="margin-bottom: 4px;">${escapeHtml(l)}</li>`).join('')}
-        </ul>
-
-        <h3 style="font-size: 15px; font-weight: 600; margin-bottom: 10px;">Recommendations</h3>
-        <ul style="font-size: 12px; line-height: 1.5; color: #6F6F68; padding-left: 20px;">
-          ${interp.conclusions.recommendations.map(r => `<li style="margin-bottom: 4px;">${escapeHtml(r)}</li>`).join('')}
-        </ul>
-      ` : ''}
 
       ${renderPageFooter(15)}
     </div>`;
@@ -1684,18 +1759,17 @@ function renderInterpretationPage(data: LCAReportData): string {
   if (!needsSplit) return page1;
 
   const page2 = `
-    <div class="page light-page">
-      ${renderSectionHeader('13', 'Interpretation (ISO 14044 §4.5)', false, true)}
+    <div class="page light-page" style="position: relative; overflow: hidden;">
+      ${mark(CHAPTERS.evidence.mark, 'br', A)}
+      <div style="position: relative; z-index: 1;">
+        ${renderSectionHeader('13', 'Interpretation (ISO 14044 §4.5)', false, true, A)}
 
-      <h3 style="font-size: 15px; font-weight: 600; margin-bottom: 10px;">Limitations</h3>
-      <ul style="font-size: 12px; line-height: 1.5; color: #6F6F68; padding-left: 20px; margin-bottom: 16px;">
-        ${interp.conclusions.limitations.map(l => `<li style="margin-bottom: 4px;">${escapeHtml(l)}</li>`).join('')}
-      </ul>
+        <div class="eyebrow" style="color: ${A}; margin-bottom: 10px;">Limitations</div>
+        ${bulletList(interp.conclusions.limitations)}
 
-      <h3 style="font-size: 15px; font-weight: 600; margin-bottom: 10px;">Recommendations</h3>
-      <ul style="font-size: 12px; line-height: 1.5; color: #6F6F68; padding-left: 20px;">
-        ${interp.conclusions.recommendations.map(r => `<li style="margin-bottom: 4px;">${escapeHtml(r)}</li>`).join('')}
-      </ul>
+        <div class="eyebrow" style="color: ${A}; margin-bottom: 10px;">Recommendations</div>
+        ${bulletList(interp.conclusions.recommendations)}
+      </div>
 
       ${renderPageFooter(16)}
     </div>`;
@@ -1707,16 +1781,18 @@ function renderUncertaintySensitivityPage(data: LCAReportData): string {
   const us = data.uncertaintySensitivity;
   if (!us) return '';
 
+  const A = CHAPTERS.evidence.accent;
+
   const paramsHtml = us.sensitivityAnalysis.parameters.length > 0
-    ? `<table class="data-table">
-        <thead><tr><th>Material</th><th>Contribution</th><th>±20% Range</th><th>Sensitivity</th></tr></thead>
+    ? `<table class="studio-table">
+        <thead><tr><th>Material</th><th style="text-align: right;">Contribution</th><th style="text-align: right;">±20% range</th><th style="text-align: right;">Sensitivity</th></tr></thead>
         <tbody>
           ${us.sensitivityAnalysis.parameters.map(p => `
             <tr>
               <td style="font-weight: 500;">${escapeHtml(p.materialName)}</td>
-              <td>${p.baselineContributionPct.toFixed(1)}%</td>
-              <td>${p.resultRange.lower} – ${p.resultRange.upper} kg CO₂e</td>
-              <td>${p.sensitivityRatio.toFixed(3)}${p.isHighlySensitive ? ' <span style="color: #BE123C; font-weight: 600;">HIGH</span>' : ''}</td>
+              <td class="num" style="text-align: right;">${p.baselineContributionPct.toFixed(1)}%</td>
+              <td class="num" style="text-align: right;">${p.resultRange.lower} to ${p.resultRange.upper} kg CO&#8322;e</td>
+              <td class="num" style="text-align: right;">${p.sensitivityRatio.toFixed(3)}${p.isHighlySensitive ? ' <span class="state state-stale">High</span>' : ''}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -1724,39 +1800,48 @@ function renderUncertaintySensitivityPage(data: LCAReportData): string {
     : '';
 
   return `
-    <div class="page light-page">
-      ${renderSectionHeader('14', 'Uncertainty & Sensitivity (ISO 14044 §4.5.3)')}
+    <div class="page light-page" style="position: relative; overflow: hidden;">
+      ${mark(CHAPTERS.evidence.mark, 'br', A)}
+      <div style="position: relative; z-index: 1;">
+        ${renderSectionLead({
+          number: '14',
+          section: 'Uncertainty & sensitivity · ISO 14044 §4.5.3',
+          value: `±${us.propagatedUncertaintyPct}`,
+          unit: '%',
+          label: 'Propagated uncertainty · 95% confidence interval',
+          statement: 'How firm the number is.',
+          accent: A,
+        })}
 
-      <div style="display: flex; gap: 16px; margin-bottom: 24px;">
-        <div class="metric-card" style="flex: 1; text-align: center;">
-          <div class="metric-label">Propagated Uncertainty</div>
-          <div class="metric-value">±${us.propagatedUncertaintyPct}%</div>
-          <div style="font-size: 11px; color: #6F6F68;">95% confidence interval</div>
+        <div class="rule" style="padding-top: 20px; display: flex; gap: 48px;">
+          <div>
+            <div class="lead-number" style="font-size: 30px; color: ${A};">±${us.propagatedUncertaintyPct}<span style="font-size: 13px;">%</span></div>
+            <div class="lead-label" style="margin-top: 6px;">Propagated uncertainty · 95% CI</div>
+          </div>
+          <div>
+            <div class="lead-number" style="font-size: 30px; color: ${A};">${us.confidenceInterval95.lower}<span style="font-size: 13px;"> to </span>${us.confidenceInterval95.upper}</div>
+            <div class="lead-label" style="margin-top: 6px;">Result range · kg CO&#8322;e per functional unit</div>
+          </div>
         </div>
-        <div class="metric-card" style="flex: 1; text-align: center;">
-          <div class="metric-label">Result Range (95% CI)</div>
-          <div style="font-size: 18px; font-weight: 700;">${us.confidenceInterval95.lower} – ${us.confidenceInterval95.upper}</div>
-          <div style="font-size: 11px; color: #6F6F68;">kg CO₂e per functional unit</div>
+
+        <div class="eyebrow" style="color: ${A}; margin: 24px 0 10px;">Sensitivity analysis</div>
+        <p class="body" style="margin-bottom: 16px;">${escapeHtml(us.sensitivityAnalysis.method)}</p>
+        ${paramsHtml}
+
+        <div class="panel" style="margin-top: 22px;">
+          <span class="eyebrow" style="color: ${A};">Conclusion</span>
+          <p class="body" style="margin-top: 8px;">${escapeHtml(us.sensitivityAnalysis.conclusion)}</p>
         </div>
-      </div>
 
-      <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Sensitivity Analysis</h3>
-      <p style="font-size: 13px; color: #6F6F68; margin-bottom: 16px;">${escapeHtml(us.sensitivityAnalysis.method)}</p>
-      ${paramsHtml}
-
-      <div style="margin-top: 20px; padding: 16px; background: #F2F1EA; border-radius: 8px; border: 1px solid #D9D6CB;">
-        <p style="font-size: 13px; line-height: 1.6; color: #6F6F68;">
-          <strong>Conclusion:</strong> ${escapeHtml(us.sensitivityAnalysis.conclusion)}
-        </p>
-      </div>
-
-      <div style="margin-top: 20px; padding: 12px 16px; background: #fffbeb; border-radius: 8px; border: 1px solid #fde68a;">
-        <p style="font-size: 12px; line-height: 1.5; color: #92400e;">
-          <strong>Methodology:</strong> Uncertainty propagation follows the root-sum-of-squares approach
-          for geometric standard deviation per Frischknecht et al. (2007), using the Pedigree Matrix
-          (Weidema &amp; Wesnæs, 1996) for data quality scoring. Sensitivity analysis applies ±20%
-          variation to emission factors of the top three contributors.
-        </p>
+        <div class="panel" style="margin-top: 16px;">
+          <span class="eyebrow" style="color: ${A};">Methodology</span>
+          <p class="body" style="font-size: 11.5px; margin-top: 8px;">
+            Uncertainty propagation follows the root-sum-of-squares approach
+            for geometric standard deviation per Frischknecht et al. (2007), using the Pedigree Matrix
+            (Weidema &amp; Wesnæs, 1996) for data quality scoring. Sensitivity analysis applies ±20%
+            variation to emission factors of the top three contributors.
+          </p>
+        </div>
       </div>
 
       ${renderPageFooter(16)}
@@ -1767,6 +1852,8 @@ function renderCriticalReviewDisclosure(data: LCAReportData): string {
   const cr = data.criticalReview;
   if (!cr) return '';
 
+  const A = CHAPTERS.evidence.accent;
+
   // Additional notes from other compliance fields
   const notes: string[] = [];
   if (data.lulucNote) notes.push(data.lulucNote);
@@ -1775,57 +1862,73 @@ function renderCriticalReviewDisclosure(data: LCAReportData): string {
 
   const zeroCategories = data.zeroImpactCategories || [];
 
+  // The verdict chip: pass -> good, qualified -> attention, remediation -> stale.
+  const statusRaw = cr.status.toLowerCase();
+  const statusClass = statusRaw.includes('remediat') || statusRaw.includes('fail')
+    ? 'state-stale'
+    : (statusRaw.includes('qualif') || statusRaw.includes('pending') || statusRaw.includes('planned'))
+      ? 'state-attention'
+      : 'state-good';
+  const statusLabel = cr.status.replace(/_/g, ' ');
+
+  // Methodological notes as a cream panel.
+  const notesPanel = (n: string) => `
+    <div class="panel" style="margin-bottom: 10px; padding: 12px 16px;">
+      <p class="body" style="font-size: 12px;">${escapeHtml(n)}</p>
+    </div>`;
+
   // Determine if we need a second page for methodological notes.
-  // Zero-impact categories table + critical review box take most of page 1;
+  // Zero-impact categories table + critical review panel take most of page 1;
   // methodological notes and circularity disclaimer go on page 2 if present.
   const hasOverflowContent = (notes.length > 0 || data.circularityMethodology) && zeroCategories.length > 3;
 
   const page1 = `
-    <div class="page light-page">
-      ${renderSectionHeader('15', 'Critical Review & Compliance Notes')}
+    <div class="page light-page" style="position: relative; overflow: hidden;">
+      ${mark(CHAPTERS.evidence.mark, 'br', A)}
+      <div style="position: relative; z-index: 1;">
+        ${renderSectionHeader('15', 'Critical Review & Compliance Notes', false, false, A)}
 
-      <div style="padding: 20px; background: #fef3c7; border-radius: 8px; border: 1px solid #fde68a; margin-bottom: 24px;">
-        <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 8px; color: #92400e;">Critical Review Status: ${escapeHtml(cr.status.replace(/_/g, ' ').toUpperCase())}</h3>
-        <p style="font-size: 13px; line-height: 1.6; color: #78350f;">${escapeHtml(cr.disclosure)}</p>
-        <p style="font-size: 12px; line-height: 1.5; color: #92400e; margin-top: 12px;">
-          <strong>Recommendation:</strong> ${escapeHtml(cr.recommendation)}
-        </p>
-      </div>
-
-      ${zeroCategories.length > 0 ? `
-        <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Zero-Impact Categories</h3>
-        <p style="font-size: 12px; color: #6F6F68; margin-bottom: 12px;">
-          The following environmental impact categories were assessed but report zero values. Justification per ISO 14044 §4.4.2.2:
-        </p>
-        <table class="data-table">
-          <thead><tr><th>Category</th><th>Reason</th></tr></thead>
-          <tbody>
-            ${zeroCategories.map(c => `
-              <tr>
-                <td style="font-weight: 500; white-space: nowrap;">${escapeHtml(c.category)}</td>
-                <td style="font-size: 12px;">${escapeHtml(c.reason)}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      ` : ''}
-
-      ${!hasOverflowContent && notes.length > 0 ? `
-        <h3 style="font-size: 16px; font-weight: 600; margin: 20px 0 12px;">Methodological Notes</h3>
-        ${notes.map(n => `
-          <div style="padding: 12px 16px; background: #F2F1EA; border-radius: 6px; border: 1px solid #D9D6CB; margin-bottom: 10px;">
-            <p style="font-size: 12px; line-height: 1.5; color: #6F6F68;">${escapeHtml(n)}</p>
+        <div class="panel" style="margin-bottom: 24px; border-left: 2px solid ${A};">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+            <span class="eyebrow" style="color: ${A};">Critical review status</span>
+            <span class="state ${statusClass}">${escapeHtml(statusLabel)}</span>
           </div>
-        `).join('')}
-      ` : ''}
-
-      ${!hasOverflowContent && data.circularityMethodology ? `
-        <div style="margin-top: 16px; padding: 12px 16px; background: #f0f9ff; border-radius: 6px; border: 1px solid #bae6fd;">
-          <p style="font-size: 12px; line-height: 1.5; color: #0c4a6e;">
-            <strong>Circularity Score Disclaimer:</strong> ${escapeHtml(data.circularityMethodology.description)}
+          <p class="body">${escapeHtml(cr.disclosure)}</p>
+          <p class="body" style="font-size: 12px; margin-top: 12px;">
+            <span class="lead-label" style="color: ${A};">Recommendation</span><br />${escapeHtml(cr.recommendation)}
           </p>
         </div>
-      ` : ''}
+
+        ${zeroCategories.length > 0 ? `
+          <div class="eyebrow" style="color: ${A}; margin-bottom: 10px;">Zero-impact categories</div>
+          <p class="body" style="font-size: 12px; margin-bottom: 12px;">
+            The following environmental impact categories were assessed but report zero values. Justification per ISO 14044 §4.4.2.2:
+          </p>
+          <table class="studio-table">
+            <thead><tr><th>Category</th><th>Reason</th></tr></thead>
+            <tbody>
+              ${zeroCategories.map(c => `
+                <tr>
+                  <td style="font-weight: 500; white-space: nowrap;">${escapeHtml(c.category)}</td>
+                  <td>${escapeHtml(c.reason)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        ` : ''}
+
+        ${!hasOverflowContent && notes.length > 0 ? `
+          <div class="eyebrow" style="color: ${A}; margin: 20px 0 12px;">Methodological notes</div>
+          ${notes.map(notesPanel).join('')}
+        ` : ''}
+
+        ${!hasOverflowContent && data.circularityMethodology ? `
+          <div class="panel" style="margin-top: 16px; padding: 12px 16px; border-left: 2px solid ${A};">
+            <span class="lead-label" style="color: ${A};">Circularity score disclaimer</span>
+            <p class="body" style="font-size: 12px; margin-top: 6px;">${escapeHtml(data.circularityMethodology.description)}</p>
+          </div>
+        ` : ''}
+      </div>
 
       ${renderPageFooter(17)}
     </div>`;
@@ -1834,25 +1937,23 @@ function renderCriticalReviewDisclosure(data: LCAReportData): string {
   if (!hasOverflowContent) return page1;
 
   const page2 = `
-    <div class="page light-page">
-      ${renderSectionHeader('15', 'Critical Review & Compliance Notes', false, true)}
+    <div class="page light-page" style="position: relative; overflow: hidden;">
+      ${mark(CHAPTERS.evidence.mark, 'br', A)}
+      <div style="position: relative; z-index: 1;">
+        ${renderSectionHeader('15', 'Critical Review & Compliance Notes', false, true, A)}
 
-      ${notes.length > 0 ? `
-        <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Methodological Notes</h3>
-        ${notes.map(n => `
-          <div style="padding: 12px 16px; background: #F2F1EA; border-radius: 6px; border: 1px solid #D9D6CB; margin-bottom: 10px;">
-            <p style="font-size: 12px; line-height: 1.5; color: #6F6F68;">${escapeHtml(n)}</p>
+        ${notes.length > 0 ? `
+          <div class="eyebrow" style="color: ${A}; margin-bottom: 12px;">Methodological notes</div>
+          ${notes.map(notesPanel).join('')}
+        ` : ''}
+
+        ${data.circularityMethodology ? `
+          <div class="panel" style="margin-top: 16px; padding: 12px 16px; border-left: 2px solid ${A};">
+            <span class="lead-label" style="color: ${A};">Circularity score disclaimer</span>
+            <p class="body" style="font-size: 12px; margin-top: 6px;">${escapeHtml(data.circularityMethodology.description)}</p>
           </div>
-        `).join('')}
-      ` : ''}
-
-      ${data.circularityMethodology ? `
-        <div style="margin-top: 16px; padding: 12px 16px; background: #f0f9ff; border-radius: 6px; border: 1px solid #bae6fd;">
-          <p style="font-size: 12px; line-height: 1.5; color: #0c4a6e;">
-            <strong>Circularity Score Disclaimer:</strong> ${escapeHtml(data.circularityMethodology.description)}
-          </p>
-        </div>
-      ` : ''}
+        ` : ''}
+      </div>
 
       ${renderPageFooter(18)}
     </div>`;
@@ -1864,52 +1965,62 @@ function renderAiCriticalReviewPage(data: LCAReportData): string {
   const ai = data.criticalReview?.aiReview;
   if (!ai) return '';
 
-  const ratingStyles: Record<string, { bg: string; color: string; label: string }> = {
-    pass: { bg: '#dcfce7', color: '#166534', label: 'PASS' },
-    qualified_pass: { bg: '#fef3c7', color: '#92400e', label: 'PASS WITH QUALIFICATIONS' },
-    needs_remediation: { bg: '#fee2e2', color: '#991b1b', label: 'NEEDS REMEDIATION' },
+  const A = CHAPTERS.evidence.accent;
+
+  // Overall rating -> a typographic .state chip.
+  const ratingStyles: Record<string, { cls: string; label: string }> = {
+    pass: { cls: 'state-good', label: 'Pass' },
+    qualified_pass: { cls: 'state-attention', label: 'Pass with qualifications' },
+    needs_remediation: { cls: 'state-stale', label: 'Needs remediation' },
   };
   const rs = ratingStyles[ai.rating] || ratingStyles.qualified_pass;
 
-  const statusStyles: Record<string, { bg: string; color: string; icon: string; label: string }> = {
-    conforms: { bg: '#dcfce7', color: '#166534', icon: '\u2713', label: 'Conforms' },
-    minor_gap: { bg: '#fef3c7', color: '#92400e', icon: '!', label: 'Minor gap' },
-    major_gap: { bg: '#fee2e2', color: '#991b1b', icon: '\u2717', label: 'Major gap' },
+  // Per-finding conformance -> a .state chip.
+  const statusStyles: Record<string, { cls: string; label: string }> = {
+    conforms: { cls: 'state-good', label: 'Conforms' },
+    minor_gap: { cls: 'state-attention', label: 'Minor gap' },
+    major_gap: { cls: 'state-stale', label: 'Major gap' },
   };
+
+  // The ISO clause labels carry an em dash separator; replace it with a middot.
+  const cleanClause = (clause: string) => clause.replace(/\s*[—–]\s*/g, ' · ');
 
   const findingsHtml = ai.findings.map(f => {
     const ss = statusStyles[f.status] || statusStyles.minor_gap;
     return `
-      <div style="padding: 12px 14px; border: 1px solid #D9D6CB; border-left: 3px solid ${ss.color}; border-radius: 6px; margin-bottom: 10px; background: #F2F1EA;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 6px;">
-          <div style="font-size: 11px; font-family: 'Fira Code', monospace; font-weight: 600; color: #1A1B1D;">${escapeHtml(f.clause)}</div>
-          <span style="font-size: 9px; padding: 2px 8px; background: ${ss.bg}; color: ${ss.color}; border-radius: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap;">${ss.icon} ${ss.label}</span>
+      <div class="rule" style="padding: 12px 0;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 6px;">
+          <div style="font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 11px; color: #1A1B1D;">${escapeHtml(cleanClause(f.clause))}</div>
+          <span class="state ${ss.cls}" style="white-space: nowrap;">${ss.label}</span>
         </div>
-        <div style="font-size: 12px; color: #6F6F68; line-height: 1.55;">${escapeHtml(f.summary)}</div>
-        ${f.detail ? `<div style="font-size: 11px; color: #6F6F68; line-height: 1.5; margin-top: 6px;">${escapeHtml(f.detail)}</div>` : ''}
+        <div class="body" style="font-size: 12px;">${escapeHtml(f.summary)}</div>
+        ${f.detail ? `<div class="body" style="font-size: 11px; margin-top: 6px;">${escapeHtml(f.detail)}</div>` : ''}
       </div>
     `;
   }).join('');
 
   return `
-    <div class="page light-page">
-      ${renderSectionHeader('15b', 'AI-Assisted Internal Review')}
+    <div class="page light-page" style="position: relative; overflow: hidden;">
+      ${mark(CHAPTERS.evidence.mark, 'br', A)}
+      <div style="position: relative; z-index: 1;">
+        ${renderSectionHeader('15b', 'AI-Assisted Internal Review', false, false, A)}
 
-      <div style="padding: 16px 18px; background: ${rs.bg}; border-radius: 8px; margin-bottom: 20px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-          <div style="font-size: 10px; font-family: 'Fira Code', monospace; color: ${rs.color}; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700;">Overall Rating</div>
-          <div style="font-size: 11px; padding: 4px 12px; background: ${rs.color}; color: white; border-radius: 12px; font-weight: 700; letter-spacing: 0.5px;">${rs.label}</div>
+        <div class="panel" style="margin-bottom: 22px; border-left: 2px solid ${A};">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <span class="eyebrow" style="color: ${A};">Overall rating</span>
+            <span class="state ${rs.cls}">${rs.label}</span>
+          </div>
+          <p class="body">${escapeHtml(ai.verdict)}</p>
         </div>
-        <p style="font-size: 13px; line-height: 1.6; color: ${rs.color}; margin: 0;">${escapeHtml(ai.verdict)}</p>
-      </div>
 
-      <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #1A1B1D;">Findings by ISO 14044 / 14067 Clause</h3>
-      ${findingsHtml}
+        <div class="eyebrow" style="color: ${A}; margin-bottom: 6px;">Findings by ISO 14044 / 14067 clause</div>
+        ${findingsHtml}
 
-      <div style="margin-top: 16px; padding: 12px 14px; background: #F2F1EA; border: 1px solid #D9D6CB; border-radius: 6px;">
-        <div style="font-size: 10px; font-family: 'Fira Code', monospace; color: #6F6F68; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px;">Reviewer Attribution</div>
-        <p style="font-size: 11px; line-height: 1.5; color: #6F6F68; margin: 0;">${escapeHtml(ai.reviewerNote)}</p>
-        <p style="font-size: 10px; color: #6F6F68; margin: 6px 0 0; font-family: 'Fira Code', monospace;">Review date: ${escapeHtml(ai.reviewDate)}</p>
+        <div class="panel" style="margin-top: 20px; padding: 14px 16px;">
+          <span class="lead-label" style="color: ${A};">Reviewer attribution</span>
+          <p class="body" style="font-size: 11px; margin-top: 6px;">${escapeHtml(ai.reviewerNote)}</p>
+          <p class="lead-label" style="margin-top: 8px;">Review date · ${escapeHtml(ai.reviewDate)}</p>
+        </div>
       </div>
 
       ${renderPageFooter(18)}
@@ -1920,13 +2031,152 @@ function renderAiCriticalReviewPage(data: LCAReportData): string {
 // SHARED ELEMENTS
 // ============================================================================
 
-function renderSectionHeader(number: string, title: string, dark = false, continuation = false): string {
-  const borderColor = dark ? 'rgba(26,27,29,0.2)' : 'rgba(0,0,0,0.1)';
+/**
+ * A section header in the studio voice: a mono eyebrow ("05 · CLIMATE
+ * IMPACT") over a Space Grotesk statement title. Hairline beneath.
+ */
+function renderSectionHeader(number: string, title: string, dark = false, continuation = false, accent = '#205E40'): string {
+  const borderColor = dark ? 'rgba(26,27,29,0.12)' : '#D9D6CB';
   return `
-    <div style="display: flex; align-items: baseline; gap: 16px; margin-bottom: ${continuation ? '24px' : '32px'}; border-bottom: 1px solid ${borderColor}; padding-bottom: 12px;">
-      <span style="color: #205E40; font-family: 'Fira Code', monospace; font-size: 14px; font-weight: 700; letter-spacing: 3px;">${number}</span>
-      <h2 style="font-size: ${continuation ? '24px' : '32px'}; font-family: 'Playfair Display', serif; font-weight: 300;">${escapeHtml(title)}</h2>
-      ${continuation ? '<span style="font-size: 10px; color: #6F6F68; font-family: \'Fira Code\', monospace;">(continued)</span>' : ''}
+    <div style="margin-bottom: ${continuation ? '24px' : '28px'}; border-bottom: 1px solid ${borderColor}; padding-bottom: 14px;">
+      <div class="eyebrow" style="color: ${accent};">${escapeHtml(number)} &middot; ${escapeHtml(title.toUpperCase())}${continuation ? ' &middot; CONT.' : ''}</div>
+      <div class="statement" style="font-size: ${continuation ? '26px' : '32px'}; margin-top: 8px;">${escapeHtml(title)}.</div>
+    </div>`;
+}
+
+/**
+ * A maker's stamp: one geometric mark per surface, cropped by a corner,
+ * behind the content at 6%. The page needs overflow:hidden (it has it)
+ * and the content should sit in a position:relative,z-index:1 wrapper.
+ */
+type MarkShape = 'circle' | 'triangle' | 'diamond' | 'arch' | 'ring' | 'quarter' | 'square';
+function mark(
+  shape: MarkShape,
+  corner: 'br' | 'bl' | 'tr' | 'tl' = 'br',
+  colour = '#205E40',
+  opacity = 0.06,
+  size = 230,
+): string {
+  const pos = {
+    br: `bottom:-${size / 4}px;right:-${size / 4}px`,
+    bl: `bottom:-${size / 4}px;left:-${size / 4}px`,
+    tr: `top:-${size / 4}px;right:-${size / 4}px`,
+    tl: `top:-${size / 4}px;left:-${size / 4}px`,
+  }[corner];
+  const shapes: Record<MarkShape, string> = {
+    circle: '<circle cx="50" cy="50" r="50"/>',
+    triangle: '<polygon points="50,2 98,98 2,98"/>',
+    diamond: '<polygon points="50,2 98,50 50,98 2,50"/>',
+    arch: '<path d="M 10 100 L 10 50 A 40 40 0 0 1 90 50 L 90 100 Z"/>',
+    quarter: '<path d="M 0 100 A 100 100 0 0 1 100 0 L 100 100 Z"/>',
+    square: '<rect x="16" y="16" width="68" height="68" transform="rotate(14 50 50)"/>',
+    ring: `<circle cx="50" cy="50" r="36" fill="none" stroke="${colour}" stroke-width="22"/>`,
+  };
+  return `<svg viewBox="0 0 100 100" fill="${colour}" style="position:absolute;${pos};width:${size}px;height:${size}px;opacity:${opacity};z-index:0;pointer-events:none;">${shapes[shape]}</svg>`;
+}
+
+/**
+ * The report walks through the app's rooms. Each chapter carries a
+ * room's colour, as a poster divider and as the accent threaded through
+ * its sections. accent is the on-paper form (ochre darkens to its ink
+ * form); block is the saturated poster fill.
+ */
+interface Chapter {
+  numeral: string;
+  room: string; // "THE CELLAR"
+  title: string; // "The footprint."
+  blurb: string;
+  sections: string[];
+  block: string; // poster fill
+  blockRgb: string; // "R G B" for the mark var on the divider
+  on: 'cream' | 'ink'; // text on the poster
+  accent: string; // on-paper accent (eyebrows, numbers)
+  mark: MarkShape;
+}
+
+const CHAPTERS: Record<'measures' | 'footprint' | 'sources' | 'evidence', Chapter> = {
+  measures: {
+    numeral: 'I', room: 'The measures', title: 'The measures.',
+    blurb: 'How the footprint was measured: the goal of the study, the method behind it, and the quality of the data underneath.',
+    sections: ['Goal & scope', 'Methodology', 'Data quality'],
+    block: '#2B46C0', blockRgb: '43 70 192', on: 'cream', accent: '#2B46C0', mark: 'triangle',
+  },
+  footprint: {
+    numeral: 'II', room: 'The cellar', title: 'The footprint.',
+    blurb: 'What the product costs the planet: the greenhouse gases behind the number, and the water, land and circularity alongside it.',
+    sections: ['Climate impact', 'Detailed GHG reporting', 'Impact categories', 'Water footprint', 'Circularity & waste', 'Land use'],
+    block: '#6D3A5D', blockRgb: '109 58 93', on: 'cream', accent: '#6D3A5D', mark: 'diamond',
+  },
+  sources: {
+    numeral: 'III', room: 'The network', title: 'The sources.',
+    blurb: 'Where it comes from: every ingredient and its factor, and the supply chain that carries them.',
+    sections: ['Ingredient breakdown', 'Supply chain'],
+    block: '#DFA32B', blockRgb: '223 163 43', on: 'ink', accent: '#A97C14', mark: 'square',
+  },
+  evidence: {
+    numeral: 'IV', room: 'The evidence', title: 'The evidence.',
+    blurb: 'How we know it is sound: the interpretation, the uncertainty, and the critical review of the study.',
+    sections: ['Interpretation', 'Uncertainty & sensitivity', 'Critical review', 'Assisted review'],
+    block: '#BF4B2A', blockRgb: '191 75 42', on: 'cream', accent: '#BF4B2A', mark: 'quarter',
+  },
+};
+
+/** A full-page poster introducing a chapter, in its room's colour. */
+function renderChapterDivider(ch: Chapter): string {
+  const text = ch.on === 'ink' ? '#1A1B1D' : '#F2F1EA';
+  const quiet = ch.on === 'ink' ? 'rgba(26,27,29,0.62)' : 'rgba(242,241,234,0.66)';
+  const line = ch.on === 'ink' ? 'rgba(26,27,29,0.18)' : 'rgba(242,241,234,0.22)';
+  const sectionList = ch.sections
+    .map(
+      (s, i) => `<div style="display:flex; align-items:baseline; gap:14px; padding:12px 0; border-top:1px solid ${line};">
+        <span style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:10px; letter-spacing:0.2em; opacity:0.6; width:26px;">${String(i + 1).padStart(2, '0')}</span>
+        <span class="card-title" style="font-size:16px; color:${text};">${escapeHtml(s)}</span>
+      </div>`,
+    )
+    .join('');
+  return `
+    <div class="page" style="background:${ch.block}; color:${text}; position:relative; justify-content:space-between; overflow:hidden;">
+      ${mark(ch.mark, 'br', text, 0.14, 360)}
+      <div style="position:relative; z-index:1;">
+        <div style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:11px; letter-spacing:0.24em; text-transform:uppercase;">Chapter ${ch.numeral} &middot; ${escapeHtml(ch.room)}</div>
+      </div>
+      <div style="position:relative; z-index:1; max-width:560px;">
+        <h2 class="statement" style="font-size:72px; color:${text}; margin-bottom:22px;">${escapeHtml(ch.title)}</h2>
+        <p style="font-family:'Inter',sans-serif; font-size:15px; line-height:1.6; color:${quiet}; max-width:460px;">${escapeHtml(ch.blurb)}</p>
+      </div>
+      <div style="position:relative; z-index:1; max-width:520px;">
+        ${sectionList}
+      </div>
+    </div>`;
+}
+
+/**
+ * The number-led section opener: a mono eyebrow, the figure that matters
+ * display-bold with a mono label, then the surface's one sentence. Say
+ * the number.
+ */
+function renderSectionLead(opts: {
+  number: string;
+  section: string;
+  value: string;
+  unit?: string;
+  label: string;
+  statement: string;
+  dark?: boolean;
+  accent?: string;
+}): string {
+  const borderColor = opts.dark ? 'rgba(26,27,29,0.12)' : '#D9D6CB';
+  const accent = opts.accent || '#205E40';
+  return `
+    <div style="margin-bottom: 28px; border-bottom: 1px solid ${borderColor}; padding-bottom: 22px;">
+      <div class="eyebrow" style="color: ${accent};">${escapeHtml(opts.number)} &middot; ${escapeHtml(opts.section.toUpperCase())}</div>
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-top: 14px;">
+        <div>
+          <div class="lead-number" style="font-size: 66px; color: ${accent};">${escapeHtml(opts.value)}${opts.unit ? `<span style="font-size: 18px; font-weight: 600; color: #6F6F68; margin-left: 10px;">${escapeHtml(opts.unit)}</span>` : ''}</div>
+          <div class="lead-label" style="margin-top: 8px;">${escapeHtml(opts.label)}</div>
+        </div>
+        <div class="statement" style="font-size: 26px; max-width: 300px; text-align: right;">${escapeHtml(opts.statement)}</div>
+      </div>
     </div>`;
 }
 
@@ -1943,7 +2193,7 @@ function renderPageFooter(pageNumber?: number, dark = false): string {
   // z-index: 10, this ensures the footer always sits cleanly on top of content.
   return `
     <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: ${bgColor}; padding: 0 48px 48px 48px;">
-      <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'Fira Code', monospace; color: ${color}; text-transform: uppercase; letter-spacing: 3px; border-top: 1px solid ${color}; padding-top: 16px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'JetBrains Mono', monospace; color: ${color}; text-transform: uppercase; letter-spacing: 0.22em; border-top: 1px solid ${color}; padding-top: 16px;">
         <div style="display: flex; align-items: center; gap: 8px;">
           <span>Generated by</span>
           ${alkateraLogo(14, dark)}
@@ -1967,26 +2217,35 @@ function renderPageFooter(pageNumber?: number, dark = false): string {
  */
 export function renderLcaReportHtml(data: LCAReportData): string {
   const pages = [
+    // Overview (forest)
     renderCoverPage(data),
     renderExecSummaryPage(data),
+    // Chapter I — The measures (cobalt): how it was measured
+    renderChapterDivider(CHAPTERS.measures),
     renderGoalAndScopePage(data),
     renderMethodologyPage(data),
     renderDataQualityPage(data),
+    // Chapter II — The footprint (plum): what it costs the planet
+    renderChapterDivider(CHAPTERS.footprint),
     renderClimatePage(data),
     renderViticulturePage(data),
     renderProcessingPage(data),
     renderGhgDetailedPage(data),
     renderEnvironmentalImpactsPages(data),
-    renderIngredientBreakdownPage(data),
     renderWaterPage(data),
     renderCircularityPage(data),
     renderLandUsePage(data),
+    // Chapter III — The sources (ochre): where it comes from
+    renderChapterDivider(CHAPTERS.sources),
+    renderIngredientBreakdownPage(data),
     renderSupplyChainPage(data),
-    // ISO compliance additions
+    // Chapter IV — The evidence (brick): how we know it is sound
+    renderChapterDivider(CHAPTERS.evidence),
     renderInterpretationPage(data),
     renderUncertaintySensitivityPage(data),
     renderCriticalReviewDisclosure(data),
     renderAiCriticalReviewPage(data),
+    // Close (ink)
     renderCommitmentPage(data),
   ].filter(Boolean).join('\n');
 
@@ -2007,12 +2266,12 @@ export function renderLcaReportHtml(data: LCAReportData): string {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LCA Report — ${escapeHtml(data.meta.productName)}</title>
+  <title>LCA Report · ${escapeHtml(data.meta.productName)}</title>
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@300;700&family=Fira+Code:wght@400;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
 
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -2044,96 +2303,98 @@ export function renderLcaReportHtml(data: LCAReportData): string {
     .dark-page { background: #F2F1EA; color: #1A1B1D; }
     .light-page { background: #ECEAE3; color: #1A1B1D; }
 
-    .metric-card {
-      background: white;
-      border: 1px solid #D9D6CB;
-      border-radius: 12px;
-      padding: 20px;
-    }
+    /* ---- The studio kit (design language) ------------------------------- */
+    /* Statements speak in Space Grotesk; Inter explains; JetBrains Mono
+       annotates. The report's accent is forest; the room inks appear only
+       in the charts. Panels are cream with a hairline, radius 6. */
 
-    .metric-label {
-      font-size: 11px;
-      font-family: 'Fira Code', monospace;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      color: #6F6F68;
-      margin-bottom: 8px;
-    }
-
-    .metric-value {
-      font-size: 32px;
-      font-family: 'Playfair Display', serif;
+    .statement {
+      font-family: 'Space Grotesk', sans-serif;
       font-weight: 700;
+      line-height: 0.98;
+      letter-spacing: -0.03em;
       color: #1A1B1D;
     }
 
-    .metric-unit {
-      font-size: 12px;
-      color: #6F6F68;
-      margin-top: 4px;
-    }
-
-    .data-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-
-    .data-table thead th {
-      text-align: left;
-      padding: 10px 12px;
-      font-size: 11px;
-      font-family: 'Fira Code', monospace;
+    .eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 10px;
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 0.22em;
+      color: #205E40;
+    }
+    .eyebrow.dim { color: #6F6F68; }
+
+    .lead-number {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: #205E40;
+      line-height: 0.9;
+      letter-spacing: -0.03em;
+    }
+    .lead-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 9.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
       color: #6F6F68;
-      border-bottom: 2px solid #D9D6CB;
     }
 
-    .data-table tbody td {
-      padding: 10px 12px;
+    .card-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: #1A1B1D;
+    }
+
+    .body { font-size: 13px; line-height: 1.6; color: #6F6F68; }
+
+    .panel {
+      background: #F2F1EA;
+      border: 1px solid #D9D6CB;
+      border-radius: 6px;
+      padding: 20px;
+    }
+
+    .rule { border-top: 1px solid #D9D6CB; }
+    .dark-page .rule { border-top-color: rgba(26,27,29,0.12); }
+
+    /* States are typographic: mono caps in a working tone, no pill. */
+    .state {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 9.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+    }
+    .state-good { color: #047857; }
+    .state-attention { color: #B45309; }
+    .state-stale { color: #BE123C; }
+    .state-quiet { color: #6F6F68; }
+
+    /* Hairline table: mono caps headers, 1px rules, tabular figures. */
+    .studio-table { width: 100%; border-collapse: collapse; }
+    .studio-table thead th {
+      text-align: left;
+      padding: 9px 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: #6F6F68;
       border-bottom: 1px solid #D9D6CB;
-      color: #6F6F68;
     }
-
-    .data-table tbody tr:nth-child(even) { background: #F2F1EA; }
-
-    .data-table-dark {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-
-    .data-table-dark thead th {
-      text-align: left;
-      padding: 10px 12px;
+    .studio-table tbody td {
+      padding: 9px 10px;
       font-size: 11px;
-      font-family: 'Fira Code', monospace;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: #6F6F68;
-      border-bottom: 2px solid rgba(26,27,29,0.15);
+      color: #1A1B1D;
+      border-bottom: 1px solid #D9D6CB;
     }
-
-    .data-table-dark tbody td {
-      padding: 10px 12px;
-      border-bottom: 1px solid rgba(26,27,29,0.05);
-      color: #6F6F68;
-    }
-
-    .data-table-dark tbody tr:nth-child(even) { background: rgba(26,27,29,0.03); }
-
-    .badge {
-      display: inline-block;
-      padding: 2px 10px;
-      border-radius: 12px;
-      font-size: 11px;
-      font-weight: 500;
-    }
-
-    .badge-low { background: #dcfce7; color: #166534; }
-    .badge-medium { background: #fef3c7; color: #92400e; }
-    .badge-high { background: #fee2e2; color: #991b1b; }
+    .studio-table tbody td .num { font-variant-numeric: tabular-nums; }
 
     @media print {
       body { background: white; }
