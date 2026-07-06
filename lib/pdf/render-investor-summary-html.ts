@@ -62,7 +62,7 @@ const ALKATERA_LOGO_URL = 'https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/o
 // ============================================================================
 
 export function renderInvestorSummaryHtml(data: InvestorSummaryData): string {
-  const primary = data.branding.primaryColor || '#ccff00';
+  const primary = data.branding.primaryColor || '#205E40';
   const total = data.emissions.total;
   const scope3Pct = total > 0 ? ((data.emissions.scope3 / total) * 100).toFixed(0) : '0';
   const scope1Pct = total > 0 ? ((data.emissions.scope1 / total) * 100).toFixed(0) : '0';
@@ -71,12 +71,12 @@ export function renderInvestorSummaryHtml(data: InvestorSummaryData): string {
   const yoyArrow = data.yoyChangePct
     ? (data.yoyChangePct.startsWith('-') ? '&#8595;' : '&#8593;')
     : '';
-  const yoyColor = data.yoyChangePct?.startsWith('-') ? '#22c55e' : '#ef4444';
+  const yoyColor = data.yoyChangePct?.startsWith('-') ? '#047857' : '#BE123C';
 
   const scopeRows = [
-    { label: 'Scope 1 — Direct', value: data.emissions.scope1, pct: scope1Pct, color: '#22c55e' },
-    { label: 'Scope 2 — Energy', value: data.emissions.scope2, pct: scope2Pct, color: '#3b82f6' },
-    { label: 'Scope 3 — Value chain', value: data.emissions.scope3, pct: scope3Pct, color: '#f97316' },
+    { label: 'Scope 1 — Direct', value: data.emissions.scope1, pct: scope1Pct, color: '#205E40' },
+    { label: 'Scope 2 — Energy', value: data.emissions.scope2, pct: scope2Pct, color: '#2B46C0' },
+    { label: 'Scope 3 — Value chain', value: data.emissions.scope3, pct: scope3Pct, color: '#A97C14' },
   ];
 
   const topTargets = (data.targets || []).slice(0, 3);
@@ -96,7 +96,7 @@ export function renderInvestorSummaryHtml(data: InvestorSummaryData): string {
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@700&family=Fira+Code:wght@400;700&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Inter', sans-serif; background: white; color: #1c1917; }
+    body { font-family: 'Inter', sans-serif; background: white; color: #1A1B1D; }
     @page { size: A4; margin: 0; }
     .page {
       width: 794px; height: 1123px; position: relative;
@@ -107,26 +107,26 @@ export function renderInvestorSummaryHtml(data: InvestorSummaryData): string {
     .page:last-child { page-break-after: auto; break-after: auto; }
     h1 { font-family: 'Playfair Display', serif; }
     .mono { font-family: 'Fira Code', monospace; }
-    .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #78716c; margin-bottom: 6px; }
-    .divider { height: 1px; background: #e7e5e4; margin: 20px 0; }
+    .label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #6F6F68; margin-bottom: 6px; }
+    .divider { height: 1px; background: #D9D6CB; margin: 20px 0; }
     .scope-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
     .scope-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-    .bar-outer { flex: 1; height: 8px; background: #e7e5e4; border-radius: 4px; overflow: hidden; }
+    .bar-outer { flex: 1; height: 8px; background: #D9D6CB; border-radius: 4px; overflow: hidden; }
     .bar-inner { height: 100%; border-radius: 4px; }
   </style>
 </head>
 <body>
 
 <!-- PAGE 1: Emissions Overview -->
-<div class="page" style="background: #1c1917; color: white;">
+<div class="page" style="background: #ECEAE3; color: #1A1B1D;">
   <!-- Header strip -->
   <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 36px;">
     <div>
       <div class="label mono" style="color: ${primary}; font-size: 10px;">Investor Summary</div>
-      <h1 style="font-size: 28px; font-weight: 700; color: white; margin-top: 4px; line-height: 1.2;">
+      <h1 style="font-size: 28px; font-weight: 700; color: #1A1B1D; margin-top: 4px; line-height: 1.2;">
         ${escapeHtml(data.organisationName)}
       </h1>
-      <div style="font-size: 13px; color: #a8a29e; margin-top: 4px;">
+      <div style="font-size: 13px; color: #6F6F68; margin-top: 4px;">
         ${data.reportYear} Sustainability Disclosure &bull; ${data.sector || 'Beverages & Spirits'}
       </div>
     </div>
@@ -134,40 +134,40 @@ export function renderInvestorSummaryHtml(data: InvestorSummaryData): string {
       ${data.branding.logo
         ? `<img src="${escapeHtml(data.branding.logo)}" style="height: 36px; object-fit: contain; margin-bottom: 8px;" />`
         : `<img src="${ALKATERA_LOGO_URL}" style="height: 28px; object-fit: contain; margin-bottom: 8px;" />`}
-      ${data.sbtiAligned ? `<div style="display:flex;justify-content:flex-end;">${badge('SBTi Aligned', primary, '#000')}</div>` : ''}
+      ${data.sbtiAligned ? `<div style="display:flex;justify-content:flex-end;">${badge('SBTi Aligned', primary, '#F2F1EA')}</div>` : ''}
     </div>
   </div>
 
   <!-- Total emissions hero -->
-  <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 28px 32px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between;">
+  <div style="background: rgba(26,27,29,0.05); border: 1px solid rgba(26,27,29,0.1); border-radius: 16px; padding: 28px 32px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between;">
     <div>
-      <div class="label mono" style="color: #a8a29e;">Total GHG Emissions</div>
+      <div class="label mono" style="color: #6F6F68;">Total GHG Emissions</div>
       <div style="font-family: 'Playfair Display', serif; font-size: 52px; font-weight: 700; color: ${primary}; line-height: 1;">
         ${fmt(total, 0)}
       </div>
-      <div style="font-size: 13px; color: #78716c; margin-top: 4px;">tCO2e &bull; ${data.reportYear}</div>
+      <div style="font-size: 13px; color: #6F6F68; margin-top: 4px;">tCO2e &bull; ${data.reportYear}</div>
     </div>
     ${data.yoyChangePct ? `
-    <div style="text-align: center; background: rgba(255,255,255,0.08); border-radius: 12px; padding: 16px 24px;">
-      <div class="label mono" style="color: #a8a29e;">YoY Change</div>
+    <div style="text-align: center; background: rgba(26,27,29,0.08); border-radius: 12px; padding: 16px 24px;">
+      <div class="label mono" style="color: #6F6F68;">YoY Change</div>
       <div style="font-size: 36px; font-weight: 700; color: ${yoyColor}; line-height: 1;">${yoyArrow} ${escapeHtml(data.yoyChangePct)}</div>
-      <div style="font-size: 11px; color: #78716c; margin-top: 4px;">vs prior year</div>
+      <div style="font-size: 11px; color: #6F6F68; margin-top: 4px;">vs prior year</div>
     </div>
     ` : ''}
   </div>
 
   <!-- Scope breakdown -->
-  <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 24px 28px; margin-bottom: 24px;">
-    <div class="label mono" style="color: #a8a29e; margin-bottom: 16px;">Emissions by Scope</div>
+  <div style="background: rgba(26,27,29,0.05); border: 1px solid rgba(26,27,29,0.1); border-radius: 16px; padding: 24px 28px; margin-bottom: 24px;">
+    <div class="label mono" style="color: #6F6F68; margin-bottom: 16px;">Emissions by Scope</div>
     ${scopeRows.map(s => `
     <div class="scope-row">
       <div class="scope-dot" style="background: ${s.color};"></div>
-      <div style="font-size: 13px; color: #d6d3d1; min-width: 160px;">${escapeHtml(s.label)}</div>
+      <div style="font-size: 13px; color: #1A1B1D; min-width: 160px;">${escapeHtml(s.label)}</div>
       <div class="bar-outer">
         <div class="bar-inner" style="width: ${s.pct}%; background: ${s.color};"></div>
       </div>
-      <div style="font-size: 12px; font-weight: 600; color: white; min-width: 80px; text-align: right;">${fmt(s.value, 0)} tCO2e</div>
-      <div style="font-size: 11px; color: #78716c; min-width: 36px; text-align: right;">${s.pct}%</div>
+      <div style="font-size: 12px; font-weight: 600; color: #1A1B1D; min-width: 80px; text-align: right;">${fmt(s.value, 0)} tCO2e</div>
+      <div style="font-size: 11px; color: #6F6F68; min-width: 36px; text-align: right;">${s.pct}%</div>
     </div>
     `).join('')}
   </div>
@@ -176,7 +176,7 @@ export function renderInvestorSummaryHtml(data: InvestorSummaryData): string {
   <!-- Primary message -->
   <div style="background: rgba(${parseInt(primary.slice(1, 3), 16)},${parseInt(primary.slice(3, 5), 16)},${parseInt(primary.slice(5, 7), 16)},0.1); border-left: 3px solid ${primary}; border-radius: 0 12px 12px 0; padding: 16px 20px;">
     <div class="label mono" style="color: ${primary}; margin-bottom: 6px;">Key Message</div>
-    <div style="font-size: 14px; color: #f5f5f4; line-height: 1.6; font-weight: 500; font-style: italic;">
+    <div style="font-size: 14px; color: #1A1B1D; line-height: 1.6; font-weight: 500; font-style: italic;">
       "${escapeHtml(data.primaryMessage)}"
     </div>
   </div>
@@ -184,8 +184,8 @@ export function renderInvestorSummaryHtml(data: InvestorSummaryData): string {
 
   <!-- Footer -->
   <div style="position: absolute; bottom: 32px; left: 52px; right: 52px; display: flex; justify-content: space-between; align-items: center;">
-    <div style="font-size: 10px; color: #57534e;">Prepared by alkatera &bull; ${escapeHtml(data.reportingPeriodStart)} to ${escapeHtml(data.reportingPeriodEnd)}</div>
-    <div style="font-size: 10px; color: #57534e;">Page 1 of 2 &bull; Investor Summary</div>
+    <div style="font-size: 10px; color: #6F6F68;">Prepared by alkatera &bull; ${escapeHtml(data.reportingPeriodStart)} to ${escapeHtml(data.reportingPeriodEnd)}</div>
+    <div style="font-size: 10px; color: #6F6F68;">Page 1 of 2 &bull; Investor Summary</div>
   </div>
 </div>
 
@@ -194,9 +194,9 @@ export function renderInvestorSummaryHtml(data: InvestorSummaryData): string {
   <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px;">
     <div>
       <div class="label mono" style="color: ${primary};">Targets &amp; Transition</div>
-      <h1 style="font-size: 22px; color: #1c1917; margin-top: 4px;">${escapeHtml(data.organisationName)}</h1>
+      <h1 style="font-size: 22px; color: #1A1B1D; margin-top: 4px;">${escapeHtml(data.organisationName)}</h1>
     </div>
-    <div style="font-size: 12px; color: #a8a29e;">${data.reportYear} Investor Summary</div>
+    <div style="font-size: 12px; color: #6F6F68;">${data.reportYear} Investor Summary</div>
   </div>
 
   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; flex: 1;">
@@ -206,9 +206,9 @@ export function renderInvestorSummaryHtml(data: InvestorSummaryData): string {
       ${topTargets.length > 0 ? `
       <div class="label mono" style="margin-bottom: 12px;">Reduction Targets</div>
       ${topTargets.map(t => `
-      <div style="background: #f5f5f4; border-radius: 10px; padding: 14px 16px; margin-bottom: 8px;">
-        <div style="font-size: 13px; font-weight: 600; color: #1c1917;">${t.reductionPct}% reduction</div>
-        <div style="font-size: 11px; color: #78716c; margin-top: 2px;">
+      <div style="background: #ECEAE3; border-radius: 10px; padding: 14px 16px; margin-bottom: 8px;">
+        <div style="font-size: 13px; font-weight: 600; color: #1A1B1D;">${t.reductionPct}% reduction</div>
+        <div style="font-size: 11px; color: #6F6F68; margin-top: 2px;">
           ${escapeHtml(t.scope.replace('scope', 'Scope '))} &bull; By ${t.targetYear}
         </div>
       </div>
@@ -220,10 +220,10 @@ export function renderInvestorSummaryHtml(data: InvestorSummaryData): string {
       <div class="label mono" style="margin-bottom: 12px;">Upcoming Milestones</div>
       ${topMilestones.map(m => `
       <div style="display: flex; gap: 10px; margin-bottom: 10px; align-items: flex-start;">
-        <div style="width: 8px; height: 8px; border-radius: 50%; background: ${m.status === 'in_progress' ? '#f59e0b' : '#e7e5e4'}; margin-top: 4px; flex-shrink: 0;"></div>
+        <div style="width: 8px; height: 8px; border-radius: 50%; background: ${m.status === 'in_progress' ? '#B45309' : '#D9D6CB'}; margin-top: 4px; flex-shrink: 0;"></div>
         <div>
-          <div style="font-size: 12px; font-weight: 500; color: #1c1917;">${escapeHtml(m.title)}</div>
-          <div style="font-size: 11px; color: #78716c;">${escapeHtml(m.targetDate)}</div>
+          <div style="font-size: 12px; font-weight: 500; color: #1A1B1D;">${escapeHtml(m.title)}</div>
+          <div style="font-size: 11px; color: #6F6F68;">${escapeHtml(m.targetDate)}</div>
         </div>
       </div>
       `).join('')}
@@ -234,8 +234,8 @@ export function renderInvestorSummaryHtml(data: InvestorSummaryData): string {
       <div class="label mono" style="margin-bottom: 12px;">Key Findings</div>
       ${topFindings.map(f => `
       <div style="margin-bottom: 10px;">
-        <div style="font-size: 12px; font-weight: 600; color: #1c1917;">${escapeHtml(f.title)}</div>
-        <div style="font-size: 11px; color: #57534e; line-height: 1.5; margin-top: 2px;">${escapeHtml(f.narrative)}</div>
+        <div style="font-size: 12px; font-weight: 600; color: #1A1B1D;">${escapeHtml(f.title)}</div>
+        <div style="font-size: 11px; color: #6F6F68; line-height: 1.5; margin-top: 2px;">${escapeHtml(f.narrative)}</div>
       </div>
       `).join('')}
       ` : ''}
@@ -248,21 +248,21 @@ export function renderInvestorSummaryHtml(data: InvestorSummaryData): string {
       ${topRisks.map(r => {
         const isOpp = r.type === 'opportunity';
         const bg = isOpp ? '#f0fdf4' : '#fff7ed';
-        const dot = isOpp ? '#22c55e' : '#f97316';
+        const dot = isOpp ? '#047857' : '#BF4B2A';
         return `
         <div style="background: ${bg}; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px;">
           <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
             <div style="width: 7px; height: 7px; border-radius: 50%; background: ${dot}; flex-shrink: 0;"></div>
-            <div style="font-size: 12px; font-weight: 600; color: #1c1917;">${escapeHtml(r.title)}</div>
+            <div style="font-size: 12px; font-weight: 600; color: #1A1B1D;">${escapeHtml(r.title)}</div>
           </div>
-          <div style="font-size: 10px; color: #78716c; padding-left: 15px;">
+          <div style="font-size: 10px; color: #6F6F68; padding-left: 15px;">
             ${escapeHtml(r.likelihood)} likelihood &bull; ${escapeHtml(r.impact)} impact
           </div>
         </div>
         `;
       }).join('')}
       ` : `
-      <div style="background: #f5f5f4; border-radius: 10px; padding: 24px; text-align: center; color: #a8a29e; font-size: 12px;">
+      <div style="background: #ECEAE3; border-radius: 10px; padding: 24px; text-align: center; color: #6F6F68; font-size: 12px;">
         No climate risks and opportunities have been recorded yet.
       </div>
       `}
@@ -271,8 +271,8 @@ export function renderInvestorSummaryHtml(data: InvestorSummaryData): string {
 
   <!-- Footer -->
   <div style="position: absolute; bottom: 32px; left: 52px; right: 52px; display: flex; justify-content: space-between; align-items: center;">
-    <div style="font-size: 10px; color: #a8a29e;">Prepared by alkatera &bull; Data covers ${escapeHtml(data.reportingPeriodStart)} to ${escapeHtml(data.reportingPeriodEnd)}</div>
-    <div style="font-size: 10px; color: #a8a29e;">Page 2 of 2</div>
+    <div style="font-size: 10px; color: #6F6F68;">Prepared by alkatera &bull; Data covers ${escapeHtml(data.reportingPeriodStart)} to ${escapeHtml(data.reportingPeriodEnd)}</div>
+    <div style="font-size: 10px; color: #6F6F68;">Page 2 of 2</div>
   </div>
 </div>
 

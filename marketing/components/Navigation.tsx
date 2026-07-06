@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
 import Link from 'next/link';
@@ -12,6 +13,7 @@ interface NavigationProps {
 export const Navigation = ({ onOpenContact }: NavigationProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const pathname = usePathname();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -20,6 +22,10 @@ export const Navigation = ({ onOpenContact }: NavigationProps) => {
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Cream-on-transparent only works over the homepage's photo hero.
+  // Every other public page opens on paper, so the bar reads in ink there.
+  const overPhoto = pathname === '/' && !scrolled;
 
   const navItems = [
     { label: 'Platform', href: '/platform' },
@@ -31,7 +37,7 @@ export const Navigation = ({ onOpenContact }: NavigationProps) => {
   ];
 
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 px-6 py-6 flex justify-between items-center transition-colors duration-200 ease-studio ${scrolled ? 'bg-background text-foreground border-b border-border' : 'bg-transparent text-[#F2F1EA]'}`}>
+    <nav className={`fixed top-0 left-0 right-0 z-50 px-6 py-6 flex justify-between items-center transition-colors duration-200 ease-studio ${overPhoto ? 'bg-transparent text-[#F2F1EA]' : 'bg-background text-foreground border-b border-border'}`}>
       <div className="z-50">
         <Link href="/" className="select-none font-display text-2xl tracking-[-0.02em] leading-none">
           <span className="font-medium">alka</span><span className="font-bold">tera</span>
@@ -50,13 +56,13 @@ export const Navigation = ({ onOpenContact }: NavigationProps) => {
         ))}
         <Link
           href="/getaccess"
-          className={`border px-6 py-2 rounded-full transition-colors duration-200 ease-studio ${scrolled ? 'border-foreground/40 hover:border-foreground' : 'border-[#F2F1EA]/40 hover:border-[#F2F1EA]'}`}
+          className={`border px-6 py-2 rounded-full transition-colors duration-200 ease-studio ${overPhoto ? 'border-[#F2F1EA]/40 hover:border-[#F2F1EA]' : 'border-foreground/40 hover:border-foreground'}`}
         >
           Get Access
         </Link>
         <Link
           href="/getaccess/signup?trial=true"
-          className={`px-6 py-2 rounded-full hover:opacity-90 transition-opacity duration-200 ease-studio ${scrolled ? 'bg-primary text-primary-foreground' : 'bg-[#F2F1EA] text-[#1A1B1D]'}`}
+          className={`px-6 py-2 rounded-full hover:opacity-90 transition-opacity duration-200 ease-studio ${overPhoto ? 'bg-[#F2F1EA] text-[#1A1B1D]' : 'bg-primary text-primary-foreground'}`}
         >
           Start free trial
         </Link>

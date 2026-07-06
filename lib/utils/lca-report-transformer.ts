@@ -380,23 +380,25 @@ export function transformLCADataForReport(
   const dqScore = dataQuality.score ?? 40;
   const dqRating = dataQuality.rating || (dqScore >= 80 ? 'Good' : dqScore >= 50 ? 'Fair' : 'Poor');
 
+  // Lifecycle stages coloured in the studio palette (forest, cobalt,
+  // ochre-ink, brick, dim, hold) rather than a rainbow.
   const chartBreakdown = hasViticulture
     ? [
-        { name: "Viticulture", value: viticulturePct, color: "#ccff00" },
-        { name: "Purchased Ingredients", value: purchasedIngredientsPct, color: "#22c55e" },
-        { name: "Packaging", value: packagingPct, color: "#eab308" },
-        { name: "Distribution", value: distributionPct, color: "#f97316" },
-        { name: "Processing", value: processingPct, color: "#3b82f6" },
-        { name: "Use Phase", value: usePhasePct, color: "#8b5cf6" },
-        { name: "End of Life", value: endOfLifePct, color: "#ef4444" },
+        { name: "Viticulture", value: viticulturePct, color: "#205E40" },
+        { name: "Purchased Ingredients", value: purchasedIngredientsPct, color: "#047857" },
+        { name: "Packaging", value: packagingPct, color: "#A97C14" },
+        { name: "Distribution", value: distributionPct, color: "#BF4B2A" },
+        { name: "Processing", value: processingPct, color: "#2B46C0" },
+        { name: "Use Phase", value: usePhasePct, color: "#6D28D9" },
+        { name: "End of Life", value: endOfLifePct, color: "#6F6F68" },
       ].filter(item => item.value > 0)
     : [
-        { name: "Raw Materials", value: rawMaterialsPct, color: "#22c55e" },
-        { name: "Packaging", value: packagingPct, color: "#eab308" },
-        { name: "Distribution", value: distributionPct, color: "#f97316" },
-        { name: "Processing", value: processingPct, color: "#3b82f6" },
-        { name: "Use Phase", value: usePhasePct, color: "#8b5cf6" },
-        { name: "End of Life", value: endOfLifePct, color: "#ef4444" },
+        { name: "Raw Materials", value: rawMaterialsPct, color: "#205E40" },
+        { name: "Packaging", value: packagingPct, color: "#A97C14" },
+        { name: "Distribution", value: distributionPct, color: "#BF4B2A" },
+        { name: "Processing", value: processingPct, color: "#2B46C0" },
+        { name: "Use Phase", value: usePhasePct, color: "#6D28D9" },
+        { name: "End of Life", value: endOfLifePct, color: "#6F6F68" },
       ].filter(item => item.value > 0);
 
   // Build waste stream from actual material data where possible
@@ -1249,9 +1251,9 @@ export function transformLCADataForReport(
       breakdown: chartBreakdown.map(item => ({
         name: item.name,
         value: item.value,
-        color: item.name === "Raw Materials" ? "#2563eb" :
-               item.name === "Packaging" ? "#3b82f6" :
-               item.name === "Processing" ? "#60a5fa" : "#1d4ed8"
+        color: item.name === "Raw Materials" ? "#2B46C0" :
+               item.name === "Packaging" ? "#205E40" :
+               item.name === "Processing" ? "#A97C14" : "#6F6F68"
       })),
       sources: (() => {
         // Sort by water volume desc so the biggest consumers always appear, then

@@ -20,9 +20,9 @@ function escapeHtml(str: string): string {
 }
 
 function statusIcon(status: 'covered' | 'partial' | 'not-covered'): string {
-  if (status === 'covered') return '<span style="color:#22c55e;font-size:14px;">&#10003;</span>';
-  if (status === 'partial') return '<span style="color:#f59e0b;font-size:12px;">&#9711;</span>';
-  return '<span style="color:#e7e5e4;font-size:12px;">&#8212;</span>';
+  if (status === 'covered') return '<span style="color:#047857;font-size:14px;">&#10003;</span>';
+  if (status === 'partial') return '<span style="color:#B45309;font-size:12px;">&#9711;</span>';
+  return '<span style="color:#D9D6CB;font-size:12px;">&#8212;</span>';
 }
 
 // ============================================================================
@@ -106,7 +106,7 @@ const ALKATERA_LOGO_URL = 'https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/o
 // ============================================================================
 
 export function renderRegulatoryIndexHtml(data: RegulatoryIndexData): string {
-  const primary = data.branding.primaryColor || '#ccff00';
+  const primary = data.branding.primaryColor || '#205E40';
   const selectedStandards = data.standards.filter(s => STANDARD_DISCLOSURES[s]);
   const sectionSet = new Set(data.sections);
 
@@ -125,18 +125,18 @@ export function renderRegulatoryIndexHtml(data: RegulatoryIndexData): string {
     const coveragePct = total > 0 ? Math.round(((covered + partial * 0.5) / total) * 100) : 0;
 
     return `
-    <div style="background: #f5f5f4; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
+    <div style="background: #ECEAE3; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
         <div>
-          <div style="font-size: 14px; font-weight: 600; color: #1c1917;">${escapeHtml(STANDARD_LABELS[stdId] || stdId)}</div>
-          <div style="font-size: 11px; color: #78716c; margin-top: 2px;">${covered} of ${total} disclosures fully covered</div>
+          <div style="font-size: 14px; font-weight: 600; color: #1A1B1D;">${escapeHtml(STANDARD_LABELS[stdId] || stdId)}</div>
+          <div style="font-size: 11px; color: #6F6F68; margin-top: 2px;">${covered} of ${total} disclosures fully covered</div>
         </div>
         <div style="text-align: right;">
           <div style="font-size: 22px; font-weight: 700; color: ${primary};">${coveragePct}%</div>
-          <div style="font-size: 10px; color: #a8a29e;">coverage</div>
+          <div style="font-size: 10px; color: #6F6F68;">coverage</div>
         </div>
       </div>
-      <div style="height: 4px; background: #e7e5e4; border-radius: 2px; overflow: hidden; margin-bottom: 14px;">
+      <div style="height: 4px; background: #D9D6CB; border-radius: 2px; overflow: hidden; margin-bottom: 14px;">
         <div style="height: 100%; width: ${coveragePct}%; background: ${primary}; border-radius: 2px;"></div>
       </div>
       <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
@@ -144,10 +144,10 @@ export function renderRegulatoryIndexHtml(data: RegulatoryIndexData): string {
           ${disclosures.map(d => {
             const cov = getCoverage(d.coveredBy);
             return `
-            <tr style="border-bottom: 1px solid #e7e5e4;">
+            <tr style="border-bottom: 1px solid #D9D6CB;">
               <td style="padding: 6px 8px 6px 0; width: 20px;">${statusIcon(cov)}</td>
-              <td style="padding: 6px 4px; font-family: 'Fira Code', monospace; font-size: 10px; color: #78716c; white-space: nowrap; padding-right: 12px;">${escapeHtml(d.id)}</td>
-              <td style="padding: 6px 0; color: ${cov === 'not-covered' ? '#a8a29e' : '#1c1917'};">${escapeHtml(d.label)}</td>
+              <td style="padding: 6px 4px; font-family: 'Fira Code', monospace; font-size: 10px; color: #6F6F68; white-space: nowrap; padding-right: 12px;">${escapeHtml(d.id)}</td>
+              <td style="padding: 6px 0; color: ${cov === 'not-covered' ? '#6F6F68' : '#1A1B1D'};">${escapeHtml(d.label)}</td>
             </tr>`;
           }).join('')}
         </tbody>
@@ -171,7 +171,7 @@ export function renderRegulatoryIndexHtml(data: RegulatoryIndexData): string {
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;700&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Inter', sans-serif; background: white; color: #1c1917; }
+    body { font-family: 'Inter', sans-serif; background: white; color: #1A1B1D; }
     @page { size: A4; margin: 0; }
     .page {
       width: 794px; min-height: 1123px; position: relative;
@@ -186,18 +186,18 @@ export function renderRegulatoryIndexHtml(data: RegulatoryIndexData): string {
 <body>
 <div class="page">
   <!-- Header -->
-  <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; padding-bottom: 20px; border-bottom: 2px solid #e7e5e4;">
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; padding-bottom: 20px; border-bottom: 2px solid #D9D6CB;">
     <div>
       <div style="font-family: 'Fira Code', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: ${primary}; margin-bottom: 6px;">Framework Coverage Index</div>
-      <div style="font-size: 22px; font-weight: 700; color: #1c1917;">${escapeHtml(data.organisationName)}</div>
-      <div style="font-size: 12px; color: #78716c; margin-top: 4px;">${data.reportYear} Sustainability Report &bull; ${escapeHtml(data.reportingPeriodStart)} to ${escapeHtml(data.reportingPeriodEnd)}</div>
+      <div style="font-size: 22px; font-weight: 700; color: #1A1B1D;">${escapeHtml(data.organisationName)}</div>
+      <div style="font-size: 12px; color: #6F6F68; margin-top: 4px;">${data.reportYear} Sustainability Report &bull; ${escapeHtml(data.reportingPeriodStart)} to ${escapeHtml(data.reportingPeriodEnd)}</div>
     </div>
     <div style="text-align: right;">
       ${data.branding.logo
         ? `<img src="${escapeHtml(data.branding.logo)}" style="height: 32px; object-fit: contain;" />`
         : `<img src="${ALKATERA_LOGO_URL}" style="height: 24px; object-fit: contain;" />`}
       ${data.dataQuality ? `
-      <div style="margin-top: 8px; font-size: 11px; color: #78716c; text-align: right;">
+      <div style="margin-top: 8px; font-size: 11px; color: #6F6F68; text-align: right;">
         Data quality: <strong>${escapeHtml(tierLabel)}</strong>
         &bull; ${Math.round((data.dataQuality.completeness || 0) * 100)}% complete
       </div>` : ''}
@@ -205,7 +205,7 @@ export function renderRegulatoryIndexHtml(data: RegulatoryIndexData): string {
   </div>
 
   <!-- Legend -->
-  <div style="display: flex; gap: 20px; margin-bottom: 20px; font-size: 11px; color: #78716c;">
+  <div style="display: flex; gap: 20px; margin-bottom: 20px; font-size: 11px; color: #6F6F68;">
     <div style="display: flex; align-items: center; gap: 6px;">${statusIcon('covered')} Fully covered in this report</div>
     <div style="display: flex; align-items: center; gap: 6px;">${statusIcon('partial')} Partially covered</div>
     <div style="display: flex; align-items: center; gap: 6px;">${statusIcon('not-covered')} Not covered</div>
@@ -213,14 +213,14 @@ export function renderRegulatoryIndexHtml(data: RegulatoryIndexData): string {
 
   <!-- Standard blocks -->
   ${selectedStandards.length > 0 ? standardBlocks : `
-  <div style="background: #f5f5f4; border-radius: 12px; padding: 32px; text-align: center; color: #a8a29e;">
+  <div style="background: #ECEAE3; border-radius: 12px; padding: 32px; text-align: center; color: #6F6F68;">
     No reporting standards have been selected for this report.
     Select standards in the report builder to generate a coverage index.
   </div>
   `}
 
   <!-- Footer -->
-  <div style="position: absolute; bottom: 32px; left: 52px; right: 52px; display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #a8a29e;">
+  <div style="position: absolute; bottom: 32px; left: 52px; right: 52px; display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #6F6F68;">
     <span>Prepared by alkatera &bull; This index is indicative and should be verified against full disclosures.</span>
     <span>${data.reportYear} Regulatory Index</span>
   </div>

@@ -73,7 +73,7 @@ export const METHODOLOGY_STATEMENTS: Record<string, string> = {
 };
 
 export function renderIso14064WorksheetHtml(data: Iso14064WorksheetData): string {
-  const primary = data.branding.primaryColor || '#ccff00';
+  const primary = data.branding.primaryColor || '#205E40';
 
   const totalEmissions = data.lineItems.reduce(
     (s, li) => s + (li.emissionsTco2e || 0),
@@ -91,26 +91,26 @@ export function renderIso14064WorksheetHtml(data: Iso14064WorksheetData): string
 
   const completenessIcon = (c: string) =>
     c === 'Complete'
-      ? '<span style="color:#22c55e;">&#10003;</span>'
+      ? '<span style="color:#047857;">&#10003;</span>'
       : c === 'Estimated'
-        ? '<span style="color:#f59e0b;">&#9711;</span>'
-        : '<span style="color:#ef4444;">&#10007;</span>';
+        ? '<span style="color:#B45309;">&#9711;</span>'
+        : '<span style="color:#BE123C;">&#10007;</span>';
 
   const rows = data.lineItems
     .map((li) => {
       const tier = uncertaintyTierForProvenance(li.dataProvenance);
       return `
-      <tr style="border-bottom:1px solid #e7e5e4; vertical-align:top;">
+      <tr style="border-bottom:1px solid #D9D6CB; vertical-align:top;">
         <td style="padding:8px 6px; font-weight:600; white-space:nowrap;">${escapeHtml(li.scope)}</td>
         <td style="padding:8px 6px;">${escapeHtml(li.sourceCategory)}</td>
-        <td style="padding:8px 6px; font-size:10px; color:#57534e;">${escapeHtml(li.methodology)}</td>
+        <td style="padding:8px 6px; font-size:10px; color:#6F6F68;">${escapeHtml(li.methodology)}</td>
         <td style="padding:8px 6px; white-space:nowrap;">${escapeHtml(li.dataQuality)}</td>
         <td style="padding:8px 6px; white-space:nowrap;">${escapeHtml(li.emissionFactorSource)}</td>
         <td style="padding:8px 6px; white-space:nowrap;">${escapeHtml(tier.label)} (&plusmn;${tier.pct}%)</td>
         <td style="padding:8px 6px; text-align:center;">${completenessIcon(li.completeness)}</td>
         <td style="padding:8px 6px; text-align:right; white-space:nowrap;">${(li.emissionsTco2e || 0).toFixed(3)}</td>
-        <td style="padding:8px 6px; font-size:10px; color:#78716c;">${escapeHtml(li.evidence || '—')}</td>
-        <td style="padding:8px 6px; font-size:10px; color:#78716c;">${escapeHtml(li.notes || '')}</td>
+        <td style="padding:8px 6px; font-size:10px; color:#6F6F68;">${escapeHtml(li.evidence || '—')}</td>
+        <td style="padding:8px 6px; font-size:10px; color:#6F6F68;">${escapeHtml(li.notes || '')}</td>
       </tr>`;
     })
     .join('');
@@ -123,21 +123,21 @@ export function renderIso14064WorksheetHtml(data: Iso14064WorksheetData): string
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family:'Inter',sans-serif; background:white; color:#1c1917; }
+    body { font-family:'Inter',sans-serif; background:white; color:#1A1B1D; }
     @page { size: A4 landscape; margin: 0; }
     .page { width:1123px; min-height:794px; padding:36px 40px; position:relative; }
     h1 { font-size:20px; font-weight:700; }
-    .sub { font-size:11px; color:#78716c; margin-top:4px; }
+    .sub { font-size:11px; color:#6F6F68; margin-top:4px; }
     table { width:100%; border-collapse:collapse; font-size:11px; margin-top:18px; }
     thead th {
-      text-align:left; padding:8px 6px; background:#1c1917; color:white;
+      text-align:left; padding:8px 6px; background:#1A1B1D; color:#F2F1EA;
       font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em;
     }
     .summary {
-      margin-top:18px; background:#f5f5f4; border-radius:10px; padding:16px;
+      margin-top:18px; background:#ECEAE3; border-radius:10px; padding:16px;
       display:flex; justify-content:space-between; align-items:center;
     }
-    .footer { margin-top:24px; font-size:9px; color:#a8a29e; border-top:1px solid #e7e5e4; padding-top:10px; }
+    .footer { margin-top:24px; font-size:9px; color:#6F6F68; border-top:1px solid #D9D6CB; padding-top:10px; }
     .accent { color:${primary}; }
   </style>
 </head>
@@ -151,7 +151,7 @@ export function renderIso14064WorksheetHtml(data: Iso14064WorksheetData): string
       </div>
       <div style="text-align:right;">
         <div style="font-size:22px; font-weight:700;" class="accent">${weightedUncertainty.toFixed(1)}%</div>
-        <div style="font-size:9px; color:#a8a29e;">inventory uncertainty (volume-weighted)</div>
+        <div style="font-size:9px; color:#6F6F68;">inventory uncertainty (volume-weighted)</div>
       </div>
     </div>
 
@@ -164,14 +164,14 @@ export function renderIso14064WorksheetHtml(data: Iso14064WorksheetData): string
         </tr>
       </thead>
       <tbody>
-        ${rows || '<tr><td colspan="10" style="padding:16px; text-align:center; color:#a8a29e;">No inventory line items.</td></tr>'}
+        ${rows || '<tr><td colspan="10" style="padding:16px; text-align:center; color:#6F6F68;">No inventory line items.</td></tr>'}
       </tbody>
     </table>
 
     <div class="summary">
       <div>
         <div style="font-size:12px; font-weight:600;">Total reported emissions</div>
-        <div style="font-size:10px; color:#78716c;">FLAG emissions and removals are reported separately and never netted (SBTi FLAG v1.2 / GHG Protocol LSR).</div>
+        <div style="font-size:10px; color:#6F6F68;">FLAG emissions and removals are reported separately and never netted (SBTi FLAG v1.2 / GHG Protocol LSR).</div>
       </div>
       <div style="font-size:20px; font-weight:700;" class="accent">${totalEmissions.toFixed(3)} tCO&#8322;e</div>
     </div>

@@ -59,7 +59,7 @@ describe('renderIso14064WorksheetHtml', () => {
           emissionsTco2e: 100,
         },
       ],
-      branding: { logo: null, primaryColor: '#ccff00' },
+      branding: { logo: null, primaryColor: '#205E40' },
     });
 
     expect(html).toContain('ISO 14064-1:2018 Verification Worksheet');
@@ -77,7 +77,7 @@ describe('renderIso14064WorksheetHtml', () => {
       reportingPeriodStart: '2025-01-01',
       reportingPeriodEnd: '2025-12-31',
       lineItems: [],
-      branding: { logo: null, primaryColor: '#ccff00' },
+      branding: { logo: null, primaryColor: '#205E40' },
     });
     expect(html).not.toContain('<script>x</script>');
     expect(html).toContain('&lt;script&gt;');

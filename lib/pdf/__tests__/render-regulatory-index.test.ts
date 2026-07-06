@@ -8,7 +8,7 @@ const baseData: RegulatoryIndexData = {
   reportingPeriodEnd: '2025-12-31',
   standards: ['csrd', 'iso-14067'],
   sections: ['executive-summary', 'scope-1-2-3', 'ghg-inventory', 'methodology', 'people-culture', 'governance', 'targets'],
-  branding: { logo: null, primaryColor: '#ccff00' },
+  branding: { logo: null, primaryColor: '#205E40' },
 };
 
 describe('renderRegulatoryIndexHtml', () => {

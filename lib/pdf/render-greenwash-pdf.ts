@@ -1,15 +1,15 @@
 import { ALKATERA_LOGO_BASE64, ALKATERA_HORIZONTAL_LOGO_BASE64 } from './alkatera-logo-base64';
 
 // Brand colours
-const LIME = { r: 204, g: 255, b: 0 };       // #ccff00
-const DARK = { r: 10, g: 10, b: 10 };         // #0a0a0a
-const DARK_GREY = { r: 28, g: 25, b: 23 };    // #1c1917
-const MID_GREY = { r: 120, g: 113, b: 108 };  // #78716c
-const LIGHT_GREY = { r: 231, g: 229, b: 228 };// #e7e5e4
+const LIME = { r: 32, g: 94, b: 64 };       // #205E40
+const DARK = { r: 26, g: 27, b: 29 };         // #1A1B1D
+const DARK_GREY = { r: 26, g: 27, b: 29 };    // #1A1B1D
+const MID_GREY = { r: 111, g: 111, b: 104 };  // #6F6F68
+const LIGHT_GREY = { r: 217, g: 214, b: 203 };// #D9D6CB
 const WHITE = { r: 255, g: 255, b: 255 };
-const RED = { r: 220, g: 38, b: 38 };         // #dc2626
-const AMBER = { r: 217, g: 119, b: 6 };       // #d97706
-const GREEN = { r: 34, g: 197, b: 94 };       // #22c55e
+const RED = { r: 190, g: 18, b: 60 };         // #BE123C
+const AMBER = { r: 180, g: 83, b: 9 };       // #B45309
+const GREEN = { r: 4, g: 120, b: 87 };       // #047857
 
 interface ClaimResult {
   claim_text: string;
@@ -145,7 +145,7 @@ function drawHeader(pdf: PDF) {
   // GREENWASH GUARDIAN right-aligned
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(7);
-  pdf.setTextColor(LIME.r, LIME.g, LIME.b);
+  pdf.setTextColor(242, 241, 234);
   pdf.text('GREENWASH GUARDIAN', PAGE_WIDTH - MARGIN, 11, { align: 'right' });
 
   // Lime accent line
@@ -274,7 +274,7 @@ function drawClaimsOverview(pdf: PDF, claims: ClaimResult[], yPos: number): numb
     const box = boxes[i];
 
     // Light background
-    pdf.setFillColor(250, 250, 250);
+    pdf.setFillColor(236, 234, 227);
     pdf.roundedRect(bx, yPos, boxW, boxH, 2, 2, 'F');
 
     // Left colour accent
@@ -325,13 +325,13 @@ export async function generateGreenwashPDF(result: AnalysisResult): Promise<void
   // Title
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(22);
-  pdf.setTextColor(WHITE.r, WHITE.g, WHITE.b);
+  pdf.setTextColor(242, 241, 234);
   pdf.text('GREENWASH GUARDIAN', PAGE_WIDTH / 2, 50, { align: 'center' });
 
   // Subtitle
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(11);
-  pdf.setTextColor(LIME.r, LIME.g, LIME.b);
+  pdf.setTextColor(242, 241, 234);
   pdf.text('Risk Assessment Report', PAGE_WIDTH / 2, 58, { align: 'center' });
 
   // Lime accent line
@@ -364,7 +364,7 @@ export async function generateGreenwashPDF(result: AnalysisResult): Promise<void
 
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(10);
-    pdf.setTextColor(60, 60, 60);
+    pdf.setTextColor(111, 111, 104);
     const summaryLines = pdf.splitTextToSize(sanitise(result.summary), CONTENT_WIDTH);
     pdf.text(summaryLines, MARGIN, yPos);
     yPos += summaryLines.length * 5 + 8;
@@ -389,18 +389,18 @@ export async function generateGreenwashPDF(result: AnalysisResult): Promise<void
       const jurisdiction = getJurisdictionLabel(leg.jurisdiction);
 
       // Jurisdiction badge
-      pdf.setFillColor(LIME.r, LIME.g, LIME.b);
+      pdf.setFillColor(26, 27, 29);
       const badgeWidth = pdf.getTextWidth(jurisdiction) + 6;
       pdf.roundedRect(MARGIN, yPos - 3.5, badgeWidth, 5.5, 1, 1, 'F');
       pdf.setFontSize(7);
       pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(DARK.r, DARK.g, DARK.b);
+      pdf.setTextColor(242, 241, 234);
       pdf.text(jurisdiction, MARGIN + 3, yPos);
 
       // Law name
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(9);
-      pdf.setTextColor(60, 60, 60);
+      pdf.setTextColor(111, 111, 104);
       pdf.text(`${leg.name}`, MARGIN + badgeWidth + 4, yPos);
 
       yPos += 7;
@@ -413,7 +413,7 @@ export async function generateGreenwashPDF(result: AnalysisResult): Promise<void
   const disclaimerY = pageHeight - FOOTER_HEIGHT - 18;
   pdf.setFillColor(255, 251, 235);
   pdf.roundedRect(MARGIN, disclaimerY, CONTENT_WIDTH, 12, 2, 2, 'F');
-  pdf.setDrawColor(217, 119, 6);
+  pdf.setDrawColor(180, 83, 9);
   pdf.setLineWidth(0.3);
   pdf.roundedRect(MARGIN, disclaimerY, CONTENT_WIDTH, 12, 2, 2, 'S');
 
@@ -483,17 +483,17 @@ export async function generateGreenwashPDF(result: AnalysisResult): Promise<void
       yPos = ensureSpace(pdf, yPos, 15);
 
       // Number circle
-      pdf.setFillColor(LIME.r, LIME.g, LIME.b);
+      pdf.setFillColor(26, 27, 29);
       pdf.circle(MARGIN + 3, yPos - 1, 3.5, 'F');
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(8);
-      pdf.setTextColor(DARK.r, DARK.g, DARK.b);
+      pdf.setTextColor(242, 241, 234);
       pdf.text(`${i + 1}`, MARGIN + 3, yPos + 0.5, { align: 'center' });
 
       // Recommendation text
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(9);
-      pdf.setTextColor(60, 60, 60);
+      pdf.setTextColor(111, 111, 104);
       const recLines = pdf.splitTextToSize(sanitise(result.recommendations[i]), CONTENT_WIDTH - 14);
       pdf.text(recLines, MARGIN + 10, yPos);
       yPos += recLines.length * 4.5 + 5;
@@ -526,7 +526,7 @@ export async function generateGreenwashPDF(result: AnalysisResult): Promise<void
   // Description
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(9);
-  pdf.setTextColor(80, 80, 80);
+  pdf.setTextColor(111, 111, 104);
   const aboutText = 'alkatera is the sustainability platform built for the drinks industry. We help breweries, distilleries, and wineries measure, manage, and communicate their environmental impact with confidence.';
   const aboutLines = pdf.splitTextToSize(aboutText, CONTENT_WIDTH);
   pdf.text(aboutLines, MARGIN, yPos);
@@ -549,7 +549,7 @@ export async function generateGreenwashPDF(result: AnalysisResult): Promise<void
 
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(8);
-  pdf.setTextColor(80, 80, 80);
+  pdf.setTextColor(111, 111, 104);
   for (const service of services) {
     yPos = ensureSpace(pdf, yPos, 10);
 
@@ -571,19 +571,19 @@ export async function generateGreenwashPDF(result: AnalysisResult): Promise<void
 
   // CTA box with lime background
   const ctaHeight = 38;
-  pdf.setFillColor(LIME.r, LIME.g, LIME.b);
+  pdf.setFillColor(26, 27, 29);
   pdf.roundedRect(MARGIN, yPos, CONTENT_WIDTH, ctaHeight, 3, 3, 'F');
 
   // CTA heading
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(13);
-  pdf.setTextColor(DARK.r, DARK.g, DARK.b);
+  pdf.setTextColor(242, 241, 234);
   pdf.text('Want unlimited scans and full compliance tracking?', PAGE_WIDTH / 2, yPos + 13, { align: 'center' });
 
   // CTA subtext: "Get started at alkatera.com" with styled brand name
   pdf.setFontSize(10);
   pdf.setFont('helvetica', 'normal');
-  pdf.setTextColor(DARK.r, DARK.g, DARK.b);
+  pdf.setTextColor(242, 241, 234);
   const prefixText = 'Get started at ';
   const suffixText = '.com';
   const prefixW = pdf.getTextWidth(prefixText);
@@ -789,17 +789,17 @@ function drawClaim(pdf: PDF, claim: ClaimResult, startY: number): number {
   // Issue description
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(9);
-  pdf.setTextColor(80, 80, 80);
+  pdf.setTextColor(111, 111, 104);
   pdf.text(issueLines, cardX + innerPad, yPos);
   yPos += issueLines.length * 4 + 5;
 
   // Legislation badge row
-  pdf.setFillColor(LIME.r, LIME.g, LIME.b);
+  pdf.setFillColor(26, 27, 29);
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(6.5);
   const jurBadgeW = pdf.getTextWidth(jurisdiction) + 5;
   pdf.roundedRect(cardX + innerPad, yPos - 3, jurBadgeW, 5, 1, 1, 'F');
-  pdf.setTextColor(DARK.r, DARK.g, DARK.b);
+  pdf.setTextColor(242, 241, 234);
   pdf.text(jurisdiction, cardX + innerPad + 2.5, yPos - 0.3);
 
   pdf.setFont('helvetica', 'normal');
@@ -813,25 +813,25 @@ function drawClaim(pdf: PDF, claim: ClaimResult, startY: number): number {
   // Suggestion box
   const suggBoxHeight = suggestionLines.length * 4 + 10;
   pdf.setFillColor(236, 253, 245);
-  pdf.setDrawColor(34, 197, 94);
+  pdf.setDrawColor(4, 120, 87);
   pdf.setLineWidth(0.3);
   pdf.roundedRect(cardX + innerPad, yPos - 1, textW, suggBoxHeight, 2, 2, 'FD');
 
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(7);
-  pdf.setTextColor(22, 101, 52);
+  pdf.setTextColor(4, 120, 87);
   pdf.text('SUGGESTION', cardX + innerPad + 4, yPos + 4);
 
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(8);
-  pdf.setTextColor(22, 101, 52);
+  pdf.setTextColor(4, 120, 87);
   pdf.text(suggestionLines, cardX + innerPad + 4, yPos + 9);
   yPos += suggBoxHeight + 3;
 
   // Suggested revision
   if (claim.suggested_revision && revisionLines.length > 0) {
     const revBoxHeight = revisionLines.length * 4 + 9;
-    pdf.setFillColor(248, 248, 248);
+    pdf.setFillColor(242, 241, 234);
     pdf.roundedRect(cardX + innerPad, yPos - 1, textW, revBoxHeight, 2, 2, 'F');
 
     pdf.setFont('helvetica', 'bold');
@@ -841,7 +841,7 @@ function drawClaim(pdf: PDF, claim: ClaimResult, startY: number): number {
 
     pdf.setFont('helvetica', 'italic');
     pdf.setFontSize(8);
-    pdf.setTextColor(60, 60, 60);
+    pdf.setTextColor(111, 111, 104);
     pdf.text(revisionLines, cardX + innerPad + 4, yPos + 8.5);
     yPos += revBoxHeight + 3;
   }

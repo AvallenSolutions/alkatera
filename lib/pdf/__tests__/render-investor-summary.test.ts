@@ -8,7 +8,7 @@ const baseData: InvestorSummaryData = {
   reportingPeriodEnd: '2025-12-31',
   sector: 'Brewing',
   emissions: { scope1: 100, scope2: 50, scope3: 850, total: 1000 },
-  branding: { logo: null, primaryColor: '#ccff00' },
+  branding: { logo: null, primaryColor: '#205E40' },
 };
 
 describe('renderInvestorSummaryHtml', () => {
@@ -156,7 +156,7 @@ describe('renderInvestorSummaryHtml', () => {
   it('uses provided logo URL when set', () => {
     const html = renderInvestorSummaryHtml({
       ...baseData,
-      branding: { logo: 'https://example.com/logo.png', primaryColor: '#ccff00' },
+      branding: { logo: 'https://example.com/logo.png', primaryColor: '#205E40' },
     });
     expect(html).toContain('https://example.com/logo.png');
   });

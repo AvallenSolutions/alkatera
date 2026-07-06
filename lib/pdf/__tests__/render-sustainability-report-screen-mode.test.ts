@@ -12,7 +12,7 @@ const minimalConfig = {
   sections: ['executive-summary', 'scope-1-2-3', 'targets'],
   isMultiYear: false,
   reportYears: [2025],
-  branding: { logo: null, primaryColor: '#ccff00', secondaryColor: '#10b981' },
+  branding: { logo: null, primaryColor: '#205E40', secondaryColor: '#10b981' },
 };
 
 const minimalData = {
@@ -72,7 +72,7 @@ describe('renderSustainabilityReportHtml — PDF mode (default)', () => {
 
   it('uses the configured primary colour', () => {
     const html = renderSustainabilityReportHtml(minimalConfig as any, minimalData as any);
-    expect(html).toContain('#ccff00');
+    expect(html).toContain('#205E40');
   });
 });
 

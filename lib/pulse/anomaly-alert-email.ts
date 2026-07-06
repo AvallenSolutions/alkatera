@@ -20,10 +20,10 @@ export interface AnomalyAlertData {
   appUrl: string;
 }
 
-const BRAND_GREEN = '#ccff00';
-const INK = '#0a0a0a';
-const SOFT = '#525960';
-const DANGER = '#b91c1c';
+const BRAND_GREEN = '#F2F1EA';
+const INK = '#1A1B1D';
+const SOFT = '#6F6F68';
+const DANGER = '#BE123C';
 
 export function renderAnomalyAlertEmail(data: AnomalyAlertData): {
   subject: string;
@@ -47,11 +47,11 @@ export function renderAnomalyAlertEmail(data: AnomalyAlertData): {
       const z = `${a.z_score >= 0 ? '+' : ''}${a.z_score.toFixed(1)}σ`;
       return `
         <tr>
-          <td style="padding:14px 16px;border-top:1px solid #e2e8f0;vertical-align:top;">
+          <td style="padding:14px 16px;border-top:1px solid #D9D6CB;vertical-align:top;">
             <div style="font-size:14px;font-weight:600;color:${INK};margin-bottom:4px;">${escapeText(label)}</div>
             <div style="font-size:12px;color:${SOFT};">Observed <strong style="color:${INK};">${escapeText(observed)}</strong> vs expected ~${escapeText(expected)}</div>
           </td>
-          <td style="padding:14px 16px;border-top:1px solid #e2e8f0;vertical-align:top;text-align:right;white-space:nowrap;">
+          <td style="padding:14px 16px;border-top:1px solid #D9D6CB;vertical-align:top;text-align:right;white-space:nowrap;">
             <span style="display:inline-block;background:${DANGER};color:#ffffff;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:4px 8px;border-radius:4px;">High</span>
             <div style="font-size:12px;color:${SOFT};margin-top:6px;font-variant-numeric:tabular-nums;">z = ${escapeText(z)}</div>
           </td>
@@ -70,16 +70,16 @@ export function renderAnomalyAlertEmail(data: AnomalyAlertData): {
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>${escapeAttr(subject)}</title>
 </head>
-<body style="margin:0;padding:0;background:#f4f6f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:${INK};">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f6f8;padding:24px 0;">
+<body style="margin:0;padding:0;background:#ECEAE3;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:${INK};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ECEAE3;padding:24px 0;">
     <tr><td align="center">
-      <table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;border-radius:12px;border:1px solid #e2e8f0;overflow:hidden;">
-        <tr><td style="background:${INK};padding:18px 28px;color:#ffffff;">
+      <table role="presentation" width="640" cellpadding="0" cellspacing="0" border="0" style="background:#F2F1EA;border-radius:12px;border:1px solid #D9D6CB;overflow:hidden;">
+        <tr><td style="background:${INK};padding:18px 28px;color:#F2F1EA;">
           <table width="100%"><tr>
             <td style="font-size:11px;letter-spacing:3px;text-transform:uppercase;color:${BRAND_GREEN};font-weight:600;">
               alka<span style="font-weight:800;">tera</span> Pulse
             </td>
-            <td align="right" style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:1.5px;">
+            <td align="right" style="font-size:11px;color:#D9D6CB;text-transform:uppercase;letter-spacing:1.5px;">
               Anomaly alert
             </td>
           </tr></table>
@@ -92,12 +92,12 @@ export function renderAnomalyAlertEmail(data: AnomalyAlertData): {
           <h1 style="margin:0 0 14px;font-size:22px;line-height:1.3;color:${INK};">
             Unusual movement detected
           </h1>
-          <p style="margin:0 0 20px;font-size:14px;line-height:1.55;color:#1f2933;">
+          <p style="margin:0 0 20px;font-size:14px;line-height:1.55;color:#1A1B1D;">
             ${escapeText(intro)}
           </p>
 
-          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
-            <tr><td colspan="2" style="background:#f8fafc;padding:8px 16px;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:${SOFT};font-weight:600;">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #D9D6CB;border-radius:8px;overflow:hidden;">
+            <tr><td colspan="2" style="background:#ECEAE3;padding:8px 16px;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:${SOFT};font-weight:600;">
               Flagged metric${isSingle ? '' : 's'}
             </td></tr>
             ${rows}

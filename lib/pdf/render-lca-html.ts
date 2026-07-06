@@ -43,7 +43,7 @@ function escapeHtml(str: string): string {
  */
 function donutGradient(segments: Array<{ value: number; color: string }>): string {
   const total = segments.reduce((sum, s) => sum + s.value, 0);
-  if (total === 0) return 'background: #333;';
+  if (total === 0) return 'background: #D9D6CB;';
 
   let cumulative = 0;
   const stops: string[] = [];
@@ -80,10 +80,10 @@ function alkateraName(): string {
 function renderCoverPage(data: LCAReportData): string {
   const heroStyle = data.meta.heroImage
     ? `background-image: url('${data.meta.heroImage}'); background-size: cover; background-position: center;`
-    : 'background: linear-gradient(135deg, #292524, #1c1917);';
+    : 'background: linear-gradient(135deg, #ECEAE3, #F2F1EA);';
 
   const productImageHtml = data.meta.productImageUrl
-    ? `<div style="position: absolute; top: 80px; right: 48px; z-index: 10; width: 220px; height: 280px; border-radius: 16px; overflow: hidden; border: 2px solid rgba(204,255,0,0.3); box-shadow: 0 20px 60px rgba(0,0,0,0.5);">
+    ? `<div style="position: absolute; top: 80px; right: 48px; z-index: 10; width: 220px; height: 280px; border-radius: 16px; overflow: hidden; border: 2px solid rgba(32,94,64,0.3); box-shadow: 0 20px 60px rgba(26,27,29,0.2);">
         <img src="${escapeHtml(data.meta.productImageUrl)}" style="width: 100%; height: 100%; object-fit: contain;" alt="${escapeHtml(data.meta.productName)}" />
       </div>`
     : '';
@@ -91,38 +91,38 @@ function renderCoverPage(data: LCAReportData): string {
   return `
     <div class="page dark-page" style="justify-content: space-between; overflow: hidden; position: relative;">
       <div style="position: absolute; inset: 0; ${heroStyle} opacity: 0.6;"></div>
-      <div style="position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,0.4), transparent, rgba(0,0,0,0.8));"></div>
+      <div style="position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(242,241,234,0.5), transparent, rgba(242,241,234,0.85));"></div>
 
       ${productImageHtml}
 
       <div style="position: relative; z-index: 10; padding-top: 48px;">
-        ${alkateraLogo(44)}
+        ${alkateraLogo(44, false)}
       </div>
 
       <div style="position: relative; z-index: 10; width: 100%; max-width: 500px;">
-        <div style="background: #ccff00; color: black; padding: 24px 32px; border-radius: 12px; margin-bottom: 80px; transform: rotate(-1deg);">
+        <div style="background: #1A1B1D; color: #F2F1EA; padding: 24px 32px; border-radius: 12px; margin-bottom: 80px; transform: rotate(-1deg);">
           <h2 style="font-family: 'Fira Code', monospace; font-weight: 700; font-style: italic; font-size: 22px; letter-spacing: -0.5px;">LIFE CYCLE ASSESSMENT</h2>
           <p style="font-size: 11px; margin-top: 4px; opacity: 0.7;">Prepared in accordance with ISO 14067:2018 &amp; ISO 14044:2006</p>
         </div>
-        <h1 style="font-size: 64px; font-family: 'Playfair Display', serif; font-weight: 300; line-height: 1.1; margin-bottom: 16px; color: white;">
+        <h1 style="font-size: 64px; font-family: 'Playfair Display', serif; font-weight: 300; line-height: 1.1; margin-bottom: 16px; color: #1A1B1D;">
           ${escapeHtml(data.meta.productName)}
         </h1>
-        <p style="font-size: 22px; color: #d6d3d1; font-weight: 300; margin-bottom: 32px;">${escapeHtml(data.meta.organization)}</p>
-        ${data.meta.productDescription ? `<p style="font-size: 13px; color: #a8a29e; max-width: 420px; line-height: 1.6;">${escapeHtml(data.meta.productDescription)}</p>` : ''}
+        <p style="font-size: 22px; color: #6F6F68; font-weight: 300; margin-bottom: 32px;">${escapeHtml(data.meta.organization)}</p>
+        ${data.meta.productDescription ? `<p style="font-size: 13px; color: #6F6F68; max-width: 420px; line-height: 1.6;">${escapeHtml(data.meta.productDescription)}</p>` : ''}
       </div>
 
       <div style="position: relative; z-index: 10; display: flex; gap: 16px; margin-bottom: 80px;">
-        <div style="border: 1px solid rgba(255,255,255,0.15); border-radius: 16px; padding: 20px 24px; background: rgba(0,0,0,0.4); flex: 1;">
-          <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #ccff00; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 6px;">Functional Unit</div>
-          <div style="font-size: 16px; font-family: 'Playfair Display', serif; color: white;">${escapeHtml(data.functionalUnit.value)}</div>
+        <div style="border: 1px solid rgba(26,27,29,0.15); border-radius: 16px; padding: 20px 24px; background: rgba(242,241,234,0.7); flex: 1;">
+          <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #205E40; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 6px;">Functional Unit</div>
+          <div style="font-size: 16px; font-family: 'Playfair Display', serif; color: #1A1B1D;">${escapeHtml(data.functionalUnit.value)}</div>
         </div>
-        <div style="border: 1px solid rgba(255,255,255,0.15); border-radius: 16px; padding: 20px 24px; background: rgba(0,0,0,0.4);">
-          <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #ccff00; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 6px;">System Boundary</div>
-          <div style="font-size: 16px; font-family: 'Playfair Display', serif; color: white;">${escapeHtml(data.meta.lcaScopeType || 'Cradle-to-Gate')}</div>
+        <div style="border: 1px solid rgba(26,27,29,0.15); border-radius: 16px; padding: 20px 24px; background: rgba(242,241,234,0.7);">
+          <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #205E40; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 6px;">System Boundary</div>
+          <div style="font-size: 16px; font-family: 'Playfair Display', serif; color: #1A1B1D;">${escapeHtml(data.meta.lcaScopeType || 'Cradle-to-Gate')}</div>
         </div>
-        <div style="border: 1px solid rgba(255,255,255,0.15); border-radius: 16px; padding: 20px 24px; background: rgba(0,0,0,0.4);">
-          <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #ccff00; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 6px;">Reference Year</div>
-          <div style="font-size: 16px; font-family: 'Playfair Display', serif; color: white;">${data.meta.referenceYear || new Date().getFullYear()}</div>
+        <div style="border: 1px solid rgba(26,27,29,0.15); border-radius: 16px; padding: 20px 24px; background: rgba(242,241,234,0.7);">
+          <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #205E40; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 6px;">Reference Year</div>
+          <div style="font-size: 16px; font-family: 'Playfair Display', serif; color: #1A1B1D;">${data.meta.referenceYear || new Date().getFullYear()}</div>
         </div>
       </div>
 
@@ -131,24 +131,24 @@ function renderCoverPage(data: LCAReportData): string {
 }
 
 function renderExecSummaryPage(data: LCAReportData): string {
-  const dqColor = data.executiveSummary.dataQualityScore >= 80 ? '#22c55e' :
-    data.executiveSummary.dataQualityScore >= 50 ? '#eab308' : '#ef4444';
+  const dqColor = data.executiveSummary.dataQualityScore >= 80 ? '#047857' :
+    data.executiveSummary.dataQualityScore >= 50 ? '#B45309' : '#BE123C';
 
   return `
     <div class="page light-page">
       ${renderSectionHeader('01', 'Executive Summary')}
 
       <div style="display: flex; gap: 24px; margin-bottom: 32px;">
-        <div style="flex: 1; background: #1c1917; border-radius: 16px; padding: 32px; color: white;">
-          <div style="font-size: 12px; font-family: 'Fira Code', monospace; color: #ccff00; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Key Insight</div>
-          <div style="font-size: 48px; font-family: 'Playfair Display', serif; font-weight: 700; color: #ccff00;">${escapeHtml(data.executiveSummary.keyHighlight.value)}</div>
-          <div style="font-size: 16px; color: #a8a29e; margin-top: 4px;">${escapeHtml(data.executiveSummary.keyHighlight.label)}</div>
-          <div style="font-size: 12px; color: #78716c; margin-top: 4px;">${escapeHtml(data.executiveSummary.keyHighlight.subtext)}</div>
+        <div style="flex: 1; background: #F2F1EA; border-radius: 16px; padding: 32px; color: #1A1B1D;">
+          <div style="font-size: 12px; font-family: 'Fira Code', monospace; color: #205E40; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Key Insight</div>
+          <div style="font-size: 48px; font-family: 'Playfair Display', serif; font-weight: 700; color: #205E40;">${escapeHtml(data.executiveSummary.keyHighlight.value)}</div>
+          <div style="font-size: 16px; color: #6F6F68; margin-top: 4px;">${escapeHtml(data.executiveSummary.keyHighlight.label)}</div>
+          <div style="font-size: 12px; color: #6F6F68; margin-top: 4px;">${escapeHtml(data.executiveSummary.keyHighlight.subtext)}</div>
         </div>
 
-        <div style="width: 200px; background: white; border: 1px solid #e7e5e4; border-radius: 16px; padding: 24px; text-align: center;">
-          <div style="font-size: 11px; font-family: 'Fira Code', monospace; text-transform: uppercase; letter-spacing: 2px; color: #78716c; margin-bottom: 16px;">Data Quality</div>
-          <div style="width: 120px; height: 120px; border-radius: 50%; margin: 0 auto 12px; position: relative; background: conic-gradient(${dqColor} ${data.executiveSummary.dataQualityScore * 3.6}deg, #e7e5e4 0deg);">
+        <div style="width: 200px; background: white; border: 1px solid #D9D6CB; border-radius: 16px; padding: 24px; text-align: center;">
+          <div style="font-size: 11px; font-family: 'Fira Code', monospace; text-transform: uppercase; letter-spacing: 2px; color: #6F6F68; margin-bottom: 16px;">Data Quality</div>
+          <div style="width: 120px; height: 120px; border-radius: 50%; margin: 0 auto 12px; position: relative; background: conic-gradient(${dqColor} ${data.executiveSummary.dataQualityScore * 3.6}deg, #D9D6CB 0deg);">
             <div style="position: absolute; inset: 12px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
               <span style="font-size: 32px; font-weight: 700; font-family: 'Playfair Display', serif; color: ${dqColor};">${data.executiveSummary.dataQualityScore}%</span>
             </div>
@@ -156,8 +156,8 @@ function renderExecSummaryPage(data: LCAReportData): string {
         </div>
       </div>
 
-      <div style="background: white; border: 1px solid #e7e5e4; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
-        <p style="font-size: 13px; line-height: 1.8; color: #44403c;">${escapeHtml(data.executiveSummary.content)}</p>
+      <div style="background: white; border: 1px solid #D9D6CB; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+        <p style="font-size: 13px; line-height: 1.8; color: #6F6F68;">${escapeHtml(data.executiveSummary.content)}</p>
       </div>
 
       <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
@@ -205,9 +205,9 @@ function renderEolMethodologySection(data: LCAReportData): string {
     <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
       <div style="font-size: 11px; font-weight: 600; color: #0c4a6e; margin-bottom: 10px;">End-of-Life Modelling Assumptions (ISO 14044 &sect;4.4)</div>
       <div style="display: flex; gap: 16px; margin-bottom: 10px;">
-        <div style="font-size: 10px; color: #44403c;"><strong>Region:</strong> ${escapeHtml(eol.regionLabel)}</div>
-        <div style="font-size: 10px; color: #44403c;"><strong>Method:</strong> ${escapeHtml(eol.avoidedBurdenMethod)}</div>
-        <div style="font-size: 10px; color: #44403c;"><strong>Data Year:</strong> ${eol.dataYear}</div>
+        <div style="font-size: 10px; color: #6F6F68;"><strong>Region:</strong> ${escapeHtml(eol.regionLabel)}</div>
+        <div style="font-size: 10px; color: #6F6F68;"><strong>Method:</strong> ${escapeHtml(eol.avoidedBurdenMethod)}</div>
+        <div style="font-size: 10px; color: #6F6F68;"><strong>Data Year:</strong> ${eol.dataYear}</div>
       </div>
       <table style="width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 8px;">
         <thead>
@@ -222,16 +222,16 @@ function renderEolMethodologySection(data: LCAReportData): string {
         </thead>
         <tbody>${pathwayRows}</tbody>
       </table>
-      <div style="font-size: 9px; color: #64748b;">Sources: ${escapeHtml(eol.dataSource)}</div>
+      <div style="font-size: 9px; color: #6F6F68;">Sources: ${escapeHtml(eol.dataSource)}</div>
     </div>`;
 }
 
 function renderGoalAndScopePage(data: LCAReportData): string {
   const allAssumptions = data.goalAndScope.assumptionsAndLimitations;
   const renderAssumption = (al: { type: string; text: string }) =>
-    `<div style="display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f5f5f4;">
+    `<div style="display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid #D9D6CB;">
       <span class="badge ${al.type === 'Assumption' ? 'badge-low' : 'badge-medium'}" style="flex-shrink: 0; align-self: flex-start; margin-top: 2px;">${escapeHtml(al.type)}</span>
-      <span style="font-size: 11px; color: #44403c; line-height: 1.4;">${escapeHtml(al.text)}</span>
+      <span style="font-size: 11px; color: #6F6F68; line-height: 1.4;">${escapeHtml(al.text)}</span>
     </div>`;
 
   // Split assumptions: first 4 on page 1, rest on continuation page
@@ -248,50 +248,50 @@ function renderGoalAndScopePage(data: LCAReportData): string {
       ${renderSectionHeader('02', 'Goal & Scope Definition')}
 
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-        <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #78716c; text-transform: uppercase; letter-spacing: 2px;">ISO 14044:2006 &sect;4.2</div>
+        <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #6F6F68; text-transform: uppercase; letter-spacing: 2px;">ISO 14044:2006 &sect;4.2</div>
         ${/* ISSUE E FIX: Display report version identifier (ISO 14044 §4.2.1). */ ''}
-        <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #78716c; letter-spacing: 1px;">Report Version ${escapeHtml(data.meta.version)}</div>
+        <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #6F6F68; letter-spacing: 1px;">Report Version ${escapeHtml(data.meta.version)}</div>
       </div>
 
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
-        <div style="background: white; border: 1px solid #e7e5e4; border-radius: 12px; padding: 16px;">
-          <div style="font-size: 11px; font-weight: 600; color: #1c1917; margin-bottom: 8px;">Intended Application</div>
-          <p style="font-size: 12px; color: #44403c; line-height: 1.6;">${escapeHtml(data.goalAndScope.intendedApplication)}</p>
+        <div style="background: white; border: 1px solid #D9D6CB; border-radius: 12px; padding: 16px;">
+          <div style="font-size: 11px; font-weight: 600; color: #1A1B1D; margin-bottom: 8px;">Intended Application</div>
+          <p style="font-size: 12px; color: #6F6F68; line-height: 1.6;">${escapeHtml(data.goalAndScope.intendedApplication)}</p>
         </div>
-        <div style="background: white; border: 1px solid #e7e5e4; border-radius: 12px; padding: 16px;">
-          <div style="font-size: 11px; font-weight: 600; color: #1c1917; margin-bottom: 8px;">Reasons for Study</div>
-          <p style="font-size: 12px; color: #44403c; line-height: 1.6;">${escapeHtml(data.goalAndScope.reasonsForStudy)}</p>
+        <div style="background: white; border: 1px solid #D9D6CB; border-radius: 12px; padding: 16px;">
+          <div style="font-size: 11px; font-weight: 600; color: #1A1B1D; margin-bottom: 8px;">Reasons for Study</div>
+          <p style="font-size: 12px; color: #6F6F68; line-height: 1.6;">${escapeHtml(data.goalAndScope.reasonsForStudy)}</p>
         </div>
       </div>
 
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
-        <div style="background: white; border: 1px solid #e7e5e4; border-radius: 12px; padding: 16px;">
-          <div style="font-size: 11px; font-weight: 600; color: #1c1917; margin-bottom: 8px;">Intended Audience</div>
+        <div style="background: white; border: 1px solid #D9D6CB; border-radius: 12px; padding: 16px;">
+          <div style="font-size: 11px; font-weight: 600; color: #1A1B1D; margin-bottom: 8px;">Intended Audience</div>
           <div>${audience}</div>
         </div>
-        <div style="background: white; border: 1px solid #e7e5e4; border-radius: 12px; padding: 16px;">
-          <div style="font-size: 11px; font-weight: 600; color: #1c1917; margin-bottom: 8px;">Comparative Assertion</div>
-          <p style="font-size: 12px; color: #44403c;">${data.goalAndScope.isComparativeAssertion ? 'Yes — this study supports comparative assertions intended for public disclosure. A critical review panel is required per ISO 14044 §6.3.' : 'No — this study does not support comparative assertions disclosed to the public.'}</p>
+        <div style="background: white; border: 1px solid #D9D6CB; border-radius: 12px; padding: 16px;">
+          <div style="font-size: 11px; font-weight: 600; color: #1A1B1D; margin-bottom: 8px;">Comparative Assertion</div>
+          <p style="font-size: 12px; color: #6F6F68;">${data.goalAndScope.isComparativeAssertion ? 'Yes — this study supports comparative assertions intended for public disclosure. A critical review panel is required per ISO 14044 §6.3.' : 'No — this study does not support comparative assertions disclosed to the public.'}</p>
         </div>
       </div>
 
-      <div style="background: white; border: 1px solid #e7e5e4; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
-        <div style="font-size: 11px; font-weight: 600; color: #1c1917; margin-bottom: 8px;">System Boundary — ${escapeHtml(data.goalAndScope.systemBoundary)}</div>
-        <p style="font-size: 12px; color: #44403c; line-height: 1.6; margin-bottom: 12px;">${escapeHtml(data.goalAndScope.systemBoundaryDescription)}</p>
+      <div style="background: white; border: 1px solid #D9D6CB; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+        <div style="font-size: 11px; font-weight: 600; color: #1A1B1D; margin-bottom: 8px;">System Boundary — ${escapeHtml(data.goalAndScope.systemBoundary)}</div>
+        <p style="font-size: 12px; color: #6F6F68; line-height: 1.6; margin-bottom: 12px;">${escapeHtml(data.goalAndScope.systemBoundaryDescription)}</p>
         <div style="display: flex; gap: 16px;">
           <div style="flex: 1; font-size: 11px;">
             <div style="font-weight: 600; color: #166534; margin-bottom: 6px;">Cut-off Criteria</div>
-            <p style="color: #44403c; line-height: 1.5;">${escapeHtml(data.goalAndScope.cutOffCriteria)}</p>
+            <p style="color: #6F6F68; line-height: 1.5;">${escapeHtml(data.goalAndScope.cutOffCriteria)}</p>
           </div>
           <div style="flex: 1; font-size: 11px;">
             <div style="font-weight: 600; color: #1e40af; margin-bottom: 6px;">Allocation Procedure</div>
-            <p style="color: #44403c; line-height: 1.5;">${escapeHtml(data.goalAndScope.allocationProcedure)}</p>
+            <p style="color: #6F6F68; line-height: 1.5;">${escapeHtml(data.goalAndScope.allocationProcedure)}</p>
           </div>
         </div>
       </div>
 
       <div style="margin-bottom: 20px;">
-        <div style="font-size: 11px; font-weight: 600; color: #1c1917; margin-bottom: 8px;">Assumptions &amp; Limitations</div>
+        <div style="font-size: 11px; font-weight: 600; color: #1A1B1D; margin-bottom: 8px;">Assumptions &amp; Limitations</div>
         ${page1Assumptions.map(renderAssumption).join('')}
       </div>
 
@@ -306,7 +306,7 @@ function renderGoalAndScopePage(data: LCAReportData): string {
       ${renderSectionHeader('02', 'Goal & Scope Definition (cont.)')}
 
       <div style="margin-bottom: 20px;">
-        <div style="font-size: 11px; font-weight: 600; color: #1c1917; margin-bottom: 8px;">Assumptions &amp; Limitations (continued)</div>
+        <div style="font-size: 11px; font-weight: 600; color: #1A1B1D; margin-bottom: 8px;">Assumptions &amp; Limitations (continued)</div>
         ${overflowAssumptions.map(renderAssumption).join('')}
       </div>
 
@@ -321,30 +321,30 @@ function renderGoalAndScopePage(data: LCAReportData): string {
 function renderMethodologyPage(data: LCAReportData): string {
   const included = data.methodology.includedStages.map(s =>
     `<div style="display: flex; align-items: center; gap: 8px; padding: 6px 0;">
-      <div style="width: 18px; height: 18px; background: #22c55e; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+      <div style="width: 18px; height: 18px; background: #047857; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
         <span style="color: white; font-size: 10px;">&#10003;</span>
       </div>
-      <span style="font-size: 12px; color: #44403c;">${escapeHtml(s)}</span>
+      <span style="font-size: 12px; color: #6F6F68;">${escapeHtml(s)}</span>
     </div>`
   ).join('');
 
   const excluded = data.methodology.excludedStages.map(s =>
     `<div style="display: flex; align-items: center; gap: 8px; padding: 6px 0;">
-      <div style="width: 18px; height: 18px; background: #ef4444; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+      <div style="width: 18px; height: 18px; background: #BE123C; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
         <span style="color: white; font-size: 10px;">&#10007;</span>
       </div>
-      <span style="font-size: 12px; color: #44403c;">${escapeHtml(s)}</span>
+      <span style="font-size: 12px; color: #6F6F68;">${escapeHtml(s)}</span>
     </div>`
   ).join('');
 
   const dataSources = data.methodology.dataSources.map(ds =>
-    `<div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #fafaf9; border-radius: 8px; margin-bottom: 6px;">
+    `<div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: #F2F1EA; border-radius: 8px; margin-bottom: 6px;">
       <div>
         <span style="font-size: 13px; font-weight: 500;">${escapeHtml(ds.name)}</span>
-        ${ds.version ? `<span style="font-size: 10px; color: #78716c; margin-left: 6px;">v${escapeHtml(ds.version)}</span>` : ''}
-        ${ds.description ? `<div style="font-size: 10px; color: #a8a29e; margin-top: 2px;">${escapeHtml(ds.description)}</div>` : ''}
+        ${ds.version ? `<span style="font-size: 10px; color: #6F6F68; margin-left: 6px;">v${escapeHtml(ds.version)}</span>` : ''}
+        ${ds.description ? `<div style="font-size: 10px; color: #6F6F68; margin-top: 2px;">${escapeHtml(ds.description)}</div>` : ''}
       </div>
-      <span style="font-size: 13px; color: #78716c; font-weight: 500;">${ds.count} factors</span>
+      <span style="font-size: 13px; color: #6F6F68; font-weight: 500;">${ds.count} factors</span>
     </div>`
   ).join('');
 
@@ -352,14 +352,14 @@ function renderMethodologyPage(data: LCAReportData): string {
     `<tr>
       <td style="font-weight: 500;">${escapeHtml(cm.category)}</td>
       <td>${escapeHtml(cm.model)}</td>
-      <td style="font-size: 11px; color: #78716c;">${escapeHtml(cm.reference)}</td>
+      <td style="font-size: 11px; color: #6F6F68;">${escapeHtml(cm.reference)}</td>
     </tr>`
   ).join('');
 
   const software = data.methodology.softwareAndDatabases.map(s =>
-    `<div style="display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #f5f5f4;">
-      <span style="font-size: 12px; font-weight: 500; width: 140px;">${/^alkatera$/i.test(s.name) ? alkateraName() : escapeHtml(s.name)} <span style="color: #78716c; font-weight: 400;">v${escapeHtml(s.version)}</span></span>
-      <span style="font-size: 11px; color: #78716c;">${escapeHtml(s.purpose)}</span>
+    `<div style="display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #D9D6CB;">
+      <span style="font-size: 12px; font-weight: 500; width: 140px;">${/^alkatera$/i.test(s.name) ? alkateraName() : escapeHtml(s.name)} <span style="color: #6F6F68; font-weight: 400;">v${escapeHtml(s.version)}</span></span>
+      <span style="font-size: 11px; color: #6F6F68;">${escapeHtml(s.purpose)}</span>
     </div>`
   ).join('');
 
@@ -367,31 +367,31 @@ function renderMethodologyPage(data: LCAReportData): string {
     <div class="page light-page">
       ${renderSectionHeader('03', 'Methodology')}
 
-      <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #78716c; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">ISO 14044:2006 &sect;4.3 &amp; &sect;4.4</div>
+      <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #6F6F68; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">ISO 14044:2006 &sect;4.3 &amp; &sect;4.4</div>
 
       <div style="display: flex; gap: 20px; margin-bottom: 20px;">
         <div style="flex: 1;">
-          <h3 style="font-size: 13px; font-weight: 600; margin-bottom: 10px; color: #1c1917;">Included Stages</h3>
+          <h3 style="font-size: 13px; font-weight: 600; margin-bottom: 10px; color: #1A1B1D;">Included Stages</h3>
           ${included}
         </div>
         <div style="flex: 1;">
-          <h3 style="font-size: 13px; font-weight: 600; margin-bottom: 10px; color: #1c1917;">Excluded Stages</h3>
+          <h3 style="font-size: 13px; font-weight: 600; margin-bottom: 10px; color: #1A1B1D;">Excluded Stages</h3>
           ${excluded}
         </div>
       </div>
 
-      <div style="background: white; border: 1px solid #e7e5e4; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+      <div style="background: white; border: 1px solid #D9D6CB; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
         <div style="font-size: 11px; font-weight: 600; margin-bottom: 4px;">LCIA Method: ${escapeHtml(data.methodology.lciaMethod)}</div>
-        <p style="font-size: 11px; color: #44403c; line-height: 1.6;">${escapeHtml(data.methodology.lciaMethodDescription)}</p>
+        <p style="font-size: 11px; color: #6F6F68; line-height: 1.6;">${escapeHtml(data.methodology.lciaMethodDescription)}</p>
       </div>
 
       <div style="margin-bottom: 16px;">
-        <h3 style="font-size: 13px; font-weight: 600; margin-bottom: 10px; color: #1c1917;">Data Sources &amp; Databases</h3>
+        <h3 style="font-size: 13px; font-weight: 600; margin-bottom: 10px; color: #1A1B1D;">Data Sources &amp; Databases</h3>
         ${dataSources}
       </div>
 
       <div>
-        <h3 style="font-size: 13px; font-weight: 600; margin-bottom: 10px; color: #1c1917;">Software &amp; Tools</h3>
+        <h3 style="font-size: 13px; font-weight: 600; margin-bottom: 10px; color: #1A1B1D;">Software &amp; Tools</h3>
         ${software}
       </div>
 
@@ -401,7 +401,7 @@ function renderMethodologyPage(data: LCAReportData): string {
     <div class="page light-page">
       ${renderSectionHeader('03', 'Methodology — Characterization Models', false, true)}
 
-      <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #78716c; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">LCIA CHARACTERIZATION FACTORS</div>
+      <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #6F6F68; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">LCIA CHARACTERIZATION FACTORS</div>
 
       <table class="data-table" style="margin-bottom: 24px;">
         <thead><tr><th>Impact Category</th><th>Characterization Model</th><th>Reference</th></tr></thead>
@@ -411,7 +411,7 @@ function renderMethodologyPage(data: LCAReportData): string {
       <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
         <div style="font-size: 11px; font-weight: 600; color: #92400e; margin-bottom: 6px;">Reference Standards</div>
         ${data.goalAndScope.referenceStandards.map(s =>
-          `<div style="font-size: 11px; color: #78716c; padding: 3px 0;">&#8226; ${escapeHtml(s)}</div>`
+          `<div style="font-size: 11px; color: #6F6F68; padding: 3px 0;">&#8226; ${escapeHtml(s)}</div>`
         ).join('')}
       </div>
 
@@ -429,17 +429,17 @@ function renderDataQualityPage(data: LCAReportData): string {
     { label: 'Technological', score: pm.technologicalRepresentativeness, desc: 'Match of data technology to actual processes' },
   ];
 
-  const dqColor = data.dataQuality.overallScore >= 80 ? '#22c55e' :
-    data.dataQuality.overallScore >= 50 ? '#eab308' : '#ef4444';
+  const dqColor = data.dataQuality.overallScore >= 80 ? '#047857' :
+    data.dataQuality.overallScore >= 50 ? '#B45309' : '#BE123C';
 
   const cs = data.dataQuality.coverageSummary;
 
   // Pedigree bar helper (1=best, 5=worst)
   const pedigreeBar = (score: number) => {
     const pct = ((6 - score) / 5) * 100;
-    const color = score <= 2 ? '#22c55e' : score <= 3 ? '#eab308' : '#ef4444';
+    const color = score <= 2 ? '#047857' : score <= 3 ? '#B45309' : '#BE123C';
     return `<div style="display: flex; align-items: center; gap: 8px;">
-      <div style="flex: 1; height: 8px; background: #e7e5e4; border-radius: 4px; overflow: hidden;">
+      <div style="flex: 1; height: 8px; background: #D9D6CB; border-radius: 4px; overflow: hidden;">
         <div style="height: 100%; width: ${pct}%; background: ${color}; border-radius: 4px;"></div>
       </div>
       <span style="font-size: 12px; font-weight: 600; width: 20px; text-align: center;">${score}</span>
@@ -460,11 +460,11 @@ function renderDataQualityPage(data: LCAReportData): string {
     <div class="page light-page">
       ${renderSectionHeader('04', 'Data Quality Assessment')}
 
-      <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #78716c; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">ISO 14044:2006 &sect;4.2.3.6 — DATA QUALITY REQUIREMENTS</div>
+      <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #6F6F68; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">ISO 14044:2006 &sect;4.2.3.6 — DATA QUALITY REQUIREMENTS</div>
 
       <div style="display: flex; gap: 20px; margin-bottom: 24px;">
-        <div style="width: 180px; background: white; border: 1px solid #e7e5e4; border-radius: 16px; padding: 24px; text-align: center;">
-          <div style="width: 100px; height: 100px; border-radius: 50%; margin: 0 auto 12px; position: relative; background: conic-gradient(${dqColor} ${data.dataQuality.overallScore * 3.6}deg, #e7e5e4 0deg);">
+        <div style="width: 180px; background: white; border: 1px solid #D9D6CB; border-radius: 16px; padding: 24px; text-align: center;">
+          <div style="width: 100px; height: 100px; border-radius: 50%; margin: 0 auto 12px; position: relative; background: conic-gradient(${dqColor} ${data.dataQuality.overallScore * 3.6}deg, #D9D6CB 0deg);">
             <div style="position: absolute; inset: 10px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column;">
               <span style="font-size: 28px; font-weight: 700; font-family: 'Playfair Display', serif; color: ${dqColor};">${data.dataQuality.overallScore}%</span>
             </div>
@@ -478,32 +478,32 @@ function renderDataQualityPage(data: LCAReportData): string {
             `<div style="display: grid; grid-template-columns: 100px 1fr 180px; gap: 8px; align-items: center; margin-bottom: 8px;">
               <span style="font-size: 11px; font-weight: 500;">${r.label}</span>
               ${pedigreeBar(r.score)}
-              <span style="font-size: 10px; color: #78716c;">${r.desc}</span>
+              <span style="font-size: 10px; color: #6F6F68;">${r.desc}</span>
             </div>`
           ).join('')}
-          <div style="font-size: 9px; color: #a8a29e; margin-top: 4px;">Scale: 1 (best) to 5 (worst) per ecoinvent pedigree approach</div>
+          <div style="font-size: 9px; color: #6F6F68; margin-top: 4px;">Scale: 1 (best) to 5 (worst) per ecoinvent pedigree approach</div>
         </div>
       </div>
 
       <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px;">
         <div class="metric-card" style="text-align: center;">
           <div class="metric-label">Primary Data</div>
-          <div style="font-size: 24px; font-weight: 700; color: #22c55e;">${cs.primaryDataShare}%</div>
+          <div style="font-size: 24px; font-weight: 700; color: #047857;">${cs.primaryDataShare}%</div>
           <div class="metric-unit">${cs.primaryCount} of ${cs.totalMaterials} materials</div>
         </div>
         <div class="metric-card" style="text-align: center;">
           <div class="metric-label">Secondary Data</div>
-          <div style="font-size: 24px; font-weight: 700; color: #3b82f6;">${cs.secondaryDataShare}%</div>
+          <div style="font-size: 24px; font-weight: 700; color: #2B46C0;">${cs.secondaryDataShare}%</div>
           <div class="metric-unit">${cs.secondaryCount} materials</div>
         </div>
         <div class="metric-card" style="text-align: center;">
           <div class="metric-label">Proxy Data</div>
-          <div style="font-size: 24px; font-weight: 700; color: #f97316;">${cs.proxyDataShare}%</div>
+          <div style="font-size: 24px; font-weight: 700; color: #B45309;">${cs.proxyDataShare}%</div>
           <div class="metric-unit">${cs.proxyCount} materials</div>
         </div>
         <div class="metric-card" style="text-align: center;">
           <div class="metric-label">Total Materials</div>
-          <div style="font-size: 24px; font-weight: 700; color: #1c1917;">${cs.totalMaterials}</div>
+          <div style="font-size: 24px; font-weight: 700; color: #1A1B1D;">${cs.totalMaterials}</div>
           <div class="metric-unit">in inventory</div>
         </div>
       </div>
@@ -520,26 +520,26 @@ function renderDataQualityPage(data: LCAReportData): string {
     <div class="page light-page">
       ${renderSectionHeader('04', 'Data Quality — Notes', false, true)}
 
-      <div style="background: white; border: 1px solid #e7e5e4; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
+      <div style="background: white; border: 1px solid #D9D6CB; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
         <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px;">Missing Data Treatment (ISO 14044 §4.2.3.6.3)</div>
-        <p style="font-size: 12px; color: #44403c; line-height: 1.7;">${escapeHtml(data.dataQuality.missingDataTreatment)}</p>
+        <p style="font-size: 12px; color: #6F6F68; line-height: 1.7;">${escapeHtml(data.dataQuality.missingDataTreatment)}</p>
       </div>
 
-      <div style="background: white; border: 1px solid #e7e5e4; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
+      <div style="background: white; border: 1px solid #D9D6CB; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
         <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px;">Uncertainty Assessment</div>
-        <p style="font-size: 12px; color: #44403c; line-height: 1.7;">${escapeHtml(data.dataQuality.uncertaintyNote)}</p>
+        <p style="font-size: 12px; color: #6F6F68; line-height: 1.7;">${escapeHtml(data.dataQuality.uncertaintyNote)}</p>
       </div>
 
-      <div style="background: white; border: 1px solid #e7e5e4; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
+      <div style="background: white; border: 1px solid #D9D6CB; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
         <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px;">Data Quality Improvement Roadmap</div>
-        <div style="display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; font-size: 12px; color: #44403c; line-height: 1.6;">
-          <div style="font-weight: 600; color: #dc2626;">Priority 1</div>
+        <div style="display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; font-size: 12px; color: #6F6F68; line-height: 1.6;">
+          <div style="font-weight: 600; color: #BE123C;">Priority 1</div>
           <div>Collect primary data from top 3 impact contributors — this typically addresses &gt;60% of total climate impact uncertainty.</div>
-          <div style="font-weight: 600; color: #f97316;">Priority 2</div>
+          <div style="font-weight: 600; color: #B45309;">Priority 2</div>
           <div>Replace proxy emission factors with material-specific secondary data from ecoinvent or AGRIBALYSE for improved geographic and technological representativeness.</div>
-          <div style="font-weight: 600; color: #eab308;">Priority 3</div>
+          <div style="font-weight: 600; color: #B45309;">Priority 3</div>
           <div>Verify transport distances and modes with suppliers to refine distribution stage estimates currently based on distance × freight factor calculations.</div>
-          <div style="font-weight: 600; color: #22c55e;">Ongoing</div>
+          <div style="font-weight: 600; color: #047857;">Ongoing</div>
           <div>Annual data refresh with updated DEFRA emission factors and database versions. Re-assess data quality scores after each improvement cycle.</div>
         </div>
       </div>
@@ -548,14 +548,14 @@ function renderDataQualityPage(data: LCAReportData): string {
         <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px; color: #0c4a6e;">Data Source Distribution</div>
         <div style="display: flex; gap: 24px; align-items: center;">
           <div style="flex: 1; height: 24px; border-radius: 6px; overflow: hidden; display: flex;">
-            <div style="width: ${cs.primaryDataShare}%; background: #22c55e; min-width: ${cs.primaryDataShare > 0 ? '2px' : '0'};"></div>
-            <div style="width: ${cs.secondaryDataShare}%; background: #3b82f6;"></div>
-            <div style="width: ${cs.proxyDataShare}%; background: #f97316;"></div>
+            <div style="width: ${cs.primaryDataShare}%; background: #047857; min-width: ${cs.primaryDataShare > 0 ? '2px' : '0'};"></div>
+            <div style="width: ${cs.secondaryDataShare}%; background: #2B46C0;"></div>
+            <div style="width: ${cs.proxyDataShare}%; background: #B45309;"></div>
           </div>
-          <div style="font-size: 11px; color: #64748b; white-space: nowrap;">
-            <span style="display: inline-block; width: 8px; height: 8px; background: #22c55e; border-radius: 2px; margin-right: 4px;"></span>Primary ${cs.primaryDataShare}%
-            <span style="display: inline-block; width: 8px; height: 8px; background: #3b82f6; border-radius: 2px; margin-left: 12px; margin-right: 4px;"></span>Secondary ${cs.secondaryDataShare}%
-            <span style="display: inline-block; width: 8px; height: 8px; background: #f97316; border-radius: 2px; margin-left: 12px; margin-right: 4px;"></span>Proxy ${cs.proxyDataShare}%
+          <div style="font-size: 11px; color: #6F6F68; white-space: nowrap;">
+            <span style="display: inline-block; width: 8px; height: 8px; background: #047857; border-radius: 2px; margin-right: 4px;"></span>Primary ${cs.primaryDataShare}%
+            <span style="display: inline-block; width: 8px; height: 8px; background: #2B46C0; border-radius: 2px; margin-left: 12px; margin-right: 4px;"></span>Secondary ${cs.secondaryDataShare}%
+            <span style="display: inline-block; width: 8px; height: 8px; background: #B45309; border-radius: 2px; margin-left: 12px; margin-right: 4px;"></span>Proxy ${cs.proxyDataShare}%
           </div>
         </div>
       </div>
@@ -575,17 +575,17 @@ function renderClimatePage(data: LCAReportData): string {
   const fossilHeadline = parseFloat(data.climateImpact.totalCarbon || '0');
   const biogenicSeparate = totalAllSpecies - fossilHeadline;
   const biogenicHeadlineNote = biogenicSeparate > 0.0005
-    ? `<div style="font-size: 9px; color: #78716c; margin-top: 8px; line-height: 1.4; max-width: 340px;">Fossil carbon footprint per ISO 14067:2018. Biogenic carbon (${biogenicSeparate.toFixed(4)} kg CO&#8322;e) is reported separately in Section 06 and excluded here. The lifecycle stage bars below include biogenic carbon and sum to ${totalAllSpecies.toFixed(4)} kg CO&#8322;e.</div>`
+    ? `<div style="font-size: 9px; color: #6F6F68; margin-top: 8px; line-height: 1.4; max-width: 340px;">Fossil carbon footprint per ISO 14067:2018. Biogenic carbon (${biogenicSeparate.toFixed(4)} kg CO&#8322;e) is reported separately in Section 06 and excluded here. The lifecycle stage bars below include biogenic carbon and sum to ${totalAllSpecies.toFixed(4)} kg CO&#8322;e.</div>`
     : '';
 
   const stagesBars = data.climateImpact.stages.map(stage =>
     `<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-      <div style="width: 120px; font-size: 12px; color: #78716c; text-align: right; flex-shrink: 0;">${escapeHtml(stage.label)}</div>
-      <div style="flex: 1; height: 28px; background: #292524; border-radius: 6px; overflow: hidden;">
+      <div style="width: 120px; font-size: 12px; color: #6F6F68; text-align: right; flex-shrink: 0;">${escapeHtml(stage.label)}</div>
+      <div style="flex: 1; height: 28px; background: #D9D6CB; border-radius: 6px; overflow: hidden;">
         <div style="height: 100%; width: ${Math.max((stage.value / maxStageValue) * 100, 1)}%; background: ${stage.color}; border-radius: 6px;"></div>
       </div>
-      <div style="width: 90px; font-size: 12px; color: #a8a29e; flex-shrink: 0;">${stage.value.toFixed(4)} ${escapeHtml(stage.unit)}</div>
-      <div style="width: 50px; font-size: 11px; color: #ccff00; text-align: right; flex-shrink: 0;">${escapeHtml(stage.percentage)}%</div>
+      <div style="width: 90px; font-size: 12px; color: #6F6F68; flex-shrink: 0;">${stage.value.toFixed(4)} ${escapeHtml(stage.unit)}</div>
+      <div style="width: 50px; font-size: 11px; color: #205E40; text-align: right; flex-shrink: 0;">${escapeHtml(stage.percentage)}%</div>
     </div>`
   ).join('');
 
@@ -597,49 +597,49 @@ function renderClimatePage(data: LCAReportData): string {
 
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px;">
         <div>
-          <div style="font-size: 10px; font-family: 'Fira Code', monospace; color: #78716c; margin-bottom: 8px;">FOSSIL CARBON FOOTPRINT (GWP-100)</div>
-          <div style="font-size: 64px; font-family: 'Playfair Display', serif; color: #ccff00; line-height: 1;">
+          <div style="font-size: 10px; font-family: 'Fira Code', monospace; color: #6F6F68; margin-bottom: 8px;">FOSSIL CARBON FOOTPRINT (GWP-100)</div>
+          <div style="font-size: 64px; font-family: 'Playfair Display', serif; color: #205E40; line-height: 1;">
             ${escapeHtml(data.climateImpact.totalCarbon)}
-            <span style="font-size: 18px; color: #78716c; font-family: 'Inter', sans-serif; margin-left: 8px;">kg CO&#8322;e</span>
+            <span style="font-size: 18px; color: #6F6F68; font-family: 'Inter', sans-serif; margin-left: 8px;">kg CO&#8322;e</span>
           </div>
-          <div style="font-size: 11px; color: #78716c; margin-top: 6px;">per ${escapeHtml(data.functionalUnit.value)}</div>
+          <div style="font-size: 11px; color: #6F6F68; margin-top: 6px;">per ${escapeHtml(data.functionalUnit.value)}</div>
           ${biogenicHeadlineNote}
         </div>
         <div style="width: 180px; height: 180px; border-radius: 50%; ${donutStyle} position: relative;">
-          <div style="position: absolute; inset: 45px; background: #1c1917; border-radius: 50%;"></div>
+          <div style="position: absolute; inset: 45px; background: #F2F1EA; border-radius: 50%;"></div>
         </div>
       </div>
 
       <div style="margin-bottom: 16px;">
-        <h3 style="font-size: 13px; font-family: 'Fira Code', monospace; color: #a8a29e; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">Lifecycle Stage Breakdown</h3>
+        <h3 style="font-size: 13px; font-family: 'Fira Code', monospace; color: #6F6F68; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">Lifecycle Stage Breakdown</h3>
         ${stagesBars}
       </div>
 
       <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; margin-bottom: 16px;">
         ${data.climateImpact.breakdown.map(b =>
-          `<div style="display: flex; align-items: center; gap: 6px; padding: 4px 12px; background: rgba(255,255,255,0.05); border-radius: 6px;">
+          `<div style="display: flex; align-items: center; gap: 6px; padding: 4px 12px; background: rgba(26,27,29,0.05); border-radius: 6px;">
             <div style="width: 10px; height: 10px; border-radius: 50%; background: ${b.color};"></div>
-            <span style="font-size: 11px; color: #a8a29e;">${escapeHtml(b.name)}</span>
+            <span style="font-size: 11px; color: #6F6F68;">${escapeHtml(b.name)}</span>
           </div>`
         ).join('')}
       </div>
 
       <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
         ${data.climateImpact.scopes.map(s =>
-          `<div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px; text-align: center;">
-            <div style="font-size: 10px; color: #78716c; margin-bottom: 4px;">${escapeHtml(s.name)}</div>
-            <div style="font-size: 20px; font-weight: 700; color: #ccff00;">${escapeHtml(s.value)}%</div>
+          `<div style="background: rgba(26,27,29,0.05); border-radius: 8px; padding: 12px; text-align: center;">
+            <div style="font-size: 10px; color: #6F6F68; margin-bottom: 4px;">${escapeHtml(s.name)}</div>
+            <div style="font-size: 20px; font-weight: 700; color: #205E40;">${escapeHtml(s.value)}%</div>
           </div>`
         ).join('')}
       </div>
 
       ${data.contractManufacturingNote ? `
-        <div style="margin-top: 20px; padding: 14px 16px; background: rgba(204, 255, 0, 0.08); border-left: 3px solid #ccff00; border-radius: 6px;">
+        <div style="margin-top: 20px; padding: 14px 16px; background: rgba(32, 94, 64, 0.08); border-left: 3px solid #205E40; border-radius: 6px;">
           <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-            <span style="font-size: 9px; font-family: 'Fira Code', monospace; color: #ccff00; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600;">Scope Attribution Note</span>
-            <span style="font-size: 9px; padding: 2px 8px; background: #ccff00; color: #1c1917; border-radius: 10px; font-weight: 700;">CORRECT</span>
+            <span style="font-size: 9px; font-family: 'Fira Code', monospace; color: #205E40; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600;">Scope Attribution Note</span>
+            <span style="font-size: 9px; padding: 2px 8px; background: #1A1B1D; color: #F2F1EA; border-radius: 10px; font-weight: 700;">CORRECT</span>
           </div>
-          <div style="font-size: 11px; color: #d6d3d1; line-height: 1.55;">${escapeHtml(data.contractManufacturingNote.explanation)}</div>
+          <div style="font-size: 11px; color: #6F6F68; line-height: 1.55;">${escapeHtml(data.contractManufacturingNote.explanation)}</div>
         </div>
       ` : ''}
 
@@ -673,9 +673,9 @@ function renderViticulturePage(data: LCAReportData): string {
 
       <!-- Primary data badge -->
       <div style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; margin-bottom: 20px;">
-        <div style="width: 8px; height: 8px; border-radius: 50%; background: #22c55e;"></div>
+        <div style="width: 8px; height: 8px; border-radius: 50%; background: #047857;"></div>
         <span style="font-size: 11px; font-weight: 600; color: #166534;">Primary Data (Vineyard)</span>
-        <span style="font-size: 10px; color: #78716c; margin-left: 4px;">Quality: ${viti.dataQualityGrade}</span>
+        <span style="font-size: 10px; color: #6F6F68; margin-left: 4px;">Quality: ${viti.dataQualityGrade}</span>
       </div>
 
       <!-- Headline metrics -->
@@ -700,23 +700,23 @@ function renderViticulturePage(data: LCAReportData): string {
       ${removals && removals.soilCarbonCo2e > 0 ? `
       <!-- FLAG Removals section -->
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;">
-        <div style="background: #1c1917; border-radius: 12px; padding: 20px; color: white;">
-          <div style="font-size: 10px; font-family: 'Fira Code', monospace; color: #ccff00; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Emissions (FLAG)</div>
-          <div style="font-size: 24px; font-family: 'Playfair Display', serif; font-weight: 700; margin-bottom: 12px;">${fmtNum(viti.emissionsTotal)} <span style="font-size: 12px; color: #a8a29e;">kg CO&#8322;e</span></div>
-          <div style="font-size: 11px; color: #a8a29e;">Includes N&#8322;O from soils, fuel combustion, pesticide production, and irrigation energy</div>
+        <div style="background: #F2F1EA; border-radius: 12px; padding: 20px; color: #1A1B1D;">
+          <div style="font-size: 10px; font-family: 'Fira Code', monospace; color: #205E40; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Emissions (FLAG)</div>
+          <div style="font-size: 24px; font-family: 'Playfair Display', serif; font-weight: 700; margin-bottom: 12px;">${fmtNum(viti.emissionsTotal)} <span style="font-size: 12px; color: #6F6F68;">kg CO&#8322;e</span></div>
+          <div style="font-size: 11px; color: #6F6F68;">Includes N&#8322;O from soils, fuel combustion, pesticide production, and irrigation energy</div>
         </div>
-        <div style="background: #052e16; border-radius: 12px; padding: 20px; color: white;">
-          <div style="font-size: 10px; font-family: 'Fira Code', monospace; color: #22c55e; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Removals (FLAG)</div>
-          <div style="font-size: 24px; font-family: 'Playfair Display', serif; font-weight: 700; color: #22c55e; margin-bottom: 12px;">${fmtNum(removals.soilCarbonCo2e)} <span style="font-size: 12px; color: #6ee7b7;">kg CO&#8322;e</span></div>
-          <div style="font-size: 11px; color: #6ee7b7;">Soil carbon sequestration (${removals.isVerified ? 'verified measurement' : 'practice-based default'})</div>
+        <div style="background: #F2F1EA; border-radius: 12px; padding: 20px; color: #1A1B1D;">
+          <div style="font-size: 10px; font-family: 'Fira Code', monospace; color: #047857; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Removals (FLAG)</div>
+          <div style="font-size: 24px; font-family: 'Playfair Display', serif; font-weight: 700; color: #047857; margin-bottom: 12px;">${fmtNum(removals.soilCarbonCo2e)} <span style="font-size: 12px; color: #047857;">kg CO&#8322;e</span></div>
+          <div style="font-size: 11px; color: #047857;">Soil carbon sequestration (${removals.isVerified ? 'verified measurement' : 'practice-based default'})</div>
         </div>
       </div>
       ${removals.removalWarning ? `
-      <div style="font-size: 10px; color: #92400e; margin-bottom: 12px; padding: 10px; background: #fffbeb; border-radius: 6px; border-left: 3px solid #f59e0b;">
+      <div style="font-size: 10px; color: #92400e; margin-bottom: 12px; padding: 10px; background: #fffbeb; border-radius: 6px; border-left: 3px solid #B45309;">
         <strong>Verification note:</strong> ${removals.removalWarning}
       </div>
       ` : ''}
-      <div style="font-size: 10px; color: #78716c; margin-bottom: 20px; padding: 10px; background: #fafaf9; border-radius: 6px; border-left: 3px solid #ccff00;">
+      <div style="font-size: 10px; color: #6F6F68; margin-bottom: 20px; padding: 10px; background: #F2F1EA; border-radius: 6px; border-left: 3px solid #205E40;">
         <strong>SBTi FLAG Compliance:</strong> Emissions and removals are reported separately and never netted, in accordance with SBTi Forest, Land and Agriculture (FLAG) Guidance v1.2 and the GHG Protocol Land Sector and Removals Standard V1.0. Removals represent soil organic carbon sequestration using the carbon stock change approach and are reported as positive values.
       </div>
       ` : ''}
@@ -738,20 +738,20 @@ function renderViticulturePage(data: LCAReportData): string {
               <tr>
                 <td>${i.label}</td>
                 <td style="text-align: right; font-family: 'Fira Code', monospace; font-size: 11px;">${fmtNum(i.value)}</td>
-                <td style="font-size: 11px; color: #78716c;">${i.unit}</td>
+                <td style="font-size: 11px; color: #6F6F68;">${i.unit}</td>
               </tr>
             `).join('')}
           </tbody>
         </table>
-        <div style="font-size: 10px; color: #a8a29e; margin-top: 6px;">
+        <div style="font-size: 10px; color: #6F6F68; margin-top: 6px;">
           Ecotoxicity characterisation: USEtox 2.0 (UNEP-SETAC consensus model). Water scarcity: AWARE method (ISO 14046).
         </div>
       </div>
       ` : ''}
 
       <!-- Data provenance -->
-      <div style="background: #fafaf9; border-radius: 8px; padding: 14px; font-size: 11px; color: #57534e;">
-        <div style="font-weight: 600; margin-bottom: 6px; color: #1c1917;">Data Provenance</div>
+      <div style="background: #F2F1EA; border-radius: 8px; padding: 14px; font-size: 11px; color: #6F6F68;">
+        <div style="font-weight: 600; margin-bottom: 6px; color: #1A1B1D;">Data Provenance</div>
         ${vintageText ? `<div style="margin-bottom: 4px;">${vintageText}</div>` : ''}
         <div style="margin-bottom: 4px;"><strong>Primary data collected:</strong> Fertiliser type, quantity, and N content; pesticide applications and type; diesel and petrol consumption; irrigation volume and energy source; grape yield; soil management practice.</div>
         <div><strong>Secondary emission factors:</strong> IPCC 2019 Refinement Tier 1 (N&#8322;O); DEFRA 2025 (fuel combustion); USEtox 2.0 (ecotoxicity); AWARE (water scarcity); ecoinvent 3.12 (grid electricity).</div>
@@ -780,12 +780,12 @@ function renderProcessingPage(data: LCAReportData): string {
           <!-- Facility header -->
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
             <div>
-              <span style="font-size: 14px; font-weight: 700; color: #1c1917;">${escapeHtml(facility.name)}</span>
-              ${facility.countryCode ? `<span style="font-size: 11px; color: #78716c; margin-left: 8px;">(${facility.countryCode})</span>` : ''}
+              <span style="font-size: 14px; font-weight: 700; color: #1A1B1D;">${escapeHtml(facility.name)}</span>
+              ${facility.countryCode ? `<span style="font-size: 11px; color: #6F6F68; margin-left: 8px;">(${facility.countryCode})</span>` : ''}
             </div>
             <div style="display: flex; gap: 8px;">
               <span style="font-size: 10px; padding: 3px 10px; border-radius: 12px; font-weight: 600; background: ${facility.isContractManufacturer ? '#fef9c3; color: #854d0e' : '#dcfce7; color: #166534'};">${facility.isContractManufacturer ? 'Contract Manufacturer (Scope 3)' : 'Owned Facility (Scope 1 & 2)'}</span>
-              <span style="font-size: 10px; padding: 3px 10px; border-radius: 12px; background: #f5f5f4; color: #57534e; font-weight: 500;">${facility.dataSource}</span>
+              <span style="font-size: 10px; padding: 3px 10px; border-radius: 12px; background: #F2F1EA; color: #6F6F68; font-weight: 500;">${facility.dataSource}</span>
             </div>
           </div>
 
@@ -793,45 +793,45 @@ function renderProcessingPage(data: LCAReportData): string {
           ${facility.isContractManufacturer ? `
           <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px;">
             <div style="background: white; border-radius: 8px; padding: 10px; text-align: center;">
-              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #a8a29e; margin-bottom: 4px;">Scope 3 Total</div>
-              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #1c1917;">${fmtNum(facility.totalEmissions)}</div>
-              <div style="font-size: 9px; color: #78716c;">kg CO&#8322;e/unit</div>
+              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #6F6F68; margin-bottom: 4px;">Scope 3 Total</div>
+              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #1A1B1D;">${fmtNum(facility.totalEmissions)}</div>
+              <div style="font-size: 9px; color: #6F6F68;">kg CO&#8322;e/unit</div>
             </div>
             <div style="background: white; border-radius: 8px; padding: 10px; text-align: center;">
-              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #a8a29e; margin-bottom: 4px;">Combustion</div>
-              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #dc2626;">${fmtNum(facility.scope1Emissions)}</div>
-              <div style="font-size: 9px; color: #78716c;">kg CO&#8322;e/unit</div>
+              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #6F6F68; margin-bottom: 4px;">Combustion</div>
+              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #BE123C;">${fmtNum(facility.scope1Emissions)}</div>
+              <div style="font-size: 9px; color: #6F6F68;">kg CO&#8322;e/unit</div>
             </div>
             <div style="background: white; border-radius: 8px; padding: 10px; text-align: center;">
-              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #a8a29e; margin-bottom: 4px;">Electricity</div>
-              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #2563eb;">${fmtNum(facility.scope2Emissions)}</div>
-              <div style="font-size: 9px; color: #78716c;">kg CO&#8322;e/unit</div>
+              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #6F6F68; margin-bottom: 4px;">Electricity</div>
+              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #2B46C0;">${fmtNum(facility.scope2Emissions)}</div>
+              <div style="font-size: 9px; color: #6F6F68;">kg CO&#8322;e/unit</div>
             </div>
           </div>
-          <div style="font-size: 10px; color: #92400e; background: #fffbeb; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; border-left: 3px solid #f59e0b;">
+          <div style="font-size: 10px; color: #92400e; background: #fffbeb; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; border-left: 3px solid #B45309;">
             All emissions from this contract manufacturer are classified as <strong>Scope 3 Category 1</strong> (Purchased Goods and Services) in the product footprint. The combustion/electricity split shows the emission source at the facility level.
           </div>
           ` : `
           <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px;">
             <div style="background: white; border-radius: 8px; padding: 10px; text-align: center;">
-              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #a8a29e; margin-bottom: 4px;">Total</div>
-              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #1c1917;">${fmtNum(facility.totalEmissions)}</div>
-              <div style="font-size: 9px; color: #78716c;">kg CO&#8322;e/unit</div>
+              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #6F6F68; margin-bottom: 4px;">Total</div>
+              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #1A1B1D;">${fmtNum(facility.totalEmissions)}</div>
+              <div style="font-size: 9px; color: #6F6F68;">kg CO&#8322;e/unit</div>
             </div>
             <div style="background: white; border-radius: 8px; padding: 10px; text-align: center;">
-              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #a8a29e; margin-bottom: 4px;">Scope 1</div>
-              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #dc2626;">${fmtNum(facility.scope1Emissions)}</div>
-              <div style="font-size: 9px; color: #78716c;">kg CO&#8322;e/unit</div>
+              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #6F6F68; margin-bottom: 4px;">Scope 1</div>
+              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #BE123C;">${fmtNum(facility.scope1Emissions)}</div>
+              <div style="font-size: 9px; color: #6F6F68;">kg CO&#8322;e/unit</div>
             </div>
             <div style="background: white; border-radius: 8px; padding: 10px; text-align: center;">
-              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #a8a29e; margin-bottom: 4px;">Scope 2</div>
-              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #2563eb;">${fmtNum(facility.scope2Emissions)}</div>
-              <div style="font-size: 9px; color: #78716c;">kg CO&#8322;e/unit</div>
+              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #6F6F68; margin-bottom: 4px;">Scope 2</div>
+              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #2B46C0;">${fmtNum(facility.scope2Emissions)}</div>
+              <div style="font-size: 9px; color: #6F6F68;">kg CO&#8322;e/unit</div>
             </div>
             <div style="background: white; border-radius: 8px; padding: 10px; text-align: center;">
-              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #a8a29e; margin-bottom: 4px;">Water</div>
-              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #0891b2;">${facility.waterLitres}</div>
-              <div style="font-size: 9px; color: #78716c;">litres/unit</div>
+              <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #6F6F68; margin-bottom: 4px;">Water</div>
+              <div style="font-size: 16px; font-weight: 700; font-family: 'Fira Code', monospace; color: #2B46C0;">${facility.waterLitres}</div>
+              <div style="font-size: 9px; color: #6F6F68;">litres/unit</div>
             </div>
           </div>
           `}
@@ -857,9 +857,9 @@ function renderProcessingPage(data: LCAReportData): string {
                 <tr>
                   <td>${escapeHtml(e.type)}</td>
                   <td style="text-align: right; font-family: 'Fira Code', monospace; font-size: 11px;">${e.quantity}</td>
-                  <td style="font-size: 11px; color: #78716c;">${e.unit}</td>
+                  <td style="font-size: 11px; color: #6F6F68;">${e.unit}</td>
                   <td style="text-align: right; font-family: 'Fira Code', monospace; font-size: 11px;">${e.emissions}</td>
-                  <td style="font-size: 11px; color: ${e.scope === 'Scope 1' ? '#dc2626' : '#2563eb'};">${scopeLabel}</td>
+                  <td style="font-size: 11px; color: ${e.scope === 'Scope 1' ? '#BE123C' : '#2B46C0'};">${scopeLabel}</td>
                 </tr>`;
               }).join('')}
             </tbody>
@@ -867,7 +867,7 @@ function renderProcessingPage(data: LCAReportData): string {
           ` : ''}
 
           <!-- Attribution info -->
-          <div style="font-size: 10px; color: #78716c; display: flex; gap: 16px; flex-wrap: wrap;">
+          <div style="font-size: 10px; color: #6F6F68; display: flex; gap: 16px; flex-wrap: wrap;">
             <span>Attribution: ${facility.attributionRatio}% of facility output</span>
             <span>Production volume: ${facility.productionVolume.toLocaleString()} units</span>
             ${facility.gridEmissionFactor ? `<span>Grid factor: ${facility.gridEmissionFactor}</span>` : ''}
@@ -876,27 +876,27 @@ function renderProcessingPage(data: LCAReportData): string {
 
           ${facility.dataCollectionMode && facility.dataCollectionMode !== 'primary' ? `
           <!-- Data Quality Declaration (ISO 14044 §4.2.3.6 / ISO 14067 §6.3.5) -->
-          <div style="margin-top: 12px; background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 12px;">
+          <div style="margin-top: 12px; background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #B45309; border-radius: 8px; padding: 12px;">
             <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
               <div style="font-size: 11px; font-weight: 700; color: #92400e; text-transform: uppercase; letter-spacing: 1px;">Secondary data &mdash; ${facility.dataCollectionMode === 'archetype_proxy' ? 'Archetype proxy' : 'Hybrid (archetype + primary)'}</div>
               ${facility.proxyUncertaintyPct ? `<div style="font-size: 10px; color: #92400e;">Uncertainty: &plusmn;${facility.proxyUncertaintyPct}%</div>` : ''}
             </div>
             ${facility.archetypeName ? `<div style="font-size: 11px; margin-bottom: 6px;"><strong>Archetype:</strong> ${escapeHtml(facility.archetypeName)}</div>` : ''}
-            ${facility.proxyJustification ? `<div style="font-size: 11px; margin-bottom: 8px; color: #44403c;"><strong>Justification:</strong> ${escapeHtml(facility.proxyJustification)}</div>` : ''}
+            ${facility.proxyJustification ? `<div style="font-size: 11px; margin-bottom: 8px; color: #6F6F68;"><strong>Justification:</strong> ${escapeHtml(facility.proxyJustification)}</div>` : ''}
             ${facility.proxyPedigree ? `
-              <div style="font-size: 10px; color: #57534e; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 8px;">
+              <div style="font-size: 10px; color: #6F6F68; display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 8px;">
                 <div><strong>R:</strong> ${facility.proxyPedigree.reliability}</div>
                 <div><strong>C:</strong> ${facility.proxyPedigree.completeness}</div>
                 <div><strong>T:</strong> ${facility.proxyPedigree.temporal}</div>
                 <div><strong>G:</strong> ${facility.proxyPedigree.geographical}</div>
                 <div><strong>Tech:</strong> ${facility.proxyPedigree.technological}</div>
               </div>
-              <div style="font-size: 9px; color: #a8a29e; margin-bottom: 8px;">Pedigree matrix (1 best &ndash; 5 worst): Reliability, Completeness, Temporal, Geographical, Technological</div>
+              <div style="font-size: 9px; color: #6F6F68; margin-bottom: 8px;">Pedigree matrix (1 best &ndash; 5 worst): Reliability, Completeness, Temporal, Geographical, Technological</div>
             ` : ''}
-            ${facility.proxySourceCitation ? `<div style="font-size: 10px; color: #78716c; margin-bottom: 8px;"><strong>Source:</strong> ${escapeHtml(facility.proxySourceCitation)}</div>` : ''}
+            ${facility.proxySourceCitation ? `<div style="font-size: 10px; color: #6F6F68; margin-bottom: 8px;"><strong>Source:</strong> ${escapeHtml(facility.proxySourceCitation)}</div>` : ''}
             ${facility.upgradeActions && facility.upgradeActions.length > 0 ? `
               <div style="font-size: 11px; font-weight: 600; color: #92400e; margin-top: 8px; margin-bottom: 4px;">Data Improvement Plan</div>
-              <ul style="font-size: 10px; color: #44403c; padding-left: 16px; margin: 0;">
+              <ul style="font-size: 10px; color: #6F6F68; padding-left: 16px; margin: 0;">
                 ${facility.upgradeActions.map(a => `<li style="margin-bottom: 2px;">${escapeHtml(a)}</li>`).join('')}
               </ul>
             ` : ''}
@@ -905,8 +905,8 @@ function renderProcessingPage(data: LCAReportData): string {
         </div>`;
 
   const methodologyNote = `
-      <div style="background: #fafaf9; border-radius: 8px; padding: 14px; font-size: 11px; color: #57534e;">
-        <div style="font-weight: 600; margin-bottom: 6px; color: #1c1917;">Methodology</div>
+      <div style="background: #F2F1EA; border-radius: 8px; padding: 14px; font-size: 11px; color: #6F6F68;">
+        <div style="font-weight: 600; margin-bottom: 6px; color: #1A1B1D;">Methodology</div>
         <div style="margin-bottom: 4px;">Processing emissions are allocated to the product using physical allocation by production volume (ISO 14044 Clause 4.3.4). Scope 1 factors from DEFRA 2025 GHG Conversion Factors; Scope 2 electricity from IEA/DEFRA 2023 country-specific grid emission factors.</div>
         <div>Contract manufacturer emissions are classified as Scope 3 Category 1 (Purchased Goods and Services) per GHG Protocol Product Standard &sect;6.3.3. Owned facility emissions are classified as Scope 1 (direct combustion) and Scope 2 (purchased electricity/heat).</div>
       </div>`;
@@ -968,22 +968,22 @@ function renderGhgDetailedPage(data: LCAReportData): string {
     <div class="page light-page">
       ${renderSectionHeader('06', 'Detailed GHG Reporting')}
 
-      <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #78716c; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">ISO 14067:2018 &mdash; GREENHOUSE GAS BREAKDOWN</div>
+      <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #6F6F68; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">ISO 14067:2018 &mdash; GREENHOUSE GAS BREAKDOWN</div>
 
       <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px;">
-        <div class="metric-card" style="text-align: center; border-left: 3px solid #ef4444;">
+        <div class="metric-card" style="text-align: center; border-left: 3px solid #BE123C;">
           <div class="metric-label">Fossil CO&#8322;</div>
-          <div style="font-size: 24px; font-weight: 700; color: #ef4444;">${escapeHtml(ghg.fossilCo2)}</div>
+          <div style="font-size: 24px; font-weight: 700; color: #BE123C;">${escapeHtml(ghg.fossilCo2)}</div>
           <div class="metric-unit">kg CO&#8322;e</div>
         </div>
-        <div class="metric-card" style="text-align: center; border-left: 3px solid #22c55e;">
+        <div class="metric-card" style="text-align: center; border-left: 3px solid #047857;">
           <div class="metric-label">Biogenic CO&#8322;</div>
-          <div style="font-size: 24px; font-weight: 700; color: #22c55e;">${escapeHtml(ghg.biogenicCo2)}</div>
+          <div style="font-size: 24px; font-weight: 700; color: #047857;">${escapeHtml(ghg.biogenicCo2)}</div>
           <div class="metric-unit">kg CO&#8322;e</div>
         </div>
-        <div class="metric-card" style="text-align: center; border-left: 3px solid #f97316;">
+        <div class="metric-card" style="text-align: center; border-left: 3px solid #B45309;">
           <div class="metric-label">LULUC CO&#8322;</div>
-          <div style="font-size: 24px; font-weight: 700; color: #f97316;">${escapeHtml(ghg.dlucCo2)}</div>
+          <div style="font-size: 24px; font-weight: 700; color: #B45309;">${escapeHtml(ghg.dlucCo2)}</div>
           <div class="metric-unit">kg CO&#8322;e</div>
         </div>
       </div>
@@ -1050,13 +1050,13 @@ function renderGhgDetailedPage(data: LCAReportData): string {
 
       <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
         <div style="font-size: 11px; font-weight: 600; color: #166534; margin-bottom: 6px;">Biogenic Carbon Note (ISO 14067:2018)</div>
-        <p style="font-size: 11px; color: #44403c; line-height: 1.6;">${escapeHtml(ghg.biogenicNote)}</p>
+        <p style="font-size: 11px; color: #6F6F68; line-height: 1.6;">${escapeHtml(ghg.biogenicNote)}</p>
       </div>
 
-      <div style="font-size: 11px; color: #78716c; margin-bottom: 8px;">
+      <div style="font-size: 11px; color: #6F6F68; margin-bottom: 8px;">
         <strong>GWP Method:</strong> ${escapeHtml(ghg.gwpMethod)} — All GWP-100 values from IPCC Sixth Assessment Report (AR6, 2021)
       </div>
-      <div style="font-size: 10px; color: #a8a29e;">
+      <div style="font-size: 10px; color: #6F6F68;">
         * Per ISO 14067:2018 §6.4.9.3, biogenic CO&#8322; is characterised at GWP=1 for the species inventory but reported separately from the fossil carbon footprint. The net biogenic carbon balance (uptake minus end-of-life release) is excluded from the headline fossil footprint figure.
       </div>
 
@@ -1080,27 +1080,27 @@ function renderEnvironmentalImpactsPages(data: LCAReportData): string {
     const categoryCards = pageCategories.map(cat => {
       const topContribs = cat.topContributors.map(tc =>
         `<div style="display: flex; justify-content: space-between; font-size: 10px; padding: 2px 0;">
-          <span style="color: #44403c; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(tc.name)}</span>
-          <span style="color: #78716c;">${escapeHtml(tc.percentage)}</span>
+          <span style="color: #6F6F68; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(tc.name)}</span>
+          <span style="color: #6F6F68;">${escapeHtml(tc.percentage)}</span>
         </div>`
       ).join('');
 
       return `
-        <div style="background: white; border: 1px solid #e7e5e4; border-radius: 12px; padding: 16px;">
+        <div style="background: white; border: 1px solid #D9D6CB; border-radius: 12px; padding: 16px;">
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
             <div>
-              <div style="font-size: 13px; font-weight: 600; color: #1c1917;">${escapeHtml(cat.name)}</div>
-              <div style="font-size: 10px; color: #78716c;">${escapeHtml(cat.indicator)}</div>
+              <div style="font-size: 13px; font-weight: 600; color: #1A1B1D;">${escapeHtml(cat.name)}</div>
+              <div style="font-size: 10px; color: #6F6F68;">${escapeHtml(cat.indicator)}</div>
             </div>
             <div style="text-align: right;">
-              <div style="font-size: 16px; font-weight: 700; color: #1c1917;">${escapeHtml(cat.totalValue)}</div>
-              <div style="font-size: 10px; color: #78716c;">${escapeHtml(cat.unit)}</div>
+              <div style="font-size: 16px; font-weight: 700; color: #1A1B1D;">${escapeHtml(cat.totalValue)}</div>
+              <div style="font-size: 10px; color: #6F6F68;">${escapeHtml(cat.unit)}</div>
             </div>
           </div>
-          <p style="font-size: 10px; color: #78716c; line-height: 1.5; margin-bottom: 8px;">${escapeHtml(cat.description)}</p>
+          <p style="font-size: 10px; color: #6F6F68; line-height: 1.5; margin-bottom: 8px;">${escapeHtml(cat.description)}</p>
           ${cat.topContributors.length > 0 ? `
-            <div style="border-top: 1px solid #f5f5f4; padding-top: 6px;">
-              <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #a8a29e; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Top Contributors</div>
+            <div style="border-top: 1px solid #D9D6CB; padding-top: 6px;">
+              <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #6F6F68; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Top Contributors</div>
               ${topContribs}
             </div>
           ` : ''}
@@ -1115,7 +1115,7 @@ function renderEnvironmentalImpactsPages(data: LCAReportData): string {
         }
 
         ${isFirstPage ? `
-          <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #78716c; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px;">ISO 14044:2006 &sect;4.4 — LIFE CYCLE IMPACT ASSESSMENT</div>
+          <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #6F6F68; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px;">ISO 14044:2006 &sect;4.4 — LIFE CYCLE IMPACT ASSESSMENT</div>
           <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px;">
             <p style="font-size: 11px; color: #92400e; line-height: 1.5;"><strong>Method:</strong> ${escapeHtml(data.environmentalImpacts.referenceMethod)} — ${escapeHtml(data.environmentalImpacts.normalisationNote)}</p>
           </div>
@@ -1164,9 +1164,9 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
 
     // First page uses the dark table style, later pages the light one — pick
     // residual/total row colours that read on whichever background applies.
-    const subtleColor = isFirstPage ? '#a8a29e' : '#57534e';
-    const strongColor = isFirstPage ? '#ffffff' : '#1c1917';
-    const ruleColor = isFirstPage ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.2)';
+    const subtleColor = isFirstPage ? '#6F6F68' : '#6F6F68';
+    const strongColor = isFirstPage ? '#1A1B1D' : '#1A1B1D';
+    const ruleColor = isFirstPage ? 'rgba(26,27,29,0.25)' : 'rgba(0,0,0,0.2)';
 
     // Residual + Total rows close the table out on the final page so the
     // "% Climate" column sums to 100% (see reconciliation note above).
@@ -1177,14 +1177,14 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
             </td>
             <td></td><td></td>
             <td style="font-weight: 500;">${otherStages.toFixed(4)}</td>
-            <td><span style="color: #ccff00;">${otherPct.toFixed(1)}%</span></td>
+            <td><span style="color: #205E40;">${otherPct.toFixed(1)}%</span></td>
             <td></td><td></td><td></td>
           </tr>` : ''}
           <tr style="font-weight: 700; color: ${strongColor}; border-top: 2px solid ${ruleColor};">
             <td>Total carbon footprint</td>
             <td></td><td></td>
             <td>${reconcileTotal.toFixed(3)}</td>
-            <td><span style="color: #ccff00;">100%</span></td>
+            <td><span style="color: #205E40;">100%</span></td>
             <td></td><td></td><td></td>
           </tr>`
       : '';
@@ -1194,14 +1194,14 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
       const ingredientCell = ing.isProxy
         ? `<td style="min-width: 160px; max-width: 220px;">
             <div style="font-weight: 500; word-wrap: break-word;">${escapeHtml(ing.name)}</div>
-            <div style="font-size: 8px; color: #f59e0b; margin-top: 2px; word-wrap: break-word;">
+            <div style="font-size: 8px; color: #B45309; margin-top: 2px; word-wrap: break-word;">
               &#8627; Proxy: ${escapeHtml(ing.calculationFactor)}
             </div>
-            <div style="font-size: 7.5px; color: #78716c;">${escapeHtml(ing.factorDatabase)}</div>
+            <div style="font-size: 7.5px; color: #6F6F68;">${escapeHtml(ing.factorDatabase)}</div>
            </td>`
         : `<td style="font-weight: 500; min-width: 160px; max-width: 220px; word-wrap: break-word;">
             ${escapeHtml(ing.name)}
-            <div style="font-size: 7.5px; color: #78716c; margin-top: 2px;">${escapeHtml(ing.factorDatabase)}</div>
+            <div style="font-size: 7.5px; color: #6F6F68; margin-top: 2px;">${escapeHtml(ing.factorDatabase)}</div>
            </td>`;
 
       const dataSourceBadge = ing.isProxy
@@ -1219,13 +1219,13 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
         : '';
 
       const containerNote = (ing as any).containerCO2
-        ? `<div style="font-size: 8px; color: #78716c; margin-top: 2px;">incl. ${escapeHtml((ing as any).containerCO2)} kg CO₂e inbound container (${escapeHtml((ing as any).containerType || '')})</div>`
+        ? `<div style="font-size: 8px; color: #6F6F68; margin-top: 2px;">incl. ${escapeHtml((ing as any).containerCO2)} kg CO₂e inbound container (${escapeHtml((ing as any).containerType || '')})</div>`
         : '';
 
       // Inbound freight transport sub-line — makes embedded transport emissions
       // visible so the ingredient table reconciles against the lifecycle stage totals.
       const transportNote = (ing as any).transportCO2
-        ? `<div style="font-size: 8px; color: #78716c; margin-top: 2px;">incl. ${escapeHtml((ing as any).transportCO2)} kg CO₂e inbound transport${(ing as any).transportMode ? ` · ${escapeHtml((ing as any).transportMode)}` : ''}${(ing as any).transportDistance ? ` · ${escapeHtml((ing as any).transportDistance)} km` : ''}</div>`
+        ? `<div style="font-size: 8px; color: #6F6F68; margin-top: 2px;">incl. ${escapeHtml((ing as any).transportCO2)} kg CO₂e inbound transport${(ing as any).transportMode ? ` · ${escapeHtml((ing as any).transportMode)}` : ''}${(ing as any).transportDistance ? ` · ${escapeHtml((ing as any).transportDistance)} km` : ''}</div>`
         : '';
 
       // Implausibility warning — e.g. "Road freight from Lima, Peru at 10,113 km".
@@ -1239,10 +1239,10 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
         <td>${escapeHtml(ing.quantity)} ${escapeHtml(ing.unit)}</td>
         <td>${escapeHtml(ing.origin)}${originWarning}</td>
         <td style="font-weight: 500;">${escapeHtml(ing.climateImpact)}${containerNote}${transportNote}</td>
-        <td><span style="color: #ccff00;">${escapeHtml(ing.climatePercentage)}</span></td>
+        <td><span style="color: #205E40;">${escapeHtml(ing.climatePercentage)}</span></td>
         <td>${escapeHtml(ing.acidification)}</td>
         <td>${escapeHtml(ing.eutrophication)}</td>
-        <td>${dataSourceBadge}${gradeChip}${ing.confidenceScore > 0 ? `<div style="font-size: 7.5px; color: #78716c; margin-top: 2px;">${ing.confidenceScore}% confidence</div>` : ''}</td>
+        <td>${dataSourceBadge}${gradeChip}${ing.confidenceScore > 0 ? `<div style="font-size: 7.5px; color: #6F6F68; margin-top: 2px;">${ing.confidenceScore}% confidence</div>` : ''}</td>
       </tr>`;
     }).join('');
 
@@ -1254,8 +1254,8 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
         }
 
         ${isFirstPage ? `
-          <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #78716c; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">PER-INGREDIENT ENVIRONMENTAL CONTRIBUTION · REAL INGREDIENT &amp; CALCULATION FACTOR</div>
-          <div style="margin-bottom: 16px; font-size: 9px; color: #78716c; line-height: 1.5;">
+          <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #6F6F68; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">PER-INGREDIENT ENVIRONMENTAL CONTRIBUTION · REAL INGREDIENT &amp; CALCULATION FACTOR</div>
+          <div style="margin-bottom: 16px; font-size: 9px; color: #6F6F68; line-height: 1.5;">
             The <strong>GWP (kg CO&#8322;e)</strong> column shows each ingredient's material production impact. Inbound transport is itemised separately on a sub-line beneath the ingredient where present, and is included in the product total. The most significant ingredients shown here are restated in the Interpretation hotspots (Section 13) using these same production figures.
           </div>
         ` : ''}
@@ -1283,9 +1283,9 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
         </table>
 
         ${isLastPage ? `
-          <div style="margin-top: 20px; padding: 14px; background: ${isFirstPage ? 'rgba(255,255,255,0.05)' : '#f5f5f4'}; border-radius: 8px; border: 1px solid ${isFirstPage ? 'rgba(255,255,255,0.1)' : '#e7e5e4'};">
-            <div style="font-size: 10px; color: ${isFirstPage ? '#a8a29e' : '#57534e'}; line-height: 1.6;">
-              <strong style="color: ${isFirstPage ? '#ccff00' : '#1c1917'};">Coverage:</strong> The ingredients and packaging listed above are material-production impacts and account for ${materialsPct.toFixed(1)}% of the ${escapeHtml(data.ingredientBreakdown.totalClimateImpact)} kg CO&#8322;e total per functional unit. The remaining ${otherPct.toFixed(1)}% comes from inbound transport and the non-material lifecycle stages (processing, distribution, use and end-of-life), shown in the "Other lifecycle stages" row and detailed in Sections 05 to 07.
+          <div style="margin-top: 20px; padding: 14px; background: ${isFirstPage ? 'rgba(26,27,29,0.05)' : '#F2F1EA'}; border-radius: 8px; border: 1px solid ${isFirstPage ? 'rgba(26,27,29,0.1)' : '#D9D6CB'};">
+            <div style="font-size: 10px; color: ${isFirstPage ? '#6F6F68' : '#6F6F68'}; line-height: 1.6;">
+              <strong style="color: ${isFirstPage ? '#205E40' : '#1A1B1D'};">Coverage:</strong> The ingredients and packaging listed above are material-production impacts and account for ${materialsPct.toFixed(1)}% of the ${escapeHtml(data.ingredientBreakdown.totalClimateImpact)} kg CO&#8322;e total per functional unit. The remaining ${otherPct.toFixed(1)}% comes from inbound transport and the non-material lifecycle stages (processing, distribution, use and end-of-life), shown in the "Other lifecycle stages" row and detailed in Sections 05 to 07.
               Acidification values in kg SO&#8322;-eq (terrestrial); eutrophication in kg P-eq (freshwater); values below detection shown as 0.000e+0.
               ${hasProxies ? '&#x26A0; Proxy factors are used where a direct dataset match was not available (see the Data Quality section).' : ''}
             </div>
@@ -1306,14 +1306,14 @@ function renderWaterPage(data: LCAReportData): string {
 
       <div style="display: flex; gap: 24px; margin-bottom: 32px;">
         <div style="flex: 1; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 16px; padding: 24px; text-align: center;">
-          <div style="font-size: 11px; font-family: 'Fira Code', monospace; color: #3b82f6; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Total Consumption</div>
+          <div style="font-size: 11px; font-family: 'Fira Code', monospace; color: #2B46C0; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Total Consumption</div>
           <div style="font-size: 48px; font-weight: 700; font-family: 'Playfair Display', serif; color: #1e40af;">${escapeHtml(data.waterFootprint.totalConsumption)}</div>
-          <div style="font-size: 14px; color: #60a5fa;">litres</div>
+          <div style="font-size: 14px; color: #2B46C0;">litres</div>
         </div>
         <div style="flex: 1; background: #fef3c7; border: 1px solid #fde68a; border-radius: 16px; padding: 24px; text-align: center;">
-          <div style="font-size: 11px; font-family: 'Fira Code', monospace; color: #d97706; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Scarcity-Weighted</div>
+          <div style="font-size: 11px; font-family: 'Fira Code', monospace; color: #B45309; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Scarcity-Weighted</div>
           <div style="font-size: 48px; font-weight: 700; font-family: 'Playfair Display', serif; color: #92400e;">${escapeHtml(data.waterFootprint.scarcityWeighted)}</div>
-          <div style="font-size: 14px; color: #d97706;">litres eq.</div>
+          <div style="font-size: 14px; color: #B45309;">litres eq.</div>
         </div>
       </div>
 
@@ -1356,23 +1356,23 @@ function renderCircularityPage(data: LCAReportData): string {
       ${renderSectionHeader('10', 'Circularity & Waste')}
 
       <div style="display: flex; gap: 16px; margin-bottom: 24px;">
-        <div style="flex: 1; text-align: center; background: white; border: 1px solid #e7e5e4; border-radius: 16px; padding: 20px;">
-          <div style="width: 120px; height: 120px; border-radius: 50%; margin: 0 auto 12px; position: relative; background: conic-gradient(#22c55e ${recycledContentRate * 3.6}deg, #e7e5e4 0deg);">
+        <div style="flex: 1; text-align: center; background: white; border: 1px solid #D9D6CB; border-radius: 16px; padding: 20px;">
+          <div style="width: 120px; height: 120px; border-radius: 50%; margin: 0 auto 12px; position: relative; background: conic-gradient(#047857 ${recycledContentRate * 3.6}deg, #D9D6CB 0deg);">
             <div style="position: absolute; inset: 12px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-              <span style="font-size: 28px; font-weight: 700; font-family: 'Playfair Display', serif; color: #22c55e;">${recycledContentRate}%</span>
+              <span style="font-size: 28px; font-weight: 700; font-family: 'Playfair Display', serif; color: #047857;">${recycledContentRate}%</span>
             </div>
           </div>
-          <div style="font-size: 12px; font-weight: 600; color: #1c1917;">Recycled Content</div>
-          <div style="font-size: 9px; color: #78716c;">Input: recycled material used</div>
+          <div style="font-size: 12px; font-weight: 600; color: #1A1B1D;">Recycled Content</div>
+          <div style="font-size: 9px; color: #6F6F68;">Input: recycled material used</div>
         </div>
-        <div style="flex: 1; text-align: center; background: white; border: 1px solid #e7e5e4; border-radius: 16px; padding: 20px;">
-          <div style="width: 120px; height: 120px; border-radius: 50%; margin: 0 auto 12px; position: relative; background: conic-gradient(#3b82f6 ${eolRecyclingRate * 3.6}deg, #e7e5e4 0deg);">
+        <div style="flex: 1; text-align: center; background: white; border: 1px solid #D9D6CB; border-radius: 16px; padding: 20px;">
+          <div style="width: 120px; height: 120px; border-radius: 50%; margin: 0 auto 12px; position: relative; background: conic-gradient(#2B46C0 ${eolRecyclingRate * 3.6}deg, #D9D6CB 0deg);">
             <div style="position: absolute; inset: 12px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-              <span style="font-size: 28px; font-weight: 700; font-family: 'Playfair Display', serif; color: #3b82f6;">${eolRecyclingRate}%</span>
+              <span style="font-size: 28px; font-weight: 700; font-family: 'Playfair Display', serif; color: #2B46C0;">${eolRecyclingRate}%</span>
             </div>
           </div>
-          <div style="font-size: 12px; font-weight: 600; color: #1c1917;">EoL Recycling Rate</div>
-          <div style="font-size: 9px; color: #78716c;">Output: packaging recycled at disposal</div>
+          <div style="font-size: 12px; font-weight: 600; color: #1A1B1D;">EoL Recycling Rate</div>
+          <div style="font-size: 9px; color: #6F6F68;">Output: packaging recycled at disposal</div>
         </div>
         <div style="flex: 1;">
           <div class="metric-card" style="margin-bottom: 12px;">
@@ -1388,19 +1388,19 @@ function renderCircularityPage(data: LCAReportData): string {
 
       ${hasEolBreakdown ? `
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px;">
-          <div class="metric-card" style="text-align: center; border-left: 3px solid #ef4444;">
+          <div class="metric-card" style="text-align: center; border-left: 3px solid #BE123C;">
             <div class="metric-label">Gross EoL Emissions</div>
-            <div style="font-size: 18px; font-weight: 700; color: #ef4444;">${totalGross.toFixed(4)}</div>
+            <div style="font-size: 18px; font-weight: 700; color: #BE123C;">${totalGross.toFixed(4)}</div>
             <div class="metric-unit">kg CO&#8322;e</div>
           </div>
-          <div class="metric-card" style="text-align: center; border-left: 3px solid #22c55e;">
+          <div class="metric-card" style="text-align: center; border-left: 3px solid #047857;">
             <div class="metric-label">Recycling Credits</div>
-            <div style="font-size: 18px; font-weight: 700; color: #22c55e;">${totalAvoided.toFixed(4)}</div>
+            <div style="font-size: 18px; font-weight: 700; color: #047857;">${totalAvoided.toFixed(4)}</div>
             <div class="metric-unit">kg CO&#8322;e (avoided)</div>
           </div>
-          <div class="metric-card" style="text-align: center; border-left: 3px solid ${totalNet < 0 ? '#22c55e' : '#f97316'};">
+          <div class="metric-card" style="text-align: center; border-left: 3px solid ${totalNet < 0 ? '#047857' : '#B45309'};">
             <div class="metric-label">Net EoL Impact</div>
-            <div style="font-size: 18px; font-weight: 700; color: ${totalNet < 0 ? '#22c55e' : '#f97316'};">${totalNet.toFixed(4)}</div>
+            <div style="font-size: 18px; font-weight: 700; color: ${totalNet < 0 ? '#047857' : '#B45309'};">${totalNet.toFixed(4)}</div>
             <div class="metric-unit">kg CO&#8322;e</div>
           </div>
         </div>
@@ -1427,7 +1427,7 @@ function renderCircularityPage(data: LCAReportData): string {
                 <td style="text-align: center;">${m.incinerationPct}%</td>
                 <td style="text-align: center;">${m.compostingPct}%</td>
                 <td style="text-align: center;">${m.adPct}%</td>
-                <td style="text-align: right; color: ${m.netEmissions < 0 ? '#22c55e' : '#44403c'};">${m.netEmissions.toFixed(4)}</td>
+                <td style="text-align: right; color: ${m.netEmissions < 0 ? '#047857' : '#6F6F68'};">${m.netEmissions.toFixed(4)}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -1504,25 +1504,25 @@ function renderLandUsePage(data: LCAReportData): string {
 function renderSupplyChainPage(data: LCAReportData): string {
   const networkHtml = data.supplyChain.network.map(category => `
     <div style="margin-bottom: 24px;">
-      <h3 style="font-size: 14px; font-weight: 600; color: #1c1917; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e7e5e4;">${escapeHtml(category.category)}</h3>
+      <h3 style="font-size: 14px; font-weight: 600; color: #1A1B1D; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #D9D6CB;">${escapeHtml(category.category)}</h3>
       ${category.items.map(item => {
         const modeLabel = item.mode ? escapeHtml(item.mode) : 'Mode not specified';
         const warningHtml = item.warning ? `
-          <div style="margin-top: 6px; padding: 6px 8px; background: #fef3c7; border-left: 3px solid #f59e0b; border-radius: 3px; font-size: 11px; color: #92400e;">
+          <div style="margin-top: 6px; padding: 6px 8px; background: #fef3c7; border-left: 3px solid #B45309; border-radius: 3px; font-size: 11px; color: #92400e;">
             &#9888; ${escapeHtml(item.warning)}
           </div>
         ` : '';
         return `
-        <div style="padding: 8px 0; border-bottom: 1px solid #fafaf9;">
+        <div style="padding: 8px 0; border-bottom: 1px solid #D9D6CB;">
           <div style="display: flex; justify-content: space-between;">
             <div>
               <div style="font-size: 14px; font-weight: 500;">${escapeHtml(item.name)}</div>
-              <div style="font-size: 12px; color: #78716c;">${escapeHtml(item.location)}</div>
-              <div style="font-size: 11px; color: #a8a29e; margin-top: 2px;">Transport: ${modeLabel}</div>
+              <div style="font-size: 12px; color: #6F6F68;">${escapeHtml(item.location)}</div>
+              <div style="font-size: 11px; color: #6F6F68; margin-top: 2px;">Transport: ${modeLabel}</div>
             </div>
             <div style="text-align: right;">
-              <div style="font-size: 14px; color: #44403c;">${escapeHtml(item.distance)}</div>
-              <div style="font-size: 12px; color: #78716c;">${escapeHtml(item.co2)}</div>
+              <div style="font-size: 14px; color: #6F6F68;">${escapeHtml(item.distance)}</div>
+              <div style="font-size: 12px; color: #6F6F68;">${escapeHtml(item.co2)}</div>
             </div>
           </div>
           ${warningHtml}
@@ -1557,20 +1557,20 @@ function renderCommitmentPage(data: LCAReportData): string {
     <div class="page dark-page" style="justify-content: center; text-align: center;">
       <div style="max-width: 500px; margin: 0 auto;">
         <div style="margin: 0 auto 32px;">
-          ${alkateraLogo(56)}
+          ${alkateraLogo(56, false)}
         </div>
-        <h2 style="font-size: 36px; font-family: 'Playfair Display', serif; font-weight: 300; margin-bottom: 24px; color: white;">Our Commitment</h2>
-        <p style="font-size: 16px; line-height: 1.8; color: #a8a29e;">${escapeHtml(data.commitment.text)}</p>
+        <h2 style="font-size: 36px; font-family: 'Playfair Display', serif; font-weight: 300; margin-bottom: 24px; color: #1A1B1D;">Our Commitment</h2>
+        <p style="font-size: 16px; line-height: 1.8; color: #6F6F68;">${escapeHtml(data.commitment.text)}</p>
 
-        <div style="margin-top: 64px; padding-top: 32px; border-top: 1px solid rgba(255,255,255,0.1);">
+        <div style="margin-top: 64px; padding-top: 32px; border-top: 1px solid rgba(26,27,29,0.1);">
           <div style="margin-bottom: 20px;">
-            ${alkateraLogo(32)}
+            ${alkateraLogo(32, false)}
           </div>
-          <p style="font-size: 12px; color: #78716c; font-family: 'Fira Code', monospace;">
+          <p style="font-size: 12px; color: #6F6F68; font-family: 'Fira Code', monospace;">
             Report generated by alka<span style="font-weight: 700;">tera</span><br />
             ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
-          <a href="https://alkatera.com" style="display: inline-block; margin-top: 16px; color: #ccff00; font-size: 12px; font-family: 'Fira Code', monospace; text-decoration: none; letter-spacing: 1px; padding: 8px 20px; border: 1px solid rgba(204,255,0,0.3); border-radius: 6px;">
+          <a href="https://alkatera.com" style="display: inline-block; margin-top: 16px; color: #205E40; font-size: 12px; font-family: 'Fira Code', monospace; text-decoration: none; letter-spacing: 1px; padding: 8px 20px; border: 1px solid rgba(32,94,64,0.3); border-radius: 6px;">
             alkatera.com
           </a>
         </div>
@@ -1601,10 +1601,10 @@ function renderInterpretationPage(data: LCAReportData): string {
           `).join('')}
         </tbody>
       </table>
-      <p style="font-size: 9px; color: #78716c; line-height: 1.5; margin-top: 6px;">
+      <p style="font-size: 9px; color: #6F6F68; line-height: 1.5; margin-top: 6px;">
         Hotspots restate the most significant ingredients from Section 08 using the same material-production GWP and contribution share, so the two sections reconcile. Inbound transport is itemised separately in Section 08 and is included in the product total.
       </p>`
-    : '<p style="font-size: 12px; color: #78716c;">No individual material exceeds the 5% significance threshold.</p>';
+    : '<p style="font-size: 12px; color: #6F6F68;">No individual material exceeds the 5% significance threshold.</p>';
 
   // FIX #5: Always explain EoL recycling credits in interpretation, not just when >100%.
   // Users need to understand avoided burden credits regardless of hotspot sum.
@@ -1622,7 +1622,7 @@ function renderInterpretationPage(data: LCAReportData): string {
         </p>
       </div>`
     : (hotspotSum > 100
-      ? `<p style="font-size: 10px; font-style: italic; color: #78716c; margin-top: 6px;">
+      ? `<p style="font-size: 10px; font-style: italic; color: #6F6F68; margin-top: 6px;">
           * Contributions sum to ${hotspotSum.toFixed(1)}% because end-of-life avoided-burden credits
           reduce the net total carbon footprint, against which individual percentages are calculated.
         </p>`
@@ -1642,7 +1642,7 @@ function renderInterpretationPage(data: LCAReportData): string {
       ${renderSectionHeader('13', 'Interpretation (ISO 14044 §4.5)')}
 
       <h3 style="font-size: 15px; font-weight: 600; margin-bottom: 10px;">Significant Issues</h3>
-      <p style="font-size: 12px; line-height: 1.5; margin-bottom: 12px; color: #44403c;">
+      <p style="font-size: 12px; line-height: 1.5; margin-bottom: 12px; color: #6F6F68;">
         ${escapeHtml(interp.significant_issues.summary)}
       </p>
       ${hotspotsHtml}
@@ -1652,28 +1652,28 @@ function renderInterpretationPage(data: LCAReportData): string {
         <div class="metric-card" style="flex: 1; text-align: center;">
           <div class="metric-label">Dominant Stage</div>
           <div style="font-size: 18px; font-weight: 700;">${escapeHtml(interp.significant_issues.dominant_lifecycle_stage)}</div>
-          <div style="font-size: 12px; color: #78716c;">${interp.significant_issues.dominant_stage_pct}% of total</div>
+          <div style="font-size: 12px; color: #6F6F68;">${interp.significant_issues.dominant_stage_pct}% of total</div>
         </div>
         <div class="metric-card" style="flex: 1; text-align: center;">
           <div class="metric-label">Dominant Scope</div>
           <div style="font-size: 18px; font-weight: 700;">${escapeHtml(interp.significant_issues.dominant_scope)}</div>
-          <div style="font-size: 12px; color: #78716c;">${interp.significant_issues.dominant_scope_pct}% of total</div>
+          <div style="font-size: 12px; color: #6F6F68;">${interp.significant_issues.dominant_scope_pct}% of total</div>
         </div>
       </div>
 
       <h3 style="font-size: 15px; font-weight: 600; margin: 16px 0 10px;">Key Findings</h3>
-      <ul style="font-size: 12px; line-height: 1.5; color: #44403c; padding-left: 20px; margin-bottom: 12px;">
+      <ul style="font-size: 12px; line-height: 1.5; color: #6F6F68; padding-left: 20px; margin-bottom: 12px;">
         ${interp.conclusions.key_findings.map(f => `<li style="margin-bottom: 4px;">${escapeHtml(f)}</li>`).join('')}
       </ul>
 
       ${!needsSplit ? `
         <h3 style="font-size: 15px; font-weight: 600; margin-bottom: 10px;">Limitations</h3>
-        <ul style="font-size: 12px; line-height: 1.5; color: #44403c; padding-left: 20px; margin-bottom: 12px;">
+        <ul style="font-size: 12px; line-height: 1.5; color: #6F6F68; padding-left: 20px; margin-bottom: 12px;">
           ${interp.conclusions.limitations.map(l => `<li style="margin-bottom: 4px;">${escapeHtml(l)}</li>`).join('')}
         </ul>
 
         <h3 style="font-size: 15px; font-weight: 600; margin-bottom: 10px;">Recommendations</h3>
-        <ul style="font-size: 12px; line-height: 1.5; color: #44403c; padding-left: 20px;">
+        <ul style="font-size: 12px; line-height: 1.5; color: #6F6F68; padding-left: 20px;">
           ${interp.conclusions.recommendations.map(r => `<li style="margin-bottom: 4px;">${escapeHtml(r)}</li>`).join('')}
         </ul>
       ` : ''}
@@ -1688,12 +1688,12 @@ function renderInterpretationPage(data: LCAReportData): string {
       ${renderSectionHeader('13', 'Interpretation (ISO 14044 §4.5)', false, true)}
 
       <h3 style="font-size: 15px; font-weight: 600; margin-bottom: 10px;">Limitations</h3>
-      <ul style="font-size: 12px; line-height: 1.5; color: #44403c; padding-left: 20px; margin-bottom: 16px;">
+      <ul style="font-size: 12px; line-height: 1.5; color: #6F6F68; padding-left: 20px; margin-bottom: 16px;">
         ${interp.conclusions.limitations.map(l => `<li style="margin-bottom: 4px;">${escapeHtml(l)}</li>`).join('')}
       </ul>
 
       <h3 style="font-size: 15px; font-weight: 600; margin-bottom: 10px;">Recommendations</h3>
-      <ul style="font-size: 12px; line-height: 1.5; color: #44403c; padding-left: 20px;">
+      <ul style="font-size: 12px; line-height: 1.5; color: #6F6F68; padding-left: 20px;">
         ${interp.conclusions.recommendations.map(r => `<li style="margin-bottom: 4px;">${escapeHtml(r)}</li>`).join('')}
       </ul>
 
@@ -1716,7 +1716,7 @@ function renderUncertaintySensitivityPage(data: LCAReportData): string {
               <td style="font-weight: 500;">${escapeHtml(p.materialName)}</td>
               <td>${p.baselineContributionPct.toFixed(1)}%</td>
               <td>${p.resultRange.lower} – ${p.resultRange.upper} kg CO₂e</td>
-              <td>${p.sensitivityRatio.toFixed(3)}${p.isHighlySensitive ? ' <span style="color: #dc2626; font-weight: 600;">HIGH</span>' : ''}</td>
+              <td>${p.sensitivityRatio.toFixed(3)}${p.isHighlySensitive ? ' <span style="color: #BE123C; font-weight: 600;">HIGH</span>' : ''}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -1731,21 +1731,21 @@ function renderUncertaintySensitivityPage(data: LCAReportData): string {
         <div class="metric-card" style="flex: 1; text-align: center;">
           <div class="metric-label">Propagated Uncertainty</div>
           <div class="metric-value">±${us.propagatedUncertaintyPct}%</div>
-          <div style="font-size: 11px; color: #78716c;">95% confidence interval</div>
+          <div style="font-size: 11px; color: #6F6F68;">95% confidence interval</div>
         </div>
         <div class="metric-card" style="flex: 1; text-align: center;">
           <div class="metric-label">Result Range (95% CI)</div>
           <div style="font-size: 18px; font-weight: 700;">${us.confidenceInterval95.lower} – ${us.confidenceInterval95.upper}</div>
-          <div style="font-size: 11px; color: #78716c;">kg CO₂e per functional unit</div>
+          <div style="font-size: 11px; color: #6F6F68;">kg CO₂e per functional unit</div>
         </div>
       </div>
 
       <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Sensitivity Analysis</h3>
-      <p style="font-size: 13px; color: #78716c; margin-bottom: 16px;">${escapeHtml(us.sensitivityAnalysis.method)}</p>
+      <p style="font-size: 13px; color: #6F6F68; margin-bottom: 16px;">${escapeHtml(us.sensitivityAnalysis.method)}</p>
       ${paramsHtml}
 
-      <div style="margin-top: 20px; padding: 16px; background: #fafaf9; border-radius: 8px; border: 1px solid #e7e5e4;">
-        <p style="font-size: 13px; line-height: 1.6; color: #44403c;">
+      <div style="margin-top: 20px; padding: 16px; background: #F2F1EA; border-radius: 8px; border: 1px solid #D9D6CB;">
+        <p style="font-size: 13px; line-height: 1.6; color: #6F6F68;">
           <strong>Conclusion:</strong> ${escapeHtml(us.sensitivityAnalysis.conclusion)}
         </p>
       </div>
@@ -1794,7 +1794,7 @@ function renderCriticalReviewDisclosure(data: LCAReportData): string {
 
       ${zeroCategories.length > 0 ? `
         <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Zero-Impact Categories</h3>
-        <p style="font-size: 12px; color: #78716c; margin-bottom: 12px;">
+        <p style="font-size: 12px; color: #6F6F68; margin-bottom: 12px;">
           The following environmental impact categories were assessed but report zero values. Justification per ISO 14044 §4.4.2.2:
         </p>
         <table class="data-table">
@@ -1813,8 +1813,8 @@ function renderCriticalReviewDisclosure(data: LCAReportData): string {
       ${!hasOverflowContent && notes.length > 0 ? `
         <h3 style="font-size: 16px; font-weight: 600; margin: 20px 0 12px;">Methodological Notes</h3>
         ${notes.map(n => `
-          <div style="padding: 12px 16px; background: #fafaf9; border-radius: 6px; border: 1px solid #e7e5e4; margin-bottom: 10px;">
-            <p style="font-size: 12px; line-height: 1.5; color: #44403c;">${escapeHtml(n)}</p>
+          <div style="padding: 12px 16px; background: #F2F1EA; border-radius: 6px; border: 1px solid #D9D6CB; margin-bottom: 10px;">
+            <p style="font-size: 12px; line-height: 1.5; color: #6F6F68;">${escapeHtml(n)}</p>
           </div>
         `).join('')}
       ` : ''}
@@ -1840,8 +1840,8 @@ function renderCriticalReviewDisclosure(data: LCAReportData): string {
       ${notes.length > 0 ? `
         <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Methodological Notes</h3>
         ${notes.map(n => `
-          <div style="padding: 12px 16px; background: #fafaf9; border-radius: 6px; border: 1px solid #e7e5e4; margin-bottom: 10px;">
-            <p style="font-size: 12px; line-height: 1.5; color: #44403c;">${escapeHtml(n)}</p>
+          <div style="padding: 12px 16px; background: #F2F1EA; border-radius: 6px; border: 1px solid #D9D6CB; margin-bottom: 10px;">
+            <p style="font-size: 12px; line-height: 1.5; color: #6F6F68;">${escapeHtml(n)}</p>
           </div>
         `).join('')}
       ` : ''}
@@ -1880,13 +1880,13 @@ function renderAiCriticalReviewPage(data: LCAReportData): string {
   const findingsHtml = ai.findings.map(f => {
     const ss = statusStyles[f.status] || statusStyles.minor_gap;
     return `
-      <div style="padding: 12px 14px; border: 1px solid #e7e5e4; border-left: 3px solid ${ss.color}; border-radius: 6px; margin-bottom: 10px; background: #fafaf9;">
+      <div style="padding: 12px 14px; border: 1px solid #D9D6CB; border-left: 3px solid ${ss.color}; border-radius: 6px; margin-bottom: 10px; background: #F2F1EA;">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 6px;">
-          <div style="font-size: 11px; font-family: 'Fira Code', monospace; font-weight: 600; color: #1c1917;">${escapeHtml(f.clause)}</div>
+          <div style="font-size: 11px; font-family: 'Fira Code', monospace; font-weight: 600; color: #1A1B1D;">${escapeHtml(f.clause)}</div>
           <span style="font-size: 9px; padding: 2px 8px; background: ${ss.bg}; color: ${ss.color}; border-radius: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap;">${ss.icon} ${ss.label}</span>
         </div>
-        <div style="font-size: 12px; color: #44403c; line-height: 1.55;">${escapeHtml(f.summary)}</div>
-        ${f.detail ? `<div style="font-size: 11px; color: #78716c; line-height: 1.5; margin-top: 6px;">${escapeHtml(f.detail)}</div>` : ''}
+        <div style="font-size: 12px; color: #6F6F68; line-height: 1.55;">${escapeHtml(f.summary)}</div>
+        ${f.detail ? `<div style="font-size: 11px; color: #6F6F68; line-height: 1.5; margin-top: 6px;">${escapeHtml(f.detail)}</div>` : ''}
       </div>
     `;
   }).join('');
@@ -1903,13 +1903,13 @@ function renderAiCriticalReviewPage(data: LCAReportData): string {
         <p style="font-size: 13px; line-height: 1.6; color: ${rs.color}; margin: 0;">${escapeHtml(ai.verdict)}</p>
       </div>
 
-      <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #1c1917;">Findings by ISO 14044 / 14067 Clause</h3>
+      <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #1A1B1D;">Findings by ISO 14044 / 14067 Clause</h3>
       ${findingsHtml}
 
-      <div style="margin-top: 16px; padding: 12px 14px; background: #f5f5f4; border: 1px solid #e7e5e4; border-radius: 6px;">
-        <div style="font-size: 10px; font-family: 'Fira Code', monospace; color: #78716c; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px;">Reviewer Attribution</div>
-        <p style="font-size: 11px; line-height: 1.5; color: #57534e; margin: 0;">${escapeHtml(ai.reviewerNote)}</p>
-        <p style="font-size: 10px; color: #a8a29e; margin: 6px 0 0; font-family: 'Fira Code', monospace;">Review date: ${escapeHtml(ai.reviewDate)}</p>
+      <div style="margin-top: 16px; padding: 12px 14px; background: #F2F1EA; border: 1px solid #D9D6CB; border-radius: 6px;">
+        <div style="font-size: 10px; font-family: 'Fira Code', monospace; color: #6F6F68; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px;">Reviewer Attribution</div>
+        <p style="font-size: 11px; line-height: 1.5; color: #6F6F68; margin: 0;">${escapeHtml(ai.reviewerNote)}</p>
+        <p style="font-size: 10px; color: #6F6F68; margin: 6px 0 0; font-family: 'Fira Code', monospace;">Review date: ${escapeHtml(ai.reviewDate)}</p>
       </div>
 
       ${renderPageFooter(18)}
@@ -1921,12 +1921,12 @@ function renderAiCriticalReviewPage(data: LCAReportData): string {
 // ============================================================================
 
 function renderSectionHeader(number: string, title: string, dark = false, continuation = false): string {
-  const borderColor = dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)';
+  const borderColor = dark ? 'rgba(26,27,29,0.2)' : 'rgba(0,0,0,0.1)';
   return `
     <div style="display: flex; align-items: baseline; gap: 16px; margin-bottom: ${continuation ? '24px' : '32px'}; border-bottom: 1px solid ${borderColor}; padding-bottom: 12px;">
-      <span style="color: #ccff00; font-family: 'Fira Code', monospace; font-size: 14px; font-weight: 700; letter-spacing: 3px;">${number}</span>
+      <span style="color: #205E40; font-family: 'Fira Code', monospace; font-size: 14px; font-weight: 700; letter-spacing: 3px;">${number}</span>
       <h2 style="font-size: ${continuation ? '24px' : '32px'}; font-family: 'Playfair Display', serif; font-weight: 300;">${escapeHtml(title)}</h2>
-      ${continuation ? '<span style="font-size: 10px; color: #a8a29e; font-family: \'Fira Code\', monospace;">(continued)</span>' : ''}
+      ${continuation ? '<span style="font-size: 10px; color: #6F6F68; font-family: \'Fira Code\', monospace;">(continued)</span>' : ''}
     </div>`;
 }
 
@@ -1934,8 +1934,8 @@ function renderSectionHeader(number: string, title: string, dark = false, contin
 // The main renderer replaces all placeholders with actual sequential page numbers,
 // eliminating hardcoded page counts that become stale when pages are added/removed.
 function renderPageFooter(pageNumber?: number, dark = false): string {
-  const color = dark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)';
-  const bgColor = dark ? '#1c1917' : '#f5f5f4';
+  const color = dark ? 'rgba(242,241,234,0.5)' : 'rgba(26,27,29,0.3)';
+  const bgColor = dark ? '#1A1B1D' : '#ECEAE3';
   const dateStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
   // The footer uses a solid background that extends upward (padding-top: 24px) to
@@ -2021,7 +2021,7 @@ export function renderLcaReportHtml(data: LCAReportData): string {
       font-family: 'Inter', system-ui, -apple-system, sans-serif;
       -webkit-font-smoothing: antialiased;
       background: white;
-      color: #1c1917;
+      color: #1A1B1D;
     }
 
     @page { size: A4; margin: 0; }
@@ -2041,12 +2041,12 @@ export function renderLcaReportHtml(data: LCAReportData): string {
 
     .page:last-child { page-break-after: auto; break-after: auto; }
 
-    .dark-page { background: #1c1917; color: white; }
-    .light-page { background: #f5f5f4; color: #1c1917; }
+    .dark-page { background: #F2F1EA; color: #1A1B1D; }
+    .light-page { background: #ECEAE3; color: #1A1B1D; }
 
     .metric-card {
       background: white;
-      border: 1px solid #e7e5e4;
+      border: 1px solid #D9D6CB;
       border-radius: 12px;
       padding: 20px;
     }
@@ -2056,7 +2056,7 @@ export function renderLcaReportHtml(data: LCAReportData): string {
       font-family: 'Fira Code', monospace;
       text-transform: uppercase;
       letter-spacing: 2px;
-      color: #78716c;
+      color: #6F6F68;
       margin-bottom: 8px;
     }
 
@@ -2064,12 +2064,12 @@ export function renderLcaReportHtml(data: LCAReportData): string {
       font-size: 32px;
       font-family: 'Playfair Display', serif;
       font-weight: 700;
-      color: #1c1917;
+      color: #1A1B1D;
     }
 
     .metric-unit {
       font-size: 12px;
-      color: #a8a29e;
+      color: #6F6F68;
       margin-top: 4px;
     }
 
@@ -2086,17 +2086,17 @@ export function renderLcaReportHtml(data: LCAReportData): string {
       font-family: 'Fira Code', monospace;
       text-transform: uppercase;
       letter-spacing: 1px;
-      color: #78716c;
-      border-bottom: 2px solid #e7e5e4;
+      color: #6F6F68;
+      border-bottom: 2px solid #D9D6CB;
     }
 
     .data-table tbody td {
       padding: 10px 12px;
-      border-bottom: 1px solid #f5f5f4;
-      color: #44403c;
+      border-bottom: 1px solid #D9D6CB;
+      color: #6F6F68;
     }
 
-    .data-table tbody tr:nth-child(even) { background: #fafaf9; }
+    .data-table tbody tr:nth-child(even) { background: #F2F1EA; }
 
     .data-table-dark {
       width: 100%;
@@ -2111,17 +2111,17 @@ export function renderLcaReportHtml(data: LCAReportData): string {
       font-family: 'Fira Code', monospace;
       text-transform: uppercase;
       letter-spacing: 1px;
-      color: #a8a29e;
-      border-bottom: 2px solid rgba(255,255,255,0.15);
+      color: #6F6F68;
+      border-bottom: 2px solid rgba(26,27,29,0.15);
     }
 
     .data-table-dark tbody td {
       padding: 10px 12px;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-      color: #d6d3d1;
+      border-bottom: 1px solid rgba(26,27,29,0.05);
+      color: #6F6F68;
     }
 
-    .data-table-dark tbody tr:nth-child(even) { background: rgba(255,255,255,0.03); }
+    .data-table-dark tbody tr:nth-child(even) { background: rgba(26,27,29,0.03); }
 
     .badge {
       display: inline-block;

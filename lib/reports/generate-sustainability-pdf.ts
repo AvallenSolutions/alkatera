@@ -59,8 +59,8 @@ export function buildReportConfig(report: Record<string, any>): ReportConfigShap
     reportFramingStatement: report.report_framing_statement || undefined,
     branding: {
       logo: report.logo_url || null,
-      primaryColor: report.primary_color || '#ccff00',
-      secondaryColor: report.secondary_color || '#10b981',
+      primaryColor: report.primary_color || '#205E40',
+      secondaryColor: report.secondary_color || '#047857',
     },
   };
 }

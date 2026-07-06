@@ -5,9 +5,10 @@
  * consistently. Mirrors the Pulse anomaly alert email style.
  */
 
-const BRAND_GREEN = '#ccff00';
-const INK = '#0a0a0a';
-const SOFT = '#525960';
+const ACCENT = '#205E40';
+const INK = '#1A1B1D';
+const CREAM = '#F2F1EA';
+const SOFT = '#6F6F68';
 
 export interface ReadinessEmailData {
   orgName: string;
@@ -40,19 +41,19 @@ export function renderReadinessEmail(data: ReadinessEmailData): {
 
   const text = `${headline}\n\n${body}\n\nOpen alkatera: ${link}`;
 
-  const html = `<!doctype html><html><body style="margin:0;background:#f5f6f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f6f7;padding:24px 0;">
+  const html = `<!doctype html><html><body style="margin:0;background:#ECEAE3;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ECEAE3;padding:24px 0;">
 <tr><td align="center">
-<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;max-width:640px;width:100%;">
+<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="background:${CREAM};border-radius:12px;overflow:hidden;max-width:640px;width:100%;">
 <tr><td style="background:${INK};padding:20px 28px;">
-<span style="color:#ffffff;font-size:18px;font-weight:700;">alka<span style="color:${BRAND_GREEN};font-weight:700;">tera</span></span>
+<span style="color:${CREAM};font-size:18px;font-weight:500;">alka<span style="color:${CREAM};font-weight:700;">tera</span></span>
 </td></tr>
 <tr><td style="padding:28px;">
-<h1 style="margin:0 0 8px;font-size:20px;color:${INK};">${headline}</h1>
+<h1 style="margin:0 0 8px;font-size:20px;color:${ACCENT};">${headline}</h1>
 <p style="margin:0 0 20px;font-size:15px;line-height:1.5;color:${SOFT};">${body}</p>
-<a href="${link}" style="display:inline-block;background:${BRAND_GREEN};color:${INK};text-decoration:none;font-weight:700;padding:12px 22px;border-radius:8px;font-size:14px;">Open the Certifications hub</a>
+<a href="${link}" style="display:inline-block;background:${INK};color:${CREAM};text-decoration:none;font-weight:700;padding:12px 22px;border-radius:8px;font-size:14px;">Open the Certifications hub</a>
 </td></tr>
-<tr><td style="padding:16px 28px;border-top:1px solid #eceded;">
+<tr><td style="padding:16px 28px;border-top:1px solid #D9D6CB;">
 <p style="margin:0;font-size:12px;color:${SOFT};">${orgName} · B Corp certification tracking on alkatera</p>
 </td></tr>
 </table>

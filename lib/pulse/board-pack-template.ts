@@ -89,7 +89,7 @@ export function renderBoardPackHtml(input: BoardPackInput): string {
   };
 
   const deltaArrow = financialFootprint.delta_gbp < 0 ? '↓' : '↑';
-  const deltaColour = financialFootprint.delta_gbp < 0 ? '#10b981' : '#ef4444';
+  const deltaColour = financialFootprint.delta_gbp < 0 ? '#047857' : '#BE123C';
 
   return `<!doctype html>
 <html>
@@ -98,28 +98,28 @@ export function renderBoardPackHtml(input: BoardPackInput): string {
   <title>Financial board pack -- ${escapeHtml(organizationName)}</title>
   <style>
     @page { size: A4 landscape; margin: 18mm 14mm; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #0f172a; font-size: 11px; line-height: 1.4; margin: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1A1B1D; font-size: 11px; line-height: 1.4; margin: 0; }
     h1 { font-size: 22px; margin: 0 0 2px 0; }
-    h2 { font-size: 13px; margin: 14px 0 6px 0; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; }
-    .header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #ccff00; padding-bottom: 8px; margin-bottom: 16px; }
-    .hero { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 18px; margin-bottom: 12px; }
+    h2 { font-size: 13px; margin: 14px 0 6px 0; text-transform: uppercase; letter-spacing: 0.08em; color: #6F6F68; }
+    .header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #205E40; padding-bottom: 8px; margin-bottom: 16px; }
+    .hero { background: #ECEAE3; border: 1px solid #D9D6CB; border-radius: 8px; padding: 14px 18px; margin-bottom: 12px; }
     .hero .num { font-size: 32px; font-weight: 700; }
     .row { display: flex; gap: 12px; }
     .col { flex: 1; }
     table { width: 100%; border-collapse: collapse; }
-    th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid #e2e8f0; }
-    th { font-weight: 600; font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; }
+    th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid #D9D6CB; }
+    th { font-weight: 600; font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; color: #6F6F68; }
     .num { text-align: right; font-variant-numeric: tabular-nums; }
     .chip { display: inline-block; padding: 1px 6px; border-radius: 99px; font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
-    .chip-green { background: rgba(16, 185, 129, 0.1); color: #10b981; }
-    .chip-amber { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
-    .chip-red { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+    .chip-green { background: rgba(16, 185, 129, 0.1); color: #047857; }
+    .chip-amber { background: rgba(245, 158, 11, 0.1); color: #B45309; }
+    .chip-red { background: rgba(239, 68, 68, 0.1); color: #BE123C; }
     .section { margin-bottom: 10px; }
     .page-break { page-break-before: always; }
-    .stat { border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 10px; }
-    .stat .lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; }
+    .stat { border: 1px solid #D9D6CB; border-radius: 6px; padding: 8px 10px; }
+    .stat .lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: #6F6F68; }
     .stat .val { font-size: 16px; font-weight: 700; }
-    .footer { margin-top: 16px; font-size: 8px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 6px; }
+    .footer { margin-top: 16px; font-size: 8px; color: #6F6F68; border-top: 1px solid #D9D6CB; padding-top: 6px; }
   </style>
 </head>
 <body>
@@ -127,18 +127,18 @@ export function renderBoardPackHtml(input: BoardPackInput): string {
   <div class="header">
     <div>
       <h1>Financial board pack</h1>
-      <div style="color:#64748b; font-size: 11px;">${escapeHtml(organizationName)} · ${escapeHtml(reportingWindow)}</div>
+      <div style="color:#6F6F68; font-size: 11px;">${escapeHtml(organizationName)} · ${escapeHtml(reportingWindow)}</div>
     </div>
-    <div style="color:#64748b; font-size: 10px;">Generated ${escapeHtml(generatedAt)} by alkatera Pulse</div>
+    <div style="color:#6F6F68; font-size: 10px;">Generated ${escapeHtml(generatedAt)} by alkatera Pulse</div>
   </div>
 
   <div class="hero">
-    <div style="color:#64748b; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;">Annual environmental liability</div>
+    <div style="color:#6F6F68; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;">Annual environmental liability</div>
     <div class="num">${fmtGbp(financialFootprint.total_gbp)}</div>
     <div style="font-size: 12px; color: ${deltaColour};">
       ${deltaArrow} ${fmtGbp(Math.abs(financialFootprint.delta_gbp))}
       ${financialFootprint.delta_pct !== null ? ` (${financialFootprint.delta_pct >= 0 ? '+' : ''}${financialFootprint.delta_pct.toFixed(1)}%)` : ''}
-      <span style="color:#64748b;">vs prior 12 months</span>
+      <span style="color:#6F6F68;">vs prior 12 months</span>
     </div>
   </div>
 
@@ -174,7 +174,7 @@ export function renderBoardPackHtml(input: BoardPackInput): string {
       <div style="font-size: 11px; line-height: 1.6;">
         At <b>${scenarioSensitivity.annual_tonnes.toLocaleString('en-GB', { maximumFractionDigits: 0 })} tCO₂e</b> annual emissions,
         every <b>£10</b> change in carbon price moves the bill by
-        <b style="color:#0f172a;">±${fmtGbp(scenarioSensitivity.sensitivity_gbp_per_10)}</b>.
+        <b style="color:#1A1B1D;">±${fmtGbp(scenarioSensitivity.sensitivity_gbp_per_10)}</b>.
         Bank of England stress test (£250/t) would reprice to
         <b>${fmtGbp(scenarioSensitivity.stress_gbp)}</b>.
       </div>
@@ -191,7 +191,7 @@ export function renderBoardPackHtml(input: BoardPackInput): string {
           l => `<tr>
             <td>${escapeHtml(l.label)}</td>
             <td class="num">${l.tonnes.toLocaleString('en-GB', { maximumFractionDigits: 0 })}</td>
-            <td class="num" style="color: ${l.gbp_per_tonne < 0 ? '#10b981' : '#0f172a'};">
+            <td class="num" style="color: ${l.gbp_per_tonne < 0 ? '#047857' : '#1A1B1D'};">
               ${l.gbp_per_tonne < 0 ? '-' : ''}£${Math.round(Math.abs(l.gbp_per_tonne))}/t
             </td>
             <td class="num">${l.payback_years === null ? 'N/A' : l.payback_years === 0 ? 'Instant' : `${l.payback_years.toFixed(1)} yrs`}</td>
@@ -225,7 +225,7 @@ export function renderBoardPackHtml(input: BoardPackInput): string {
     <div class="col">
       <h2>Regulatory exposure</h2>
       <div style="margin-bottom: 4px;">
-        <span style="font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b;">Total annual liability</span>
+        <span style="font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: #6F6F68;">Total annual liability</span>
         <div style="font-size: 20px; font-weight: 700;">${fmtGbp(regulatory.total_gbp)}</div>
       </div>
       <table>
@@ -233,7 +233,7 @@ export function renderBoardPackHtml(input: BoardPackInput): string {
         ${regulatory.lines
           .map(
             l => `<tr>
-              <td>${escapeHtml(l.label)}<br/><span style="font-size: 9px; color: #94a3b8;">${escapeHtml(l.basis)}</span></td>
+              <td>${escapeHtml(l.label)}<br/><span style="font-size: 9px; color: #6F6F68;">${escapeHtml(l.basis)}</span></td>
               <td class="num">${l.gbp > 0 ? fmtGbp(l.gbp) : '—'}</td>
             </tr>`,
           )

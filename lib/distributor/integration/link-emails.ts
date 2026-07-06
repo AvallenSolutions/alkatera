@@ -38,26 +38,26 @@ function renderNewLinkEmail(args: NewLinkEmailArgs): { subject: string; html: st
     : `${args.distributorName} has connected to your alkatera profile`;
 
   const introCopy = args.needsBrandConfirmation
-    ? `<strong style="color: #fff;">${safeDistributor}</strong> has identified <strong style="color: #fff;">${safeBrand}</strong> in their distributor portfolio and would like to connect to your alkatera account. We have not shared your data yet — please confirm or reject the request from your account.`
-    : `<strong style="color: #fff;">${safeDistributor}</strong> distributes your products and has connected to your alkatera profile. They can now see your verified sustainability data in real time.`;
+    ? `<strong style="color: #1A1B1D;">${safeDistributor}</strong> has identified <strong style="color: #1A1B1D;">${safeBrand}</strong> in their distributor portfolio and would like to connect to your alkatera account. We have not shared your data yet — please confirm or reject the request from your account.`
+    : `<strong style="color: #1A1B1D;">${safeDistributor}</strong> distributes your products and has connected to your alkatera profile. They can now see your verified sustainability data in real time.`;
 
   const ctaLabel = args.needsBrandConfirmation ? 'Review request' : 'Manage distributors';
 
   const html = `
-    <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #e0e0e0; padding: 40px; border: 1px solid #222;">
-      <div style="border-bottom: 1px solid #333; padding-bottom: 20px; margin-bottom: 30px; text-align: center;">
+    <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #F2F1EA; color: #1A1B1D; padding: 40px; border: 1px solid #D9D6CB;">
+      <div style="border-bottom: 1px solid #D9D6CB; padding-bottom: 20px; margin-bottom: 30px; text-align: center;">
         <img src="${LOGO_URL}" alt="alkatera" width="160" height="auto" style="display: block; margin: 0 auto 16px auto;" />
-        <h1 style="color: #ccff00; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; margin: 0;">Distributor Connection</h1>
+        <h1 style="color: #205E40; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; margin: 0;">Distributor Connection</h1>
       </div>
-      <p style="color: #ccc; font-size: 14px; line-height: 1.8;">Hi ${safeBrand} team,</p>
-      <p style="color: #ccc; font-size: 14px; line-height: 1.8;">${introCopy}</p>
+      <p style="color: #1A1B1D; font-size: 14px; line-height: 1.8;">Hi ${safeBrand} team,</p>
+      <p style="color: #1A1B1D; font-size: 14px; line-height: 1.8;">${introCopy}</p>
       <div style="margin: 32px 0; text-align: center;">
-        <a href="${settingsUrl}" style="display: inline-block; background: #ccff00; color: #000; font-family: 'Courier New', monospace; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 3px; padding: 16px 32px; text-decoration: none;">${escapeHtml(ctaLabel)} →</a>
+        <a href="${settingsUrl}" style="display: inline-block; background: #1A1B1D; color: #F2F1EA; font-family: 'Courier New', monospace; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 3px; padding: 16px 32px; text-decoration: none;">${escapeHtml(ctaLabel)} →</a>
       </div>
-      <p style="color: #888; font-size: 12px; line-height: 1.8;">
-        You can revoke this connection at any time from <strong style="color: #fff;">Settings → Distributors</strong> in your alkatera dashboard. You also control which specific data fields are shared.
+      <p style="color: #6F6F68; font-size: 12px; line-height: 1.8;">
+        You can revoke this connection at any time from <strong style="color: #1A1B1D;">Settings → Distributors</strong> in your alkatera dashboard. You also control which specific data fields are shared.
       </p>
-      <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #333; color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 2px; text-align: center;">
+      <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #D9D6CB; color: #6F6F68; font-size: 10px; text-transform: uppercase; letter-spacing: 2px; text-align: center;">
         Sent via alka<strong>tera</strong>
       </div>
     </div>

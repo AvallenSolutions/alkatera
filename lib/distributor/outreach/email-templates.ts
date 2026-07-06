@@ -16,8 +16,8 @@ const SITE_URL =
  * accent colour on the CTA.
  *
  * Keeping it optional means every existing distributor outreach call
- * (which passes nothing) continues to render the standard
- * alka**tera** dark + neon-lime identity it always has.
+ * (which passes nothing) continues to render the standard alka**tera**
+ * studio identity (paper ground, ink text, forest accents).
  */
 export interface EmailCoBrand {
   /** Display name shown in copy (e.g. "Foodbuy"). */
@@ -175,7 +175,7 @@ export function renderSubmissionReceiptEmail(args: SubmissionReceiptArgs): Rende
   const filesHtml = args.fileNames
     .map(
       (n) =>
-        `<li style="color: #ccc; font-size: 13px; line-height: 1.8; margin: 0;">${escapeHtml(n)}</li>`,
+        `<li style="color: #1A1B1D; font-size: 13px; line-height: 1.8; margin: 0;">${escapeHtml(n)}</li>`,
     )
     .join('');
 
@@ -183,12 +183,12 @@ export function renderSubmissionReceiptEmail(args: SubmissionReceiptArgs): Rende
   const html = wrap(
     'Submission Received',
     `
-      <p style="color: #ccc; font-size: 14px; line-height: 1.8;">Hi ${safeSubmitter},</p>
-      <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
-        Thanks for sending your sustainability documents to <strong style="color: #fff;">${safeDistributor}</strong>. We have received the following on behalf of <strong style="color: #fff;">${safeBrand}</strong>:
+      <p style="color: #1A1B1D; font-size: 14px; line-height: 1.8;">Hi ${safeSubmitter},</p>
+      <p style="color: #1A1B1D; font-size: 14px; line-height: 1.8;">
+        Thanks for sending your sustainability documents to <strong style="color: #1A1B1D;">${safeDistributor}</strong>. We have received the following on behalf of <strong style="color: #1A1B1D;">${safeBrand}</strong>:
       </p>
       <ul style="margin: 16px 0 24px 18px; padding: 0;">${filesHtml}</ul>
-      <p style="color: #888; font-size: 12px; line-height: 1.8;">
+      <p style="color: #6F6F68; font-size: 12px; line-height: 1.8;">
         ${safeDistributor} will review and follow up if anything is unclear. You do not need to do anything else.
       </p>
     `,
@@ -222,17 +222,17 @@ export function renderDistributorNotificationEmail(
   const html = wrap(
     'Brand Submission',
     `
-      <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
-        <strong style="color: #fff;">${safeBrand}</strong> has submitted ${args.fileCount} sustainability document${args.fileCount === 1 ? '' : 's'} via the brand upload portal.
+      <p style="color: #1A1B1D; font-size: 14px; line-height: 1.8;">
+        <strong style="color: #1A1B1D;">${safeBrand}</strong> has submitted ${args.fileCount} sustainability document${args.fileCount === 1 ? '' : 's'} via the brand upload portal.
       </p>
       <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
         <tr>
-          <td style="padding: 10px 0; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; width: 120px;">Submitter</td>
-          <td style="padding: 10px 0; color: #fff; font-size: 14px;">${safeSubmitter}</td>
+          <td style="padding: 10px 0; color: #6F6F68; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; width: 120px;">Submitter</td>
+          <td style="padding: 10px 0; color: #1A1B1D; font-size: 14px;">${safeSubmitter}</td>
         </tr>
         ${safeEmail ? `<tr>
-          <td style="padding: 10px 0; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;">Email</td>
-          <td style="padding: 10px 0; color: #fff; font-size: 14px;">${safeEmail}</td>
+          <td style="padding: 10px 0; color: #6F6F68; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;">Email</td>
+          <td style="padding: 10px 0; color: #1A1B1D; font-size: 14px;">${safeEmail}</td>
         </tr>` : ''}
       </table>
       ${renderCta(args.brandDetailUrl, 'View brand', ALKATERA_THEME)}
@@ -274,15 +274,15 @@ export function renderDirectoryContactEmail(args: DirectoryContactArgs): Rendere
   const html = wrap(
     'Distributor enquiry',
     `
-      <p style="color: #ccc; font-size: 14px; line-height: 1.8;">Hi ${safeBrand} team,</p>
-      <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
-        <strong style="color: #fff;">${safeSender}</strong> from <strong style="color: #fff;">${safeDistributor}</strong> found your brand in the alka<strong>tera</strong> industry directory and would like to get in touch.
+      <p style="color: #1A1B1D; font-size: 14px; line-height: 1.8;">Hi ${safeBrand} team,</p>
+      <p style="color: #1A1B1D; font-size: 14px; line-height: 1.8;">
+        <strong style="color: #1A1B1D;">${safeSender}</strong> from <strong style="color: #1A1B1D;">${safeDistributor}</strong> found your brand in the alka<strong>tera</strong> industry directory and would like to get in touch.
       </p>
-      <div style="margin: 24px 0; padding: 16px; background: #111; border-left: 3px solid #ccff00; color: #ddd; font-size: 14px; line-height: 1.7;">
+      <div style="margin: 24px 0; padding: 16px; background: #ECEAE3; border-left: 3px solid #205E40; color: #1A1B1D; font-size: 14px; line-height: 1.7;">
         ${safeMessageHtml}
       </div>
-      <p style="color: #888; font-size: 13px; line-height: 1.8;">
-        Reply directly to this email and it will go straight back to <strong style="color: #ccc;">${safeEmail}</strong>.
+      <p style="color: #6F6F68; font-size: 13px; line-height: 1.8;">
+        Reply directly to this email and it will go straight back to <strong style="color: #1A1B1D;">${safeEmail}</strong>.
       </p>
     `,
     args.distributorName,
@@ -319,29 +319,29 @@ interface EmailTheme {
 }
 
 const ALKATERA_THEME: EmailTheme = {
-  card: '#0a0a0a',
-  body: '#ccc',
-  strong: '#fff',
-  muted: '#888',
-  border: '#222',
-  box: '#111',
-  accent: '#ccff00',
-  accentText: '#000',
-  divider: '#333',
-  outerBg: '#0a0a0a',
+  card: '#F2F1EA',
+  body: '#1A1B1D',
+  strong: '#1A1B1D',
+  muted: '#6F6F68',
+  border: '#D9D6CB',
+  box: '#ECEAE3',
+  accent: '#1A1B1D',
+  accentText: '#F2F1EA',
+  divider: '#D9D6CB',
+  outerBg: '#ECEAE3',
 };
 
 const COBRAND_THEME: EmailTheme = {
   card: '#ffffff',
   body: '#475569',
-  strong: '#0f172a',
-  muted: '#94a3b8',
-  border: '#e5e7eb',
-  box: '#f8fafc',
+  strong: '#1A1B1D',
+  muted: '#6F6F68',
+  border: '#D9D6CB',
+  box: '#ECEAE3',
   accent: '#3dbac6',
   accentText: '#ffffff',
-  divider: '#e5e7eb',
-  outerBg: '#f1f5f9',
+  divider: '#D9D6CB',
+  outerBg: '#ECEAE3',
 };
 
 function themeForCoBrand(coBrand: EmailCoBrand | null | undefined): EmailTheme {

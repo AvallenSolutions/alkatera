@@ -103,36 +103,36 @@ export function renderSupplierEsgReportHtml(data: SupplierEsgReportData): string
 <meta charset="utf-8" />
 <style>
   * { box-sizing: border-box; }
-  body { font-family: -apple-system, Helvetica, Arial, sans-serif; color: #111; margin: 0; font-size: 12px; line-height: 1.5; }
+  body { font-family: -apple-system, Helvetica, Arial, sans-serif; color: #1A1B1D; margin: 0; font-size: 12px; line-height: 1.5; }
   .page { padding: 40px 44px; }
   h1 { font-size: 24px; margin: 0 0 4px; }
-  h2 { font-size: 15px; margin: 28px 0 8px; border-bottom: 2px solid #ccff00; padding-bottom: 4px; }
+  h2 { font-size: 15px; margin: 28px 0 8px; border-bottom: 2px solid #205E40; padding-bottom: 4px; }
   h3 { font-size: 14px; margin: 0; }
-  h4 { font-size: 12px; margin: 14px 0 4px; color: #444; text-transform: uppercase; letter-spacing: 0.04em; }
-  .sub { color: #666; font-size: 12px; margin: 0 0 24px; }
-  .muted { color: #888; }
+  h4 { font-size: 12px; margin: 14px 0 4px; color: #6F6F68; text-transform: uppercase; letter-spacing: 0.04em; }
+  .sub { color: #6F6F68; font-size: 12px; margin: 0 0 24px; }
+  .muted { color: #6F6F68; }
   .stats { display: flex; gap: 12px; margin: 12px 0 4px; flex-wrap: wrap; }
-  .stat { border: 1px solid #e3e3e3; border-radius: 8px; padding: 10px 14px; min-width: 130px; }
+  .stat { border: 1px solid #D9D6CB; border-radius: 8px; padding: 10px 14px; min-width: 130px; }
   .stat .n { font-size: 22px; font-weight: 700; }
-  .stat .l { font-size: 11px; color: #666; }
-  .narrative { background: #f7f8f4; border-left: 3px solid #ccff00; padding: 12px 16px; margin: 12px 0; }
-  .supplier { border: 1px solid #e3e3e3; border-radius: 8px; padding: 16px; margin: 12px 0; page-break-inside: avoid; }
+  .stat .l { font-size: 11px; color: #6F6F68; }
+  .narrative { background: #F2F1EA; border-left: 3px solid #205E40; padding: 12px 16px; margin: 12px 0; }
+  .supplier { border: 1px solid #D9D6CB; border-radius: 8px; padding: 16px; margin: 12px 0; page-break-inside: avoid; }
   .supplier-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
   .status { font-size: 10px; padding: 3px 8px; border-radius: 999px; }
-  .st-verified { background: #d9f7e6; color: #066b3a; }
-  .st-submitted { background: #e7eefc; color: #21508f; }
+  .st-verified { background: #d9f7e6; color: #047857; }
+  .st-submitted { background: #e7eefc; color: #2B46C0; }
   table { width: 100%; border-collapse: collapse; }
   table.meta td { padding: 3px 6px; font-size: 11px; }
-  table.meta td:nth-child(odd) { color: #888; width: 22%; }
-  table.qa td { padding: 5px 6px; border-top: 1px solid #eee; vertical-align: top; }
+  table.meta td:nth-child(odd) { color: #6F6F68; width: 22%; }
+  table.qa td { padding: 5px 6px; border-top: 1px solid #D9D6CB; vertical-align: top; }
   table.qa td.q { width: 80%; }
   table.qa td.r { text-align: right; }
   .ans { font-size: 11px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
-  .a-yes { background: #d9f7e6; color: #066b3a; }
-  .a-partial { background: #fef0cd; color: #8a5a00; }
-  .a-no { background: #fde2e1; color: #9b1c1c; }
-  .a-na { background: #eee; color: #666; }
-  .footer { margin-top: 28px; padding-top: 12px; border-top: 1px solid #e3e3e3; color: #888; font-size: 10px; }
+  .a-yes { background: #d9f7e6; color: #047857; }
+  .a-partial { background: #fef0cd; color: #B45309; }
+  .a-no { background: #fde2e1; color: #BE123C; }
+  .a-na { background: #ECEAE3; color: #6F6F68; }
+  .footer { margin-top: 28px; padding-top: 12px; border-top: 1px solid #D9D6CB; color: #6F6F68; font-size: 10px; }
 </style>
 </head>
 <body>
