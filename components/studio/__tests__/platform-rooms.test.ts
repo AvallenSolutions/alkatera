@@ -26,6 +26,14 @@ describe('roomForPath', () => {
     expect(roomForPath('/reports/').key).toBe('evidence');
   });
 
+  it('keeps Pulse in Today but routes Targets to the evidence room', () => {
+    // Targets is a "prove & steer" surface, so it wears the evidence band
+    // even though it sits under /pulse. The specific prefix must win.
+    expect(roomForPath('/pulse/').key).toBe('today');
+    expect(roomForPath('/pulse/financial/').key).toBe('today');
+    expect(roomForPath('/pulse/targets/').key).toBe('evidence');
+  });
+
   it('keeps suppliers and messages in the network', () => {
     expect(roomForPath('/suppliers/').key).toBe('network');
     expect(roomForPath('/settings/messages/').key).toBe('network');

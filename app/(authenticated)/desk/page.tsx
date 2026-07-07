@@ -48,7 +48,7 @@ function posterContent(counts: DeskCounts | null): Record<
     today: {
       eyebrow: 'TODAY',
       headline: 'The day ahead.',
-      note: 'BRIEF · PULSE · TARGETS',
+      note: 'BRIEF · PULSE · FINANCIAL',
       href: '/rosa/',
     },
     workbench: {
@@ -63,22 +63,22 @@ function posterContent(counts: DeskCounts | null): Record<
       eyebrow: 'THE CELLAR',
       headline: 'What we make.',
       note: counts
-        ? n(counts.products, 'PRODUCT', 'PRODUCTS') + ' · LCAS · NATURE'
-        : 'PRODUCTS · LCAS · NATURE',
+        ? n(counts.products, 'PRODUCT', 'PRODUCTS') + ' · LCAS'
+        : 'PRODUCTS · LCAS',
       href: '/products/',
     },
     network: {
       eyebrow: 'THE NETWORK',
       headline: "Who we're talking to.",
-      note: 'SUPPLIERS · MESSAGES · EXPERTS',
+      note: 'SUPPLIERS · MESSAGES · SUPPORT',
       href: '/suppliers/',
     },
     evidence: {
       eyebrow: 'THE EVIDENCE',
       headline: 'What we can prove.',
       note: counts
-        ? n(counts.reports, 'REPORT', 'REPORTS') + ' · CERTIFICATIONS'
-        : 'REPORTS · CERTIFICATIONS · GUARDIAN',
+        ? n(counts.reports, 'REPORT', 'REPORTS') + ' · TARGETS · CERTIFICATIONS'
+        : 'REPORTS · TARGETS · CERTIFICATIONS',
       href: '/reports/',
     },
     library: {

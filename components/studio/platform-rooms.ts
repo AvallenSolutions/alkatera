@@ -58,7 +58,6 @@ export const PLATFORM_ROOMS: Record<PlatformRoomKey, RoomConfig> = {
       { label: 'Brief', href: '/rosa/' },
       { label: 'Pulse', href: '/pulse/' },
       { label: 'Financial', href: '/pulse/financial/' },
-      { label: 'Targets', href: '/pulse/targets/' },
     ],
   },
   workbench: {
@@ -76,9 +75,9 @@ export const PLATFORM_ROOMS: Record<PlatformRoomKey, RoomConfig> = {
       { label: 'Emissions', href: '/data/scope-1-2/' },
       { label: 'Spend', href: '/data/spend-data/' },
       { label: 'Quality', href: '/data/quality/' },
-      { label: 'Sources', href: '/data/sources/' },
     ],
     more: [
+      { label: 'Sources', href: '/data/sources/' },
       { label: 'Inventory', href: '/data/inventory-ledger/' },
       { label: 'Fleet', href: '/company/fleet/' },
       { label: 'Vineyards', href: '/vineyards/' },
@@ -100,8 +99,8 @@ export const PLATFORM_ROOMS: Record<PlatformRoomKey, RoomConfig> = {
     tabs: [
       { label: 'Products', href: '/products/' },
       { label: 'LCAs', href: '/reports/lcas/' },
-      { label: 'Nature', href: '/nature-assessment/' },
     ],
+    more: [{ label: 'Nature', href: '/nature-assessment/' }],
   },
   network: {
     key: 'network',
@@ -116,10 +115,12 @@ export const PLATFORM_ROOMS: Record<PlatformRoomKey, RoomConfig> = {
     tabs: [
       { label: 'Suppliers', href: '/suppliers/' },
       { label: 'Messages', href: '/settings/messages/' },
-      { label: 'Experts', href: '/expert-partners/' },
       { label: 'Support', href: '/settings/feedback/' },
     ],
-    more: [{ label: 'Responsibility', href: '/supplier-responsibility/' }],
+    more: [
+      { label: 'Experts', href: '/expert-partners/' },
+      { label: 'Responsibility', href: '/supplier-responsibility/' },
+    ],
   },
   evidence: {
     key: 'evidence',
@@ -133,9 +134,15 @@ export const PLATFORM_ROOMS: Record<PlatformRoomKey, RoomConfig> = {
     mark: 'quarter', // the atelier window
     tabs: [
       { label: 'Reports', href: '/reports/' },
+      { label: 'Targets', href: '/pulse/targets/' },
       { label: 'Certifications', href: '/certifications/' },
       { label: 'Guardian', href: '/greenwash-guardian/' },
+    ],
+    more: [
       { label: 'Library', href: '/evidence-library/' },
+      { label: 'Materiality', href: '/reports/materiality/' },
+      { label: 'Transition plan', href: '/reports/transition-plan/' },
+      { label: 'Historical', href: '/reports/historical/' },
     ],
   },
   library: {
@@ -165,15 +172,17 @@ export const PLATFORM_ROOMS: Record<PlatformRoomKey, RoomConfig> = {
     mark: 'ring', // the quiet listener
     tabs: [
       { label: 'Settings', href: '/settings/' },
-      { label: 'EPR', href: '/epr/' },
-      { label: 'People', href: '/people-culture/' },
+      { label: 'Billing', href: '/settings/billing/' },
     ],
     more: [
+      { label: 'EPR', href: '/epr/' },
+      { label: 'People', href: '/people-culture/' },
       { label: 'Governance', href: '/governance/' },
       { label: 'Community', href: '/community-impact/' },
-      { label: 'Vitality weights', href: '/governance/vitality-weights/' },
       { label: 'Byproducts', href: '/byproducts/' },
       { label: 'Nature actions', href: '/nature-actions/' },
+      { label: 'Vitality weights', href: '/governance/vitality-weights/' },
+      { label: 'Dependencies', href: '/dependencies/' },
     ],
   },
 };
@@ -192,7 +201,9 @@ const ROOM_PREFIXES: Array<[prefix: string, room: PlatformRoomKey]> = [
   ['/expert-partners', 'network'],
   ['/suppliers', 'network'],
   ['/supplier-responsibility', 'network'],
-  // today
+  // today (but Targets is a "prove & steer" surface, so it lives in the
+  // evidence room, checked before the /pulse catch-all)
+  ['/pulse/targets', 'evidence'],
   ['/rosa', 'today'],
   ['/pulse', 'today'],
   ['/dashboard', 'today'],
