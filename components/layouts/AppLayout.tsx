@@ -8,7 +8,8 @@ import { useSubscription } from '@/hooks/useSubscription'
 import { RoomBand } from '@/components/studio/room-band'
 import { AskRosaBand } from '@/components/studio/ask-rosa-band'
 import { BandControls } from '@/components/studio/band-controls'
-import { roomForPath, tabsForPersona } from '@/components/studio/platform-rooms'
+import { roomForPath, tabsForPersona, type PlatformRoomKey } from '@/components/studio/platform-rooms'
+import { resolveRoomPalette } from '@/lib/studio/brand-palette'
 import { useUserRole } from '@/lib/rosa/useUserRole'
 import { SupplierLayout } from './SupplierLayout'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -196,13 +197,16 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
 
   // The house of rooms: which room's colours does this surface wear?
   // The --room-* variables drive bg-room / text-room-on / text-room-accent
-  // everywhere below (band, tabs, eyebrows, links).
+  // everywhere below (band, tabs, eyebrows, links). If the org has a brand
+  // palette, the room wears the brand-derived colour instead of the studio
+  // default; the marks and accents follow the CSS vars for free.
   const room = roomForPath(pathname)
   const roomTabs = tabsForPersona(room, persona)
+  const paletteEntry = resolveRoomPalette(currentOrganization)[room.key as PlatformRoomKey]
   const roomVars = {
-    '--room-rgb': room.rgb,
-    '--room-accent-rgb': room.accentRgb,
-    '--room-on-rgb': room.onRgb,
+    '--room-rgb': paletteEntry?.rgb ?? room.rgb,
+    '--room-accent-rgb': paletteEntry?.accentRgb ?? room.accentRgb,
+    '--room-on-rgb': paletteEntry?.onRgb ?? room.onRgb,
   } as React.CSSProperties
 
   return (

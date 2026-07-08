@@ -24,6 +24,9 @@ export interface Organization {
   product_type?: string | null
   report_defaults?: Record<string, any> | null
   subscription_status?: string | null
+  /** Seed brand colour (#RRGGBB) and the studio room palette derived from it. */
+  brand_colour?: string | null
+  room_palette?: import('@/lib/studio/brand-palette').RoomPalette | null
 }
 
 interface OrganizationMember {

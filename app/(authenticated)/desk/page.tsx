@@ -12,6 +12,8 @@ import {
   type PlatformRoomKey,
 } from '@/components/studio/platform-rooms';
 import { useUserRole } from '@/lib/rosa/useUserRole';
+import { useOrganization } from '@/lib/organizationContext';
+import { resolveRoomPalette } from '@/lib/studio/brand-palette';
 import { VitalityHero } from '@/components/vitality/VitalityHero';
 
 interface DeskCounts {
@@ -99,6 +101,8 @@ function posterContent(counts: DeskCounts | null): Record<
 export default function DeskPage() {
   const { user } = useAuth();
   const { persona } = useUserRole();
+  const { currentOrganization } = useOrganization();
+  const palette = resolveRoomPalette(currentOrganization);
   const firstName = (user?.user_metadata?.full_name as string | undefined)?.split(' ')[0];
   const [counts, setCounts] = useState<DeskCounts | null>(null);
 
@@ -131,8 +135,8 @@ export default function DeskPage() {
         headline={c.headline}
         note={c.note}
         href={c.href}
-        colour={room.colour}
-        on={room.onColour}
+        colour={palette[key].colour}
+        on={palette[key].onColour}
         mark={room.mark}
         className="min-h-[15rem]"
       />
