@@ -40,6 +40,7 @@ import { AdvisorCompletionStep } from './steps/AdvisorCompletionStep'
 
 // Step components — fast track flow
 import { FastTrackSetupStep } from './steps/FastTrackSetupStep'
+import { FastTrackRevealStep } from './steps/FastTrackRevealStep'
 import { FastTrackImportStep } from './steps/FastTrackImportStep'
 import { FastTrackProductsStep } from './steps/FastTrackProductsStep'
 import { FastTrackFacilityStep } from './steps/FastTrackFacilityStep'
@@ -75,6 +76,7 @@ const STEP_COMPONENTS: Record<string, React.ComponentType> = {
   'advisor-completion': AdvisorCompletionStep,
   // Fast Track steps
   'fast-track-setup': FastTrackSetupStep,
+  'fast-track-reveal': FastTrackRevealStep,
   'fast-track-import': FastTrackImportStep,
   'fast-track-products': FastTrackProductsStep,
   'fast-track-facility': FastTrackFacilityStep,

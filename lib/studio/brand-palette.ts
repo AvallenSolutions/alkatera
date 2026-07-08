@@ -34,11 +34,20 @@ const CREAM_RGB = '242 241 234';
 const INK_RGB = '26 27 29';
 
 /**
- * How much of the studio's native hue spread to keep. 1 = the full studio
- * rainbow (rotated); 0 = every room the same hue. ~0.44 gives a ~140°
- * analogous fan: distinct rooms, unmistakably one colour family.
+ * Each room's hue offset from the brand, in degrees. Today sits exactly on
+ * the brand hue; the others fan out evenly within ±60° so the six rooms are
+ * clearly distinct yet unmistakably one colour family. Fixed offsets (not
+ * scaled from the studio's uneven spacing) keep the fan tight and even for
+ * any brand, so a lone anchor like plum never runs off to the far side.
  */
-const SPREAD = 0.44;
+const ROOM_OFFSET: Record<string, number> = {
+  today: 0,
+  library: 15,
+  workbench: 36,
+  cellar: 60,
+  network: -30,
+  evidence: -55,
+};
 
 /** Saturation ceiling so a bright anchor never reads as neon once rotated. */
 const MAX_S = 0.54;
@@ -167,7 +176,6 @@ export function roomPaletteFromBrand(brandHex: string | null | undefined): RoomP
   if (!brandRgb) return DEFAULT_ROOM_PALETTE;
 
   const brandHue = rgbToHsl(...brandRgb).h;
-  const forestHue = rgbToHsl(...parseHex(PLATFORM_ROOMS.today.colour)!).h;
 
   const palette: Partial<RoomPalette> = {};
   for (const key of Object.keys(PLATFORM_ROOMS) as PlatformRoomKey[]) {
@@ -176,20 +184,20 @@ export function roomPaletteFromBrand(brandHex: string | null | undefined): RoomP
       palette[key] = DEFAULT_ROOM_PALETTE[key];
       continue;
     }
+    // Keep each room's studio saturation and lightness (its character); take
+    // only the hue from the brand, placed at the room's even fan offset. Cap
+    // saturation and darken the green band so a bright anchor never reads as
+    // neon and every room stays in the gallery-muted register.
     const anchor = rgbToHsl(...parseHex(PLATFORM_ROOMS[key].colour)!);
-    // The room's native distance from forest, taken as the shortest way
-    // round the wheel, then compressed into an analogous fan on the brand.
-    let offset = anchor.h - forestHue;
-    offset = ((offset + 540) % 360) - 180;
-    // Cap saturation and lightness so a bright, saturated anchor (ochre,
-    // brick) doesn't read as neon once rotated to a green or pink hue.
-    // Greens and yellows look lighter than reds/blues at the same value,
-    // so the ceiling keeps every room in the gallery-muted register.
-    const hue = brandHue + offset * SPREAD;
+    const hue = brandHue + (ROOM_OFFSET[key] ?? 0);
+    // Only the light rooms need the green-band darkening (they are the ones
+    // that turn neon); already-dark rooms keep their tone, so a green brand's
+    // Today stays exactly the brand colour.
+    const lightness = Math.max(0, Math.min(1, (anchor.l - 0.3) / 0.18));
     const rotated: Hsl = {
       h: hue,
       s: Math.min(anchor.s, MAX_S),
-      l: Math.max(0.16, Math.min(0.52, anchor.l - greenPenalty(hue))),
+      l: Math.max(0.16, Math.min(0.52, anchor.l - greenPenalty(hue) * lightness)),
     };
     const rgb = hslToRgb(rotated);
     const colour = toHex(rgb);

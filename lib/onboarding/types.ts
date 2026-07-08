@@ -50,6 +50,7 @@ export type OnboardingStep =
   | 'advisor-completion'
   // Fast Track flow steps
   | 'fast-track-setup'
+  | 'fast-track-reveal'
   | 'fast-track-import'
   | 'fast-track-products'
   | 'fast-track-facility'
@@ -116,12 +117,13 @@ export const TOTAL_ADVISOR_STEPS = ADVISOR_ONBOARDING_STEPS.length
 export const FAST_TRACK_STEPS: OnboardingStepConfig[] = [
   { id: 'welcome-screen',        phase: 'welcome',        title: 'Welcome',         description: 'Welcome to alkatera',          skippable: false, index: 0 },
   { id: 'fast-track-setup',      phase: 'welcome',        title: 'Your Company',    description: 'Tell us about your business',  skippable: false, index: 1 },
-  { id: 'fast-track-import',     phase: 'quick-wins',     title: 'Bring Your Data', description: 'Connect or import what you have', skippable: true, index: 2 },
-  { id: 'fast-track-products',   phase: 'quick-wins',     title: 'Your Products',   description: 'Add or refine products',       skippable: true,  index: 3 },
-  { id: 'fast-track-facility',   phase: 'quick-wins',     title: 'Your Facility',   description: 'Where you produce',            skippable: true,  index: 4 },
-  { id: 'fast-track-estimate',   phase: 'first-insights', title: 'Your Footprint',  description: 'Your instant estimate',        skippable: false, index: 5 },
-  { id: 'fast-track-target',     phase: 'first-insights', title: 'Your Target',     description: 'Set a reduction goal',         skippable: true,  index: 6 },
-  { id: 'fast-track-completion', phase: 'power-features', title: 'All Set',         description: 'Next steps to improve',        skippable: false, index: 7 },
+  { id: 'fast-track-reveal',     phase: 'welcome',        title: 'Here You Are',    description: 'What we found on your website', skippable: true, index: 2 },
+  { id: 'fast-track-import',     phase: 'quick-wins',     title: 'Bring Your Data', description: 'Connect or import what you have', skippable: true, index: 3 },
+  { id: 'fast-track-products',   phase: 'quick-wins',     title: 'Your Products',   description: 'Add or refine products',       skippable: true,  index: 4 },
+  { id: 'fast-track-facility',   phase: 'quick-wins',     title: 'Your Facility',   description: 'Where you produce',            skippable: true,  index: 5 },
+  { id: 'fast-track-estimate',   phase: 'first-insights', title: 'Your Footprint',  description: 'Your instant estimate',        skippable: false, index: 6 },
+  { id: 'fast-track-target',     phase: 'first-insights', title: 'Your Target',     description: 'Set a reduction goal',         skippable: true,  index: 7 },
+  { id: 'fast-track-completion', phase: 'power-features', title: 'All Set',         description: 'Next steps to improve',        skippable: false, index: 8 },
 ]
 
 export const TOTAL_FAST_TRACK_STEPS = FAST_TRACK_STEPS.length
@@ -191,6 +193,12 @@ export interface PersonalizationData {
   annualProductionBucket?: AnnualProductionBucket
   /** Company website URL */
   websiteUrl?: string
+  /** Brand colour scraped from the website (or confirmed by the user). */
+  brandColour?: string
+  /** Brand logo URL scraped from the website. */
+  brandLogoUrl?: string
+  /** Product names found on the website (shown on the reveal step). */
+  scrapedProductNames?: string[]
   /** Country of operation */
   country?: string
   /** Year company was founded */

@@ -131,6 +131,16 @@ export function FastTrackSetupStep() {
           const data = await poll.json().catch(() => ({}))
           if (data?.status === 'completed') {
             applyBrandPrefill(data.brandMetadata ?? null, data.orgDescription ?? null)
+            // Stash what the crawl found so the reveal step can show it: the
+            // brand colour (for the room recolour), logo and product names.
+            const found = Array.isArray(data.products)
+              ? data.products.map((p: any) => p?.name).filter(Boolean).slice(0, 12)
+              : []
+            updatePersonalization({
+              ...(data.brandMetadata?.brand_colour ? { brandColour: data.brandMetadata.brand_colour } : {}),
+              ...(data.brandMetadata?.logo_url ? { brandLogoUrl: data.brandMetadata.logo_url } : {}),
+              ...(found.length ? { scrapedProductNames: found } : {}),
+            })
             return
           }
           if (data?.status === 'failed') return
