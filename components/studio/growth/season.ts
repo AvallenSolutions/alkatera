@@ -17,8 +17,64 @@ import type { Prim } from './species/shared';
 
 export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
 
-export function seasonForDate(date: Date): Season {
-  const m = date.getMonth(); // 0..11
+export type Hemisphere = 'north' | 'south';
+
+/**
+ * Southern-hemisphere countries, matched against the organisation's
+ * free-text country field (case-insensitive, punctuation-light). An
+ * Adelaide winery gets summer in December; unknown or missing countries
+ * default north. Equator-straddlers are placed by where their industry
+ * mostly sits.
+ */
+const SOUTHERN_COUNTRIES = [
+  'australia',
+  'new zealand',
+  'aotearoa',
+  'south africa',
+  'argentina',
+  'chile',
+  'uruguay',
+  'paraguay',
+  'bolivia',
+  'peru',
+  'brazil',
+  'brasil',
+  'namibia',
+  'botswana',
+  'zimbabwe',
+  'zambia',
+  'mozambique',
+  'madagascar',
+  'malawi',
+  'angola',
+  'lesotho',
+  'eswatini',
+  'swaziland',
+  'tanzania',
+  'fiji',
+  'papua new guinea',
+  'samoa',
+  'tonga',
+  'vanuatu',
+  'new caledonia',
+  'timor',
+  'indonesia',
+];
+
+/** ISO-style short codes, in case the field ever carries one. */
+const SOUTHERN_CODES = new Set(['au', 'nz', 'za', 'ar', 'cl', 'uy', 'py', 'bo', 'pe', 'br', 'id', 'fj', 'pg']);
+
+export function hemisphereForCountry(country?: string | null): Hemisphere {
+  if (!country) return 'north';
+  const c = country.trim().toLowerCase();
+  if (!c) return 'north';
+  if (SOUTHERN_CODES.has(c)) return 'south';
+  return SOUTHERN_COUNTRIES.some((name) => c.includes(name)) ? 'south' : 'north';
+}
+
+export function seasonForDate(date: Date, hemisphere: Hemisphere = 'north'): Season {
+  // The southern year is the northern year six months around.
+  const m = (date.getMonth() + (hemisphere === 'south' ? 6 : 0)) % 12; // 0..11
   if (m >= 2 && m <= 4) return 'spring';
   if (m >= 5 && m <= 7) return 'summer';
   if (m >= 8 && m <= 10) return 'autumn';

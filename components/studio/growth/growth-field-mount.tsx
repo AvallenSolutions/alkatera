@@ -23,7 +23,7 @@ import { useOrganization } from '@/lib/organizationContext';
 import type { GrowthBandKey } from '@/lib/desk/growth-score';
 import { GrowthField } from './growth-field';
 import { ForestKey } from './forest-key';
-import type { Season } from './season';
+import { hemisphereForCountry, type Season } from './season';
 
 interface GrowthPayload {
   score: number;
@@ -121,6 +121,7 @@ export function GrowthFieldMount({ className }: { className?: string }) {
         seed={orgId}
         replayFrom={replayFrom}
         season={season}
+        hemisphere={hemisphereForCountry(currentOrganization?.country)}
         className={className}
       />
       <ForestKey score={payload.score} bands={payload.bands} organizationId={orgId} />

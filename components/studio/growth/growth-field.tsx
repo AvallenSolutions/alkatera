@@ -41,7 +41,7 @@ import {
   type LayerKey,
   type PlantSlot,
 } from './layout';
-import { dressForSeason, seasonForDate, type Season } from './season';
+import { dressForSeason, seasonForDate, type Hemisphere, type Season } from './season';
 import type { Creature } from './species/creatures';
 import type { Prim } from './species/shared';
 
@@ -54,6 +54,8 @@ interface GrowthFieldProps {
   replayFrom?: number;
   /** Override the calendar (dev tooling); defaults to today's season. */
   season?: Season;
+  /** Which half of the world the org lives in; flips the calendar. */
+  hemisphere?: Hemisphere;
   className?: string;
 }
 
@@ -249,7 +251,14 @@ function rosaSpotForSession(seed: string): { x: number; flip: boolean } | null {
   }
 }
 
-export function GrowthField({ score, seed, replayFrom, season, className }: GrowthFieldProps) {
+export function GrowthField({
+  score,
+  seed,
+  replayFrom,
+  season,
+  hemisphere,
+  className,
+}: GrowthFieldProps) {
   const population = useMemo(() => makePopulation(seed), [seed]);
   const rosaSpot = useMemo(() => rosaSpotForSession(seed), [seed]);
   const creatures = useMemo(
@@ -259,7 +268,7 @@ export function GrowthField({ score, seed, replayFrom, season, className }: Grow
       ),
     [population, rosaSpot],
   );
-  const liveSeason = season ?? seasonForDate(new Date());
+  const liveSeason = season ?? seasonForDate(new Date(), hemisphere ?? 'north');
   const [still, setStill] = useState(false);
   // The replay: open on the score you last saw, then grow to today's.
   const start = Math.min(Math.max(0, replayFrom ?? 0), score);

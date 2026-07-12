@@ -13,6 +13,7 @@ import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
 import { resolveAccessibleOrg } from '@/lib/supabase/verify-org-access'
 import { computeGrowthScore } from '@/lib/desk/growth-score'
 import { buildForestSvg } from '@/components/studio/growth/render-svg'
+import { hemisphereForCountry, seasonForDate } from '@/components/studio/growth/season'
 
 export const runtime = 'nodejs'
 
@@ -30,8 +31,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'No organisation' }, { status: 403 })
   }
 
-  const { score } = await computeGrowthScore(client as any, organizationId)
-  const svg = buildForestSvg({ seed: organizationId, score })
+  const [{ score }, org] = await Promise.all([
+    computeGrowthScore(client as any, organizationId),
+    (client as any)
+      .from('organizations')
+      .select('country')
+      .eq('id', organizationId)
+      .maybeSingle(),
+  ])
+  const season = seasonForDate(new Date(), hemisphereForCountry(org?.data?.country))
+  const svg = buildForestSvg({ seed: organizationId, score, season })
 
   return new NextResponse(svg, {
     headers: {
