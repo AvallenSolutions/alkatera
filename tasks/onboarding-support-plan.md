@@ -3,6 +3,12 @@
 **Worktree:** `/Users/timej/Documents/GitHub/alkatera/.claude/worktrees/redesign` (branch `redesign`, never main)
 **Session scope:** approve plan, then build phases in order until the Fable budget runs out, committing each phase as it completes. A copy of this plan lands in the worktree at `tasks/onboarding-support-plan.md` so later sessions can continue.
 
+**Status: all four phases built.**
+- Phase 1 (arrival ritual, never-empty desk) — commit `16a5a1ae`.
+- Phase 2 (room-segmented onboarding, coachmark primitive) — commit `9abf5341`.
+- Phase 3 (Rosa + wiki support spine) — commit `0c9a38d2`.
+- Phase 4 (lifecycle, nudges and measurement) — this session, uncommitted at time of writing. See "Phase 4 — build notes" below.
+
 ## Context
 
 alka**tera** asks users for a huge amount of data. The redesign (house of rooms, growth field, Rosa) gives us the raw material for onboarding that feels like moving into a studio rather than filling in a government form. The goals:
@@ -85,6 +91,22 @@ Goal: a user's first, second and third recourse are all in-app.
 - **Stalled-band nudges** via the existing `useRosaNudges` path: a band unchanged for N days surfaces one gentle desk priority (never more than one nudge at a time).
 - **Band-completion moments**: one-time celebratory statement when a growth band crosses its threshold (the forest already grows; add the acknowledgement).
 - **Measurement**: extend `onboarding_step_events` telemetry to room-checklist events; track Rosa conversations that used support tools vs tickets filed (the support-deflection number); surface both in the existing `admin/platform` OnboardingFunnelSection.
+
+### Phase 4 — build notes
+
+Kept deliberately client-side and additive; no DB migrations (`rosa_telemetry` and `onboarding_step_events` used exactly as they already exist).
+
+- **Band-completion moments** — `components/studio/growth/growth-field-mount.tsx` gained a `useBandCompletion` hook and `components/studio/growth/band-completion-toast.tsx`. A sibling localStorage key, `alkatera:bands:${orgId}`, snapshots which of the six bands are at full weight; on the visit a band newly crosses that line (and only when a prior snapshot exists, so a first-ever visit stays quiet), a one-time cream/hairline toast fades in top-centre for ~5s and auto-clears. At most one per page load.
+- **Stalled-band nudge** — new `lib/desk/stall-detection.ts` (`checkScoreStall`), a sibling to the forest replay's own localStorage pattern: it remembers `{score, since}` per org under `alkatera:score-snapshot:${orgId}`, resets the clock whenever the score moves, and reports "stalled" once the same score has sat for 14+ days. Wired into `components/studio/desk-priorities.tsx`'s existing setup-action fallback: only the first action gets a hint line, "The forest has been quiet for a while.", never more than one. Note: this is the client-side desk-priorities nudge described in the build prompt, not the `useRosaNudges` server-polling path mentioned above — see Future work.
+- **Room-checklist telemetry** — `components/studio/room-setup-panel.tsx` now calls `trackOnboarding` (unchanged contract, `lib/onboarding/telemetry.ts`) at three points: first intro render, checklist dismiss, and each checklist item click. All three use `flow: 'room_checklist'`, `step: <room>`, and the *existing* `onboarding_step_events.event` values (`view` / `dismiss` / `complete`) — the specific moment (`room_intro_seen`, `room_checklist_dismissed`, `room_checklist_item_clicked`, the latter with `itemId`) lives in `meta.kind` rather than a new `event` string, because `event` is DB CHECK-constrained and no migration was in scope.
+- **Support-deflection measurement** — `lib/rosa/tools.ts` (`toolSearchKnowledgeBank`, `toolGetSetupNextSteps`) and `lib/rosa/actions.ts` (`execProposeSupportTicket`) now call `logRosaTelemetry` (existing helper in `lib/rosa/budget.ts`, fails silently if the table is missing) with events `support.knowledge_search`, `support.next_steps`, `support.ticket_filed`. New `app/api/admin/support-stats/route.ts` (bearer + `is_alkatera_admin()` + service-role read, cribbed from `app/api/admin/beta-access/route.ts`) counts the last 30 days; new `app/(authenticated)/admin/platform/components/SupportDeflectionSection.tsx` renders the four numbers (searches, asks, tickets, deflection ratio) and is mounted in `admin/platform/page.tsx` beside `OnboardingFunnelSection`.
+
+### Future work (parked, out of scope for this pass)
+
+- **Server-side scheduled nudges/drip** — the stalled-band nudge above is a client-side, per-visit check against a localStorage snapshot. A proper drip (email/notification when a band goes quiet, independent of the user opening the app) needs an Inngest scheduled function reading the growth score server-side per org, per the project's background-work convention (see root `CLAUDE.md`). Not built this pass.
+- **Converging legacy guides onto Coachmark** — `EmissionsGuide`, `ProductGuide` and the other hand-rolled guide variants (Phase 2) still work standalone; only new surfaces use `components/studio/coachmark.tsx`. Migrating the existing ones is a follow-up, not a blocker.
+- **Member/advisor flow restyle** — the 6/4-step member and advisor onboarding flows were only restyled with the studio kit in Phase 1, not redesigned; lower priority than the owner arrival ritual.
+- **Arrival flow live click-through** — the arrival ritual (Phase 1) has not been walked end-to-end in a browser against a fresh sign-up in this worktree; worth a manual pass before this goes anywhere near main.
 
 ## Files most touched
 

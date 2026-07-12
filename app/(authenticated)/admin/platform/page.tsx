@@ -22,6 +22,7 @@ import type {
 import { StatsOverview } from "./components/StatsOverview";
 import { GrowthTrendsSection } from "./components/GrowthTrendsSection";
 import { OnboardingFunnelSection } from "./components/OnboardingFunnelSection";
+import { SupportDeflectionSection } from "./components/SupportDeflectionSection";
 import { OrganizationsAndSuppliersCard } from "./components/OrganizationsAndSuppliersCard";
 import { InsightsSection } from "./components/InsightsSection";
 import { AlertsPanel } from "./components/AlertsPanel";
@@ -207,6 +208,9 @@ export default function PlatformDashboardPage() {
         />
         <OnboardingFunnelSection data={onboardingAnalytics} loading={false} />
       </div>
+
+      {/* Support-deflection measurement (Phase 4) */}
+      <SupportDeflectionSection />
 
       {/* Insights (Improvement 4) */}
       <InsightsSection data={insights} loading={false} />

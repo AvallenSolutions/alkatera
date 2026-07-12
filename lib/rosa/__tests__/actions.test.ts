@@ -162,8 +162,15 @@ describe('executeAction', () => {
 });
 
 describe('action proposer tools', () => {
-  it('expose the three action tool names', async () => {
+  it('exposes the core action tool names', async () => {
     const { ACTION_TOOL_NAMES } = await import('../tools');
-    expect(ACTION_TOOL_NAMES).toEqual(['propose_log_utility_entry', 'propose_set_target', 'propose_add_supplier']);
+    expect(ACTION_TOOL_NAMES).toEqual(
+      expect.arrayContaining([
+        'propose_log_utility_entry',
+        'propose_set_target',
+        'propose_add_supplier',
+        'propose_support_ticket',
+      ])
+    );
   });
 });

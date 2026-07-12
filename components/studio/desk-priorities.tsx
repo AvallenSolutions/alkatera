@@ -6,6 +6,7 @@ import { Eyebrow } from './eyebrow';
 import { FactList } from './fact-list';
 import type { WorkingTone } from './theme';
 import { GROWTH_WEIGHTS, type GrowthBandKey, type GrowthSignal } from '@/lib/desk/growth-score';
+import { checkScoreStall } from '@/lib/desk/stall-detection';
 
 interface CuratedTile {
   id: string;
@@ -95,6 +96,7 @@ export function DeskPriorities({ limit = 3 }: { limit?: number }) {
   const orgId = currentOrganization?.id;
   const [tiles, setTiles] = useState<CuratedTile[] | null>(null);
   const [growth, setGrowth] = useState<GrowthResponse | null>(null);
+  const [stalled, setStalled] = useState(false);
 
   useEffect(() => {
     if (!orgId) return;
@@ -121,6 +123,15 @@ export function DeskPriorities({ limit = 3 }: { limit?: number }) {
     };
   }, [orgId]);
 
+  // Stalled-band nudge: has this org's score sat still for a fortnight?
+  // Client-only comparison against a localStorage snapshot — see
+  // lib/desk/stall-detection.ts. Only ever affects the setup-action
+  // fallback below, and only ever nudges once.
+  useEffect(() => {
+    if (!orgId || growth === null) return;
+    setStalled(checkScoreStall(orgId, growth.score));
+  }, [orgId, growth]);
+
   const hasCuratedTiles = !!tiles && tiles.length > 0;
   const scoreIsLow = growth ? growth.score < NEVER_EMPTY_SCORE_THRESHOLD : false;
   const useFallback = growth?.signals && (!hasCuratedTiles || scoreIsLow);
@@ -137,9 +148,13 @@ export function DeskPriorities({ limit = 3 }: { limit?: number }) {
         <section className="rounded-[6px] border border-border bg-card p-5 md:p-6">
           <Eyebrow className="mb-4 text-room-accent">Get your desk started</Eyebrow>
           <FactList
-            items={actions.map((action) => ({
+            items={actions.map((action, index) => ({
               id: action.id,
               title: action.label,
+              // The stalled-band nudge: never more than one, and only ever
+              // on the first action, so it reads as a gentle aside rather
+              // than a warning.
+              hint: index === 0 && stalled ? 'The forest has been quiet for a while.' : undefined,
               href: action.href,
             }))}
           />

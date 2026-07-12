@@ -18,6 +18,7 @@ import { useEffect, useState } from 'react';
 import { useOrganization } from '@/lib/organizationContext';
 import { useOnboarding } from '@/lib/onboarding/OnboardingContext';
 import { useRosaContext } from '@/lib/rosa/RosaContextProvider';
+import { trackOnboarding } from '@/lib/onboarding/telemetry';
 import { ROOM_GUIDES, ROOM_CHECKLIST_LIMIT } from '@/lib/onboarding/room-guides';
 import { PLATFORM_ROOMS, type PlatformRoomKey } from './platform-rooms';
 import { Panel } from './panel';
@@ -94,6 +95,17 @@ export function RoomSetupPanel({ room }: { room: PlatformRoomKey }) {
     if (!introSeenSaved) {
       setShowIntro(true);
       markRoomIntroSeen(room);
+      // room_intro_seen: the room-checklist telemetry family (Phase 4). The
+      // `event` value stays within onboarding_step_events' existing enum;
+      // the specific event name lives in meta.kind so analysts can filter
+      // flow='room_checklist' down to the moment that happened.
+      trackOnboarding({
+        organizationId: currentOrganization?.id,
+        flow: 'room_checklist',
+        step: room,
+        event: 'view',
+        meta: { kind: 'room_intro_seen' },
+      });
     }
     // Runs once per mount, as soon as the real state has loaded.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -130,6 +142,14 @@ export function RoomSetupPanel({ room }: { room: PlatformRoomKey }) {
     chip: s.done ? { tone: 'good' as const, label: 'Done' } : undefined,
     meta: s.done ? undefined : 'TO DO',
     href: s.href,
+    onNavigate: () =>
+      trackOnboarding({
+        organizationId: currentOrganization?.id,
+        flow: 'room_checklist',
+        step: room,
+        event: 'complete',
+        meta: { kind: 'room_checklist_item_clicked', itemId: s.id },
+      }),
   }));
 
   return (
@@ -153,7 +173,16 @@ export function RoomSetupPanel({ room }: { room: PlatformRoomKey }) {
           </button>
           <button
             type="button"
-            onClick={() => dismissRoomChecklist(room)}
+            onClick={() => {
+              dismissRoomChecklist(room);
+              trackOnboarding({
+                organizationId: currentOrganization?.id,
+                flow: 'room_checklist',
+                step: room,
+                event: 'dismiss',
+                meta: { kind: 'room_checklist_dismissed' },
+              });
+            }}
             className="font-mono text-[10px] uppercase tracking-[0.18em] text-studio-dim underline-offset-2 hover:text-foreground hover:underline"
           >
             Hide this.

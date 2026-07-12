@@ -20,9 +20,10 @@
 
 import { useEffect, useState } from 'react';
 import { useOrganization } from '@/lib/organizationContext';
-import type { GrowthBandKey } from '@/lib/desk/growth-score';
+import { GROWTH_WEIGHTS, type GrowthBandKey } from '@/lib/desk/growth-score';
 import { GrowthField, rosaSpotForSession } from './growth-field';
 import { ForestKey } from './forest-key';
+import { BandCompletionToast } from './band-completion-toast';
 import { hemisphereForCountry, seasonForDate, type Season } from './season';
 
 interface GrowthPayload {
@@ -34,6 +35,53 @@ const SEASONS: Season[] = ['spring', 'summer', 'autumn', 'winter'];
 
 function storageKey(orgId: string): string {
   return `alkatera:forest:${orgId}`;
+}
+
+function bandsStorageKey(orgId: string): string {
+  return `alkatera:bands:${orgId}`;
+}
+
+/**
+ * The band-completion moment: compares this visit's per-band completion
+ * against the last-seen snapshot in localStorage, and reports at most one
+ * newly-completed band (never more than one moment per page load). A band
+ * counts as complete once its points reach its full weight (see
+ * GROWTH_WEIGHTS). Silent on the very first visit — there is nothing to
+ * compare against yet, so nothing "newly" completed.
+ */
+function useBandCompletion(
+  orgId: string | undefined,
+  bands: Record<GrowthBandKey, number> | null,
+): [GrowthBandKey | null, () => void] {
+  const [band, setBand] = useState<GrowthBandKey | null>(null);
+  const [evaluatedFor, setEvaluatedFor] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!orgId || !bands || evaluatedFor === orgId) return;
+    setEvaluatedFor(orgId);
+    try {
+      const key = bandsStorageKey(orgId);
+      const raw = window.localStorage.getItem(key);
+      const prevDone: Partial<Record<GrowthBandKey, boolean>> = raw ? JSON.parse(raw) : {};
+      const nextDone: Partial<Record<GrowthBandKey, boolean>> = {};
+      let newlyCompleted: GrowthBandKey | null = null;
+      for (const bandKey of Object.keys(GROWTH_WEIGHTS) as GrowthBandKey[]) {
+        const done = bands[bandKey] >= GROWTH_WEIGHTS[bandKey] - 0.01;
+        nextDone[bandKey] = done;
+        // Only a real snapshot (raw !== null) can make a completion "new" —
+        // a first-ever visit simply records the baseline, quietly.
+        if (raw !== null && done && !prevDone[bandKey] && !newlyCompleted) {
+          newlyCompleted = bandKey;
+        }
+      }
+      window.localStorage.setItem(key, JSON.stringify(nextDone));
+      if (newlyCompleted) setBand(newlyCompleted);
+    } catch {
+      // Private browsing: the moment simply doesn't fire today.
+    }
+  }, [orgId, bands, evaluatedFor]);
+
+  return [band, () => setBand(null)];
 }
 
 export function useGrowthScore(): GrowthPayload | null {
@@ -80,6 +128,7 @@ export function GrowthFieldMount({ className }: { className?: string }) {
   const [replayFrom, setReplayFrom] = useState<number | undefined>(undefined);
   const [replayReady, setReplayReady] = useState(false);
   const [season, setSeason] = useState<Season | undefined>(undefined);
+  const [completedBand, clearCompletedBand] = useBandCompletion(orgId, payload?.bands ?? null);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== 'production') {
@@ -137,6 +186,9 @@ export function GrowthFieldMount({ className }: { className?: string }) {
         season={effectiveSeason}
         rosaSpot={rosaSpot}
       />
+      {completedBand && (
+        <BandCompletionToast band={completedBand} onDone={clearCompletedBand} />
+      )}
     </>
   );
 }

@@ -14,6 +14,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { isReadOnlyAdvisor } from '@/lib/auth/advisor-access';
 import { findSmartMeterOverlap } from '@/lib/energy/smart-meter-conflict';
+import { logRosaTelemetry } from './budget';
 
 export interface ProposeInput {
   organizationId: string;
@@ -696,5 +697,11 @@ async function execProposeSupportTicket(
     .select('id')
     .single();
   if (error) throw new Error(error.message);
+  // Support-deflection measurement (Phase 4): the escalation actually
+  // firing, counted against the in-place resolutions above (search +
+  // next-steps) to see how much support genuinely deflects. Best-effort.
+  await logRosaTelemetry(supabase, organizationId, userId, 'support.ticket_filed', {
+    ticket_id: (data as any).id,
+  });
   return { ticket_id: (data as any).id, table: 'feedback_tickets' };
 }

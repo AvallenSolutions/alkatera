@@ -26,6 +26,7 @@ import { loadAttachment, extractStructured } from './document-extraction';
 import { buildOrgSignalPack } from './priority-signals';
 import { getBenchmarkForProductType } from '@/lib/industry-benchmarks';
 import { gatherGrowthIngredients, scoreFromIngredients, computeGrowthSignals } from '@/lib/desk/growth-score';
+import { logRosaTelemetry } from './budget';
 
 export interface ToolContext {
   supabase: SupabaseClient;
@@ -1474,6 +1475,13 @@ async function toolSearchKnowledgeBank(
   if (error) {
     return { is_error: true, content: error.message, audit: { tool: 'search_knowledge_bank', error: error.message } };
   }
+  // Support-deflection measurement (Phase 4): a knowledge-bank search is a
+  // question Rosa is trying to answer in place, before it ever becomes a
+  // ticket. Best-effort, never blocks the tool result.
+  await logRosaTelemetry(ctx.supabase, ctx.organizationId, ctx.userId, 'support.knowledge_search', {
+    query,
+    row_count: data?.length ?? 0,
+  });
   return {
     is_error: false,
     content: JSON.stringify({
@@ -1659,6 +1667,10 @@ async function toolGetSetupNextSteps(ctx: ToolContext): Promise<ToolResult> {
     const undone = signals[band].filter((s) => !s.done).map((s) => ({ label: s.label, href: s.href }));
     if (undone.length > 0) undoneByBand[band] = undone;
   }
+
+  // Support-deflection measurement (Phase 4): Rosa answering "what's next"
+  // is a support interaction resolved in place. Best-effort, non-blocking.
+  await logRosaTelemetry(ctx.supabase, ctx.organizationId, ctx.userId, 'support.next_steps', { score });
 
   return {
     is_error: false,
