@@ -158,23 +158,32 @@ export function OnboardingWizard() {
 
   const isWelcome = state.currentStep === 'welcome-screen' || state.currentStep === 'member-welcome' || state.currentStep === 'advisor-welcome' || state.currentStep === 'arrival-welcome'
   const isCompletion = state.currentStep === 'completion' || state.currentStep === 'member-completion' || state.currentStep === 'fast-track-completion' || state.currentStep === 'advisor-completion'
-  const arrivalStepNumber = isArrivalFlow ? Math.max(0, ARRIVAL_STEPS.findIndex(s => s.id === state.currentStep)) + 1 : 0
+
+  // The arrival ritual's quiet mono step counter (cream ground, no phase
+  // bar, no chunky progress bar) now covers the member and advisor flows
+  // too — all three are short, linear rituals rather than the owner's
+  // multi-phase build-out, so they share the same quiet chrome.
+  const isQuietFlow = isArrivalFlow || isMemberFlow || isAdvisorFlow
+  const quietFlowSteps = isArrivalFlow ? ARRIVAL_STEPS : isMemberFlow ? MEMBER_ONBOARDING_STEPS : isAdvisorFlow ? ADVISOR_ONBOARDING_STEPS : []
+  const quietStepNumber = isQuietFlow ? Math.max(0, quietFlowSteps.findIndex(s => s.id === state.currentStep)) + 1 : 0
 
   return (
     <div className="fixed inset-0 z-[60] overflow-y-auto" role="dialog" aria-label="Onboarding wizard">
       {/* Full-screen ground, fixed so it stays during scroll. It is opaque
           on purpose: it does the scrim's job of screening the app behind
-          the wizard. The arrival ritual sits on the studio's own paper
-          cream; the older flows keep the gallery-grey background. */}
-      <div className={cn('fixed inset-0 z-0', isArrivalFlow ? 'bg-studio-cream' : 'bg-background')} />
+          the wizard. The quiet rituals (arrival, member, advisor) sit on
+          the studio's own paper cream; the owner and fast-track flows
+          keep the gallery-grey background. */}
+      <div className={cn('fixed inset-0 z-0', isQuietFlow ? 'bg-studio-cream' : 'bg-background')} />
 
-      {/* Top bar — arrival gets a quiet mono step counter, no phase bar and
-          no chunky progress bar; the other flows keep the phase chrome. */}
-      {!isWelcome && isArrivalFlow && (
+      {/* Top bar — the quiet flows get a mono step counter, no phase bar and
+          no chunky progress bar; the owner/fast-track flows keep the phase
+          chrome. */}
+      {!isWelcome && isQuietFlow && (
         <div className="sticky top-0 z-10 bg-studio-cream/95 backdrop-blur-sm border-b border-studio-hairline px-4 py-3">
           <div className="max-w-2xl mx-auto flex items-center justify-between">
             <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-studio-dim">
-              {arrivalStepNumber} of {ARRIVAL_STEPS.length}
+              {quietStepNumber} of {quietFlowSteps.length}
             </span>
             <div className="flex items-center gap-1">
               {canGoBack && (
@@ -201,7 +210,7 @@ export function OnboardingWizard() {
           </div>
         </div>
       )}
-      {!isWelcome && !isArrivalFlow && (
+      {!isWelcome && !isQuietFlow && (
         <div className="sticky top-0 z-10 bg-card/95 backdrop-blur-sm border-b border-border px-4 py-3">
           <div className="max-w-2xl mx-auto">
             {/* Phase indicators */}
@@ -301,7 +310,7 @@ export function OnboardingWizard() {
             variant="ghost"
             size="sm"
             onClick={dismissOnboarding}
-            className={cn('text-muted-foreground hover:text-foreground', isArrivalFlow ? 'hover:bg-studio-ink/5' : 'hover:bg-secondary')}
+            className={cn('text-muted-foreground hover:text-foreground', isQuietFlow ? 'hover:bg-studio-ink/5' : 'hover:bg-secondary')}
             aria-label="Skip onboarding"
           >
             <X className="w-4 h-4 mr-1" />

@@ -2,10 +2,10 @@
 
 import { useState, useMemo } from 'react'
 import { useOnboarding, type UserRole, type BeverageType, type CompanySize, type PrimaryGoal } from '@/lib/onboarding'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { PillButton } from '@/components/studio'
 
 const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
   { value: 'sustainability_manager', label: 'Sustainability Manager' },
@@ -151,7 +151,7 @@ export function PersonalizationStep() {
 
         {/* Question: Role */}
         {currentSubStep === 'role' && (
-          <div className="space-y-4 animate-in fade-in duration-300 rounded-[6px] border border-border bg-card p-6">
+          <div className="space-y-4 animate-in fade-in duration-300 rounded-[6px] border border-studio-hairline bg-studio-cream p-6">
             <h3 className="text-xl font-display font-bold text-foreground text-center">
               What&apos;s your role?
             </h3>
@@ -164,7 +164,7 @@ export function PersonalizationStep() {
                     'w-full text-left px-4 py-3 rounded-[6px] border transition-all',
                     role === opt.value
                       ? 'border-studio-forest bg-secondary text-foreground'
-                      : 'border-border bg-card hover:border-foreground/30 text-foreground'
+                      : 'border-studio-hairline bg-studio-cream hover:border-foreground/30 text-foreground'
                   )}
                 >
                   {opt.label}
@@ -187,7 +187,7 @@ export function PersonalizationStep() {
 
         {/* Question: Beverage type (owner only) */}
         {currentSubStep === 'beverage' && (
-          <div className="space-y-4 animate-in fade-in duration-300 rounded-[6px] border border-border bg-card p-6">
+          <div className="space-y-4 animate-in fade-in duration-300 rounded-[6px] border border-studio-hairline bg-studio-cream p-6">
             <h3 className="text-xl font-display font-bold text-foreground text-center">
               What do you produce?
             </h3>
@@ -203,7 +203,7 @@ export function PersonalizationStep() {
                     'w-full text-left px-4 py-3 rounded-[6px] border transition-all',
                     beverageTypes.includes(opt.value)
                       ? 'border-studio-forest bg-secondary text-foreground'
-                      : 'border-border bg-card hover:border-foreground/30 text-foreground'
+                      : 'border-studio-hairline bg-studio-cream hover:border-foreground/30 text-foreground'
                   )}
                 >
                   {opt.label}
@@ -226,7 +226,7 @@ export function PersonalizationStep() {
 
         {/* Question: Company size (owner only) */}
         {currentSubStep === 'size' && (
-          <div className="space-y-4 animate-in fade-in duration-300 rounded-[6px] border border-border bg-card p-6">
+          <div className="space-y-4 animate-in fade-in duration-300 rounded-[6px] border border-studio-hairline bg-studio-cream p-6">
             <h3 className="text-xl font-display font-bold text-foreground text-center">
               Company size?
             </h3>
@@ -239,7 +239,7 @@ export function PersonalizationStep() {
                     'w-full text-left px-4 py-3 rounded-[6px] border transition-all',
                     companySize === opt.value
                       ? 'border-studio-forest bg-secondary text-foreground'
-                      : 'border-border bg-card hover:border-foreground/30 text-foreground'
+                      : 'border-studio-hairline bg-studio-cream hover:border-foreground/30 text-foreground'
                   )}
                 >
                   {opt.label}
@@ -254,7 +254,7 @@ export function PersonalizationStep() {
 
         {/* Question: Primary goal */}
         {currentSubStep === 'goals' && (
-          <div className="space-y-4 animate-in fade-in duration-300 rounded-[6px] border border-border bg-card p-6">
+          <div className="space-y-4 animate-in fade-in duration-300 rounded-[6px] border border-studio-hairline bg-studio-cream p-6">
             <h3 className="text-xl font-display font-bold text-foreground text-center">
               Your primary goal?
             </h3>
@@ -270,7 +270,7 @@ export function PersonalizationStep() {
                     'w-full text-left px-4 py-3 rounded-[6px] border transition-all',
                     primaryGoals.includes(opt.value)
                       ? 'border-studio-forest bg-secondary text-foreground'
-                      : 'border-border bg-card hover:border-foreground/30 text-foreground',
+                      : 'border-studio-hairline bg-studio-cream hover:border-foreground/30 text-foreground',
                     primaryGoals.length >= 2 && !primaryGoals.includes(opt.value)
                       ? 'opacity-50 cursor-not-allowed'
                       : ''
@@ -289,18 +289,14 @@ export function PersonalizationStep() {
 
         {/* Navigation */}
         <div className="flex items-center justify-between pt-4">
-          <Button variant="ghost" onClick={handleBack} className="text-muted-foreground hover:text-foreground hover:bg-secondary">
-            <ArrowLeft className="w-4 h-4 mr-2" />
+          <PillButton variant="ghost" size="md" onClick={handleBack}>
+            <ArrowLeft className="w-4 h-4" />
             Back
-          </Button>
-          <Button
-            onClick={handleNext}
-            disabled={!canProceed()}
-            className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-[6px]"
-          >
+          </PillButton>
+          <PillButton variant="ink" size="md" onClick={handleNext} disabled={!canProceed()}>
             {subStepIndex === totalSubSteps - 1 ? 'Continue' : 'Next'}
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </Button>
+            <ArrowRight className="w-4 h-4" />
+          </PillButton>
         </div>
       </div>
     </div>

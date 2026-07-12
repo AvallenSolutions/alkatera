@@ -1,8 +1,8 @@
 'use client'
 
 import { useOnboarding } from '@/lib/onboarding'
-import { Button } from '@/components/ui/button'
-import { Dog, CheckCircle2, ArrowLeft } from 'lucide-react'
+import { Dog, CheckCircle2, ArrowLeft, ArrowRight } from 'lucide-react'
+import { PillButton } from '@/components/studio'
 
 export function MeetRosa() {
   const { completeStep, previousStep } = useOnboarding()
@@ -17,7 +17,7 @@ export function MeetRosa() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-8 px-4 animate-in fade-in duration-500">
       {/* Rosa avatar */}
-      <div className="w-20 h-20 rounded-[6px] border border-border bg-card flex items-center justify-center">
+      <div className="w-20 h-20 rounded-[6px] border border-studio-hairline bg-studio-cream flex items-center justify-center">
         <Dog className="w-10 h-10 text-studio-forest" />
       </div>
 
@@ -33,7 +33,7 @@ export function MeetRosa() {
         </p>
       </div>
 
-      <div className="rounded-[6px] border border-border bg-card p-6 space-y-3 text-left max-w-sm w-full">
+      <div className="rounded-[6px] border border-studio-hairline bg-studio-cream p-6 space-y-3 text-left max-w-sm w-full">
         {capabilities.map((capability) => (
           <div
             key={capability}
@@ -50,21 +50,14 @@ export function MeetRosa() {
       </p>
 
       <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          onClick={previousStep}
-          className="text-muted-foreground hover:text-foreground hover:bg-secondary"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
+        <PillButton variant="ghost" size="md" onClick={previousStep}>
+          <ArrowLeft className="w-4 h-4" />
           Back
-        </Button>
-        <Button
-          size="lg"
-          onClick={completeStep}
-          className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium text-base px-8 rounded-[6px]"
-        >
+        </PillButton>
+        <PillButton variant="ink" size="md" onClick={completeStep} className="px-6">
           Let&apos;s go!
-        </Button>
+          <ArrowRight className="w-4 h-4" />
+        </PillButton>
       </div>
     </div>
   )

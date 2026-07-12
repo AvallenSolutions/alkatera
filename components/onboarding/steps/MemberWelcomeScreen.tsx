@@ -2,9 +2,8 @@
 
 import { useOnboarding } from '@/lib/onboarding'
 import { useOrganization } from '@/lib/organizationContext'
-import { Button } from '@/components/ui/button'
-import { Users } from 'lucide-react'
-import { Eyebrow } from '@/components/studio'
+import { Users, ArrowRight } from 'lucide-react'
+import { Eyebrow, PillButton } from '@/components/studio'
 
 export function MemberWelcomeScreen() {
   const { completeStep } = useOnboarding()
@@ -15,12 +14,12 @@ export function MemberWelcomeScreen() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-8 px-4 animate-in fade-in duration-700">
       {/* Icon area */}
-      <div className="w-20 h-20 rounded-[6px] bg-card border border-border flex items-center justify-center">
+      <div className="w-20 h-20 rounded-[6px] bg-studio-cream border border-studio-hairline flex items-center justify-center">
         <Users className="w-10 h-10 text-studio-forest" />
       </div>
 
       <div className="space-y-4 max-w-md">
-        <Eyebrow tone="inherit" className="text-studio-forest">Member onboarding</Eyebrow>
+        <Eyebrow tone="dim" className="justify-center flex">Member onboarding</Eyebrow>
         <h1 className="text-3xl md:text-4xl font-display font-bold tracking-tight text-foreground">
           Welcome to {orgName}.
         </h1>
@@ -33,13 +32,10 @@ export function MemberWelcomeScreen() {
         We&apos;ll give you a quick tour of the platform and personalise your experience. This will only take a couple of minutes.
       </p>
 
-      <Button
-        size="lg"
-        onClick={completeStep}
-        className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium text-base px-8 rounded-full"
-      >
+      <PillButton onClick={completeStep} variant="ink" size="md" className="px-6">
         Let&apos;s Go
-      </Button>
+        <ArrowRight className="h-4 w-4" />
+      </PillButton>
     </div>
   )
 }

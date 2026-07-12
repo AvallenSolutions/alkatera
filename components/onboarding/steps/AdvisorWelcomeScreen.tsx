@@ -2,9 +2,8 @@
 
 import { useOnboarding } from '@/lib/onboarding'
 import { useOrganization } from '@/lib/organizationContext'
-import { Button } from '@/components/ui/button'
-import { Briefcase } from 'lucide-react'
-import { Eyebrow } from '@/components/studio'
+import { Briefcase, ArrowRight } from 'lucide-react'
+import { Eyebrow, PillButton } from '@/components/studio'
 
 export function AdvisorWelcomeScreen() {
   const { completeStep } = useOnboarding()
@@ -15,12 +14,12 @@ export function AdvisorWelcomeScreen() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-8 px-4 animate-in fade-in duration-700">
       {/* Icon area */}
-      <div className="w-20 h-20 rounded-[6px] bg-card border border-border flex items-center justify-center">
+      <div className="w-20 h-20 rounded-[6px] bg-studio-cream border border-studio-hairline flex items-center justify-center">
         <Briefcase className="w-10 h-10 text-studio-forest" />
       </div>
 
       <div className="space-y-4 max-w-md">
-        <Eyebrow tone="inherit" className="text-studio-forest">Advisor onboarding</Eyebrow>
+        <Eyebrow tone="dim" className="justify-center flex">Advisor onboarding</Eyebrow>
         <h1 className="text-3xl md:text-4xl font-display font-bold tracking-tight text-foreground">
           You&apos;re advising {orgName}.
         </h1>
@@ -36,13 +35,10 @@ export function AdvisorWelcomeScreen() {
         helping. It takes less than a minute.
       </p>
 
-      <Button
-        size="lg"
-        onClick={completeStep}
-        className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium text-base px-8 rounded-full"
-      >
+      <PillButton onClick={completeStep} variant="ink" size="md" className="px-6">
         Get Started
-      </Button>
+        <ArrowRight className="h-4 w-4" />
+      </PillButton>
     </div>
   )
 }

@@ -2,9 +2,8 @@
 
 import { useOnboarding } from '@/lib/onboarding'
 import { useOrganization } from '@/lib/organizationContext'
-import { Button } from '@/components/ui/button'
 import { ArrowLeft, ArrowRight, Building2, MapPin, Factory, Users2, Grape } from 'lucide-react'
-import { Eyebrow } from '@/components/studio'
+import { Eyebrow, PillButton } from '@/components/studio'
 
 const PRODUCT_TYPE_LABELS: Record<string, string> = {
   beer: 'Beer',
@@ -42,7 +41,7 @@ export function MemberOrgOverview() {
     <div className="flex flex-col items-center min-h-[60vh] px-4 animate-in fade-in duration-300">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-2">
-          <Eyebrow tone="inherit" className="text-studio-forest">Your organisation</Eyebrow>
+          <Eyebrow tone="dim" className="justify-center flex">Your organisation</Eyebrow>
           <h3 className="text-xl font-display font-bold tracking-tight text-foreground">
             Your sustainability hub.
           </h3>
@@ -52,7 +51,7 @@ export function MemberOrgOverview() {
         </div>
 
         {/* Org details card */}
-        <div className="bg-card border border-border rounded-[6px] p-6 space-y-4">
+        <div className="bg-studio-cream border border-studio-hairline rounded-[6px] p-6 space-y-4">
           {details.map((detail) => (
             <div key={detail.label} className="flex items-start gap-3">
               <div className="w-8 h-8 rounded-[6px] bg-secondary flex items-center justify-center flex-shrink-0">
@@ -72,17 +71,14 @@ export function MemberOrgOverview() {
 
         {/* Navigation */}
         <div className="flex items-center justify-between pt-4">
-          <Button variant="ghost" onClick={previousStep} className="text-muted-foreground hover:text-foreground hover:bg-secondary">
-            <ArrowLeft className="w-4 h-4 mr-2" />
+          <PillButton variant="ghost" size="md" onClick={previousStep}>
+            <ArrowLeft className="w-4 h-4" />
             Back
-          </Button>
-          <Button
-            onClick={completeStep}
-            className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-full"
-          >
+          </PillButton>
+          <PillButton variant="ink" size="md" onClick={completeStep}>
             Continue
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </Button>
+            <ArrowRight className="w-4 h-4" />
+          </PillButton>
         </div>
       </div>
     </div>
